@@ -13,13 +13,12 @@ where
 
 import BlockApps.Logging
 import Blockchain.DB.CodeDB
-import Blockchain.DB.StorageDB
+--import Blockchain.DB.StorageDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.EthConf
 import Blockchain.KafkaTopics
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ExtendedWord
 import Control.Monad ((<=<))
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Composable.Kafka
@@ -42,7 +41,6 @@ runJsonRpcCommand ::
   ( MonadIO m,
     MonadLogger m,
     HasCodeDB m,
-    HasStorageDB m,
     (Address `A.Alters` AddressState) m
   ) =>
   JsonRpcCommand ->
@@ -54,7 +52,6 @@ runJsonRpcCommand =
 runJsonRpcCommand' ::
   ( MonadLogger m,
     HasCodeDB m,
-    HasStorageDB m,
     (Address `A.Alters` AddressState) m
   ) =>
   JsonRpcCommand ->
@@ -83,9 +80,12 @@ runJsonRpcCommand' c@JRCGetTransactionCount {jrcAddress = address, jrcId = id} =
       <$> A.lookupWithDefault (A.Proxy @AddressState) address
   $logInfoS "runJsonRpcCommand'.JRCGetTransactionCount" $ T.pack response
   return (id, BC.pack response)
+{-
 runJsonRpcCommand' c@JRCGetStorageAt {jrcAddress = address, jrcKey = key, jrcId = id} = do
   $logInfoS "runJsonRpcCommand'.JRCGetStorageAt" . T.pack $ "running command: " ++ show c
   value <- getStorageKeyVal' address $ bytesToWord256 $ key
   $logInfoS "runJsonRpcCommand'.JRCGetStorageAt" . T.pack $ show value
   return (id, word256ToBytes value)
+-}
+runJsonRpcCommand' JRCGetStorageAt {} = error "unsupported RPC command call"
 runJsonRpcCommand' (JRCCall _ _ _) = error "unsupported RPC command call"

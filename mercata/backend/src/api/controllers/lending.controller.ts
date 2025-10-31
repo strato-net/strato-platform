@@ -20,6 +20,8 @@ import {
   setDebtCeilings as setDebtCeilingsService,
   borrowMax,
   withdrawCollateralMax,
+  pauseLendingPool,
+  unpauseLendingPool,
 } from "../services/lending.service";
 import {
   validateDepositLiquidityArgs,
@@ -357,6 +359,40 @@ class LendingController {
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
+    }
+  }
+
+  static async pausePool(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress } = req;
+      validateUserAddress(userAddress);
+
+      const result = await pauseLendingPool(accessToken, userAddress as string);
+      res.status(RestStatus.OK).json(result);
+      return next();
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async unpausePool(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress } = req;
+      validateUserAddress(userAddress);
+
+      const result = await unpauseLendingPool(accessToken, userAddress as string);
+      res.status(RestStatus.OK).json(result);
+      return next();
+    } catch (error) {
+      return next(error);
     }
   }
 }

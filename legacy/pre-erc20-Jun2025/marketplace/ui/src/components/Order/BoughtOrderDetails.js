@@ -102,7 +102,7 @@ const BoughtOrderDetails = ({ user, users }) => {
       setcomment(orderDetails.order.comments);
       const orderQuantities = orderDetails.order.quantities
         ? orderDetails.order.quantities
-        : orderDetails.order['BlockApps-Mercata-Order-quantities'].map(
+        : orderDetails.order['BlockApps-Order-quantities'].map(
             (item) => item.value
           );
       let items = [];
@@ -115,8 +115,8 @@ const BoughtOrderDetails = ({ user, users }) => {
           chainId: prod.chainId,
           key: prod.address,
           productImage:
-            prod['BlockApps-Mercata-Asset-images'].length > 0
-              ? prod['BlockApps-Mercata-Asset-images'][0].value
+            prod['BlockApps-Asset-images'].length > 0
+              ? prod['BlockApps-Asset-images'][0].value
               : image_placeholder,
           productName: prod,
           name: prod.name,

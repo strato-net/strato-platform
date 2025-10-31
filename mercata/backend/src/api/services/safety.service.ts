@@ -1,7 +1,8 @@
 import { strato, cirrus, bloc } from "../../utils/mercataApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
-import { StratoPaths, constants, rewardsChef } from "../../config/constants";
+import { StratoPaths, constants } from "../../config/constants";
+import * as config from "../../config/config";
 import { extractContractName } from "../../utils/utils";
 import { FunctionInput } from "../../types/types";
 import { getTokenBalanceForUser } from "./tokens.service";
@@ -86,7 +87,7 @@ export const getSafetyModuleInfo = async (
       // Query SafetyModule contract configuration
       const response1 = await cirrus.get(
         accessToken,
-        `/BlockApps-Mercata-SafetyModule`,
+        `/BlockApps-SafetyModule`,
         {
           params: {
             address: `eq.${safetyModuleAddress}`,
@@ -104,11 +105,11 @@ export const getSafetyModuleInfo = async (
       // Use the nested relationship pattern like other services
       const response2 = await cirrus.get(
         accessToken,
-        `/BlockApps-Mercata-Token`,
+        `/BlockApps-Token`,
         {
           params: {
             address: `eq.${safetyModuleConfig.asset.address}`,
-            select: `address,balances:BlockApps-Mercata-Token-_balances(user:key,balance:value::text)`,
+            select: `address,balances:BlockApps-Token-_balances(user:key,balance:value::text)`,
             "balances.key": `eq.${safetyModuleAddress}`
           }
         }
@@ -123,7 +124,7 @@ export const getSafetyModuleInfo = async (
       // Query sToken total supply (this represents totalShares)
       const response3 = await cirrus.get(
         accessToken,
-        `/BlockApps-Mercata-Token`,
+        `/BlockApps-Token`,
         {
           params: {
             address: `eq.${sTokenAddress}`,
@@ -140,11 +141,11 @@ export const getSafetyModuleInfo = async (
       // Query user's sUSDST token balance using nested relationship pattern
       const response4 = await cirrus.get(
         accessToken,
-        `/BlockApps-Mercata-Token`,
+        `/BlockApps-Token`,
         {
           params: {
             address: `eq.${sTokenAddress}`,
-            select: `address,balances:BlockApps-Mercata-Token-_balances(user:key,balance:value::text)`,
+            select: `address,balances:BlockApps-Token-_balances(user:key,balance:value::text)`,
             "balances.key": `eq.${userAddress.toLowerCase()}`
           }
         }
@@ -159,7 +160,7 @@ export const getSafetyModuleInfo = async (
       // Query user's cooldown start from SafetyModule
       const response5 = await cirrus.get(
         accessToken,
-        `/BlockApps-Mercata-SafetyModule-cooldownStart`,
+        `/BlockApps-SafetyModule-cooldownStart`,
         {
           params: {
             key: `eq.${userAddress.toLowerCase()}`,
@@ -191,11 +192,11 @@ export const getSafetyModuleInfo = async (
 
     // Get user's staked sUSDST balance from RewardsChef
     // Find the pool for this sToken
-    const poolForSToken = await findPoolByLpToken(accessToken, rewardsChef, sTokenAddress);
+    const poolForSToken = await findPoolByLpToken(accessToken, config.rewardsChef, sTokenAddress);
 
     // If no pool found, staked balance is 0
     const stakedSTokenBalance = poolForSToken
-      ? await getStakedBalance(accessToken, rewardsChef, poolForSToken.poolIdx, userAddress)
+      ? await getStakedBalance(accessToken, config.rewardsChef, poolForSToken.poolIdx, userAddress)
       : "0";
 
     // Calculate exchange rate (assets per share)
@@ -338,7 +339,7 @@ export const stakeSafetyModule = async (
 
     if (BigInt(newlyMintedAmount) > 0n) {
       // Find the pool for this sToken
-      const poolForSToken = await findPoolByLpToken(accessToken, rewardsChef, sTokenAddress);
+      const poolForSToken = await findPoolByLpToken(accessToken, config.rewardsChef, sTokenAddress);
 
       if (!poolForSToken) {
         throw new Error(`No RewardsChef pool found for sToken ${sTokenAddress}. Cannot stake after deposit.`);
@@ -352,12 +353,12 @@ export const stakeSafetyModule = async (
           contractName: extractContractName(Token),
           contractAddress: sTokenAddress,
           method: "approve",
-          args: { spender: rewardsChef, value: newlyMintedAmount },
+          args: { spender: config.rewardsChef, value: newlyMintedAmount },
         },
         // Then deposit into RewardsChef
         {
           contractName: "RewardsChef",
-          contractAddress: rewardsChef,
+          contractAddress: config.rewardsChef,
           method: "deposit",
           args: { _pid: poolIdx, _amount: newlyMintedAmount },
         },
@@ -421,7 +422,7 @@ export const redeemSafetyModule = async (
       const amountToUnstake = requiredSTokenWei - unstakedSTokenWei;
 
       // Find the pool for this sToken
-      const poolForSToken = await findPoolByLpToken(accessToken, rewardsChef, sTokenAddress);
+      const poolForSToken = await findPoolByLpToken(accessToken, config.rewardsChef, sTokenAddress);
 
       if (!poolForSToken) {
         throw new Error(`No RewardsChef pool found for sToken ${sTokenAddress}. Cannot unstake before redemption.`);
@@ -432,7 +433,7 @@ export const redeemSafetyModule = async (
       // Build unstaking transaction
       const unstakeTx = await buildFunctionTx({
         contractName: "RewardsChef",
-        contractAddress: rewardsChef,
+        contractAddress: config.rewardsChef,
         method: "withdraw",
         args: {
           _pid: poolIdx,

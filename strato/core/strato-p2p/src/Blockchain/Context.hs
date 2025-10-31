@@ -46,8 +46,6 @@ module Blockchain.Context
     , shouldSendToPeer
     , withActivePeer
     , withCertifiedPeer
-    , getPeerX509
-    , getMyX509
     ) where
 
 import           Conduit
@@ -75,13 +73,11 @@ import           Data.Time.Clock
 import           GHC.Exts                                (Constraint)
 
 import           BlockApps.Logging
-import           BlockApps.X509.Certificate
 
 import           Blockchain.BlockDB
 import           Blockchain.Blockstanbul                 (WireMessage)
 import           Blockchain.Data.Block
 import           Blockchain.Data.BlockHeader
-import           Blockchain.Data.PubKey
 import           Blockchain.DB.DetailsDB
 import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
@@ -562,19 +558,6 @@ getPeerByIP ::
   Host ->
   m (Maybe PPeer)
 getPeerByIP = A.select (Proxy @PPeer)
-
-getPeerX509 ::
-  A.Selectable Address X509CertInfoState m =>
-  PPeer ->
-  m (Maybe X509CertInfoState)
-getPeerX509 peer = case pPeerPubkey peer of
-  Nothing -> pure Nothing
-  Just pk -> A.select (Proxy @X509CertInfoState) . fromPublicKey . pointToSecPubKey $ pk
-
-getMyX509 ::
-  (A.Selectable Address X509CertInfoState m, Mod.Accessible PublicKey m) =>
-  m (Maybe X509CertInfoState)
-getMyX509 = Mod.access (Mod.Proxy @PublicKey) >>= A.select (Proxy @X509CertInfoState) . fromPublicKey
 
 setPeerAddrIfUnset :: Mod.Modifiable PeerAddress m => Address -> m ()
 setPeerAddrIfUnset addr = Mod.modify_ (Proxy @PeerAddress) $ pure . withPeerAddress (<|> Just addr)

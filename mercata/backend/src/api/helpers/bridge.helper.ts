@@ -11,21 +11,21 @@ interface QueryConfig {
 const QUERY_CONFIGS: Record<string, QueryConfig> = {
   withdrawal: {
     tableName: `${constants.MercataBridge}-withdrawals`,
-    selectFields: "withdrawalId:key,WithdrawalInfo:value,block_timestamp,transaction_hash",
+    selectFields: "withdrawalId:key,WithdrawalInfo:value,block_timestamp",
     countField: "count()",
   },
   deposit: {
     tableName: `${constants.MercataBridge}-deposits`,
-    selectFields: "externalChainId:key,externalTxHash:key2,DepositInfo:value,block_timestamp,transaction_hash",
+    selectFields: "externalChainId:key,externalTxHash:key2,DepositInfo:value,block_timestamp",
     countField: "count()",
   }
 };
 
 export function buildQueryParams(
   rawParams: Record<string, string | undefined>,
-  userAddress?: string,
-  excludeFields: string[] = [],
-  queryType?: 'withdrawal' | 'deposit'
+  userAddress: string,
+  excludeFields: string[],
+  queryType: 'withdrawal' | 'deposit'
 ): Record<string, string> {
   const baseParams: Record<string, string> = {
     address: `eq.${constants.mercataBridge}`,
@@ -36,35 +36,31 @@ export function buildQueryParams(
     )
   };
 
-  if (userAddress) {
-    // For withdrawals, use stratoSender; for deposits, use stratoRecipient
-    const userField = queryType === 'deposit' ? 'stratoRecipient' : 'stratoSender';
-    baseParams[`value->>${userField}`] = `eq.${userAddress}`;
-  }
+  // For withdrawals, use stratoSender; for deposits, use stratoRecipient
+  const userField = queryType === 'deposit' ? 'stratoRecipient' : 'stratoSender';
+  baseParams[`value->>${userField}`] = `eq.${userAddress}`;
 
   return baseParams;
 }
 
 export function enrichTransactionData(
   results: any[],
-  bridgeAssets: Map<string, any>,
+  externalAssets: Map<string, any>,
   type: 'withdrawal' | 'deposit'
 ) {
   return results.map((result: any) => {    
-    const token = type === 'withdrawal'
-      ? result.WithdrawalInfo?.stratoToken
-      : result.DepositInfo?.stratoToken;
+    const externalToken = type === 'withdrawal'
+      ? result.WithdrawalInfo?.externalToken
+      : result.DepositInfo?.externalToken;
 
-    const matchingAsset = bridgeAssets.get(token);
+    const matchingAsset = externalAssets.get(externalToken);
 
     return {
       ...result,
-      stratoToken: matchingAsset?.stratoToken || "-",
       stratoTokenName: matchingAsset?.stratoTokenName || "-",
       stratoTokenSymbol: matchingAsset?.stratoTokenSymbol || "-",
       externalName: matchingAsset?.externalName || "-",
       externalSymbol: matchingAsset?.externalSymbol || "-",
-      externalToken: matchingAsset?.externalToken || "-"
     };
   });
 }
@@ -87,19 +83,17 @@ export async function executeParallelQueries(
 }
 
 // Bridge-specific helper function to enrich assets with token metadata
-export function enrichAssetsWithTokenData(assets: any[], tokenMap: Map<string, any>, keyField: string) {
+export function enrichAssetsWithTokenData(assets: any[], tokenMap: Map<string, any>) {
   return assets.map((asset: any) => {
-    const tokenKey = asset[keyField];
-    const info = tokenMap.get(tokenKey);
-    if (asset.AssetInfo?.externalToken) {
+    const info = tokenMap.get(asset.AssetInfo.stratoToken);
+    if (asset?.externalToken) {
       asset.AssetInfo.externalToken = ensureHexPrefix(asset.AssetInfo.externalToken);
     }
     return {
-      [keyField]: tokenKey,
+      ...asset.AssetInfo,
       stratoTokenName: info?.name || "",
       stratoTokenSymbol: info?.symbol || "",
-      ...asset.AssetInfo,
-      externalChainId: asset.externalChainId
+      id: `${asset.externalToken}-${asset.externalChainId}`
     };
   });
 }

@@ -26,46 +26,30 @@ where
 import Bloc.Server.Utils
 import BlockApps.Logging
 import qualified BlockApps.SolidVMStorageDecoder as SolidVM
-import qualified BlockApps.Solidity.Contract as OLD
 import BlockApps.Solidity.Value
-import qualified BlockApps.SolidityVarReader as SVR
-import Blockchain.Data.AddressStateDB
 import Blockchain.Data.TransactionResult
 import Blockchain.Slipstream.Data.Action
 import qualified Blockchain.Slipstream.Events as E
 import Blockchain.Slipstream.OutputData
-import Blockchain.Slipstream.Metrics (recordAction)
-import Blockchain.Slipstream.QueryFormatHelper
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Event
-import Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Stream.Action as Action
 import qualified Blockchain.Stream.VMEvent as VME
 import Conduit
-import Control.Lens ((^.), (<&>))
+import Control.Lens ((^.))
 import Control.Monad (forM, forM_, unless, when)
 import Data.Either (lefts, rights)
 import Data.Foldable (toList)
 import Data.Function
 import qualified Data.IntMap as I
-import qualified Data.Map.Ordered as OMap
-import Data.List (sortOn)
 import qualified Data.Map as Map
 import Data.Maybe
-import Data.Ord (Down (..))
 import Data.Source
 import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Traversable (for)
 import SolidVM.Model.CodeCollection hiding (contractName)
 import qualified SolidVM.Model.Type as SVMType
-import Text.Format
 import Text.Tools (boringBox, multilineLog)
 import Prelude hiding (lookup)
-
-diffNull :: Action.DataDiff -> Bool
-diffNull (Action.EVMDiff m) = Map.null m
-diffNull (Action.SolidVMDiff m) = Map.null m
 
 data BatchedInserts = BatchedInserts
   { indexInsert :: E.ProcessedContract
@@ -74,64 +58,42 @@ data BatchedInserts = BatchedInserts
   deriving (Show)
 
 matters :: AggregateAction -> Bool
-matters AggregateAction {..} =
-  (actionType == Action.Create || (not $ diffNull actionStorage))
-    && (codePtrToSHA actionCodeHash /= emptyHash)
+matters AggregateAction {} = True -- codePtrToSHA actionCodeHash /= emptyHash
 
 
 splitActions :: [AggregateAction] -> [(Address, [AggregateAction])]
 splitActions = partitionWith actionAddress
 
-data ABIID = ABIID
-  { aiName :: Text,
-    aiChain :: Text
-  }
-  deriving (Eq, Show)
-
 processedContract ::
-  ABIID ->
   Map.Map Text Value ->
   AggregateAction ->
   E.ProcessedContract
-processedContract ABIID {..} state AggregateAction {..} =
+processedContract state AggregateAction {..} =
   E.ProcessedContract
     { address = actionAddress,
-      codehash = actionCodeHash,
-      creator = actionCreator,
-      cc_creator = actionCCCreator,
-      root = actionRoot,
-      application = actionApplication,
-      contractName = aiName,
-      chain = aiChain,
       contractData = state,
       blockHash = actionBlockHash,
       blockTimestamp = actionBlockTimestamp,
-      blockNumber = actionBlockNumber,
-      transactionHash = actionTxHash,
-      transactionSender = actionTxSender
+      blockNumber = actionBlockNumber
     }
 
 rowToInsert ::
-  ABIID ->
   AggregateAction ->
-  OLD.Contract ->
   E.ProcessedContract
-rowToInsert abiid row cont =
+rowToInsert row =
   let newState = case actionStorage row of
-        Action.EVMDiff mp -> SVR.decodeCacheValues cont (flip Map.lookup mp) []
         Action.SolidVMDiff mp -> SolidVM.decodeCacheValues mp
-   in processedContract abiid (Map.fromList $ newState) row
+   in processedContract (Map.fromList $ newState) row
 
 
 rowToCollections :: AggregateAction -> Map.Map Text Value
 rowToCollections row =
   let newState = case actionStorage row of
         Action.SolidVMDiff mp -> SolidVM.decodeCacheValuesForCollections mp
-        _ -> [] 
    in Map.fromList newState
 
-processedContractToProcessedCollectionRows :: Map.Map Text Value -> AggregateAction -> ABIID -> Maybe Text -> [ProcessedCollectionRow]
-processedContractToProcessedCollectionRows state row abiid cregator =
+processedContractToProcessedCollectionRows :: Map.Map Text Value -> AggregateAction -> [ProcessedCollectionRow]
+processedContractToProcessedCollectionRows state row =
   let extractValues (ValueArrayFixed _ b) = concatMap (\(i, v') -> (\(_, ks, v) -> ("Array", (SimpleValue $ ValueInt False Nothing i):ks, v)) <$> extractValues v') $ zip [0..] b
       extractValues (ValueArrayDynamic b) = concatMap (\(i, v') -> (\(_, ks, v) -> ("Array", (SimpleValue . ValueInt False Nothing $ fromIntegral i):ks, v)) <$> extractValues v') $ I.toList b
       extractValues (ValueMapping b)      = concatMap (\(k, v') -> (\(_, ks, v) -> ("Mapping", (SimpleValue k):ks, v)) <$> extractValues v') $ Map.toList b
@@ -143,40 +105,27 @@ processedContractToProcessedCollectionRows state row abiid cregator =
             _  -> Just (a, t, ks, v)
           ) $ extractValues value
         ) $ Map.toList state
-      processRecord (n, t, ks, v) = processedCollectionRow n t row abiid cregator ks v
+      processRecord (n, t, ks, v) = processedCollectionRow n t row ks v
    in processRecord <$> recordVMs  
 
-processedCollectionRow :: Text -> Text -> AggregateAction -> ABIID -> Maybe Text -> [Value] -> Value ->  ProcessedCollectionRow
-processedCollectionRow collection ttype AggregateAction {..} ABIID {..} cregator ks v =
+processedCollectionRow :: Text -> Text -> AggregateAction -> [Value] -> Value ->  ProcessedCollectionRow
+processedCollectionRow collection ttype AggregateAction {..} ks v =
   ProcessedCollectionRow
     { address = actionAddress,
       -- codehash = actionCodeHash,
-      creator = actionCreator,
-      cc_creator = cregator,
-      root = actionRoot,
-      application = actionApplication,
-      contractname = aiName,
       eventInfo = Nothing,
       collection_name = collection,
       collection_type = ttype,
       blockHash = actionBlockHash,
       blockTimestamp = actionBlockTimestamp,
       blockNumber = actionBlockNumber,
-      transactionHash = actionTxHash,
-      transactionSender = actionTxSender,
       collectionDataKeys = ks,
       collectionDataValue = v 
     }
 
--- Prioritizing with-source actions prevents the issue where updates to contracts
--- at different addresses are lost because the schema has not been seen yet.
-withSourceFirst :: (a, [AggregateAction]) -> Down Bool
-withSourceFirst = Down . any (isJust . actionSrc) . snd
-
 parseActions :: [VME.VMEvent] -> [(Address, [AggregateAction])]
 parseActions events' =
-  sortOn withSourceFirst
-    . splitActions
+  splitActions
     . filter matters
     . concatMap (flatten)
     $ [a | VME.NewAction a <- events']
@@ -191,9 +140,7 @@ parseEvents = concatMap parseEvent
         { eventBlockHash = Action._blockHash a,
           eventBlockTimestamp = Action._blockTimestamp a,
           eventBlockNumber = Action._blockNumber a,
-          eventTxHash = Action._transactionHash a,
           eventTxSender = Action._transactionSender a,
-          eventAbstracts = maybe Map.empty Action._actionDataAbstracts . OMap.lookup (evContractAddress e) $ Action._actionData a,
           eventEvent = e, 
           eventIndex = idx
         }
@@ -206,13 +153,6 @@ getCollectionsFromContract = mapMaybe (uncurry filterAndExtract) . Map.toList . 
         extractKeys (SVMType.Array entry _)     = let (ks, v) = extractKeys entry in ((SVMType.Int Nothing Nothing):ks, v)
         extractKeys (SVMType.Mapping _ k entry) = let (ks, v) = extractKeys entry in (k:ks, v)
         extractKeys v                           = ([], v)
-
--- Function to duplicate each collection row for each parent, changing the contract name, and include the original
-duplicateForParentsAndIncludeOriginal :: [ProcessedCollectionRow] -> [(Text,Text,Text)] -> [ProcessedCollectionRow]
-duplicateForParentsAndIncludeOriginal collections parentz = concatMap duplicateForSingle collections
-  where
-    duplicateForSingle :: ProcessedCollectionRow -> [ProcessedCollectionRow]
-    duplicateForSingle row = row : [ row { creator = c, application = a, contractname = n } | (c,a,n) <- parentz ]
 
 processTheMessages ::
   ( MonadIO m
@@ -231,13 +171,13 @@ processTheMessages messages = do
       -- TODO (Dan) : would be nice if we didn't just rip events out at the top
       -- level like this
       creates =
-        [(cc, cp, cr, ap) | VME.CodeCollectionAdded cc cp cr ap _ <- messages]
+        [(cc, cr) | VME.CodeCollectionAdded cc cr <- messages]
       delegatecalls = concatMap toList
         [Action._delegatecalls a | VME.NewAction a <- messages]
       transactionResults = [tr | VME.NewTransactionResult tr <- messages]
 
-  fkeys <- mapOutput Right . outputDataDedup . fmap concat . forM creates $ \(cc, cp, cr, ap) -> do
-    $logInfoS "processTheMessages" $ "CodeCollection Added: " <> T.pack (format cp) 
+  fkeys <- mapOutput Right . outputDataDedup . fmap concat . forM creates $ \(cc, cr) -> do
+    $logInfoS "processTheMessages" $ "CodeCollection Added"
     multilineLog "processTheMessages/contracts" $ boringBox $ map show (Map.keys $ cc ^. contracts)
 
     fmap concat . forM (filter (_isContractRecord . snd) . Map.toList $ cc ^. contracts) $ \(_, c) -> do
@@ -250,8 +190,8 @@ processTheMessages messages = do
       let collectionNamesAndTypes = getCollectionsFromContract c
       $logInfoS "processTheMessages/collectionNamesAndTypes" $ T.pack $ show collectionNamesAndTypes
 
-      let nameParts@(cr', ap',  n'') = (cr, ap, T.pack $ _contractName c)
-      $logInfoS "processTheMessages/Contract Added" $ "ccreator=" <> cr' <> ", app=" <> ap' <> ", name=" <> n''
+      let nameParts@(cr', n'') = (cr, T.pack $ _contractName c)
+      $logInfoS "processTheMessages/Contract Added" $ "ccreator=" <> cr' <> ", name=" <> n''
       multilineLog "processTheMessages/fields" $ boringBox $ map (show) $ Map.toList $ fmap _varType $ c ^. storageDefs
 
       -- Create collection tables
@@ -270,41 +210,13 @@ processTheMessages messages = do
     forM changes $ \(_, actions) -> do
       forM actions $ \(row) -> do
         case actionStorage row of
-          Action.EVMDiff {} -> pure $ Left "EVM code indexing ignored"
           Action.SolidVMDiff {} -> do
-            let name = case actionCodeHash row of
-                  SolidVMCode name' _ -> name'
-                  _ -> error "internal error: contract should be SolidVM for SolidVM"
-                abiid =
-                  ABIID
-                    { aiName = T.pack name,
-                      aiChain = ""
-                    }
-                cont = error "internal error: contract should be unused for SolidVM"
-            $logInfoLS "Contract name is: " $ T.pack $ show name
-            let indexContract = rowToInsert abiid row cont
-                abstracts = actionAbstracts row
+            let indexContract = rowToInsert row
             --get columns for abstract table
-            $logInfoLS "abstractColumns" $ T.pack $ "Getting abstract columns from " ++ (show abstracts)
-            abstractColumns' <- fmap catMaybes . for (Map.toList abstracts) $ \((_, n'), (cr', ap', cols)) -> do
-                let cregator = fromMaybe cr' (actionCCCreator row)
-                    tableName = AbstractTableName cregator ap' n'
-                    tableNameText = tableNameToDoubleQuoteText tableName
-                $logDebugLS "actionCCCreator" $ T.pack (show (actionCCCreator row))
-                $logDebugLS "cregator" $ T.pack (show cregator)
-                $logInfoS "Row will be inserted into abstract table: " tableNameText
-                $logInfoS "cols: " $ T.pack (show cols)
-                
-                let result = (indexContract, tableName, (cr', ap', n'), cols)
-                $logInfoS "result: " $ T.pack (show result)
-                pure (Just result)
             $logDebugLS "History inserts are: " $ T.pack $ show indexContract
             let stateDiff = rowToCollections row
-                parents' = map (\(_,_,p ,_)-> p) abstractColumns'
-                pCollections = processedContractToProcessedCollectionRows stateDiff row abiid (actionCCCreator row) --get all collection rows to insert
-                pCollectionsWithAbstracts = duplicateForParentsAndIncludeOriginal pCollections parents'
-            recordAction row
-            pure . Right $ BatchedInserts indexContract pCollectionsWithAbstracts
+                pCollections = processedContractToProcessedCollectionRows stateDiff row --get all collection rows to insert
+            pure . Right $ BatchedInserts indexContract pCollections
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"
 
@@ -321,76 +233,12 @@ processTheMessages messages = do
 
     forM_ delegatecalls insertDelegatecall
 
-  let processedEvents = concatMap getAllEvents events'
-      processedEventArrays = concatMap aggEventToCollectionRows processedEvents
+  let processedEventArrays = concatMap aggEventToCollectionRows events'
 
   when (not (null events')) $ do
-    mapOutput Right . outputData $ pipeInsertGlobalEventTable processedEvents
+    mapOutput Right . outputData $ pipeInsertGlobalEventTable events'
     unless (null processedEventArrays) $
       mapOutput Right . outputData $ insertCollectionTable processedEventArrays
-
-  let delegateMap = Map.fromList $ (\d -> (Action._delegatecallStorageAddress d, d)) <$> delegatecalls
-      insertViews = insertsByCodeHash >>= \ins ->
-        let indexView = (\i ->
-              indexTableName
-                (E.creator i)
-                (E.application i)
-                (E.contractName i)
-              ) $ indexInsert ins
-            collViews = (\c ->
-              collectionTableName
-                (creator c)
-                (application c)
-                (contractname c)
-                (collection_name c)
-              : maybe [] (\Action.Delegatecall{..} -> [
-                  collectionTableName
-                    _delegatecallOrganization
-                    _delegatecallApplication
-                    _delegatecallContractName
-                    (collection_name c)
-                ]) (Map.lookup (address c) delegateMap)
-              ) =<< collectionInserts ins
-         in indexView : collViews
-      eventViews = (\e ->
-        eventTableName
-          (T.pack $ evContractCreator e)
-          (T.pack $ evContractApplication e)
-          (T.pack $ evContractName e)
-          (T.pack $ evName e)
-        : maybe [] (\Action.Delegatecall{..} -> [
-          eventTableName
-            _delegatecallOrganization
-            _delegatecallApplication
-            _delegatecallContractName
-            (T.pack $ evName e)
-        ]) (Map.lookup (evContractAddress e) delegateMap)
-        ) =<< eventEvent <$> processedEvents
-      eventArrViews = concat $ mapMaybe (\e -> eventInfo e <&> \(eName, _) ->
-        eventCollectionTableName
-          (creator e)
-          (application e)
-          (contractname e)
-          eName
-          (collection_name e)
-        : maybe [] (\Action.Delegatecall{..} -> [
-          eventCollectionTableName
-            _delegatecallOrganization
-            _delegatecallApplication
-            _delegatecallContractName
-            eName
-            (collection_name e)
-        ]) (Map.lookup (address e) delegateMap)
-        ) processedEventArrays
-      delegateViews = (\Action.Delegatecall{..} ->
-        indexTableName
-          _delegatecallOrganization
-          _delegatecallApplication
-          _delegatecallContractName
-        ) <$> delegatecalls
-      allViews = insertViews ++ eventViews ++ eventArrViews ++ delegateViews
-
-  _ <- mapOutput Right . outputDataDedup $ traverse refreshMaterializedView allViews
 
   when (not $ null fkeys) $ do
     $logDebugLS "processTheMessages" $ T.pack $ "Updating PostgREST schema cache for " ++ show (length fkeys) ++ " foreign keys"

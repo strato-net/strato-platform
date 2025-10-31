@@ -44,7 +44,8 @@ module SolidVM.Model.CodeCollection (
   --module SolidVM.Model.CodeCollection.Type,
   module SolidVM.Model.CodeCollection.VariableDecl,
   module SolidVM.Model.CodeCollection.Event,
-  module SolidVM.Model.CodeCollection.VarDef
+  module SolidVM.Model.CodeCollection.VarDef,
+  module SolidVM.Model.CodeCollection.Visibility
   ) where
 
 import Blockchain.SolidVM.Exception
@@ -70,6 +71,7 @@ import SolidVM.Model.CodeCollection.Statement
 --import           SolidVM.Model.CodeCollection.Type
 import SolidVM.Model.CodeCollection.VarDef
 import SolidVM.Model.CodeCollection.VariableDecl
+import SolidVM.Model.CodeCollection.Visibility
 import SolidVM.Model.SolidString
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()

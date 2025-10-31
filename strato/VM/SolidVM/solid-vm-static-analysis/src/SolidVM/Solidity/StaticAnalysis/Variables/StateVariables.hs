@@ -230,7 +230,7 @@ expressionHelper (BoolLiteral _ _) = pure []
 expressionHelper (NumberLiteral _ _ _) = pure []
 expressionHelper (DecimalLiteral _ _) = pure []
 expressionHelper (StringLiteral _ _) = pure []
-expressionHelper (AccountLiteral _ _) = pure []
+expressionHelper (AddressLiteral _ _) = pure []
 expressionHelper (TupleExpression _ es) =
   concat <$> traverse (maybe (pure []) expressionHelper) es
 expressionHelper (ArrayExpression _ es) = concat <$> traverse expressionHelper es

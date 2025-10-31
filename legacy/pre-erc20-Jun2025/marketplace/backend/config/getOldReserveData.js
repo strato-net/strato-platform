@@ -48,7 +48,7 @@ async function main() {
       }
     };
 
-    const reserves = await rest.search(token, { name: "BlockApps-Mercata-Reserve" }, reserveQuery);
+    const reserves = await rest.search(token, { name: "BlockApps-Reserve" }, reserveQuery);
     console.log(`Found ${reserves.length} reserves matching criteria.`);
 
     // 3. For each reserve, query active escrows.
@@ -63,7 +63,7 @@ async function main() {
         }
       };
 
-      const escrows = await rest.search(token, { name: "BlockApps-Mercata-Escrow" }, escrowQuery);
+      const escrows = await rest.search(token, { name: "BlockApps-Escrow" }, escrowQuery);
       console.log(`Reserve ${reserve.address} has ${escrows.length} active escrow(s).`);
 
       // Only include reserves that have at least one active escrow.

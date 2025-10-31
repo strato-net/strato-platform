@@ -24,6 +24,7 @@ export interface NetworkConfig {
  * Bridge token information
  */
 export interface BridgeToken {
+  id: string;
   stratoToken: string;           // Key: address of the STRATO token
   stratoTokenName: string;       // From TokenFactory (not in AssetInfo)
   stratoTokenSymbol: string;     // From TokenFactory (not in AssetInfo)
@@ -33,7 +34,7 @@ export interface BridgeToken {
   externalToken: string;         // Matches AssetInfo.externalToken
   externalSymbol: string;        // Matches AssetInfo.externalSymbol
   externalDecimals: string;      // Matches AssetInfo.externalDecimals
-  maxPerTx: string;              // Matches AssetInfo.maxPerTx
+  maxPerWithdrawal: string;      // Matches AssetInfo.maxPerWithdrawal
 }
 
 // ============================================================================
@@ -44,7 +45,6 @@ export interface BridgeToken {
  * Bridge transaction information
  */
 export interface BridgeTransaction {
-  transaction_hash: string;
   block_timestamp: string;
   chainId?: number;
   from: string;
@@ -90,9 +90,10 @@ export type BridgeTransactionTab = 'DepositRecorded' | 'WithdrawalInitiated' | '
  */
 export interface WithdrawalRequestParams {
   externalChainId: string;
+  externalRecipient: string;
+  externalToken: string;
   stratoToken: string;
   stratoTokenAmount: string;
-  externalRecipient: string;
 }
 
 /**
@@ -101,5 +102,4 @@ export interface WithdrawalRequestParams {
 export interface WithdrawalRequestResponse {
   status: string;
   hash: string;
-  message: string;
 }

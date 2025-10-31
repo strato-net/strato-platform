@@ -442,7 +442,7 @@ postBlocTransaction' ::
 postBlocTransaction' cacheNonce mUseWallet resolve (PostBlocTransactionRequest mAddr txs' txParams msrcs) = do
   checkIsSynced
   userRegistry <- fmap userRegistryAddress getBlocEnv
-  userRegistryHash <- fmap userRegistryCodeHash getBlocEnv
+  userRegistryHash <- keccak256ToByteString . maybe zeroHash id . userRegistryCodeHash <$> getBlocEnv
   addr <- case mAddr of
     Nothing -> fromPublicKey <$> getPub
     Just addr' -> return addr'
@@ -456,7 +456,7 @@ postBlocTransaction' cacheNonce mUseWallet resolve (PostBlocTransactionRequest m
                 ]
       userCert <- maybe (throwIO err) pure =<<
         A.select (A.Proxy @Certificate) addr
-      pure $ deriveAddressWithSalt (Just userRegistry) (certificateCommonName userCert) userRegistryHash (Just $ show [SMV.SString $ certificateCommonName userCert])
+      pure $ getNewAddressWithSalt_unsafe userRegistry (certificateCommonName userCert) userRegistryHash [SMV.SString $ certificateCommonName userCert]
     else pure addr
   let src' :: ContractPayload -> Maybe SourceMap
       src' p =
@@ -692,7 +692,11 @@ data TransactionHeader = TransactionHeader
 
 postUsersSend' ::
   ( MonadUnliftIO m,
+    HasCodeDB m,
+    A.Selectable Address AddressState m,
+    (Keccak256 `A.Selectable` SourceMap) m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
     A.Selectable Keccak256 [TransactionResult] m,
     A.Selectable TxsFilterParams [RawTransaction] m,
     m `Mod.Outputs` [IngestEvent],
@@ -723,12 +727,14 @@ postUsersSend' cacheNonce TransferParameters {..} = do
 postUsersContractSolidVM' ::
   ( MonadUnliftIO m,
     MonadLogger m,
-    A.Selectable AccountsFilterParams [AddressStateRef] m,
+    HasCodeDB m,
     A.Selectable Address AddressState m,
+    (Keccak256 `A.Selectable` SourceMap) m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
     A.Selectable Keccak256 [TransactionResult] m,
     A.Selectable TxsFilterParams [RawTransaction] m,
     m `Mod.Outputs` [IngestEvent],
-    HasCodeDB m,
     HasBlocEnv m,
     HasVault m
   ) =>
@@ -772,6 +778,8 @@ postUsersUploadListSolidVM' ::
     MonadLogger m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable Address AddressState m,
+    (Keccak256 `A.Selectable` SourceMap) m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
     A.Selectable Keccak256 [TransactionResult] m,
     A.Selectable TxsFilterParams [RawTransaction] m,
     m `Mod.Outputs` [IngestEvent],
@@ -817,8 +825,12 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters {..} = do
 
 postUsersSendList' ::
   ( MonadUnliftIO m,
+    HasCodeDB m,
+    A.Selectable Address AddressState m,
+    (Keccak256 `A.Selectable` SourceMap) m,
     MonadLogger m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
     A.Selectable Keccak256 [TransactionResult] m,
     A.Selectable TxsFilterParams [RawTransaction] m,
     m `Mod.Outputs` [IngestEvent],
@@ -1237,7 +1249,6 @@ getSolidityType _ (Xabi.String _) = Right . SimpleType $ TypeString
 getSolidityType _ (Xabi.Bytes _ b) = Right . SimpleType . TypeBytes $ fmap toInteger b
 getSolidityType _ Xabi.Bool = Right . SimpleType $ TypeBool
 getSolidityType _ Xabi.Address = Right . SimpleType $ TypeAddress
-getSolidityType _ Xabi.Account = Right . SimpleType $ TypeAccount
 getSolidityType _ (Xabi.Struct _ name) = Right $ TypeStruct name
 getSolidityType _ (Xabi.Enum _ name _) = Right $ TypeEnum name
 getSolidityType _ (Xabi.Contract name) = Right $ TypeContract name
@@ -1261,7 +1272,11 @@ getSolidityType _ Xabi.Decimal = Right . SimpleType $ TypeDecimal
 
 getResultAndRespond ::
   ( MonadUnliftIO m,
+    HasCodeDB m,
+    A.Selectable Address AddressState m,
+    (Keccak256 `A.Selectable` SourceMap) m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
     A.Selectable Keccak256 [TransactionResult] m,
     A.Selectable TxsFilterParams [RawTransaction] m,
     MonadLogger m

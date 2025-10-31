@@ -1,5 +1,6 @@
 import { strato } from "../../utils/mercataApiHelper";
-import { constants, rewardsChef as rewardsChefAddress, StratoPaths } from "../../config/constants";
+import { constants, StratoPaths } from "../../config/constants";
+import * as config from "../../config/config";
 import { getTokenBalanceForUser } from "./tokens.service";
 import * as Helpers from "../helpers/rewards/rewardsChef.helpers";
 import { pendingCataAll } from "../helpers/rewards/pending.helpers";
@@ -123,7 +124,7 @@ export const claimAll = async (
 ): Promise<{ status: string; hash: string }> => {
   const builtTx = await buildFunctionTx({
     contractName: extractContractName(RewardsChef),
-    contractAddress: rewardsChefAddress,
+    contractAddress: config.rewardsChef,
     method: "claimAll",
     args: {}
   }, userAddress, accessToken);

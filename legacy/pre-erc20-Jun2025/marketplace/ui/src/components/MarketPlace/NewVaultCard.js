@@ -105,8 +105,8 @@ const NewVaultCard = ({ reserveItem, reserve, parent = '', contextHolder }) => {
           <img
             className="h-[60px] w-[60px] object-contain rounded-md cursor-pointer"
             src={
-              reserveItem['BlockApps-Mercata-Asset-images']?.length > 0
-                ? reserveItem['BlockApps-Mercata-Asset-images'][0].value
+              reserveItem['BlockApps-Asset-images']?.length > 0
+                ? reserveItem['BlockApps-Asset-images'][0].value
                 : images_placeholder
             }
             alt={imgMeta}

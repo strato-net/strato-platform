@@ -1,19 +1,18 @@
 import { config } from "../config";
 import { execute } from "../utils/stratoHelper";
 import sendEmail from "./emailService";
-import { NonEmptyArray, Withdrawal, Deposit, SafeTransactionData } from "../types";
+import { NonEmptyArray, WithdrawalInfo, DepositArgs, ConfirmDepositArgs, SafeTransactionData } from "../types";
 import { createSafeTransactions, proposeSafeTransactions } from "./safeService";
 import { logInfo, logError } from "../utils/logger";
 import { mintVouchersForDeposits } from "./voucherService";
 
-export const depositBatch = async (deposits: NonEmptyArray<Deposit>) => {
-  const externalChainIds = deposits.map((deposit) => deposit.externalChainId);
-  const externalTxHashes = deposits.map((deposit) => deposit.externalTxHash);
-  const stratoTokens = deposits.map((deposit) => deposit.stratoToken);
-  const stratoTokenAmounts = deposits.map((deposit) => deposit.stratoTokenAmount);
-  const stratoRecipients = deposits.map((deposit) => deposit.stratoRecipient);
-  const externalSenders = deposits.map((deposit) => deposit.externalSender);
-  const mintUSDSTs = deposits.map((deposit) => deposit.mintUSDST);
+export const depositBatch = async (depositArgs: NonEmptyArray<DepositArgs>) => {
+  const externalChainIds = depositArgs.map((deposit) => deposit.externalChainId);
+  const externalSenders = depositArgs.map((deposit) => deposit.externalSender);
+  const externalTokens = depositArgs.map((deposit) => deposit.externalToken);
+  const externalTokenAmounts = depositArgs.map((deposit) => deposit.externalTokenAmount);
+  const externalTxHashes = depositArgs.map((deposit) => deposit.externalTxHash);
+  const stratoRecipients = depositArgs.map((deposit) => deposit.stratoRecipient);
 
   try {
     await execute({
@@ -23,17 +22,16 @@ export const depositBatch = async (deposits: NonEmptyArray<Deposit>) => {
       args: {
         externalChainIds,
         externalTxHashes,
-        stratoTokens,
-        stratoTokenAmounts,
+        externalTokens,
+        externalTokenAmounts,
         stratoRecipients,
         externalSenders,
-        mintUSDSTs,
       },
     });
 
     logInfo(
       "BridgeService",
-      `Successfully deposited ${deposits.length} deposits`,
+      `Successfully deposited ${depositArgs.length} deposits`,
     );
   } catch (error) {
     const errorMessage = (error as Error).message;
@@ -42,7 +40,7 @@ export const depositBatch = async (deposits: NonEmptyArray<Deposit>) => {
     if (errorMessage.includes("MB: dup key")) {
       logInfo(
         "BridgeService",
-        `Deposits already processed by another server: ${deposits.length} deposits (${externalTxHashes.join(", ")})`,
+        `Deposits already processed by another server: ${depositArgs.length} deposits (${externalTxHashes.join(", ")})`,
       );
       return; // Gracefully handle duplicate deposits
     }
@@ -52,9 +50,10 @@ export const depositBatch = async (deposits: NonEmptyArray<Deposit>) => {
   }
 };
 
-export const confirmDepositBatch = async (deposits: NonEmptyArray<Deposit>) => {
+export const confirmDepositBatch = async (deposits: NonEmptyArray<ConfirmDepositArgs>) => {
   const externalChainIds = deposits.map((deposit) => deposit.externalChainId);
   const externalTxHashes = deposits.map((deposit) => deposit.externalTxHash);
+  const stratoRecipients = deposits.map((deposit) => deposit.stratoRecipient);
 
   try {
     await execute({
@@ -72,7 +71,7 @@ export const confirmDepositBatch = async (deposits: NonEmptyArray<Deposit>) => {
       `Successfully confirmed ${deposits.length} deposits`,
     );
 
-    await mintVouchersForDeposits(deposits);
+    await mintVouchersForDeposits(stratoRecipients);
   } catch (error) {
     const errorMessage = (error as Error).message;
     
@@ -90,7 +89,7 @@ export const confirmDepositBatch = async (deposits: NonEmptyArray<Deposit>) => {
   }
 };
 
-export const reviewDepositBatch = async (deposits: NonEmptyArray<Deposit>) => {
+export const reviewDepositBatch = async (deposits: NonEmptyArray<ConfirmDepositArgs>) => {
   const externalChainIds = deposits.map((deposit) => deposit.externalChainId);
   const externalTxHashes = deposits.map((deposit) => deposit.externalTxHash);
 
@@ -127,12 +126,12 @@ export const reviewDepositBatch = async (deposits: NonEmptyArray<Deposit>) => {
 };
 
 export const confirmWithdrawalBatch = async (
-  withdrawals: NonEmptyArray<Withdrawal>,
+  withdrawals: NonEmptyArray<WithdrawalInfo>,
 ) => {
-  const transactionProposals = await createSafeTransactions(withdrawals);
+  const transactionProposals = await createSafeTransactions(withdrawals as NonEmptyArray<WithdrawalInfo>);
 
   if (transactionProposals && transactionProposals.length > 0) {
-    const withdrawalIds = withdrawals.map((w) => w.withdrawalId!);
+    const withdrawalIds = withdrawals.map((w) => w.withdrawalId);
     const custodyTxHashes = transactionProposals.map((tx) => tx.safeTxHash);
 
     try {
@@ -160,7 +159,7 @@ export const confirmWithdrawalBatch = async (
 
     const emailPromises = withdrawals.map(async (withdrawal) => {
       try {
-        await sendEmail(withdrawal.withdrawalId!);
+        await sendEmail(withdrawal.withdrawalId!, withdrawal.externalChainId);
         return "success";
       } catch (emailError) {
         logError("BridgeService", emailError as Error, {
@@ -182,25 +181,21 @@ export const confirmWithdrawalBatch = async (
 };
 
 export const finaliseWithdrawalBatch = async (
-  withdrawals: NonEmptyArray<Withdrawal>,
+  ids: NonEmptyArray<Number>,
 ) => {
-  const withdrawalIds = withdrawals.map((w) => w.withdrawalId!);
-  const custodyTxHashes = withdrawals.map((w) => w.safeTxHash!);
-
   try {
     await execute({
       contractName: "MercataBridge",
       contractAddress: config.bridge.address!,
       method: "finaliseWithdrawalBatch",
       args: {
-        ids: withdrawalIds,
-        custodyTxHashes,
+        ids,
       },
     });
 
     logInfo(
       "BridgeService",
-      `Successfully finalized ${withdrawals.length} withdrawals`,
+      `Successfully finalized ${ids.length} withdrawals`,
     );
   } catch (error) {
     const errorMessage = (error as Error).message;
@@ -209,7 +204,7 @@ export const finaliseWithdrawalBatch = async (
     if (errorMessage.includes("MB: bad state")) {
       logInfo(
         "BridgeService",
-        `Withdrawals already finalized by another server: ${withdrawals.length} withdrawals (${withdrawalIds.join(", ")})`,
+        `Withdrawals already finalized by another server: ${ids.length} withdrawals (${ids.join(", ")})`,
       );
       return; // Gracefully handle already finalized withdrawals
     }
@@ -220,9 +215,8 @@ export const finaliseWithdrawalBatch = async (
 };
 
 export const handleRejectedWithdrawalBatch = async (
-  withdrawals: NonEmptyArray<Withdrawal>,
+  ids: NonEmptyArray<Number>,
 ) => {
-  const withdrawalIds = withdrawals.map((w) => w.withdrawalId!);
 
   try {
     await execute({
@@ -230,13 +224,13 @@ export const handleRejectedWithdrawalBatch = async (
       contractAddress: config.bridge.address!,
       method: "abortWithdrawalBatch",
       args: {
-        ids: withdrawalIds,
+        ids,
       },
     });
 
     logInfo(
       "BridgeService",
-      `Successfully aborted ${withdrawals.length} rejected withdrawals`,
+      `Successfully aborted ${ids.length} rejected withdrawals`,
     );
   } catch (error) {
     const errorMessage = (error as Error).message;
@@ -245,7 +239,7 @@ export const handleRejectedWithdrawalBatch = async (
     if (errorMessage.includes("MB: not abortable")) {
       logInfo(
         "BridgeService",
-        `Withdrawals already aborted by another server: ${withdrawals.length} withdrawals (${withdrawalIds.join(", ")})`,
+        `Withdrawals already aborted by another server: ${ids.length} withdrawals (${ids.join(", ")})`,
       );
       return; // Gracefully handle already aborted withdrawals
     }

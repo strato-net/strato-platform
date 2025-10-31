@@ -48,7 +48,6 @@ import           Data.Text                            (Text)
 import qualified Data.Text                            as T
 
 import           Blockchain.Data.AddressStateDB
-import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Keccak256
 
@@ -174,15 +173,15 @@ resolveFile getCCFromHash getNamedSUnits expr (seen, resolved) =
   if tShowExpr expr `S.member` seen
     then pure (seen, resolved)
     else case expr of
-      AccountLiteral x acct -> do
-        lift (A.select (A.Proxy @AddressState) (acct^.namedAccountAddress)) >>= \case
+      AddressLiteral x addr -> do
+        lift (A.select (A.Proxy @AddressState) addr) >>= \case
           Nothing -> pure (seen, resolved)
           Just AddressState {..} ->
             case addressStateCodeHash of
               SolidVMCode _ ch -> do
-                rfu <- lift $ codeCollectionToFileUnits (Just $ acct^.namedAccountAddress) <$> getCCFromHash ch
+                rfu <- lift $ codeCollectionToFileUnits (Just addr) <$> getCCFromHash ch
                 pure (seen, M.insert (tShowExpr expr) (Right rfu) resolved)
-              _ -> throwE (x, T.pack $ "Account referenced in import contains EVM code: " ++ show acct)
+              _ -> throwE (x, T.pack $ "Account referenced in import contains EVM code: " ++ show addr)
       StringLiteral x fileName' ->
         let fileName = T.pack fileName'
          in case M.lookup fileName resolved of
@@ -310,5 +309,5 @@ lit' a = StringLiteral a . T.unpack
 
 tShowExpr :: Show a => ExpressionF a -> Text
 tShowExpr (StringLiteral _ str) = T.pack str
-tShowExpr (AccountLiteral _ acct) = "<" <> T.pack (show acct) <> ">"
+tShowExpr (AddressLiteral _ addr) = "<" <> T.pack (show addr) <> ">"
 tShowExpr expr = T.pack $ show expr

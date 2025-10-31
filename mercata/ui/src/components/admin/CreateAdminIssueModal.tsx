@@ -53,8 +53,7 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
 
   const allContractFunctions = (contractDetailsResults || {})['_functions'] || {};
   const contractFunctions = (Object.entries(allContractFunctions) || []).filter(([N, t]) => {
-    return form.getValues().target === '000000000000000000000000000000000000100c'
-      || (t['_funcVisibility'] !== 'internal' && t['_funcVisibility'] !== 'private');
+    return t['_funcVisibility'] !== 'internal' && t['_funcVisibility'] !== 'private';
   }).map(([N, t]) => N);
 
   const { fields, replace } = useFieldArray({ control: form.control, name: 'args' });
@@ -65,9 +64,73 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
     if (Array.isArray(functionArgs) && functionArgs.length > 0) {
       replace(functionArgs.map(() => ({ value: '' })));
     } else {
-      replace([{ value: '' }]);
+      replace([]);
     }
   }, [functionArgs?.length, replace]);
+
+  const validateFunctionArg = (_type: object, value: string): [boolean, any?] => {
+    const tag = _type['tag']?.toLocaleLowerCase() || 'string'
+    if (tag === 'int') {
+      try {
+        const i = JSON.parse(value.trim());
+        return [true, i];
+      } catch(e) {
+        return [false, `Invalid integer value: ${value}`];
+      }
+    }
+    if (tag === 'bool') {
+      const b = value.toLocaleLowerCase();
+      if (b === 'true' || b === 'false') {
+        return [true, b === 'true'];
+      } else {
+        return [false, `Invalid boolean value: ${value}`];
+      }
+    }
+    if (tag === 'address') {
+      const lowercase = value.toLocaleLowerCase();
+      const isHex = /^(0x)?[0-9A-Fa-f]{1,40}$/.test(lowercase);
+      if (!isHex) {
+        return [false, `Invalid address: ${value}`];
+      }
+      if (lowercase.substring(0,2) !== '0x') {
+        return [true, `0x${lowercase}`];
+      } else {
+        return [true, lowercase];
+      }
+    }
+    if (tag === 'array') {
+      try {
+        const arr = JSON.parse(value);
+        if (!Array.isArray(arr)) {
+          return [false, 'Invalid array'];
+        }
+        return arr.reduce(([success, prev], val) => {
+          if (success) {
+            const [newSuccess, newVal] = validateFunctionArg(_type['entry'], val);
+            if (newSuccess) {
+              return [newSuccess, [...prev, newVal]];
+            } else {
+              return [newSuccess, newVal];
+            }
+          } else {
+            return [success, prev];
+          }
+        }, [true, []]);
+      } catch {
+        return [false, 'Invalid JSON'];
+      }
+    }
+    return [true, `"${value.trim().replace("\"","\\\"")}"`];
+  }
+
+  const getTypeName = (_type: object): string => {
+    const tagName = _type['tag']?.toLocaleLowerCase() || 'string'
+    if (tagName === 'array') {
+      return getTypeName(_type['entry']) + '[]';
+    } else {
+      return tagName;
+    }
+  }
 
   const onSubmit = async (values: CreateAdminIssueFormValues) => {
     // Clean up whitespace and empty args
@@ -75,13 +138,11 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
     const trimmedFunc = values.func.trim();
     const argsArray = values.args
       .map((a, i) => {
-        if (functionArgs[i][1].type?.tag === 'Int') {
-          return parseInt(a.value.trim());
+        const [success, v] = validateFunctionArg(functionArgs[i][1].type || {}, a.value);
+        if (!success) {
+          throw v;
         }
-        if (functionArgs[i][1].type?.tag === 'Bool') {
-          return a.value.toLocaleLowerCase() === 'true';
-        }
-        return a.value.trim();
+        return v;
       });
 
     // Build payload with JSON-stringified target/func, and a JSON array for args
@@ -138,7 +199,10 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
               name="target"
               rules={{
                 required: 'Contract address is required',
-                validate: (v) => v.trim().length > 0 || 'Contract address cannot be empty',
+                validate: (v) => {
+                  const [success, w] = validateFunctionArg({tag: 'Address'}, v);
+                  return success || w;
+                },
               }}
               render={({ field }) => (
                 <FormItem>
@@ -223,7 +287,8 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
                 {fields.map((f, idx) => {
                   const abi = functionArgs?.[idx];
                   const abiName = abi?.[0];
-                  const abiType = abi?.[1]?.type?.tag?.toLocaleLowerCase();
+                  const abiType = abi?.[1]?.type || {tag: 'String'};
+                  const abiTypeName = getTypeName(abiType);
               
                   return (
                     <FormField
@@ -232,6 +297,10 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
                       name={`args.${idx}.value`}
                       rules={{
                         required: 'Argument is required',
+                        validate: (v) => {
+                          const [success, w] = validateFunctionArg(abiType, v);
+                          return success || w;
+                        },
                         // add per-type validation here if desired (e.g., address, uint, etc.)
                       }}
                       render={({ field: argField }) => (
@@ -241,7 +310,7 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
                               <Input
                                 {...argField}
                                 placeholder={
-                                  abiName ? `${abiName}: ${abiType}` : `Argument ${idx + 1}`
+                                  abiName ? `${abiName}: ${abiTypeName}` : `Argument ${idx + 1}`
                                 }
                               />
                             </FormControl>

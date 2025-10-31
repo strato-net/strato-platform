@@ -2,16 +2,8 @@
 
 module Blockchain.GenesisBlocks.Contracts.Mercata where
 
-import           Data.ByteString       (ByteString)
-import qualified Data.ByteString.Char8 as BC
-import           Data.FileEmbed        (embedDir)
-import           Data.Map              (Map)
-import qualified Data.Map              as Map
-import           Data.Maybe
-import           System.FilePath       (takeFileName)
-
-filesToEmbed :: [String]
-filesToEmbed = [
+mercataContractFiles :: [String]
+mercataContractFiles = [
   "contracts/abstract/ERC20/ERC20.sol",
   "contracts/abstract/ERC20/IERC20.sol",
   "contracts/abstract/ERC20/access/Authorizable.sol",
@@ -19,9 +11,11 @@ filesToEmbed = [
   "contracts/abstract/ERC20/extensions/IERC20Metadata.sol",
   "contracts/abstract/ERC20/utils/Context.sol",
   "contracts/abstract/ERC20/utils/Pausable.sol",
+  "contracts/abstract/ERC20/utils/StringUtils.sol",
   "contracts/concrete/Admin/AdminRegistry.sol",
   "contracts/concrete/Admin/FeeCollector.sol",
   "contracts/concrete/BaseCodeCollection.sol",
+  "contracts/libraries/Bridge/BridgeTypes.sol",
   "contracts/concrete/Bridge/MercataBridge.sol",
   "contracts/concrete/CDP/CDPEngine.sol",
   "contracts/concrete/CDP/CDPRegistry.sol",
@@ -45,18 +39,3 @@ filesToEmbed = [
   "contracts/concrete/Tokens/TokenMetadata.sol",
   "contracts/concrete/Voucher/Voucher.sol"
   ]
-
-
-embeddedFiles :: [(FilePath, ByteString)]
-embeddedFiles = $(embedDir "resources")
-
-fileMap :: Map FilePath ByteString
-fileMap = Map.fromList embeddedFiles
-
-
-
-----------------------
-
-
-mercataContracts :: [[String]]
-mercataContracts=map (\filename -> [takeFileName filename, BC.unpack $ fromMaybe (error $ "internal error finding source code in genesis resources: " ++ show filename) $ Map.lookup filename fileMap]) filesToEmbed

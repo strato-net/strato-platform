@@ -420,6 +420,11 @@ router.get("/liquidate/near-unhealthy", authHandler.authorizeRequest(), LendingC
  *                   - type: string
  *                   - type: number
  *                 description: Amount of debt to repay ("ALL" to cover full debt)
+ *               minCollateralOut:
+ *                 oneOf:
+ *                   - type: string
+ *                   - type: number
+ *                 description: Minimum collateral amount to receive (slippage protection, defaults to 0)
  *     responses:
  *       200:
  *         description: Liquidation transaction payload
@@ -460,6 +465,11 @@ router.post("/liquidate/:id", authHandler.authorizeRequest(), LendingController.
  *                   - type: string
  *                   - type: number
  *                 description: Amount of debt to repay ("ALL" to cover full debt)
+ *               minCollateralOut:
+ *                 oneOf:
+ *                   - type: string
+ *                   - type: number
+ *                 description: Minimum collateral amount to receive (slippage protection, defaults to 0)
  *     responses:
  *       200:
  *         description: Liquidation transaction payload
@@ -579,6 +589,40 @@ router.post("/admin/sweep-reserves", authHandler.authorizeRequest(), LendingCont
  *               additionalProperties: true
  */
 router.post("/admin/set-debt-ceilings", authHandler.authorizeRequest(), LendingController.setDebtCeilings);
+
+/**
+ * @openapi
+ * /lending/admin/pause:
+ *   post:
+ *     summary: Pause the lending pool (admin)
+ *     tags: [Lending]
+ *     responses:
+ *       200:
+ *         description: Pause transaction payload
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               additionalProperties: true
+ */
+router.post("/admin/pause", authHandler.authorizeRequest(), LendingController.pausePool);
+
+/**
+ * @openapi
+ * /lending/admin/unpause:
+ *   post:
+ *     summary: Unpause the lending pool (admin)
+ *     tags: [Lending]
+ *     responses:
+ *       200:
+ *         description: Unpause transaction payload
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               additionalProperties: true
+ */
+router.post("/admin/unpause", authHandler.authorizeRequest(), LendingController.unpausePool);
 
 /**
  * @openapi

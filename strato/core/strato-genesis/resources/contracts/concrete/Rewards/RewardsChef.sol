@@ -160,6 +160,7 @@ contract record RewardsChef is Ownable {
     event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
     event EmergencyWithdraw(address indexed user, uint256 indexed pid, uint256 amount);
+    event Claim(address indexed user, uint256 indexed pid, uint256 amount);
     event CurrentUserAmount(address indexed user, uint256 indexed pid, uint256 currentAmount);
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -466,6 +467,39 @@ contract record RewardsChef is Ownable {
         emit EmergencyWithdraw(msg.sender, _pid, amount);
     }
 
+    function claim(uint256 _pid) public {
+        require(_pid < pools.length, "Pool does not exist");
+
+        PoolInfo storage pool = pools[_pid];
+        UserInfo storage user = userInfo[_pid][msg.sender];
+
+        updatePool(_pid);
+
+        uint256 pending = ((user.amount * pool.accPerToken) / PRECISION_MULTIPLIER) - user.rewardDebt;
+        if (pending > 0) {
+            rewardToken.transfer(msg.sender, pending);
+        }
+
+        // ═════════════════════════════════════════════════════════════════════
+        // WARNING!!
+        // ═════════════════════════════════════════════════════════════════════
+        // This has to be set in variable and only then applied to
+        // user.rewardDebt, otherwise the solidvm throws!
+        uint256 rewardDebt = (user.amount * pool.accPerToken) / PRECISION_MULTIPLIER;
+        user.rewardDebt = rewardDebt;
+
+        emit Claim(msg.sender, _pid, pending);
+    }
+
+    function claimAll() public {
+        for (uint256 pid = 0; pid < pools.length; pid++) {
+            UserInfo storage user = userInfo[pid][msg.sender];
+            if (user.amount > 0) {
+                claim(pid);
+            }
+        }
+    }
+
     function pendingCata(uint256 _pid, address _user) external view returns (uint256) {
         require(_pid < pools.length, "Pool does not exist");
 
@@ -482,6 +516,29 @@ contract record RewardsChef is Ownable {
         }
 
         return ((user.amount * accPerToken) / PRECISION_MULTIPLIER) - user.rewardDebt;
+    }
+
+    function pendingCataAll(address _user) external view returns (uint256) {
+        uint256 totalPending = 0;
+
+        for (uint256 pid = 0; pid < pools.length; pid++) {
+            PoolInfo storage pool = pools[pid];
+            UserInfo storage user = userInfo[pid][_user];
+
+            uint256 accPerToken = pool.accPerToken;
+            uint256 lpSupply = ERC20(pool.lpToken).balanceOf(address(this));
+
+            if (block.timestamp > pool.lastRewardTimestamp && lpSupply != 0) {
+                uint256 multiplier = getMultiplier(pid, pool.lastRewardTimestamp, block.timestamp);
+                uint256 cataReward = (multiplier * cataPerSecond * pool.allocPoint) / totalAllocPoint;
+                accPerToken += (cataReward * PRECISION_MULTIPLIER) / lpSupply;
+            }
+
+            uint256 pending = ((user.amount * accPerToken) / PRECISION_MULTIPLIER) - user.rewardDebt;
+            totalPending += pending;
+        }
+
+        return totalPending;
     }
 
     function getBalance(uint256 _pid, address _user) external view returns (uint256) {

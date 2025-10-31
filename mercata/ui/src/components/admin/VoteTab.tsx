@@ -11,14 +11,30 @@ import {
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useUser } from '@/context/UserContext';
-import { Loader2, MoreVertical } from 'lucide-react';
+import { Loader2, MoreVertical, CheckCircle2 } from 'lucide-react';
 import CopyButton from '../ui/copy';
 import CreateAdminIssueModal from './CreateAdminIssueModal';
+import CastVoteModal from './CastVoteModal';
+import AddAdminModal from './AddAdminModal';
+import RemoveAdminModal from './RemoveAdminModal';
+import JSONBig from 'json-bigint';
 
 
 const VoteTab = () => {
-  const { userAddress, openIssuesLoading, openIssues, getOpenIssues, castVoteOnIssue } = useUser();
+  const { userAddress, openIssuesLoading, openIssues, getOpenIssues, castVoteOnIssue, castVoteOnIssueById, addAdmin, removeAdmin } = useUser();
   const [createOpen, setCreateOpen] = useState(false);
+  const [voteModalOpen, setVoteModalOpen] = useState(false);
+  const [addAdminOpen, setAddAdminOpen] = useState(false);
+  const [removeAdminOpen, setRemoveAdminOpen] = useState(false);
+  const [selectedIssue, setSelectedIssue] = useState<{
+    issueId: string;
+    target: string;
+    func: string;
+    args: any[];
+    votesCast: number;
+    votesNeeded: number;
+    threshold: number;
+  } | null>(null);
 
   useEffect(() => {
     getOpenIssues();
@@ -26,6 +42,33 @@ const VoteTab = () => {
 
   const handleCastVoteOnIssue = (target: string, func: string, args: string[]) => {
     castVoteOnIssue(target, func, args);
+  };
+
+  const handleOpenVoteModal = (issueData: {
+    issueId: string;
+    target: string;
+    func: string;
+    args: any[];
+    votesCast: number;
+    votesNeeded: number;
+    threshold: number;
+  }) => {
+    setSelectedIssue(issueData);
+    setVoteModalOpen(true);
+  };
+
+  const handleCastVoteOnIssueById = async (issueId: string) => {
+    await castVoteOnIssueById(issueId);
+    // Refresh the issues after voting
+    getOpenIssues();
+  };
+
+  const handleAddAdmin = async (userAddress: string) => {
+    await addAdmin(userAddress);
+  };
+
+  const handleRemoveAdmin = async (userAddress: string) => {
+    await removeAdmin(userAddress);
   };
 
   if (openIssuesLoading) {
@@ -51,15 +94,37 @@ const VoteTab = () => {
   const issues: any[] = (openIssues && openIssues['issues']) || [];
   const votes: any[] = (openIssues && openIssues['votes']) || [];
   const thresholds: any[] = (openIssues && openIssues['thresholds']) || [];
+  const globalThreshold: number = (openIssues && openIssues['globalThreshold']) || 6000;
   const executed: object[] = (openIssues && openIssues['executed']) || [];
+  const JSONBigNative = JSONBig({ useNativeBigInt: true });
 
   return (
     <div className="space-y-6">
       {/* List of Admins */}
       <Card>
-        <CardHeader>
-          <CardTitle>Admins</CardTitle>
-          <CardDescription>Current administrators with voting rights</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <div className="space-y-1">
+            <CardTitle>Admins</CardTitle>
+            <CardDescription>Current administrators with voting rights</CardDescription>
+          </div>
+
+          <div className="flex flex-row gap-2 shrink-0">
+            <Button
+              size="sm"
+              onClick={() => setAddAdminOpen(true)}
+              className="bg-strato-blue hover:bg-strato-blue/90"
+            >
+              Add Admin
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => setRemoveAdminOpen(true)}
+              disabled={admins.length <= 1}
+              className="bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Remove Admin
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="mb-4">
@@ -137,7 +202,6 @@ const VoteTab = () => {
                     <TableHead className="w-[120px]">Issue ID</TableHead>
                     <TableHead className="w-[120px]">Contract</TableHead>
                     <TableHead className="w-[80px]">Function</TableHead>
-                    <TableHead className="w-[180px]">Arguments</TableHead>
                     <TableHead className="w-[60px]">Votes Cast</TableHead>
                     <TableHead className="w-[60px]">Votes Needed</TableHead>
                     <TableHead className="w-[60px]">Voting Threshold</TableHead>
@@ -148,15 +212,18 @@ const VoteTab = () => {
                   {issues.map((issue: any, index) => {
                     const issueId = issue.issueId;
                     const address = issue.target;
-                    const issueArgs = JSON.parse(issue.args) || [];
-                    const threshold = (thresholds.find((v) => v.target === address && v.func === issue.func)?.threshold || 6666)/100;
+                    const issueArgs = JSONBigNative.parse(issue.args);
+                    const threshold = (thresholds.find((v) => v.target === address && v.func === issue.func)?.threshold || globalThreshold)/100;
                     const votesNeeded = Math.ceil((admins.length * threshold)/100);
-                    const alreadyVoted = votes.find((v) => v.issueId === issueId && v.voter === userAddress);
+                    const hasUserVoted = votes.some((v) => v.issueId === issueId && v.voter === userAddress);
 
                     return (
-                      <TableRow key={`${issueId}-${index}`}>
+                      <TableRow key={`${issueId}-${index}`} className={hasUserVoted ? 'bg-green-50' : ''}>
                         <TableCell className="font-medium text-sm max-w-[120px] truncate">
                           <div className="flex items-center space-x-2">
+                            {hasUserVoted && (
+                              <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
+                            )}
                             <span>
                               {issueId && issueId !== 'Unknown' 
                                 ? `${issueId.slice(0, 6)}...${issueId.slice(-4)}`
@@ -184,9 +251,6 @@ const VoteTab = () => {
                         <TableCell className="text-sm max-w-[90px]">
                           {issue.func}
                         </TableCell>
-                        <TableCell className="font-mono text-xs max-w-[180px] truncate">
-                          {issueArgs.join(', ')}
-                        </TableCell>
                         <TableCell className="text-sm max-w-[90px]">
                           {votes.filter((v) => v.issueId === issueId).length}
                         </TableCell>
@@ -197,14 +261,26 @@ const VoteTab = () => {
                           {`${threshold}%`}
                         </TableCell>
                         <TableCell className="max-w-[60px]">
-                          <Button 
-                            size="sm" 
-                            onClick={() => handleCastVoteOnIssue(address, issue.func, issueArgs)}
-                            disabled={alreadyVoted}
-                            className="bg-strato-blue hover:bg-strato-blue/90 text-xs"
-                          >
-                            Cast Vote
-                          </Button>
+                          <div className="flex flex-col items-start gap-1">
+                            <Button 
+                              size="sm" 
+                              onClick={() => handleOpenVoteModal({
+                                issueId,
+                                target: address,
+                                func: issue.func,
+                                args: issueArgs,
+                                votesCast: votes.filter((v) => v.issueId === issueId).length,
+                                votesNeeded,
+                                threshold
+                              })}
+                              className="bg-strato-blue hover:bg-strato-blue/90 text-xs"
+                            >
+                              View Vote
+                            </Button>
+                            {hasUserVoted && (
+                              <span className="text-xs text-green-600 font-medium">You voted</span>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
@@ -251,8 +327,7 @@ const VoteTab = () => {
                   {executed.map((issue: any, index) => {
                     const issueId = issue.issueId;
                     const address = issue.target;
-                    const issueArgs = JSON.parse(issue.args) || [];
-
+                    const issueArgs = JSONBigNative.parse(issue.args);
                     return (
                       <TableRow key={`${issueId}-${index}`}>
                         <TableCell className="font-mono text-xs max-w-[80px] truncate">
@@ -313,6 +388,24 @@ const VoteTab = () => {
         open={createOpen}
         onOpenChange={setCreateOpen}
         handleCastVoteOnIssue={handleCastVoteOnIssue}
+      />
+      <CastVoteModal
+        open={voteModalOpen}
+        onOpenChange={setVoteModalOpen}
+        issue={selectedIssue}
+        onCastVote={handleCastVoteOnIssueById}
+      />
+      <AddAdminModal
+        open={addAdminOpen}
+        onOpenChange={setAddAdminOpen}
+        onAddAdmin={handleAddAdmin}
+        admins={admins}
+      />
+      <RemoveAdminModal
+        open={removeAdminOpen}
+        onOpenChange={setRemoveAdminOpen}
+        onRemoveAdmin={handleRemoveAdmin}
+        admins={admins}
       />
     </div>
   );

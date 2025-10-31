@@ -13,44 +13,29 @@
 module Blockchain.Slipstream.Data.Action where
 
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Code
-import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Stream.Action (Action)
-import qualified Blockchain.Stream.Action as Action (Action (..), ActionData (..), CallType (..), DataDiff (..))
+import qualified Blockchain.Stream.Action as Action (Action (..), ActionData (..), DataDiff (..))
 import Control.DeepSeq
 import Data.Aeson
 import qualified Data.Aeson as JSON
 import Data.Binary
 import Data.Binary.Get
-import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import qualified Data.Map.Ordered as OMap
-import Data.Maybe (fromMaybe, listToMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time
 import GHC.Generics
-import SolidVM.Model.CodeCollection hiding (Event)
 
 data AggregateAction = AggregateAction
   { actionBlockHash :: Keccak256,
     actionBlockTimestamp :: UTCTime,
     actionBlockNumber :: Integer,
-    actionTxHash :: Keccak256,
     actionTxSender :: Address,
-    actionCreator :: Text,
-    actionCCCreator :: Maybe Text,
-    actionRoot :: Text,
-    actionApplication :: Text,
     actionAddress :: Address,
-    actionCodeHash :: CodePtr,
-    actionCodeCollection :: CodeCollection,
-    actionStorage :: Action.DataDiff,
-    actionAbstracts :: Map (Address, Text) (Text, Text, [Text]),
-    actionType :: Action.CallType,
-    actionSrc :: Maybe Code
+    actionStorage :: Action.DataDiff
   }
   deriving (Show, Generic, NFData)
 
@@ -58,10 +43,8 @@ data AggregateEvent = AggregateEvent
   { eventBlockHash :: Keccak256,
     eventBlockTimestamp :: UTCTime,
     eventBlockNumber :: Integer,
-    eventTxHash :: Keccak256,
     eventTxSender :: Address,
     eventIndex :: Int,
-    eventAbstracts :: Map (Address, Text) (Text, Text, [Text]),
     eventEvent :: Event
   }
   deriving (Show, Generic, NFData, ToJSON, FromJSON)
@@ -81,51 +64,33 @@ flatten :: Action -> [AggregateAction]
 flatten Action.Action {..} = flip map (OMap.assocs _actionData) $
   \(address, Action.ActionData {..}) ->
     -- It's a Create because I said so
-    let t = fromMaybe Action.Create $ listToMaybe _actionDataCallTypes
-     in AggregateAction
+    AggregateAction
           { actionBlockHash = _blockHash,
             actionBlockTimestamp = _blockTimestamp,
             actionBlockNumber = _blockNumber,
-            actionTxHash = _transactionHash,
             actionTxSender = _transactionSender,
-            actionCreator = _actionDataCreator,
-            actionCCCreator = _actionDataCCCreator,
-            actionRoot = _actionDataRoot,
-            actionApplication = _actionDataApplication,
             actionAddress = address,
-            actionCodeHash = _actionDataCodeHash,
-            actionCodeCollection = _actionDataCodeCollection,
-            actionStorage = _actionDataStorageDiffs,
-            actionAbstracts = _actionDataAbstracts,
-            actionType = t,
-            actionSrc = _src
+            actionStorage = _actionDataStorageDiffs
           }
 
 formatAction :: AggregateAction -> Text
 formatAction AggregateAction {..} =
   T.concat
-    [ tshow actionType,
-      ", blockHash: ",
+    [ "blockHash: ",
       tshow actionBlockHash,
       ", blockTimestamp: ",
       tshow actionBlockTimestamp,
       ", blockNumber: ",
       tshow actionBlockNumber,
-      ", transactionHash: ",
-      tshow actionTxHash,
-      ", ",
-      " with account: ",
+      ", with account: ",
       tshow actionAddress,
       " with ",
-      tshow
-        ( case actionStorage of
-            Action.EVMDiff m -> M.size m
-            Action.SolidVMDiff m -> M.size m
-        ),
-      " items\n",
-      "    codeHash = ",
-      tshow actionCodeHash
+      tshow (numberOfDiffs actionStorage),
+      " items"
     ]
   where
     tshow :: Show a => a -> Text
     tshow = T.pack . show
+
+numberOfDiffs :: Action.DataDiff -> Int
+numberOfDiffs (Action.SolidVMDiff m) = M.size m

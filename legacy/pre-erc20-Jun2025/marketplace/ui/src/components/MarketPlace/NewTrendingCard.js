@@ -365,8 +365,8 @@ const NewTrendingCard = ({
           <img
             className="md:h-[200px] md:w-[40vw] h-[150px] w-full object-contain rounded-md cursor-pointer mb-2"
             src={
-              topSellingProduct['BlockApps-Mercata-Asset-images']?.length > 0
-                ? topSellingProduct['BlockApps-Mercata-Asset-images'][0].value
+              topSellingProduct['BlockApps-Asset-images']?.length > 0
+                ? topSellingProduct['BlockApps-Asset-images'][0].value
                 : images_placeholder
             }
             alt={imgMeta}

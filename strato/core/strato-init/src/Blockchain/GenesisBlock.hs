@@ -28,8 +28,8 @@ import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockDB
 import Blockchain.Data.Extra
 import Blockchain.Data.GenesisBlock
-import Blockchain.Data.GenesisInfo
-import Blockchain.Data.RLP
+import Blockchain.Data.GenesisInfo (GenesisInfo)
+import qualified Blockchain.Data.GenesisInfo as GI
 import qualified Blockchain.Data.TXOrigin as Origin
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.EthConf
@@ -41,9 +41,7 @@ import Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.Strato.Indexer.ApiIndexer as ApiIndexer
 import qualified Blockchain.Strato.Indexer.Kafka as IdxKafka
 import qualified Blockchain.Strato.Indexer.Model as IdxModel
-import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.Event
-import Blockchain.Strato.Model.Account
 import qualified Blockchain.Strato.Model.Address as Ad
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord
@@ -64,16 +62,12 @@ import Control.Monad.Composable.Redis
 import Control.Monad.IO.Class
 import Data.Foldable (for_, traverse_)
 import qualified Data.Map as Map
-import Data.Map.Strict (Map)
 import qualified Data.Map.Ordered as OMap
 import Data.Maybe
 import qualified Data.Sequence as S
-import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Data.Traversable (for)
-import SolidVM.Model.CodeCollection (emptyCodeCollection)
-import SolidVM.Model.Storable hiding (toList)
 import Text.Format
 
 getGenesisBlockAndPopulateInitialMPs ::
@@ -87,12 +81,12 @@ getGenesisBlockAndPopulateInitialMPs ::
     HasMemStorageDB m,
     (Ad.Address `Alters` AddressState) m
   ) =>
-  m ([Validator], GenesisInfo, ([(AccountInfo, CodeInfo)], Block))
+  m ([Validator], GenesisInfo, Block)
 getGenesisBlockAndPopulateInitialMPs = do
-  genesisInfo <- getGenesisInfo
+  genesisInfo <- GI.getGenesisInfo
   let validators = readValidatorsFromGenesisInfo genesisInfo
 
-  (validators, genesisInfo,) <$> genesisInfoToGenesisBlock genesisInfo
+  (validators, genesisInfo,) <$> genesisInfoToGenesisBlock validators genesisInfo
 
 initializeGenesisBlock ::
   ( HasCodeDB m,
@@ -110,7 +104,7 @@ initializeGenesisBlock ::
   m ()
 initializeGenesisBlock = do
   $logInfoS "initgen" "Begin of initgen"
-  (validators, genesisInfo, (srcInfo, genesisBlock)) <- getGenesisBlockAndPopulateInitialMPs
+  (validators, genesisInfo, genesisBlock) <- getGenesisBlockAndPopulateInitialMPs
   obGB <- liftIO $ bootstrapSequencer genesisBlock
   putGenesisHash $ blockHash genesisBlock
   $logInfoS "initgen" "Initial merkle patricia tries successfully created"
@@ -138,17 +132,7 @@ initializeGenesisBlock = do
   $logInfoS "initgen" "best block info inserted"
   liftIO $ bootstrapIndexer obGB
   $logInfoS "initgen" "indexer has been bootstrapped"
-  let rewrite (_, CodeInfo src name) =
-        ( hash $ T.encodeUtf8 src,
-          Map.fromList $
-            [("src", src)]
-              ++ case name of
-                Nothing -> []
-                Just n -> [("name", n)]
-        )
-      metadatas = Map.fromList . map rewrite $ srcInfo
-      findMetadata = flip Map.lookup metadatas
-  populateStorageDBs findMetadata genesisInfo genesisBlock genesisChainId
+  populateStorageDBs genesisInfo genesisBlock genesisChainId
   $logInfoS "initgen" "populateStorageDBs is done"
 
 
@@ -203,12 +187,11 @@ populateStorageDBs ::
     HasHashDB m,
     Selectable Ad.Address AddressState m
   ) =>
-  (Keccak256 -> Maybe (Map Text Text)) ->
   GenesisInfo ->
   Block ->
   Maybe Word256 ->
   m ()
-populateStorageDBs getMetadata genesisInfo genesisBlock genesisChainId = do
+populateStorageDBs genesisInfo genesisBlock genesisChainId = do
   -- Step 1: State Root Management - Retrieve current state root and temporarily replace it
   sr <- getStateRoot genesisChainId
 
@@ -219,7 +202,7 @@ populateStorageDBs getMetadata genesisInfo genesisBlock genesisChainId = do
   let pub sd vmes = do
         traverse_ commitSqlDiffs sd
         void . runKafkaMUsingEnv kafkaEnv $ produceVMEvents' vmes
-  populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub
+  populateStorageDBs' genesisInfo genesisBlock genesisChainId sr pub
 
 populateStorageDBs' ::
   ( MonadIO m,
@@ -229,58 +212,45 @@ populateStorageDBs' ::
     HasHashDB m,
     Selectable Ad.Address AddressState m
   ) =>
-  (Keccak256 -> Maybe (Map Text Text)) ->
   GenesisInfo ->
   Block ->
   Maybe Word256 ->
   MP.StateRoot ->
   (Maybe StateDiff.StateDiff -> [VMEvent] -> m ()) ->
   m ()
-populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub = do
+populateStorageDBs' genesisInfo genesisBlock genesisChainId sr pub = do
   mSR <- A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
   A.insert (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256) sr
 
   -- Step 3: Address Processing - Iterate through all genesis account addresses
-  let addresses = acctInfoAddress <$> genesisInfoAccountInfo genesisInfo
-      events = genesisInfoEvents genesisInfo
-      delegatecalls = genesisInfoDelegatecalls genesisInfo
-  ccas <- fmap catMaybes . for (genesisInfoCodeInfo genesisInfo) $ \(CodeInfo src mName) -> for mName $ \name -> do
+  let addresses = GI.addrInfoAddress <$> GI.addressInfo genesisInfo
+      events = GI.events genesisInfo
+      delegatecalls = GI.delegatecalls genesisInfo
+
+  ccas <- fmap catMaybes . for (GI.codeInfo genesisInfo) $ \(GI.CodeInfo src mName) -> for mName $ \_ -> do
     let srcHash = hash $ T.encodeUtf8 src
-        codePtr' = SolidVMCode (T.unpack name) srcHash
     cc <- codeCollectionFromHash False True srcHash
-    pure $ CodeCollectionAdded (() <$ cc) codePtr' "BlockApps" name Map.empty
+    pure $ CodeCollectionAdded (() <$ cc) "BlockApps"
 
   pub Nothing ccas
 
   for_ addresses $ \address -> do
     -- Fetch full address state from the state database
-    fullAddressState <- A.selectWithDefault (A.Proxy @AddressState) address
+    addressState <- A.selectWithDefault (A.Proxy @AddressState) address
 
     $logInfoS "initgen" $ T.pack $
       "##################### writing to DBs: " ++ format address
 
-    -- Apply special filtering for Vitu vehicle manager contract (0x7000...0000)
-    -- to prevent performance issues with large arrays
-    -- For now, we are just clumsily filtering out any state changes for the
-    -- Vitu vehicle manager, since this contract has giant arrays that would
-    -- choke strato (yes, this temprary feature is hardcoded into the whole
-    -- platform for one client)
-    let acct = address
-        filteredAddressState =
-          if address /= Ad.Address 0x7000000000000000000000000000000000000000
-            then fullAddressState
-            else fullAddressState {addressStateContractRoot = MP.blankStateRoot}
-        fullAddrStates = [(acct, fullAddressState)]
-        filteredAddrStates = [(acct, filteredAddressState)]
+    let addrStateMap = Map.fromList [(address, addressState)]
         squashMap f = mapM (uncurry f) . Map.toList
 
     -- Step 4: State Diff Generation - Create SQL database diffs for account creation
-    fullAccountDiffs <- mapM eventualAccountState . Map.fromList $ fullAddrStates
+    accountDiffs <- mapM eventualAccountState addrStateMap
     -- Step 5: VM Event Production - Generate and publish VM events to Kafka
     let addressEvents = Map.findWithDefault S.empty address  events
     let addressDelegatecalls = Map.findWithDefault S.empty address delegatecalls
-    vmEvents <- squashMap (toAction addressEvents addressDelegatecalls) =<< mapM eventualAccountState (Map.fromList filteredAddrStates)
-    pub (Just $ mkStateDiff fullAccountDiffs) vmEvents
+    vmEvents <- squashMap (toAction addressEvents addressDelegatecalls) accountDiffs
+    pub (Just $ mkStateDiff accountDiffs) vmEvents
 
   for_ mSR $ A.insert (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
 
@@ -306,38 +276,16 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
       -> AccountDiff 'Eventual
       -> m VMEvent
     toAction addressEvents delegatecalls a d = do
-      let cPtr = codeHash d
-      let
-          theMetadata = getMetadata $ genesisBlockCodePtr cPtr
-          creator' = fromMaybe "" mkCreator
-          originAddress' = mkOriginAddress
-
-      let appName' =
-            case cPtr of
-              SolidVMCode n _ -> T.pack n
-              _ -> ""
       pure . NewAction $ A.Action
             { A._blockHash = blockHeaderHash $ blockHeader genesisBlock,
               A._blockTimestamp =
                 blockHeaderTimestamp $ blockHeader genesisBlock,
               A._blockNumber =
                 blockHeaderBlockNumber $ blockHeader genesisBlock,
-              A._transactionHash = rlpHash a,
               A._transactionSender = Ad.Address 0,
               A._actionData =
-                OMap.singleton (a,
-                  A.ActionData
-                    cPtr
-                    emptyCodeCollection
-                    creator'
-                    mkCreator
-                    originAddress'
-                    appName'
-                    storageDiff
-                    Map.empty
-                    [A.Create]),
-              A._src = fmap Code $ join $ fmap (Map.lookup "src") theMetadata,
-              A._name = join $ fmap (Map.lookup "name") theMetadata,
+                OMap.singleton (a, A.ActionData storageDiff),
+              A._newCodeCollections = [],
               A._events = addressEvents,
               A._delegatecalls = delegatecalls
             }
@@ -346,26 +294,9 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
         fromDiff :: Diff a 'Eventual -> a
         fromDiff (Value v) = v
 
-        mkCreator =
-            (\case BString str -> Just $ T.decodeUtf8 str; _ -> Nothing)
-          . rlpDecode
-          . rlpDeserialize =<< lookupSolidDiff ".:creator" storageDiff
-
-        mkOriginAddress =
-            (\case BAccount (NamedAccount a' _) -> T.pack $ show a'; _ -> "")
-          . maybe BDefault (rlpDecode . rlpDeserialize)
-          $ lookupSolidDiff ".:originAddress" storageDiff
-
         storageDiff = case storage d of
           SolidVMDiff m -> A.SolidVMDiff $ Map.map fromDiff m
-          EVMDiff m -> A.EVMDiff $ Map.map fromDiff m
-
-        genesisBlockCodePtr (ExternallyOwned ch') = ch'
-        genesisBlockCodePtr (SolidVMCode _ ch') = ch'
-
-        lookupSolidDiff k (A.SolidVMDiff m) = Map.lookup k m
-        lookupSolidDiff _ _                 = Nothing
-
+          EVMDiff _ -> error "evm state in genesis block isn't supported"
 
 bootstrapIndexer :: OutputBlock -> IO ()
 bootstrapIndexer obGB = do

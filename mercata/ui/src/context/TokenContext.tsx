@@ -34,6 +34,7 @@ type TokenContextType = {
   getActiveTokens: (page?: number, limit?: number) => Promise<void>;
   getToken: (address: string) => Promise<Token | null>;
   getUserTokensWithBalance: () => Promise<Token[]>;
+  getTransferableTokens: () => Promise<Token[]>;
   createToken: (token: CreateTokenPayload) => Promise<void>;
   transferToken: (payload: { address: string; to: string; value: string }) => Promise<void>;
   approveToken: (payload: { address: string; spender: string; value: string }) => Promise<void>;
@@ -143,6 +144,18 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  const getTransferableTokens = useCallback(async (): Promise<Token[]> => {
+    setLoading(true);
+    try {
+      const res = await api.get<Token[]>(`/tokens/transferable`);
+      return res.data || [];
+    } catch (err) {
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const createToken = useCallback(async (token: CreateTokenPayload) => {
     setLoading(true);
     try {
@@ -227,6 +240,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
         getActiveTokens,
         getToken,
         getUserTokensWithBalance,
+        getTransferableTokens,
         createToken,
         transferToken,
         approveToken,

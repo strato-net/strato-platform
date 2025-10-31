@@ -11,7 +11,7 @@ module Blockchain.DB.RawStorageDB
     RawStorageValue,
     HasRawStorageDB,
     HasMemRawStorageDB (..),
-    FullRawStorage,
+    --FullRawStorage,
     genericLookupRawStorageDB,
     genericInsertRawStorageDB,
     genericInsertManyRawStorageDB,
@@ -22,8 +22,7 @@ module Blockchain.DB.RawStorageDB
     getAllRawStorageKeyVals',
     deleteRawStorageKey',
     flushMemRawStorageTxDBToBlockDB,
-    flushMemRawStorageDB,
-    flushMemDBs
+    flushMemRawStorageDB
   )
 where
 
@@ -37,12 +36,10 @@ import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ExtendedWord
 import Control.Arrow ((***))
 import Control.Monad (forM_, join)
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Loops
-import Data.ByteString (ByteString)
 import Data.Default
 import Data.Foldable (for_)
 import Data.List
@@ -50,13 +47,14 @@ import Data.Map (Map)
 import qualified Data.Map as M
 import qualified Data.NibbleString as N
 import Data.Traversable (for)
+import SolidVM.Model.Storable
 
-instance Default ByteString where
+instance Default BasicValue where
   def = blankVal
 
-type RawStorageKey = (Address, ByteString)
+type RawStorageKey = (Address, StoragePath)
 
-type RawStorageValue = ByteString
+type RawStorageValue = BasicValue
 
 type HasRawStorageDB m = (RawStorageKey `A.Alters` RawStorageValue) m
 
@@ -177,38 +175,15 @@ flushMemRawStorageTxDBToBlockDB = do
 
 flushMemRawStorageDB :: (MonadLogger m, FullRawStorage m) => m ()
 flushMemRawStorageDB = do
-  flushMemRawStorageTxDBToBlockDB
   theMap <- getMemRawStorageBlockDB
 
-  let changesByAddress :: Map Address [(ByteString, RawStorageValue)]
+  let changesByAddress :: Map Address [(StoragePath, RawStorageValue)]
       changesByAddress = M.fromListWith (++) $ map (\((a, k), v) -> (a, [(k, v)])) $ M.toList theMap
 
   forM_ (M.toList changesByAddress) $ \(a, changes) ->
     putAllRawStorageKeyValForAddress a changes
 
   putMemRawStorageBlockMap M.empty
-
-flushMemDBs :: (MonadLogger m, FullRawStorage m) => m ()
-flushMemDBs = do
-  flushMemRawStorageTxDBToBlockDB
-  storageMap <- getMemRawStorageBlockDB
-
-  let changesByAddress :: Map Address [(ByteString, RawStorageValue)]
-      changesByAddress = M.fromListWith (++) $ map (\((a, k), v) -> (a, [(k, v)])) $ M.toList storageMap
-
-  forM_ (M.toList changesByAddress) $ \(a, changes) -> do
-    addressState <- A.lookupWithDefault A.Proxy a
-    cr' <- putAllRawStorageKeyValForStateRoot (addressStateContractRoot addressState) changes
-    A.insert A.Proxy a addressState {addressStateContractRoot = cr'}
-
-  flushMemAddressStateTxToBlockDB
-  addrStMap <- getAddressStateBlockDBMap
-  sr <- A.lookupWithDefault (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
-  sr' <- putAllAddressStateKeyValForStateRoot sr $ M.toList addrStMap
-  A.insert (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256) sr'
-
-  putMemRawStorageBlockMap M.empty
-  putAddressStateBlockDBMap M.empty
 
 --The following are the DB versions of the functions
 
@@ -218,12 +193,12 @@ flushMemDBs = do
 -- the word256 based storage.
 {-# NOINLINE blankVal #-}
 blankVal :: RawStorageValue
-blankVal = rlpSerialize $ RLPString ""
+blankVal = BDefault
 
 putAllRawStorageKeyValForAddress ::
   (MonadLogger m, FullRawStorage m) =>
   Address ->
-  [(ByteString, RawStorageValue)] ->
+  [(StoragePath, RawStorageValue)] ->
   m ()
 putAllRawStorageKeyValForAddress owner rawChanges = do
   addressState <- A.lookupWithDefault A.Proxy owner
@@ -234,23 +209,11 @@ putAllRawStorageKeyValForAddress owner rawChanges = do
 putAllRawStorageKeyValForStateRoot ::
   (MonadLogger m, FullRawStorage m) =>
   MP.StateRoot ->
-  [(ByteString, RawStorageValue)] ->
+  [(StoragePath, RawStorageValue)] ->
   m MP.StateRoot
 putAllRawStorageKeyValForStateRoot sr rawChanges = do
   let changes :: [(MP.Key, MP.Val)]
-      changes = map (N.EvenNibbleString *** rlpEncode) rawChanges
-  putAllKeyValForStateRoot sr changes
-
-putAllAddressStateKeyValForStateRoot ::
-  (MonadLogger m, FullRawStorage m) =>
-  MP.StateRoot ->
-  [(Address, AddressStateModification)] ->
-  m MP.StateRoot
-putAllAddressStateKeyValForStateRoot sr rawChanges = do
-  let changes :: [(MP.Key, MP.Val)]
-      changes = map (addressAsNibbleString *** encodeASM) rawChanges
-      encodeASM (ASModification as) = rlpEncode as
-      encodeASM ASDeleted = rlpEncode blankVal
+      changes = map ((N.EvenNibbleString . unparsePath) *** rlpEncode) rawChanges
   putAllKeyValForStateRoot sr changes
 
 putAllKeyValForStateRoot ::
@@ -296,7 +259,7 @@ getRawStorageKeyValDBMaybe ::
   m (Maybe RawStorageValue)
 getRawStorageKeyValDBMaybe (owner, key) = do
   mContractRoot <- fmap addressStateContractRoot <$> A.lookup (A.Proxy @AddressState) owner
-  fmap (fmap rlpDecode . join) . for mContractRoot $ \cr -> MP.getKeyVal cr (N.EvenNibbleString key)
+  fmap (fmap rlpDecode . join) . for mContractRoot $ \cr -> MP.getKeyVal cr (N.EvenNibbleString $ unparsePath key)
 
 getRawStorageKeyValDB ::
   ( (Address `A.Alters` AddressState) m,
@@ -306,7 +269,7 @@ getRawStorageKeyValDB ::
   m RawStorageValue
 getRawStorageKeyValDB (owner, key) = do
   contractRoot <- addressStateContractRoot <$> A.lookupWithDefault (A.Proxy @AddressState) owner
-  maybe def rlpDecode <$> MP.getKeyVal contractRoot (N.EvenNibbleString key)
+  maybe def rlpDecode <$> MP.getKeyVal contractRoot (N.EvenNibbleString $ unparsePath key)
 
 getAllRawStorageKeyValsDB :: FullRawStorage m => Address -> m [(MP.Key, RawStorageValue)]
 getAllRawStorageKeyValsDB owner = do

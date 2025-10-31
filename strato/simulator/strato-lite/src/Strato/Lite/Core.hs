@@ -34,13 +34,12 @@ import Blockchain.DB.RawStorageDB
 import Blockchain.DB.StateDB (setStateDBStateRoot)
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.Block
-import Blockchain.Data.BlockHeader
+import Blockchain.Data.BlockHeader as BH
 import Blockchain.Data.BlockDB ()
 import Blockchain.Data.BlockSummary
 import qualified Blockchain.Data.DataDefs as DataDefs
 import Blockchain.Data.GenesisBlock
-import Blockchain.Data.GenesisInfo
-import Blockchain.Data.RLP
+import Blockchain.Data.GenesisInfo as GI
 import qualified Blockchain.Data.TXOrigin as Origin
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified "vm-runner" Blockchain.Event as VMEvent
@@ -54,7 +53,6 @@ import qualified Blockchain.Sequencer as Seq
 import qualified Blockchain.Sequencer.DB.DependentBlockDB as DBDB
 import Blockchain.Sequencer.DB.SeenTransactionDB
 import Blockchain.Sequencer.Event
-import Blockchain.Sequencer.ExtraCertsHack
 import Blockchain.Sequencer.Monad
 import Blockchain.Slipstream.OutputData
 import Blockchain.Slipstream.Processor
@@ -65,7 +63,6 @@ import Blockchain.Strato.Indexer.IContext (API (..), P2P (..))
 import Blockchain.Strato.Indexer.Model
 import Blockchain.Strato.Indexer.P2PIndexer
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Host
 import Blockchain.Strato.Model.Keccak256
@@ -111,7 +108,6 @@ import GHC.Conc (ThreadId, myThreadId)
 import SolidVM.Model.Storable hiding (toList)
 import Strato.Lite.Base
 import Text.Format
-import Text.Read (readMaybe)
 import UnliftIO
 import Prelude hiding (round, sequence)
 
@@ -475,20 +471,12 @@ instance {-# OVERLAPPING #-} MonadBase m => (Maybe Word256 `A.Alters` MP.StateRo
 
 instance {-# OVERLAPPING #-} MonadBase m => (Address `A.Selectable` X509.X509Certificate) (CoreT m) where
   select _ k = do
-    let certKey addr = (addr,) . Text.encodeUtf8
     mCertAddress <- lookupX509AddrFromCBHash k
     fmap join . for mCertAddress $ \certAddress -> do
-      mBString <- fmap (rlpDecode . rlpDeserialize) <$> A.lookup (A.Proxy) (certKey certAddress ".certificateString")
+      mBString <- A.lookup (A.Proxy) (certAddress, "certificateString" :: StoragePath)
       case mBString of
         Just (BString bs) -> pure . eitherToMaybe $ bytesToCert bs
         _ -> pure Nothing
-
-instance {-# OVERLAPPING #-} MonadBase m => ((Address, T.Text) `A.Selectable` X509.X509CertificateField) (CoreT m) where
-  select _ (k, t) = do
-    let certKey addr = (addr,) . Text.encodeUtf8
-    mCertAddress <- lookupX509AddrFromCBHash k
-    fmap join . for mCertAddress $ \certAddress ->
-      maybe Nothing (readMaybe . T.unpack . Text.decodeUtf8) <$> A.lookup (A.Proxy) (certKey certAddress t)
 
 instance {-# OVERLAPPING #-} MonadIO m => HasMemRawStorageDB (CoreT m) where
   getMemRawStorageTxDB = gets $ Lens.view $ memDBs . storageTxMap
@@ -663,13 +651,10 @@ instance {-# OVERLAPPING #-} Mod.Accessible IdentityData (CoreT m) where
 startingCheckpoint :: [Validator] -> Checkpoint
 startingCheckpoint as = def {checkpointValidators = as}
 
-newBlockstanbulContext :: String -> Validator -> [Validator] -> Bool -> BlockstanbulContext
-newBlockstanbulContext network' selfValidator as valBehav =
+newBlockstanbulContext :: String -> [Validator] -> Bool -> BlockstanbulContext
+newBlockstanbulContext network' as valBehav =
   let ckpt = startingCheckpoint as
-   in newContext network' ckpt Nothing valBehav (Just $ validatorToChainMemberParsedSet selfValidator)
-
-emptyBlockstanbulContext :: BlockstanbulContext
-emptyBlockstanbulContext = newBlockstanbulContext "" undefined [] True
+   in newContext network' ckpt Nothing valBehav
 
 newSequencerContext :: MonadIO m => BlockstanbulContext -> m SequencerContext
 newSequencerContext bc = do
@@ -767,23 +752,14 @@ instance (MP.StateRoot `A.Alters` MP.NodeData) (State.State (a, Map MP.StateRoot
   insert _ k v = State.modify' $ \(a, b) -> (a, M.insert k v b)
   delete _ k = State.modify' $ \(a, b) -> (a, M.delete k b)
 
-type CertMap = Map Address X509CertInfoState
-
-addValidatorsToCertMap :: [(Address, Validator)] -> CertMap -> CertMap
-addValidatorsToCertMap vals m =
-  let valToXcis a (Validator n) = X509CertInfoState a rootCert True [] "" (Just "") (T.unpack n)
-      insertValidatorInfo (a, b) = M.insert a (valToXcis a b)
-   in foldr insertValidatorInfo m vals
-
 createCorePeer ::
   String ->
   String ->
-  Validator ->
   GenesisInfo ->
   Bool ->
   (Text -> LoggingT IO () -> IO ()) ->
   IO CorePeer
-createCorePeer network' name selfValidator genesisInfo valBehav logF = do
+createCorePeer network' name genesisInfo valBehav logF = do
   unseqSource <- newTQueueIO
   seqP2pSource <- newBroadcastTMChanIO
   seqVmSource <- newTQueueIO
@@ -793,7 +769,7 @@ createCorePeer network' name selfValidator genesisInfo valBehav logF = do
   timerChan <- newTMChanIO
   nodeDataReqs <- newTVarIO M.empty
   let validators' = readValidatorsFromGenesisInfo genesisInfo
-  seqCtx <- newSequencerContext $ newBlockstanbulContext network' selfValidator validators' valBehav
+  seqCtx <- newSequencerContext $ newBlockstanbulContext network' validators' valBehav
   cache <- TRC.new 64
   let cstate = def & txRunResultsCache .~ cache
   coreContext <- coreContextIO seqCtx cstate
@@ -832,7 +808,8 @@ corePeerSetup :: MonadBase m => CoreT m ()
 corePeerSetup = do
   MP.initializeBlank
   genesisInfo <- asks _corePeerGenesisInfo
-  (srcInfo, gb) <- genesisInfoToGenesisBlock genesisInfo
+  let validators' = readValidatorsFromGenesisInfo genesisInfo
+  (srcInfo, gb) <- genesisInfoToGenesisBlock validators' genesisInfo
   let genHash = rlpHash $ blockBlockData gb
   asks (_genesisBlock . _corePeerContext) >>= atomically . flip writeTVar gb
   asks (_genesisBlockHash . _corePeerContext) >>= atomically . flip writeTVar (GenesisBlockHash genHash)
@@ -847,7 +824,7 @@ corePeerSetup = do
       case mOB of
         Nothing -> error $ "Couldn't locate best sequenced block: " ++ formatKeccak256WithoutColor bh
         Just ob -> do
-          putContextBestBlockInfo $ ContextBestBlockInfo bh (obBlockData ob) (fromIntegral . number $ obBlockData ob)
+          putContextBestBlockInfo $ ContextBestBlockInfo bh (obBlockData ob) (fromIntegral . BH.number $ obBlockData ob)
           processNewBestBlock bh (obBlockData ob) (rlpHash . otBaseTx <$> obReceiptTransactions ob)
           withCurrentBlockHash bh . setStateDBStateRoot Nothing . stateRoot $ obBlockData ob
     else do
@@ -876,12 +853,6 @@ corePeerSetup = do
       writeBlockSummary genesisOutputBlock
       -- for_ (M.toList mpMap) $ \(k, v) -> A.insert (A.Proxy @MP.NodeData) k v
       -- for_ (genesisInfoCodeInfo genesisInfo) $ \(CodeInfo _ src _) -> addCode SolidVM $ Text.encodeUtf8 src
-      let extraCerts = readCertsFromGenesisInfo genesisInfo
-      for_ extraCerts $ \c -> do
-        let cis = x509CertToCertInfoState c
-            ua = userAddress cis
-        A.insert (A.Proxy @X509CertInfoState) ua cis
-      for_ extraCertsHack . uncurry $ A.insert (A.Proxy @X509CertInfoState)
   
       let hashAndMd (_, CodeInfo src name) =
             ( hash $ Text.encodeUtf8 src,
@@ -895,7 +866,7 @@ corePeerSetup = do
           findMetadata = flip M.lookup metadatas
       slip <- asks _corePeerSlipstreamSource
       let pub sd vmes = do
-            Mod.output sd
+            traverse_ Mod.output sd
             atomically $ writeTQueue slip vmes
       withCurrentBlockHash genHash $ populateStorageDBs' findMetadata genesisInfo gb Nothing (stateRoot genHeader) pub
 

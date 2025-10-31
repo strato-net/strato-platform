@@ -1,10 +1,9 @@
 import { cirrus } from "../utils/api";
 import { config } from "../config";
-import { ChainInfo } from "../types";
-import { logError } from "../utils/logger";
-import { getBAUserAddress } from "../auth";
+import { ChainInfo, WithdrawalInfo } from "../types";
+import { DepositInfo } from "../types";
 
-const MERCATA_URL = "BlockApps-Mercata-MercataBridge";
+const MERCATA_URL = "BlockApps-MercataBridge";
 
 // Get all enabled chains from the bridge contract
 export const getEnabledChains = async (): Promise<ChainInfo[]> => {
@@ -50,12 +49,11 @@ export const getAssetInfo = async (
   stratoTokenAddress: string | string[],
 ): Promise<any | null | any[]> => {
   const isArray = Array.isArray(stratoTokenAddress);
-  const key = isArray ? `in.(${stratoTokenAddress.join(",")})` : `eq.${stratoTokenAddress}`;
   
   const data = await cirrus.get(`/${MERCATA_URL}-assets`, {
     params: {
-      key,
-      "value->>permissions": "gt.0",
+      "value->>stratoToken": isArray ? `in.(${stratoTokenAddress.join(",")})` : `eq.${stratoTokenAddress}`,
+      "value->>enabled": "eq.true",
       address: `eq.${config.bridge.address}`,
     },
   });
@@ -65,14 +63,14 @@ export const getAssetInfo = async (
   }
 
   return isArray 
-    ? data.map(item => ({ ...item.value, stratoToken: item.key }))
-    : data[0].value ? { ...data[0].value, stratoToken: data[0].key } : null;
+    ? data.map(item => ({ ...item.value, stratoToken: item.value.stratoToken }))
+    : data[0].value ? { ...data[0].value, stratoToken: data[0].value.stratoToken } : null;
 };
 
 // Get withdrawals by status (reusable function)
 export const getWithdrawalsByStatus = async (
   status: string,
-): Promise<any[]> => {
+): Promise<WithdrawalInfo[]> => {
   const data = await cirrus.get(`/${MERCATA_URL}-withdrawals`, {
     params: {
       "value->>bridgeStatus": `eq.${status}`,
@@ -91,7 +89,7 @@ export const getWithdrawalsByStatus = async (
 };
 
 // Get deposits by status (reusable function)
-export const getDepositsByStatus = async (status: string): Promise<any[]> => {
+export const getDepositsByStatus = async (status: string): Promise<DepositInfo[]> => {
   const data = await cirrus.get(`/${MERCATA_URL}-deposits`, {
     params: {
       "value->>bridgeStatus": `eq.${status}`,
@@ -122,9 +120,7 @@ export const getDepositsByStatus = async (status: string): Promise<any[]> => {
       ...v,
       externalChainId,
       externalTxHash,
-      externalToken: asset.externalToken,
       externalDecimals: asset.externalDecimals,
-      permissions: asset.permissions,
       depositRouter: chainInfo.depositRouter,
     };
   });

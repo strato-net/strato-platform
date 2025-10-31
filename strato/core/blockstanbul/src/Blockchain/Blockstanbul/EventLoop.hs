@@ -15,7 +15,6 @@ module Blockchain.Blockstanbul.EventLoop where
 
 import BlockApps.Crossmon
 import BlockApps.Logging
-import BlockApps.X509.Certificate
 import Blockchain.Blockstanbul.Authentication
 import Blockchain.Blockstanbul.Messages
 import Blockchain.Blockstanbul.Metrics
@@ -32,7 +31,6 @@ import Blockchain.Strato.Model.Validator
 import Conduit
 import Control.Lens hiding (view)
 import Control.Monad hiding (sequence)
-import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Extra (whenM)
 import Control.Monad.State.Strict
 import Control.Monad.Trans.Except
@@ -67,7 +65,7 @@ authorize = \case
       throwE reason
   _ -> return ()
 
-isAuthorized :: (StateMachineM m, (Address `A.Alters` X509CertInfoState) m) => InEvent -> m AuthResult
+isAuthorized :: StateMachineM m => InEvent -> m AuthResult
 isAuthorized iev = fmap (either AuthFailure (const AuthSuccess)) . runExceptT $ do
   doAuthn <- use productionAuth
   authenticated <- authenticate iev --InEvent (benf is a (ChainMemberParsedSet, Bool,Int))
@@ -175,23 +173,15 @@ nextRound nt = do
 
   when (isJust self) $ isValidator .= (Validator (fromJust self) `elem` vals)
 
-applyValidatorChanges ::
-  ( (Address `A.Alters` X509CertInfoState) m
-  , MonadState BlockstanbulContext m
-  ) =>
-  BlockHeader ->
-  m ()
+applyValidatorChanges :: MonadState BlockstanbulContext m =>
+                         BlockHeader -> m ()
 applyValidatorChanges BlockHeader{} = pure ()
 applyValidatorChanges BlockHeaderV2{..} = do
   validators %= (S.union $ S.fromList newValidators)
   validators %= (flip S.difference $ S.fromList removedValidators)
 
-commitBlock ::
-  ( (Address `A.Alters` X509CertInfoState) m
-  , StateMachineM m
-  ) =>
-  Block ->
-  ConduitM InEvent EOutEvent m ()
+commitBlock :: StateMachineM m =>
+               Block -> ConduitM InEvent EOutEvent m ()
 commitBlock blk = do
   lift . applyValidatorChanges $ blockBlockData blk
   yieldR $ ToCommit blk
@@ -204,26 +194,10 @@ commitBlock blk = do
   s <- use $ view . sequence
   nextRound . Sequence $ s + 1
 
-instance (Address `A.Alters` X509CertInfoState) m => (Address `A.Alters` X509CertInfoState) (StateT BlockstanbulContext m) where
-  lookup p   = lift . A.lookup p
-  insert p k = lift . A.insert p k
-  delete p   = lift . A.delete p
-
-instance (Address `A.Alters` X509CertInfoState) m => (Address `A.Alters` X509CertInfoState) (ExceptT String m) where
-  lookup p = lift . A.lookup p
-  insert p k = lift . A.insert p k
-  delete p   = lift . A.delete p
-
-instance {-# OVERLAPPING #-} (Address `A.Alters` X509CertInfoState) m => (A.Selectable Address X509CertInfoState) (ExceptT e m) where
-  select p = lift . A.lookup p
-
-
-
 eventLoop ::
   ( MonadIO m,
     MonadLogger m,
-    HasVault m,
-    (Address `A.Alters` X509CertInfoState) m
+    HasVault m
   ) =>
   BlockstanbulContext ->
   ConduitM InEvent EOutEvent m BlockstanbulContext
@@ -455,8 +429,7 @@ sendMessages' ::
   ( MonadIO m,
     MonadLogger m,
     HasBlockstanbulContext m,
-    HasVault m,
-    (Address `A.Alters` X509CertInfoState) m
+    HasVault m
   ) =>
   [InEvent] ->
   m [EOutEvent]
@@ -486,10 +459,10 @@ sendMessages' wms = do
 
       return evs
 
-sendMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m, HasVault m, (Address `A.Alters` X509CertInfoState) m) => [InEvent] -> m [OutEvent]
+sendMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m, HasVault m) => [InEvent] -> m [OutEvent]
 sendMessages = fmap (map fromE) . sendMessages'
 
-sendAllMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m, HasVault m, (Address `A.Alters` X509CertInfoState) m) => [InEvent] -> m [OutEvent]
+sendAllMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m, HasVault m) => [InEvent] -> m [OutEvent]
 sendAllMessages wms = do
   eout <- sendMessages' wms
   let out = fromE <$> eout

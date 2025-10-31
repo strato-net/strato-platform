@@ -2,8 +2,6 @@
 
 module Blockchain.Slipstream.Metrics
   ( recordKafkaMessages,
-    recordAction,
-    recordCombinedAction,
     incNumTables,
     incNumMappingTables,
     incNumArrayTables,
@@ -16,9 +14,6 @@ module Blockchain.Slipstream.Metrics
   )
 where
 
-import BlockApps.Crossmon
-import Blockchain.Slipstream.Data.Action
-import qualified Blockchain.Stream.Action as Action
 import Control.Monad
 import Control.Monad.Composable.Kafka
 import Control.Monad.IO.Class
@@ -31,14 +26,6 @@ kafkaCount =
   unsafeRegister
     . counter
     $ Info "slipstream_kafka_read" "Number of messages read from kafka"
-
-{-# NOINLINE actionCount #-}
-actionCount :: Vector (T.Text, T.Text) Counter
-actionCount =
-  unsafeRegister
-    . vector ("action_stage", "action_type")
-    . counter
-    $ Info "slipstream_action_count" "Number of actions seen, by type"
 
 {-# NOINLINE tablesCreated #-}
 tablesCreated :: Vector T.Text Counter
@@ -64,21 +51,6 @@ stackDepth =
 
 recordKafkaMessages :: MonadIO m => [a] -> m ()
 recordKafkaMessages = liftIO . void . addCounter kafkaCount . fromIntegral . length
-
-recordActionOn :: MonadIO m => T.Text -> AggregateAction -> m ()
-recordActionOn stage act = do
-  let kind = case actionType act of
-        Action.Create -> "create"
-        Action.Delete -> "delete"
-        Action.Update -> "update"
-  liftIO $ withLabel actionCount (stage, kind) incCounter
-  recordMaxBlockNumber "slipstream_processor" . actionBlockNumber $ act
-
-recordAction :: MonadIO m => AggregateAction -> m ()
-recordAction = recordActionOn "raw"
-
-recordCombinedAction :: MonadIO m => AggregateAction -> m ()
-recordCombinedAction = recordActionOn "combined"
 
 incNumTables :: MonadIO m => m ()
 incNumTables = liftIO $ withLabel tablesCreated "normal" incCounter

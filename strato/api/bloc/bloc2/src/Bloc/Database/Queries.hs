@@ -51,6 +51,7 @@ import Handlers.AccountInfo
 import Handlers.Storage
 import SQLM
 import SolidVM.Model.CodeCollection
+import SolidVM.Model.Storable
 import Text.Format
 import UnliftIO
 
@@ -88,7 +89,7 @@ getContractByAccountsFilterParams aParams = runMaybeT $ do
     -- This is a quick hack to get around the issues with calling Proxy 
     -- contracts through the API. If the contract is named "Proxy", and 
     -- the function name being called is not "setLogicContract", then 
-    -- the API will load the ".logicContract" storage element from the 
+    -- the API will load the "logicContract" storage element from the 
     -- contract's storage, then load the code for that address. 
     -- 
     -- Ideally, we wouldn't have to hardcode any of these names in 
@@ -101,9 +102,12 @@ getContractByAccountsFilterParams aParams = runMaybeT $ do
         . getStorage'
         $ storageFilterParams
             { qsAddress = Just a
-            , qsKey = Just ".logicContract"
+            , qsKey = Just "logicContract"
             }
-      logicContract <- MaybeT . pure . stringAddress $ Text.unpack v
+      logicContract <- MaybeT $ pure $
+            case v of
+              BAddress address' -> Just address'
+              _ -> Nothing
       (AddressStateRef' l _) <- MaybeT
         . fmap listToMaybe
         . getAccount'

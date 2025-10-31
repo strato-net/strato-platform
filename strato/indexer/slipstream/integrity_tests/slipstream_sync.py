@@ -133,34 +133,34 @@ if __name__ == "__main__":
     token_info2 = (client_id2, client_secret2, realm_2)
 
     # Wait until both nodes have the same latest block indexed in Slipstream
-    wait_for_slipstream_to_sync(node1_url, node2_url, token_info1, token_info2, attempts, sleep_time, "BlockApps-Mercata-Asset")
-    wait_for_slipstream_to_sync(node1_url, node2_url, token_info1, token_info2, attempts, sleep_time, "BlockApps-Mercata-PaymentService.Order")
-    wait_for_slipstream_to_sync(node1_url, node2_url, token_info1, token_info2, attempts, sleep_time, "BlockApps-Mercata-Sale")
-    wait_for_slipstream_to_sync(node1_url, node2_url, token_info1, token_info2, attempts, sleep_time, "BlockApps-Mercata-Asset.ItemTransfers")
-    wait_for_slipstream_to_sync(node1_url, node2_url, token_info1, token_info2, attempts, sleep_time, "BlockApps-Mercata-Asset-files")
-    wait_for_slipstream_to_sync(node1_url, node2_url, token_info1, token_info2, attempts, sleep_time, "BlockApps-Mercata-Asset-images")
-    wait_for_slipstream_to_sync(node1_url, node2_url, token_info1, token_info2, attempts, sleep_time, "BlockApps-Mercata-Asset-fileNames")
+    wait_for_slipstream_to_sync(node1_url, node2_url, token_info1, token_info2, attempts, sleep_time, "BlockApps-Asset")
+    wait_for_slipstream_to_sync(node1_url, node2_url, token_info1, token_info2, attempts, sleep_time, "BlockApps-PaymentService.Order")
+    wait_for_slipstream_to_sync(node1_url, node2_url, token_info1, token_info2, attempts, sleep_time, "BlockApps-Sale")
+    wait_for_slipstream_to_sync(node1_url, node2_url, token_info1, token_info2, attempts, sleep_time, "BlockApps-Asset.ItemTransfers")
+    wait_for_slipstream_to_sync(node1_url, node2_url, token_info1, token_info2, attempts, sleep_time, "BlockApps-Asset-files")
+    wait_for_slipstream_to_sync(node1_url, node2_url, token_info1, token_info2, attempts, sleep_time, "BlockApps-Asset-images")
+    wait_for_slipstream_to_sync(node1_url, node2_url, token_info1, token_info2, attempts, sleep_time, "BlockApps-Asset-fileNames")
 
     token1 = get_auth_token(*token_info1)
     token2 = get_auth_token(*token_info2)
     headers1 = {'Authorization': f'Bearer {token1}'}
     headers2 = {'Authorization': f'Bearer {token2}'}
 
-    discrepancies_asset, count_asset_discrepancy = check_table("BlockApps-Mercata-Asset", headers1, headers2)
-    discrepancies_sale, count_sale_discrepancy = check_table("BlockApps-Mercata-PaymentService.Order", headers1, headers2)
-    discrepancies_order, count_order_discrepancy = check_table("BlockApps-Mercata-Sale", headers1, headers2)
+    discrepancies_asset, count_asset_discrepancy = check_table("BlockApps-Asset", headers1, headers2)
+    discrepancies_sale, count_sale_discrepancy = check_table("BlockApps-PaymentService.Order", headers1, headers2)
+    discrepancies_order, count_order_discrepancy = check_table("BlockApps-Sale", headers1, headers2)
 
     #Event tables
-    discrepancies_asset_its, count_asset_its_discrepancy = check_table("BlockApps-Mercata-Asset.ItemTransfers", headers1, headers2)
-    discrepancies_asset_own, count_asset_own_discrepancy = check_table("BlockApps-Mercata-Asset.OwnershipTransfer", headers1, headers2)
+    discrepancies_asset_its, count_asset_its_discrepancy = check_table("BlockApps-Asset.ItemTransfers", headers1, headers2)
+    discrepancies_asset_own, count_asset_own_discrepancy = check_table("BlockApps-Asset.OwnershipTransfer", headers1, headers2)
 
     #Colletion tables
-    discrepancies_asset_files, count_asset_files_discrepancy = check_table("BlockApps-Mercata-Asset-files", headers1, headers2)
-    discrepancies_asset_fileNames, count_asset_fileNames_discrepancy = check_table("BlockApps-Mercata-Asset-fileNames", headers1, headers2)
-    discrepancies_asset_images, count_asset_images_discrepancy = check_table("BlockApps-Mercata-Asset-images", headers1, headers2)
+    discrepancies_asset_files, count_asset_files_discrepancy = check_table("BlockApps-Asset-files", headers1, headers2)
+    discrepancies_asset_fileNames, count_asset_fileNames_discrepancy = check_table("BlockApps-Asset-fileNames", headers1, headers2)
+    discrepancies_asset_images, count_asset_images_discrepancy = check_table("BlockApps-Asset-images", headers1, headers2)
 
     #Joins
-    discrepancies_join, count_join_discrepancy = check_table("BlockApps-Mercata-Asset?&select=*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Asset-fileNames(*),BlockApps-Mercata-Sale!BlockApps-Mercata-Sale_BlockApps-Mercata-Asset_fk(*,BlockApps-Mercata-Sale-paymentProviders(*))"
+    discrepancies_join, count_join_discrepancy = check_table("BlockApps-Asset?&select=*,BlockApps-Asset-files(*),BlockApps-Asset-images(*),BlockApps-Asset-fileNames(*),BlockApps-Sale!BlockApps-Sale_BlockApps-Asset_fk(*,BlockApps-Sale-paymentProviders(*))"
                                                              , headers1
                                                              , headers2)
 

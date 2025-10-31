@@ -15,7 +15,11 @@ export interface ContractInfo {
  */
 export interface EventData {
   event_name?: string;
-  contract_name?: string;
+  storage?: {
+    contract?: Array<{
+      contract_name?: string;
+    }>;
+  };
 }
 
 /**
@@ -27,10 +31,8 @@ export interface Event {
   block_hash: string;
   block_timestamp: string;
   block_number: string;
-  transaction_hash: string;
   transaction_sender: string;
   event_index: number;
-  creator: string;
   contract_name: string;
   event_name: string;
   attributes: Record<string, string>;

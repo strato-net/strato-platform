@@ -17,7 +17,6 @@ module Blockchain.Init.Monad (
   ) where
 
 import BlockApps.Logging
-import BlockApps.X509.Certificate
 import Blockchain.Constants
 import Blockchain.DB.CodeDB
 import Blockchain.DB.HashDB
@@ -37,14 +36,13 @@ import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Resource
-import qualified Data.ByteString as B
 import Data.IORef
 import qualified Data.Map as M
 import qualified Data.NibbleString as N
-import qualified Data.Text as T
 import qualified Database.LevelDB as DB
 import Network.HTTP.Client (defaultManagerSettings, newManager)
 import Servant.Client
+import SolidVM.Model.Storable
 import qualified Strato.Strato23.API as VC
 import qualified Strato.Strato23.Client as VC
 
@@ -54,8 +52,8 @@ data SetupDBs = SetupDBs
     hashDB :: HashDB,
     codeDB :: CodeDB,
     vaultDB :: ClientEnv,
-    localStorageTx :: IORef (M.Map (Address, B.ByteString) B.ByteString),
-    localStorageBlock :: IORef (M.Map (Address, B.ByteString) B.ByteString),
+    localStorageTx :: IORef (M.Map (Address, StoragePath) BasicValue),
+    localStorageBlock :: IORef (M.Map (Address, StoragePath) BasicValue),
     localAddressStateTx :: IORef (M.Map Address AddressStateModification),
     localAddressStateBlock :: IORef (M.Map Address AddressStateModification)
   }
@@ -144,12 +142,6 @@ instance (MonadIO m, MonadLogger m, HasDBs m) => (Keccak256 `A.Alters` DBCode) m
  
 instance {-# OVERLAPPING #-} Monad m => A.Selectable FilePath (Either String String) (ReaderT SetupDBs m) where
   select _ _ = pure Nothing
-
-instance (MonadIO m, MonadLogger m, HasDBs m) => (Address `A.Selectable` X509Certificate) m where
-  select _ = error "SetupDBM select @X509Certificate"
-
-instance (MonadIO m, MonadLogger m, HasDBs m) => ((Address, T.Text) `A.Selectable` X509CertificateField) m where
-  select _ = error "SetupDBM select @X509CertificateField"
 
 instance (MonadIO m, MonadLogger m, HasDBs m) => (N.NibbleString `A.Alters` N.NibbleString) m where
   lookup _ = genericLookupHashDB $ fmap hashDB $ Mod.access Mod.Proxy

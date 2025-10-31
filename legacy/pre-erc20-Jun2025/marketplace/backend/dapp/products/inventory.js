@@ -431,8 +431,8 @@ async function get(user, args, options) {
       saleAddress: sale.address,
       saleQuantity: sale.quantity,
       paymentServices: sale
-        ? sale['BlockApps-Mercata-Sale-paymentServices']
-          ? sale['BlockApps-Mercata-Sale-paymentServices']
+        ? sale['BlockApps-Sale-paymentServices']
+          ? sale['BlockApps-Sale-paymentServices']
           : null
         : null,
     };
@@ -452,8 +452,8 @@ async function get(user, args, options) {
   }
 
   // Sort the images and files by their order
-  if (inventory['BlockApps-Mercata-Asset-images']) {
-    inventory['BlockApps-Mercata-Asset-images'].sort((a, b) => {
+  if (inventory['BlockApps-Asset-images']) {
+    inventory['BlockApps-Asset-images'].sort((a, b) => {
       return parseInt(a.key) - parseInt(b.key);
     });
   }
@@ -529,8 +529,8 @@ async function getAll(admin, args = {}, defaultOptions) {
             saleQuantity: itemSale?.quantity,
             saleDate: itemSale?.block_timestamp,
             paymentServices: itemSale
-              ? itemSale['BlockApps-Mercata-Sale-paymentServices']
-                ? itemSale['BlockApps-Mercata-Sale-paymentServices']
+              ? itemSale['BlockApps-Sale-paymentServices']
+                ? itemSale['BlockApps-Sale-paymentServices']
                 : null
               : null,
             totalLockedQuantity: itemSale?.totalLockedQuantity,
@@ -597,13 +597,13 @@ async function getAll(admin, args = {}, defaultOptions) {
       for (let i = 0; i < inventories.length; i++) {
         const inventory = inventories[i];
         if (
-          inventory['BlockApps-Mercata-Sale'] &&
-          inventory['BlockApps-Mercata-Sale'].length > 0 &&
-          inventory['BlockApps-Mercata-Sale'].some(
+          inventory['BlockApps-Sale'] &&
+          inventory['BlockApps-Sale'].length > 0 &&
+          inventory['BlockApps-Sale'].some(
             (item) => item.isOpen === true
           )
         ) {
-          let sales = inventory['BlockApps-Mercata-Sale'].filter(
+          let sales = inventory['BlockApps-Sale'].filter(
             (sale) => sale.isOpen === true
           );
 
@@ -641,11 +641,11 @@ async function getAll(admin, args = {}, defaultOptions) {
                 saleDate: sales[0]?.block_timestamp,
                 totalLockedQuantity: sales[0]?.totalLockedQuantity,
                 paymentServices: sales[0]
-                  ? sales[0]['BlockApps-Mercata-Sale-paymentServices']
-                    ? sales[0]['BlockApps-Mercata-Sale-paymentServices']
+                  ? sales[0]['BlockApps-Sale-paymentServices']
+                    ? sales[0]['BlockApps-Sale-paymentServices']
                     : null
                   : null,
-                'BlockApps-Mercata-Sale': undefined, // Removing the nested sale data to avoid redundancy
+                'BlockApps-Sale': undefined, // Removing the nested sale data to avoid redundancy
               });
             }
           } else {
@@ -658,24 +658,24 @@ async function getAll(admin, args = {}, defaultOptions) {
               saleDate: sales[0]?.block_timestamp,
               totalLockedQuantity: sales[0]?.totalLockedQuantity,
               paymentServices: sales[0]
-                ? sales[0]['BlockApps-Mercata-Sale-paymentServices']
-                  ? sales[0]['BlockApps-Mercata-Sale-paymentServices']
+                ? sales[0]['BlockApps-Sale-paymentServices']
+                  ? sales[0]['BlockApps-Sale-paymentServices']
                   : null
                 : null,
-              'BlockApps-Mercata-Sale': undefined, // Removing the nested sale data to avoid redundancy
+              'BlockApps-Sale': undefined, // Removing the nested sale data to avoid redundancy
             });
           }
         } else {
           let escrow;
           if (
-            inventory['BlockApps-Mercata-Escrow-assets'] &&
-            inventory['BlockApps-Mercata-Escrow-assets'].length > 0
+            inventory['BlockApps-Escrow-assets'] &&
+            inventory['BlockApps-Escrow-assets'].length > 0
           ) {
-            escrow = inventory['BlockApps-Mercata-Escrow-assets'].find(
+            escrow = inventory['BlockApps-Escrow-assets'].find(
               (asset) =>
-                asset['BlockApps-Mercata-Escrow']?.isActive === true &&
+                asset['BlockApps-Escrow']?.isActive === true &&
                 asset.value === inventory.address
-            )?.['BlockApps-Mercata-Escrow'];
+            )?.['BlockApps-Escrow'];
           }
           if (isMarketplaceSearch && isNullPriceRange) {
             if (!escrow) {
@@ -701,8 +701,8 @@ async function getAll(admin, args = {}, defaultOptions) {
   // Sort the images and files by their order
   return finalInventory
     ? finalInventory.map((inventory) => {
-        if (inventory['BlockApps-Mercata-Asset-images']) {
-          inventory['BlockApps-Mercata-Asset-images'].sort(
+        if (inventory['BlockApps-Asset-images']) {
+          inventory['BlockApps-Asset-images'].sort(
             (a, b) => parseInt(a.key) - parseInt(b.key)
           );
         }
@@ -727,7 +727,7 @@ async function getStakeableProducts(admin, defaultOptions) {
     };
     const reserveResponse = await rest.search(
       admin,
-      { name: 'BlockApps-Mercata-Reserve' },
+      { name: 'BlockApps-Reserve' },
       reserveSearchOptions
     );
     const stakeableAssets = reserveResponse.map(
@@ -752,7 +752,7 @@ async function getStakeableProducts(admin, defaultOptions) {
     // Get the total count of assets.
     const countResponse = await rest.search(
       admin,
-      { name: 'BlockApps-Mercata-Asset' },
+      { name: 'BlockApps-Asset' },
       searchOptions
     );
     const totalCount = countResponse?.[0]?.count || 0;
@@ -778,13 +778,13 @@ async function getStakeableProducts(admin, defaultOptions) {
 
       const batchUtxos = await rest.search(
         admin,
-        { name: 'BlockApps-Mercata-Asset' },
+        { name: 'BlockApps-Asset' },
         batchOptions
       );
 
       batchUtxos.forEach((utxo) => {
         // Retrieve sale data and look for an open sale.
-        const sales = utxo['BlockApps-Mercata-Sale'] || [];
+        const sales = utxo['BlockApps-Sale'] || [];
         const openSale = sales.find((sale) => sale.isOpen === true);
 
         // Validate UTXO based on sale state.
@@ -800,11 +800,11 @@ async function getStakeableProducts(admin, defaultOptions) {
           bestSalesByRoot.set(
             utxo.root,
             openSale
-              ? { ...utxo, 'BlockApps-Mercata-Sale': [openSale] }
-              : { ...utxo, sale: null, 'BlockApps-Mercata-Sale': [] }
+              ? { ...utxo, 'BlockApps-Sale': [openSale] }
+              : { ...utxo, sale: null, 'BlockApps-Sale': [] }
           );
         } else if (openSale) {
-          const currentSale = currentBest['BlockApps-Mercata-Sale']?.find(
+          const currentSale = currentBest['BlockApps-Sale']?.find(
             (s) => s.isOpen
           );
           if ((currentSale?.quantity || 0) < (openSale.quantity || 0)) {
@@ -818,7 +818,7 @@ async function getStakeableProducts(admin, defaultOptions) {
 
     // Map over the filtered UTXOs to update them with sale details.
     const updatedInventories = filteredSales.map((utxo) => {
-      const sale = utxo['BlockApps-Mercata-Sale']?.[0];
+      const sale = utxo['BlockApps-Sale']?.[0];
       return {
         ...utxo,
         assetToBeSold: sale?.assetToBeSold,
@@ -829,17 +829,17 @@ async function getStakeableProducts(admin, defaultOptions) {
         saleDate: sale?.block_timestamp,
         totalLockedQuantity: sale?.totalLockedQuantity,
         paymentServices: sale
-          ? sale['BlockApps-Mercata-Sale-paymentServices']
+          ? sale['BlockApps-Sale-paymentServices']
           : null,
         // Remove the nested sale data to avoid redundancy.
-        'BlockApps-Mercata-Sale': undefined,
+        'BlockApps-Sale': undefined,
       };
     });
 
     // Sort the images by their key order and marshal each inventory.
     return updatedInventories.map((inventory) => {
-      if (Array.isArray(inventory['BlockApps-Mercata-Asset-images'])) {
-        inventory['BlockApps-Mercata-Asset-images'].sort(
+      if (Array.isArray(inventory['BlockApps-Asset-images'])) {
+        inventory['BlockApps-Asset-images'].sort(
           (a, b) => parseInt(a.key) - parseInt(b.key)
         );
       }

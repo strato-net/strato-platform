@@ -13,6 +13,52 @@ import { Form, Input, Switch, Button as AntButton } from 'antd';
 import { ExclamationCircleOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { handleRecipientAddress, handleAdminNumericInputChange } from '@/utils/transferValidation';
 
+// Helper functions for stability fee rate conversion
+const RAY = BigInt(10) ** BigInt(27);
+
+const rpow = (x: bigint, n: bigint): bigint => {
+  let z = n % 2n !== 0n ? x : RAY;
+  let xCopy = x;
+  let nCopy = n;
+  for (nCopy = nCopy / 2n; nCopy !== 0n; nCopy = nCopy / 2n) {
+    xCopy = (xCopy * xCopy) / RAY;
+    if (nCopy % 2n !== 0n) {
+      z = (z * xCopy) / RAY;
+    }
+  }
+  return z;
+};
+
+const convertAnnualPercentageToStabilityFeeRate = (annualPercentage: number): bigint => {
+  const secondsPerYear = 31536000n;
+  const targetAnnualFactorRay = RAY + BigInt(Math.floor((annualPercentage / 100) * Number(RAY)));
+  
+  let low = RAY;
+  let high = RAY + (RAY / 100n);
+  
+  for (let i = 0; i < 100; i++) {
+    const mid = (low + high) / 2n;
+    const result = rpow(mid, secondsPerYear);
+    
+    if (result < targetAnnualFactorRay) {
+      low = mid;
+    } else {
+      high = mid;
+    }
+    
+    if (high - low <= 1n) {
+      break;
+    }
+  }
+  
+  const lowResult = rpow(low, secondsPerYear);
+  const highResult = rpow(high, secondsPerYear);
+  const lowDiff = lowResult > targetAnnualFactorRay ? lowResult - targetAnnualFactorRay : targetAnnualFactorRay - lowResult;
+  const highDiff = highResult > targetAnnualFactorRay ? highResult - targetAnnualFactorRay : targetAnnualFactorRay - highResult;
+  
+  return lowDiff < highDiff ? low : high;
+};
+
 const CollateralConfigManager = () => {
   const [form] = Form.useForm();
   const [activeTab, setActiveTab] = useState('add');
@@ -57,6 +103,24 @@ const CollateralConfigManager = () => {
  
 
   const handleSubmit = useCallback(async (values: any) => {
+    // Validate minCR >= liquidationRatio BEFORE setting loading state
+    const liquidationRatioValue = Number(values.liquidationRatio);
+    const minCRValue = Number(values.minCR);
+    
+    if (minCRValue < liquidationRatioValue) {
+      setInputErrors(prev => ({
+        ...prev,
+        minCR: `Must be >= Liquidation Ratio (${liquidationRatioValue.toFixed(2)})`
+      }));
+      return;
+    }
+    
+    // Clear any previous errors
+    setInputErrors(prev => {
+      const { minCR, ...rest } = prev;
+      return rest;
+    });
+    
     try {
       setLoading(true);
       
@@ -68,21 +132,25 @@ const CollateralConfigManager = () => {
       // Convert liquidation ratio from percentage to WAD (e.g., 150% -> 1.5e18)
       const liquidationRatioContract = (BigInt(Math.floor(Number(values.liquidationRatio) * 100)) * WAD) / BigInt(100);
       
+      // Convert min collateral ratio from percentage to WAD (e.g., 160% -> 1.6e18)
+      const minCRContract = (BigInt(Math.floor(Number(values.minCR) * 100)) * WAD) / BigInt(100);
+      
       // Convert stability fee rate from annual percentage to per-second RAY
-      const [intPart, decPart = ''] = values.stabilityFeeRate.toString().split('.');
-      const scale = BigInt(10) ** BigInt(decPart.length);
-      const stabilityFeeRateContract = (BigInt(intPart + decPart) * RAY) / (BigInt(100) * scale * secondsPerYear) + RAY;
+      const annualPercentage = Number(values.stabilityFeeRate);
+      const stabilityFeeRateContract = convertAnnualPercentageToStabilityFeeRate(annualPercentage);
       
       // Convert unit scale from decimal count to 1eX format
       const unitScaleContract = BigInt(10) ** BigInt(values.unitScale);
-      
+
       // Convert debt floor/ceiling from USD to wei (18 decimals)
-      const debtFloorContract = BigInt(Math.floor(Number(values.debtFloor) * 1e18));
-      const debtCeilingContract = BigInt(Math.floor(Number(values.debtCeiling) * 1e18));
+      // Convert to BigInt first, then multiply to avoid precision loss
+      const debtFloorContract = BigInt(Math.floor(Number(values.debtFloor))) * (BigInt(10) ** BigInt(18));
+      const debtCeilingContract = BigInt(Math.floor(Number(values.debtCeiling))) * (BigInt(10) ** BigInt(18));
       
       const configData = {
         asset: values.asset,
         liquidationRatio: liquidationRatioContract.toString(),
+        minCR: minCRContract.toString(),
         liquidationPenaltyBps: values.liquidationPenaltyBps,
         closeFactorBps: values.closeFactorBps,
         stabilityFeeRate: stabilityFeeRateContract.toString(),
@@ -97,6 +165,9 @@ const CollateralConfigManager = () => {
       toast.success('Collateral configuration updated successfully');
       resetForm();
       await loadAssets();
+    } catch (error) {
+      console.error('Failed to set collateral config:', error);
+      toast.error('Failed to update collateral configuration. Please check the values and try again.');
     } finally {
       setLoading(false);
     }
@@ -106,8 +177,8 @@ const CollateralConfigManager = () => {
     setEditingAsset(asset.asset);
     
     // Convert debt floor/ceiling from wei back to USD
-    const debtFloorUI = Number(asset.debtFloor) / 1e18;
-    const debtCeilingUI = Number(asset.debtCeiling) / 1e18;
+    const debtFloorUI = (BigInt(asset.debtFloor || 0) / (BigInt(10) ** BigInt(18)));
+    const debtCeilingUI = (BigInt(asset.debtCeiling) / (BigInt(10) ** BigInt(18)));
     
     // Convert unit scale from 1eX back to decimal count
     const unitScaleUI = Math.log10(Number(asset.unitScale));
@@ -115,9 +186,12 @@ const CollateralConfigManager = () => {
     form.setFieldsValue({
       asset: asset.asset.trim(),
       liquidationRatio: (asset.liquidationRatio / 100).toString(), // Convert percentage to decimal for form
+      minCR: ((asset.minCR || asset.liquidationRatio) / 100).toString(), // Convert percentage to decimal for form, fallback to liquidationRatio
       liquidationPenaltyBps: asset.liquidationPenaltyBps.toString(),
       closeFactorBps: asset.closeFactorBps.toString(),
-      stabilityFeeRate: asset.stabilityFeeRate.toString(), // Backend already provides annual percentage
+      // Round to 2 decimals for display to avoid showing floating-point artifacts like 2.0000000099
+      // The binary search ensures the saved value is optimal
+      stabilityFeeRate: asset.stabilityFeeRate.toFixed(2),
       debtFloor: debtFloorUI.toString(),
       debtCeiling: debtCeilingUI.toString(),
       unitScale: unitScaleUI.toString(),
@@ -288,6 +362,21 @@ const CollateralConfigManager = () => {
                       className="w-full"
                       inputMode="decimal"
                       onChange={(e) => handleNumericInputChange('liquidationRatio', e.target.value, "5", 2, "1")}
+                    />
+                  </Form.Item>
+
+                  <Form.Item
+                    name="minCR"
+                    label="Min Collateral Ratio (e.g., 1.6 = 160%)"
+                    extra="Range: 1.0-5.0 (100%-500%), must be >= Liquidation Ratio"
+                    validateStatus={inputErrors.minCR ? 'error' : ''}
+                    help={inputErrors.minCR}
+                  >
+                    <Input 
+                      placeholder="1.6"
+                      className="w-full"
+                      inputMode="decimal"
+                      onChange={(e) => handleNumericInputChange('minCR', e.target.value, "5", 2, "1")}
                     />
                   </Form.Item>
 
@@ -506,6 +595,10 @@ const CollateralConfigManager = () => {
                           <div>
                             <p className="text-sm text-gray-500">Liquidation Ratio</p>
                             <p className="font-semibold">{formatValue(asset.liquidationRatio.toString(), 'percentage')}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-500">Min CR</p>
+                            <p className="font-semibold">{formatValue((asset.minCR || asset.liquidationRatio).toString(), 'percentage')}</p>
                           </div>
                           <div>
                             <p className="text-sm text-gray-500">Penalty</p>

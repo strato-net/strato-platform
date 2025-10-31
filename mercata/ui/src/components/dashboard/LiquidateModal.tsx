@@ -69,12 +69,16 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
   const [repayStr, setRepayStr] = useState<string>(maxRepayEth.toString());
   const [displayAmount, setDisplayAmount] = useState<string>(addCommasToInput(maxRepayEth.toString()));
   const [isAllSelected, setIsAllSelected] = useState<boolean>(true);
+  const [minCollateralOutStr, setMinCollateralOutStr] = useState<string>("0");
+  const [minCollateralOutDisplay, setMinCollateralOutDisplay] = useState<string>("0");
 
   // Reset when collateral changes or modal opens anew
   useEffect(() => {
     setRepayStr(maxRepayEth.toString());
     setDisplayAmount(addCommasToInput(maxRepayEth.toString()));
     setIsAllSelected(true);
+    setMinCollateralOutStr("0");
+    setMinCollateralOutDisplay("0");
   }, [maxRepayEth]);
 
   const { toast } = useToast();
@@ -138,6 +142,14 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
     }
   };
 
+  const handleMinCollateralOutChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/,/g, '');
+    if (/^\d*\.?\d*$/.test(value)) {
+      setMinCollateralOutDisplay(addCommasToInput(value));
+      setMinCollateralOutStr(value);
+    }
+  };
+
   // Determine loan token USD price. For now assume 1 if symbol contains "USD", else use collPriceUsd / bonus to approximate
   let loanPriceUsd = 1;
   if (!/usd/i.test(loan.assetSymbol || "")) {
@@ -155,8 +167,10 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
       return;
     }
     
+    const minCollateralOutWei = toWeiFromStr(minCollateralOutStr || "0");
+    
     try {
-      const result = await executeLiquidation(loan.id, collateral.asset, repayWeiOrAll);
+      const result = await executeLiquidation(loan.id, collateral.asset, repayWeiOrAll, minCollateralOutWei);
       // Check the actual transaction status, not just that the API call succeeded
       if (result && result.status && result.status.toLowerCase() === 'success') {
         toast({ title: "Liquidation submitted", variant: "success" });
@@ -170,13 +184,10 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
           variant: "destructive" 
         });
       }
-    } catch (error) {
-      console.error('Liquidation failed:', error);
-      toast({ 
-        title: "Liquidation Failed", 
-        description: "Unable to submit liquidation. Please try again.",
-        variant: "destructive" 
-      });
+    } catch (error: any) {
+      // Axios interceptor already shows the error toast, so we don't need to show another one
+      // Just log for debugging
+      console.error('Liquidation error:', error?.response?.data || error);
     }
   };
 
@@ -210,6 +221,23 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
                 maxValue={maxRepayDec}
                 onChange={handlePercentageChange}
               />
+          </div>
+
+          <div className="space-y-3">
+            <label className="text-sm font-medium">Min Collateral Out ({collateral.symbol || "COLL"}) - Optional</label>
+            <div className="text-xs text-gray-500 mb-2">
+              Set a minimum collateral amount to receive (slippage protection). Leave at 0 to accept any amount.
+            </div>
+            <div className="relative">
+              <Input
+                type="text"
+                inputMode="decimal"
+                pattern="[0-9]*\.?[0-9]*"
+                placeholder="0.00"
+                value={minCollateralOutDisplay}
+                onChange={handleMinCollateralOutChange}
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4 text-sm pt-2">

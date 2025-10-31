@@ -24,6 +24,9 @@ interface UserContextType {
   contractDetailsResultsLoading: boolean;
   getContractDetails: (address: string) => Promise<void>;
   castVoteOnIssue: (target: string, func: string, args: string[]) => Promise<void>;
+  castVoteOnIssueById: (issueId: string) => Promise<void>;
+  addAdmin: (userAddress: string) => Promise<void>;
+  removeAdmin: (userAddress: string) => Promise<void>;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -97,11 +100,21 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
   const castVoteOnIssue = async (target: string, func: string, args: any[]) => {
     try {
-      await api.post('/user/admin/vote', {target, func, args});
+      await api.post('/user/admin/vote', { target, func, args });
+      await getOpenIssues();
     } catch (error) {
-    } finally {
-      const response = await getOpenIssues();
-      return response;
+      await getOpenIssues();
+      throw error;
+    }
+  };
+
+  const castVoteOnIssueById = async (issueId: string) => {
+    try {
+      await api.post('/user/admin/vote/by-id', { issueId });
+      await getOpenIssues();
+    } catch (error) {
+      await getOpenIssues();
+      throw error;
     }
   };
 
@@ -144,6 +157,16 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  const addAdmin = async (userAddress: string) => {
+    await api.post('/user/admin', { userAddress });
+    await getOpenIssues();
+  };
+
+  const removeAdmin = async (userAddress: string) => {
+    await api.delete('/user/admin', { data: { userAddress } });
+    await getOpenIssues();
+  };
+
   const refreshAuth = () => {
     checkAuthenticationStatus();
   };
@@ -173,6 +196,9 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     openIssues,
     getOpenIssues,
     castVoteOnIssue,
+    castVoteOnIssueById,
+    addAdmin,
+    removeAdmin,
     contractSearch,
     contractSearchResults,
     contractSearchResultsLoading,
@@ -180,7 +206,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     contractDetailsResults,
     contractDetailsResultsLoading,
   }), [userAddress, isLoggedIn, isAdmin, loading, userName,
-    openIssues, openIssuesLoading, getOpenIssues, castVoteOnIssue,
+    openIssues, openIssuesLoading, getOpenIssues, castVoteOnIssue, castVoteOnIssueById, addAdmin, removeAdmin,
     contractSearch, contractSearchResults, contractSearchResultsLoading,
     getContractDetails, contractDetailsResults, contractDetailsResultsLoading,
   ]);

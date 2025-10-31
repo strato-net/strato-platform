@@ -49,13 +49,10 @@ unparseSourceUnit (FLContract contract) = unparseContract contract
 unparseSourceUnit (FLFunc n a) = unparseFunc (n, a)
 
 unparseVar :: (SolidString, VariableDecl) -> String
-unparseVar (name, (VariableDecl theType isPublic maybeExpression _ _ _)) =
+unparseVar (name, (VariableDecl theType vis maybeExpression _ _ _)) =
   unparseVarType (theType)
     <> " "
-    <> ( if isPublic --TODO- I need to expand this to public, private or nothing
-           then "public "
-           else ""
-       )
+    <> maybe "" ((<> " ") . Text.unpack . tShowVisibility) vis
     <> labelToString name
     <> ( case maybeExpression of
            Nothing -> ""
@@ -64,13 +61,10 @@ unparseVar (name, (VariableDecl theType isPublic maybeExpression _ _ _)) =
     <> ";"
 
 unparseConstant :: (SolidString, ConstantDecl) -> String
-unparseConstant (name, (ConstantDecl theType isPublic expression _)) =
+unparseConstant (name, (ConstantDecl theType vis expression _)) =
   unparseVarType (theType)
     <> " "
-    <> ( if isPublic --TODO- I need to expand this to public, private or nothing
-           then "public "
-           else ""
-       )
+    <> maybe "" ((<> " ") . Text.unpack . tShowVisibility) vis
     {-  <> (case varTypePublic theType of
             Nothing -> ""
             Just True -> "public "
@@ -142,7 +136,6 @@ unparseVarType (SVMType.Int Nothing Nothing) = "uint"
 unparseVarType (SVMType.Bool) = "bool"
 unparseVarType (SVMType.String _) = "string"
 unparseVarType (SVMType.Address _) = "address"
-unparseVarType (SVMType.Account _) = "account"
 unparseVarType (SVMType.Bytes (Just True) _) = "bytes"
 unparseVarType (SVMType.Bytes Nothing (Just bytes)) = "bytes" <> (show bytes)
 unparseVarType (SVMType.UnknownLabel str _) = labelToString str
@@ -333,7 +326,7 @@ unparseExpression (BoolLiteral _ False) = "false"
 unparseExpression (BoolLiteral _ True) = "true"
 unparseExpression (DecimalLiteral _ v) = show $ unwrapDecimal v
 unparseExpression (StringLiteral _ s) = ('"' :) . (++ "\"") $ s
-unparseExpression (AccountLiteral _ a) = ('<' :) . (++ ">") $ show a
+unparseExpression (AddressLiteral _ a) = ('<' :) . (++ ">") $ show a
 unparseExpression (HexaLiteral _ a) = "hex\"" ++ (labelToString a) ++ "\""
 unparseExpression (InlineBoundsCheck _ _ _ a) = unparseExpression a
 unparseExpression (TupleExpression _ vals) = "(" ++ List.intercalate ", " (map (maybe "" unparseExpression) vals) ++ ")"

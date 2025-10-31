@@ -38,48 +38,37 @@ module Blockchain.SolidVM.SM
     getEnv,
     getGasInfo,
     getVariableOfName,
-    getTypeOfName,
-    getXabiType,
-    getXabiValueType,
-    getXabiValueType',
-    getValueType,
-    getValueType',
     pushSender,
     initializeAction,
-    -- lookupX509AddrFromCBHash,
     markDiffForAction,
     getBlockHashWithNumber,
     getBSum,
     addEvent,
     addDelegatecall,
+    addNewCodeCollection,
     getContractNameAndHash,
     getCodeAndCollection,
     getContractsForParents,
     getAbstractParentsFromContract,
     getMapNamesFromContract,
-    getArrayNamesFromContract,
-    resolveNameParts
+    getArrayNamesFromContract
   )
 where
 
 --import           Data.IORef
 
 import BlockApps.Logging
-import BlockApps.X509.Certificate
 import Blockchain.DB.CodeDB
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.RawStorageDB
-import Blockchain.DB.SolidStorageDB
 import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockSummary
-import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.CodeCollectionDB
 import Blockchain.SolidVM.Exception
 import Blockchain.SolidVM.GasInfo
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Code
@@ -91,7 +80,6 @@ import qualified Blockchain.Stream.Action as Action
 import Blockchain.VMContext
 import Blockchain.VMOptions
 import Control.Applicative ((<|>))
-import Control.DeepSeq (force, ($!!))
 import Control.Lens hiding (Context)
 import Control.Monad
 import Control.Monad.Catch (MonadCatch)
@@ -99,12 +87,9 @@ import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Reader
-import Data.Bifunctor (first)
-import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import Data.Either (isLeft)
 import Data.Foldable (for_)
-import Data.List (find)
 import qualified Data.List.NonEmpty as NE
 import Data.Map (Map)
 import qualified Data.Map.Ordered as OMap
@@ -114,9 +99,10 @@ import qualified Data.NibbleString as N
 import qualified Data.Sequence as Q
 import qualified Data.Set as S
 import Data.Source
+import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import Debugger
+import SolidVM.Model.CodeCollection (CodeCollection)
 import qualified SolidVM.Model.CodeCollection as CC
 import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Storable as MS
@@ -137,7 +123,7 @@ data CallInfo = CallInfo
     collectionHash :: Keccak256,
     localVariables :: NE.NonEmpty (Map SolidString Variable),
     stateMap :: !(M.Map Address AddressStateModification),
-    storageMap :: !(M.Map (Address, B.ByteString) B.ByteString),
+    storageMap :: !(M.Map (Address, MS.StoragePath) MS.BasicValue),
     readOnly :: Bool,
     isUncheckedSection :: Bool, -- TODO: Perform overflow/underflow checks for all arithmetic operations and revert if so, use this flag to disable checks
     currentSourcePos :: Maybe SourcePosition,
@@ -183,9 +169,6 @@ type MonadSM m =
     HasStateDB m,
     HasCodeDB m,
     (Keccak256 `A.Alters` BlockSummary) m,
-    HasSelectX509CertDB m,
-    HasSelectX509FieldDB m,
-    A.Selectable (Address, T.Text) X509CertificateField m,
     HasRawStorageDB m,
     HasMemAddressStateDB m,
     HasMemRawStorageDB m,
@@ -200,6 +183,7 @@ type MonadSM m =
     Mod.Modifiable Action m,
     Mod.Modifiable (Q.Seq Event) m,
     Mod.Modifiable (Q.Seq Action.Delegatecall) m,
+    Mod.Modifiable [(Text, CodeCollection)] m,
     Mod.Modifiable (Maybe DebugSettings) m,
     MonadUnliftIO m, --todo: remove
     MonadCatch m,
@@ -393,12 +377,6 @@ instance (Keccak256 `A.Alters` DBCode) m => (Keccak256 `A.Alters` DBCode) (SM m)
   insert p k = lift . A.insert p k
   delete p = lift . A.delete p
 
-instance (Address `A.Selectable` X509Certificate) m => (Address `A.Selectable` X509Certificate) (SM m) where
-  select p k = lift $ A.select p k
-
-instance ((Address, T.Text) `A.Selectable` X509CertificateField) m => ((Address, T.Text) `A.Selectable` X509CertificateField) (SM m) where
-  select p k = lift $ A.select p k
-
 instance (N.NibbleString `A.Alters` N.NibbleString) m => (N.NibbleString `A.Alters` N.NibbleString) (SM m) where
   lookup p = lift . A.lookup p
   insert p k = lift . A.insert p k
@@ -446,6 +424,10 @@ instance MonadUnliftIO m => Mod.Modifiable (Q.Seq Action.Delegatecall) (SM m) wh
   get _ = gets (Action._delegatecalls . _action)
   put _ q = modify $ action . Action.delegatecalls .~ q
 
+instance MonadUnliftIO m => Mod.Modifiable ([(Text, CodeCollection)]) (SM m) where
+  get _ = gets (Action._newCodeCollections . _action)
+  put _ q = modify $ action . Action.newCodeCollections .~ q
+
 variableSet :: VMBase m => SM m VariableSet
 variableSet = do
   cis <- Mod.get (Mod.Proxy @[CallInfo])
@@ -488,7 +470,7 @@ runSM maybeCode envBefore gi f = do
           { env = envBefore,
             callStack = [],
             _ssMemDBs = csMemDBs,
-            _action = startingAction maybeCode envBefore,
+            _action = startingAction envBefore,
             _gasInfo = gi {_gasLeft = min (_gasLeft gi) gasCap} -- capping the transaction gas limit
           }
   startingStateRef <- newIORef startingState
@@ -522,21 +504,15 @@ pushSender newSender mv = do
   Mod.put (Mod.Proxy @Env.Sender) oldSender
   return $ ret
 
-startingAction :: Maybe Code -> Env.Environment -> Action
-startingAction maybeCode env' =
+startingAction :: Env.Environment -> Action
+startingAction env' =
   Action.Action
     { _blockHash = blockHeaderHash $ Env.blockHeader env',
       _blockTimestamp = blockHeaderTimestamp $ Env.blockHeader env',
       _blockNumber = blockHeaderBlockNumber $ Env.blockHeader env',
-      _transactionHash = Env.txHash env',
       _transactionSender = Env.sender env',
       _actionData = OMap.empty,
-      _src =
-        case maybeCode of
-          Just theCode ->
-            Just theCode
-          Nothing -> Env.src env',
-      _name = Env.name env',
+      _newCodeCollections = [],
       _events = Q.empty,
       _delegatecalls = Q.empty
     }
@@ -635,11 +611,6 @@ getVariableOfName name = do
                        "bytes32ToString",
                        "create",
                        "create2",
-                       "getUserCert",
-                       "parseCert",
-                       "verifyCert",
-                       "verifyCertSignedBy",
-                       "verifySignature",
                        "fastForward"
                      ]
           )
@@ -681,13 +652,13 @@ getVariableOfName name = do
         if name `elem` M.keys (currentContract currentCallInfo ^. CC.storageDefs)
           then
             Just . Constant . SReference $
-              AccountPath
+              AddressPath
                 (currentAddress currentCallInfo)
                 (MS.singleton $ BC.pack $ labelToString name)
           else Nothing
 
       maybeThis :: Maybe Variable
-      maybeThis = toMaybe (name == "this") . t "this" . Constant $ SAccount (NamedAccount (currentAddress currentCallInfo) UnspecifiedChain) False
+      maybeThis = toMaybe (name == "this") . t "this" . Constant $ SAddress (currentAddress currentCallInfo) False
 
   --        M.lookup (currentAddress currentCallInfo) (accounts sstate) >>= M.lookup name . storage
 
@@ -718,24 +689,6 @@ getVariableOfName name = do
       --, maybeUserDefined
       unknownVariable ("getVariableOfName " ++ (show (currentContract currentCallInfo ^. CC.storageDefs))) name
     ]
-
-getTypeOfName' :: SolidString -> CC.CodeCollection -> Typo
-getTypeOfName' s (CC.CodeCollection ccs _ _ enms strcts _ _ _) =
-  let lookInContract :: CC.Contract -> [Typo]
-      lookInContract (CC.Contract {..}) =
-        catMaybes
-          [ fmap StructTypo (fmap (\(a, b, _) -> (a, b)) <$> M.lookup s _structs),
-            fmap EnumTypo (fst <$> M.lookup s _enums),
-            fmap StructTypo (fmap (\(a, b, _) -> (a, b)) <$> M.lookup s strcts),
-            fmap EnumTypo (fst <$> M.lookup s enms)
-          ]
-      ctrs = map ContractTypo $ M.keys ccs
-   in case concatMap lookInContract ccs ++ ctrs of
-        [] -> internalError "getTypeOfName' " s
-        (typo : _) -> typo
-
-getTypeOfName :: MonadSM m => SolidString -> m Typo
-getTypeOfName s = getTypeOfName' s . codeCollection <$> getCurrentCallInfo
 
 withCallInfo ::
   MonadSM m =>
@@ -867,14 +820,7 @@ getCurrentContract = do
   case cs of
     (currentCallInfo : _) -> return $ currentContract currentCallInfo
     _ -> internalError "getCurrentContract called with an empty stack" ()
-{-
-getCurrentAccount :: MonadSM m => m Account
-getCurrentAccount = do
-  cs <- Mod.get (Mod.Proxy @[CallInfo])
-  case cs of
-    (currentCallInfo : _) -> return $ currentAddress currentCallInfo
-    _ -> internalError "getCurrentAccount called with an empty stack" ()
--}
+    
 getCurrentAddress :: MonadSM m => m Address
 getCurrentAddress = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])
@@ -936,132 +882,16 @@ getCurrentCodeCollection = do
     (currentCallInfo : _) -> return (collectionHash currentCallInfo, codeCollection currentCallInfo)
     _ -> internalError "getCurrentCodeCollection called with an empty stack" ()
 
-hintFromType :: MonadSM m => SVMType.Type -> m BasicType
-hintFromType = \case
-  SVMType.Address _ -> return TAccount
-  SVMType.Account _ -> return TAccount
-  SVMType.Bool {} -> return TBool
-  SVMType.Bytes {} -> return TString
-  SVMType.Int {} -> return TInteger
-  SVMType.String {} -> return TString
-  SVMType.Decimal {} -> return TDecimal
-  (SVMType.UserDefined _ SVMType.Bool {}) -> return TBool
-  (SVMType.UserDefined _ SVMType.Int {}) -> return TString
-  SVMType.UnknownLabel s _ -> do
-    t' <- getTypeOfName s
-    case t' of
-      ContractTypo {} -> return $ TContract s
-      EnumTypo {} -> return $ TEnumVal s
-      StructTypo fs -> do
-        let upgrade :: MonadSM m => (SolidString, CC.FieldType) -> m (B.ByteString, BasicType)
-            upgrade = mapM (hintFromType . CC.fieldTypeType) . first (encodeUtf8 . labelToText)
-        TStruct s <$> mapM upgrade fs
-  SVMType.Array t ml -> do
-    t' <- hintFromType t
-    pure $ TArray t' ml
-  SVMType.Mapping{} -> pure TMapping
-  tt'' -> todo "hintFromType" tt''
-
-getXabiTypeFromContract :: B.ByteString -> CC.Contract -> Maybe SVMType.Type
-getXabiTypeFromContract field ctract =
-  M.lookup (stringToLabel $ BC.unpack field)
-    . fmap CC._varType
-    . CC._storageDefs
-    $ ctract
-
-getXabiType :: MonadSM m => Address -> B.ByteString -> m (Maybe SVMType.Type)
-getXabiType acct field = do
-  (ctract, _, _) <- getCodeAndCollection acct
-  pure $ getXabiTypeFromContract field ctract
-
-getXabiValueType :: MonadSM m => AccountPath -> m SVMType.Type
-getXabiValueType a = getXabiValueType' a >>= \case
-  Left (Left e) -> typeError "getXabiValueType/invalid storage path" e
-  Left (Right field) -> todo "getXabiValueType/unknown storage reference" field
-  Right t -> pure t
-
-getXabiValueType' :: MonadSM m => AccountPath -> m (Either (Either String B.ByteString) SVMType.Type)
-getXabiValueType' (AccountPath loc path) = do
-  ccs' <- codeCollection <$> getCurrentCallInfo
-  case MS.getField path of
-    Left e -> pure . Left $ Left e
-    Right field -> getXabiType loc field >>= \case
-      Nothing -> pure . Left $ Right field
-      Just v -> pure . Right $!!  case MS.toList path of
-                  [] -> v
-                  (_:xs) -> loop ccs' xs v
-  where
-    loop :: CC.CodeCollection -> [MS.StoragePathPiece] -> SVMType.Type -> SVMType.Type
-    loop _ [] = id
-    loop ccs [x] = \case
-      SVMType.Mapping {SVMType.value = v} -> case x of
-        MS.MapIndex {} -> v
-        _ -> typeError "non map index attribute of mapping" x
-      SVMType.Array {SVMType.entry = v} -> case x of
-        MS.Field "length" -> SVMType.Int {signed = Just True, bytes = Nothing}
-        MS.ArrayIndex {} -> v
-        MS.MapIndex MS.INum{} -> v
-        _ -> typeError "non-length or array index attribute of array" x
-      SVMType.String {} -> case x of
-        MS.Field "length" -> SVMType.Int {signed = Just True, bytes = Nothing}
-        _ -> force (typeError "non-length attribute of string" x)
-      SVMType.UnknownLabel s _ ->
-        let t' = getTypeOfName' s ccs
-         in case (x, t') of
-              (MS.Field n, StructTypo fs) ->
-                let mt'' = lookup (textToLabel $ decodeUtf8 n) fs
-                 in case mt'' of
-                      Just t'' -> CC.fieldTypeType t''
-                      Nothing -> missingField "field not present in struct definition" $ show (n, fs)
-              (_, StructTypo {}) -> typeError "non field access to struct" x
-              (_, ContractTypo {}) -> todo "getValueType/contract access" t'
-              (_, EnumTypo {}) -> todo "getValueType/enum acess" t'
-      t'' -> t''
-    loop ccs (x : rs) = \case
-      SVMType.Mapping {SVMType.value = t'} -> loop ccs rs t'
-      SVMType.Array {SVMType.entry = t'} -> loop ccs rs t'
-      SVMType.UnknownLabel s _ ->
-        let t' = getTypeOfName' s ccs
-         in case (x, t') of
-              (MS.Field n, StructTypo fs) ->
-                let mt'' = lookup (textToLabel $ decodeUtf8 n) fs
-                 in case mt'' of
-                      Just t'' -> loop ccs rs $ CC.fieldTypeType t''
-                      Nothing -> missingField "field not present in struct definition" $ show (n, fs)
-              (_, StructTypo {}) -> typeError "non field access to struct" x
-              (_, ContractTypo {}) -> todo "getValueType/contract access" t'
-              (_, EnumTypo {}) -> todo "getValueType/enum acess" t'
-      t -> todo "getXabiValueType/loopnext unsupported type" t
-
-getValueType :: MonadSM m => AccountPath -> m BasicType
-getValueType p = hintFromType =<< getXabiValueType p
-
-getValueType' :: MonadSM m => AccountPath -> m (Either (Either String B.ByteString) BasicType)
-getValueType' p = traverse hintFromType =<< getXabiValueType' p
-
-initializeAction :: MonadSM m
-                 => Address
-                 -> String
-                 -> String
-                 -> Maybe String
-                 -> String
-                 -> String
-                 -> Keccak256
-                 -> CC.CodeCollection
-                 -> Map (Address, T.Text) (T.Text, T.Text, [T.Text])
-                 -> m ()
-initializeAction acct name crtr cc_crtr root appName hsh cc ab = do
-  let newData = Action.ActionData (SolidVMCode name hsh) cc (T.pack crtr) (fmap T.pack cc_crtr) (T.pack root) (T.pack appName) (Action.SolidVMDiff M.empty) ab []
+initializeAction :: MonadSM m =>
+                    Address -> m ()
+initializeAction acct = do
+  let newData = Action.ActionData (Action.SolidVMDiff M.empty)
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= Action.omapInsertWith Action.mergeActionData acct newData
 
 markDiffForAction :: Mod.Modifiable Action m => Address -> MS.StoragePath -> MS.BasicValue -> m ()
 markDiffForAction owner key' val' = do
-  let key = MS.unparsePath key'
-      val = rlpSerialize $ rlpEncode val'
-      ins = \case
-        Action.SolidVMDiff m -> Action.SolidVMDiff $ M.insert key val m
-        e -> internalError "SolidVM Diff executing in EVM" $ show e
+  let ins (Action.SolidVMDiff m) = Action.SolidVMDiff $ M.insert key' val' m
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData . Action.omapLens owner . mapped . Action.actionDataStorageDiffs %= ins
 
@@ -1070,6 +900,9 @@ addEvent newEvent = Mod.modify_ (Mod.Proxy @(Q.Seq Event)) $ pure . (Q.|> newEve
 
 addDelegatecall :: Mod.Modifiable (Q.Seq Action.Delegatecall) m => Address -> Address -> T.Text -> T.Text -> T.Text -> m ()
 addDelegatecall s c o a n = Mod.modify_ (Mod.Proxy @(Q.Seq Action.Delegatecall)) $ pure . (Q.|> Action.Delegatecall s c o a n)
+
+addNewCodeCollection :: Mod.Modifiable [(Text, CodeCollection)] m => Text -> CodeCollection -> m ()
+addNewCodeCollection userName cc = Mod.modify_ (Mod.Proxy @([(Text, CodeCollection)])) $ pure . ((userName, cc):)
 
 getBlockHashWithNumber :: MonadSM m => Integer -> Keccak256 -> m (Maybe Keccak256)
 getBlockHashWithNumber num h = do
@@ -1094,29 +927,12 @@ getContractNameAndHash address' = do
     ch -> internalError ("SolidVM for non-solidvm code at address " ++ formatAddressWithoutColor address') (format ch)
 
 getCodeAndCollection :: MonadSM m => Address -> m (CC.Contract, Keccak256, CC.CodeCollection)
-getCodeAndCollection address' = getCurrentCallInfoIfExists >>= \case
-  Just ci | currentAddress ci == address' -> pure (currentContract ci, collectionHash ci, codeCollection ci)
-  _ -> do
-    callStack' <- Mod.get (Mod.Proxy @[CallInfo])
-    let maybeCI = find (\ci -> currentAddress ci == address') callStack'
-
-    -- $logDebugS "getCodeAndCollection" . T.pack $ "----------------- caller address: " ++ fromMaybe "Nothing" (fmap format maybeAddress)
-    -- $logDebugS "getCodeAndCollection" . T.pack $ "----------------- callee address: " ++ format address'
-    (contractName', ch) <- getContractNameAndHash address'
-    case maybeCI of
-      Just ci -> do
-        let contract = fromMaybe (currentContract ci)
-                     . M.lookup contractName'
-                     . CC._contracts
-                     $ codeCollection ci
-        return (contract, collectionHash ci, codeCollection ci)
-      Nothing -> do
-        isRunningTests <- Env.runningTests <$> getEnv
-        cc <- codeCollectionFromHash isRunningTests True ch
-
-        let !contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc ^. CC.contracts
-
-        return (contract', ch, cc)
+getCodeAndCollection address' = do
+  (contractName', ch) <- getContractNameAndHash address'
+  isRunningTests <- Env.runningTests <$> getEnv
+  cc <- codeCollectionFromHash isRunningTests True ch
+  let !contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc ^. CC.contracts
+  return (contract', ch, cc)
 
 getContractsForParents :: [SolidString] -> M.Map SolidString (CC.ContractF a) -> [CC.ContractF a]
 getContractsForParents parents' cc =
@@ -1142,35 +958,3 @@ getArrayNamesFromContract c =
       storageDefsList = M.toList storageDefs'
       listOfArrays = filter (\(_, vd) -> case (CC._varType vd) of SVMType.Array _ _ -> True; _ -> False) storageDefsList
    in T.pack . fst <$> listOfArrays -- we need to change this to filter on _isRecord on testnet3
-
-resolveNameParts ::
-  ( MonadLogger m
-  , A.Selectable Address AddressState m
-  , HasSolidStorageDB m
-  ) =>
-  Address ->
-  T.Text ->
-  T.Text ->
-  CC.Contract ->
-  m ((Address, T.Text), (T.Text, T.Text, [T.Text]))
-resolveNameParts to' crtr app c = do
-  let tName = T.pack . CC._contractName
-  case c ^. CC.importedFrom of
-    Nothing -> pure ((to', tName c), (crtr, app, (map T.pack (M.keys $ CC._storageDefs c))))
-    Just address -> do
-      A.select (A.Proxy @AddressState) address >>= \case
-        Nothing -> do
-          $logWarnS "processTheMessages/resolveNameParts" . T.pack $
-            "Could not find address state for address " ++ show address
-          pure ((address, tName c), (crtr, app, (map T.pack (M.keys $ CC._storageDefs c))))
-        Just s ->
-          case addressStateCodeHash s of
-            SolidVMCode appName _ -> do
-              appCreator <- getSolidStorageKeyVal' address $ MS.StoragePath [MS.Field ":creator"]
-              case appCreator of
-                MS.BString cn' -> pure ((address, tName c), (T.pack $ BC.unpack cn', T.pack appName, (map T.pack (M.keys $ CC._storageDefs c))))
-                _ -> pure ((address, tName c), (crtr, T.pack appName, (map T.pack (M.keys $ CC._storageDefs c))))
-            _ -> do
-              $logWarnS "resolveNameParts" . T.pack $
-                "Could not resolve code for address " ++ show address
-              pure ((address, tName c), (crtr, app, (map T.pack (M.keys $ CC._storageDefs c))))

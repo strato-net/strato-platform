@@ -27,7 +27,6 @@ typeToEvmType (SVMType.String x) = Just $ OLDXABI.String x
 typeToEvmType (SVMType.Bytes x y) = Just $ OLDXABI.Bytes x y
 typeToEvmType SVMType.Bool = Just $ OLDXABI.Bool
 typeToEvmType (SVMType.Address _) = Just $ OLDXABI.Address
-typeToEvmType (SVMType.Account _) = Just $ OLDXABI.Account
 typeToEvmType (SVMType.UnknownLabel x _) = Just $ OLDXABI.UnknownLabel x
 typeToEvmType (SVMType.Struct x y) = Just $ OLDXABI.Struct x (labelToText y)
 typeToEvmType (SVMType.Enum x y z) = Just $ OLDXABI.Enum x (labelToText y) (map labelToText <$> z)

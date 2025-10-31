@@ -8,13 +8,14 @@ import "../Tokens/TokenFactory.sol";
 
 import "../../abstract/ERC20/access/Ownable.sol";
 import "../../abstract/ERC20/IERC20.sol";
+import "../../abstract/ERC20/utils/Pausable.sol";
 
 /**
  * @title LendingPool
  * @notice Core lending logic contract managing deposits, borrows, repayments, and liquidations.
  * @dev Risk parameters are configured by PoolConfigurator; operational functions may be owner-gated.
  */
-contract record LendingPool is Ownable {
+contract record LendingPool is Ownable, Pausable {
 
     // ═══════════════════════════════════════════════════════════════════════════════
     // EVENTS
@@ -108,7 +109,7 @@ contract record LendingPool is Ownable {
         // @dev important: must be set here for proxied instances; ensure consistency with desired initial values
         RAY = 1e27;
         SECONDS_PER_YEAR = 31536000;
-        
+
         require(_registry != address(0), "Invalid registry address");
         registry = LendingRegistry(_registry);
         require(_poolConfigurator != address(0), "Invalid pool configurator address");
@@ -128,6 +129,13 @@ contract record LendingPool is Ownable {
     modifier onlyTokenFactory(address token) {
         require(token != address(0) && tokenFactory.isTokenActive(token), "Invalid or inactive token");
         _;
+    }
+
+    /**
+     * @dev Override to provide custom error message when contract is paused
+     */
+    function _requireNotPaused() internal view override {
+        require(!paused(), "This functionality has been paused and is currently not available");
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -170,6 +178,18 @@ contract record LendingPool is Ownable {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
+    // PAUSE & UNPAUSE FUNCTIONS
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
     // LIQUIDITY OPERATIONS (DEPOSITS & WITHDRAWALS)
     // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -202,7 +222,7 @@ contract record LendingPool is Ownable {
      * @notice Withdraw liquidity by specifying underlying asset amount
      * @param amount The amount of underlying assets to withdraw
      */
-    function withdrawLiquidity(uint amount) external onlyTokenFactory(borrowableAsset) {
+    function withdrawLiquidity(uint amount) external whenNotPaused onlyTokenFactory(borrowableAsset) {
         require(amount > 0, "Invalid amount");
         require(mToken != address(0), "mToken not set");
 
@@ -253,7 +273,7 @@ contract record LendingPool is Ownable {
      * @param asset The collateral asset address
      * @param amount The amount of collateral to withdraw
      */
-    function withdrawCollateral(address asset, uint amount) external onlyTokenFactory(asset) {
+    function withdrawCollateral(address asset, uint amount) external whenNotPaused onlyTokenFactory(asset) {
         require(amount > 0, "Invalid amount");
 
         uint totalCollateral = CollateralVault(_collateralVault()).userCollaterals(msg.sender, asset);
@@ -280,7 +300,7 @@ contract record LendingPool is Ownable {
     * @param amount The amount to borrow (underlying units, 18 decimals)
     * @dev Uses global borrow index; enforces system-wide debt ceilings.
     */
-    function borrow(uint amount) external onlyTokenFactory(borrowableAsset) {
+    function borrow(uint amount) external whenNotPaused onlyTokenFactory(borrowableAsset) {
         require(amount > 0, "Invalid amount");
 
         // 1) bring index & reserves current, then enforce global caps
@@ -294,7 +314,8 @@ contract record LendingPool is Ownable {
 
         // 3) update index-based loan storage
         LoanInfo storage loan = userLoan[msg.sender];
-        uint scaledAdd = (amount * RAY) / borrowIndex;
+        uint scaledAdd = (amount * RAY + borrowIndex - 1) / borrowIndex;
+        require(scaledAdd > 0, "Insufficient loan amount");
         loan.scaledDebt += scaledAdd;
         loan.lastUpdated = block.timestamp;
         totalScaledDebt += scaledAdd;
@@ -330,11 +351,18 @@ contract record LendingPool is Ownable {
         // Clamp to what's owed
         uint repayAmount = amount > owed ? owed : amount;
 
+        // Convert repayAmount to scaled units
+        uint scaledDelta = (repayAmount * RAY) / borrowIndex;
+
+        // If partial, prove this will burn at least 1 scaled unit (avoid donation)
+        if (repayAmount < owed) {
+            require(scaledDelta > 0, "Insufficient repayment amount");
+        }
+
         // Move funds into the pool
         LiquidityPool(_liquidityPool()).repay(repayAmount, msg.sender);
 
-        // Convert repayAmount to scaled units and reduce debt
-        uint scaledDelta = (repayAmount * RAY) / borrowIndex;
+        // Reduce debt
         if (scaledDelta > loan.scaledDebt) scaledDelta = loan.scaledDebt; // clamp dust
 
         loan.scaledDebt -= scaledDelta;
@@ -347,7 +375,8 @@ contract record LendingPool is Ownable {
                 totalScaledDebt -= loan.scaledDebt;
                 loan.scaledDebt = 0;
             }
-            delete userLoan[msg.sender];
+            delete userLoan[msg.sender].scaledDebt;
+            delete userLoan[msg.sender].lastUpdated;
         } else {
             loan.lastUpdated = block.timestamp;
         }
@@ -360,7 +389,7 @@ contract record LendingPool is Ownable {
      * @notice Borrow the maximum amount allowed by current collateral (minus 1 wei safety)
      * @return amountBorrowed The amount actually borrowed
      */
-    function borrowMax() external onlyTokenFactory(borrowableAsset) returns (uint amountBorrowed) {
+    function borrowMax() external whenNotPaused onlyTokenFactory(borrowableAsset) returns (uint amountBorrowed) {
         // Bring index & reserves current, then enforce system caps on the final amount
         _accrue();
 
@@ -377,7 +406,8 @@ contract record LendingPool is Ownable {
 
         // Update index-based loan storage
         LoanInfo storage loan = userLoan[msg.sender];
-        uint scaledAdd = (amountBorrowed * RAY) / borrowIndex;
+        uint scaledAdd = (amountBorrowed * RAY + borrowIndex - 1) / borrowIndex;
+        require(scaledAdd > 0, "Insufficient loan amount");
         loan.scaledDebt += scaledAdd;
         loan.lastUpdated = block.timestamp;
         totalScaledDebt += scaledAdd;
@@ -420,7 +450,8 @@ contract record LendingPool is Ownable {
         totalScaledDebt -= scaledDelta;
 
         if (loan.scaledDebt == 0) {
-            delete userLoan[msg.sender];
+            delete userLoan[msg.sender].scaledDebt;
+            delete userLoan[msg.sender].lastUpdated;
         } else {
             loan.lastUpdated = block.timestamp;
         }
@@ -434,7 +465,7 @@ contract record LendingPool is Ownable {
      * @notice Withdraw all supplied liquidity by burning the caller's entire mToken balance
      * @dev Burns 100% of caller's mTokens and transfers the corresponding underlying based on current exchange rate
      */
-    function withdrawLiquidityAll() external onlyTokenFactory(borrowableAsset) {
+    function withdrawLiquidityAll() external whenNotPaused onlyTokenFactory(borrowableAsset) {
         _accrue();
         require(mToken != address(0), "mToken not set");
         uint userShares = IERC20(mToken).balanceOf(msg.sender);
@@ -458,7 +489,7 @@ contract record LendingPool is Ownable {
      * @param asset The collateral asset to withdraw
      * @return amountWithdrawn The amount actually withdrawn
      */
-        function withdrawCollateralMax(address asset) external onlyTokenFactory(asset) returns (uint amountWithdrawn) {
+    function withdrawCollateralMax(address asset) external whenNotPaused onlyTokenFactory(asset) returns (uint amountWithdrawn) {
          // Current user collateral for asset
          uint totalCollateral = CollateralVault(_collateralVault()).userCollaterals(msg.sender, asset);
          require(totalCollateral > 0, "No collateral");
@@ -478,8 +509,8 @@ contract record LendingPool is Ownable {
          require(maxBorrowAmount > currentOwed, "No room");
 
          // Prices and LTV
-         uint priceAsset = PriceOracle(_priceOracle()).getAssetPrice(asset); // 1e18
-         uint priceBorrow = PriceOracle(_priceOracle()).getAssetPrice(borrowableAsset); // 1e18
+         (uint priceAsset, uint timestampAsset) = PriceOracle(_priceOracle()).getAssetPriceWithTimestamp(asset); // 1e18
+         (uint priceBorrow, uint timestampBorrow) = PriceOracle(_priceOracle()).getAssetPriceWithTimestamp(borrowableAsset); // 1e18
          uint ltv = assetConfigs[asset].ltv; // bps
          require(priceAsset > 0 && priceBorrow > 0 && ltv > 0, "Config");
 
@@ -522,6 +553,7 @@ contract record LendingPool is Ownable {
     * @param collateralAsset The collateral asset to seize
     * @param borrower The address of the borrower being liquidated
     * @param debtToCover Amount of debt (in borrowableAsset units) the liquidator is repaying
+    * @param minCollateralOut Minimum collateral amount to receive (slippage protection). Transaction reverts if actual collateral is less.
     * Requirements:
     *  - Borrower health factor must be < 1e18 (unsafe)
     *  - If health factor >= 0.95e18, liquidator may repay at most 50% of outstanding debt
@@ -530,8 +562,9 @@ contract record LendingPool is Ownable {
     function liquidationCall(
         address collateralAsset,
         address borrower,
-        uint debtToCover
-    ) public onlyTokenFactory(borrowableAsset) {
+        uint debtToCover,
+        uint minCollateralOut
+    ) public whenNotPaused onlyTokenFactory(borrowableAsset) {
         require(collateralAsset != address(0), "Invalid collateral asset");
         require(borrower != address(0) && borrower != msg.sender, "Invalid borrower");
         require(debtToCover > 0, "Invalid debt amount");
@@ -553,12 +586,33 @@ contract record LendingPool is Ownable {
         uint maxRepay = (health < 95e16) ? totalOwed : (totalOwed / 2);
         require(debtToCover <= maxRepay, "Repay amount exceeds allowed limit");
 
+         // Calculate collateral to seize
+        (uint priceDebt, uint timestampDebt) = PriceOracle(_priceOracle()).getAssetPriceWithTimestamp(borrowableAsset); // 18 decimals USD
+        (uint priceColl, uint timestampColl) = PriceOracle(_priceOracle()).getAssetPriceWithTimestamp(collateralAsset);
+        require(priceDebt > 0 && priceColl > 0, "Invalid oracle price");
+
+        uint collateralToSeize = (debtToCover * priceDebt * cConfig.liquidationBonus) / (priceColl * 10000);
+        // debtToCover and prices are 1e18, so collateralToSeize is in collateral decimals (assume 18)
+
+        // Ensure borrower has enough collateral
+        uint borrowerCollateral = CollateralVault(_collateralVault()).userCollaterals(borrower, collateralAsset);
+        if (collateralToSeize > borrowerCollateral) {
+            collateralToSeize = borrowerCollateral; // seize all remaining
+        }
+
+        // Enforce minimum collateral out requested from user
+        require(collateralToSeize > 0, "There is no collateral to seize");
+        require(collateralToSeize >= minCollateralOut, "Remaining collateral is less than minimum requested by user");
+
+        // Prove this will burn at least 1 scaled unit (avoid donation)
+        LoanInfo storage loan = userLoan[borrower];
+        uint scaledDelta = (debtToCover * RAY) / borrowIndex;
+        require(scaledDelta > 0, "Insufficient repayment amount");
+
         // Collect repayment from liquidator into LiquidityPool
         LiquidityPool(_liquidityPool()).repay(debtToCover, msg.sender);
 
         // NEW: reduce borrower scaled debt (index-based)
-        LoanInfo storage loan = userLoan[borrower];
-        uint scaledDelta = (debtToCover * RAY) / borrowIndex;
         if (scaledDelta > loan.scaledDebt) scaledDelta = loan.scaledDebt; // clamp dust
         loan.scaledDebt -= scaledDelta;
         totalScaledDebt -= scaledDelta;
@@ -570,23 +624,10 @@ contract record LendingPool is Ownable {
                 totalScaledDebt -= loan.scaledDebt;
                 loan.scaledDebt = 0;
             }
-            delete userLoan[borrower];
+            delete userLoan[borrower].scaledDebt;
+            delete userLoan[borrower].lastUpdated;
         } else {
             loan.lastUpdated = block.timestamp;
-        }
-
-        // Calculate collateral to seize
-        uint priceDebt = PriceOracle(_priceOracle()).getAssetPrice(borrowableAsset); // 18 decimals USD
-        uint priceColl = PriceOracle(_priceOracle()).getAssetPrice(collateralAsset);
-        require(priceDebt > 0 && priceColl > 0, "Invalid oracle price");
-
-        uint collateralToSeize = (debtToCover * priceDebt * cConfig.liquidationBonus) / (priceColl * 10000);
-        // debtToCover and prices are 1e18, so collateralToSeize is in collateral decimals (assume 18)
-
-        // Ensure borrower has enough collateral
-        uint borrowerCollateral = CollateralVault(_collateralVault()).userCollaterals(borrower, collateralAsset);
-        if (collateralToSeize > borrowerCollateral) {
-            collateralToSeize = borrowerCollateral; // seize all remaining
         }
 
         // Transfer collateral to liquidator
@@ -604,7 +645,8 @@ contract record LendingPool is Ownable {
 
                 // Zero the user loan
                 ln.scaledDebt = 0;
-                delete userLoan[borrower];
+                delete userLoan[borrower].scaledDebt;
+                delete userLoan[borrower].lastUpdated;
 
                 // Bump global bad debt
                 badDebt += baseBad;
@@ -624,11 +666,13 @@ contract record LendingPool is Ownable {
      *         to avoid overpaying when collateral cannot cover more.
      * @param collateralAsset The collateral asset to seize
      * @param borrower The address of the borrower being liquidated
+     * @param minCollateralOut Minimum collateral amount to receive (slippage protection). Transaction reverts if actual collateral is less.
      */
     function liquidationCallAll(
         address collateralAsset,
-        address borrower
-    ) external onlyTokenFactory(borrowableAsset) {
+        address borrower,
+        uint minCollateralOut
+    ) external whenNotPaused onlyTokenFactory(borrowableAsset) {
         require(collateralAsset != address(0), "Invalid collateral asset");
         require(borrower != address(0) && borrower != msg.sender, "Invalid borrower");
 
@@ -647,8 +691,8 @@ contract record LendingPool is Ownable {
         uint maxRepay = (health < 95e16) ? totalOwed : (totalOwed / 2);
 
         // Coverage cap = borrowerCollateral * priceColl / (priceDebt * bonus)
-        uint priceDebt = PriceOracle(_priceOracle()).getAssetPrice(borrowableAsset);
-        uint priceColl = PriceOracle(_priceOracle()).getAssetPrice(collateralAsset);
+        (uint priceDebt, uint timestampDebt) = PriceOracle(_priceOracle()).getAssetPriceWithTimestamp(borrowableAsset);
+        (uint priceColl, uint timestampColl) = PriceOracle(_priceOracle()).getAssetPriceWithTimestamp(collateralAsset);
         require(priceDebt > 0 && priceColl > 0, "Invalid oracle price");
         uint borrowerCollateral = CollateralVault(_collateralVault()).userCollaterals(borrower, collateralAsset);
         uint num = borrowerCollateral * priceColl * 10000;
@@ -660,7 +704,7 @@ contract record LendingPool is Ownable {
         if (debtToCover > coverage) debtToCover = coverage;
         require(debtToCover > 0, "Nothing liquidatable");
 
-        liquidationCall(collateralAsset, borrower, debtToCover);
+        liquidationCall(collateralAsset, borrower, debtToCover, minCollateralOut);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -858,7 +902,7 @@ contract record LendingPool is Ownable {
             require(newDebt <= debtCeilingAsset, "Debt ceiling (asset) exceeded");
         }
         if (debtCeilingUSD > 0) {
-            uint p = PriceOracle(_priceOracle()).getAssetPrice(borrowableAsset); // 1e18 USD
+            (uint p, uint timestamp) = PriceOracle(_priceOracle()).getAssetPriceWithTimestamp(borrowableAsset); // 1e18 USD
             require(p > 0, "No oracle price");
             uint newUsd = (newDebt * p) / 1e18;
             require(newUsd <= debtCeilingUSD, "Debt ceiling (USD) exceeded");
@@ -965,7 +1009,7 @@ contract record LendingPool is Ownable {
             uint collateralAmount = vault.userCollaterals(user, asset);
             if (collateralAmount == 0) continue;
 
-            uint price = oracle.getAssetPrice(asset);
+            (uint price, uint timestamp) = oracle.getAssetPriceWithTimestamp(asset);
             uint liqThreshold = assetConfigs[asset].liquidationThreshold;
             if (price == 0 || liqThreshold == 0) continue;
 
@@ -983,7 +1027,7 @@ contract record LendingPool is Ownable {
         uint debt = getUserDebt(user); // scaledDebt * borrowIndex / RAY
         if (debt == 0) return 0;
 
-        uint price = PriceOracle(_priceOracle()).getAssetPrice(borrowableAsset); // USD 1e18
+        (uint price, uint timestamp) = PriceOracle(_priceOracle()).getAssetPriceWithTimestamp(borrowableAsset); // USD 1e18
         if (price == 0) return 0;
 
         // USD value (18 decimals)
@@ -1019,7 +1063,7 @@ contract record LendingPool is Ownable {
                 }
 
                 if (collateralAmount > 0) {
-                    uint price = PriceOracle(_priceOracle()).getAssetPrice(asset);
+                    (uint price, uint timestamp) = PriceOracle(_priceOracle()).getAssetPriceWithTimestamp(asset);
 
                     if (price > 0) {
                         // Calculate borrowable value using LTV (max borrowing power)
@@ -1031,7 +1075,7 @@ contract record LendingPool is Ownable {
         }
 
         // Convert total borrowable value back to borrowableAsset units
-        uint borrowableAssetPrice = PriceOracle(_priceOracle()).getAssetPrice(borrowableAsset);
+        (uint borrowableAssetPrice, uint timestamp) = PriceOracle(_priceOracle()).getAssetPriceWithTimestamp(borrowableAsset);
         if (borrowableAssetPrice == 0) {
             return 0;
         }
@@ -1089,7 +1133,7 @@ contract record LendingPool is Ownable {
     function getTotalBorrowValuePreview(address user) public view returns (uint usdValuePreview) {
         uint debt = getUserDebtPreview(user);
         if (debt == 0) return 0;
-        uint price = PriceOracle(_priceOracle()).getAssetPrice(borrowableAsset); // 1e18 USD
+        (uint price, uint timestamp) = PriceOracle(_priceOracle()).getAssetPriceWithTimestamp(borrowableAsset); // 1e18 USD
         if (price == 0) return 0;
         return (debt * price) / 1e18;
     }
@@ -1118,7 +1162,8 @@ contract record LendingPool is Ownable {
         // stop interest accrual on this borrower
         totalScaledDebt -= scaled;
         ln.scaledDebt = 0;
-        delete userLoan[borrower];
+        delete userLoan[borrower].scaledDebt;
+        delete userLoan[borrower].lastUpdated;
 
         // track non-accruing receivable
         badDebt += baseBad;

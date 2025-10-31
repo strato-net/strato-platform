@@ -72,11 +72,12 @@ contract record PoolFactory is Ownable {
     
     /// @notice Constructor
     /// @param initialOwner The initial owner of the contract
+    constructor(address initialOwner) Ownable(initialOwner) { }
+
+    /// @notice Initialize the contract
     /// @param _tokenFactory The address of the token factory
     /// @param _adminRegistry The address of the admin registry
     /// @param _feeCollector The address of the fee collector
-    constructor(address initialOwner) Ownable(initialOwner) { }
-
     function initialize(address _tokenFactory, address _adminRegistry, address _feeCollector) external onlyOwner {
         require(_adminRegistry != address(0), "Zero admin registry address");
         require(_tokenFactory  != address(0), "Zero token factory address");
@@ -204,6 +205,7 @@ contract record PoolFactory is Ownable {
     // ============ POOL MANAGEMENT ============
     
     /// @notice Create a new pool for tokenA/tokenB
+    /// @dev After pool creation, the pool should be whitelisted for mint and burn of the LP tokenby the admin registry
     function createPool(address tokenA, address tokenB) external tokensActive(tokenA, tokenB) onlyOwner returns (address pool) {
         require(tokenA != address(0) && tokenB != address(0), "Zero address");
         require(tokenA != tokenB, "Identical addresses");
@@ -227,9 +229,9 @@ contract record PoolFactory is Ownable {
 
         // deploy new pool first
         address thisOwner = owner();
-        pool = address(new Pool(tokenA, tokenB, lpTokenAddress, address(thisOwner)));
-        Token(lpTokenAddress).addWhitelist(thisOwner, "mint", pool);
-        Token(lpTokenAddress).addWhitelist(thisOwner, "burn", pool);
+        pool = address(new Proxy(address(new Pool(address(thisOwner))), address(this)));
+        Pool(pool).initialize(tokenA, tokenB, lpTokenAddress);
+        Pool(pool).transferOwnership(thisOwner);
         Ownable(lpTokenAddress).transferOwnership(thisOwner);
 
         // update pool registry

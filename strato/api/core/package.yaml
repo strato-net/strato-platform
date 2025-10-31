@@ -43,6 +43,7 @@ library:
   - servant-multipart
   - servant-multipart-client  
 #  - servant-swagger-tags
+  - solid-vm-model
   - source-tools
   - sql-monad
   - strato-model

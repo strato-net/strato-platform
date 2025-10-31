@@ -11,7 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { SAFETY_STAKE_FEE, SAFETY_REDEEM_FEE, usdstAddress, safetyModuleAddress } from "@/lib/constants";
+import { SAFETY_STAKE_FEE, SAFETY_REDEEM_FEE, usdstAddress, safetyModuleAddress, rewardsEnabled } from "@/lib/constants";
 import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
 
 const SafetyModuleSection = () => {
@@ -30,7 +30,7 @@ const SafetyModuleSection = () => {
   const [stakeAmount, setStakeAmount] = useState<string>("");
   const [redeemAmount, setRedeemAmount] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
-  const [stakeSUSDST, setStakeSUSDST] = useState<boolean>(true);
+  const [stakeSUSDST, setStakeSUSDST] = useState<boolean>(rewardsEnabled);
   const [includeStakedSUSDST, setIncludeStakedSUSDST] = useState<boolean>(false);
   const { toast } = useToast();
 
@@ -119,7 +119,7 @@ const SafetyModuleSection = () => {
       });
 
       // Then stake the tokens
-      await stakeSafety({ amount: amountWei, stakeSToken: stakeSUSDST });
+      await stakeSafety({ amount: amountWei, stakeSToken: rewardsEnabled && stakeSUSDST });
 
       if (stakeSUSDST) {
         toast({
@@ -291,32 +291,34 @@ const SafetyModuleSection = () => {
                   <div className="text-sm text-gray-500 mt-1">
                     Transaction Fee: {SAFETY_STAKE_FEE} USDST
                   </div>
-                  {/* Stake sUSDST Checkbox */}
-                  <div className="flex items-center space-x-2 mt-3">
-                    <Checkbox
-                      id="stake-susdst"
-                      checked={stakeSUSDST}
-                      onCheckedChange={(checked) => setStakeSUSDST(checked as boolean)}
-                    />
-                    <label
-                      htmlFor="stake-susdst"
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                    >
-                      Stake my sUSDST to earn rewards
-                    </label>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="max-w-xs text-sm">
-                          When you deposit USDST to the Safety Module, you receive sUSDST tokens representing your share.
-                          If this option is enabled, these sUSDST tokens will be automatically staked in the rewards program to earn additional rewards.
-                          The longer the tokens are staked, the more rewards they accrue.
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
+                  {/* Stake sUSDST Checkbox - only show if rewards are enabled */}
+                  {rewardsEnabled && (
+                    <div className="flex items-center space-x-2 mt-3">
+                      <Checkbox
+                        id="stake-susdst"
+                        checked={stakeSUSDST}
+                        onCheckedChange={(checked) => setStakeSUSDST(checked as boolean)}
+                      />
+                      <label
+                        htmlFor="stake-susdst"
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        Stake my sUSDST to earn rewards
+                      </label>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="max-w-xs text-sm">
+                            When you deposit USDST to the Safety Module, you receive sUSDST tokens representing your share.
+                            If this option is enabled, these sUSDST tokens will be automatically staked in the rewards program to earn additional rewards.
+                            The longer the tokens are staked, the more rewards they accrue.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  )}
                   {/* Fee Warning */}
                   {(() => {
                     const availableWei = BigInt(usdstBalance);
@@ -526,32 +528,34 @@ const SafetyModuleSection = () => {
                     <div className="text-sm text-gray-500 mt-1">
                       Transaction Fee: {SAFETY_REDEEM_FEE} USDST
                     </div>
-                    {/* Include Staked sUSDST Checkbox */}
-                    <div className="flex items-center space-x-2 mt-3">
-                      <Checkbox
-                        id="include-staked-susdst"
-                        checked={includeStakedSUSDST}
-                        onCheckedChange={(checked) => setIncludeStakedSUSDST(checked as boolean)}
-                      />
-                      <label
-                        htmlFor="include-staked-susdst"
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        Include staked sUSDST
-                      </label>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p className="max-w-xs text-sm">
-                            Some of your sUSDST tokens may be staked in the rewards program.
-                            When this option is enabled, you can redeem sUSDST that was staked as well.
-                            If disabled, only unstaked sUSDST will be eligible for redemption.
-                          </p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
+                    {/* Include Staked sUSDST Checkbox - only show if rewards are enabled */}
+                    {rewardsEnabled && (
+                      <div className="flex items-center space-x-2 mt-3">
+                        <Checkbox
+                          id="include-staked-susdst"
+                          checked={includeStakedSUSDST}
+                          onCheckedChange={(checked) => setIncludeStakedSUSDST(checked as boolean)}
+                        />
+                        <label
+                          htmlFor="include-staked-susdst"
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        >
+                          Include staked sUSDST
+                        </label>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="max-w-xs text-sm">
+                              Some of your sUSDST tokens may be staked in the rewards program.
+                              When this option is enabled, you can redeem sUSDST that was staked as well.
+                              If disabled, only unstaked sUSDST will be eligible for redemption.
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                    )}
                     {/* Mobile Button */}
                     <Button
                       onClick={() => handleRedeemAction("redeem")}
@@ -633,34 +637,38 @@ const SafetyModuleSection = () => {
                     )}
                   </span>
                 </div>
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start pl-4">
-                  <span className="text-gray-400 text-xs sm:text-sm">• Staked</span>
-                  <span className="font-medium text-xs sm:text-sm sm:text-right">
-                    {loading ? (
-                      <span className="text-gray-400 animate-pulse">
-                        Loading...
+                {rewardsEnabled && (
+                  <>
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start pl-4">
+                      <span className="text-gray-400 text-xs sm:text-sm">• Staked</span>
+                      <span className="font-medium text-xs sm:text-sm sm:text-right">
+                        {loading ? (
+                          <span className="text-gray-400 animate-pulse">
+                            Loading...
+                          </span>
+                        ) : safetyInfo?.userSharesStaked ? (
+                          formatBalance(safetyInfo.userSharesStaked || 0n, undefined, 18, 2, 2)
+                        ) : (
+                          "0.00"
+                        )}
                       </span>
-                    ) : safetyInfo?.userSharesStaked ? (
-                      formatBalance(safetyInfo.userSharesStaked || 0n, undefined, 18, 2, 2)
-                    ) : (
-                      "0.00"
-                    )}
-                  </span>
-                </div>
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start pl-4">
-                  <span className="text-gray-400 text-xs sm:text-sm">• Unstaked</span>
-                  <span className="font-medium text-xs sm:text-sm sm:text-right">
-                    {loading ? (
-                      <span className="text-gray-400 animate-pulse">
-                        Loading...
+                    </div>
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start pl-4">
+                      <span className="text-gray-400 text-xs sm:text-sm">• Unstaked</span>
+                      <span className="font-medium text-xs sm:text-sm sm:text-right">
+                        {loading ? (
+                          <span className="text-gray-400 animate-pulse">
+                            Loading...
+                          </span>
+                        ) : safetyInfo?.userShares ? (
+                          formatBalance(safetyInfo.userShares || 0n, undefined, 18, 2, 2)
+                        ) : (
+                          "0.00"
+                        )}
                       </span>
-                    ) : safetyInfo?.userShares ? (
-                      formatBalance(safetyInfo.userShares || 0n, undefined, 18, 2, 2)
-                    ) : (
-                      "0.00"
-                    )}
-                  </span>
-                </div>
+                    </div>
+                  </>
+                )}
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
                   <span className="text-gray-500 text-sm sm:text-base">Cooldown Period</span>
                   <span className="font-medium text-sm sm:text-base">

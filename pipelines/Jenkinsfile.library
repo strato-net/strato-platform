@@ -1113,7 +1113,7 @@ def generateGenesisBlock() {
     # TODO: run genesis-builder outside of Docker
     sudo docker cp ./strato/tools/genesis-builder strato-strato-1:/
     # Inject the nodeAddress into the validators.json file:
-    sudo docker exec -e addr="${nodeAddress}" strato-strato-1 bash -c 'echo "[{\"commonName\": \"$nodeAddress\"}]" > /genesis-builder/validators.json'
+    sudo docker exec -e addr="${nodeAddress}" strato-strato-1 bash -c 'echo "[\"$addr\"]" > /genesis-builder/validators.json'
     sudo docker cp ./.docker-work/usr/local/bin/genesis-builder strato-strato-1:/usr/local/bin/
     sudo docker cp ./strato/tools/genesis-builder strato-strato-1:/
     sudo docker exec strato-strato-1 genesis-builder \\
@@ -1306,7 +1306,7 @@ def spinUpPaymentServer() {
         POSTGRES_USER='${AWS_RDS_PAYMENT_SERVER_CREDENTIALS_DEV_USER}' \\
         POSTGRES_PASSWORD='${AWS_RDS_PAYMENT_SERVER_CREDENTIALS_DEV_PASSWORD}' \\
         POSTGRES_DBNAME=payments_dev \\
-        TABLE_PREFIX="Test-Mercata-" \\
+        TABLE_PREFIX="Test-" \\
         SKIP_CONTRACT_VALIDATION="true" \\
         SKIP_DEPLOYMENT="true" \\
         USDST_ADDRESS=f19d88d5b88d4948def06fcc12852d4b9e45caf2 \\
@@ -1408,7 +1408,7 @@ def replaceServerPortsDocker() {
   '''
 
   sh 'chmod +x replace_server_ports_docker.sh'
-  sh './replace_server_ports_docker.sh ../docker-compose.highway.yml'
+  sh './replace_server_ports_docker.sh docker-compose.highway.yml'
 }
 
 def waitLocalNodeIsSynced() {

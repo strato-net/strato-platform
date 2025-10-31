@@ -73,7 +73,7 @@ import Data.Foldable (traverse_)
 import Data.List (foldl', sortOn)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
-import Data.Maybe (catMaybes, listToMaybe)
+import Data.Maybe (catMaybes)
 import qualified Data.NibbleString as N
 import Data.Ord (Down(..))
 import qualified Data.Text as T
@@ -306,11 +306,11 @@ instance {-# OVERLAPPING #-} MonadIO m => (Address `A.Alters` X509CertInfoState)
 instance {-# OVERLAPPING #-} MonadIO m => A.Selectable Validator X509CertInfoState (MonadSimulator m) where
   select _ (Validator k) = do
     ctx <- asks _simulatorPeerContext
-    atomically $ listToMaybe . filter ((== k) . T.pack . commonName) . M.elems . _simulatorContextX509CertMap <$> readTVar ctx
+    atomically $ M.lookup k . _simulatorContextX509CertMap <$> readTVar ctx
   selectMany _ ks = do
     ctx <- asks _simulatorPeerContext
     atomically $ do
-      m <- M.fromList . map (\(_,v) -> (Validator . T.pack $ commonName v, v)) . M.toList . _simulatorContextX509CertMap <$> readTVar ctx
+      m <- M.fromList . map (\(a,v) -> (Validator a, v)) . M.toList . _simulatorContextX509CertMap <$> readTVar ctx
       pure . M.fromList . catMaybes $ (\k -> (k,) <$> M.lookup k m) <$> ks
 
 instance {-# OVERLAPPING #-} MonadIO m => (Keccak256 `A.Alters` DBDB.DependentBlockEntry) (MonadSimulator m) where

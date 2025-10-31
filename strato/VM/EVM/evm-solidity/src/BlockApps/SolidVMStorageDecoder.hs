@@ -11,13 +11,12 @@ module BlockApps.SolidVMStorageDecoder
     replayDeltas, -- Testing only
     ReplayFailure (..),
     synthesize, -- Testing only
-    TotalStorage,
+    TotalStorage
   )
 where
 
 import BlockApps.Solidity.SolidityValue
 import BlockApps.Solidity.Value as V
-import Blockchain.Strato.Model.Account (unspecifiedChain)
 import Control.DeepSeq
 import Control.Monad.Extra
 import Data.Bifunctor
@@ -35,10 +34,10 @@ import GHC.Generics
 import SolidVM.Model.SolidString
 import SolidVM.Model.Storable
 import Text.Printf
+import Text.Read
 
-decodeSolidVMValues :: [(T.Text, T.Text)] -> [(T.Text, SolidityValue)]
-decodeSolidVMValues hxs = either (error . printf "decodeSolidVMValues: %s" . show) id $ do
-  pathValues <- mapM (bimapM storageKeyToPath (Right . textToBasicValue)) hxs
+decodeSolidVMValues :: [(StoragePath, BasicValue)] -> [(T.Text, SolidityValue)]
+decodeSolidVMValues pathValues = either (error . printf "decodeSolidVMValues: %s" . show) id $ do
   totalStorage <- bimap show HM.toList $ synthesize pathValues
   mapMaybeM (bimapValue bsToText) totalStorage
 
@@ -48,21 +47,19 @@ bimapValue f (name', value') = do
   mValue <- valueToSolidityValue value'
   return $ fmap (name,) mValue
 
-decodeCacheValuesWith :: (StoragePath -> BasicValue -> Bool) -> M.Map B.ByteString B.ByteString -> [(T.Text, Value)]
+decodeCacheValuesWith :: (StoragePath -> BasicValue -> Bool) -> M.Map StoragePath BasicValue -> [(T.Text, Value)]
 decodeCacheValuesWith f hxs = either (error . (++ ": " ++ show hxs) . printf "SVM.decodeCacheValuesWith: %s" . show) id $ do
-  let parseM = bimapM parsePath storageValueByteStringToBasic
-  pathValues <- mapM parseM $ M.toList hxs
-  let pathValues' = filter (uncurry f) pathValues
+  let pathValues' = filter (uncurry f) $ M.toList hxs
   finalState <- bimap show HM.toList $ synthesize pathValues'
   mapM (bimapM bsToText return) finalState
 
-decodeCacheValues :: M.Map B.ByteString B.ByteString -> [(T.Text, Value)]
+decodeCacheValues :: M.Map StoragePath BasicValue -> [(T.Text, Value)]
 decodeCacheValues = decodeCacheValuesWith (const . isBasic)
   where isBasic (StoragePath ([Field _])) = True
         isBasic (StoragePath [Field _, Field fieldBS]) = C8.unpack fieldBS /= "length"
         isBasic _ = False
 
-decodeCacheValuesForCollections :: M.Map B.ByteString B.ByteString -> [(T.Text, Value)]
+decodeCacheValuesForCollections :: M.Map StoragePath BasicValue -> [(T.Text, Value)]
 decodeCacheValuesForCollections = decodeCacheValuesWith (\_ _ -> True)
 
 bsToText :: B.ByteString -> Either String T.Text
@@ -80,7 +77,6 @@ valueToSolidityValue = \case
     ValueInt _ _ n -> fromShowable n
     ValueDecimal n -> Right . Just $ SolidityValueAsString $ decodeUtf8 n
     ValueAddress a -> fromShowable a
-    ValueAccount a -> fromShowable a
     ValueString s -> fromText s
   ValueEnum _ ev _ -> fromText ev
   ValueArraySentinel {} -> fromText ""
@@ -103,7 +99,6 @@ valueToSolidityValue = \case
       ValueInt _ _ n -> Right . T.pack . show $ n
       ValueDecimal n -> Right . T.pack . show $ n
       ValueAddress a -> Right . T.pack . show $ a
-      ValueAccount a -> Right . T.pack . show $ a
       ValueString t -> Right t
       -- The collapse of bytes and str to a single types means that selecting an encoding
       -- for keys is not obvious. bytestrings may contain non UTF8 text, and at the same time
@@ -147,23 +142,41 @@ applyDelta' (Field n : sp) bv (ValueStruct ss) = do
   case M.lookup n' ss of
     Just v -> ValueStruct . (\x -> M.insert n' x ss) <$> applyDelta' sp bv v
     Nothing -> Right . ValueStruct $ M.insert n' (constructFromNothing' sp bv) ss
-applyDelta' (MapIndex n : sp) bv (ValueMapping ms) =
+applyDelta' (Index n : sp) bv (ValueMapping ms) =
   let n' = fromIndex n
    in case M.lookup n' ms of
         Just v -> ValueMapping . (\x -> M.insert n' x ms) <$> applyDelta' sp bv v
         Nothing -> Right . ValueMapping $ M.insert n' (constructFromNothing' sp bv) ms
-applyDelta' (ArrayIndex n : sp) bv (ValueArrayDynamic vs) =
+applyDelta' sp'@(Index n' : sp) bv s@(ValueArrayDynamic vs) = do
+  let err = Left $ TypeMismatch (StoragePath sp') bv s
+  n <- maybe err Right . readMaybe . T.unpack $ decodeUtf8 n'
   case I.lookup n vs of
     Just v -> ValueArrayDynamic . (\x -> I.insert n x vs) <$> applyDelta' sp bv v
     Nothing -> Right . ValueArrayDynamic $ I.insert n (constructFromNothing' sp bv) vs
-applyDelta' (ArrayIndex n : sp) bv sent@(ValueArraySentinel len) =
-  Right . ValueArrayDynamic $ I.fromList [(n, constructFromNothing' sp bv), (len, sent)]
+applyDelta' sp'@(Index n' : sp) bv sent@(ValueArraySentinel len) = do
+  let err = Left $ TypeMismatch (StoragePath sp') bv sent
+  n <- maybe err Right . readMaybe . T.unpack $ decodeUtf8 n'
+  pure . ValueArrayDynamic $ I.fromList [(n, constructFromNothing' sp bv), (len, sent)]
 applyDelta' [Field "length"] (BInteger n) (ValueArrayDynamic vs) =
   let n' = fromIntegral n
    in Right . ValueArrayDynamic $ I.insert n' (ValueArraySentinel n') vs
-applyDelta' [Field "length"] (BInteger n) (ValueArraySentinel {}) = Right . ValueArraySentinel $ fromIntegral n
-applyDelta' [Field _] bv _ = Right $ fromBasic bv -- Handle struct value assignment case
+applyDelta' sp@[Field "length"] b@(BInteger n) s@(ValueMapping vs) =
+  let err = Left $ TypeMismatch (StoragePath sp) b s
+      n' = fromIntegral n
+      toArrayElem (ValueInt _ _ k', v') = Right (fromInteger k', v')
+      toArrayElem (ValueString k', v') = maybe err (Right . (,v')) . readMaybe $ T.unpack k'
+      toArrayElem _ = err
+   in ValueArrayDynamic
+      . I.insert n' (ValueArraySentinel n')
+      . I.fromList
+      <$> traverse toArrayElem (M.toList vs)
+applyDelta' [Field "length"] (BInteger n) _ = Right . ValueArraySentinel $ fromIntegral n
+applyDelta' [Field n] bv _ = do
+  n' <- first (UnicodeError n) $ decodeUtf8' n
+  Right . ValueStruct . M.singleton n' $ fromBasic bv
 applyDelta' sp bv (ValueArraySentinel {}) = Right $ constructFromNothing' sp bv
+applyDelta' sp@[Index _] BDefault _ = Right $ constructFromNothing' sp BDefault
+applyDelta' sp@[Index _] _ _ = Right $ constructFromNothing' sp BDefault
 applyDelta' sp b s = Left $ TypeMismatch (StoragePath sp) b s
 
 constructFromNothing :: StoragePath -> BasicValue -> V.Value
@@ -173,14 +186,12 @@ constructFromNothing' :: [StoragePathPiece] -> BasicValue -> V.Value
 constructFromNothing' [] = fromBasic
 constructFromNothing' [Field "length"] = \case
   BInteger n -> ValueArraySentinel $ fromIntegral n
-  BAccount a | a == unspecifiedChain 0x0 -> ValueArraySentinel 0
+  BAddress a | a == 0x0 -> ValueArraySentinel 0
   BDefault -> ValueArraySentinel 0
   bv -> ValueStruct . M.singleton "length" $ constructFromNothing' [] bv
 constructFromNothing' (Field n : sp) = ValueStruct . M.singleton (decodeUtf8 n) . constructFromNothing' sp
-constructFromNothing' (MapIndex n : sp) =
+constructFromNothing' (Index n : sp) =
   ValueMapping . M.singleton (fromIndex n) . constructFromNothing' sp
-constructFromNothing' (ArrayIndex n : sp) =
-  ValueArrayDynamic . I.singleton n . constructFromNothing' sp
 
 synthesize :: [(StoragePath, BasicValue)] -> Either ReplayFailure TotalStorage
 synthesize spbvs = do
@@ -210,14 +221,12 @@ fromBasic = \case
   BInteger n -> SimpleValue $! valueInt n
   BString bs -> SimpleValue $! valueBytes bs
   BDecimal v -> SimpleValue $! ValueDecimal v
-  BAccount a -> SimpleValue $! ValueAccount a
+  BAddress a -> SimpleValue $! ValueAddress a
   BContract _ c -> ValueContract c
   BEnumVal tipe name num -> ValueEnum (labelToText tipe) (labelToText name) (fromIntegral num)
   BDefault -> SimpleValue $ ValueAddress 0x0
 
-fromIndex :: IndexType -> V.SimpleValue
-fromIndex = \case
-  IBool b -> ValueBool b
-  INum n -> valueInt n
-  IText bs -> valueBytes bs
-  IAccount a -> ValueAccount a
+fromIndex :: B.ByteString -> V.SimpleValue
+fromIndex b = case decodeUtf8' b of
+  Right t -> V.ValueString t
+  _       -> V.ValueBytes Nothing b

@@ -9,7 +9,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { HelpCircle, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
+import { HelpCircle, ArrowUpCircle, ArrowDownCircle, PauseCircle } from "lucide-react";
 import { formatBalance } from "@/utils/numberUtils";
 import { CollateralData, NewLoanData } from "@/interface";
 import { getMaxSafeWithdrawAmount } from "@/utils/lendingUtils";
@@ -185,9 +185,12 @@ const CollateralManagementTable = ({
                           const maxWithdrawAmount = getMaxSafeWithdrawAmount(asset, loans);
                           const hasCollateral = BigInt(asset?.collateralizedAmount || 0) > 0n;
                           const canWithdraw = maxWithdrawAmount > 0n;
+                          const isPaused = asset?.isPaused;
 
                           let tooltipMessage = "";
-                          if (canWithdraw) {
+                          if (isPaused) {
+                            tooltipMessage = "Lending Pool is on pause. Action currently disabled.";
+                          } else if (canWithdraw) {
                             tooltipMessage = "Withdraw collateral.\nReduces borrowing power.";
                           } else if (!hasCollateral) {
                             tooltipMessage = "Cannot withdraw.\nNo collateral supplied for this asset.";
@@ -201,13 +204,18 @@ const CollateralManagementTable = ({
                                 <span className="cursor-help">
                                   <Button
                                     onClick={() => onWithdraw(asset)}
-                                    disabled={!canWithdraw || !hasCollateral}
+                                    disabled={!canWithdraw || !hasCollateral || isPaused}
                                   >
+                                    {isPaused ? (
+                                      <PauseCircle className="h-4 w-4 mr-1" />
+                                    ) : (
+                                      <ArrowUpCircle className="h-4 w-4 mr-1" />
+                                    )}
                                     Withdraw
                                   </Button>
                                 </span>
                               </TooltipTrigger>
-                              <TooltipContent>
+                              <TooltipContent className={isPaused ? "bg-amber-50 border-amber-300 text-amber-900" : ""}>
                                 <span>{tooltipMessage}</span>
                               </TooltipContent>
                             </Tooltip>

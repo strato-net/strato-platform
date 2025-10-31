@@ -1,5 +1,3 @@
-import { logError } from "../utils/logger";
-
 // Constants
 export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 export const STRATO_DECIMALS = 18;
@@ -8,9 +6,9 @@ export const ERC20_ABI = [
   "function transfer(address to, uint256 amount) public returns (bool)",
 ];
 
-// DepositRouted(address indexed token, uint256 amount, address indexed sender, address indexed stratoAddress, uint96 depositId, bool mint)
+// DepositRouted(address indexed token, uint256 amount, address indexed sender, address indexed stratoAddress, uint96 depositId)
 export const DEPOSIT_EVENT_SIGNATURE =
-  "0x68f47eab267a6fd1abbf749504fa687981eb8c975b8b517363b6ec86f55f57d5";
+  "0x97968ffb53b74828f5a31cffca247ee14443247de34e1220399e6f9f56b9d33e";
 
 // Transfer(address,address,uint256)
 export const TRANSFER_EVENT_SIGNATURE =
@@ -37,6 +35,7 @@ const config = {
     address: process.env.SAFE_ADDRESS,
     safeProposerAddress: process.env.SAFE_PROPOSER_ADDRESS,
     safeProposerPrivateKey: process.env.SAFE_PROPOSER_PRIVATE_KEY,
+    apiKey: process.env.SAFE_API_KEY,
   },
   voucher: {
     contractAddress:

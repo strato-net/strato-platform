@@ -8,7 +8,7 @@ async function fetchVoucherBalance(): Promise<bigint> {
     const userAddr = await oauthClient().getUserAddress();
 
     const response = await apiGet(
-        `${process.env.STRATO_NODE_URL}/cirrus/search/BlockApps-Mercata-Voucher-_balances`,
+        `${process.env.STRATO_NODE_URL}/cirrus/search/BlockApps-Voucher-_balances`,
         {
             headers: {
                 'Authorization': `Bearer ${accessToken}`,
@@ -31,7 +31,7 @@ async function fetchUSDSTBalance(): Promise<bigint> {
     const userAddr = await oauthClient().getUserAddress();
 
     const response = await apiGet(
-        `${process.env.STRATO_NODE_URL}/cirrus/search/BlockApps-Mercata-Token-_balances`,
+        `${process.env.STRATO_NODE_URL}/cirrus/search/BlockApps-Token-_balances`,
         {
             headers: {
                 'Authorization': `Bearer ${accessToken}`,

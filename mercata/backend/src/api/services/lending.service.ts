@@ -2,7 +2,7 @@ import { cirrus, strato, bloc } from "../../utils/mercataApiHelper";
 
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx, until } from "../../utils/txHelper";
-import { StratoPaths, constants, rewardsChef } from "../../config/constants";
+import { StratoPaths, constants } from "../../config/constants";
 import * as config from "../../config/config";
 import { getBalance, getTokens, getTokenBalanceForUser } from "./tokens.service";
 import { extractContractName } from "../../utils/utils";
@@ -161,7 +161,7 @@ export const depositLiquidity = async (
 
     if (BigInt(newlyMintedAmount) > 0n) {
       // Find the pool for this mToken
-      const rewardsPool = await findPoolByLpToken(accessToken, rewardsChef, mToken);
+      const rewardsPool = await findPoolByLpToken(accessToken, config.rewardsChef, mToken);
 
       if (!rewardsPool) {
         throw new Error(`No RewardsChef pool found for mToken ${mToken}. Cannot stake after deposit.`);
@@ -173,12 +173,12 @@ export const depositLiquidity = async (
           contractName: extractContractName(Token),
           contractAddress: mToken,
           method: "approve",
-          args: { spender: rewardsChef, value: newlyMintedAmount },
+          args: { spender: config.rewardsChef, value: newlyMintedAmount },
         },
         // Then deposit into RewardsChef
         {
           contractName: extractContractName(RewardsChef),
-          contractAddress: rewardsChef,
+          contractAddress: config.rewardsChef,
           method: "deposit",
           args: { _pid: rewardsPool.poolIdx, _amount: newlyMintedAmount },
         },
@@ -242,7 +242,7 @@ export const withdrawLiquidity = async (
       const amountToUnstake = requiredMTokenWei - unstakedMTokenWei;
 
       // Find the pool for this mToken
-      const rewardsPool = await findPoolByLpToken(accessToken, rewardsChef, mToken);
+      const rewardsPool = await findPoolByLpToken(accessToken, config.rewardsChef, mToken);
 
       if (!rewardsPool) {
         throw new Error(`No RewardsChef pool found for mToken ${mToken}. Cannot unstake before withdrawal.`);
@@ -251,7 +251,7 @@ export const withdrawLiquidity = async (
       // Build unstaking transaction
       const unstakeTx = await buildFunctionTx({
         contractName: extractContractName(RewardsChef),
-        contractAddress: rewardsChef,
+        contractAddress: config.rewardsChef,
         method: "withdraw",
         args: {
           _pid: rewardsPool.poolIdx,
@@ -442,7 +442,7 @@ export const collateralAndBalance = async (
     select:
       `lendingPool:lendingPool_fkey(` +
         `assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value),` +
-        `borrowableAsset` +
+        `borrowableAsset,_paused` +
       `),` +
       `collateralVault:collateralVault_fkey(` +
         `userCollaterals:${CollateralVault}-userCollaterals(user:key,asset:key2,amount:value::text)` +
@@ -455,6 +455,8 @@ export const collateralAndBalance = async (
   if (!registry.lendingPool || !registry.collateralVault) {
     throw new Error("Lending pool or collateral vault not found");
   }
+
+  const isPaused = registry.lendingPool._paused;
 
   const assets = registry.lendingPool.assetConfigs?.map((a: any) => a.asset).filter((asset: string) => asset !== registry.lendingPool.borrowableAsset) || [];
   const userCollaterals = (registry.collateralVault.userCollaterals || []).filter((c: any) => c.user === userAddress);
@@ -516,6 +518,7 @@ export const collateralAndBalance = async (
         assetPrice,
         ltv,
         liquidationThreshold,
+        isPaused,
       };
     });
 };
@@ -524,11 +527,11 @@ export const liquidityAndBalance = async (
   accessToken: string,
   userAddress: string,
 ) => {
-  // Fetch pool data with explicit select (index fields + userLoan + prices)
+  // Fetch pool data with explicit select (index fields + userLoan + prices + pause status)
   const registry = await getPool(accessToken, {
     select:
       `lendingPool:lendingPool_fkey(` +
-        `address,borrowableAsset,mToken,` +
+        `address,borrowableAsset,mToken,_paused,` +
         `borrowIndex::text,totalScaledDebt::text,reservesAccrued::text,lastAccrual::text,badDebt::text,` +
         `assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value),` +
         `userLoan:${LendingPool}-userLoan(user:key,LoanInfo:value)` +
@@ -544,8 +547,9 @@ export const liquidityAndBalance = async (
     "lendingPool.userLoan.key": `eq.${userAddress}`
   });
 
-  const { borrowableAsset, mToken, assetConfigs } = registry.lendingPool || {};
+  const { borrowableAsset, mToken, assetConfigs, _paused } = registry.lendingPool || {};
   const allCollaterals = registry.collateralVault?.userCollaterals || [];
+  const isPaused = _paused;
 
   if (!borrowableAsset || !mToken) {
     throw new Error("Lending pool, borrowable asset, or mToken not found");
@@ -642,11 +646,11 @@ export const liquidityAndBalance = async (
 
   // Get user's staked balance from RewardsChef
   // Find the pool for this mToken
-  const rewardsPool = await findPoolByLpToken(accessToken, rewardsChef, mToken);
+  const rewardsPool = await findPoolByLpToken(accessToken, config.rewardsChef, mToken);
 
   // If no pool found, staked balance is 0
   const stakedMTokenBalance = rewardsPool
-    ? await getStakedBalance(accessToken, rewardsChef, rewardsPool.poolIdx, userAddress)
+    ? await getStakedBalance(accessToken, config.rewardsChef, rewardsPool.poolIdx, userAddress)
     : "0";
 
   // User's withdrawable underlying (min of user mToken value and pool cash)
@@ -697,6 +701,8 @@ export const liquidityAndBalance = async (
     totalAmountOwedPreview: totalAmountOwedPreviewClamped,
     // Compat:
     totalBorrowPrincipal,
+    // Pause status
+    isPaused,
   };
 };
 
@@ -828,7 +834,7 @@ export const executeLiquidation = async (
   accessToken: string,
   userAddress: string,
   loanId: string,
-  options: { collateralAsset?: string; repayAmount?: string | number | bigint } = {}
+  options: { collateralAsset?: string; repayAmount?: string | number | bigint; minCollateralOut?: string | number | bigint } = {}
 ) => {
   // LiquidityPool address
   const { liquidityPool } = await getPool(accessToken, { select: "liquidityPool" });
@@ -939,6 +945,9 @@ export const executeLiquidation = async (
   const approveValue = treatAsAll ? MAX_UINT256 : repayAmount.toString();
 
   const repayAmountAtomic = repayAmount.toString();
+  const minCollateralOutAtomic = options.minCollateralOut 
+    ? toBig(options.minCollateralOut).toString() 
+    : "0";
 
   const tx = await buildFunctionTx([
     {
@@ -954,10 +963,12 @@ export const executeLiquidation = async (
       args: treatAsAll ? {
         collateralAsset: options.collateralAsset || userCollaterals[0]?.asset,
         borrower: loanId,
+        minCollateralOut: minCollateralOutAtomic,
       } : {
         collateralAsset: options.collateralAsset || userCollaterals[0]?.asset,
         borrower: loanId,
         debtToCover: repayAmountAtomic,
+        minCollateralOut: minCollateralOutAtomic,
       },
     },
   ], userAddress, accessToken);
@@ -1132,6 +1143,7 @@ export const listLoansForLiquidation = async (
       `address,` +
       `borrowableAsset,` +
       `borrowIndex::text,` +
+      `_paused,` +
       `assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value),` +
       `loans:${LendingPool}-userLoan(user:key,LoanInfo:value)` +
     `),` +
@@ -1146,6 +1158,7 @@ export const listLoansForLiquidation = async (
 
   const borrowableAsset: string = registry.lendingPool?.borrowableAsset;
   const borrowIndexStr = registry.lendingPool?.borrowIndex || "0";
+  const isPaused = registry.lendingPool?._paused;
   const assetConfigsArr = registry.lendingPool?.assetConfigs || [];
   const loansArr = registry.lendingPool?.loans || [];
   const collateralsArr = registry.collateralVault?.userCollaterals || [];
@@ -1245,6 +1258,7 @@ export const listLoansForLiquidation = async (
         expectedProfit: expectedProfit.toString(),
         maxRepay: effectiveMaxRepay.toString(),
         liquidationBonus,
+        isPaused,
       };
     })
     // Filter out zero-amount or zero-USD-value collaterals
@@ -1300,6 +1314,44 @@ export const withdrawCollateralMax = async (
     contractAddress: lendingPool,
     method: "withdrawCollateralMax",
     args: { asset },
+  }, userAddress, accessToken);
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
+  );
+};
+
+export const pauseLendingPool = async (
+  accessToken: string,
+  userAddress: string,
+) => {
+  const { lendingPool } = await getPool(accessToken, { select: "lendingPool" });
+  if (!lendingPool) {
+    throw new Error("Lending pool address not found");
+  }
+  const builtTx = await buildFunctionTx({
+    contractName: extractContractName(LendingPool),
+    contractAddress: lendingPool,
+    method: "pause",
+    args: {},
+  }, userAddress, accessToken);
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
+  );
+};
+
+export const unpauseLendingPool = async (
+  accessToken: string,
+  userAddress: string,
+) => {
+  const { lendingPool } = await getPool(accessToken, { select: "lendingPool" });
+  if (!lendingPool) {
+    throw new Error("Lending pool address not found");
+  }
+  const builtTx = await buildFunctionTx({
+    contractName: extractContractName(LendingPool),
+    contractAddress: lendingPool,
+    method: "unpause",
+    args: {},
   }, userAddress, accessToken);
   return await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, builtTx)

@@ -134,6 +134,14 @@ export function validateSetCollateralConfigArgs(args: any) {
     }).messages({
       'custom.liquidationRatio': 'Liquidation ratio must be >= 1e18 (WAD format)'
     }),
+    minCR: Joi.string().custom((value, helpers) => {
+      if (BigInt(value) < WAD) {
+        return helpers.error('custom.minCR');
+      }
+      return value;
+    }).messages({
+      'custom.minCR': 'Min collateral ratio must be >= 1e18 (WAD format)'
+    }).required(),
     liquidationPenaltyBps: Joi.number().integer().min(500).max(3000).required(),
     closeFactorBps: Joi.number().integer().min(5000).max(10000).required(),
     stabilityFeeRate: Joi.string().custom((value, helpers) => {

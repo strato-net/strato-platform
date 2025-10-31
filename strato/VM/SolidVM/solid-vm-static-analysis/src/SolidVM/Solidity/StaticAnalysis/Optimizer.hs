@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections #-}
 
 module SolidVM.Solidity.StaticAnalysis.Optimizer
   ( detector,
@@ -16,7 +17,7 @@ import Data.Decimal
 import Data.Foldable (for_)
 import Data.Functor.Compose
 import qualified Data.Map as M
-import Data.Maybe (fromMaybe)
+import Data.Maybe (catMaybes, fromMaybe)
 import Data.Source.Annotation
 import SolidVM.Model.CodeCollection
 import SolidVM.Model.SolidString (SolidString)
@@ -29,8 +30,8 @@ data R = R
 
 type SSS = StateT ([M.Map SolidString SVMType.Type], Bool) (Reader R) -- Is there a better data structure for this job?
 
-runSSS :: R -> SSS a -> a
-runSSS r f = runReader (evalStateT f ([M.empty], False)) r
+runSSS :: R -> M.Map SolidString SVMType.Type -> SSS a -> a
+runSSS r m f = runReader (evalStateT f ([m], False)) r
 
 detector :: CodeCollection -> CodeCollection
 detector cc =
@@ -59,7 +60,7 @@ varDeclHelper cc c v = case _varType v of
   where
     run e t =
       let r = R cc c
-       in runSSS r $ optimizeExpression e (Just t)
+       in runSSS r M.empty $ optimizeExpression e (Just t)
 
 constDeclHelper ::
   CodeCollection ->
@@ -73,7 +74,7 @@ constDeclHelper cc c v =
   where
     run e =
       let r = R cc c
-       in runSSS r $ optimizeExpression e Nothing
+       in runSSS r M.empty $ optimizeExpression e Nothing
 
 -- TODO clean this code up
 functionHelper ::
@@ -85,15 +86,34 @@ functionHelper cc mc f =
   case _funcContents f of
     Nothing -> f
     Just stmts ->
-      if ((Just True) ==) $ M.null <$> (_userDefined <$> mc)
-        then
-          let r = R cc mc
-           in f {_funcContents = Just $ runSSS r $ optimizeStatements stmts}
-        else
-          let r = R cc mc
-           in functionHelperForUserDefined f {_funcContents = Just $
-                  runSSS r $ optimizeStatements stmts
-                }
+      let swap (a,b) = (b,a)
+          args =
+            ( \(it, n) ->
+                ( n,
+                  VarDefEntry (Just $ indexedTypeType it) Nothing n $ _funcContext f
+                )
+            )
+              <$> (catMaybes $ sequence . swap <$> _funcArgs f)
+          vals =
+            ( \(it, n) ->
+                ( n,
+                  VarDefEntry (Just $ indexedTypeType it) Nothing n $ _funcContext f
+                )
+            )
+              <$> (catMaybes $ sequence . swap <$> _funcVals f)
+          argVals = M.fromList $ args ++ vals
+          argTypes = M.fromList . catMaybes . flip map (M.toList argVals) $ \(k,v) -> case v of
+              VarDefEntry mType _ _ _ -> (k,) <$> mType
+              _ -> Nothing
+       in if ((Just True) ==) $ M.null <$> (_userDefined <$> mc)
+            then
+              let r = R cc mc
+               in f {_funcContents = Just $ runSSS r argTypes $ optimizeStatements stmts}
+            else
+              let r = R cc mc
+               in functionHelperForUserDefined f {_funcContents = Just $
+                      runSSS r argTypes $ optimizeStatements stmts
+                    }
 
 functionHelperForUserDefined :: Func -> Func
 functionHelperForUserDefined f = f {_funcArgs = tForm $ _funcArgs f, _funcVals = tForm $ _funcVals f}
@@ -345,13 +365,38 @@ optimizeExpression (FunctionCall x1 (MemberAccess x2 (Variable x3 nam) "unwrap")
       [x] | M.member nam (_userDefined c) -> optimizeExpression x Nothing
       _ -> pure $ FunctionCall x1 (MemberAccess x2 (Variable x3 nam) "unwrap") args
     Nothing -> pure $ FunctionCall x1 (MemberAccess x2 (Variable x3 nam) "unwrap") args
-optimizeExpression (FunctionCall x1 (Variable x3 f@('u':'i':'n':'t':_)) (xp:args)) _ = do
-  let xp' = Ternary x3 (Binary x3 "<" xp (NumberLiteral x3 0 Nothing)) (Unitary x3 "-" xp) xp
-  pure $ FunctionCall x1 (Variable x3 f) (xp':args)
 
--- This needs further research before letting loose on the code base
--- This function as of now is neutured
--- See git blame for code that was here before
-optimizeExpression (Variable x name) _ = pure $ Variable x name
-
-optimizeExpression e _ = pure e
+optimizeExpression e@(Variable x name) _ = checkUintUnderflow x name e
+optimizeExpression (Unitary x s a) z = Unitary x s
+                                   <$> optimizeExpression a z
+optimizeExpression (Binary x s a b) z = Binary x s
+                                    <$> optimizeExpression a z
+                                    <*> optimizeExpression b z
+optimizeExpression (IndexAccess x e mI) z = IndexAccess x
+                                        <$> optimizeExpression e z
+                                        <*> traverse (flip optimizeExpression z) mI
+optimizeExpression (MemberAccess x e m) z = MemberAccess x
+                                        <$> optimizeExpression e z
+                                        <*> pure m
+optimizeExpression (FunctionCall x f a) z = FunctionCall x
+                                        <$> optimizeExpression f z
+                                        <*> pure a
+optimizeExpression (Ternary x a b c) z = Ternary x
+                                        <$> optimizeExpression a z
+                                        <*> optimizeExpression b z
+                                        <*> optimizeExpression c z
+optimizeExpression (TupleExpression x mes) z = TupleExpression x
+                                           <$> traverse (traverse (flip optimizeExpression z)) mes
+optimizeExpression (ArrayExpression x es) z = ArrayExpression x
+                                          <$> traverse (flip optimizeExpression z) es
+optimizeExpression (ObjectLiteral x m) z = ObjectLiteral x
+                                       <$> traverse (flip optimizeExpression z) m
+--  Keeping each case explicitly listed here, so that none are accidentally forgotten in the future
+optimizeExpression e@NewExpression{}     _ = pure e
+optimizeExpression e@BoolLiteral{}       _ = pure e
+optimizeExpression e@NumberLiteral{}     _ = pure e
+optimizeExpression e@DecimalLiteral{}    _ = pure e
+optimizeExpression e@StringLiteral{}     _ = pure e
+optimizeExpression e@AddressLiteral{}    _ = pure e
+optimizeExpression e@HexaLiteral{}       _ = pure e
+optimizeExpression e@InlineBoundsCheck{} _ = pure e

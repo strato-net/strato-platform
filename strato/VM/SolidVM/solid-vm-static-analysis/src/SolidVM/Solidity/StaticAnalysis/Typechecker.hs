@@ -108,7 +108,6 @@ showType (SVMType.Bytes _ b) =
 showType SVMType.Decimal = "decimal"
 showType SVMType.Bool = "bool"
 showType (SVMType.Address _) = "address"
-showType (SVMType.Account _) = "account"
 showType (SVMType.UnknownLabel s _) = "label " <> labelToText s
 showType (SVMType.Struct _ n) = "struct " <> labelToText n
 showType (SVMType.UserDefined _ a) = showType a
@@ -166,6 +165,7 @@ showType' (SolidVM.Solidity.StaticAnalysis.Typechecker.Modifier _ _ _ _) =
   T.empty
 
 mutable :: Type' -> Type'
+mutable b@Bottom{} = b
 mutable m@Mutable{} = m
 mutable m@(Product ts _) =
   let isMutable Mutable{} = True
@@ -291,11 +291,9 @@ lookupContractFunction x cName fName = do
                 let fArgs = Product ((\(_,t,y) -> Static (fieldTypeType t) y) <$> fields) x
                     fRets = Static (SVMType.Struct Nothing fName) x
                  in pure $ Function fArgs fRets x [] [] False
-            Just VariableDecl {..} ->
-              if _varIsPublic
-                then constructGetterType x _varType
-                else
-                  pure . bottom $
+            Just VariableDecl {..} -> case _varVisibility of
+              Just Public -> constructGetterType x _varType
+              _ -> pure . bottom $
                     ( T.concat
                         [ "Unknown contract function: ",
                           labelToText cName,
@@ -423,9 +421,6 @@ boolType' = Static SVMType.Bool
 addressType' :: SourceAnnotation Text -> Type'
 addressType' = Static $ SVMType.Address False
 
-accountType' :: SourceAnnotation Text -> Type'
-accountType' = Static $ SVMType.Account False
-
 enumType' :: SourceAnnotation Text -> Type'
 enumType' = Static (SVMType.Enum Nothing "" Nothing)
 
@@ -443,17 +438,15 @@ simpleType' x =
   Sum $
     stringType' x
       :| [ addressType' x,
-           accountType' x,
            intType' x,
-           contractType' x,
            boolType' x,
            bytesType' x,
            decimalType' x,
            enumType' x
          ]
 
-arrayType' :: SourceAnnotation Text -> Type'
-arrayType' x = Static (SVMType.Array (SVMType.UnknownLabel "*" Nothing) Nothing) x
+-- arrayType' :: SourceAnnotation Text -> Type'
+-- arrayType' x = Static (SVMType.Array (SVMType.UnknownLabel "*" Nothing) Nothing) x
 
 sumType' :: Type' -> Type' -> Type'
 sumType' (Sum t1) (Sum t2) = Sum (t1 <> t2)
@@ -640,10 +633,7 @@ typecheckStatic (SVMType.Bytes d1 b1) (SVMType.Bytes d2 b2) =
       _ -> Right $ SVMType.Bytes (d1 <|> d2) (b1 <|> b2)
 typecheckStatic SVMType.Decimal SVMType.Decimal = Right $ SVMType.Decimal
 typecheckStatic SVMType.Bool SVMType.Bool = Right SVMType.Bool
-typecheckStatic (SVMType.Address a) (SVMType.Address b) = Right $ SVMType.Account (a && b)
-typecheckStatic (SVMType.Address a) (SVMType.Account b) = Right $ SVMType.Account (a && b)
-typecheckStatic (SVMType.Account a) (SVMType.Address b) = Right $ SVMType.Account (a && b)
-typecheckStatic (SVMType.Account a) (SVMType.Account b) = Right $ SVMType.Account (a && b)
+typecheckStatic (SVMType.Address a) (SVMType.Address b) = Right $ SVMType.Address (a && b)
 typecheckStatic (SVMType.UnknownLabel a' _) (SVMType.UnknownLabel b' _) = case (theLastPartOf a', theLastPartOf b') of
   (a, b) -> if a == b || a == "" || b == ""
     then Right (SVMType.UnknownLabel (string' [a', b']) Nothing)
@@ -719,7 +709,6 @@ typecheckStatic (SVMType.Mapping d1 k1 v1) (SVMType.Mapping d2 k2 v2) = do
   case (d1, d2) of
     (Just a, Just b) | a /= b -> Left "Mismatched dynamicity between mapping values"
     _ -> Right $ SVMType.Mapping (d1 <|> d2) k v
-typecheckStatic (SVMType.Bytes d1 b1) (SVMType.String _) = Right (SVMType.Bytes d1 b1)
 typecheckStatic (SVMType.UserDefined alias1 a) (SVMType.UserDefined alias2 b) =
   if alias1 == alias2 
     then typecheckStatic a b
@@ -738,7 +727,6 @@ typecheckStatic (SVMType.UserDefined a c) b =
       <> showType b
       <> " do not match."
 typecheckStatic _ (SVMType.UserDefined _ _) = Left "Type mismatch"
-typecheckStatic theType (SVMType.Bytes _ _) = Right theType
 typecheckStatic _ SVMType.Variadic = Right SVMType.Variadic
 typecheckStatic SVMType.Variadic _ = Right SVMType.Variadic
 typecheckStatic t1 t2 =
@@ -757,7 +745,7 @@ typecheckIndex (Static (SVMType.Array t _) x) i = i ~> (pure $ intType' x) !> pu
 typecheckIndex (Product [(Static (SVMType.Array t _) x)] _) i = i ~> (pure $ intType' x) !> pure (Static t x)
 typecheckIndex (Static SVMType.Variadic x) i = i ~> (pure $ intType' x) !> pure (topType' x)
 typecheckIndex (Product [(Static SVMType.Variadic x)] _) i = i ~> (pure $ intType' x) !> pure (topType' x)
-typecheckIndex (Static (SVMType.Bytes _ _) x) i = i ~> (pure $ intType' x) !> pure (Static (SVMType.Bytes Nothing (Just 1)) x)
+typecheckIndex (Static (SVMType.Bytes _ _) x) i = i ~> (pure $ intType' x) !> pure (intType' x)
 typecheckIndex (Static (SVMType.Mapping _ k v) x) i = do
   t <- typecheck (Static k x) i
   pure $ case t of
@@ -791,7 +779,7 @@ typecheckMember (Mutable t) member = do
     Top{} -> Mutable t'
     _ -> t'
 typecheckMember (Product [t] _) member = typecheckMember t member
-typecheckMember (Static (SVMType.Array _ _) x) "length" = pure $ Static (SVMType.Int Nothing Nothing) x
+typecheckMember (Static (SVMType.Array _ _) x) "length" = pure . Mutable $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Array t _) x) "push" = pure $ Function (Static t x) (Product [] x) x [] [] False
 typecheckMember (Static (SVMType.Array _ _) x) n = pure . bottom $ ("Unknown member of SVMType.Array: " <> labelToText n) <$ x
 typecheckMember (Static (SVMType.String _) x) "length" = pure $ Static (SVMType.Int Nothing Nothing) x
@@ -799,10 +787,10 @@ typecheckMember (Static (SVMType.Bytes _ _) x) "length" = pure $ Static (SVMType
 typecheckMember (Static (SVMType.UnknownLabel "Util" Nothing) x) "bytes32ToString" = pure $ Function (Static (SVMType.Bytes Nothing (Just 32)) x) (Static (SVMType.String Nothing) x) x [] [] False
 typecheckMember (Static (SVMType.UnknownLabel "Util" Nothing) x) "b32" = pure $ Function (Static (SVMType.Bytes Nothing (Just 32)) x) (Static (SVMType.Bytes Nothing (Just 32)) x) x [] [] False
 typecheckMember (Static (SVMType.UnknownLabel "string" Nothing) x) "concat" = pure $ Function (stringConcatArgs x) (Static (SVMType.String Nothing) x) x [] [] False
-typecheckMember (Static (SVMType.UnknownLabel "msg" Nothing) x) "sender" = pure $ Static (SVMType.Account False) x
-typecheckMember (Static (SVMType.UnknownLabel "msg" Nothing) x) "data" = pure $ Static (SVMType.String Nothing) x
-typecheckMember (Static (SVMType.UnknownLabel "msg" Nothing) x) "sig" = pure $ Static (SVMType.Bytes Nothing (Just 4)) x
-typecheckMember (Static (SVMType.UnknownLabel "tx" Nothing) x) "origin" = pure $ Static (SVMType.Account False) x
+typecheckMember (Static (SVMType.UnknownLabel "msg" Nothing) x) "sender" = pure $ Static (SVMType.Address False) x
+typecheckMember (Static (SVMType.UnknownLabel "msg" Nothing) x) "data" = pure $ Static SVMType.Variadic x
+typecheckMember (Static (SVMType.UnknownLabel "msg" Nothing) x) "sig" = pure $ stringType' x
+typecheckMember (Static (SVMType.UnknownLabel "tx" Nothing) x) "origin" = pure $ Static (SVMType.Address False) x
 typecheckMember (Static (SVMType.UnknownLabel "tx" Nothing) x) "username" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.UnknownLabel "tx" Nothing) x) "organization" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.UnknownLabel "tx" Nothing) x) "group" = pure $ Static (SVMType.String Nothing) x
@@ -810,10 +798,10 @@ typecheckMember (Static (SVMType.UnknownLabel "tx" Nothing) x) "organizationalUn
 typecheckMember (Static (SVMType.UnknownLabel "tx" Nothing) x) "certificate" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.UnknownLabel "block" Nothing) x) "timestamp" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.UnknownLabel "block" Nothing) x) "number" = pure $ Static (SVMType.Int Nothing Nothing) x
-typecheckMember (Static (SVMType.UnknownLabel "block" Nothing) x) "coinbase" = pure $ Static (SVMType.Account True) x
+typecheckMember (Static (SVMType.UnknownLabel "block" Nothing) x) "coinbase" = pure $ Static (SVMType.Address True) x
 typecheckMember (Static (SVMType.UnknownLabel "block" Nothing) x) "difficulty" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.UnknownLabel "block" Nothing) x) "gaslimit" = pure $ Static (SVMType.Int Nothing Nothing) x
-typecheckMember (Static (SVMType.UnknownLabel "block" Nothing) x) "proposer" = pure $ Static (SVMType.Account False) x
+typecheckMember (Static (SVMType.UnknownLabel "block" Nothing) x) "proposer" = pure $ Static (SVMType.Address False) x
 typecheckMember (Static (SVMType.UnknownLabel "type" Nothing) x) "name" = pure $ (Static (SVMType.String Nothing) x)
 typecheckMember (Static (SVMType.UnknownLabel "type" Nothing) x) "creationCode" = pure $ (Static (SVMType.String Nothing) x)
 typecheckMember (Static (SVMType.UnknownLabel "type" Nothing) x) "runtimeCode" = pure $ (Static (SVMType.String Nothing) x)
@@ -852,28 +840,8 @@ typecheckMember (Static e@(SVMType.Enum _ enum mNames) x) n = do
 
 -- Function: argType, returnType, contextType
 -- Static: argType, ContextType
-typecheckMember (Static (SVMType.Account True) x) "transfer" = pure $ Function (Static (SVMType.Int Nothing Nothing) x) (Product [] x) x [] [] False
-typecheckMember (Static (SVMType.Account True) x) "send" = pure $ Function (Static (SVMType.Int Nothing Nothing) x) (Static (SVMType.Bool) x) x [] [] False
-typecheckMember (Static (SVMType.Account _) x) "nonce" = pure $ Static (SVMType.Int Nothing Nothing) x
-typecheckMember (Static (SVMType.Account _) x) "balance" = pure $ Static (SVMType.Int Nothing Nothing) x
-typecheckMember (Static (SVMType.Account _) x) "code" =
-  pure . Sum $
-    (Static (SVMType.String Nothing) x)
-      :| [ Function
-             (Sum $ (Product [] x) :| [Static (SVMType.String Nothing) x])
-             (Static (SVMType.String Nothing) x)
-             x
-             []
-             []
-             False
-         ]
-typecheckMember (Static (SVMType.Account _) x) "codehash" = pure $ Static (SVMType.String Nothing) x
-typecheckMember (Static (SVMType.Account _) x) "chainId" = pure $ Static (SVMType.Int Nothing Nothing) x
-typecheckMember (Static (SVMType.Account _) x) "chainIdString" = pure $ Static (SVMType.String Nothing) x
-typecheckMember (Static (SVMType.Account _) x) "creator" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.Address _) x) "creator" = pure $ Static (SVMType.String Nothing) x
-typecheckMember (Static (SVMType.Account _) x) "root" = pure $ Static (SVMType.Account False) x
-typecheckMember (Static (SVMType.Address _) x) "root" = pure $ Static (SVMType.Account False) x
+typecheckMember (Static (SVMType.Address _) x) "root" = pure $ Static (SVMType.Address False) x
 typecheckMember (Static (SVMType.Struct _ struct) x) n = do
   names <- M.fromList <$> lookupStruct struct
   pure $ case M.lookup n names of
@@ -906,7 +874,7 @@ typecheckMember (Static (SVMType.Contract _) x) "code" =
 -- typecheckMember (Static (SVMType.Contract _) x) "searchcode" = pure $ Function (Static (SVMType.String Nothing) x) (Static (SVMType.String Nothing) x) x
 typecheckMember (Static (SVMType.Contract _) x) "codehash" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.Contract _) x) "chainId" = pure $ Static (SVMType.Int Nothing Nothing) x
-typecheckMember (Static (SVMType.Contract _) x) "root" = pure $ Static (SVMType.Account False) x
+typecheckMember (Static (SVMType.Contract _) x) "root" = pure $ Static (SVMType.Address False) x
 typecheckMember (Static (SVMType.Contract c) x) n = lookupContractFunction x c n
 typecheckMember (Static (SVMType.UnknownLabel c _) x) n = do
   e <- typecheckMember (Static (SVMType.Enum Nothing c Nothing) x) n
@@ -1403,9 +1371,12 @@ stringArgs x =
   Sum $
     stringType' x
       :| [ addressType' x,
-           accountType' x,
            intType' x,
-           boolType' x
+           boolType' x,
+           bytesType' x,
+           Product [bytesType' x, stringType' x] x,
+           Product [intType' x, intType' x] x,
+           Product [intType' x, intType' x, intType' x] x
          ]
 
 addressArgs :: SourceAnnotation Text -> Type'
@@ -1413,29 +1384,13 @@ addressArgs x =
   Sum $
     stringType' x
       :| [ addressType' x,
-           accountType' x,
            intType' x,
+           bytesType' x,
            contractType' x
          ]
 
-accountArgs :: SourceAnnotation Text -> Type'
-accountArgs x =
-  Sum $
-    stringType' x
-      :| [ addressType' x,
-           accountType' x,
-           intType' x,
-           contractType' x,
-           Product [intType' x, intType' x] x,
-           Product [intType' x, stringType' x] x,
-           Product [addressType' x, intType' x] x,
-           Product [accountType' x, intType' x] x,
-           Product [addressType' x, stringType' x] x,
-           Product [accountType' x, stringType' x] x
-         ]
-
 deleteArgs :: SourceAnnotation Text -> Type'
-deleteArgs x = sumType' (simpleType' x) . Sum $ Static (SVMType.Struct Nothing "") x :| [arrayType' x]
+deleteArgs x = simpleType' x -- sumType' (simpleType' x) . Sum $ Static (SVMType.Struct Nothing "") x :| [arrayType' x]
 
 boolArgs :: SourceAnnotation Text -> Type'
 boolArgs x =
@@ -1445,7 +1400,13 @@ boolArgs x =
          ]
 
 byteArgs :: SourceAnnotation Text -> Type'
-byteArgs x = intType' x
+byteArgs x =
+  Sum $
+    stringType' x
+      :| [ intType' x
+         , addressType' x
+         , Product [stringType' x, stringType' x] x
+         ]
 
 keccak256Args :: SourceAnnotation Text -> Type'
 keccak256Args x = topType' x
@@ -1499,10 +1460,10 @@ verifySignatureArgs :: SourceAnnotation Text -> Type'
 verifySignatureArgs x = Product [stringType' x, stringType' x, stringType' x] x
 
 selfdestructArgs :: SourceAnnotation Text -> Type'
-selfdestructArgs x = accountType' x
+selfdestructArgs x = addressType' x
 
 getUserCertArgs :: SourceAnnotation Text -> Type'
-getUserCertArgs x = accountType' x
+getUserCertArgs x = addressType' x
 
 mulmodArgs :: SourceAnnotation Text -> Type'
 mulmodArgs x = Product [intType' x, intType' x, intType' x] x
@@ -1521,7 +1482,7 @@ addmodArgs :: SourceAnnotation Text -> Type'
 addmodArgs x = Product [intType' x, intType' x, intType' x] x
 
 payableArgs :: SourceAnnotation Text -> Type'
-payableArgs x = accountType' x
+payableArgs x = addressType' x
 
 parseCertArgs :: SourceAnnotation Text -> Type'
 parseCertArgs x = stringType' x
@@ -1536,7 +1497,7 @@ fastForwardArgs :: SourceAnnotation Text -> Type'
 fastForwardArgs x = intType' x
 
 getVarType' :: String -> SourceAnnotation Text -> SSS Type'
-getVarType' "this" ctx = pure $ Static (SVMType.Account False) ctx
+getVarType' "this" ctx = pure $ Static (SVMType.Address False) ctx
 getVarType' s@('u' : 'i' : 'n' : 't' : n) ctx = case n of
   [] -> pure $ Function (intArgs ctx) (Static (SVMType.Int (Just False) Nothing) ctx) ctx [] [] False
   _ -> case readMaybe n of
@@ -1547,8 +1508,7 @@ getVarType' s@('i' : 'n' : 't' : n) ctx = case n of
   _ -> case readMaybe n of
     Just n' -> pure $ Function (intArgs ctx) (Static (SVMType.Int (Just True) (Just n')) ctx) ctx [] [] False
     Nothing -> getVarTypeByName' (stringToLabel s) ctx
-getVarType' "address" ctx = pure $ Function (addressArgs ctx) (Static (SVMType.Account False) ctx) ctx [] [] False
-getVarType' "account" ctx = pure $ Function (accountArgs ctx) (Static (SVMType.Account False) ctx) ctx [] [] False
+getVarType' "address" ctx = pure $ Function (addressArgs ctx) (Static (SVMType.Address False) ctx) ctx [] [] False
 --This is either the string() function or the string.member() function
 getVarType' "string" ctx = pure $ Sum $ (Function (stringArgs ctx) (stringType' ctx) ctx [] [] False) :| [Static (SVMType.UnknownLabel "string" Nothing) ctx]
 getVarType' "decimal" ctx = pure $ Function (decimalArgs ctx) (Static (SVMType.Decimal) ctx) ctx [] [] False
@@ -1578,12 +1538,12 @@ getVarType' "verifySignature" ctx = pure $ Function (verifySignatureArgs ctx) (b
 getVarType' "getUserCert" ctx = pure $ Function (getUserCertArgs ctx) (certType' ctx) ctx [] [] False
 getVarType' "addmod" ctx = pure $ Function (addmodArgs ctx) (intType' ctx) ctx [] [] False
 getVarType' "mulmod" ctx = pure $ Function (mulmodArgs ctx) (intType' ctx) ctx [] [] False
-getVarType' "payable" ctx = pure $ Function (payableArgs ctx) (Static (SVMType.Account True) ctx) ctx [] [] False
+getVarType' "payable" ctx = pure $ Function (payableArgs ctx) (Static (SVMType.Address True) ctx) ctx [] [] False
 getVarType' "blockhash" ctx = pure $ Function (blockhashArgs ctx) (stringType' ctx) ctx [] [] False
 getVarType' "ecrecover" ctx = pure $ Function (ecrecoverArgs ctx) (addressType' ctx) ctx [] [] False
 getVarType' "parseCert" ctx = pure $ Function (parseCertArgs ctx) (certType' ctx) ctx [] [] False
-getVarType' "create" ctx = pure $ Function (createFuncArgs ctx) (accountType' ctx) ctx [] [] False
-getVarType' "create2" ctx = pure $ Function (saltCreateArgs ctx) (accountType' ctx) ctx [] [] False
+getVarType' "create" ctx = pure $ Function (createFuncArgs ctx) (addressType' ctx) ctx [] [] False
+getVarType' "create2" ctx = pure $ Function (saltCreateArgs ctx) (addressType' ctx) ctx [] [] False
 getVarType' "fastForward" ctx = do
   test <- asks isRunningTests
   if test
@@ -1709,7 +1669,7 @@ getVarTypeByName' name ctx = do
                   pure . Sum $
                         ctrct
                           :| [ Function
-                                 (Sum (Static (SVMType.Account False) ctx :| [ctrct, lbl] ++ pContracts ++ pLabels ++ cContracts ++ cLabels))
+                                 (Sum (Static (SVMType.Address False) ctx :| [ctrct, lbl] ++ pContracts ++ pLabels ++ cContracts ++ cLabels))
                                  ctrct
                                  ctx
                                  []
@@ -1944,9 +1904,15 @@ tcExpr (IndexAccess _ a (Just b)) = do
   b' <- tcExpr b
   typecheckIndex a' b'
 tcExpr (IndexAccess _ a Nothing) = tcExpr a
-tcExpr (MemberAccess x var name) | name `elem` ["call", "delegatecall", "staticcall", "derive"] =
-  sumType' (accountType' x) (addressType' x) ~> tcExpr var !> (pure $
+tcExpr (MemberAccess x var name) | name `elem` ["call", "delegatecall", "staticcall"] =
+  sumType' (addressType' x) (addressType' x) ~> tcExpr var !> (pure $
       Function (Product [stringType' x, Static SVMType.Variadic x] x)
+               (Static SVMType.Variadic x)
+               x [] [] False
+    )
+tcExpr (MemberAccess x var "derive") =
+  sumType' (addressType' x) (addressType' x) ~> tcExpr var !> (pure $
+      Function (Product [stringType' x, stringType' x, Static SVMType.Variadic x] x)
                (Static SVMType.Variadic x)
                x [] [] False
     )
@@ -2041,7 +2007,7 @@ tcExpr (NumberLiteral x n _) = if n < 0
                                   else pure $ intType' x
 tcExpr (DecimalLiteral x _) = pure $ decimalType' x
 tcExpr (StringLiteral x _) = pure $ stringType' x
-tcExpr (AccountLiteral x _) = pure $ accountType' x
+tcExpr (AddressLiteral x _) = pure $ addressType' x
 tcExpr (HexaLiteral x _) = pure $ stringType' x
 tcExpr (InlineBoundsCheck x _ _ a) = intType' x ~> tcExpr a
 tcExpr (TupleExpression x es) =

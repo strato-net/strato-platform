@@ -9,6 +9,7 @@ import {
   transferFromToken,
   setTokenStatus,
   getVoucherBalance,
+  getTransferableTokens,
 } from "../services/tokens.service";
 import {
   validateAddressArgs,
@@ -78,6 +79,20 @@ class TokensController {
         accessToken,
         { ...query, status: "eq.2" } as Record<string, string | undefined>
       );
+      res.status(RestStatus.OK).json(tokens);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getTransferable(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress } = req;
+      const tokens = await getTransferableTokens(accessToken, userAddress);
       res.status(RestStatus.OK).json(tokens);
     } catch (error) {
       next(error);

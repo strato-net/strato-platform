@@ -5,7 +5,7 @@
 .stack-work-profile
 docker-compose.push.yml
 docker-compose.push.ecr.yml
-/docker-compose.yml
+docker-compose.yml
 docker-compose.ecr.yml
 docker-compose.allDocker.push.yml
 docker-compose.allDocker.push.ecr.yml
@@ -55,3 +55,6 @@ docker-compose.notification.push.yml
 docker-compose.notification.yml
 docker-compose.oracle.ecr.yml
 docker-compose.oracle.yml
+
+/app
+/mynode/

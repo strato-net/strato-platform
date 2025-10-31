@@ -1,6 +1,7 @@
 import "../abstract/ERC20/access/Authorizable.sol";
+import "../abstract/ERC20/utils/StringUtils.sol";
 import "../concrete/BaseCodeCollection.sol";
-import "main.groth16.sol";
+import "General/main.groth16.sol";
 
 contract User {
     function do(address a, string f, variadic args) public returns (variadic) {
@@ -10,6 +11,8 @@ contract User {
 }
 
 contract Describe_Mercata is Authorizable {
+    using StringUtils for string;
+    using BytesUtils for bytes;
     constructor() {
     }
 
@@ -52,6 +55,13 @@ contract Describe_Mercata is Authorizable {
         Token(t2).mint(address(u2), 10000e18);
         address p1 = m.poolFactory().createPool(t1,t2);
         require(p1 != address(0), "Failed to create pool 1");
+
+        // Give Pool mint/burn rights over its LP token
+        Token lpToken = Pool(p1).lpToken();
+        AdminRegistry adminRegistry = m.adminRegistry();
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lpToken), "mint", address(p1));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lpToken), "burn", address(p1));
+
         // address p2 = m.poolFactory().createPool(t2,t1);
         // require(p2 != address(0), "Failed to create pool 2");
         require(ERC20(t1).approve(address(p1), 4000e18), "Approval failed for t1");
@@ -81,6 +91,13 @@ contract Describe_Mercata is Authorizable {
         Token(t1).mint(address(u1), u1t1Amt);
         Token(t2).mint(address(u1), 20000000e18);
         address p1 = m.poolFactory().createPool(t1,t2);
+
+        // Give Pool mint/burn rights over its LP token
+        Token lpToken = Pool(p1).lpToken();
+        AdminRegistry adminRegistry = m.adminRegistry();
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lpToken), "mint", address(p1));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lpToken), "burn", address(p1));
+
         require(p1 != address(0), "Failed to create pool 1");
         require(ERC20(t1).approve(address(p1), 4000e18), "Approval failed for t1");
         require(ERC20(t2).approve(address(p1), 10000000e18), "Approval failed for t2");
@@ -107,6 +124,13 @@ contract Describe_Mercata is Authorizable {
         string u = keccak256(ver, nonce, gasLimit, to, funcName, args, network);
         address from = ecrecover(u, v, r, s);
         require(from == address(0x1b7dc206ef2fe3aab27404b88c36470ccf16c0ce), "Signed tx hash: " + h + ", unsigned tx hash: " + u + ", Signer: 0x" + string(from) + " didn't match 0x1b7dc206ef2fe3aab27404b88c36470ccf16c0ce");
+    }
+
+    function property_hex_encoding_roundtrips(uint w) {
+        string x = string(w, 16);
+        uint y = uint(x);
+        string z = string(y, 16);
+        require(w == y && x == z, "Hex encoding failed: " + ", ".intercalate([string(w), x, string(y), z]));
     }
 
     struct Transaction {
@@ -167,21 +191,10 @@ contract Describe_Mercata is Authorizable {
         require(success, "Groth16 proof failed!");
     }
 
-    function intercalate(string s, string[] strs) internal returns (string) {
-        string r = "";
-        for (uint i = 0; i < strs.length; i++) {
-            if (i > 0) {
-                r += s;
-            }
-            r += strs[i];
-        }
-        return r;
-    }
-
     string output;
 
     function performIssue(uint num, bool should, address isDeadbeef, string message) public {
-        output = intercalate(",", [string(num), string(should), string(isDeadbeef), string(message)]);
+        output = ",".intercalate([string(num), string(should), string(isDeadbeef), string(message)]);
     }
 
     function it_can_execute_issues() {
@@ -271,5 +284,34 @@ contract Describe_Mercata is Authorizable {
         adminUser.do(address(admin), "castVoteOnIssue", address(admin), "updateDelegate", "_shouldExecute", newVotingRules);
         admin.removeAdmin(address(adminUser));
         require(admin.admins(0) == address(this) && admin.admins(1) == address(0), "Voting logic was not overwritten properly");
+    }
+
+    function it_can_use_string_utils() {
+        string v = "HeLlO wOrLd";
+        string w = v.toLower();
+        string x = v.toUpper();
+        string y = w.toUpper();
+        bytes z = bytes(v).b16encode();
+        string alpha = string(z.b16decode());
+        require(w == "hello world", w);
+        require(x == y, x + ", " + y);
+        require(string(z) == "48654c6c4f20774f724c64", z);
+        require(alpha == v, alpha);
+        string blob0 = "16dad75a9959f69f811ebca00b839206cdee3f51611f2f44283d3c19ae429e47";
+        bytes blob = bytes(blob0).b16decode();
+        string blob2 = string(blob.b16encode());
+        require(blob0 == blob2, blob0 + ", " + blob2);
+        string blob3 = "0x" + blob0;
+        require(blob3.normalizeHex() == blob3, blob0 + ", " + blob2);
+        bytes blob4 = bytes("16dad75a9959f69f811ebca00b839206cdee3f51611f2f44283d3c19ae429e47").b16decode();
+        string emojis = "🦑🎉⚡🪩🌮🐘🚀💾🐧🔥🍕🧠🌈🎸🦄💻🕹️💥";
+        string emojiHexString = "f09fa691f09f8e89e29aa1f09faaa9f09f8caef09f9098f09f9a80f09f92bef09f90a7f09f94a5f09f8d95f09fa7a0f09f8c88f09f8eb8f09fa684f09f92bbf09f95b9efb88ff09f92a5";
+        bytes emojiBytes = bytes(emojis, "utf-8");
+        bytes emojiBytesHex = emojiBytes.b16encode();
+        string emojiBytesHexString = string(emojiBytesHex, "utf-8");
+        require(emojiBytesHexString == emojiHexString, "Emojis did not encode properly: " + emojiBytesHexString);
+        bytes emojiBytesUnhex = emojiBytesHex.b16decode();
+        string emojis2 = string(emojiBytesUnhex, "utf-8");
+        require(emojis == emojis2, "Emojis did not decode properly: " + emojis2);
     }
 }

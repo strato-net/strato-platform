@@ -3,8 +3,8 @@ const getItemQuantity = (item) => {
     return item.quantity;
   } else if (item.quantities?.length) {
     return item.quantities[0];
-  } else if (item['BlockApps-Mercata-Order-quantities']?.length) {
-    return item['BlockApps-Mercata-Order-quantities'][0]?.value;
+  } else if (item['BlockApps-Order-quantities']?.length) {
+    return item['BlockApps-Order-quantities'][0]?.value;
   } else {
     return '';
   }
@@ -145,9 +145,9 @@ class TransactionController {
         const getImage = (assetItem) => {
           if (
             assetItem &&
-            assetItem['BlockApps-Mercata-Asset-images']?.length
+            assetItem['BlockApps-Asset-images']?.length
           ) {
-            return assetItem['BlockApps-Mercata-Asset-images'][0].value;
+            return assetItem['BlockApps-Asset-images'][0].value;
           } else if (item.image) {
             return item.image;
           } else {
@@ -326,9 +326,9 @@ class TransactionController {
         const getImage = (assetItem) => {
           if (
             assetItem &&
-            assetItem['BlockApps-Mercata-Asset-images']?.length
+            assetItem['BlockApps-Asset-images']?.length
           ) {
-            return assetItem['BlockApps-Mercata-Asset-images'][0].value;
+            return assetItem['BlockApps-Asset-images'][0].value;
           } else if (item.image) {
             return item.image;
           } else {

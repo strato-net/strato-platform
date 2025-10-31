@@ -37,7 +37,7 @@ export const OracleProvider = ({ children }: { children: ReactNode }) => {
         // Fetch oracle prices directly using the lending/pools endpoint which has access to detailed oracle data
         const response = await api.get(`/lending/pools`, {
           params: {
-            select: `priceOracle:priceOracle_fkey(address,prices:BlockApps-Mercata-PriceOracle-prices(asset:key,price:value::text))`
+            select: `priceOracle:priceOracle_fkey(address,prices:BlockApps-PriceOracle-prices(asset:key,price:value::text))`
           }
         });
         

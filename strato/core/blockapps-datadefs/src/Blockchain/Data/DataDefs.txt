@@ -92,8 +92,8 @@ RawTransaction
 
 Storage json
     addressStateRefId AddressStateRefId
-    key Text
-    value Text
+    key StoragePath
+    value BasicValue
     deriving Eq Read Show
 
 TransactionResult json
@@ -111,8 +111,6 @@ TransactionResult json
     newStorage String
     deletedStorage String
     status TransactionResultStatus Maybe
-    creator String
-    appName String
     deriving Eq Read Show Generic
 
 UserN json

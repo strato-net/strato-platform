@@ -73,7 +73,7 @@ require("dotenv").config();
   // fetch state helper using Cirrus
   const fetchState = async () => {
     // Get pool info from Cirrus
-    const poolRows = await cirrusGet("/BlockApps-Mercata-Pool", {
+    const poolRows = await cirrusGet("/BlockApps-Pool", {
       address: `eq.${POOL}`,
       select: "tokenA,tokenB,lpToken,tokenABalance,tokenBBalance",
       limit: 1,

@@ -14,21 +14,12 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 
 {-# OPTIONS -fno-warn-orphans      #-}
-{-# OPTIONS -fno-warn-unused-top-binds #-}
 
 module Blockchain.BlockChain
-  ( addBlock,
-    addBlocks,
+  ( addBlocks,
     verifyBlock,
     mineTransactions,
-    addTransaction,
-    addTransactions,
-    outputTransactionResult,
-    runCodeForTransaction,
 --    calculateIntrinsicGas',
-    compactDiffs, -- For testing
-    mkLogEntry,
-    mkEventEntry,
   )
 where
 
@@ -61,7 +52,6 @@ import qualified Blockchain.SolidVM as SolidVM
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
-import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.Delta
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.ExtendedWord
@@ -75,7 +65,6 @@ import Blockchain.Stream.VMEvent
 import Blockchain.TheDAOFork
 import Blockchain.Timing
 import Blockchain.VM.SolidException (SolidException(PaymentError, TooMuchGas))
-import Blockchain.VMConstants
 import Blockchain.VMContext
 import Blockchain.VMMetrics
 import Blockchain.Blockstanbul.Model.Authentication
@@ -96,6 +85,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.DList as DL
 import Data.List
+import Data.Map (Map)
 import qualified Data.Map as M
 import qualified Data.Map.Ordered as O
 import Data.Maybe
@@ -103,7 +93,6 @@ import Data.Proxy
 import qualified Data.Sequence as Seq
 import qualified Data.Set as S
 import qualified Data.Text as T
-import Data.Text.Encoding (encodeUtf8)
 import Data.Time.Clock
 import Prometheus as P
 import SolidVM.Model.CodeCollection hiding (Event, Block, events, _events)
@@ -301,13 +290,51 @@ verifyBlock b@Block{blockBlockData = bh} (trrs, derivedSR) parentBSum = do
         v -> [VersionMismatch $ BlockDelta v 2]
 
 addBlockTransactions :: (Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> Address -> ConduitT a VmOutEvent m [TxRunResult]
-addBlockTransactions OutputBlock {obBlockData = bd, obReceiptTransactions = transactions} proposer = do
+addBlockTransactions b@OutputBlock {obBlockData = bd, obReceiptTransactions = transactions} proposer = do
   $logDebugS "addBlockTransactions" . T.pack $ "All transactions: " ++ show transactions
   trrs <- addTransactions bd transactions proposer
 
+  flushMemStorageTxDBToBlockDB
+
+  sendNewActionMessage b trrs
+  
   lift $ timeit "flushMemStorageDB" (Just vmBlockInsertionMined) flushMemStorageDB
+  flushMemAddressStateTxToBlockDB
+  flushMemAddressStateTxToBlockDB
   lift $ timeit "flushMemAddressStateDB" (Just vmBlockInsertionMined) flushMemAddressStateDB
   pure trrs
+
+sendNewActionMessage :: (HasMemRawStorageDB m, MonadIO m) =>
+                        OutputBlock -> [TxRunResult] -> m ()
+sendNewActionMessage b trrs = do
+  let bd = obBlockData b
+  theMap <- getMemRawStorageBlockDB
+
+  let recombined :: Map Address ActionData
+      recombined =
+        fmap (ActionData . SolidVMDiff)
+        $ M.fromListWith M.union
+        [ (addr, M.singleton path val)
+        | ((addr, path), val) <- M.toList theMap
+        ]
+
+      action :: Action
+      action = Action {
+        _blockHash=blockHash b,
+        _blockTimestamp=blockHeaderTimestamp bd,
+        _blockNumber=blockHeaderBlockNumber bd,
+        _transactionSender=0x0,
+        _actionData=O.fromList $ M.toList recombined,
+        _newCodeCollections=[],
+        _events=Seq.fromList $ concat $ map (either (const []) erEvents . trrResult) trrs,
+        _delegatecalls=mconcat $ map (either (const Seq.empty) (fromMaybe Seq.empty . fmap _delegatecalls . erAction) . trrResult) trrs
+        }
+
+  _ <- produceVMEvents $ [NewAction action]
+
+  return ()
+
+
 
 addTransactions ::
   (VMBase m, MonadMonitor m) =>
@@ -322,12 +349,15 @@ addTransactions blockData txs proposer =
     yield . OutASM $ foldr (flip M.union) M.empty $ map trrAfterMap trrs
     pure trrs
   where
+    go :: (VMBase m, MonadMonitor m) =>
+          Integer -> [OutputTx] -> DL.DList TxRunResult -> m [TxRunResult]
     go _ [] trrs = return $ DL.toList trrs
     go blockGas (t : rest) trrs = do
-      let bt = fromMaybe (otBaseTx t) (otPrivatePayload t)
+      let bt = otBaseTx t
+      beforeMap <- getAddressStateTxDBMap
       flushMemAddressStateTxToBlockDB
       flushMemStorageTxDBToBlockDB
-      beforeMap <- getAddressStateTxDBMap
+
       (!deltaT, !result) <- timeIt $ runExceptT $ addTransaction blockData blockGas t proposer
 
       afterMap <- getAddressStateTxDBMap
@@ -350,8 +380,7 @@ mineTransactions bd remGas otxs mSelfAddress = mineTransactions' bd remGas DL.em
 mineTransactions' :: (VMBase m, MonadMonitor m) => BlockHeader -> Integer -> DL.DList TxRunResult -> [OutputTx] -> Address-> m Bagger.TxMiningResult
 mineTransactions' _ remGas ran [] _ = return $ Bagger.TxMiningResult Nothing (DL.toList ran) [] remGas
 mineTransactions' header remGas ran unran@(tx : txs) mSelfAddress = do
-
-  let bt = fromMaybe (otBaseTx tx) (otPrivatePayload tx)
+  let bt = otBaseTx tx
   beforeMap <- getAddressStateTxDBMap
   (!time', !result) <- timeIt . runExceptT $ addTransaction header remGas tx mSelfAddress
   afterMap <- getAddressStateTxDBMap
@@ -384,9 +413,6 @@ mineTransactions' header remGas ran unran@(tx : txs) mSelfAddress = do
     Left failure -> do
       return $ Bagger.TxMiningResult (Just failure) (DL.toList ran) unran remGas
 
-blockIsHomestead :: Integer -> Bool
-blockIsHomestead blockNum = blockNum >= fromIntegral gHomesteadFirstBlock
-
 addTransaction ::
   (VMBase m, MonadMonitor m) =>
   BlockHeader ->
@@ -397,7 +423,7 @@ addTransaction ::
 addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
   nonceValid <- lift $ isNonceValid t
 
-  let bt = fromMaybe (otBaseTx t) (otPrivatePayload t)
+  let bt = otBaseTx t
   let maxGas = fromIntegral (maxBound :: Int)
   acctNonce <- lift $ addressStateNonce <$> A.lookupWithDefault (Proxy @AddressState) tAddr
 
@@ -412,9 +438,8 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
       adjustedTxGasLimit = bool (transactionGasLimit bt) (flags_strictGasLimit) (flags_strictGas && not isKnownToBeSlow)
       availableGas = fromInteger adjustedTxGasLimit
 
-  feeResult' <- payFees b availableGas tAddr t proposer
-  let feeResult = feeResult'{ erAction = (actionData %~ (O.fromList . map (fmap $ actionDataCodeCollection .~ emptyCodeCollection) . O.assocs)) <$> erAction feeResult' }
-      combineA f x y = liftA2 f x y <|> x <|> y
+  feeResult <- payFees b availableGas tAddr t proposer
+  let combineA f x y = liftA2 f x y <|> x <|> y
       attachFeeResult er = er
         { erAction = combineA (\era ->
               (actionData %~ (O.unionWithL (const $ flip mergeActionDataStorageDiffs) $ _actionData era))
@@ -470,7 +495,7 @@ runCodeForTransaction ::
   Address ->
   ExceptT TransactionFailureCause m ExecResults
 runCodeForTransaction b availableGas tAddr t proposer =
-  let ut = fromMaybe (otBaseTx t) (otPrivatePayload t)
+  let ut = otBaseTx t
    in if isContractCreationTX ut
         then do
           when flags_debug $ $logInfoS "runCodeForTransaction" "runCodeForTransaction: ContractCreationTX"
@@ -516,7 +541,6 @@ payFees ::
   Address ->
   ExceptT TransactionFailureCause m ExecResults
 payFees b availableGas tAddr t proposer = do
-  let ut = fromMaybe (otBaseTx t) (otPrivatePayload t)
   -- BEGIN: Custom Validation Check
   -- Call validation contract at 0xDEC1DE. Require it returns True.
 
@@ -528,7 +552,7 @@ payFees b availableGas tAddr t proposer = do
       proposer  --proposer
       (fromIntegral availableGas) --availableGas
       tAddr -- origin
-      (txHash ut) -- txHash
+      (txHash $ otBaseTx t) -- txHash
       "decide"
       []
       (Just DelegateCall)
@@ -537,7 +561,7 @@ payFees b availableGas tAddr t proposer = do
 {-
 codeOrDataLength :: OutputTx -> Int
 codeOrDataLength t =
-  let bt = fromMaybe (otBaseTx t) (otPrivatePayload t)
+  let bt = otBaseTx t
    in if isMessageTX bt
         then B.length $ transactionData bt
         else codeLength $ transactionInit bt --is ContractCreationTX
@@ -548,7 +572,7 @@ codeLength (PtrToCode _) = 20
 
 zeroBytesLength :: OutputTx -> Int
 zeroBytesLength t =
-  let bt = fromMaybe (otBaseTx t) (otPrivatePayload t)
+  let bt = otBaseTx t
    in if isMessageTX bt
         then length $ filter (== 0) $ B.unpack $ transactionData bt
         else length $ filter (== 0) $ B.unpack $ codeBytes' bt --is ContractCreationTX
@@ -562,7 +586,7 @@ calculateIntrinsicGas' blockNum = intrinsicGas (blockIsHomestead blockNum)
 
 intrinsicGas :: Bool -> OutputTx -> Gas
 intrinsicGas isHomestead t =
-  let bt = fromMaybe (otBaseTx t) (otPrivatePayload t)
+  let bt = otBaseTx t
    in gTXDATAZERO * zeroLen + gTXDATANONZERO * (fromIntegral (codeOrDataLength t) - zeroLen) + txCost bt
   where
     zeroLen = fromIntegral $ zeroBytesLength t
@@ -600,15 +624,15 @@ outputTransactionResult ::
   TxRunResult ->
   ConduitT a VmOutEvent m ()
 outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHash} result deltaT beforeMap afterMap newAddresses) = do
-  let t = fromMaybe (otBaseTx ot) (otPrivatePayload ot)
-      (txrStatus, message, gasRemaining, creator, appName) =
+  let t = otBaseTx ot
+      (txrStatus, message, gasRemaining) =
         case result of
-          Left err -> let fmt = format err in (Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt), fmt, 0, "", "") -- TODO Also include the trace
+          Left err -> let fmt = format err in (Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt), fmt, 0) -- TODO Also include the trace
           Right r -> case erException r of
-            Nothing -> (Success, "Success!", erRemainingTxGas r, erCreator r, erAppName r)
+            Nothing -> (Success, "Success!", erRemainingTxGas r)
             Just ex ->
               let fmt = either show show ex
-               in (Failure "Execution" Nothing (ExecutionFailure $ show ex) Nothing Nothing (Just fmt), fmt, 0, "", "")
+               in (Failure "Execution" Nothing (ExecutionFailure $ show ex) Nothing Nothing (Just fmt), fmt, 0)
       gasUsed = fromInteger $ transactionGasLimit t - gasRemaining
       etherUsed = gasUsed
 
@@ -639,48 +663,22 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
           transactionResultTime = realToFrac deltaT,
           transactionResultNewStorage = "",
           transactionResultDeletedStorage = "",
-          transactionResultStatus = Just txrStatus,
-          transactionResultCreator = creator,
-          transactionResultAppName = appName
+          transactionResultStatus = Just txrStatus
         }
   yield . OutVMEvents . (txr:) $ if not flags_diffPublish
     then []
     else case erAction <$> result of
-      Right (Just act) ->
-        let ccEvents = maybeToList $ extractCodeCollectionAddedMessages act
-            act' = act { Action._actionData = Action.omapMap (Action.actionDataCodeCollection .~ mempty) (Action._actionData act) }
-            actionEvents = [NewAction act']
-         in ccEvents ++ actionEvents
+      Right (Just act) -> extractCodeCollectionAddedMessages act
       _ -> []
 
-extractCodeCollectionAddedMessages :: Action.Action -> Maybe VMEvent
+extractCodeCollectionAddedMessages :: Action.Action -> [VMEvent]
 extractCodeCollectionAddedMessages a =
-  case ( a ^. Action.src,
-         a ^. Action.name,
-         O.assocs $ a ^. Action.actionData
-       ) of
-    (Just (Code c), Just n, actionDatas) ->
-      let cp = SolidVMCode (T.unpack n) . hash $ encodeUtf8 c
-          cn = fromMaybe "" . listToMaybe . catMaybes . flip map actionDatas $ \(_, Action.ActionData {..}) ->
-            if _actionDataCodeHash == cp
-              then Just _actionDataCreator
-              else Nothing
-          cc = foldr (\ad b -> Action._actionDataCodeCollection ad <> b) mempty $ snd <$> actionDatas
-          abstracts' = foldr (\ad b -> Action._actionDataAbstracts ad <> b) mempty $ snd <$> actionDatas
-          contracts' = (cc ^. contracts) <&> ( (functions .~ M.empty)
-                                            --  . (constructor .~ Nothing)
-                                             . (modifiers .~ M.empty)
-                                             )
-          cc' = emptyCodeCollection & contracts .~ contracts'
-       in Just $
-            CodeCollectionAdded
-              { codeCollection = const () <$> cc',
-                codePtr = cp,
-                creator = cn,
-                application = n,
-                abstracts = abstracts'
+  let mkCCAnouncement (userName, cc) =
+        CodeCollectionAdded
+              { codeCollection = const () <$> cc,
+                creator = userName
               }
-    _ -> Nothing
+  in map mkCCAnouncement $ _newCodeCollections a
 
 printTransactionMessage ::
   MonadLogger m =>
@@ -689,8 +687,7 @@ printTransactionMessage ::
   NominalDiffTime ->
   m ()
 printTransactionMessage ot@OutputTx {otSigner = tAddr, otHash = theHash} (Left errMsg) deltaT = do
-  let baseTx = fromMaybe (otBaseTx ot) (otPrivatePayload ot)
-      tNonce = transactionNonce baseTx
+  let tNonce = transactionNonce $ otBaseTx ot
   multilineLog "printTx/err" $
     boringBox
       [ "Adding transaction signed by: " ++ format tAddr,
@@ -700,7 +697,7 @@ printTransactionMessage ot@OutputTx {otSigner = tAddr, otHash = theHash} (Left e
         "t = " ++ printf "%.5f" (realToFrac deltaT :: Double) ++ "s"
       ]
 printTransactionMessage ot@OutputTx {otSigner = tAddr, otHash = theHash} (Right results) deltaT = do
-  let t = fromMaybe (otBaseTx ot) (otPrivatePayload ot)
+  let t = otBaseTx ot
       tNonce = transactionNonce t
       extra =
         if isMessageTX t
@@ -779,32 +776,6 @@ calculateAndEmitStateDiffs Nothing _ = pure ()
 calculateAndEmitStateDiffs (Just (next, hsh, num)) oldHeader =
   let base = MP.StateRoot $ blockHeaderStateRoot oldHeader
    in completeDiff base next hsh num
-
-diffMaxCost :: Int
-diffMaxCost = 500
-
-type PreDiff = (MP.StateRoot, Keccak256, Integer, Int)
-
-type ToDiff = (MP.StateRoot, MP.StateRoot, Keccak256, Integer)
-
-promote :: MP.StateRoot -> PreDiff -> ToDiff
-promote base (next, hsh, num, _) = (base, next, hsh, num)
-
-cost :: PreDiff -> Int
-cost (_, _, _, c) = c
-
-compactDiffs :: MP.StateRoot -> [PreDiff] -> [ToDiff]
-compactDiffs _ [] = error "should not be called on an empty list"
-compactDiffs base (p : ps) = go (cost p) (promote base p) ps
-  where
-    go :: Int -> ToDiff -> [PreDiff] -> [ToDiff]
-    go _ lastPending [] = [lastPending]
-    go pendingCost pending@(pendingBase, pendingNext, _, _) (c : cs) =
-      -- If we can fit this PreDiff in, we augment it to the pending ToDiff.
-      -- Otherwise, we emit and create a new ToDiff
-      if pendingCost + cost c > diffMaxCost
-        then pending : go (cost c) (promote pendingNext c) cs
-        else go (pendingCost + cost c) (promote pendingBase c) cs
 
 completeDiff ::
   ( MonadLogger m,

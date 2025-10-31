@@ -192,7 +192,8 @@ solidityLanguage =
           "="
         ],
       P.caseSensitive = True,
-      P.identStart = letter <|> char '_',
+      P.identStart = letter <|> oneOf "$_",
+      P.identLetter = alphaNum <|> oneOf "$_",
       P.nestedComments = False
     }
 

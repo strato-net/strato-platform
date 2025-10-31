@@ -24,7 +24,6 @@ import Blockchain.Sequencer.Monad
 import Blockchain.Strato.Discovery.Data.MemPeerDB
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Model.Host
-import Blockchain.Strato.Model.Validator
 import Control.Lens
 import Control.Monad.IO.Class
 import Control.Monad.Reader
@@ -78,8 +77,8 @@ getPeers mgr label = do
       pure peers
 
 postAddNode :: NetworkManager -> T.Text -> AddNodeParams -> Handler Bool
-postAddNode mgr label (AddNodeParams ip identity bootNodes) =
-  liftIO . runLoggingT . runResourceT $ runReaderT (addSimulatorNode "strato-lite" label (Validator identity) (Host ip) (TCPPort 30303) (UDPPort 30303) (Host <$> bootNodes)) mgr
+postAddNode mgr label (AddNodeParams ip _ bootNodes) =
+  liftIO . runLoggingT . runResourceT $ runReaderT (addSimulatorNode "strato-lite" label (Host ip) (TCPPort 30303) (UDPPort 30303) (Host <$> bootNodes)) mgr
 
 postRemoveNode :: NetworkManager -> T.Text -> Handler Bool
 postRemoveNode mgr label = liftIO . runLoggingT . runResourceT $ runReaderT (removeSimulatorNode label) mgr

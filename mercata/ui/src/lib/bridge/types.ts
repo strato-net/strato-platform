@@ -28,8 +28,7 @@ export type BridgeContextType = {
   // Navigation state for bridge transactions
   targetTransactionTab: BridgeTransactionTab | null;
   setTargetTransactionTab: (tab: BridgeTransactionTab | null) => void;
-  bridgeOut: (params: WithdrawalRequestParams) => Promise<BridgeResponse>;
-  redeemOut: (params: WithdrawalRequestParams) => Promise<BridgeResponse>;
+  requestWithdrawal: (params: WithdrawalRequestParams) => Promise<BridgeResponse>;
   useBalance: (tokenAddress: string | null) => {
     data: { 
       balance: string; 
@@ -60,7 +59,6 @@ export interface ContractValidationResult {
 
 // Transaction Detail Interfaces
 export interface DepositTransaction {
-  transaction_hash: string;
   block_timestamp: string;
   chainId?: number;
   from: string;
@@ -77,7 +75,6 @@ export interface DepositTransaction {
 }
 
 export interface WithdrawTransaction {
-  transaction_hash: string;
   block_timestamp: string;
   from: string;
   to: string;
