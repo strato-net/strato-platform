@@ -354,18 +354,6 @@ const AssetDetail = () => {
                       <span className="font-medium">{formatUnits(BigInt(asset?.balance || "0"), 18)}</span>
                     </div>
 
-                    {asset?.status == "2" ? (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Status:</span>
-                        <span className="font-medium text-green-500">Available</span>
-                      </div>
-                    ) : (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Status:</span>
-                        <span className="font-medium text-red-500">Sold Out</span>
-                      </div>
-                    )}
-
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-500">Owner:</span>
                       <span className="font-medium">
