@@ -81,8 +81,8 @@ then
 
     echo "Running setup"
     strato-setup -p api -K localhost --network=$network --apiIPAddress=$STRATO_IP > logs/strato-setup 2>&1
-    sed -i '' "s|--network=helium|--network=$network|g" commands.txt
-    sed -i '' "s|--svmTrace=false|--svmTrace=$svmTrace|g" commands.txt
+    sed -i.bak "s|--network=helium|--network=$network|g" commands.txt && rm commands.txt.bak
+    sed -i.bak "s|--svmTrace=false|--svmTrace=$svmTrace|g" commands.txt && rm commands.txt.bak
     echo "Setup complete"
 fi
 
