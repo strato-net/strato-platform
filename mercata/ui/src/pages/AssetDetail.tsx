@@ -350,7 +350,7 @@ const AssetDetail = () => {
                     </div>
 
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">User Balance:</span>
+                      <span className="text-gray-500">Balance:</span>
                       <span className="font-medium">{formatUnits(BigInt(asset?.balance || "0") + BigInt(asset?.collateralBalance || "0"), 18)}</span>
                     </div>
 
