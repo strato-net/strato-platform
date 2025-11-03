@@ -31,7 +31,8 @@ export OAUTH_DISCOVERY_URL
 export OAUTH_CLIENT_ID
 export OAUTH_CLIENT_SECRET
 
-export network=helium
+export network=${network:-helium}
+export svmTrace=${svmTrace:-false}
 export VAULT_URL=https://vault.blockapps.net:8093
 
 ####################################
@@ -79,7 +80,9 @@ then
     PGPASSWORD=api createdb -h localhost -U postgres cirrus
 
     echo "Running setup"
-    strato-setup -p api -K localhost --network=helium --apiIPAddress=$STRATO_IP > logs/strato-setup 2>&1
+    strato-setup -p api -K localhost --network=$network --apiIPAddress=$STRATO_IP > logs/strato-setup 2>&1
+    sed -i '' "s|--network=helium|--network=$network|g" commands.txt
+    sed -i '' "s|--svmTrace=false|--svmTrace=$svmTrace|g" commands.txt
     echo "Setup complete"
 fi
 
