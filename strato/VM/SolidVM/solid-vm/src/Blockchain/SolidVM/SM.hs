@@ -561,16 +561,22 @@ getVariableOfName name = do
               else x
       vars = NE.head $ localVariables currentCallInfo
       t s v = ('x' : s, v) `seq` v
+      curContract = currentContract currentCallInfo
 
   -- when (name == "theSixthSense") (internalError "M. Night Shyamalan presents" currentCallInfo)
 
   let maybeLocalValue = M.lookup name vars
 
   let maybeContractFunction :: Maybe Variable
-      maybeContractFunction = fmap (t "constant function" . Constant . SFunction name . Just) $ M.lookup name $ currentContract currentCallInfo ^. CC.functions
+      maybeContractFunction =
+        (t "constant function" . Constant . SFunction name $ Just curContract)
+        <$ (M.lookup name $ curContract ^. CC.functions)
 
       maybeFreeFunction :: Maybe Variable
-      maybeFreeFunction = fmap (t "free function" . Constant . SFunction name . Just) $ M.lookup name $ codeCollection currentCallInfo ^. CC.flFuncs
+      maybeFreeFunction =
+        (\f -> t "free function" . Constant . SFunction name . Just $
+          curContract & CC.functions %~ M.insert name f)
+        <$> (M.lookup name $ codeCollection currentCallInfo ^. CC.flFuncs)
 
       maybeBuiltinFunction :: Maybe Variable
       maybeBuiltinFunction =
