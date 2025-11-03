@@ -85,7 +85,7 @@ data Value
   | STuple (Vector Variable)
   | SArray (Vector Variable)
   | SMap (Map Value Variable)
-  | SFunction SolidString (Maybe CC.Func) -- Nothing means it's a builtin function
+  | SFunction SolidString (Maybe CC.Contract) -- Nothing means it's a builtin function
   | SBuiltinVariable SolidString
   | SSetterGetter String (Maybe Value)
   | SContractDef SolidString

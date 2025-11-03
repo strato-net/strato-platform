@@ -1175,7 +1175,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
         Nothing -> missingType "contract function lookup" contractName'
         Just ct -> pure ct
       case constName `M.lookup` CC._functions cont of
-        Just f -> return $ Constant . SFunction constName $ Just f
+        Just _ -> return $ Constant . SFunction constName $ Just cont
         Nothing -> case constName `M.lookup` CC._constants cont of
           Nothing -> case constName `M.lookup` (cc ^. CC.flConstants) of
             Just (CC.ConstantDecl _ _ constExp _) -> expToVar constExp
@@ -1209,7 +1209,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
             , method
             , " inside parent contract: "
             ]) (p ^. CC.functions)
-          Just f -> pure . Constant . SFunction method $ Just f
+          Just _ -> pure . Constant . SFunction method $ Just p
     (SAddress a _, n) -> evaluateAddressMember a False n
     (SContractItem a _, n) -> evaluateAddressMember a False n
     (SContract _ a, n) -> evaluateAddressMember a True n
@@ -1524,15 +1524,14 @@ expToVar' (CC.FunctionCall _ e args) = do
                     Nothing -> return $ Constant SNULL
                 x -> todo "expToVar'/FunctionCall" x
             Constant (SFunction name Nothing) -> Constant <$> callBuiltin name argVals
-            Constant (SFunction funcName (Just func)) -> do
+            Constant (SFunction funcName (Just contract')) -> do
               ro <- readOnly <$> getCurrentCallInfo
-              contract' <- getCurrentContract
               address <- getCurrentAddress
               codeAddr <- getCurrentCodeAddress
               (hsh, cc) <- getCurrentCodeCollection
               -- when (True) (internalError "IT'S MORBIN TIME" matchingFuncOverload)
-              res <- do
-                if (CC._funcIsFree func)
+              res <- case M.lookup funcName $ contract' ^. CC.functions of
+                Just func -> if (CC._funcIsFree func)
                   then do
                     validateFunctionArguments func argVals >>= \case
                       Just (mo, argVals') -> runTheCall address codeAddr contract' funcName hsh cc mo argVals' ro True
@@ -1546,6 +1545,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                             Just (mo, argVals') -> runTheCall address codeAddr contract' funcName hsh cc mo argVals' ro True
                             Nothing -> runTheCall address codeAddr contract' funcName hsh cc func argVals ro False
                         Nothing -> runTheCall address codeAddr contract' funcName hsh cc func argVals ro False
+                Nothing -> unknownFunction "regularFunctionCall/SFunction" funcName
               return . Constant . fromMaybe SNULL $ res
             Constant (SStructDef structName) -> do
               contract' <- getCurrentContract
