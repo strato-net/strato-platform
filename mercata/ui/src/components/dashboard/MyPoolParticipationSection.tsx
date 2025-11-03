@@ -61,24 +61,26 @@ export default function MyPoolParticipationSection({
       </CardHeader>
 
       <CardContent className="space-y-4">
-        {/* Header Row */}
-        <div className="grid grid-cols-4 px-4 text-sm text-gray-500 font-medium">
-          <div>Token</div>
-          <div className="text-center">Balance</div>
-          <div className="text-center">APY</div>
-          <div className="text-right">Value</div>
-        </div>
-
-        {shouldShowLoading ? (
-          <div className="flex items-center justify-center gap-2">
-            <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
-            <span className="text-sm text-gray-600">Loading...</span>
+        {/* Scrollable Table Container - Mobile Only */}
+        <div className="overflow-x-auto -mx-4 px-4 md:overflow-x-visible md:mx-0 md:px-0">
+          {/* Header Row */}
+          <div className="grid grid-cols-[180px_120px_100px_120px] md:grid-cols-4 min-w-full md:min-w-0 text-sm text-gray-500 font-medium md:px-4">
+            <div>Token</div>
+            <div className="text-center">Balance</div>
+            <div className="text-center">APY</div>
+            <div className="text-right">Value</div>
           </div>
-        ) : (
-          <>
+
+          {shouldShowLoading ? (
+            <div className="flex items-center justify-center gap-2 py-4">
+              <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
+              <span className="text-sm text-gray-600">Loading...</span>
+            </div>
+          ) : (
+            <>
             {/* Lending Pool Row */}
             {liquidityInfo?.withdrawable ? (
-              <div className="grid grid-cols-4 items-center bg-gray-50 px-4 py-3 rounded-md mb-2">
+              <div className="grid grid-cols-[180px_120px_100px_120px] md:grid-cols-4 min-w-full md:min-w-0 items-center bg-gray-50 md:px-4 py-3 rounded-md mb-2">
                 <div className="font-semibold text-gray-700">{liquidityInfo.withdrawable._name}</div>
                 <div className="text-center font-semibold text-gray-900">
                   {liquidityInfo?.withdrawable?.userBalance
@@ -98,7 +100,7 @@ export default function MyPoolParticipationSection({
 
             {/* SUSDST Row */}
             {sUSDSTBalance && (
-              <div className="grid grid-cols-4 items-center bg-gray-50 px-4 py-3 rounded-md mb-2">
+              <div className="grid grid-cols-[180px_120px_100px_120px] md:grid-cols-4 min-w-full md:min-w-0 items-center bg-gray-50 md:px-4 py-3 rounded-md mb-2">
                 <div className="font-semibold text-gray-700">sUSDST</div>
                 <div className="text-center font-semibold text-gray-900">
                   {formatBalance(safetyInfo.userShares, undefined, 18, 2, 2)}
@@ -123,7 +125,7 @@ export default function MyPoolParticipationSection({
                     <div key={tokenAddress}>
                       {/* Clickable LP Token Row */}
                       <div 
-                        className="grid grid-cols-4 items-center bg-gray-50 px-4 py-3 rounded-md mb-2 cursor-pointer hover:bg-gray-100 transition-colors"
+                        className="grid grid-cols-[180px_120px_100px_120px] md:grid-cols-4 min-w-full md:min-w-0 items-center bg-gray-50 md:px-4 py-3 rounded-md mb-2 cursor-pointer hover:bg-gray-100 transition-colors"
                         onClick={() => toggleTokenExpansion(tokenAddress)}
                       >
                         <div className="flex items-center gap-2">
@@ -162,8 +164,9 @@ export default function MyPoolParticipationSection({
             ) : !liquidityInfo?.withdrawable && Array.isArray(userPools) && userPools.length === 0 ? (
               <div className="p-2 flex justify-center text-gray-500">No LP tokens found</div>
             ) : null}
-          </>
-        )}
+            </>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
