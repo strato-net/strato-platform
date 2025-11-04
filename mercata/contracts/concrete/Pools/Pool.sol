@@ -456,7 +456,7 @@ contract record Pool is Ownable {
     function _internalSwapForZap(
         bool isAToB,
         uint256 amountIn
-    ) internal returns (uint256 amountOut) {
+    ) internal returns (uint256 amountOut, uint256 protocolFee) {
         uint256 inputReserve = isAToB ? tokenABalance : tokenBBalance;
         uint256 outputReserve = isAToB ? tokenBBalance : tokenABalance;
 
@@ -464,7 +464,7 @@ contract record Pool is Ownable {
         if (zapSwapFeesEnabled) {
             uint256 fee = (amountIn * _swapFeeRate()) / 10000;
             uint256 lpFee = (fee * _lpSharePercent()) / 10000;
-            uint256 protocolFee = fee - lpFee;
+            protocolFee = fee - lpFee;
             netInput = amountIn - fee;
 
             // protocol fee sent to collector
@@ -510,23 +510,37 @@ contract record Pool is Ownable {
         Token depositToken = isAToB ? tokenA : tokenB;
         uint256 reserveIn = isAToB ? tokenABalance : tokenBBalance; // reserve before deposit
         require(depositToken.transferFrom(msg.sender, address(this), amountIn), "Deposit transfer failed");
-        
+
         uint256 feeBps = zapSwapFeesEnabled ? _swapFeeRate() : 0;
         uint256 swapAmt = _getOptimalSwapAmount(reserveIn, amountIn, feeBps);
 
-        uint256 amountOut = _internalSwapForZap(isAToB, swapAmt);
+        (uint256 amountOut, uint256 protocolFee) = _internalSwapForZap(isAToB, swapAmt);
 
+        // Token contributions represent the net change to the pool's actual
+        // token balances (i.e., how much of each token physically remains in
+        // the pool after accounting for protocol fees sent to the fee
+        // collector)
         uint256 tokenAContribution;
         uint256 tokenBContribution;
+
+        // Liquidity contributions represent the amounts used to calculate LP
+        // token minting (i.e., the effective amounts of each token that
+        // contribute to the pool's liquidity, after the internal swap)
+        uint256 tokenALiquidityContribution;
+        uint256 tokenBLiquidityContribution;
         if (isAToB) {
-            tokenAContribution = amountIn - swapAmt;
-            tokenBContribution = amountOut;
+            tokenAContribution = amountIn - protocolFee;
+            tokenBContribution = 0;
+            tokenALiquidityContribution = amountIn - swapAmt;
+            tokenBLiquidityContribution = amountOut;
         } else {
-            tokenBContribution = amountIn - swapAmt;
-            tokenAContribution = amountOut;
+            tokenBContribution = amountIn - protocolFee;
+            tokenAContribution = 0;
+            tokenBLiquidityContribution = amountIn - swapAmt;
+            tokenALiquidityContribution = amountOut;
         }
 
-        liquidityMinted = _mintLiquidityAfterZap(tokenBContribution, tokenAContribution);
+        liquidityMinted = _mintLiquidityAfterZap(tokenBLiquidityContribution, tokenALiquidityContribution);
         _updateStateVars(tokenABalance + tokenAContribution, tokenBBalance + tokenBContribution);
     }
 }
