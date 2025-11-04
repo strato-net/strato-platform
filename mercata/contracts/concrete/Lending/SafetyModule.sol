@@ -246,17 +246,11 @@ contract record SafetyModule is Ownable {
     // ─────────────────────────────────────────
     // Rewards / Shortfall
     // ─────────────────────────────────────────
-    /// @notice Pull USDST from owner and treat as rewards (price ↑ for all holders).
+    /// @notice Recognize USDST receipt and treat as rewards (price ↑ for all holders).
     function notifyReward(uint amount) external onlyOwner {
         require(amount > 0, "SM:zero");
-
-        uint256 bal = IERC20(asset).balanceOf(address(this));
-        require(IERC20(asset).transferFrom(msg.sender, address(this), amount), "SM: notifyReward transfer failed");
-        uint256 delta = IERC20(asset).balanceOf(address(this)) - bal;
-        require(delta > 0, "SM:no delta");
-        _managedAssets += delta;
-
-        emit RewardNotified(delta);
+        _managedAssets += amount;
+        emit RewardNotified(amount);
     }
 
     /// @notice Slash vault to cover protocol shortfall.

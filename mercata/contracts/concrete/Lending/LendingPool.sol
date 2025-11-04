@@ -980,8 +980,7 @@ contract record LendingPool is Ownable, Pausable {
         // Pay SM directly from LiquidityPool
         if (toSafety > 0 && address(safetyModule) != address(0)) {
             LiquidityPool(_liquidityPool()).transferReserve(toSafety, address(safetyModule));
-            // Optional: if you want a log inside SM, you could later have governance call SM.notifyReward(toSafety).
-            // Not required for accounting; SM.totalAssets() reads its balance directly.
+            SafetyModule(address(safetyModule)).notifyReward(toSafety);
         }
 
         // Pay treasury/feeCollector as usual
