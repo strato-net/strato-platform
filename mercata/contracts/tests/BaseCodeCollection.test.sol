@@ -314,4 +314,70 @@ contract Describe_Mercata is Authorizable {
         string emojis2 = string(emojiBytesUnhex, "utf-8");
         require(emojis == emojis2, "Emojis did not decode properly: " + emojis2);
     }
+
+    /// @notice Property test to verify that one-sided liquidity deposits
+    /// maintain correct internal accounting
+    ///
+    /// @dev This test ensures that after a user deposits single-sided liquidity
+    ///      and withdraws it, the pool's internal balance tracking
+    ///      (tokenABalance, tokenBBalance) matches the actual token balances
+    ///      held by the pool contract. This catches accounting bugs where
+    ///      protocol fees or swap amounts aren't properly accounted for.
+    function property_one_sided_liquidity_doesnt_corrupt_internal_accounting(
+        uint _a,
+        uint _b1,
+        uint _b2,
+        uint _b3,
+        uint _c
+    ) {
+        // GIVEN: A pool with initial liquidity and a user with tokens to deposit
+
+        // Create two tokens for the pool
+        address t1 = m.tokenFactory().createToken("ETHST", "ETHST Token", [], [], [], "ETHST", 0, 18);
+        Token(t1).setStatus(2);
+        address t2 = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
+        Token(t2).setStatus(2);
+
+        User u1 = new User();
+        User u2 = new User();
+
+        // Calculate randomized token amounts
+        uint a = _a + 1; // Mint _a + 1 A tokens
+        uint b = a * (10 + (((_b1 % 10) + 1) * ((_b2 % 10) + 1) * ((_b3 * 10) + 1))); // Mint roughly 1-1000x as many B tokens
+        uint c = (_c % b) + 1; // User deposits anywhere from 1 to b units of token B
+        uint t1Amt = a * 1e18;
+        uint t2Amt = b * 1e17; // b is denominated in 0.1 token units
+        uint u1Amt = c * 1e17; // c is denominated in 0.1 token units
+
+        // Mint tokens: pool gets t1 and t2, user u1 gets t2 for single-sided deposit
+        Token(t1).mint(address(this), t1Amt);
+        Token(t2).mint(address(this), t2Amt);
+        Token(t2).mint(address(u1), u1Amt);
+
+        // Create pool and set up permissions
+        address p1 = m.poolFactory().createPool(t1,t2);
+        Token lpToken = Pool(p1).lpToken();
+        AdminRegistry adminRegistry = m.adminRegistry();
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lpToken), "mint", address(p1));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lpToken), "burn", address(p1));
+
+        // Add initial liquidity to the pool (both tokens)
+        require(p1 != address(0), "Failed to create pool 1");
+        require(ERC20(t1).approve(address(p1), t1Amt), "Approval failed for t1");
+        require(ERC20(t2).approve(address(p1), t2Amt), "Approval failed for t2");
+        uint l1 = Pool(p1).addLiquidity(t2Amt, t1Amt, 1);
+        require(l1 > 0, "Failed to add liquidity to pool 1");
+
+        // WHEN: User deposits single-sided liquidity (tokenB only) and then withdraws it
+
+        require(u1.do(t2, "approve", p1, u1Amt), "Approval failed for u1");
+        u1.do(p1, "addLiquiditySingleToken", false, u1Amt, 1); // Deposit tokenB only
+        uint lpBal = lpToken.balanceOf(address(u1));
+        u1.do(p1, "removeLiquidity", lpBal, 1, 1, 1); // Withdraw all liquidity
+
+        // THEN: The pool's internal balance accounting must match the actual token balances
+
+        require(Pool(p1).tokenABalance() == Token(t1).balanceOf(p1), "Pool's tokenABalance doesn't match reality: " + string(Pool(p1).tokenABalance()) + ", " + string(Token(t1).balanceOf(p1)));
+        require(Pool(p1).tokenBBalance() == Token(t2).balanceOf(p1), "Pool's tokenBBalance doesn't match reality: " + string(Pool(p1).tokenBBalance()) + ", " + string(Token(t2).balanceOf(p1)));
+    }
 }
