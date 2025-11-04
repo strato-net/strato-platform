@@ -178,6 +178,8 @@ export const getSafetyModuleInfo = async (
     
     // Get totalAssets from SafetyModule's USDST balance (nested structure)
     const totalAssets = usdstContractBalance?.[0]?.balance || "0";
+
+    const managedAssets = safetyModule._managedAssets || "0";
     
     // Get totalShares from sToken's total supply
     const totalShares = sTokenTotalSupply?.[0]?._totalSupply || "0";
@@ -201,7 +203,7 @@ export const getSafetyModuleInfo = async (
 
     // Calculate exchange rate (assets per share)
     const exchangeRate = totalShares !== "0" && BigInt(totalShares) > 0n 
-      ? (BigInt(totalAssets) * BigInt("1000000000000000000")) / BigInt(totalShares) // 18 decimals
+      ? (BigInt(managedAssets) * BigInt("1000000000000000000")) / BigInt(totalShares) // 18 decimals
       : BigInt("1000000000000000000"); // 1:1 ratio initially
 
     // Calculate cooldown status
