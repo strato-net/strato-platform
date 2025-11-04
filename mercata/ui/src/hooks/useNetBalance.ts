@@ -32,7 +32,12 @@ export const useNetBalance = ({
   });
 
   useEffect(() => {
-    if ((!tokens || tokens.length === 0) && !cataToken) {
+    const hasTokens = tokens && tokens.length > 0;
+    const hasCata = !!cataToken;
+    const hasLendingPool = !!(liquidityInfo?.withdrawable as any)?.withdrawValue;
+    const hasSafety = !!(safetyInfo?.userShares && safetyInfo?.exchangeRate);
+
+    if (!hasTokens && !hasCata && !hasLendingPool && !hasSafety) {
       return;
     }
 

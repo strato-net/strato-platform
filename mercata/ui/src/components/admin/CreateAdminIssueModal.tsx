@@ -106,7 +106,7 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
         }
         return arr.reduce(([success, prev], val) => {
           if (success) {
-            const [newSuccess, newVal] = validateFunctionArg(_type['entry'], val);
+            const [newSuccess, newVal] = validateFunctionArg(_type['entry'], String(val));
             if (newSuccess) {
               return [newSuccess, [...prev, newVal]];
             } else {
