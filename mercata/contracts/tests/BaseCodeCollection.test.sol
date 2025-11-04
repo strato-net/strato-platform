@@ -315,7 +315,7 @@ contract Describe_Mercata is Authorizable {
         require(emojis == emojis2, "Emojis did not decode properly: " + emojis2);
     }
 
-    function skip_property_one_sided_liquidity_doesnt_corrupt_internal_accounting(
+    function property_one_sided_liquidity_doesnt_corrupt_internal_accounting(
         uint _a,
         uint _b1,
         uint _b2,
