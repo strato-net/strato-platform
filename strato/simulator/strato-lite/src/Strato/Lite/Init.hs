@@ -47,9 +47,6 @@ runStratoLite nodes' = do
             gasLimit = 10000000,
             stateFetchLimit = stateFetchLimit',
             globalNonceCounter = nonceCache,
-            userRegistryAddress = Address 0x100,
-            userRegistryCodeHash = Nothing,
-            useWalletsByDefault = False,
             nodePubKey = derivePublicKey $ privKeys !! 0
           }
 

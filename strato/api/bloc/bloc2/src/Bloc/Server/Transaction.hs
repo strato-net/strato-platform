@@ -59,7 +59,6 @@ import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Extra
 import Control.Monad.Reader
 import Control.Monad.Trans.State.Lazy
-import Data.Bool
 import qualified Data.Cache as Cache
 import qualified Data.Cache.Internal as Cache
 import Data.Foldable
@@ -384,7 +383,7 @@ postBlocTransactionParallel ::
     HasBlocEnv m,
     HasVault m
   ) =>
-  Maybe Bool -> -- use_wallet
+  Maybe String -> -- username
   Bool -> -- resolve
   PostBlocTransactionRequest ->
   m [BlocTransactionResult]
@@ -407,7 +406,7 @@ postBlocTransaction ::
     HasBlocEnv m,
     HasVault m
   ) =>
-  Maybe Bool -> -- use_wallet
+  Maybe String -> -- username
   Bool ->
   PostBlocTransactionRequest ->
   m [BlocTransactionResult]
@@ -431,22 +430,27 @@ postBlocTransaction' ::
     HasVault m
   ) =>
   Should CacheNonce ->
-  Maybe Bool -> -- use_wallet
+  Maybe String -> -- username
   Bool ->
   PostBlocTransactionRequest ->
   m [BlocTransactionResult]
-postBlocTransaction' cacheNonce mUseWallet resolve (PostBlocTransactionRequest mAddr txs' txParams msrcs) = do
+postBlocTransaction' cacheNonce mUsername resolve (PostBlocTransactionRequest mAddr txs' txParams msrcs) = do
   checkIsSynced
-  userRegistry <- fmap userRegistryAddress getBlocEnv
-  userRegistryHash <- keccak256ToByteString . maybe zeroHash id . userRegistryCodeHash <$> getBlocEnv
   addr <- case mAddr of
     Nothing -> fromPublicKey <$> getPub
     Just addr' -> return addr'
-  walletFlag <- useWalletsByDefault <$> getBlocEnv
-  let useWallet = fromMaybe walletFlag mUseWallet
-      userContractAddr = if useWallet
-        then getNewAddressWithSalt_unsafe userRegistry "" userRegistryHash [SMV.SString ""]
-        else addr
+  let useWallet = maybe False (not . null) mUsername
+  userContractAddr <- case (useWallet, mUsername) of
+    (True, Just u) -> do
+      let userRegistry = Address 0x720
+      ch <- A.selectWithDefault (A.Proxy @AddressState) userRegistry >>= \s ->
+        pure . keccak256ToByteString $ case addressStateCodeHash s of
+          ExternallyOwned h -> h
+          SolidVMCode _ h   -> h
+      $logInfoS "postBlocTransactions'/userRegistry" . Text.pack $ show (userRegistry, ch) 
+      pure $ getNewAddressWithSalt_unsafe userRegistry u ch [SMV.SString "User", SMV.SString u]
+    _ -> pure addr
+  $logInfoS "postBlocTransactions'/userContractAddr" . Text.pack $ show (useWallet, mUsername, userContractAddr) 
   let src' :: ContractPayload -> Maybe SourceMap
       src' p =
         if contractpayloadSrc p == mempty
@@ -505,7 +509,7 @@ postBlocTransaction' cacheNonce mUseWallet resolve (PostBlocTransactionRequest m
                     addr
                     userContractAddr
                     "createContract"
-                    (M.fromList $ [("contractName", ArgString cn), ("contractSrc", ArgString $ contractSrcText), ("args", ArgString $ "(" <> Text.intercalate "," argsAsSource <> ")")])
+                    (M.fromList $ [("contractName", ArgString cn), ("contractSrc", ArgString $ sourceBlob $ contractSrc), ("args", ArgArray . V.fromList $ ArgString <$> argsAsSource)])
                     (mergeTxParams (contractpayloadTxParams p) txParams)
                     (maybe (Just metadata) (\m -> Just $ metadata `Map.union` m) md)
                     resolve
@@ -545,10 +549,10 @@ postBlocTransaction' cacheNonce mUseWallet resolve (PostBlocTransactionRequest m
                               let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
                                   xabiArgs = Map.fromList . catMaybes $ maybe [] (map f . _funcArgs) _constructor
                               argsAsSource <- constructArgValuesAndSource a xabiArgs
-                              pure $ MethodCall 
-                                userContractAddr 
-                                "createContract"  
-                                (M.fromList $ [("contractName", ArgString cn), ("contractSrc", ArgString $ sourceBlob $ contractSrc), ("args", ArgString $ "(" <> Text.intercalate "," argsAsSource <> ")")])
+                              pure $ MethodCall
+                                userContractAddr
+                                "createContract"
+                                (M.fromList $ [("contractName", ArgString cn), ("contractSrc", ArgString $ sourceBlob $ contractSrc), ("args", ArgArray . V.fromList $ ArgString <$> argsAsSource)])
                                 (mergeTxParams x txParams) 
                                 (maybe (Just metadata) (\m' -> Just $ metadata `Map.union` m') m)
                           ) ps
@@ -586,43 +590,56 @@ postBlocTransaction' cacheNonce mUseWallet resolve (PostBlocTransactionRequest m
       [] -> return []
       [x] -> do
         p <- fromFunction x
-        let bfp = FunctionParameters
-                    addr
-                    (functionpayloadContractAddress p)
-                    (functionpayloadMethod p)
-                    (functionpayloadArgs p)
-                    (mergeTxParams (functionpayloadTxParams p) txParams)
-                    (functionpayloadMetadata p)
-                    resolve
-        let bfpWallet = FunctionParameters
-                    addr
-                    userContractAddr
-                    "callContract"
-                    (M.fromList $ [("contractToCall",ArgString $ Text.pack $ show $ functionpayloadContractAddress p), ("functionName",ArgString $ functionpayloadMethod p), ("args", ArgArray $ V.fromList $ M.elems $ functionpayloadArgs p)])
-                    (mergeTxParams (functionpayloadTxParams p) txParams)
-                    (functionpayloadMetadata p)
-                    resolve
-        let bfp' = bool bfp bfpWallet useWallet
+        bfp' <- if useWallet && userContractAddr /= functionpayloadContractAddress p
+          then do
+            args' <- getContractByAddress (functionpayloadContractAddress p) >>= \case
+              Nothing -> pure $ M.elems (functionpayloadArgs p)
+              Just Contract{..} -> do
+                let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
+                    xabiArgs = Map.fromList . catMaybes $ maybe [] (map f . _funcArgs) $
+                      Map.lookup (Text.unpack $ functionpayloadMethod p) _functions
+                map ArgString <$> constructArgValuesAndSource (Just $ functionpayloadArgs p) xabiArgs
+            pure $ FunctionParameters
+              addr
+              userContractAddr
+              "callContract"
+              (M.fromList $
+                [ ("contractToCall", ArgString . Text.pack . show $ functionpayloadContractAddress p)
+                , ("functionName", ArgString $ functionpayloadMethod p)
+                , ("args", ArgArray $ V.fromList args')
+                ])
+              (mergeTxParams (functionpayloadTxParams p) txParams)
+              (functionpayloadMetadata p)
+              resolve
+          else pure $ FunctionParameters
+            addr
+            (functionpayloadContractAddress p)
+            (functionpayloadMethod p)
+            (functionpayloadArgs p)
+            (mergeTxParams (functionpayloadTxParams p) txParams)
+            (functionpayloadMetadata p)
+            resolve
         fmap (:[]) $ postUsersContractMethod' cacheNonce bfp'
       xs -> do
         p <- mapM fromFunction xs
-        let bflp = FunctionListParameters
-                    addr
-                    (map (\(FunctionPayload a m r x md) ->
-                      MethodCall a m r (mergeTxParams x txParams) md) p)
-                    resolve
-        let bflpWallet = FunctionListParameters
-                    addr
-                    (map (\(FunctionPayload a m r x md) ->
-                            MethodCall 
-                              userContractAddr 
-                              "callContract"  
-                              (M.fromList $ [("contractToCall",ArgString $ Text.pack $ show a), ("functionName",ArgString m), ("args", ArgArray $ V.fromList $ M.elems r)])
-                              (mergeTxParams x txParams) 
-                              md
-                          ) p)
-                    resolve
-        let bflp' = bool bflp bflpWallet useWallet
+        bflp' <- flip (FunctionListParameters addr) resolve <$> traverse (\(FunctionPayload a m r x md) ->
+            if useWallet && a /= userContractAddr
+              then do
+                args' <- getContractByAddress a >>= \case
+                  Nothing -> pure $ M.elems r
+                  Just Contract{..} -> do
+                    let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
+                        xabiArgs = Map.fromList . catMaybes $ maybe [] (map f . _funcArgs) $
+                          Map.lookup (Text.unpack m) _functions
+                    map ArgString <$> constructArgValuesAndSource (Just r) xabiArgs
+                pure $ MethodCall 
+                  userContractAddr 
+                  "callContract"  
+                  (M.fromList $ [("contractToCall",ArgString $ Text.pack $ show a), ("functionName",ArgString m), ("args", ArgArray $ V.fromList args')])
+                  (mergeTxParams x txParams) 
+                  md
+              else pure $ MethodCall a m r (mergeTxParams x txParams) md
+          ) p
         postUsersContractMethodList' cacheNonce bflp'
   where
     fromTransfer = \case

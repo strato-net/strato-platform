@@ -120,7 +120,7 @@ postBlocTransactionResultsExternal = client (Proxy @PostBlocTransactionResultsEx
 
 ------------- /transaction endpoints -------------
 postBlocTransactionParallel ::
-  Maybe Bool ->
+  Maybe String ->
   Bool ->
   PostBlocTransactionRequest ->
   ClientM [BlocTransactionResult]
@@ -128,7 +128,7 @@ postBlocTransactionParallel = client (Proxy @PostBlocTransactionParallel)
 
 postBlocTransactionParallelExternal ::
   Maybe Text ->
-  Maybe Bool ->
+  Maybe String ->
   Bool ->
   PostBlocTransactionRequest ->
   ClientM [BlocTransactionResult]
@@ -145,7 +145,7 @@ postBlocTransactionUnsigned ::
 postBlocTransactionUnsigned = client (Proxy @PostBlocTransactionUnsigned)
 
 postBlocTransaction ::
-  Maybe Bool ->
+  Maybe String ->
   Bool ->
   PostBlocTransactionRequest ->
   ClientM [BlocTransactionResult]

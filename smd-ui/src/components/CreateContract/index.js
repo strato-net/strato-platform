@@ -106,7 +106,6 @@ class CreateContract extends Component {
 
   handleUsernameChange = (e) => {
     this.props.usernameChange(e.target.value);
-    this.props.fetchUserAddresses(e.target.value, true)
   };
 
   handleContractNameChange = (e) => {
@@ -229,55 +228,29 @@ class CreateContract extends Component {
     this.props.reset();
   };
 
-  renderUsername = (isModeOauth) => {
-    const users = Object.getOwnPropertyNames(this.props.accounts);
-    return (<div className={isModeOauth ? "" : "pt-select"}>
+  renderUsername = () => {
+    return (
       <Field
-        className="pt-input"
-        component="select"
         name="username"
+        component="input"
+        type="text"
+        placeholder="username"
         onChange={this.handleUsernameChange}
-        disabled={isModeOauth}
-      >
-        <option value={isModeOauth && this.props.oAuthUser ? this.props.oAuthUser.username : "STRATO Mercata User"}>
-          {isModeOauth && this.props.oAuthUser ? this.props.oAuthUser.username : "STRATO Mercata User"}
-        </option>
-        {
-          users.map((user, i) => {
-            return (
-              <option key={'user' + i} value={user}>{user}</option>
-            )
-          })
-        }
-      </Field>
-    </div>)
+        className="pt-input"
+      />
+    )
   };
 
   renderAddress = (isModeOauth) => {
-    const userAddresses = this.props.accounts && this.props.username ?
-      Object.getOwnPropertyNames(this.props.accounts[this.props.username])
-      : [];
-    return (<div className={isModeOauth ? "" : "pt-select"}>
+    return (
       <Field
         className="pt-input"
-        component="select"
+        component="input"
         name="address"
-        validate={required}
-        required
-        disabled={isModeOauth}
-      >
-        <option value={this.props.oAuthUser ? this.props.oAuthUser.address : this.props.address}>
-          {isModeOauth && this.props.oAuthUser ? this.props.oAuthUser.address : this.props.address}
-        </option>
-        {
-          userAddresses.map((address, i) => {
-            return (
-              <option key={address} value={address}>{address}</option>
-            )
-          })
-        }
-      </Field>
-    </div>);
+        disabled={true}
+        placeholder={isModeOauth && this.props.oAuthUser ? this.props.oAuthUser.address : this.props.address}
+      />
+    );
   };
 
   componentDidMount() {
@@ -373,7 +346,7 @@ class CreateContract extends Component {
                   </label>
                 </div>
                 <div className="col-sm-9 smd-pad-4">
-                  {this.renderUsername(isModeOauth)}
+                  {this.renderUsername()}
                 </div>
               </div>
               <div className="row">

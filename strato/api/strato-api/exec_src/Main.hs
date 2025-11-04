@@ -50,7 +50,7 @@ import qualified Data.ByteString.Lazy.Char8 as BLC
 import qualified Data.Cache as Cache
 import qualified Data.HashMap.Strict.InsOrd as H
 import Data.Map (fromList, traverseWithKey)
-import Data.Maybe (fromJust, listToMaybe)
+import Data.Maybe (listToMaybe)
 import Data.Source.Map
 import Data.Swagger hiding (Header, Http, delete)
 import Data.Text (Text)
@@ -66,7 +66,6 @@ import Data.String (fromString)
 import Network.Wai.Middleware.Cors
 import Network.Wai.Middleware.Prometheus
 import Network.Wai.Middleware.RequestLogger
-import Options
 import SQLM
 import Servant
 import Servant.Multipart
@@ -233,9 +232,6 @@ main = do
             gasLimit = flags_gasLimit,
             stateFetchLimit = stateFetchLimit',
             globalNonceCounter = nonceCache,
-            userRegistryAddress = fromJust $ stringAddress flags_userRegistryAddress,
-            userRegistryCodeHash = if flags_useBuiltinUserRegistry then Nothing else stringKeccak256 flags_userRegistryCodeHash,
-            useWalletsByDefault = flags_useWalletsByDefault,
             nodePubKey = pubKey
           }
   runSettings (setPort 3000 $ setHost (fromString $ ipAddress $ apiConfig ethConf) defaultSettings) $ app env theDoc urlMap

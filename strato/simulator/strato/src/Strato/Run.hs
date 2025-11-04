@@ -137,9 +137,6 @@ runStratoNode runUI = do
               gasLimit = 10000000,
               stateFetchLimit = stateFetchLimit',
               globalNonceCounter = nonceCache,
-              userRegistryAddress = 0x100,
-              userRegistryCodeHash = Nothing,
-              useWalletsByDefault = False,
               nodePubKey = S.derivePublicKey $ _filesystemPeerPrivKey f
             }
     as <- liftIO $ runFilesystemNode f c
