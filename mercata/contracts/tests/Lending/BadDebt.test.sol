@@ -500,4 +500,78 @@ contract Describe_BadDebt_Basic is Authorizable {
         require(pool.getExchangeRate() < 1e18, "Exchange rate should fall due to mUSDST haircut");
     }
 
+    function it_can_notify_safety_module_of_rewards() public {
+        SafetyModule sm = m.safetyModule();
+        LendingPool pool = m.lendingPool();
+        PoolConfigurator configurator = m.poolConfigurator();
+        CollateralVault cv = m.collateralVault();
+        PriceOracle oracle = m.priceOracle();
+
+        // === SETUP: Ensure liquidity in the pool ===
+        Token(USDST).mint(address(this), 100000e18);
+        IERC20(USDST).approve(address(m.liquidityPool()), 100000e18);
+        pool.depositLiquidity(100000e18);
+
+        // === SETUP: Create a borrower with debt ===
+        User borrower = new User();
+        
+        // Mint and supply collateral (Gold) for the borrower
+        oracle.setAssetPrice(GOLDST, 2000e18);
+        Token(GOLDST).mint(address(borrower), 10e18);
+        borrower.do(GOLDST, "approve", address(cv), 10e18);
+        borrower.do(address(pool), "supplyCollateral", GOLDST, 10e18);
+        
+        // Borrow against collateral
+        uint borrowAmount = 10000e18; // Borrow $10,000 USDST
+        borrower.do(address(pool), "borrow", borrowAmount);
+        
+        // Verify debt was created
+        uint initialDebt = pool.getUserDebt(address(borrower));
+        require(initialDebt == borrowAmount, "Initial debt should equal borrow amount");
+        
+        // === STEP 1: Record state before time advancement ===
+        uint borrowIndexBefore = pool.borrowIndex();
+        uint totalScaledDebtBefore = pool.totalScaledDebt();
+        uint reservesBefore = pool.reservesAccrued();
+        
+        // === STEP 2: Fast forward time to accrue interest ===
+        fastForward(365 * 24 * 60 * 60);
+        
+        // === STEP 3: Trigger interest accrual ===
+        // Interest is accrued lazily - need to trigger it with a state-changing action
+        // We'll make a tiny deposit to trigger _accrue() internally
+        Token(USDST).mint(address(this), 1e18);
+        IERC20(USDST).approve(address(m.liquidityPool()), 1e18);
+        pool.depositLiquidity(1e18); // This triggers _accrue() internally
+        
+        // Now read the updated state
+        uint borrowIndexAfter = pool.borrowIndex();
+        uint totalScaledDebtAfter = pool.totalScaledDebt();
+        uint reservesAfter = pool.reservesAccrued();
+        uint debtAfter = pool.getUserDebt(address(borrower));
+        
+        // === STEP 4: Verify interest accrued ===
+        require(borrowIndexAfter > borrowIndexBefore, "Borrow index should increase after time passes");
+        require(debtAfter > initialDebt, "User debt should increase due to interest accrual");
+        require(reservesAfter > reservesBefore, "Reserves should accrue from interest (reserve factor = 10%)");
+        
+        // === STEP 5: Sweep reserves to safety module ===
+        uint reservesToSweep = reservesAfter;
+        require(reservesToSweep > 0, "Should have reserves to sweep");
+        
+        uint smBalanceBefore = IERC20(USDST).balanceOf(address(sm));
+        uint smExRateBefore = sm.exchangeRate();
+        
+        configurator.sweepReserves(reservesToSweep);
+        
+        uint smBalanceAfter = IERC20(USDST).balanceOf(address(sm));
+        uint reservesAfterSweep = pool.reservesAccrued();
+        uint smExRateAfter = sm.exchangeRate();
+        
+        // === STEP 6: Verify reserves were swept to safety module ===
+        require(reservesAfterSweep == 0, "Reserves should be 0 after sweeping all reserves");
+        require(smBalanceAfter > smBalanceBefore, "Safety module should receive the swept reserves");
+        require(smExRateAfter > smExRateBefore, "Exchange rate should increase after sweep");
+    }
+
 }

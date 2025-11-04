@@ -127,6 +127,7 @@ contract record Mercata is Authorizable {
         lendingPool = LendingPool(address(new Proxy(lendingPoolImpl, this)));
         lendingPool.initialize(address(lendingRegistry), address(poolConfigurator), address(tokenFactory), address(feeCollector), address(safetyModule));
         Ownable(lendingPool).transferOwnership(address(adminRegistry));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(safetyModule), "notifyReward", address(lendingPool));
 
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lendingRegistry), "setLendingPool", address(poolConfigurator));
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lendingRegistry), "setLiquidityPool", address(poolConfigurator));
