@@ -111,7 +111,7 @@ export const getBalance = async (
     select: rawParams.select || tokenBalanceSelectFields.join(","),
   };
 
-  const [balances, collaterals, cdps, prices] = await Promise.all([
+  const [balances, collaterals, cdps, rawPrices] = await Promise.all([
     cirrus.get(accessToken, "/" + Token + "-_balances", { params }),
     cirrus.get(accessToken, "/" + CollateralVault + "-userCollaterals", {
       params: {
@@ -127,8 +127,16 @@ export const getBalance = async (
         "value->>collateral": `gt.0`
       }
     }),
-    // Get all oracle prices (could be optimized to filter by token addresses if needed)
-    getOraclePrices(accessToken)
+    // Get all oracle prices (includes LP token prices via createCompletePriceMap)
+    getOraclePrices(accessToken).then(async (priceMap) => {
+      // Convert Map to array format for createCompletePriceMap
+      const rawPriceArray = Array.from(priceMap.entries()).map(([key, value]) => ({
+        key,
+        value: parseFloat(value)
+      }));
+      // Use createCompletePriceMap to include LP token and mToken prices
+      return await createCompletePriceMap(accessToken, rawPriceArray);
+    })
   ]);
 
   const collateralMap = new Map<string, bigint>();
@@ -152,14 +160,14 @@ export const getBalance = async (
   const allTokens = [
     ...balanceData.map((t: any) => ({
       ...t,
-      price: prices.get(t.address) || "0",
+      price: rawPrices.get(t.address) || "0",
       collateralBalance: (collateralMap.get(t.address) || 0n).toString(),
     })),
     ...tokensWithCollateralOnly.map((a) => ({
       address: a,
       user: address,
       balance: "0",
-      price: prices.get(a) || "0",
+      price: rawPrices.get(a) || "0",
       collateralBalance: (collateralMap.get(a) || 0n).toString(),
       token: tokenDetails.get(a),
     })),
