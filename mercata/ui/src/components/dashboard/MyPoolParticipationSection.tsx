@@ -4,7 +4,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { formatBalance } from "@/utils/numberUtils";
+import { formatBalance, calculateTokenValue } from "@/utils/numberUtils";
 import { formatUnits } from "ethers";
 import { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
@@ -22,22 +22,12 @@ export default function MyPoolParticipationSection({
 }: PoolParticipationProps) {
   
   const [expandedTokens, setExpandedTokens] = useState<Set<string>>(new Set());
-  
-  const formatValue = (rawBalance: string, price: string): string => {
-    if (!rawBalance || !price) return "0.00";
-
-    const balance = parseFloat(formatUnits(rawBalance, 18));
-    const priceValue = parseFloat(formatUnits(price, 18));
-    const value = balance * priceValue;
-
-    return value.toFixed(2);
-  };
 
   // Helper variables for sUSDST calculations
   const sUSDSTBalance = safetyInfo?.userShares && BigInt(safetyInfo.userShares) > 0n;
   const sUsdstExchangeRate = safetyInfo?.exchangeRate ? parseFloat(formatUnits(safetyInfo.exchangeRate, 18)) : 1;
   const sUsdstApy = safetyInfo?.exchangeRate ? `${((sUsdstExchangeRate - 1) * 100).toFixed(2)}%` : "N/A";
-  const sUsdstValue = safetyInfo?.exchangeRate ? `$${formatValue(safetyInfo.userShares, safetyInfo.exchangeRate)}` : "$0.00";
+  const sUsdstValue = safetyInfo?.exchangeRate ? `$${calculateTokenValue(safetyInfo.userShares, safetyInfo.exchangeRate)}` : "$0.00";
 
   const toggleTokenExpansion = (tokenAddress: string) => {
     const newExpanded = new Set(expandedTokens);
@@ -144,7 +134,7 @@ export default function MyPoolParticipationSection({
                         </div>
                         <div className="text-right font-medium text-gray-900">
                           {userPool?.lpToken?._totalSupply
-                            ? `$${formatValue(userPool?.lpToken?.balance, userPool?.lpToken?.price)}`
+                            ? `$${calculateTokenValue(userPool?.lpToken?.balance, userPool?.lpToken?.price)}`
                             : "$0.00"}
                         </div>
                       </div>

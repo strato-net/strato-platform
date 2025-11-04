@@ -8,14 +8,35 @@ import { getExchangeRateFromCirrus } from "../services/lending.service";
 const { Token } = constants;
 
 /**
+ * Converts a number to string without scientific notation
+ * For very large numbers (like wei values), this ensures proper integer string representation
+ */
+const numberToString = (num: number | string): string => {
+  if (typeof num === 'string') {
+    return num;
+  }
+  
+  // For very large numbers, use toLocaleString with full precision
+  // This avoids scientific notation
+  if (Math.abs(num) >= 1e21) {
+    // Use toLocaleString with specific options to avoid scientific notation
+    return num.toLocaleString('fullwide', { useGrouping: false, maximumFractionDigits: 0 });
+  }
+  
+  // For smaller numbers, regular toString is fine
+  return num.toString();
+};
+
+/**
  * Create a complete price map from raw oracle prices, including calculated LP token and mToken prices
  */
 export const createCompletePriceMap = async (
   accessToken: string,
-  rawPrices: Array<{ key: string; value: number }>
+  rawPrices: Array<{ key: string; value: number | string }>
 ): Promise<Map<string, string>> => {
-  // Start with oracle prices
-  const priceMap = new Map<string, string>(rawPrices.map(p => [p.key, p.value.toString()]));
+  // Start with oracle prices - use numberToString to avoid scientific notation
+  // Handle both string and number values (value::text returns strings, but JSON may parse them as numbers)
+  const priceMap = new Map<string, string>(rawPrices.map(p => [p.key, numberToString(p.value)]));
 
   // Add LP token prices
   try {
