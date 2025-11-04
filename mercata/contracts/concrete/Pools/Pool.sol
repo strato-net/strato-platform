@@ -510,14 +510,22 @@ contract record Pool is Ownable {
         Token depositToken = isAToB ? tokenA : tokenB;
         uint256 reserveIn = isAToB ? tokenABalance : tokenBBalance; // reserve before deposit
         require(depositToken.transferFrom(msg.sender, address(this), amountIn), "Deposit transfer failed");
-        
+
         uint256 feeBps = zapSwapFeesEnabled ? _swapFeeRate() : 0;
         uint256 swapAmt = _getOptimalSwapAmount(reserveIn, amountIn, feeBps);
 
         (uint256 amountOut, uint256 protocolFee) = _internalSwapForZap(isAToB, swapAmt);
 
+        // Token contributions represent the net change to the pool's actual
+        // token balances (i.e., how much of each token physically remains in
+        // the pool after accounting for protocol fees sent to the fee
+        // collector)
         uint256 tokenAContribution;
         uint256 tokenBContribution;
+
+        // Liquidity contributions represent the amounts used to calculate LP
+        // token minting (i.e., the effective amounts of each token that
+        // contribute to the pool's liquidity, after the internal swap)
         uint256 tokenALiquidityContribution;
         uint256 tokenBLiquidityContribution;
         if (isAToB) {
