@@ -1,0 +1,16 @@
+
+Storage
+    address Address
+    blockHash Keccak256
+    blockTimestamp String
+    blockNumber Int
+    data (JSONB JSON.Value)
+    Primary address
+    deriving Eq Ord Read Show
+
+Contract
+    address StorageId
+    creator String
+    contract_name String
+    Primary address creator contract_name
+    deriving Eq Ord Read Show

@@ -17,6 +17,10 @@
 {-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
+{-# OPTIONS_GHC -fno-warn-unused-imports #-}
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
+{-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
+
 module Blockchain.Slipstream.Processor
   ( processTheMessages,
     parseActions,
@@ -28,15 +32,21 @@ import BlockApps.Logging
 import qualified BlockApps.SolidVMStorageDecoder as SolidVM
 import BlockApps.Solidity.Value
 import Blockchain.Data.TransactionResult
+import Blockchain.DB.SQLDB
 import Blockchain.Slipstream.Data.Action
+import Blockchain.Slipstream.Data.CirrusTables
 import qualified Blockchain.Slipstream.Events as E
 import Blockchain.Slipstream.OutputData
 import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Stream.Action as Action
 import qualified Blockchain.Stream.VMEvent as VME
 import Conduit
 import Control.Lens ((^.))
 import Control.Monad (forM, forM_, unless, when)
+import Control.Monad.Composable.SQL
+import Control.Monad.Trans.Reader
+import qualified Data.Aeson as JSON
 import Data.Either (lefts, rights)
 import Data.Foldable (toList)
 import Data.Function
@@ -46,7 +56,10 @@ import Data.Maybe
 import Data.Source
 import Data.Text (Text)
 import qualified Data.Text as T
-import SolidVM.Model.CodeCollection hiding (contractName)
+--import Database.Persist
+import Database.Persist.Postgresql
+import qualified Database.Persist.Postgresql as SQL
+import SolidVM.Model.CodeCollection hiding (contractName, Storage)
 import qualified SolidVM.Model.Type as SVMType
 import Text.Tools (boringBox, multilineLog)
 import Prelude hiding (lookup)
@@ -156,6 +169,7 @@ getCollectionsFromContract = mapMaybe (uncurry filterAndExtract) . Map.toList . 
 
 processTheMessages ::
   ( MonadIO m
+  , HasSQL m
   , MonadLogger m
   ) =>
   [VME.VMEvent] ->
@@ -227,6 +241,7 @@ processTheMessages messages = do
   
   mapOutput Right . outputDataDedup $ do
     forM_ insertsByCodeHash $ \ins -> do
+--      lift $ insertIndexTable2 $ insertToStorage $ indexInsert ins
       insertIndexTable $ indexInsert ins
       unless (null $ collectionInserts ins) $
         insertCollectionTable $ collectionInserts ins
@@ -251,4 +266,15 @@ processTheMessages messages = do
   yieldMany $ Left <$> transactionResults
 
   return events'
+{-
+insertToStorage :: E.ProcessedContract -> Storage
+insertToStorage _ = Storage 1 emptyHash "qq" 4 (JSON.String "what is up?")
 
+insertIndexTable2 :: (HasSQLDB m, PersistEntityBackend Storage ~ SqlBackend) =>
+                     Storage -> m ()
+insertIndexTable2 record = do
+--  putTransactionResult processedContract'
+  sqlQuery $ SQL.insertMany [record]
+--  sqlQuery $ insertMany [processedContract']
+  return ()
+-}

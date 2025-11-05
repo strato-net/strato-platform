@@ -10,6 +10,7 @@
 
 import BlockApps.Init
 import BlockApps.Logging
+import Blockchain.Slipstream.Data.CirrusTables
 import Blockchain.Slipstream.MessageConsumer
 import Blockchain.Slipstream.Options
 import Blockchain.Slipstream.OutputData
@@ -21,6 +22,7 @@ import Control.Monad.IO.Class
 import Control.Monad.Trans.Resource
 import Data.String
 import Data.Text.Encoding (encodeUtf8)
+import Database.Persist.Postgresql
 import Blockchain.Slipstream.PostgresqlTypedShim
 import HFlags
 import Instrumentation
@@ -35,6 +37,12 @@ main = do
   _ <- $initHFlags "Setup Slipstream Variables"
   blockappsInit "slipstream_main"
   runInstrumentation "slipstream"
+
+  let connStr = "host=localhost dbname=cirrus user=postgres password=api port=5432"
+
+  runNoLoggingT $ do
+    pool <- createPostgresqlPool connStr 1
+    liftIO $ runSqlPersistMPool (runMigration migrateAll) pool
 
   runLoggingT
     . runResourceT

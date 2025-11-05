@@ -35,6 +35,7 @@ library:
     - containers
     - cross-monitoring
     - deepseq
+    - esqueleto
     - extra
     - filepath
     - format
@@ -42,6 +43,7 @@ library:
     - kafka-monad
     - network
     - persistent
+    - persistent-postgresql
     - postgresql-simple
     - prometheus-client
     - solid-vm-model

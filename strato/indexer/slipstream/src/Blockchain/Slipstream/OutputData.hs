@@ -1097,7 +1097,7 @@ eventArrayTableName = indexTableName "" "event_array"
 
 initialSlipstreamQueries :: [SlipstreamQuery]
 initialSlipstreamQueries =
-  [ CreateTable
+  [ {-CreateTable
       storageTableName
       [ ("address", SqlText)
       , ("block_hash", SqlText)
@@ -1107,7 +1107,8 @@ initialSlipstreamQueries =
       ]
       ["address"]
       Nothing
-  , CreateTable
+  , -}
+    CreateTable
       storageHistoryTableName
       [ ("address", SqlText)
       , ("block_hash", SqlText)
@@ -1117,14 +1118,14 @@ initialSlipstreamQueries =
       ]
       []
       Nothing
-  , CreateTable
+{-  , CreateTable
       contractTableName
       [ ("address", SqlText)
       , ("creator", SqlText)
       , ("contract_name", SqlText)
       ]
       ["address", "creator", "contract_name"]
-      (Just $ Foreign "contract_storage" ["address"] storageTableName ["address"])
+      (Just $ Foreign "contract_storage" ["address"] storageTableName ["address"])-}
   , CreateTable
       mappingTableName
       [ ("address", SqlText)
