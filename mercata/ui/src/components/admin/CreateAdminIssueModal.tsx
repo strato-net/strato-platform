@@ -71,12 +71,13 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
   const validateFunctionArg = (_type: object, value: string): [boolean, any?] => {
     const tag = _type['tag']?.toLocaleLowerCase() || 'string'
     if (tag === 'int') {
-      try {
-        const i = JSON.parse(value.trim());
-        return [true, i];
-      } catch(e) {
+      const val = value.trim();
+      const valNum = Number(val);
+      
+      if (isNaN(valNum) || !Number.isInteger(valNum)) {
         return [false, `Invalid integer value: ${value}`];
       }
+      return [true, val];
     }
     if (tag === 'bool') {
       const b = value.toLocaleLowerCase();
@@ -106,7 +107,7 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
         }
         return arr.reduce(([success, prev], val) => {
           if (success) {
-            const [newSuccess, newVal] = validateFunctionArg(_type['entry'], String(val));
+            const [newSuccess, newVal] = validateFunctionArg(_type['entry'], val);
             if (newSuccess) {
               return [newSuccess, [...prev, newVal]];
             } else {
