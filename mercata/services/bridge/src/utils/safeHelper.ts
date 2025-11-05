@@ -6,18 +6,15 @@ import {
   config,
   ZERO_ADDRESS,
   ERC20_ABI,
-  STRATO_DECIMALS,
   getChainRpcUrl,
 } from "../config";
-import { getAssetInfo } from "../services/cirrusService";
 import {
-  convertDecimals,
   ensureHexPrefix,
   safeChecksum,
   safeToBigInt,
 } from "./utils";
 import { logError, logInfo } from "./logger";
-import { AssetInfo, PreparedWithdrawal, WithdrawalInfo, TxType, SafeTransactionData, NonEmptyArray } from "../types";
+import { WithdrawalInfo, SafeTransactionData, NonEmptyArray } from "../types";
 import { retry } from "./api";
 
 // Constants
@@ -26,59 +23,6 @@ const NONCE_CONFLICT_PATTERNS = /nonce|already exists|conflict/i;
 
 // Module-scope heavy objects
 const erc20Interface = new Interface(ERC20_ABI);
-
-// Simple in-memory cache for single function call
-// Caches asset info within a single createSafeTransactionsForWithdrawals call
-// Multiple withdrawals for the same chain often use the same tokens
-export class CallCache {
-  private cache = new Map<string, any>();
-
-  get(key: string): any | undefined {
-    return this.cache.get(key);
-  }
-
-  set(key: string, value: any): void {
-    this.cache.set(key, value);
-  }
-
-  clear(): void {
-    this.cache.clear();
-  }
-}
-
-export async function getAssetInfoForChain(
-  stratoToken: string,
-  externalChainId: number,
-  callCache: CallCache,
-): Promise<AssetInfo> {
-  const cacheKey = `${stratoToken}-${externalChainId}`;
-  let assetInfo = callCache.get(cacheKey);
-
-  if (!assetInfo) {
-    assetInfo = await getAssetInfo(stratoToken);
-
-    if (
-      !assetInfo ||
-      assetInfo.externalChainId !== externalChainId.toString() ||
-      assetInfo.permissions === 0
-    ) {
-      throw new Error(
-        `getAssetInfoForChain failed: No external mapping found for token ${stratoToken} on chain ${externalChainId}`
-      );
-    }
-
-    assetInfo = {
-      externalToken: ensureHexPrefix(assetInfo.externalToken),
-      externalDecimals: parseInt(assetInfo.externalDecimals) || STRATO_DECIMALS,
-      permissions: assetInfo.permissions,
-      externalChainId: assetInfo.externalChainId,
-    };
-
-    callCache.set(cacheKey, assetInfo);
-  }
-
-  return assetInfo;
-}
 
 export function buildTxDescriptor(params: {
   type: "eth" | "erc20";
