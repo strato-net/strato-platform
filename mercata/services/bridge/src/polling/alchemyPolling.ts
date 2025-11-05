@@ -1,6 +1,7 @@
 import { config } from "../config";
 import {
   getEnabledChains,
+  getBridgeInfo,
 } from "../services/cirrusService";
 import { depositBatch } from "../services/bridgeService";
 import { blockTrackingService } from "../services/blockTrackingService";
@@ -10,7 +11,7 @@ import {
   getChainLogs,
   isChainConfigured,
 } from "../services/rpcService";
-import { logError } from "../utils/logger";
+import { logError, logInfo } from "../utils/logger";
 import { normalizeAddress } from "../utils/utils";
 
 // DepositInitiated(uint256,string,address,uint256,address) keccak256 hash
@@ -39,8 +40,7 @@ const parseDepositEvents = async (logs: any[], externalChainId: number): Promise
 const pollChainForDeposits = async (chainInfo: ChainInfo) => {
   const externalChainId = chainInfo.externalChainId;
   const depositRouter = chainInfo.depositRouter;
-  const blockchainLastProcessedBlock = parseInt(chainInfo.lastProcessedBlock) || 0;
-  
+  const blockchainLastProcessedBlock = chainInfo.lastProcessedBlock;
   // Get the effective last processed block (max of blockchain and local storage)
   const lastProcessedBlock = await blockTrackingService.getEffectiveLastProcessedBlock(
     externalChainId, 
@@ -108,31 +108,20 @@ const pollChainForDeposits = async (chainInfo: ChainInfo) => {
 };
 
 export const startMultiChainDepositPolling = () => {
-  const pollingInterval = config.polling.bridgeInInterval || 100 * 1000;
-
+  const interval = config.polling.bridgeInInterval || 100_000;
   const poll = async () => {
     try {
-      const enabledChains = await getEnabledChains();
-      if (enabledChains.length === 0) return;
-
-      const results = await Promise.allSettled(enabledChains.map(pollChainForDeposits));
-      
-      // Log any errors from individual chain processing
-      results.forEach((result, index) => {
-        if (result.status === 'rejected') {
-          logError("AlchemyPolling", result.reason, {
-            operation: "pollChainForDeposits",
-            chain: enabledChains[index],
-          });
-        }
-      });
-    } catch (e: any) {
-      logError("AlchemyPolling", e as Error, {
-        operation: "startMultiChainDepositPolling",
-      });
+      const [chains, info] = await Promise.all([getEnabledChains(), getBridgeInfo()]);
+      if (!chains.size) return logInfo("AlchemyPolling", "No enabled chains");
+      if (info?.withdrawalsPaused) logInfo("AlchemyPolling", "Withdrawals are paused");
+      if (info?.depositsPaused) return logInfo("AlchemyPolling", "Deposits are paused");
+      const infos = Array.from(chains.values());
+      (await Promise.allSettled(infos.map(pollChainForDeposits)))
+        .forEach((r, i) => r.status === "rejected" && logError("AlchemyPolling", r.reason, { operation: "pollChainForDeposits", chain: infos[i]}));
+    } catch (e) {
+      logError("AlchemyPolling", e as Error, { operation: "startMultiChainDepositPolling" });
     }
   };
-
   poll();
-  setInterval(poll, pollingInterval);
+  setInterval(poll, interval);
 };
