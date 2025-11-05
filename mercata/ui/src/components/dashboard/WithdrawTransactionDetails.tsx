@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Clock, CheckCircle2, AlertCircle } from 'lucide-react';
-import { Table, Select, Space, Card } from 'antd';
+import { Table, Select, Card } from 'antd';
 import { CopyOutlined, FrownOutlined } from '@ant-design/icons';
 import { useBridgeContext } from '@/context/BridgeContext';
 import { formatDate, getChainName, BRIDGE_STATUS_OPTIONS, CHAIN_OPTIONS, handleCopyToClipboard, getExplorerUrl } from '@/lib/bridge/utils';
@@ -190,8 +190,8 @@ const WithdrawTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean
   return (
     <div className="space-y-4">
       <Card className="bg-white/80 rounded-xl shadow-sm border border-gray-200">
-        <Space size="large">
-          <div>
+        <div className="flex flex-row gap-4 md:gap-6">
+          <div className="flex-1 md:flex-none md:w-auto">
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Status Filter
             </label>
@@ -201,11 +201,12 @@ const WithdrawTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean
                 setWithdrawalStatus(v);
                 setCurrentPage(1);
               }}
-              style={{ width: 150 }}
+              style={{ width: '100%' }}
+              className="md:!w-[150px]"
               options={BRIDGE_STATUS_OPTIONS}
             />
           </div>
-          <div>
+          <div className="flex-1 md:flex-none md:w-auto">
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Chain Filter
             </label>
@@ -215,17 +216,18 @@ const WithdrawTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean
                 setSelectedChainId(v);
                 setCurrentPage(1);
               }}
-              style={{ width: 150 }}
+              style={{ width: '100%' }}
+              className="md:!w-[150px]"
               options={[
                 { value: null, label: 'All Chains' },
                 ...availableNetworks.map((n) => ({ value: parseInt(n.chainId), label: n.chainName }))
               ]}
             />
           </div>
-        </Space>
+        </div>
       </Card>
       
-      <div className="bg-white/80 rounded-xl shadow-sm border border-gray-200">
+      <div className="bg-white/80 rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
         <Table
           columns={columns}
           dataSource={transactions}
