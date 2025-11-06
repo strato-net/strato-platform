@@ -455,28 +455,6 @@ contract record MercataBridge is Ownable {
         require(actualAmount > 0, "MB: no tokens sent");
     }
 
-    /**
-     * @dev Checks if the caller is the owner or has admin permissions via AdminRegistry
-     * @notice First attempts direct owner check via _checkOwner(), then falls back to AdminRegistry
-     * @notice Uses the same logic as the onlyOwner modifier but returns a boolean instead of reverting
-     * @return bool True if caller is owner or has admin permissions, false otherwise
-     */
-    function _isOwnerOrAdmin() internal returns (bool) {
-        try {
-            _checkOwner();
-            return true;
-        } catch {
-            address myOwner = owner();
-            AdminRegistry admin = AdminRegistry(myOwner);
-            address sender = _msgSender();
-            if (myOwner == address(this)) {
-                sender = address(this);
-            }
-            (bool didExecute, variadic ret) = admin.castVoteOnIssue(sender, msg.sig, msg.data);
-            return didExecute;
-        }
-    }
-
     // ───────────── Deposit & withdrawal related functions ─────────────
     // ───────────── Deposit flow functions ─────────────
     /**
@@ -824,33 +802,48 @@ contract record MercataBridge is Ownable {
     }
 
     /**
-     * @dev Aborts a withdrawal and refunds the escrowed tokens
+     * @dev Aborts a withdrawal and refunds the escrowed tokens (owner/admin/whitelisted only)
      * @notice Step-4 of the withdrawal flow - abort a withdrawal and refund tokens
-     * @notice Owner or admin can abort any withdrawal in INITIATED or PENDING_REVIEW status
-     * @notice User can only abort their own withdrawal in INITIATED status after timeout
+     * @notice Owner, admin, or whitelisted relayer can abort any withdrawal in INITIATED or PENDING_REVIEW status
+     * @notice The onlyOwner modifier handles whitelisted relayers through AdminRegistry.castVoteOnIssue
      * @notice Covers the scenario where admin disappears before confirming
      * @notice Does not cover the scenario where custody transaction is waiting to be signed
      * @param id The unique withdrawal identifier
      */
     function abortWithdrawal(
         uint256 id
+    ) public onlyOwner {
+        require(id > 0, "MB: invalid withdrawal id");
+
+        WithdrawalInfo w = withdrawals[id];
+        require(w.bridgeStatus == BridgeStatus.INITIATED || w.bridgeStatus == BridgeStatus.PENDING_REVIEW, "MB: not abortable");
+
+        w.bridgeStatus = BridgeStatus.ABORTED;
+        w.timestamp = block.timestamp;
+
+        uint256 actualRefundedAmount = _refundFunds(w.stratoToken, w.stratoSender, w.stratoTokenAmount);
+        require(actualRefundedAmount > 0, "MB: no tokens refunded");
+
+        emit WithdrawalAborted(id);
+    }
+
+    /**
+     * @dev Aborts a withdrawal and refunds the escrowed tokens (user only)
+     * @notice User can only abort their own withdrawal in INITIATED status after timeout
+     * @param id The unique withdrawal identifier
+     */
+    function abortWithdrawalByUser(
+        uint256 id
     ) public {
         require(id > 0, "MB: invalid withdrawal id");
 
         WithdrawalInfo w = withdrawals[id];
-        uint256 currentTimestamp = block.timestamp;
-
-        if (_isOwnerOrAdmin()) {
-            require(w.bridgeStatus == BridgeStatus.INITIATED || w.bridgeStatus == BridgeStatus.PENDING_REVIEW, "MB: not abortable");
-        }
-        else {
-            require(msg.sender == w.stratoSender, "MB: not sender");
-            require(w.bridgeStatus == BridgeStatus.INITIATED, "MB: not abortable");
-            require(currentTimestamp >= w.requestedAt + WITHDRAWAL_ABORT_DELAY, "MB: wait 48h");
-        }
+        require(msg.sender == w.stratoSender, "MB: not sender");
+        require(w.bridgeStatus == BridgeStatus.INITIATED, "MB: not abortable");
+        require(block.timestamp >= w.requestedAt + WITHDRAWAL_ABORT_DELAY, "MB: wait 48h");
 
         w.bridgeStatus = BridgeStatus.ABORTED;
-        w.timestamp = currentTimestamp;
+        w.timestamp = block.timestamp;
 
         uint256 actualRefundedAmount = _refundFunds(w.stratoToken, w.stratoSender, w.stratoTokenAmount);
         require(actualRefundedAmount > 0, "MB: no tokens refunded");

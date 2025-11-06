@@ -599,7 +599,7 @@ contract Describe_MercataBridge is Authorizable {
         // Abort by user (should fail due to 48h wait period)
         bool reverted = false;
         try {
-            user1.do(address(bridge), "abortWithdrawal", withdrawalId);
+            user1.do(address(bridge), "abortWithdrawalByUser", withdrawalId);
         } catch {
             reverted = true;
         }
@@ -992,7 +992,7 @@ contract Describe_MercataBridge is Authorizable {
         // Try to abort with different user
         bool reverted = false;
         try {
-            user2.do(address(bridge), "abortWithdrawal", withdrawalId);
+            user2.do(address(bridge), "abortWithdrawalByUser", withdrawalId);
         } catch {
             reverted = true;
         }
