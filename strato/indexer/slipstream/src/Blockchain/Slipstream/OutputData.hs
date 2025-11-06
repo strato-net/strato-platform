@@ -38,6 +38,7 @@ module Blockchain.Slipstream.OutputData (
 
 
 import           BlockApps.Solidity.Value as V
+import qualified BlockApps.SolidVMStorageDecoder as SolidVM
 import           Conduit
 import           Control.Lens ((^.))
 import           Control.Monad
@@ -48,6 +49,7 @@ import qualified Data.ByteString.Base16         as Base16
 import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString                 as B
 import qualified Data.ByteString.Lazy            as BL
+import           Data.Map                        (Map)
 import qualified Data.Map.Strict                 as Map
 import           Data.Maybe                      (catMaybes, fromMaybe, listToMaybe, mapMaybe)
 import           Data.Text                       (Text)
@@ -69,6 +71,7 @@ import           Blockchain.Slipstream.PostgresqlTypedShim
 import           SolidVM.Model.CodeCollection    hiding (contractName, contracts, parents)
 import qualified SolidVM.Model.CodeCollection.VarDef as VarDef
 import           SolidVM.Model.SolidString
+import           SolidVM.Model.Storable
 import qualified SolidVM.Model.Type              as SVMType
 import           Text.Printf
 import           UnliftIO.Exception              (SomeException, handle)
@@ -656,7 +659,8 @@ insertIndexTable ::
   E.ProcessedContract ->
   ConduitM () SlipstreamQuery m ()
 insertIndexTable cs =
-  let cs' = (\c@E.ProcessedContract {contractData = contractData} -> (c, Map.toList contractData)) cs
+  let cs' = (\c@E.ProcessedContract {contractData = contractData} -> (c, contractData)) cs
+      processContract :: (E.ProcessedContract, Map StoragePath BasicValue) -> [SlipstreamQuery]
       processContract (contract, list) =
           let keySt = baseColumns ++ [("data", SqlJsonb)]
               baseVals =
@@ -666,7 +670,7 @@ insertIndexTable cs =
                   ValueInt False Nothing . E.blockNumber
                 ]
               baseRowVals = map (Just . SimpleValue . ($ contract)) baseVals
-              dataVals = [Just . ValueMapping . Map.fromList $ (\(k, v) -> (ValueString k, v)) <$> list]
+              dataVals = [Just . ValueMapping $ Map.mapKeys ValueString $ Map.fromList $ SolidVM.decodeCacheValues list]
               valsForSQL = baseRowVals ++ dataVals
               conflictUpdateCols = ["address", "block_hash", "block_timestamp", "block_number"]
               tblText = tableNameToDoubleQuoteText storageTableName

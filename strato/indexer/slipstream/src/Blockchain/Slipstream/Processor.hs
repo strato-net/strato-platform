@@ -61,6 +61,7 @@ import Database.Persist.Postgresql
 import Database.Esqueleto.PostgreSQL.JSON
 import qualified Database.Persist.Postgresql as SQL
 import SolidVM.Model.CodeCollection hiding (contractName, Storage)
+import SolidVM.Model.Storable hiding (toList)
 import qualified SolidVM.Model.Type as SVMType
 import Text.Tools (boringBox, multilineLog)
 import Prelude hiding (lookup)
@@ -80,7 +81,7 @@ splitActions :: [AggregateAction] -> [(Address, [AggregateAction])]
 splitActions = partitionWith actionAddress
 
 processedContract ::
-  Map.Map Text Value ->
+  Map.Map StoragePath BasicValue ->
   AggregateAction ->
   E.ProcessedContract
 processedContract state AggregateAction {..} =
@@ -97,8 +98,8 @@ rowToInsert ::
   E.ProcessedContract
 rowToInsert row =
   let newState = case actionStorage row of
-        Action.SolidVMDiff mp -> SolidVM.decodeCacheValues mp
-   in processedContract (Map.fromList $ newState) row
+        Action.SolidVMDiff mp -> mp
+   in processedContract newState row
 
 
 rowToCollections :: AggregateAction -> Map.Map Text Value
