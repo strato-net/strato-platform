@@ -7,7 +7,7 @@ import { buildFunctionTx } from "../../utils/txBuilder";
 import { executeTransaction } from "../../utils/txHelper";
 import { waitForBalanceUpdate } from "./rewards/rewardsChef.helpers";
 
-const { Pool, PoolSwap, swapHistorySelectFields } = constants;
+const { Pool, PoolFactory, PoolSwap, swapHistorySelectFields } = constants;
 
 // ============================================================================
 // CALCULATION HELPERS
@@ -365,6 +365,37 @@ export const fetchPoolBalances = async (accessToken: string, poolAddress: string
   });
 
   return poolData[0];
+};
+
+/**
+ * Fetches pool balances, swap fee rate, and LP token supply for single token liquidity operations
+ */
+export const fetchPoolDataForSingleTokenLiquidity = async (accessToken: string, poolAddress: string) => {
+  const [{ data: poolData }, { data: factoryData }] = await Promise.all([
+    cirrus.get(accessToken, `/${Pool}`, {
+      params: {
+        poolFactory: "eq." + constants.poolFactory,
+        address: "eq." + poolAddress,
+        select: "tokenABalance::text,tokenBBalance::text,lpToken:lpToken_fkey(_totalSupply::text),swapFeeRate"
+      }
+    }),
+    cirrus.get(accessToken, `/${PoolFactory}`, {
+      params: { address: "eq." + config.poolFactory, select: "swapFeeRate" }
+    })
+  ]);
+
+  const pool = poolData[0];
+  const factory = factoryData[0];
+  
+  // Use pool-specific swap fee rate if set, otherwise use factory default
+  const swapFeeRate = pool.swapFeeRate || factory?.swapFeeRate || 30;
+
+  return {
+    tokenABalance: pool.tokenABalance,
+    tokenBBalance: pool.tokenBBalance,
+    lpTokenTotalSupply: pool.lpToken._totalSupply,
+    swapFeeRate
+  };
 };
 
 /**
