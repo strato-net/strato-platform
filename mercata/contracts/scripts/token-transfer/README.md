@@ -1,6 +1,6 @@
 # Token Transfer Script
 
-Script for transferring tokens to users using environment variables.
+Script for transferring tokens to multiple users using environment variables.
 
 ## Usage
 
@@ -15,7 +15,7 @@ node contestTransfer.js
 
 Or set environment variables directly:
 ```bash
-export USER_ADDRESS=1234567890abcdef...
+export USER_ADDRESSES=1234567890abcdef...,abcdef1234567890...
 export USDST=1000
 export bCSPXST=50
 export GOLDST=25
@@ -26,7 +26,7 @@ node contestTransfer.js
 ## Environment Variables
 
 ### Required
-- `USER_ADDRESS` - Target user's Ethereum address (without 0x prefix)
+- `USER_ADDRESSES` - Comma-separated list of target user Ethereum addresses (without 0x prefix)
 
 ### Optional (set only the tokens you want to transfer)
 - `USDST` - USDST token amount (in token units, not wei)
@@ -40,20 +40,25 @@ node contestTransfer.js
 
 - Hardcoded token addresses (no CSV needed)
 - Automatic wei conversion using ethers.js
+- Supports multiple recipient addresses
+- Fixed token amounts transferred to each address
 - Clean, minimal output
 - Detailed transaction logging
 
 ## Output
 
 ```
-Transferring to 1234567890abcdef...:
-  USDST: 1000 (1000000000000000000000 wei)
-  bCSPXST: 50 (50000000000000000000 wei)
-  GOLDST: 25 (25000000000000000000 wei)
-Executing 3 transfers...
+Transferring to 2 user(s):
+  - f11d828c8c126428ab0f46bce3112681931da9fb
+  - aba1e58958107c4267c090786972e64b970ec19d
 
-Results: 3/3 successful
-Total transferred: 1075.000000 tokens
+Processing transfers for f11d828c8c126428ab0f46bce3112681931da9fb...
+  Completed 1 transfers
+
+Processing transfers for aba1e58958107c4267c090786972e64b970ec19d...
+  Completed 1 transfers
+
+Results: 2/2 successful
 ```
 
 ## Token Addresses
