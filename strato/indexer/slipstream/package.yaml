@@ -29,6 +29,7 @@ library:
     - binary
     - bloc2
     - blockapps-data
+    - blockapps-datadefs
     - blockapps-mpdbs
     - classy-prelude
     - conduit

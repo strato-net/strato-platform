@@ -3,7 +3,7 @@ Storage
     address Address
     blockHash Keccak256
     blockTimestamp String
-    blockNumber Int
+    blockNumber Integer
     data (JSONB JSON.Value)
     Primary address
     deriving Eq Ord Read Show

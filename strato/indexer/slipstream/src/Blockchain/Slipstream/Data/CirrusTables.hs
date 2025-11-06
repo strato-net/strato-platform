@@ -23,6 +23,7 @@
 
 module Blockchain.Slipstream.Data.CirrusTables where
 
+import Blockchain.Data.PersistTypes ()
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
 import Control.Monad.Trans.Class (lift)

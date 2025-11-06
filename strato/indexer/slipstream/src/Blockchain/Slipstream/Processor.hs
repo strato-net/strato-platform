@@ -58,11 +58,13 @@ import Data.Text (Text)
 import qualified Data.Text as T
 --import Database.Persist
 import Database.Persist.Postgresql
+import Database.Esqueleto.PostgreSQL.JSON
 import qualified Database.Persist.Postgresql as SQL
 import SolidVM.Model.CodeCollection hiding (contractName, Storage)
 import qualified SolidVM.Model.Type as SVMType
 import Text.Tools (boringBox, multilineLog)
 import Prelude hiding (lookup)
+import Blockchain.Slipstream.SolidityValue
 
 data BatchedInserts = BatchedInserts
   { indexInsert :: E.ProcessedContract
@@ -268,7 +270,8 @@ processTheMessages messages = do
   return events'
 {-
 insertToStorage :: E.ProcessedContract -> Storage
-insertToStorage _ = Storage 1 emptyHash "qq" 4 (JSON.String "what is up?")
+insertToStorage E.ProcessedContract{..} = Storage address blockHash (show blockTimestamp) blockNumber
+                                          (JSONB $ JSON.toJSON contractData)
 
 insertIndexTable2 :: (HasSQLDB m, PersistEntityBackend Storage ~ SqlBackend) =>
                      Storage -> m ()
