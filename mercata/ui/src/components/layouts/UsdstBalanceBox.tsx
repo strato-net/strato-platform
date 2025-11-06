@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useUser } from "@/context/UserContext";
 import { useTokenContext } from "@/context/TokenContext";
@@ -13,8 +13,11 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Token } from "@/interface";
-import { usdstAddress } from "@/lib/constants";
+import { usdstAddress, VOUCHER_TO_USDST_FACTOR } from "@/lib/constants";
 import { useMobileTooltip } from "@/hooks/use-mobile-tooltip";
+
+// Combined balance threshold for warnings (in USDST)
+const COMBINED_BALANCE_THRESHOLD = 10; // Show warning if USDST + vouchers < 10 USDST
 
 // Optimized InfoTooltip component using hook
 const InfoTooltip = ({ children, content }: { children: React.ReactNode; content: string }) => {
@@ -82,14 +85,20 @@ const UsdstBalanceBox: React.FC = () => {
     fetchUsdstToken();
   }, [getToken]);
 
-  const getBalanceValue = (balance: string): number => {
-    const formattedBalance = formatWeiAmount(balance);
-    return safeParseFloat(formattedBalance);
-  };
+  const combinedBalance = useMemo(() => {
+    if (loadingUsdstBalance) return 0;
+    try {
+      const usdst = safeParseFloat(formatWeiAmount(usdstBalance || "0"));
+      const vouchers = safeParseFloat(formatWeiAmount(voucherBalance || "0", 20));
+      return usdst + vouchers / Number(VOUCHER_TO_USDST_FACTOR);
+    } catch {
+      return safeParseFloat(formatWeiAmount(usdstBalance || "0"));
+    }
+  }, [usdstBalance, voucherBalance, loadingUsdstBalance]);
 
-  const balanceValue = getBalanceValue(usdstBalance);
-  const isLowBalance = balanceValue <= 0.2 && balanceValue > 0.03;
-  const isCriticalBalance = balanceValue <= 0.03;
+  const shouldShowWarning = combinedBalance < COMBINED_BALANCE_THRESHOLD;
+  const isCriticalBalance = shouldShowWarning && combinedBalance <= COMBINED_BALANCE_THRESHOLD * 0.5;
+  const isLowBalance = shouldShowWarning && !isCriticalBalance;
 
   // Don't render if user is not logged in or if on homepage
   if (!userAddress || location.pathname === "/") {
@@ -209,7 +218,7 @@ const UsdstBalanceBox: React.FC = () => {
           </Button>
         </div>
 
-        {(isLowBalance || isCriticalBalance) && !loadingUsdstBalance && (
+        {shouldShowWarning && !loadingUsdstBalance && (
           <div className="mt-2 pt-2 border-t border-gray-200">
             <div
               className={`flex items-start space-x-1 ${
