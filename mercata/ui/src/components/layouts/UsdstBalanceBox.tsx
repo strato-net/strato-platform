@@ -96,9 +96,10 @@ const UsdstBalanceBox: React.FC = () => {
     }
   }, [usdstBalance, voucherBalance, loadingUsdstBalance]);
 
-  const shouldShowWarning = combinedBalance < COMBINED_BALANCE_THRESHOLD;
-  const isCriticalBalance = shouldShowWarning && combinedBalance <= COMBINED_BALANCE_THRESHOLD * 0.5;
-  const isLowBalance = shouldShowWarning && !isCriticalBalance;
+  
+  const balanceValue = combinedBalance;
+  const isLowBalance = balanceValue <= COMBINED_BALANCE_THRESHOLD && balanceValue > 0.03;
+  const isCriticalBalance = balanceValue <= 0.03;
 
   // Don't render if user is not logged in or if on homepage
   if (!userAddress || location.pathname === "/") {
@@ -218,7 +219,7 @@ const UsdstBalanceBox: React.FC = () => {
           </Button>
         </div>
 
-        {shouldShowWarning && !loadingUsdstBalance && (
+        {(isLowBalance || isCriticalBalance) && !loadingUsdstBalance && (
           <div className="mt-2 pt-2 border-t border-gray-200">
             <div
               className={`flex items-start space-x-1 ${
