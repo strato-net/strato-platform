@@ -28,7 +28,6 @@ where
 
 import Bloc.API
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256
 import Data.Proxy
 import Data.Text
@@ -43,7 +42,6 @@ getContracts ::
   Maybe Text ->
   Maybe Integer ->
   Maybe Integer ->
-  Maybe ChainId ->
   ClientM GetContractsResponse
 getContracts = client (Proxy @GetContracts)
 
@@ -58,14 +56,12 @@ getContractsData = client (Proxy @GetContractsData)
 getContractsContract ::
   ContractName ->
   Address ->
-  Maybe ChainId ->
   ClientM Contract
 getContractsContract = client (Proxy @GetContractsContract)
 
 getContractsState ::
   ContractName ->
   Address ->
-  Maybe ChainId ->
   Maybe Text ->
   Maybe Integer ->
   Maybe Integer ->
@@ -73,20 +69,18 @@ getContractsState ::
   ClientM GetContractsStateResponses
 getContractsState = client (Proxy @GetContractsState)
 
-getContractsDetails :: Address -> Maybe ChainId -> ClientM Contract
+getContractsDetails :: Address -> ClientM Contract
 getContractsDetails = client (Proxy @GetContractsDetails)
 
 getContractsFunctions ::
   ContractName ->
   Address ->
-  Maybe ChainId ->
   ClientM [FunctionName]
 getContractsFunctions = client (Proxy @GetContractsFunctions)
 
 getContractsSymbols ::
   ContractName ->
   Address ->
-  Maybe ChainId ->
   ClientM [SymbolName]
 getContractsSymbols = client (Proxy @GetContractsSymbols)
 
@@ -95,7 +89,6 @@ getContractsStateMapping ::
   Address ->
   SymbolName ->
   Text ->
-  Maybe ChainId ->
   ClientM GetContractsStateMappingResponse
 getContractsStateMapping = client (Proxy @GetContractsStateMapping)
 
@@ -106,7 +99,6 @@ getContractsEnum ::
   ContractName ->
   Address ->
   EnumName ->
-  Maybe ChainId ->
   ClientM [EnumValue]
 getContractsEnum = client (Proxy @GetContractsEnum)
 

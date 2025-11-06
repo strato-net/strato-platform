@@ -71,9 +71,6 @@ namespaceToKeyPrefix ns = case ns of
   Children           -> "c:"
   Canonical          -> "q:"
   Validators         -> "validators"
-  X509Certificates   -> "x509:"
-  ParsedSetWhitePage -> "potu:"
-  ParsedSetToX509    -> "psx509:"
 
 bestBlockInfoKey :: S8.ByteString
 bestBlockInfoKey = S8.pack "<best>"

@@ -24,6 +24,7 @@ import Text.Format
 
 data Event = Event
   { evBlockHash :: Keccak256,
+    evTxSender :: Address,
     evContractName :: String,
     evContractAddress :: Address,
     evName :: String,
@@ -34,6 +35,8 @@ data Event = Event
 instance Format Event where
   format Event {..} =
     "evBlockHash: " ++ format evBlockHash ++ "\n"
+      ++ "evTxSender: "
+      ++ format evTxSender
       ++ "evContractName: "
       ++ evContractName
       ++ "\n"
@@ -53,6 +56,7 @@ instance ToJSON Event where
   toJSON Event {..} =
     object
       [ "eventBlockHash" .= evBlockHash,
+        "eventTxSender" .= evTxSender,
         "eventContractName" .= evContractName,
         "eventContractAddress" .= evContractAddress,
         "eventName" .= evName,
@@ -63,6 +67,7 @@ instance FromJSON Event where
   parseJSON (Object o) =
     Event
       <$> (o .: "eventBlockHash")
+      <*> (o .: "eventTxSender")
       <*> (o .: "eventContractName")
       <*> (o .: "eventContractAddress")
       <*> (o .: "eventName")

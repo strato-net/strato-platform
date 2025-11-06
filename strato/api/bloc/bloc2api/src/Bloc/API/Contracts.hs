@@ -13,7 +13,6 @@ import Bloc.API.Utils
 import BlockApps.Solidity.SolidityValue
 import BlockApps.Solidity.Xabi
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256
 import Control.Lens (mapped, (&), (?~))
 import Data.Aeson
@@ -47,7 +46,6 @@ type GetContracts =
     :> QueryParam "name" Text
     :> QueryParam "offset" Integer
     :> QueryParam "limit" Integer
-    :> QueryParam "chainid" ChainId
     :> Get '[JSON] GetContractsResponse
 
 instance ToParam (QueryParam "limit" Integer) where
@@ -55,8 +53,7 @@ instance ToParam (QueryParam "limit" Integer) where
 
 data AddressCreatedAt = AddressCreatedAt
   { createdAt :: Int64,
-    address :: Address,
-    chainId :: Maybe ChainId
+    address :: Address
   }
   deriving (Eq, Show, Generic)
 
@@ -77,8 +74,7 @@ instance ToSchema AddressCreatedAt where
       ex =
         AddressCreatedAt
           { createdAt = 1494448021000,
-            address = Address 0xdeadbeef,
-            chainId = Nothing
+            address = Address 0xdeadbeef
           }
 
 newtype GetContractsResponse = GetContractsResponse
@@ -95,7 +91,7 @@ instance ToSchema GetContractsResponse where
       ex :: GetContractsResponse
       ex =
         GetContractsResponse
-          { unContracts = Map.fromList [("MySampleContract", [AddressCreatedAt 1976 (Address 0xdeadbeef) Nothing])]
+          { unContracts = Map.fromList [("MySampleContract", [AddressCreatedAt 1976 (Address 0xdeadbeef)])]
           }
 
 instance ToJSON GetContractsResponse where
@@ -114,13 +110,11 @@ instance ToSample GetContractsResponse where
           "Sample"
           [ AddressCreatedAt
               { address = Address 0x309e10eddc6333b82889bfc25a2b107b9c2c9a8c,
-                createdAt = 100,
-                chainId = Nothing
+                createdAt = 100
               },
             AddressCreatedAt
               { address = Address 0x409e10eddc6333b82889bfc25a2b107b9c2c9a8d,
-                createdAt = 101,
-                chainId = Nothing
+                createdAt = 101
               }
           ]
 
@@ -136,7 +130,6 @@ type GetContractsContract =
   "contracts"
     :> Capture "contractName" ContractName
     :> Capture "contractAddress" Address
-    :> QueryParam "chainid" ChainId
     :> Get '[JSON] Contract
 
 instance ToSample Contract where
@@ -168,7 +161,6 @@ type GetContractsState =
     :> Capture "contractName" ContractName
     :> Capture "contractAddress" Address
     :> "state"
-    :> QueryParam "chainid" ChainId
     :> QueryParam "name" Text
     :> QueryParam "count" Integer
     :> QueryParam "offset" Integer
@@ -195,7 +187,6 @@ instance ToSample GetContractsStateResponses where toSamples _ = noSamples
 data PostContractsBatchStatesRequest = PostContractsBatchStatesRequest
   { postcontractsbatchstatesrequestContractName :: ContractName,
     postcontractsbatchstatesrequestAddress :: Address,
-    postcontractsbatchstatesrequestChainid :: Maybe ChainId, -- lowercase `i` for camelCase JSON instances
     postcontractsbatchstatesrequestVarName :: Maybe Text,
     postcontractsbatchstatesrequestCount :: Maybe Integer,
     postcontractsbatchstatesrequestOffset :: Maybe Integer,
@@ -225,7 +216,6 @@ instance ToSchema PostContractsBatchStatesRequest where
         PostContractsBatchStatesRequest
           { postcontractsbatchstatesrequestContractName = ContractName "MySampleContract",
             postcontractsbatchstatesrequestAddress = 0xdeadbeef,
-            postcontractsbatchstatesrequestChainid = Nothing,
             postcontractsbatchstatesrequestVarName = Nothing,
             postcontractsbatchstatesrequestCount = Nothing,
             postcontractsbatchstatesrequestOffset = Nothing,
@@ -243,7 +233,6 @@ type GetContractsDetails =
     :> "contract"
     :> Capture "contractAddress" Address
     :> "details"
-    :> QueryParam "chainid" ChainId
     :> Get '[JSON] Contract -- change to HTML
 
 
@@ -254,7 +243,6 @@ type GetContractsFunctions =
   "contracts"
     :> Capture "contractName" ContractName
     :> Capture "contractAddress" Address
-    :> QueryParam "chainid" ChainId
     :> "functions"
     :> Get '[JSON] [FunctionName]
 
@@ -287,7 +275,6 @@ type GetContractsSymbols =
   "contracts"
     :> Capture "contractName" ContractName
     :> Capture "contractAddress" Address
-    :> QueryParam "chainid" ChainId
     :> "symbols"
     :> Get '[JSON] [SymbolName]
 
@@ -300,7 +287,6 @@ type GetContractsEnum =
     :> Capture "contractAddress" Address
     :> "enum"
     :> Capture "enumName" EnumName
-    :> QueryParam "chainid" ChainId
     :> Get '[JSON] [EnumValue]
 
 newtype EnumName = EnumName {getEnumName :: Text} deriving (Eq, Show, Generic)
@@ -347,7 +333,6 @@ type GetContractsStateMapping =
     :> "state"
     :> Capture "mapping" SymbolName
     :> Capture "key" Text
-    :> QueryParam "chainid" ChainId
     :> Get '[JSON] GetContractsStateMappingResponse
 
 instance ToCapture (Capture "key" Text) where

@@ -390,7 +390,17 @@ primaryExpression = do
     <|> (uncurry Variable . fmap stringToLabel <$> res "string")
     <|> (uncurry BoolLiteral <$> res' "false" False)
     <|> (uncurry BoolLiteral <$> res' "true" True)
-    <|> (uncurry NewExpression <$> withPosition (reserved "new" >> simpleTypeExpression))
+    <|> (do
+          (a, (t, mSalt)) <- withPosition $ do
+            reserved "new"
+            t' <- simpleTypeExpression
+            mSalt' <- optionMaybe . braces $ do
+              reserved "salt"
+              void colon
+              expression
+            pure (t', mSalt')
+          pure $ NewExpression a t mSalt
+        )
     <|> ( try $ do
             ~(a, decimalNum) <- withPosition $ do
               num <- lexeme $ integer

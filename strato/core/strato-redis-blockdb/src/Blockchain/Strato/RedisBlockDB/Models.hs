@@ -24,7 +24,6 @@ import Blockchain.Data.RLP
 import qualified Blockchain.Data.Transaction as TXD
 import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
@@ -34,8 +33,6 @@ import qualified Data.ByteString.Base16 as SB16
 import qualified Data.ByteString.Char8 as S8
 import Data.ByteString.Lazy (toStrict)
 import Data.List (intercalate)
-import qualified Data.Map.Strict as M
-import qualified Data.Set as S
 import Text.Format
 
 data BlockDBNamespace
@@ -47,9 +44,6 @@ data BlockDBNamespace
   | Children
   | Canonical
   | Validators
-  | X509Certificates
-  | ParsedSetWhitePage
-  | ParsedSetToX509
   deriving (Eq, Read, Show)
 
 class RedisDBKeyable k where
@@ -79,9 +73,6 @@ instance RedisDBKeyable (String, Maybe String, Maybe String) where
 instance RedisDBKeyable Keccak256 where
   toKey = S8.pack . keccak256ToHex
 
-instance RedisDBKeyable ChainMemberParsedSet where
-  toKey = toStrict . encode
-
 instance RedisDBKeyable Validator where
   toKey = toStrict . encode
 
@@ -94,9 +85,6 @@ instance RedisDBKeyable Word256 where
 instance RedisDBKeyable IPAddress where
   toKey = S8.pack . showIP
 
-instance RedisDBKeyable RedisValidator where
-  toKey = rlpSerialize . rlpEncode
-
 instance RedisDBKeyable Integer where
   toKey = S8.pack . show
 
@@ -108,46 +96,6 @@ newtype RedisTxs = RedisTxs [RedisTx] deriving newtype (Eq, Read, Show, RLPSeria
 
 newtype RedisUncles = RedisUncles [RedisHeader] deriving newtype (Eq, Show, RLPSerializable)
 
-newtype RedisChainMemberRSet = RedisChainMemberRSet ChainMemberRSet deriving newtype (Eq, Show, RLPSerializable)
-
-newtype RedisChainTxsInBlocks = RedisChainTxsInBlocks (M.Map Word256 [Keccak256]) deriving newtype (Eq, Show, RLPSerializable)
-
-newtype RedisIPChains = RedisIPChains (S.Set Word256) deriving (Eq, Show)
-
-newtype RedisOrgIdChains = RedisOrgIdChains (S.Set Word256) deriving (Eq, Show)
-
-newtype RedisOrgNameChains = RedisOrgNameChains (S.Set Word256) deriving (Eq, Show)
-
-newtype RedisOrgUnits = RedisOrgUnits [ChainMemberParsedSet] deriving (Eq, Show)
-
-newtype RedisOrgUnitMembers = RedisOrgUnitMembers [ChainMemberParsedSet] deriving (Eq, Show)
-
-newtype RedisValidator = RedisValidator ChainMemberParsedSet deriving (Eq, Show)
-
-instance RLPSerializable RedisIPChains where
-  rlpEncode (RedisIPChains s) = rlpEncode $ S.toList s
-  rlpDecode = RedisIPChains . S.fromList . rlpDecode
-
-instance RLPSerializable RedisOrgIdChains where
-  rlpEncode (RedisOrgIdChains s) = rlpEncode $ S.toList s
-  rlpDecode = RedisOrgIdChains . S.fromList . rlpDecode
-
-instance RLPSerializable RedisOrgNameChains where
-  rlpEncode (RedisOrgNameChains s) = rlpEncode $ S.toList s
-  rlpDecode = RedisOrgNameChains . S.fromList . rlpDecode
-
-instance RLPSerializable RedisOrgUnits where
-  rlpEncode (RedisOrgUnits s) = rlpEncode $ s
-  rlpDecode = RedisOrgUnits . rlpDecode
-
-instance RLPSerializable RedisOrgUnitMembers where
-  rlpEncode (RedisOrgUnitMembers s) = rlpEncode $ s
-  rlpDecode = RedisOrgUnitMembers . rlpDecode
-
-instance RLPSerializable RedisValidator where
-  rlpEncode (RedisValidator s) = rlpEncode s
-  rlpDecode = RedisValidator . rlpDecode
-
 displayForNamespace :: BlockDBNamespace -> S8.ByteString -> String
 displayForNamespace ns input = case ns of
   Numbers -> readSHA
@@ -158,8 +106,5 @@ displayForNamespace ns input = case ns of
   Transactions -> let RedisTxs txs = fromValue input in intercalate "\n" [format tx | RedisTx tx <- txs]
   Uncles -> let RedisUncles us = fromValue input in show us
   Validators -> format (fromValue input :: S8.ByteString)
-  X509Certificates -> format (fromValue input :: Address)
-  ParsedSetWhitePage -> let RedisOrgUnits units = fromValue input in show units
-  ParsedSetToX509 -> format input
   where
     readSHA = let x = fromValue input in format (keccak256ToWord256 x)
