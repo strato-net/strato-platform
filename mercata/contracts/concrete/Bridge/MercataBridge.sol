@@ -455,6 +455,28 @@ contract record MercataBridge is Ownable {
         require(actualAmount > 0, "MB: no tokens sent");
     }
 
+    /**
+     * @dev Checks if the caller is the owner or has admin permissions via AdminRegistry
+     * @notice First attempts direct owner check via _checkOwner(), then falls back to AdminRegistry
+     * @notice Uses the same logic as the onlyOwner modifier but returns a boolean instead of reverting
+     * @return bool True if caller is owner or has admin permissions, false otherwise
+     */
+    function _isOwnerOrAdmin() internal returns (bool) {
+        try {
+            _checkOwner();
+            return true;
+        } catch {
+            address myOwner = owner();
+            AdminRegistry admin = AdminRegistry(myOwner);
+            address sender = _msgSender();
+            if (myOwner == address(this)) {
+                sender = address(this);
+            }
+            (bool didExecute, variadic ret) = admin.castVoteOnIssue(sender, msg.sig, msg.data);
+            return didExecute;
+        }
+    }
+
     // ───────────── Deposit & withdrawal related functions ─────────────
     // ───────────── Deposit flow functions ─────────────
     /**
@@ -804,7 +826,7 @@ contract record MercataBridge is Ownable {
     /**
      * @dev Aborts a withdrawal and refunds the escrowed tokens
      * @notice Step-4 of the withdrawal flow - abort a withdrawal and refund tokens
-     * @notice Admin can abort any withdrawal in INITIATED or PENDING_REVIEW status
+     * @notice Owner or admin can abort any withdrawal in INITIATED or PENDING_REVIEW status
      * @notice User can only abort their own withdrawal in INITIATED status after timeout
      * @notice Covers the scenario where admin disappears before confirming
      * @notice Does not cover the scenario where custody transaction is waiting to be signed
@@ -818,8 +840,7 @@ contract record MercataBridge is Ownable {
         WithdrawalInfo w = withdrawals[id];
         uint256 currentTimestamp = block.timestamp;
 
-        AdminRegistry admin = AdminRegistry(owner());
-        if (admin.whitelist(address(this), "abortWithdrawal", msg.sender)) {
+        if (_isOwnerOrAdmin()) {
             require(w.bridgeStatus == BridgeStatus.INITIATED || w.bridgeStatus == BridgeStatus.PENDING_REVIEW, "MB: not abortable");
         }
         else {
