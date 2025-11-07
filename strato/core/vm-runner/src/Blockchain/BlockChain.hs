@@ -296,7 +296,7 @@ addBlockTransactions b@OutputBlock {obBlockData = bd, obReceiptTransactions = tr
 
   flushMemStorageTxDBToBlockDB
 
-  sendNewActionMessage b trrs
+  yield . OutVMEvents =<< sendNewActionMessage b trrs
   
   lift $ timeit "flushMemStorageDB" (Just vmBlockInsertionMined) flushMemStorageDB
   flushMemAddressStateTxToBlockDB
@@ -304,8 +304,8 @@ addBlockTransactions b@OutputBlock {obBlockData = bd, obReceiptTransactions = tr
   lift $ timeit "flushMemAddressStateDB" (Just vmBlockInsertionMined) flushMemAddressStateDB
   pure trrs
 
-sendNewActionMessage :: (HasMemRawStorageDB m, MonadIO m) =>
-                        OutputBlock -> [TxRunResult] -> m ()
+sendNewActionMessage :: (HasMemRawStorageDB m) =>
+                        OutputBlock -> [TxRunResult] -> m [VMEvent]
 sendNewActionMessage b trrs = do
   let bd = obBlockData b
   theMap <- getMemRawStorageBlockDB
@@ -330,9 +330,7 @@ sendNewActionMessage b trrs = do
         _delegatecalls=mconcat $ map (either (const Seq.empty) (fromMaybe Seq.empty . fmap _delegatecalls . erAction) . trrResult) trrs
         }
 
-  _ <- produceVMEvents $ [NewAction action]
-
-  return ()
+  pure [NewAction action]
 
 
 

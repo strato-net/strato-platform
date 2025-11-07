@@ -16,7 +16,6 @@ where
 import Bloc.Monad
 import BlockApps.Logging
 import Blockchain.Strato.Discovery.Data.Peer
-import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Host
 import Blockchain.Strato.Model.Secp256k1
 import Control.Monad.IO.Class
