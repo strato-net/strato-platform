@@ -38,6 +38,34 @@ router.get("/balance", authHandler.authorizeRequest(), TokensController.getBalan
 
 /**
  * @openapi
+ * /tokens/admin/balance:
+ *   get:
+ *     summary: Retrieve token balances for any user address
+ *     tags: [Tokens]
+ *     parameters:
+ *       - name: address
+ *         in: query
+ *         required: true
+ *         description: Target user address to lookup balances for
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Token balance entries for the specified address
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 additionalProperties: true
+ *       400:
+ *         description: Missing or invalid address parameter
+ */
+router.get("/admin/balance", authHandler.authorizeRequest(), TokensController.getBalanceForAddress);
+
+/**
+ * @openapi
  * /tokens/transferable:
  *   get:
  *     summary: List transferable tokens

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Shield, Coins, DollarSign, Droplets, Settings, ArrowLeft, ToggleLeft, Cog, CreditCard, TrendingUp, Vote, Database, ChevronDown } from 'lucide-react';
+import { Shield, Coins, DollarSign, Droplets, Settings, ArrowLeft, ToggleLeft, Cog, CreditCard, TrendingUp, Vote, Database, ChevronDown, Users } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import CreateTokenForm from '@/components/admin/CreateTokenForm';
 import CreatePoolForm from '@/components/admin/CreatePoolForm';
@@ -14,6 +14,7 @@ import SwapPoolsTable from '@/components/admin/SwapPoolsTable';
 import LendingTab from '@/components/admin/LendingTab';
 import CollateralConfigManager from '@/components/admin/CollateralConfigManager';
 import VoteTab from '@/components/admin/VoteTab';
+import UserTokenBalances from '@/components/admin/UserTokenBalances';
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -53,7 +54,12 @@ const Admin = () => {
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 ">
           <div className="w-full overflow-x-auto">
-            <TabsList className="grid grid-cols-5 w-full min-w-[600px] md:min-w-0">
+            <TabsList className="grid grid-cols-6 w-full min-w-[700px] md:min-w-0">
+              <TabsTrigger value="users" className="flex items-center space-x-1 md:space-x-2 text-xs md:text-sm">
+                <Users className="h-3 w-3 md:h-4 md:w-4" />
+                <span className="hidden sm:inline">User Lookup</span>
+                <span className="sm:hidden">Users</span>
+              </TabsTrigger>
               <TabsTrigger value="pools" className="flex items-center space-x-1 md:space-x-2 text-xs md:text-sm">
                 <Droplets className="h-3 w-3 md:h-4 md:w-4" />
                 <span className="hidden sm:inline">Create Pools</span>
@@ -127,6 +133,10 @@ const Admin = () => {
               </TabsTrigger>
             </TabsList>
           </div>
+
+          <TabsContent value="users" className="space-y-6">
+            <UserTokenBalances />
+          </TabsContent>
 
           <TabsContent value="tokens" className="space-y-6">
             <Card>

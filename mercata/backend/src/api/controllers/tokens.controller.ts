@@ -198,6 +198,29 @@ class TokensController {
       next(error);
     }
   }
+
+  static async getBalanceForAddress(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, query } = req;
+      const { address: targetAddress } = query;
+
+      if (!targetAddress || typeof targetAddress !== 'string') {
+        res.status(RestStatus.BAD_REQUEST).json({
+          error: 'address query parameter is required'
+        });
+        return;
+      }
+
+      const balances = await getBalance(accessToken, targetAddress);
+      res.status(RestStatus.OK).json(balances);
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export default TokensController;
