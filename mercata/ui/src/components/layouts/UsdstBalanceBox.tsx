@@ -90,7 +90,7 @@ const UsdstBalanceBox: React.FC = () => {
     try {
       const usdst = safeParseFloat(formatWeiAmount(usdstBalance || "0"));
       const vouchers = safeParseFloat(formatWeiAmount(voucherBalance || "0", 20));
-      return usdst + vouchers / Number(VOUCHER_TO_USDST_FACTOR);
+      return usdst * Number(VOUCHER_TO_USDST_FACTOR) + vouchers;
     } catch {
       return safeParseFloat(formatWeiAmount(usdstBalance || "0"));
     }
