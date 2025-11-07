@@ -159,13 +159,39 @@ export function getExplorerUrl(chainId: string, txHash: string): string {
 }
 
 /**
- * Gets chain name from chain ID
+ * Chain ID to display name mapping
  */
-export function getChainName(chainId: number): string {
-  const chainEntries = Object.entries(SUPPORTED_CHAINS);
-  const chainEntry = chainEntries.find(([_, id]) => id === chainId);
-  return chainEntry ? chainEntry[0] : "Unknown Chain";
+const CHAIN_NAME_MAP: Record<number, string> = {
+  1: 'Ethereum',
+  11155111: 'Sepolia',
+  137: 'Polygon',
+  80002: 'Polygon Amoy',
+  10: 'Optimism',
+  8453: 'Base',
+  42161: 'Arbitrum',
+  42170: 'Arbitrum Nova',
+  56: 'BSC',
+  43114: 'Avalanche',
+};
+
+/**
+ * Gets chain name from chain ID (supports both number and string)
+ */
+export function getChainName(chainId: number | string): string {
+  const chainIdNum = typeof chainId === 'string' ? parseInt(chainId) : chainId;
+  return CHAIN_NAME_MAP[chainIdNum] || `Chain ${chainIdNum}`;
 }
+
+/**
+ * Bridge status map for UI display
+ */
+export const BRIDGE_STATUS_MAP: Record<string, { label: string; color: string }> = {
+  '0': { label: 'None', color: 'bg-gray-500' },
+  '1': { label: 'Initiated', color: 'bg-blue-500' },
+  '2': { label: 'Pending Review', color: 'bg-yellow-500' },
+  '3': { label: 'Completed', color: 'bg-green-500' },
+  '4': { label: 'Aborted', color: 'bg-red-500' },
+};
 
 /**
  * Bridge status options for filter dropdowns
