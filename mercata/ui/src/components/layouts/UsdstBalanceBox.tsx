@@ -90,7 +90,7 @@ const UsdstBalanceBox: React.FC = () => {
     try {
       const usdst = safeParseFloat(formatWeiAmount(usdstBalance || "0"));
       const vouchers = safeParseFloat(formatWeiAmount(voucherBalance || "0", 20));
-      return usdst + vouchers / Number(VOUCHER_TO_USDST_FACTOR);
+      return usdst * Number(VOUCHER_TO_USDST_FACTOR) + vouchers;
     } catch {
       return safeParseFloat(formatWeiAmount(usdstBalance || "0"));
     }
@@ -98,7 +98,7 @@ const UsdstBalanceBox: React.FC = () => {
 
   
   const balanceValue = combinedBalance;
-  const isLowBalance = balanceValue <= COMBINED_BALANCE_THRESHOLD && balanceValue > 0.03;
+  const isLowBalance = balanceValue < COMBINED_BALANCE_THRESHOLD && balanceValue > 0.03;
   const isCriticalBalance = balanceValue <= 0.03;
 
   // Don't render if user is not logged in or if on homepage
