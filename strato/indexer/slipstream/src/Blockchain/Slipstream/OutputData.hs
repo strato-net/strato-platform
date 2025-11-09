@@ -133,14 +133,10 @@ slipstreamQueryPostgres :: SlipstreamQuery -> Text
 slipstreamQueryPostgres = slipstreamQueryText sqlTypePostgres
 
 performSQLQueries :: (MonadLogger m, MonadUnliftIO m) =>
-                     [SlipstreamQuery] -> m ()
-performSQLQueries slipstreamQueries = do
-  conn <- connectToCirrus
+                     PGConnection -> [SlipstreamQuery] -> m ()
+performSQLQueries conn slipstreamQueries = do
   forM_ slipstreamQueries $ \slipstreamQuery -> do
     dbQueryCatchError conn . slipstreamQueryPostgres $ slipstreamQuery
-
-connectToCirrus :: MonadIO m => m PGConnection
-connectToCirrus = liftIO $ pgConnect cirrusInfo
 
 slipstreamQueryText :: (SqlType -> Text) -> SlipstreamQuery -> Text
 slipstreamQueryText sqlTypeText CreateTable{..} = T.concat $
@@ -494,29 +490,31 @@ handlePostgresError e =
 
 outputData ::
   OutputM m =>
+  PGConnection ->
   ConduitM () SlipstreamQuery m a ->
   ConduitM i [SlipstreamQuery] m a
-outputData c = do
+outputData conn c = do
   (a, cmds) <- lift . runConduit $ c `fuseBoth` sinkList -- mapM_C (dbQueryCatchError conn)
-  lift $ performSQLQueries cmds
+  lift $ performSQLQueries conn cmds
   pure a
 
-dedupC :: (MonadUnliftIO m, MonadLogger m) => ConduitM SlipstreamQuery SlipstreamQuery m ()
-dedupC = go Set.empty
+dedupC :: (MonadUnliftIO m, MonadLogger m) => PGConnection -> ConduitM SlipstreamQuery SlipstreamQuery m ()
+dedupC conn = go Set.empty
   where go seen = await >>= \case
           Just a | not (a `Set.member` seen) -> do
-                     lift $ performSQLQueries [a]
+                     lift $ performSQLQueries conn [a]
                      go (Set.insert a seen)
           Just _ -> go seen
           Nothing -> pure ()
 
 outputDataDedup ::
   OutputM m =>
+  PGConnection ->
   ConduitM () SlipstreamQuery m a ->
   ConduitM i [SlipstreamQuery] m a
-outputDataDedup c = do
-  (a, cmds) <- lift . runConduit $ c `fuseBoth` (dedupC .| sinkList) -- mapM_C (dbQueryCatchError conn))
-  lift $ performSQLQueries cmds
+outputDataDedup conn c = do
+  (a, cmds) <- lift . runConduit $ c `fuseBoth` (dedupC conn .| sinkList) -- mapM_C (dbQueryCatchError conn))
+  lift $ performSQLQueries conn cmds
   pure a
 
 baseColumns :: TableColumns
@@ -556,25 +554,27 @@ baseMappingColumns =
 
 notifyPostgREST ::
   OutputM m =>
+  PGConnection ->
   ConduitM i SlipstreamQuery m ()
-notifyPostgREST = lift $ performSQLQueries [NotifyPostgREST]
+notifyPostgREST conn = lift $ performSQLQueries conn [NotifyPostgREST]
 
 createIndexTable ::
   OutputM m=>
   --
+  PGConnection ->
   ContractF () ->
   CodeCollectionF () ->
   (Text, Text) ->
   [Text] ->
   ConduitM () SlipstreamQuery m [ForeignKeyInfo]
-createIndexTable contract cc (creator, n) inherited = do
+createIndexTable conn contract cc (creator, n) inherited = do
   let tableName = indexTableName creator n
       -- histTableName = historyTableName creator a n
       cols = getTableColumnAndType False cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
       contractCols = ["creator", "contract_name"]
       cols' = (\(x, t, _) -> (x, t)) <$> cols
       fkeys = mapMaybe (\(x, t, mf) -> (\f -> ForeignKeyInfo tableName (indexTableName creator f) x t) <$> mf) cols
-  lift $ performSQLQueries [CreateView
+  lift $ performSQLQueries conn [CreateView
     tableName
     inherited
     storageTableName
@@ -588,13 +588,14 @@ createIndexTable contract cc (creator, n) inherited = do
 
 createCollectionTable ::
   OutputM m =>
+  PGConnection ->
   (Text, Text) ->
   ContractF () ->
   CodeCollectionF () ->
   [Text] ->
   (Text, [SVMType.Type], SVMType.Type) ->
   ConduitM () SlipstreamQuery m (Maybe ForeignKeyInfo)
-createCollectionTable (creator, n) c cc inherited (collectionName, keyTypes, valueType) = do
+createCollectionTable conn (creator, n) c cc inherited (collectionName, keyTypes, valueType) = do
   let tableName = collectionTableName creator n collectionName
       keySqlTypes = fromMaybe SqlText . solidityTypeToSQLType False (Just c) cc <$> keyTypes
       keyNames = keyColumnNames keySqlTypes
@@ -612,7 +613,7 @@ createCollectionTable (creator, n) c cc inherited (collectionName, keyTypes, val
         )) <$> (structDef c cc =<< mStructName)
       mappingCols = (fst <$> baseMappingColumns)
         ++ maybe ["value"] (const []) mStructVal
-  lift $ performSQLQueries [CreateView
+  lift $ performSQLQueries conn [CreateView
     tableName
     inherited
     mappingTableName
@@ -632,12 +633,13 @@ createCollectionTable (creator, n) c cc inherited (collectionName, keyTypes, val
 
 createEventArrayTable ::
   OutputM m =>
+  PGConnection ->
   (Text, Text, Text) ->
   CodeCollectionF () ->
   [Text] ->
   (Text, SVMType.Type) ->
   ConduitM () SlipstreamQuery m (Maybe ForeignKeyInfo)
-createEventArrayTable (creator, n, e) cc inherited (arr, arrType) = do
+createEventArrayTable conn (creator, n, e) cc inherited (arr, arrType) = do
   let keyTypes (SVMType.Array t _) = SqlDecimal : keyTypes t
       keyTypes _                   = []
       tableName = eventCollectionTableName creator n e arr
@@ -650,7 +652,7 @@ createEventArrayTable (creator, n, e) cc inherited (arr, arrType) = do
   $logInfoS "createEventArrayTable/tableExists"  $ T.pack ( "Table Name: " ++ show tableName ++ ", table exists: ")
   $logInfoS "createEventArrayTable/(creator, n, e) " (T.pack $ show (creator, n, e))
   $logInfoS "createEventArrayTable/(arr, arrType) " (T.pack $ show (arr, arrType))
-  lift $ performSQLQueries [CreateView
+  lift $ performSQLQueries conn [CreateView
     tableName
     inherited
     eventArrayTableName
@@ -668,9 +670,10 @@ createEventArrayTable (creator, n, e) cc inherited (arr, arrType) = do
 
 insertIndexTable ::
   OutputM m =>
+  PGConnection ->
   E.ProcessedContract ->
   ConduitM () SlipstreamQuery m ()
-insertIndexTable cs =
+insertIndexTable conn cs =
   let cs' = (\c@E.ProcessedContract {contractData = contractData} -> (c, contractData)) cs
       processContract :: (E.ProcessedContract, Map StoragePath BasicValue) -> [SlipstreamQuery]
       processContract (contract, list) =
@@ -689,29 +692,31 @@ insertIndexTable cs =
               dataUpdateSQL = jsonbUpdateClause tblText "data"
           in [ InsertTable storageTableName keySt [valsForSQL] . Just $ OnConflict ["address"] conflictUpdateCols (Just dataUpdateSQL)
              ]
-   in lift $ performSQLQueries $ processContract cs'
+   in lift $ performSQLQueries conn $ processContract cs'
 
 insertDelegatecall ::
   OutputM m =>
+  PGConnection ->
   Delegatecall ->
   ConduitM () SlipstreamQuery m ()
-insertDelegatecall (Delegatecall s _ c _ n) = do
+insertDelegatecall conn (Delegatecall s _ c _ n) = do
   let contractKeySt = (,SqlText) <$> ["address", "creator", "contract_name"]
       contractValsForSQL = map (Just . SimpleValue)
         [ ValueAddress s,
           ValueString c,
           ValueString n
         ]
-    in lift $ performSQLQueries [InsertTable contractTableName contractKeySt [contractValsForSQL] (Just DoNothing)]
+    in lift $ performSQLQueries conn [InsertTable contractTableName contractKeySt [contractValsForSQL] (Just DoNothing)]
 
 insertCollectionTable ::
   OutputM m =>
+  PGConnection ->
   [ProcessedCollectionRow] ->
   ConduitM () SlipstreamQuery m ()
-insertCollectionTable [] = error "insertCollectionTable: unhandled empty list"
-insertCollectionTable maps = do
+insertCollectionTable _ [] = error "insertCollectionTable: unhandled empty list"
+insertCollectionTable conn maps = do
   let results = processGroupedData maps
-  lift $ performSQLQueries results
+  lift $ performSQLQueries conn results
 
 refreshMaterializedView ::
   -- OutputM m =>
@@ -730,9 +735,10 @@ processGroupedData [] = []
 
 createFkeyFunctions ::
   OutputM m =>
+  PGConnection ->
   [ForeignKeyInfo] ->
   ConduitM () SlipstreamQuery m ()
-createFkeyFunctions rows = lift $ performSQLQueries $ CreateFkeyFunction <$> rows
+createFkeyFunctions conn rows = lift $ performSQLQueries conn $ CreateFkeyFunction <$> rows
 
 eventBaseColumnsQuery :: [(Text, SqlType)]
 eventBaseColumnsQuery =
@@ -879,24 +885,26 @@ insertEventArrayTableQuery ms =
 -- globals{createdEvents}
 createExpandEventTables ::
   OutputM m =>
+  PGConnection ->
   ContractF () ->
   CodeCollectionF () ->
   (Text, Text) ->
   [Text] ->
   ConduitM () SlipstreamQuery m [ForeignKeyInfo]
-createExpandEventTables c cc nameParts inherited = fmap concat . mapM go . Map.toList $ c ^. events
+createExpandEventTables conn c cc nameParts inherited = fmap concat . mapM go . Map.toList $ c ^. events
   where
-    go (evName, ev) = createEventTable nameParts evName ev cc inherited
+    go (evName, ev) = createEventTable conn nameParts evName ev cc inherited
 
 createEventTable ::
   OutputM m =>
+  PGConnection ->
   (Text, Text) ->
   SolidString ->
   EventF () ->
   CodeCollectionF () ->
   [Text] ->
   ConduitM () SlipstreamQuery m [ForeignKeyInfo]
-createEventTable (creator, n) evName ev cc inherited = do
+createEventTable conn (creator, n) evName ev cc inherited = do
   $logInfoS "createEventTable" . T.pack $ show ev
   let (crtr, cname) = constructTableNameParameters creator n
       eventTable = EventTableName crtr cname (escapeQuotes $ labelToText evName)
@@ -906,7 +914,7 @@ createEventTable (creator, n) evName ev cc inherited = do
       fcols = mapMaybe (\(x, t, mf) -> (\f -> ForeignKeyInfo eventTable (indexTableName creator f) x t) <$> mf) cols
       arrayNamesAndTypes = [(key, entry) | (key, IndexedType _ (SVMType.Array entry _)) <- map evLogToPair $ ev ^. eventLogs]
   $logInfoS "keys" (T.pack $ show arrayNamesAndTypes)
-  lift $ performSQLQueries $
+  lift $ performSQLQueries conn $
     (\i ->
       let tableName' = if i then indexedEventTableName eventTable else eventTable
           cols' = (\(x, v, _) -> (x, v)) <$> cols
@@ -922,7 +930,7 @@ createEventTable (creator, n) evName ev cc inherited = do
             [([Right "event_name"], Nothing, wrapEscapeSingle $ tableNameEventName tableName')]
     ) <$> [False] -- , (True, tableNameToText tableName)]
   arrayFkeys <- forM arrayNamesAndTypes $
-    createEventArrayTable (crtr, cname, escapeQuotes $ labelToText evName) cc inherited
+    createEventArrayTable conn (crtr, cname, escapeQuotes $ labelToText evName) cc inherited
   pure $ fcols ++ catMaybes arrayFkeys
 
 -- Function to convert AggregateEvent to ProcessedCollectionRow
@@ -960,10 +968,10 @@ getArraysFromEvents evArgs = do
          in (arrayName, zip (map (SimpleValue . ValueString . T.pack . show) [0 :: Int ..])
                             (map (SimpleValue . ValueString . T.pack) elements))
 
-pipeInsertGlobalEventTable :: OutputM m => [AggregateEvent] -> ConduitM () SlipstreamQuery m ()
-pipeInsertGlobalEventTable aggregatedEvents = do
+pipeInsertGlobalEventTable :: OutputM m => PGConnection -> [AggregateEvent] -> ConduitM () SlipstreamQuery m ()
+pipeInsertGlobalEventTable conn aggregatedEvents = do
   queries <- lift (mapM insertGlobalEventTable aggregatedEvents)
-  lift $ performSQLQueries queries
+  lift $ performSQLQueries conn queries
 
 insertGlobalEventTable :: OutputM m => AggregateEvent -> m SlipstreamQuery
 insertGlobalEventTable agEv = do

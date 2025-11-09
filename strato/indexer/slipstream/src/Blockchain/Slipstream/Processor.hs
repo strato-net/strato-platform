@@ -43,7 +43,7 @@ import qualified Blockchain.Stream.Action as Action
 import qualified Blockchain.Stream.VMEvent as VME
 import Conduit
 import Control.Lens ((^.))
-import Control.Monad (forM, forM_, unless, when)
+import Control.Monad (forM, forM_, unless, when, void)
 import Control.Monad.Composable.SQL
 import Control.Monad.Trans.Reader
 import qualified Data.Aeson as JSON
@@ -66,6 +66,7 @@ import qualified SolidVM.Model.Type as SVMType
 import Text.Tools (boringBox, multilineLog)
 import Prelude hiding (lookup)
 import Blockchain.Slipstream.SolidityValue
+import           Blockchain.Slipstream.PostgresqlTypedShim
 
 data BatchedInserts = BatchedInserts
   { indexInsert :: E.ProcessedContract
@@ -175,9 +176,10 @@ processTheMessages ::
   , HasSQL m
   , MonadLogger m
   ) =>
+  PGConnection ->
   [VME.VMEvent] ->
   ConduitM i (Either TransactionResult [SlipstreamQuery]) m [AggregateEvent]
-processTheMessages messages = do
+processTheMessages conn messages = do
   case length messages of
     0 -> return ()
     1 -> $logInfoS "processTheMessages" "1 message has arrived"
@@ -193,7 +195,7 @@ processTheMessages messages = do
         [Action._delegatecalls a | VME.NewAction a <- messages]
       transactionResults = [tr | VME.NewTransactionResult tr <- messages]
 
-  fkeys <- mapOutput Right . outputDataDedup . fmap concat . forM creates $ \(cc, cr) -> do
+  fkeys <- mapOutput Right . outputDataDedup conn . fmap concat . forM creates $ \(cc, cr) -> do
     $logInfoS "processTheMessages" $ "CodeCollection Added"
     multilineLog "processTheMessages/contracts" $ boringBox $ map show (Map.keys $ cc ^. contracts)
 
@@ -218,9 +220,9 @@ processTheMessages messages = do
           $logWarnS "processTheMessages" $ "Failed to get inherited contracts for " <> T.pack (_contractName c) <> ": " <> T.pack (show err)
           pure []
         Right inheritedContracts -> pure $ map (T.pack . _contractName) inheritedContracts
-      indexFkeys <- createIndexTable c cc nameParts inherited
-      collectionFkeys <- catMaybes <$> traverse (createCollectionTable nameParts c cc inherited) collectionNamesAndTypes
-      eventFkeys <- createExpandEventTables c cc nameParts inherited
+      indexFkeys <- createIndexTable conn c cc nameParts inherited
+      collectionFkeys <- catMaybes <$> traverse (createCollectionTable conn nameParts c cc inherited) collectionNamesAndTypes
+      eventFkeys <- createExpandEventTables conn c cc nameParts inherited
       pure $ indexFkeys ++ collectionFkeys ++ eventFkeys
 
   inserts <- fmap concat $ do
@@ -242,31 +244,32 @@ processTheMessages messages = do
 
   forM_ (rights inserts) $ $logDebugLS "processTheMessages/toInsert"
   
-  mapOutput Right . outputDataDedup $ do
+  mapOutput Right . outputDataDedup conn $ do
     forM_ insertsByCodeHash $ \ins -> do
 --      lift $ insertIndexTable2 $ insertToStorage $ indexInsert ins
-      insertIndexTable $ indexInsert ins
+      insertIndexTable conn $ indexInsert ins
       unless (null $ collectionInserts ins) $
-        insertCollectionTable $ collectionInserts ins
+        insertCollectionTable conn $ collectionInserts ins
 
-    forM_ delegatecalls insertDelegatecall
+    forM_ delegatecalls $ insertDelegatecall conn
 
   let processedEventArrays = concatMap aggEventToCollectionRows events'
 
   when (not (null events')) $ do
-    mapOutput Right . outputData $ pipeInsertGlobalEventTable events'
+    mapOutput Right . outputData conn $ pipeInsertGlobalEventTable conn events'
     unless (null processedEventArrays) $
-      mapOutput Right . outputData $ insertCollectionTable processedEventArrays
+      mapOutput Right . outputData conn $ insertCollectionTable conn processedEventArrays
 
   when (not $ null fkeys) $ do
     $logDebugLS "processTheMessages" $ T.pack $ "Updating PostgREST schema cache for " ++ show (length fkeys) ++ " foreign keys"
-    mapOutput Right . outputDataDedup $ createFkeyFunctions fkeys
-    mapOutput Right . outputData $ notifyPostgREST
+    mapOutput Right . outputDataDedup conn $ createFkeyFunctions conn fkeys
+    mapOutput Right . outputData conn $ notifyPostgREST conn
 
   $logInfoS "processTheMessages" . T.pack $
     "Inserting " ++ show (length transactionResults) ++ " transaction results"
 
-  yieldMany $ Left <$> transactionResults
+  forM_ transactionResults $ \txr -> do
+    void . lift $ putTransactionResult txr
 
   return events'
 {-
