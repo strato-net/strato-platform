@@ -696,11 +696,14 @@ insertDelegatecall ::
   PGConnection ->
   Delegatecall ->
   ConduitM () SlipstreamQuery m ()
-insertDelegatecall conn (Delegatecall s _ c _ n) = do
+insertDelegatecall conn (Delegatecall s _ c n) = do
   let contractKeySt = (,SqlText) <$> ["address", "creator", "contract_name"]
       contractValsForSQL = map (Just . SimpleValue)
         [ ValueAddress s,
-          ValueString c,
+          --ValueString $ fromMaybe (error $ "delegate call = " ++ show dc) c,
+          -- TODO: THIS IS A HACK!! I've hardcoded the creator to "BlockApps" to get things working in the app,
+          --       but this needs to be fixed ASAP so that Slipstream can use the real creator name
+          ValueString $ fromMaybe "BlockApps" c,
           ValueString n
         ]
     in lift $ performSQLQueries conn [InsertTable contractTableName contractKeySt [contractValsForSQL] (Just DoNothing)]
