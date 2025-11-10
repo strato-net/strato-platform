@@ -143,7 +143,10 @@ const ActivityFeedList = () => {
   }, []);
 
   const formatTimestamp = useCallback((timestamp: string) => {
-    return new Date(timestamp).toLocaleString();
+    if (!timestamp || timestamp === 'N/A') return 'N/A';
+    
+    const date = new Date(timestamp.replace(' UTC', 'Z').replace(' ', 'T'));
+    return isNaN(date.getTime()) ? 'N/A' : date.toLocaleString();
   }, []);
 
   const getEventIcon = useCallback((eventName: string) => {
@@ -354,11 +357,11 @@ const ActivityFeedList = () => {
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2 sm:block sm:text-right">
-            <Badge variant="outline" className="text-xs inline-flex">
+          <div className="flex flex-col gap-1 sm:block sm:text-right">
+            <Badge variant="outline" className="text-xs inline-flex w-fit">
               Block #{event?.block_number ? event?.block_number : 'N/A'}
             </Badge>
-            <div className="text-xs text-gray-500 sm:mt-1">
+            <div className="text-xs text-gray-500">
               {formatTimestamp(event?.block_timestamp ? event?.block_timestamp : 'N/A')}
             </div>
           </div>
