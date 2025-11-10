@@ -28,7 +28,7 @@ RUN npm install -g serve
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/package.json ./
-COPY docker-run.sh /docker-run.sh
+COPY ui/docker-run.sh /docker-run.sh
 
 RUN chmod +x /docker-run.sh
 
