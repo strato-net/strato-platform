@@ -25,8 +25,6 @@ interface BridgeAdminContextType {
   loadingDeposits: boolean;
   errorDeposits: string | null;
   fetchDeposits: (page?: number, limit?: number) => Promise<void>;
-  abortWithdrawal: (withdrawalId: string) => Promise<void>;
-  abortDeposit: (chainId: string, txHash: string) => Promise<void>;
 }
 
 const BridgeAdminContext = createContext<BridgeAdminContextType | undefined>(undefined);
@@ -92,24 +90,6 @@ export const BridgeAdminProvider = ({ children }: { children: ReactNode }) => {
     []
   );
 
-  const abortWithdrawal = useCallback(async (withdrawalId: string) => {
-    try {
-      await api.post(`/bridge/admin/withdrawals/${withdrawalId}/abort`);
-      await fetchWithdrawals();
-    } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Failed to abort withdrawal');
-    }
-  }, [fetchWithdrawals]);
-
-  const abortDeposit = useCallback(async (chainId: string, txHash: string) => {
-    try {
-      await api.post('/bridge/admin/deposits/abort', { chainId, txHash });
-      await fetchDeposits();
-    } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Failed to abort deposit');
-    }
-  }, [fetchDeposits]);
-
   return (
     <BridgeAdminContext.Provider
       value={{
@@ -123,8 +103,6 @@ export const BridgeAdminProvider = ({ children }: { children: ReactNode }) => {
         loadingDeposits,
         errorDeposits,
         fetchDeposits,
-        abortWithdrawal,
-        abortDeposit,
       }}
     >
       {children}

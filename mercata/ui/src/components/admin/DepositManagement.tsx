@@ -3,16 +3,15 @@ import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { RefreshCw, Loader2, XCircle } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { formatBalance } from '@/utils/numberUtils';
 import { getChainName, BRIDGE_STATUS_MAP } from '@/lib/bridge/utils';
 import { Table } from 'antd';
 import { useBridgeAdminContext } from '@/context/BridgeAdminContext';
-import { ITEMS_PER_PAGE, getIndexRenderer, renderAddressWithCopy, renderHashWithCopy } from './utils';
+import { ITEMS_PER_PAGE, getIndexRenderer, renderAddressWithCopy, renderHashWithCopy, formatTimestampToNY } from './utils';
 
 const DepositManagement = () => {
-  const { deposits, depositsTotalCount, loadingDeposits, fetchDeposits, abortDeposit } = useBridgeAdminContext();
-  const [processing, setProcessing] = useState<Record<string, boolean>>({});
+  const { deposits, depositsTotalCount, loadingDeposits, fetchDeposits } = useBridgeAdminContext();
   const [currentPage, setCurrentPage] = useState(1);
   const { toast } = useToast();
 
@@ -22,24 +21,6 @@ const DepositManagement = () => {
     return () => clearInterval(interval);
   }, [currentPage, fetchDeposits]);
 
-  const handleAbort = async (chainId: string, txHash: string) => {
-    const key = `${chainId}-${txHash}`;
-    try {
-      setProcessing(prev => ({ ...prev, [key]: true }));
-      await abortDeposit(chainId, txHash);
-      toast({ title: 'Success', description: 'Deposit aborted successfully' });
-      await fetchDeposits(currentPage, ITEMS_PER_PAGE);
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message || 'Failed to abort deposit', variant: 'destructive' });
-    } finally {
-      setProcessing(prev => {
-        const next = { ...prev };
-        delete next[key];
-        return next;
-      });
-    }
-  };
-
   const getInfo = (record: any) => record.DepositInfo || {};
 
   const columns = [
@@ -48,6 +29,15 @@ const DepositManagement = () => {
       key: 'index',
       width: 60,
       render: getIndexRenderer(currentPage),
+    },
+    {
+      title: 'STRATO Token',
+      key: 'stratoToken',
+      width: 150,
+      render: (_: any, record: any) => {
+        const token = getInfo(record).stratoToken;
+        return token ? renderAddressWithCopy(token, toast, 8) : '-';
+      },
     },
     {
       title: 'TX Hash',
@@ -92,25 +82,12 @@ const DepositManagement = () => {
       ),
     },
     {
-      title: 'Actions',
-      key: 'actions',
-      width: 100,
-      align: 'right' as const,
-      render: (_: any, record: any) => {
-        if (getInfo(record).bridgeStatus !== '2') return null;
-        const key = `${record.externalChainId}-${record.externalTxHash}`;
-        return (
-          <Button
-            size="sm"
-            variant="destructive"
-            onClick={() => handleAbort(record.externalChainId, record.externalTxHash)}
-            disabled={processing[key]}
-            title="Abort"
-          >
-            {processing[key] ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
-          </Button>
-        );
-      },
+      title: 'Timestamp',
+      key: 'timestamp',
+      width: 180,
+      render: (_: any, record: any) => (
+        <span className="text-sm">{formatTimestampToNY(record.block_timestamp)}</span>
+      ),
     },
   ];
 

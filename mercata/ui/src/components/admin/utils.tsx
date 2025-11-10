@@ -64,3 +64,24 @@ export const getIndexRenderer = (currentPage: number) => (_: any, __: any, index
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   return <span className="font-bold">{startIndex + index + 1}</span>;
 };
+
+export const formatTimestampToNY = (timestamp: string): string => {
+  if (!timestamp) return '-';
+  try {
+    // Parse the UTC timestamp string "2025-11-10 07:05:25 UTC"
+    const date = new Date(timestamp.replace(' UTC', 'Z'));
+    // Format to New York timezone
+    return date.toLocaleString('en-US', {
+      timeZone: 'America/New_York',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+  } catch (error) {
+    return timestamp;
+  }
+};

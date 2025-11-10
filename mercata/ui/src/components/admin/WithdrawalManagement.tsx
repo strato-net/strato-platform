@@ -8,12 +8,10 @@ import { formatBalance } from '@/utils/numberUtils';
 import { getChainName, BRIDGE_STATUS_MAP } from '@/lib/bridge/utils';
 import { Table } from 'antd';
 import { useBridgeAdminContext } from '@/context/BridgeAdminContext';
-import AbortWithdrawalModal from './AbortWithdrawalModal';
-import { ITEMS_PER_PAGE, getIndexRenderer, renderAddressWithCopy, renderSafeTxHash } from './utils';
+import { ITEMS_PER_PAGE, getIndexRenderer, renderAddressWithCopy, renderSafeTxHash, formatTimestampToNY } from './utils';
 
 const WithdrawalManagement = () => {
   const { withdrawals, withdrawalsTotalCount, loadingWithdrawals, fetchWithdrawals } = useBridgeAdminContext();
-  const [abortModal, setAbortModal] = useState<{ open: boolean; withdrawal: any }>({ open: false, withdrawal: null });
   const [currentPage, setCurrentPage] = useState(1);
   const { toast } = useToast();
 
@@ -23,11 +21,6 @@ const WithdrawalManagement = () => {
     return () => clearInterval(interval);
   }, [currentPage, fetchWithdrawals]);
 
-  const handleAbort = async () => {
-    await fetchWithdrawals(currentPage, ITEMS_PER_PAGE);
-    setAbortModal({ open: false, withdrawal: null });
-  };
-
   const getInfo = (record: any) => record.WithdrawalInfo || {};
 
   const columns = [
@@ -36,6 +29,23 @@ const WithdrawalManagement = () => {
       key: 'id',
       width: 60,
       render: getIndexRenderer(currentPage),
+    },
+    {
+      title: 'Withdrawal ID',
+      key: 'withdrawalId',
+      width: 100,
+      render: (_: any, record: any) => (
+        <span className="font-mono text-sm">{record.withdrawalId}</span>
+      ),
+    },
+    {
+      title: 'STRATO Token',
+      key: 'stratoToken',
+      width: 150,
+      render: (_: any, record: any) => {
+        const token = getInfo(record).stratoToken;
+        return token ? renderAddressWithCopy(token, toast, 8) : '-';
+      },
     },
     {
       title: 'Safe TX Hash',
@@ -82,19 +92,12 @@ const WithdrawalManagement = () => {
       ),
     },
     {
-      title: 'Actions',
-      key: 'actions',
-      width: 100,
-      align: 'right' as const,
-      render: (_: any, record: any) => {
-        const status = getInfo(record).bridgeStatus;
-        if (status !== '1' && status !== '2') return null;
-        return (
-          <Button variant="destructive" size="sm" onClick={() => setAbortModal({ open: true, withdrawal: record })}>
-            Abort
-          </Button>
-        );
-      },
+      title: 'Timestamp',
+      key: 'timestamp',
+      width: 180,
+      render: (_: any, record: any) => (
+        <span className="text-sm">{formatTimestampToNY(record.block_timestamp)}</span>
+      ),
     },
   ];
 
@@ -123,14 +126,6 @@ const WithdrawalManagement = () => {
           }}
         />
       </CardContent>
-      {abortModal.open && (
-        <AbortWithdrawalModal
-          open={abortModal.open}
-          onClose={() => setAbortModal({ open: false, withdrawal: null })}
-          withdrawal={abortModal.withdrawal}
-          onSuccess={handleAbort}
-        />
-      )}
     </Card>
   );
 };
