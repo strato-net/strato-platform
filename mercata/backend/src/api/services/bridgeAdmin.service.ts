@@ -68,9 +68,7 @@ export const getAllWithdrawals = async (accessToken: string, filters?: QueryFilt
     statusField: "value->>bridgeStatus",
     chainField: "value->>externalChainId",
   };
-  // Always filter by bridgeStatus = "2" (Pending Review) at Cirrus API level
-  const filtersWithStatus = { ...filters, status: "2" };
-  return fetchWithPagination(accessToken, `/${MERCATA_URL}-withdrawals`, filtersWithStatus, config);
+  return fetchWithPagination(accessToken, `/${MERCATA_URL}-withdrawals`, filters, config);
 };
 
 export const getAllDeposits = async (accessToken: string, filters?: QueryFilters) => {
@@ -81,7 +79,5 @@ export const getAllDeposits = async (accessToken: string, filters?: QueryFilters
     statusField: "value->>bridgeStatus",
     chainField: "key",
   };
-  // Always filter by bridgeStatus = "2" (Pending Review) at Cirrus API level
-  const filtersWithStatus = { ...filters, status: "2" };
-  return fetchWithPagination(accessToken, `/${MERCATA_URL}-deposits`, filtersWithStatus, config);
+  return fetchWithPagination(accessToken, `/${MERCATA_URL}-deposits`, filters, config);
 };
