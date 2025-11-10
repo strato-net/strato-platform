@@ -2,7 +2,6 @@ import { Request, Response, NextFunction } from "express";
 import {
   getAllWithdrawals,
   getAllDeposits,
-  getWithdrawalById,
   abortWithdrawal,
   abortDeposit,
 } from "../services/bridgeAdmin.service";
@@ -29,16 +28,6 @@ class BridgeAdminController {
     const { status, chainId, limit, offset } = req.query;
     const result = await getAllDeposits(accessToken, { status, chainId, limit, offset } as any);
     res.json({ data: result.data, totalCount: result.totalCount });
-  });
-
-  static getWithdrawal = handleAsync(async (req: Request, res: Response) => {
-    const { accessToken } = req;
-    const data = await getWithdrawalById(accessToken, req.params.id);
-    if (!data) {
-      res.status(404).json({ error: "Withdrawal not found" });
-      return;
-    }
-    res.json(data);
   });
 
   static abortWithdrawal = handleAsync(async (req: Request, res: Response) => {

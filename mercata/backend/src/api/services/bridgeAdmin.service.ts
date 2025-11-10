@@ -68,33 +68,26 @@ export const getAllWithdrawals = async (accessToken: string, filters?: QueryFilt
   const config: QueryConfig = {
     select: "withdrawalId:key,WithdrawalInfo:value,block_timestamp",
     address: `eq.${mercataBridge}`,
-    order: "key.asc",
+    order: "block_timestamp.desc",
     statusField: "value->>bridgeStatus",
     chainField: "value->>externalChainId",
   };
-  return fetchWithPagination(accessToken, `/${MERCATA_URL}-withdrawals`, filters, config);
+  // Always filter by bridgeStatus = "2" (Pending Review) at Cirrus API level
+  const filtersWithStatus = { ...filters, status: "2" };
+  return fetchWithPagination(accessToken, `/${MERCATA_URL}-withdrawals`, filtersWithStatus, config);
 };
 
 export const getAllDeposits = async (accessToken: string, filters?: QueryFilters) => {
   const config: QueryConfig = {
     select: "externalChainId:key,externalTxHash:key2,DepositInfo:value,block_timestamp",
     address: `eq.${mercataBridge}`,
-    order: "block_timestamp.asc",
+    order: "block_timestamp.desc",
     statusField: "value->>bridgeStatus",
     chainField: "key",
   };
-  return fetchWithPagination(accessToken, `/${MERCATA_URL}-deposits`, filters, config);
-};
-
-export const getWithdrawalById = async (accessToken: string, withdrawalId: string) => {
-  const { data } = await cirrus.get(accessToken, `/${MERCATA_URL}-withdrawals`, {
-    params: {
-      select: "withdrawalId:key,WithdrawalInfo:value,block_timestamp",
-      key: `eq.${withdrawalId}`,
-      address: `eq.${mercataBridge}`,
-    },
-  });
-  return data?.[0] || null;
+  // Always filter by bridgeStatus = "2" (Pending Review) at Cirrus API level
+  const filtersWithStatus = { ...filters, status: "2" };
+  return fetchWithPagination(accessToken, `/${MERCATA_URL}-deposits`, filtersWithStatus, config);
 };
 
 const executeAbort = async (
