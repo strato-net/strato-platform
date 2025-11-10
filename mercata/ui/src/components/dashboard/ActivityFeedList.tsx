@@ -143,38 +143,10 @@ const ActivityFeedList = () => {
   }, []);
 
   const formatTimestamp = useCallback((timestamp: string) => {
-    console.log('[formatTimestamp] Input:', timestamp, 'Type:', typeof timestamp);
+    if (!timestamp || timestamp === 'N/A') return 'N/A';
     
-    if (!timestamp || timestamp === 'N/A') {
-      console.log('[formatTimestamp] Returning N/A - invalid input');
-      return 'N/A';
-    }
-    
-    // Handle UTC format: "2024-01-01 12:00:00 UTC"
-    const normalizedTimestamp = timestamp.replace(' UTC', 'Z').replace(' ', 'T');
-    console.log('[formatTimestamp] Normalized:', normalizedTimestamp);
-    
-    const date = new Date(normalizedTimestamp);
-    console.log('[formatTimestamp] Parsed date:', date, 'Valid:', !isNaN(date.getTime()));
-    
-    if (isNaN(date.getTime())) {
-      // Fallback: try parsing as-is
-      console.log('[formatTimestamp] First parse failed, trying original format');
-      const fallbackDate = new Date(timestamp);
-      console.log('[formatTimestamp] Fallback date:', fallbackDate, 'Valid:', !isNaN(fallbackDate.getTime()));
-      
-      if (isNaN(fallbackDate.getTime())) {
-        console.log('[formatTimestamp] Both parses failed, returning N/A');
-        return 'N/A';
-      }
-      const result = fallbackDate.toLocaleString();
-      console.log('[formatTimestamp] Returning fallback result:', result);
-      return result;
-    }
-    
-    const result = date.toLocaleString();
-    console.log('[formatTimestamp] Returning result:', result);
-    return result;
+    const date = new Date(timestamp.replace(' UTC', 'Z').replace(' ', 'T'));
+    return isNaN(date.getTime()) ? 'N/A' : date.toLocaleString();
   }, []);
 
   const getEventIcon = useCallback((eventName: string) => {
@@ -390,11 +362,7 @@ const ActivityFeedList = () => {
               Block #{event?.block_number ? event?.block_number : 'N/A'}
             </Badge>
             <div className="text-xs text-gray-500">
-              {(() => {
-                const timestamp = event?.block_timestamp ? event?.block_timestamp : 'N/A';
-                console.log('[renderEventCard] Event block_timestamp:', timestamp, 'Full event:', event);
-                return formatTimestamp(timestamp);
-              })()}
+              {formatTimestamp(event?.block_timestamp ? event?.block_timestamp : 'N/A')}
             </div>
           </div>
         </div>
