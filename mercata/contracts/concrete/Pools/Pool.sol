@@ -456,7 +456,7 @@ contract record Pool is Ownable {
     function _internalSwapForZap(
         bool isAToB,
         uint256 amountIn
-    ) internal returns (uint256 amountOut) {
+    ) internal returns (uint256 amountOut, uint256 protocolFee) {
         uint256 inputReserve = isAToB ? tokenABalance : tokenBBalance;
         uint256 outputReserve = isAToB ? tokenBBalance : tokenABalance;
 
@@ -464,7 +464,7 @@ contract record Pool is Ownable {
         if (zapSwapFeesEnabled) {
             uint256 fee = (amountIn * _swapFeeRate()) / 10000;
             uint256 lpFee = (fee * _lpSharePercent()) / 10000;
-            uint256 protocolFee = fee - lpFee;
+            protocolFee = fee - lpFee;
             netInput = amountIn - fee;
 
             // protocol fee sent to collector
@@ -482,11 +482,16 @@ contract record Pool is Ownable {
 
     function _mintLiquidityAfterZap(
         uint256 tokenBContribution,
-        uint256 tokenAContribution
+        uint256 tokenAContribution,
+        uint256 postSwapTokenAReserve,
+        uint256 postSwapTokenBReserve
     ) internal returns (uint256 liquidityMinted) {
         uint256 totalLiquidity = lpToken.totalSupply();
-        uint256 tokenBReserve = tokenBBalance;
-        liquidityMinted = tokenBContribution * totalLiquidity / tokenBReserve;
+        
+        // Use min-of-both rule (Uniswap V2 standard)
+        uint256 liquidityA = (tokenAContribution * totalLiquidity) / postSwapTokenAReserve;
+        uint256 liquidityB = (tokenBContribution * totalLiquidity) / postSwapTokenBReserve;
+        liquidityMinted = liquidityA < liquidityB ? liquidityA : liquidityB;
         
         lpToken.mint(msg.sender, liquidityMinted);
         emit AddLiquidity(msg.sender, tokenBContribution, tokenAContribution);
@@ -510,23 +515,58 @@ contract record Pool is Ownable {
         Token depositToken = isAToB ? tokenA : tokenB;
         uint256 reserveIn = isAToB ? tokenABalance : tokenBBalance; // reserve before deposit
         require(depositToken.transferFrom(msg.sender, address(this), amountIn), "Deposit transfer failed");
-        
+
         uint256 feeBps = zapSwapFeesEnabled ? _swapFeeRate() : 0;
         uint256 swapAmt = _getOptimalSwapAmount(reserveIn, amountIn, feeBps);
 
-        uint256 amountOut = _internalSwapForZap(isAToB, swapAmt);
+        (uint256 amountOut, uint256 protocolFee) = _internalSwapForZap(isAToB, swapAmt);
 
+        // Calculate post-swap reserves for LP calculation
+        // These represent the pool state after the internal swap but before adding liquidity
+        uint256 postSwapTokenAReserve;
+        uint256 postSwapTokenBReserve;
+        
+        // Token contributions represent the net change to the pool's actual
+        // token balances (i.e., how much of each token physically remains in
+        // the pool after accounting for protocol fees sent to the fee
+        // collector)
         uint256 tokenAContribution;
         uint256 tokenBContribution;
+
+        // Liquidity contributions represent the amounts used to calculate LP
+        // token minting (i.e., the effective amounts of each token that
+        // contribute to the pool's liquidity, after the internal swap)
+        uint256 tokenALiquidityContribution;
+        uint256 tokenBLiquidityContribution;
+        
         if (isAToB) {
-            tokenAContribution = amountIn - swapAmt;
-            tokenBContribution = amountOut;
+            // Depositing tokenA: swap some tokenA for tokenB
+            // Post-swap reserves: tokenA increased by swapAmt (minus protocolFee), tokenB decreased by amountOut
+            postSwapTokenAReserve = tokenABalance + swapAmt - protocolFee;
+            postSwapTokenBReserve = tokenBBalance - amountOut;
+            
+            tokenAContribution = amountIn - protocolFee;
+            tokenBContribution = 0;
+            tokenALiquidityContribution = amountIn - swapAmt;
+            tokenBLiquidityContribution = amountOut;
         } else {
-            tokenBContribution = amountIn - swapAmt;
-            tokenAContribution = amountOut;
+            // Depositing tokenB: swap some tokenB for tokenA
+            // Post-swap reserves: tokenB increased by swapAmt (minus protocolFee), tokenA decreased by amountOut
+            postSwapTokenAReserve = tokenABalance - amountOut;
+            postSwapTokenBReserve = tokenBBalance + swapAmt - protocolFee;
+            
+            tokenBContribution = amountIn - protocolFee;
+            tokenAContribution = 0;
+            tokenBLiquidityContribution = amountIn - swapAmt;
+            tokenALiquidityContribution = amountOut;
         }
 
-        liquidityMinted = _mintLiquidityAfterZap(tokenBContribution, tokenAContribution);
+        liquidityMinted = _mintLiquidityAfterZap(
+            tokenBLiquidityContribution, 
+            tokenALiquidityContribution,
+            postSwapTokenAReserve,
+            postSwapTokenBReserve
+        );
         _updateStateVars(tokenABalance + tokenAContribution, tokenBBalance + tokenBContribution);
     }
 }
