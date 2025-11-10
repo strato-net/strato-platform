@@ -1,11 +1,7 @@
-import { cirrus, strato } from "../../utils/mercataApiHelper";
+import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
-import { buildFunctionTx } from "../../utils/txBuilder";
-import { postAndWaitForTx } from "../../utils/txHelper";
-import { StratoPaths } from "../../config/constants";
-import { extractContractName } from "../../utils/utils";
 
-const { MercataBridge, mercataBridge } = constants;
+const { mercataBridge } = constants;
 const MERCATA_URL = "BlockApps-MercataBridge";
 
 interface QueryFilters {
@@ -89,32 +85,3 @@ export const getAllDeposits = async (accessToken: string, filters?: QueryFilters
   const filtersWithStatus = { ...filters, status: "2" };
   return fetchWithPagination(accessToken, `/${MERCATA_URL}-deposits`, filtersWithStatus, config);
 };
-
-const executeAbort = async (
-  accessToken: string,
-  userAddress: string,
-  method: string,
-  args: Record<string, any>
-) => {
-  const tx = await buildFunctionTx(
-    {
-      contractName: extractContractName(MercataBridge),
-      contractAddress: mercataBridge,
-      method,
-      args,
-    },
-    userAddress,
-    accessToken
-  );
-  return postAndWaitForTx(accessToken, () => strato.post(accessToken, StratoPaths.transactionParallel, tx));
-};
-
-export const abortWithdrawal = async (accessToken: string, userAddress: string, withdrawalId: string) =>
-  executeAbort(accessToken, userAddress, "abortWithdrawal", { id: withdrawalId });
-
-export const abortDeposit = async (
-  accessToken: string,
-  userAddress: string,
-  externalChainId: string,
-  externalTxHash: string
-) => executeAbort(accessToken, userAddress, "abortDeposit", { externalChainId, externalTxHash });
