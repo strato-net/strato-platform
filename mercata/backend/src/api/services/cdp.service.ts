@@ -1689,6 +1689,204 @@ export const topUpJuniorNote = async (
   }
 };
 
+// CDP Stats interface for aggregated data
+interface CDPStatsData {
+  asset: string;
+  symbol: string;
+  totalCollateral: string;
+  totalScaledDebt: string;
+  totalDebtUSD: string;
+  collateralValueUSD: string;
+  collateralizationRatio: number;
+  numberOfVaults: number;
+}
+
+interface CDPStatsResponse {
+  totalCollateralValueUSD: string;
+  totalDebtUSD: string;
+  globalCollateralizationRatio: number;
+  assets: CDPStatsData[];
+}
+
+/**
+ * Get aggregated CDP statistics by asset
+ * Fetches all vaults from CDPEngine and aggregates collateral and debt by asset
+ */
+export const getCDPStats = async (
+  accessToken: string,
+  userAddress: string
+): Promise<CDPStatsResponse> => {
+  try {
+    // Get registry to find CDPEngine address
+    const registry = await getCDPRegistry(accessToken, userAddress, {}, "getCDPStats");
+    
+    if (!registry?.cdpEngine) {
+      throw new Error("CDP Engine not found");
+    }
+    const cdpEngineAddress = registry.cdpEngine.address;
+
+    // Fetch all vaults from CDPEngine
+    const { data: vaults } = await cirrus.get(
+      accessToken,
+      `/${CDPEngine}-vaults`,
+      {
+        params: {
+          select: "user:key,asset:key2,Vault:value",
+          address: `eq.${cdpEngineAddress}`
+        }
+      }
+    );
+
+    if (!vaults || vaults.length === 0) {
+      return {
+        totalCollateralValueUSD: "0",
+        totalDebtUSD: "0",
+        globalCollateralizationRatio: 0,
+        assets: []
+      };
+    }
+
+    // Get all unique assets
+    const uniqueAssets = [...new Set(vaults.map((v: any) => v.asset))] as string[];
+    // Get token info, prices, and configs for all assets in parallel
+    const [tokenInfoMap, priceMap, configMap, globalStateMap] = await Promise.all([
+      // Get token info for all assets
+      Promise.all(
+        uniqueAssets.map(async (asset: string) => {
+          const info = await getTokenInfo(accessToken, asset);
+          return { asset, info };
+        })
+      ).then(results => 
+        results.reduce((map, { asset, info }) => {
+          map[asset] = info;
+          return map;
+        }, {} as Record<string, any>)
+      ),
+
+      // Get prices from registry
+      Promise.resolve(
+        registry.priceOracle?.prices?.reduce((map: Record<string, string>, p: any) => {
+          map[p.asset] = p.value || "0";
+          return map;
+        }, {}) || {}
+      ),
+
+      // Get configs from registry
+      Promise.resolve(
+        registry.cdpEngine.collateralConfigs?.reduce((map: Record<string, any>, c: any) => {
+          map[c.asset] = c.CollateralConfig;
+          return map;
+        }, {}) || {}
+      ),
+
+      // Get global states from registry
+      Promise.resolve(
+        registry.cdpEngine.collateralGlobalStates?.reduce((map: Record<string, any>, s: any) => {
+          map[s.asset] = s.CollateralGlobalState;
+          return map;
+        }, {}) || {}
+      )
+    ]);
+    // Aggregate vaults by asset
+    const assetStats: Record<string, {
+      collateral: bigint;
+      scaledDebt: bigint;
+      vaultCount: number;
+    }> = {};
+
+    vaults.forEach((vault: any) => {
+      const asset = vault.asset.toLowerCase();
+      const vaultData = vault.Vault || {};
+      
+      if (!assetStats[asset]) {
+        assetStats[asset] = {
+          collateral: 0n,
+          scaledDebt: 0n,
+          vaultCount: 0
+        };
+      }
+
+      assetStats[asset].collateral += BigInt(vaultData.collateral || "0");
+      assetStats[asset].scaledDebt += BigInt(vaultData.scaledDebt || "0");
+      assetStats[asset].vaultCount += 1;
+    });
+
+    // Calculate stats for each asset
+    let totalCollateralValueUSD = 0n;
+    let totalDebtUSD = 0n;
+
+    const assetsData: CDPStatsData[] = await Promise.all(
+      Object.entries(assetStats).map(async ([assetAddress, stats]) => {
+        const tokenInfo = tokenInfoMap[assetAddress];
+        const price = BigInt(priceMap[assetAddress.toLowerCase()] || "0");
+        const config = configMap[assetAddress.toLowerCase()];
+        const globalState = globalStateMap[assetAddress.toLowerCase()];
+
+        // Calculate current debt using rate accumulator
+        const currentRateAccumulator = BigInt(globalState?.rateAccumulator || RAY.toString());
+        const currentDebtUSD = (stats.scaledDebt * currentRateAccumulator) / RAY;
+
+        // Calculate collateral value in USD
+        const unitScale = BigInt(config?.unitScale || WAD.toString());
+        const collateralValueUSD = (stats.collateral * price) / unitScale;
+
+        totalCollateralValueUSD += collateralValueUSD;
+        totalDebtUSD += currentDebtUSD;
+
+        // Calculate collateralization ratio as percentage
+        let collateralizationRatio = 0;
+        if (currentDebtUSD > 0n) {
+          // CR = (collateralValue / debt) * 100
+          collateralizationRatio = Number((collateralValueUSD * WAD) / currentDebtUSD) / Number(WAD) * 100;
+        } else if (collateralValueUSD > 0n) {
+          // If there's collateral but no debt, CR is effectively infinite
+          collateralizationRatio = Number.MAX_SAFE_INTEGER;
+        }
+
+        return {
+          asset: assetAddress,
+          symbol: tokenInfo?.symbol || "UNKNOWN",
+          totalCollateral: stats.collateral.toString(),
+          totalScaledDebt: stats.scaledDebt.toString(),
+          totalDebtUSD: currentDebtUSD.toString(),
+          collateralValueUSD: collateralValueUSD.toString(),
+          collateralizationRatio,
+          numberOfVaults: stats.vaultCount
+        };
+      })
+    );
+
+    // Sort assets by collateral value USD (descending)
+    assetsData.sort((a, b) => {
+      const aValue = BigInt(a.collateralValueUSD);
+      const bValue = BigInt(b.collateralValueUSD);
+      if (aValue > bValue) return -1;
+      if (aValue < bValue) return 1;
+      return 0;
+    });
+
+    // Calculate global collateralization ratio
+    let globalCollateralizationRatio = 0;
+    if (totalDebtUSD > 0n) {
+      globalCollateralizationRatio = Number((totalCollateralValueUSD * WAD) / totalDebtUSD) / Number(WAD) * 100;
+    } else if (totalCollateralValueUSD > 0n) {
+      globalCollateralizationRatio = Number.MAX_SAFE_INTEGER;
+    }
+
+    return {
+      totalCollateralValueUSD: totalCollateralValueUSD.toString(),
+      totalDebtUSD: totalDebtUSD.toString(),
+      globalCollateralizationRatio,
+      assets: assetsData
+    };
+  } catch (error: any) {
+    console.error("Error fetching CDP stats:", {
+      error: error.response?.data || error.message
+    });
+    throw new Error("Failed to fetch CDP statistics");
+  }
+};
+
 export const openJuniorNote = async (
   accessToken: string,
   userAddress: string,

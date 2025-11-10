@@ -28,6 +28,7 @@ import {
   openJuniorNote,
   topUpJuniorNote,
   claimJuniorNote,
+  getCDPStats,
 } from "../services/cdp.service";
 import {
   validateDepositArgs,
@@ -437,6 +438,20 @@ class CDPController {
       const { accessToken, address: userAddress } = req;
       const result = await claimJuniorNote(accessToken, userAddress as string);
       res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getCDPStats(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress } = req;
+      const stats = await getCDPStats(accessToken, userAddress as string);
+      res.status(RestStatus.OK).json(stats);
     } catch (error) {
       next(error);
     }
