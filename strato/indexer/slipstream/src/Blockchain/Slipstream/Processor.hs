@@ -195,7 +195,7 @@ processTheMessages conn messages = do
         [Action._delegatecalls a | VME.NewAction a <- messages]
       transactionResults = [tr | VME.NewTransactionResult tr <- messages]
 
-  fkeys <- mapOutput Right . outputDataDedup conn . fmap concat . forM creates $ \(cc, cr) -> do
+  fkeys <- mapOutput Right . outputData . fmap concat . forM creates $ \(cc, cr) -> do
     $logInfoS "processTheMessages" $ "CodeCollection Added"
     multilineLog "processTheMessages/contracts" $ boringBox $ map show (Map.keys $ cc ^. contracts)
 
@@ -244,7 +244,7 @@ processTheMessages conn messages = do
 
   forM_ (rights inserts) $ $logDebugLS "processTheMessages/toInsert"
   
-  mapOutput Right . outputDataDedup conn $ do
+  mapOutput Right . outputData $ do
     forM_ insertsByCodeHash $ \ins -> do
 --      lift $ insertIndexTable2 $ insertToStorage $ indexInsert ins
       insertIndexTable conn $ indexInsert ins
@@ -256,14 +256,14 @@ processTheMessages conn messages = do
   let processedEventArrays = concatMap aggEventToCollectionRows events'
 
   when (not (null events')) $ do
-    mapOutput Right . outputData conn $ pipeInsertGlobalEventTable conn events'
+    mapOutput Right . outputData $ pipeInsertGlobalEventTable conn events'
     unless (null processedEventArrays) $
-      mapOutput Right . outputData conn $ insertCollectionTable conn processedEventArrays
+      mapOutput Right . outputData $ insertCollectionTable conn processedEventArrays
 
   when (not $ null fkeys) $ do
     $logDebugLS "processTheMessages" $ T.pack $ "Updating PostgREST schema cache for " ++ show (length fkeys) ++ " foreign keys"
-    mapOutput Right . outputDataDedup conn $ createFkeyFunctions conn fkeys
-    mapOutput Right . outputData conn $ notifyPostgREST conn
+    mapOutput Right . outputData $ createFkeyFunctions conn fkeys
+    mapOutput Right . outputData $ notifyPostgREST conn
 
   $logInfoS "processTheMessages" . T.pack $
     "Inserting " ++ show (length transactionResults) ++ " transaction results"

@@ -13,7 +13,6 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE DataKinds #-}
 
-
 module Blockchain.Slipstream.OutputData (
   SlipstreamQuery(..),
   slipstreamQueryPostgres,
@@ -490,12 +489,10 @@ handlePostgresError e =
 
 outputData ::
   OutputM m =>
-  PGConnection ->
   ConduitM () SlipstreamQuery m a ->
   ConduitM i [SlipstreamQuery] m a
-outputData conn c = do
-  (a, cmds) <- lift . runConduit $ c `fuseBoth` sinkList -- mapM_C (dbQueryCatchError conn)
-  lift $ performSQLQueries conn cmds
+outputData c = do
+  (a, _) <- lift . runConduit $ c `fuseBoth` sinkList -- mapM_C (dbQueryCatchError conn)
   pure a
 
 dedupC :: (MonadUnliftIO m, MonadLogger m) => PGConnection -> ConduitM SlipstreamQuery SlipstreamQuery m ()
