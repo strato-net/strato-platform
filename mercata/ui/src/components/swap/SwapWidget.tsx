@@ -5,7 +5,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { ArrowDownUp, Check, ChevronDown } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { ArrowDownUp, Check, ChevronDown, ChevronUp } from "lucide-react";
 import { Pool, SwapToken } from "@/interface";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
@@ -259,22 +264,6 @@ const TokenInput = ({
           />
         </div>
       </div>
-      {asset && (
-        <div className="mt-2 flex justify-between">
-          <span className="text-sm text-gray-500">
-            User Balance: <AnimatedNumber 
-              value={userBalanceWei !== "0" ? formatBalance(userBalanceWei, asset._symbol || "", undefined, 2, 6) : "0"} 
-              isLoading={loading} 
-            />
-          </span>
-          <span className="text-sm text-gray-500">
-            Pool Balance: <AnimatedNumber 
-              value={poolBalanceWei !== "0" ? formatBalance(poolBalanceWei, asset._symbol || "", undefined, 2, 6) : "0"} 
-              isLoading={loading} 
-            />
-          </span>
-        </div>
-      )}
     </div>
   );
 };
@@ -453,6 +442,7 @@ const SwapWidget = () => {
   const [autoSlippage, setAutoSlippage] = useState(true);
   const [editingField, setEditingField] = useState<'from' | 'to' | null>(null);
   const [maxTransferableError, setMaxTransferableError] = useState("");
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
   // ========================================================================
   // COMPUTED VALUES
@@ -819,48 +809,112 @@ const SwapWidget = () => {
         loading={poolLoading}
       />
 
-      <div className="flex flex-col gap-2 bg-gray-50 p-4 rounded-lg">
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600 decoration-2">Exchange Rate</span>
-          <span className="font-medium">
-            1 {fromAsset?._symbol || ""} ≈ <AnimatedNumber value={exchangeRate} isLoading={poolLoading} /> {toAsset?._symbol || ""}
-          </span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-400">Exchange Rate (Spot)</span>
-          <span className="font-medium text-gray-400">
-            {oracleExchangeRate === "0" ? (
-              "Price data unavailable"
+      <Collapsible open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+        <CollapsibleTrigger asChild>
+          <Button
+            variant="ghost"
+            className="w-full justify-between text-sm text-gray-600 hover:text-gray-900"
+          >
+            <span>Transaction Details</span>
+            {isDetailsOpen ? (
+              <ChevronUp className="h-4 w-4" />
             ) : (
-              <>1 {fromAsset?._symbol || ""} ≈ <AnimatedNumber value={oracleExchangeRate} isLoading={poolLoading} /> {toAsset?._symbol || ""}</>
+              <ChevronDown className="h-4 w-4" />
             )}
-          </span>
-        </div>
-        <div className="my-1"></div>
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600">Transaction Fee</span>
-          <span className="font-medium">{SWAP_FEE} USDST ({parseFloat(SWAP_FEE) * 100} voucher)</span>
-        </div>
-        
-        {/* Fee Warnings */}
-        {maxTransferableError && (
-          <p className="text-yellow-600 text-sm mt-1">
-            {maxTransferableError}
-          </p>
-        )}
-        {isLowBalanceWarning && (
-          <p className="text-yellow-600 text-sm mt-1">
-            Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
-          </p>
-        )}
-        
-        <SlippageControl
-          slippage={slippage}
-          autoSlippage={autoSlippage}
-          onSlippageChange={setSlippage}
-          onAutoToggle={setAutoSlippage}
-        />
-      </div>
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="flex flex-col gap-4 bg-gray-50 p-4 rounded-lg mt-2">
+            {/* Balance Information */}
+            <div className="space-y-3">
+              {fromAsset && (
+                <div className="space-y-2">
+                  <div className="text-sm font-semibold text-gray-700">From ({fromAsset._symbol})</div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">User Balance:</span>
+                    <AnimatedNumber 
+                      value={fromAsset.balance && fromAsset.balance !== "0" ? formatBalance(fromAsset.balance, fromAsset._symbol || "", undefined, 2, 6) : "0"} 
+                      isLoading={poolLoading} 
+                    />
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Pool Balance:</span>
+                    <AnimatedNumber 
+                      value={fromAsset.poolBalance && fromAsset.poolBalance !== "0" ? formatBalance(fromAsset.poolBalance, fromAsset._symbol || "", undefined, 2, 6) : "0"} 
+                      isLoading={poolLoading} 
+                    />
+                  </div>
+                </div>
+              )}
+              {toAsset && (
+                <div className="space-y-2 pt-2 border-t border-gray-200">
+                  <div className="text-sm font-semibold text-gray-700">To ({toAsset._symbol})</div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">User Balance:</span>
+                    <AnimatedNumber 
+                      value={toAsset.balance && toAsset.balance !== "0" ? formatBalance(toAsset.balance, toAsset._symbol || "", undefined, 2, 6) : "0"} 
+                      isLoading={poolLoading} 
+                    />
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Pool Balance:</span>
+                    <AnimatedNumber 
+                      value={toAsset.poolBalance && toAsset.poolBalance !== "0" ? formatBalance(toAsset.poolBalance, toAsset._symbol || "", undefined, 2, 6) : "0"} 
+                      isLoading={poolLoading} 
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-gray-200 pt-3 space-y-3">
+              {/* Exchange Rate */}
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Exchange Rate</span>
+                <span className="font-medium">
+                  1 {fromAsset?._symbol || ""} ≈ <AnimatedNumber value={exchangeRate} isLoading={poolLoading} /> {toAsset?._symbol || ""}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">Exchange Rate (Spot)</span>
+                <span className="font-medium text-gray-400">
+                  {oracleExchangeRate === "0" ? (
+                    "Price data unavailable"
+                  ) : (
+                    <>1 {fromAsset?._symbol || ""} ≈ <AnimatedNumber value={oracleExchangeRate} isLoading={poolLoading} /> {toAsset?._symbol || ""}</>
+                  )}
+                </span>
+              </div>
+              
+              {/* Transaction Fee */}
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Transaction Fee</span>
+                <span className="font-medium">{SWAP_FEE} USDST ({parseFloat(SWAP_FEE) * 100} voucher)</span>
+              </div>
+              
+              {/* Fee Warnings */}
+              {maxTransferableError && (
+                <p className="text-yellow-600 text-sm">
+                  {maxTransferableError}
+                </p>
+              )}
+              {isLowBalanceWarning && (
+                <p className="text-yellow-600 text-sm">
+                  Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
+                </p>
+              )}
+              
+              {/* Slippage Control */}
+              <SlippageControl
+                slippage={slippage}
+                autoSlippage={autoSlippage}
+                onSlippageChange={setSlippage}
+                onAutoToggle={setAutoSlippage}
+              />
+            </div>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
 
       <Button
         className="w-full bg-strato-blue hover:bg-strato-blue/90"
