@@ -25,7 +25,6 @@ interface BridgeAdminContextType {
   loadingDeposits: boolean;
   errorDeposits: string | null;
   fetchDeposits: (page?: number, limit?: number) => Promise<void>;
-  getWithdrawalById: (withdrawalId: string) => Promise<Withdrawal | null>;
   abortWithdrawal: (withdrawalId: string) => Promise<void>;
   abortDeposit: (chainId: string, txHash: string) => Promise<void>;
 }
@@ -93,15 +92,6 @@ export const BridgeAdminProvider = ({ children }: { children: ReactNode }) => {
     []
   );
 
-  const getWithdrawalById = useCallback(async (withdrawalId: string): Promise<Withdrawal | null> => {
-    try {
-      const { data } = await api.get(`/bridge/admin/withdrawals/${withdrawalId}`);
-      return data.data || null;
-    } catch {
-      return null;
-    }
-  }, []);
-
   const abortWithdrawal = useCallback(async (withdrawalId: string) => {
     try {
       await api.post(`/bridge/admin/withdrawals/${withdrawalId}/abort`);
@@ -133,7 +123,6 @@ export const BridgeAdminProvider = ({ children }: { children: ReactNode }) => {
         loadingDeposits,
         errorDeposits,
         fetchDeposits,
-        getWithdrawalById,
         abortWithdrawal,
         abortDeposit,
       }}
