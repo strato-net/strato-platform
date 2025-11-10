@@ -22,21 +22,20 @@ RUN npm run build
 FROM base AS runner
 WORKDIR /app
 
-ENV NODE_ENV=production
-
 RUN npm install -g serve
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/package.json ./
-COPY ui/docker-run.sh /docker-run.sh
-
-RUN chmod +x /docker-run.sh
 
 EXPOSE 8080
+
+ENV NODE_ENV=production
+
+ENV PORT=8080
 
 # Add health check
 HEALTHCHECK --interval=5s --timeout=2s --start-period=180s \
   CMD lsof -i :8080 || \
     exit 1
 
-ENTRYPOINT ["/docker-run.sh"]
+CMD ["serve", "-s", "dist", "-l", "8080"]
