@@ -248,7 +248,16 @@ populateStorageDBs' genesisInfo genesisBlock genesisChainId sr pub = do
     accountDiffs <- mapM eventualAccountState addrStateMap
     -- Step 5: VM Event Production - Generate and publish VM events to Kafka
     let addressEvents = Map.findWithDefault S.empty address  events
-    let addressDelegatecalls = Map.findWithDefault S.empty address delegatecalls
+        dc = case addressStateCodeHash addressState of
+          ExternallyOwned{} -> S.empty
+          SolidVMCode name _ -> S.singleton $ A.Delegatecall
+            { A._delegatecallStorageAddress = address
+            , A._delegatecallCodeAddress = address
+            , A._delegatecallOrganization = "BlockApps"
+            , A._delegatecallApplication = "Mercata"
+            , A._delegatecallContractName = T.pack name
+            }
+    let addressDelegatecalls = dc S.>< Map.findWithDefault S.empty address delegatecalls
     vmEvents <- squashMap (toAction addressEvents addressDelegatecalls) accountDiffs
     pub (Just $ mkStateDiff accountDiffs) vmEvents
 

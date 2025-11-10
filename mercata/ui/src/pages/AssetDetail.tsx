@@ -98,6 +98,20 @@ const fetchSwapPoolPrices = async (assetAddress: string): Promise<SwapPricePoint
     
     for (const pool of pools) {
       try {
+        // Determine which token is being viewed and which is the other token
+        const isViewingAssetTokenB = pool.tokenB?.address?.toLowerCase() === assetAddress.toLowerCase();
+        const otherToken: any = isViewingAssetTokenB ? pool.tokenA : pool.tokenB;
+        
+        // Get the oracle price of the OTHER token to convert swap ratio to USD
+        const otherTokenPriceRaw = otherToken?.price || '0';
+        const otherTokenPrice = parseFloat(otherTokenPriceRaw) / 1e18; // Oracle price in USD
+        
+        // Skip this pool if oracle price is not available
+        if (otherTokenPrice === 0 || isNaN(otherTokenPrice)) {
+          console.warn(`Skipping pool ${pool.address} - missing oracle price for ${otherToken?._symbol}`);
+          continue;
+        }
+        
         const response = await api.get(`/swap-history/${pool.address}`, {
           params: {
             limit: '1000', // Get more history for better chart
@@ -107,14 +121,36 @@ const fetchSwapPoolPrices = async (assetAddress: string): Promise<SwapPricePoint
         
         const swapHistory: SwapHistoryEntry[] = response.data.data || [];
         
-        // Convert swap history to price points
+        if (swapHistory.length === 0) {
+          continue;
+        }
+        
+        // Convert swap history to price points with USD conversion
         const poolPrices = swapHistory
           .filter(swap => swap.impliedPrice && swap.impliedPrice !== "0")
           .map(swap => {
             const date = new Date(swap.timestamp);
+            
+            // Backend always returns TokenB/TokenA price (how much TokenB per 1 TokenA)
+            let swapRatio = parseFloat(swap.impliedPrice);
+            
+            // Calculate USD price based on which token we're viewing
+            let usdPrice: number;
+            if (isViewingAssetTokenB) {
+              // Viewing tokenB: Need to invert to get TokenB/TokenA → TokenA/TokenB
+              // Example: 0.0000077 WBTC/USDST → 129,870 USDST/WBTC
+              // USD price = (USDST/WBTC) × (USD/USDST) = 129,870 × $1 = $129,870
+              usdPrice = swapRatio !== 0 ? (1 / swapRatio) * otherTokenPrice : 0;
+            } else {
+              // Viewing tokenA: Ratio is already correct (TokenB/TokenA)
+              // Example: 0.0000077 WBTC/USDST means 1 USDST = 0.0000077 WBTC
+              // USD price = (WBTC/USDST) × (USD/WBTC) = 0.0000077 × $130k = $1
+              usdPrice = swapRatio * otherTokenPrice;
+            }
+            
             return {
               date: `${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`,
-              price: swap.impliedPrice,
+              price: usdPrice.toFixed(2), // USD price with 2 decimals
               timestamp: date.getTime(),
               poolAddress: pool.address,
               volume: swap.amountIn
@@ -122,8 +158,10 @@ const fetchSwapPoolPrices = async (assetAddress: string): Promise<SwapPricePoint
           });
         
         allSwapPrices.push(...poolPrices);
-      } catch (poolError) {
-        console.error(`Failed to fetch swap history for pool ${pool.address}:`, poolError);
+      } catch (poolError: any) {
+        const errorMsg = poolError?.response?.data?.error?.message || poolError?.response?.data?.message || poolError?.message || 'Unknown error';
+        console.error(`Failed to fetch swap history for pool ${pool.address}:`, errorMsg);
+        // Continue to next pool instead of failing completely
       }
     }
     
@@ -350,21 +388,9 @@ const AssetDetail = () => {
                     </div>
 
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">User Balance:</span>
-                      <span className="font-medium">{formatUnits(BigInt(asset?.balance || "0"), 18)}</span>
+                      <span className="text-gray-500">Balance:</span>
+                      <span className="font-medium">{formatUnits(BigInt(asset?.balance || "0") + BigInt(asset?.collateralBalance || "0"), 18)}</span>
                     </div>
-
-                    {asset?.status == "2" ? (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Status:</span>
-                        <span className="font-medium text-green-500">Available</span>
-                      </div>
-                    ) : (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Status:</span>
-                        <span className="font-medium text-red-500">Sold Out</span>
-                      </div>
-                    )}
 
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-500">Owner:</span>

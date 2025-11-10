@@ -172,7 +172,7 @@ expressionHelper (MinusMinus _ (Variable x name)) = do
   modify $ M.insert name x
   pure []
 expressionHelper (MinusMinus _ e) = expressionHelper e
-expressionHelper (NewExpression _ _) = pure []
+expressionHelper (NewExpression _ _ mSalt) = maybe (pure []) expressionHelper mSalt
 expressionHelper (IndexAccess _ a b) = do
   as <- expressionHelper a
   bs <- maybe (pure []) expressionHelper b

@@ -438,7 +438,7 @@ getTableColumnAndType isEvent cc@(CodeCollection ccs _ _ _ _ _ _ _) = mapMaybe g
     go :: (Text, SVMType.Type) -> Maybe (T.Text, SqlType, Maybe T.Text)
     go (x, y) =
       (\v -> case y of
-        SVMType.UnknownLabel s _ -> (x, v, bool Nothing (Just $ T.pack s) $ Map.member s ccs)
+        SVMType.UnknownLabel s -> (x, v, bool Nothing (Just $ T.pack s) $ Map.member s ccs)
         _ -> (x, v, Nothing)
       ) <$> solidityTypeToSQLType isEvent Nothing cc y
 
@@ -584,7 +584,7 @@ createCollectionTable (creator, n) c cc inherited (collectionName, keyTypes, val
       keySqlTypes = fromMaybe SqlText . solidityTypeToSQLType False (Just c) cc <$> keyTypes
       keyNames = keyColumnNames keySqlTypes
       mStructName = case valueType of
-        SVMType.UnknownLabel structName _ -> Just structName
+        SVMType.UnknownLabel structName -> Just structName
         SVMType.Struct _ structName -> Just structName
         _ -> Nothing
       mStructVal = map (\(fieldName, fieldType, _) ->
@@ -971,7 +971,7 @@ insertGlobalEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
       blockHash = T.pack . keccak256ToHex $ eventBlockHash agEv
       blockTimestamp = tshow $ eventBlockTimestamp agEv
       blockNumber = eventBlockNumber agEv
-      transactionSender = eventTxSender agEv
+      transactionSender = Action.evTxSender ev
       eventIdx = eventIndex agEv
 
       attributesMap = ValueMapping $
@@ -1011,7 +1011,7 @@ solidityTypeToSQLType _ _ _ SVMType.Decimal = Just SqlDecimal
 solidityTypeToSQLType _ _ _ SVMType.Address{} = Just SqlText
 solidityTypeToSQLType isEvent _ _ SVMType.Array{} = if isEvent then Just SqlJsonb else Nothing
 solidityTypeToSQLType _ _ _ SVMType.Mapping{} = Nothing -- Just SqlJsonb
-solidityTypeToSQLType _ mc cc (SVMType.UnknownLabel l _) = Just . maybe SqlText (const SqlJsonb) $ (\c -> structDef c cc l) =<< mc
+solidityTypeToSQLType _ mc cc (SVMType.UnknownLabel l) = Just . maybe SqlText (const SqlJsonb) $ (\c -> structDef c cc l) =<< mc
 solidityTypeToSQLType _ _ _ SVMType.Struct{} = Just SqlJsonb
 solidityTypeToSQLType _ _ _ SVMType.Enum{} = Just SqlText
 solidityTypeToSQLType _ _ _ SVMType.Contract{} = Just SqlText

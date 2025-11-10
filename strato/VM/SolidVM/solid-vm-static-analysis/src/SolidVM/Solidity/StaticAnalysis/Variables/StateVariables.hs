@@ -212,7 +212,7 @@ expressionHelper (PlusPlus _ e) = expressionHelper e
 expressionHelper (MinusMinus y (Variable x name)) =
   stateVarWriteHelper name (x <> y)
 expressionHelper (MinusMinus _ e) = expressionHelper e
-expressionHelper (NewExpression _ _) = pure []
+expressionHelper (NewExpression _ _ mSalt) = maybe (pure []) expressionHelper mSalt
 expressionHelper (IndexAccess _ a b) = do
   as <- expressionHelper a
   bs <- maybe (pure []) expressionHelper b

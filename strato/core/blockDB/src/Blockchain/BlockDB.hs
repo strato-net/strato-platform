@@ -72,9 +72,6 @@ namespaceToKeyPrefix ns = case ns of
   Children           -> "c:"
   Canonical          -> "q:"
   Validators         -> "validators"
-  X509Certificates   -> "x509:"
-  ParsedSetWhitePage -> "potu:"
-  ParsedSetToX509    -> "psx509:"
 
 getInNamespace ::
   (RedisDBKeyable key) =>

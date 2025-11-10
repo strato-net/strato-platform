@@ -392,7 +392,7 @@ optimizeExpression (ArrayExpression x es) z = ArrayExpression x
 optimizeExpression (ObjectLiteral x m) z = ObjectLiteral x
                                        <$> traverse (flip optimizeExpression z) m
 --  Keeping each case explicitly listed here, so that none are accidentally forgotten in the future
-optimizeExpression e@NewExpression{}     _ = pure e
+optimizeExpression (NewExpression x t mSalt) z = NewExpression x t <$> traverse (flip optimizeExpression z) mSalt
 optimizeExpression e@BoolLiteral{}       _ = pure e
 optimizeExpression e@NumberLiteral{}     _ = pure e
 optimizeExpression e@DecimalLiteral{}    _ = pure e

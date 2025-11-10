@@ -97,12 +97,14 @@ export const monitorSafeTransactionStatusBatch = async (
 
   const results = new Map<Number, "executed" | "rejected" | "pending">();
   
-  await Promise.all(
-    withdrawals.map(async ({ id, safeTxHash }) => {
-      const status = await checkSafeTxStatus(safeTxHash, apiKit);
-      results.set(id, status);
-    })
-  );
+  for (let i = 0; i < withdrawals.length; i++) {
+    const { id, safeTxHash } = withdrawals[i];
+    const status = await checkSafeTxStatus(safeTxHash, apiKit);
+    results.set(id, status);
+    if (i < withdrawals.length - 1) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
 
   return results;
 };

@@ -5,7 +5,7 @@ import { Button } from "../ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 import { Token } from "../../interface";
 import { formatUnits } from "ethers";
-import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
+import { formatBalance, safeParseUnits, calculateTokenValue } from "@/utils/numberUtils";
 
 interface AssetsProps {
   loading: boolean;
@@ -147,7 +147,7 @@ const AssetsList = ({
                         <p className="font-medium text-gray-900">
                           {!asset?.["price"]
                             ? "-"
-                            : formatBalance(asset.price, undefined, 18, 2,2, true)}
+                            : formatBalance(asset.price, undefined, 18, 2, 2, true)}
                         </p>
                       </td>
                       <td className="py-4 px-4 whitespace-nowrap text-right">
@@ -181,9 +181,9 @@ const AssetsList = ({
                       </td>
                       <td className="py-4 px-4 whitespace-nowrap text-right">
                         <p className="font-medium text-gray-900">
-                          {!asset?.["price"] || (!asset?.balance && !asset?.collateralBalance)
+                          {!asset?.["price"] || asset.price === "0" || (!asset?.balance && !asset?.collateralBalance)
                             ? "-"
-                            : formatBalance(safeParseUnits((parseFloat(formatUnits(BigInt(asset.price), 18)) * (parseFloat(formatUnits(BigInt(asset.balance || 0), 18)) + parseFloat(formatUnits(BigInt(asset.collateralBalance || 0), 18)))).toString(), 18), undefined, 18, 2, 2, true)}
+                            : `$${calculateTokenValue(asset.balance || "0", asset.price, asset.collateralBalance || "0")}`}
                         </p>
                       </td>
                     </tr>

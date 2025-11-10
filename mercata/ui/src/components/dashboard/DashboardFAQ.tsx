@@ -5,7 +5,7 @@ const DashboardFAQ = () => {
   const faqItems = [
     {
       question: "What assets can I deposit?",
-      answer: "You can deposit various assets including gold, silver, and cryptocurrencies like Ethereum. Each asset has different yield opportunities and borrowing capabilities."
+      answer: "You can deposit various assets including gold, silver, and cryptocurrencies like Ethereum and wrapped Bitcoin. Each asset has different yield opportunities and borrowing capabilities."
     },
     {
       question: "How does borrowing work?",
@@ -13,7 +13,7 @@ const DashboardFAQ = () => {
     },
     {
       question: "What are CATA Rewards?",
-      answer: "CATA is the governance token of STRATO Mercata. You earn CATA rewards based on your deposits and platform activity. These tokens can be used for governance voting and receive platform benefits."
+      answer: "CATA points is the reward system on STRATO Mercata. Points are rewarded based on your deposits and platform activity."
     },
     {
       question: "How secure are my assets?",

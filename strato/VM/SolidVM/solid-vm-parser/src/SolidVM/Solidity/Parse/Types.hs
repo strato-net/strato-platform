@@ -33,20 +33,9 @@ simpleType =
     <|> intSuffixed "uint" (SVMType.Int (Just False))
     <|> intSuffixed "int" (SVMType.Int (Just True))
     <|> simple "variadic" SVMType.Variadic
-    <|> saltParser
     <|> unknownLabelMemberParser
     <|> unknownLabelParser
   where
-    saltParser = try $ do
-      name <- identifier
-      salt <- braces $ do
-        reserved "salt"
-        colon
-        let myReallyGoodParser = do
-              myStr <- stringLiteral
-              return ("\"" ++ myStr ++ "\"")
-        identifier <|> myReallyGoodParser
-      return $ SVMType.UnknownLabel name $ Just salt
     unknownLabelParser = try $ do
       name <- identifier
       isUserDefined <- isInUserDefinedTypes name
@@ -54,10 +43,10 @@ simpleType =
         then do
           typ <- getUserDefinedType name
           return $ (SVMType.UserDefined name (userTypeHelper' typ))
-        else return $ (SVMType.UnknownLabel name Nothing)
+        else return $ (SVMType.UnknownLabel name)
     unknownLabelMemberParser = try $ do
       name <- concat <$> sequence [identifier, dot, identifier]
-      return $ SVMType.UnknownLabel name Nothing
+      return $ SVMType.UnknownLabel name
     simple name nameType = do
       reserved name
       return nameType

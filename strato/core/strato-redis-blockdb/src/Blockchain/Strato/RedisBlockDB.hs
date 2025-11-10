@@ -47,9 +47,6 @@ findNamespace key = case S8.takeWhile (/= ':') key of
   "c" -> Children
   "q" -> Canonical
   "validators" -> Validators
-  "x509" -> X509Certificates
-  "potu" -> ParsedSetWhitePage
-  "psx509" -> ParsedSetToX509
   wut -> error $ "unknown namespace: " ++ show wut
 
 -- TODO: Use an effect system (IO eww... 😒)
