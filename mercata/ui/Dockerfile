@@ -28,6 +28,9 @@ RUN npm install -g serve
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/package.json ./
+COPY docker-run.sh /docker-run.sh
+
+RUN chmod +x /docker-run.sh
 
 EXPOSE 8080
 
@@ -36,4 +39,4 @@ HEALTHCHECK --interval=5s --timeout=2s --start-period=180s \
   CMD lsof -i :8080 || \
     exit 1
 
-CMD ["serve", "-s", "dist", "-l", "8080"]
+ENTRYPOINT ["/docker-run.sh"]
