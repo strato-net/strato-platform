@@ -13,6 +13,8 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE DataKinds #-}
 
+{-# OPTIONS -fno-warn-deprecations #-}
+
 module Blockchain.Slipstream.OutputData (
   SlipstreamQuery(..),
   slipstreamQueryPostgres,
@@ -67,6 +69,7 @@ import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Stream.Action        (Delegatecall(..))
 import           Data.Text.Encoding              (decodeUtf8, decodeUtf8', encodeUtf8)
 import           Data.Time
+import qualified Database.Esqueleto              as E
 import           Database.Persist                (insert_)
 import           Database.Persist.Postgresql     (runSqlPool, SqlPersistT)
 import           Blockchain.Slipstream.PostgresqlTypedShim
@@ -704,16 +707,20 @@ insertDelegatecall ::
   PGConnection ->
   Delegatecall ->
   ConduitM () SlipstreamQuery m ()
-insertDelegatecall conn (Delegatecall s _ Nothing n) = do
-  --ValueString $ fromMaybe (error $ "delegate call = " ++ show dc) c,
-  -- TODO: Hardcoding "BlockApps" IS A HACK!! I've hardcoded the creator to "BlockApps" to get things working in the app,
-  --       but this needs to be fixed ASAP so that Slipstream can use the real creator name
-  lift $ performSQLQueries conn [insert_ $
-                                 Contract
-                                 (StorageKey s)
-                                 "BlockApps"
-                                 n
-                                ]
+insertDelegatecall conn (Delegatecall storageAddress codeAddress Nothing contractName) = do
+  lift $ performSQLQueries conn
+    [
+      E.insertSelect $ do
+        src <- E.from $ \c -> do
+          E.where_ (c E.^. ContractAddress E.==. E.val (StorageKey codeAddress))
+          return c
+          -- Build an Insertion MyTable by listing *non-id* fields in schema order:
+        pure $ Contract
+          E.<#  (E.val $ StorageKey storageAddress)
+          E.<&> (src E.^. ContractCreator)
+          E.<&> (E.val contractName)
+    ]
+
 insertDelegatecall conn (Delegatecall s _ (Just c) n) = do
   lift $ performSQLQueries conn
     [insert_ $ Contract (StorageKey s) c n]
