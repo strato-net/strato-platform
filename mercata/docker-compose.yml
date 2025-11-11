@@ -26,8 +26,6 @@ services:
       - backend
     build: ./ui
     image: mercata-ui:latest
-    environment:
-      - LUCKY_ORANGE_SITE_ID=${LUCKY_ORANGE_SITE_ID}
     restart: unless-stopped
     logging:
       driver: "json-file"
