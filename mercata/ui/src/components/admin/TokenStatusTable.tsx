@@ -17,6 +17,7 @@ import { Loader2, Filter, Search, RefreshCw } from 'lucide-react';
 import SetTokenStatusModal from './SetTokenStatusForm';
 import { Token } from '@/interface';
 import CopyButton from '../ui/copy';
+import PaginationControls from '@/components/ui/PaginationControls';
 
 const getStatusLabel = (status?: string | number) => {
   switch (String(status)) {
@@ -32,7 +33,7 @@ const getStatusLabel = (status?: string | number) => {
 };
 
 const TokenStatusTable = () => {
-  const { tokens, loading, error, getAllTokens } = useTokenContext();
+  const { tokens, loading, error, pagination, getAllTokens } = useTokenContext();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusModalOpen, setStatusModalOpen] = useState(false);
@@ -40,11 +41,11 @@ const TokenStatusTable = () => {
 
   const refreshAllData = useCallback(async () => {
     try {
-      await getAllTokens();
+      await getAllTokens(pagination.page, pagination.limit);
     } catch (error) {
       console.error('Error refreshing data:', error);
     }
-  }, [getAllTokens]);
+  }, [getAllTokens, pagination.page, pagination.limit]);
 
   useEffect(() => {
     getAllTokens();
@@ -163,11 +164,6 @@ const TokenStatusTable = () => {
               Refresh
             </Button>
           </div>
-          <div className="text-sm text-gray-500">
-            Showing {filteredTokens.length} of {tokens.length} tokens
-            {searchQuery && ` matching "${searchQuery}"`}
-            {statusFilter !== 'all' && ` with ${getStatusLabel(statusFilter).label} status`}
-          </div>
         </div>
         
         {filteredTokens.length === 0 ? (
@@ -251,6 +247,16 @@ const TokenStatusTable = () => {
             </Table>
           </div>
         )}
+        
+        {/* Pagination */}
+        <PaginationControls
+          currentPage={pagination.page}
+          totalPages={pagination.totalPages}
+          onPageChange={(page) => getAllTokens(page, pagination.limit)}
+          loading={loading}
+          totalItems={pagination.total}
+          itemsPerPage={pagination.limit}
+        />
       </CardContent>
       
       <SetTokenStatusModal

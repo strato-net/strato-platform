@@ -17,10 +17,11 @@ import { Loader2, MoreVertical } from 'lucide-react';
 import CopyButton from '../ui/copy';
 import ConfigureAssetModal from './ConfigureAssetModal';
 import { Token, LendingPoolResponse } from '@/interface';
+import PaginationControls from '@/components/ui/PaginationControls';
 
 
 const TokenConfigTable = () => {
-  const { activeTokens, loading, error, getActiveTokens } = useTokenContext();
+  const { activeTokens, loading, error, activePagination, getActiveTokens } = useTokenContext();
   const { getLend } = useLendingContext();
   const [lendData, setLendData] = useState<LendingPoolResponse | null>(null);
   const [lendLoading, setLendLoading] = useState(false);
@@ -29,11 +30,11 @@ const TokenConfigTable = () => {
 
   const fetchActiveTokens = useCallback(async () => {
     try {
-      await getActiveTokens();
+      await getActiveTokens(activePagination.page, activePagination.limit);
     } catch (error) {
       console.error('Error fetching active tokens:', error);
     }
-  }, [getActiveTokens]);
+  }, [getActiveTokens, activePagination.page, activePagination.limit]);
 
   const fetchLendData = useCallback(async () => {
     try {
@@ -320,6 +321,16 @@ const TokenConfigTable = () => {
             </Table>
           </div>
         )}
+        
+        {/* Pagination */}
+        <PaginationControls
+          currentPage={activePagination.page}
+          totalPages={activePagination.totalPages}
+          onPageChange={(page) => getActiveTokens(page, activePagination.limit)}
+          loading={loading}
+          totalItems={activePagination.total}
+          itemsPerPage={activePagination.limit}
+        />
       </CardContent>
       
       <ConfigureAssetModal

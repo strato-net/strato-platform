@@ -27,7 +27,7 @@ import { cataAddress } from '@/lib/constants';
 
 const DepositsPage = () => {
   const { userAddress } = useUser();
-  const { activeTokens: tokens, inactiveTokens, allActiveTokens, loading, allActiveLoading, fetchTokens, fetchAllActiveTokens, fetchUsdstBalance } = useUserTokens();
+  const { activeTokens: tokens, inactiveTokens, allActiveTokens, allActivePagination, loading, allActiveLoading, fetchTokens, fetchAllActiveTokens, fetchUsdstBalance } = useUserTokens();
   const { loans, liquidityInfo, refreshLoans } = useLendingContext();
   const { totalCDPDebt, refreshVaults } = useCDP();
   const { userPools } = useSwapContext();
@@ -67,6 +67,11 @@ const DepositsPage = () => {
         fetchUsdstBalance(userAddress);
       }
     }, 1000); // Longer delay to ensure smooth UX
+  };
+
+  // Handle pagination for all active tokens
+  const handleAllActiveTokensPageChange = (page: number) => {
+    fetchAllActiveTokens(page, allActivePagination.limit);
   };
 
   useEffect(() => {
@@ -146,7 +151,12 @@ const DepositsPage = () => {
               <CardTitle>Available Assets</CardTitle>
             </CardHeader>
             <CardContent>
-              <AssetsGrid loading={allActiveLoading} assets={allActiveTokens} />
+              <AssetsGrid 
+                loading={allActiveLoading} 
+                assets={allActiveTokens} 
+                pagination={allActivePagination}
+                onPageChange={handleAllActiveTokensPageChange}
+              />
             </CardContent>
           </Card>
         </main>

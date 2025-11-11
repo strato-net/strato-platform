@@ -49,11 +49,18 @@ class TokensController {
       const { accessToken, query } = req;
       validateQueryParams(query);
 
-      const tokens = await getTokens(
+      // Add default pagination parameters if not provided
+      const paramsWithDefaults = {
+        ...query,
+        limit: query.limit || "10",
+        offset: query.offset || "0"
+      };
+
+      const result = await getTokens(
         accessToken,
-        query as Record<string, string | undefined>
+        paramsWithDefaults as Record<string, string | undefined>
       );
-      res.status(RestStatus.OK).json(tokens);
+      res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
     }
