@@ -215,18 +215,18 @@ slipstreamQueryText _ CreateView{..} =
             (("s." <>) <$> sourceTableColumns)
          ++ (("c." <>) <$> contractTableColumns)
          ++ concatMap (\(cols', dataColumn) -> (\(c, t) -> T.concat
-            [ "CASE WHEN s."
+            [ "CASE WHEN jsonb_exists(s."
             , wrapEscapeDouble dataColumn
-            , " ? '"
+            , ", '"
             , c
-            , "' "
+            , "') "
             , case t of
                 SqlDecimal -> T.concat
                   [ "AND (s."
                   , wrapEscapeDouble dataColumn
                   , "->>'"
                   , c
-                  , "') ~ '^\\s*-?\\d+(\\.\\d*)?\\s*$' "
+                  , "') ~ '^\\s*-{0,1}\\d+(\\.\\d*){0,1}\\s*$' "
                   ]
                 SqlBool -> T.concat
                   [ "AND jsonb_typeof(s."
@@ -269,11 +269,11 @@ slipstreamQueryText _ CreateView{..} =
             . T.intercalate ", " $ concatMap (\(c, t) ->
             [ wrapEscapeSingle $ if c `Set.member` baseColumnSet then "arg_" <> c else c
             , T.concat
-              [ "to_jsonb(CASE WHEN s."
+              [ "to_jsonb(CASE WHEN jsonb_exists(s."
               , wrapEscapeDouble dataColumn
-              , " ? '"
+              , ", '"
               , c
-              , "' "
+              , "') "
               , case t of
                   SqlJsonb -> T.concat
                     [ "THEN (s."

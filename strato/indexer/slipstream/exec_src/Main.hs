@@ -29,9 +29,6 @@ import Instrumentation
 import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Prometheus
 
-connectToCirrus :: MonadIO m => m PGConnection
-connectToCirrus = liftIO $ pgConnect cirrusInfo
-
 main :: IO ()
 main = do
   _ <- $initHFlags "Setup Slipstream Variables"
@@ -52,7 +49,8 @@ main = do
       void . liftIO . forkIO . run 10777 $ metricsApp
       $logInfoS "main" "Serving metrics on port 10777"
 
-      conn <- connectToCirrus
+      conn <- createPostgresqlPool connStr 10
+
       _ <- traverse (liftIO . pgQuery conn . encodeUtf8 . slipstreamQueryPostgres) initialSlipstreamQueries
 
       -- There are two permanent connections/pools to postgres:
