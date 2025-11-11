@@ -22,14 +22,16 @@ RUN npm run build
 FROM base AS runner
 WORKDIR /app
 
-ENV NODE_ENV=production
-
 RUN npm install -g serve
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/package.json ./
 
 EXPOSE 8080
+
+ENV NODE_ENV=production
+
+ENV PORT=8080
 
 # Add health check
 HEALTHCHECK --interval=5s --timeout=2s --start-period=180s \
