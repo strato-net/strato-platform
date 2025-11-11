@@ -81,15 +81,26 @@ const MercataStats = () => {
   const [cdpError, setCdpError] = useState<string | null>(null);
 
   // Protocol Revenue state
-  const [totalRevenue, setTotalRevenue] = useState<string>('0');
-  const [revenueByPeriod, setRevenueByPeriod] = useState<RevenuePeriod>({
+  const [cdpTotalRevenue, setCdpTotalRevenue] = useState<string>('0');
+  const [cdpRevenueByPeriod, setCdpRevenueByPeriod] = useState<RevenuePeriod>({
     daily: { total: '0', byAsset: [] },
     weekly: { total: '0', byAsset: [] },
     monthly: { total: '0', byAsset: [] },
     ytd: { total: '0', byAsset: [] },
     allTime: { total: '0', byAsset: [] }
   });
+  
+  const [swapTotalRevenue, setSwapTotalRevenue] = useState<string>('0');
+  const [swapRevenueByPeriod, setSwapRevenueByPeriod] = useState<RevenuePeriod>({
+    daily: { total: '0', byAsset: [] },
+    weekly: { total: '0', byAsset: [] },
+    monthly: { total: '0', byAsset: [] },
+    ytd: { total: '0', byAsset: [] },
+    allTime: { total: '0', byAsset: [] }
+  });
+  
   const [selectedPeriod, setSelectedPeriod] = useState<keyof RevenuePeriod>('allTime');
+  const [revenueSource, setRevenueSource] = useState<'cdp' | 'swap' | 'combined'>('combined');
   const [revenueLoading, setRevenueLoading] = useState(true);
   const [revenueError, setRevenueError] = useState<string | null>(null);
 
@@ -135,10 +146,18 @@ const MercataStats = () => {
   const fetchProtocolRevenue = async () => {
     try {
       setRevenueLoading(true);
-      const response = await api.get<ProtocolRevenueResponse>('/cdp/protocol-revenue');
       
-      setTotalRevenue(response.data.totalRevenue);
-      setRevenueByPeriod(response.data.revenueByPeriod);
+      // Fetch both CDP and Swap revenue in parallel
+      const [cdpResponse, swapResponse] = await Promise.all([
+        api.get<ProtocolRevenueResponse>('/cdp/protocol-revenue'),
+        api.get<ProtocolRevenueResponse>('/swap-pools/protocol-revenue')
+      ]);
+      
+      setCdpTotalRevenue(cdpResponse.data.totalRevenue);
+      setCdpRevenueByPeriod(cdpResponse.data.revenueByPeriod);
+      
+      setSwapTotalRevenue(swapResponse.data.totalRevenue);
+      setSwapRevenueByPeriod(swapResponse.data.revenueByPeriod);
     } catch (err) {
       console.error('Failed to fetch protocol revenue:', err);
       setRevenueError('Failed to load protocol revenue');
@@ -164,6 +183,76 @@ const MercataStats = () => {
       return '∞';
     }
     return `${cr.toFixed(2)}%`;
+  };
+  
+  // Helper to combine revenue data from CDP and Swap
+  const getCombinedRevenue = (period: keyof RevenuePeriod): PeriodRevenue => {
+    const cdpPeriod = cdpRevenueByPeriod[period];
+    const swapPeriod = swapRevenueByPeriod[period];
+    
+    // Combine totals
+    const combinedTotal = (BigInt(cdpPeriod.total) + BigInt(swapPeriod.total)).toString();
+    
+    // Combine by asset
+    const assetMap = new Map<string, { symbol: string; revenue: bigint }>();
+    
+    // Add CDP revenue
+    cdpPeriod.byAsset.forEach(item => {
+      const existing = assetMap.get(item.asset) || { symbol: item.symbol, revenue: 0n };
+      assetMap.set(item.asset, {
+        symbol: item.symbol,
+        revenue: existing.revenue + BigInt(item.revenue)
+      });
+    });
+    
+    // Add Swap revenue
+    swapPeriod.byAsset.forEach(item => {
+      const existing = assetMap.get(item.asset) || { symbol: item.symbol, revenue: 0n };
+      assetMap.set(item.asset, {
+        symbol: item.symbol,
+        revenue: existing.revenue + BigInt(item.revenue)
+      });
+    });
+    
+    // Convert back to array and sort by revenue
+    const combinedAssets = Array.from(assetMap.entries())
+      .map(([asset, data]) => ({
+        asset,
+        symbol: data.symbol,
+        revenue: data.revenue.toString()
+      }))
+      .sort((a, b) => {
+        const revenueA = BigInt(a.revenue);
+        const revenueB = BigInt(b.revenue);
+        if (revenueA > revenueB) return -1;
+        if (revenueA < revenueB) return 1;
+        return 0;
+      });
+    
+    return {
+      total: combinedTotal,
+      byAsset: combinedAssets
+    };
+  };
+  
+  // Helper to get the appropriate revenue data based on source
+  const getRevenueData = (source: typeof revenueSource): { total: string; byPeriod: RevenuePeriod } => {
+    if (source === 'cdp') {
+      return { total: cdpTotalRevenue, byPeriod: cdpRevenueByPeriod };
+    } else if (source === 'swap') {
+      return { total: swapTotalRevenue, byPeriod: swapRevenueByPeriod };
+    } else {
+      // Combined
+      const combinedTotal = (BigInt(cdpTotalRevenue) + BigInt(swapTotalRevenue)).toString();
+      const combinedByPeriod: RevenuePeriod = {
+        daily: getCombinedRevenue('daily'),
+        weekly: getCombinedRevenue('weekly'),
+        monthly: getCombinedRevenue('monthly'),
+        ytd: getCombinedRevenue('ytd'),
+        allTime: getCombinedRevenue('allTime')
+      };
+      return { total: combinedTotal, byPeriod: combinedByPeriod };
+    }
   };
 
 
@@ -370,8 +459,42 @@ const MercataStats = () => {
               </TabsContent>
 
               <TabsContent value="revenue">
-                {/* Time Period Selector */}
-                <div className="flex flex-col sm:flex-row gap-4 mb-6">
+                {/* Revenue Source Selector */}
+                <div className="flex flex-col gap-4 mb-6">
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    <button
+                      onClick={() => setRevenueSource('combined')}
+                      className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+                        revenueSource === 'combined' 
+                          ? 'bg-green-600 text-white' 
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}
+                    >
+                      Combined Revenue
+                    </button>
+                    <button
+                      onClick={() => setRevenueSource('cdp')}
+                      className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+                        revenueSource === 'cdp' 
+                          ? 'bg-green-600 text-white' 
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}
+                    >
+                      CDP Revenue
+                    </button>
+                    <button
+                      onClick={() => setRevenueSource('swap')}
+                      className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+                        revenueSource === 'swap' 
+                          ? 'bg-green-600 text-white' 
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}
+                    >
+                      Swap Pool Revenue
+                    </button>
+                  </div>
+                  
+                  {/* Time Period Selector */}
                   <div className="flex flex-wrap gap-2">
                     <button
                       onClick={() => setSelectedPeriod('daily')}
@@ -426,29 +549,69 @@ const MercataStats = () => {
                   </div>
                 </div>
 
-                {/* Revenue Summary Card */}
-                <div className="grid grid-cols-1 gap-6 mb-6">
-                  <Card>
+                {/* Revenue Summary Cards */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                  <Card className={revenueSource !== 'swap' ? '' : 'opacity-50'}>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">
-                        {selectedPeriod === 'daily' && 'Daily Revenue (Last 24 Hours)'}
-                        {selectedPeriod === 'weekly' && 'Weekly Revenue (Last 7 Days)'}
-                        {selectedPeriod === 'monthly' && 'Monthly Revenue (Last 30 Days)'}
-                        {selectedPeriod === 'ytd' && 'Year-to-Date Revenue'}
-                        {selectedPeriod === 'allTime' && 'All-Time Revenue'}
-                      </CardTitle>
-                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      <CardTitle className="text-sm font-medium">CDP Revenue</CardTitle>
+                      <Vault className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">
                         {revenueLoading ? (
                           <Skeleton className="h-8 w-24" />
                         ) : (
-                          `$${formatLargeNumber(parseFloat(formatUnits(BigInt(revenueByPeriod[selectedPeriod].total || '0'), 18)))}`
+                          `$${formatLargeNumber(parseFloat(formatUnits(BigInt(cdpRevenueByPeriod[selectedPeriod].total || '0'), 18)))}`
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        Total CDP protocol revenue for selected period
+                        {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} CDP fees
+                      </p>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card className={revenueSource !== 'cdp' ? '' : 'opacity-50'}>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Swap Pool Revenue</CardTitle>
+                      <Activity className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">
+                        {revenueLoading ? (
+                          <Skeleton className="h-8 w-24" />
+                        ) : (
+                          `$${formatLargeNumber(parseFloat(formatUnits(BigInt(swapRevenueByPeriod[selectedPeriod].total || '0'), 18)))}`
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} swap fees
+                      </p>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card className="border-2 border-green-500">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">
+                        {revenueSource === 'combined' && 'Combined Revenue'}
+                        {revenueSource === 'cdp' && 'CDP Revenue'}
+                        {revenueSource === 'swap' && 'Swap Pool Revenue'}
+                      </CardTitle>
+                      <DollarSign className="h-4 w-4 text-green-600" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-green-600">
+                        {revenueLoading ? (
+                          <Skeleton className="h-8 w-24" />
+                        ) : (
+                          `$${formatLargeNumber(parseFloat(formatUnits(BigInt(getRevenueData(revenueSource).byPeriod[selectedPeriod].total || '0'), 18)))}`
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {selectedPeriod === 'daily' && 'Last 24 hours'}
+                        {selectedPeriod === 'weekly' && 'Last 7 days'}
+                        {selectedPeriod === 'monthly' && 'Last 30 days'}
+                        {selectedPeriod === 'ytd' && 'Year-to-date'}
+                        {selectedPeriod === 'allTime' && 'All-time total'}
                       </p>
                     </CardContent>
                   </Card>
@@ -457,9 +620,15 @@ const MercataStats = () => {
                 {/* Revenue by Asset Table */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>Revenue by Asset</CardTitle>
+                    <CardTitle>
+                      {revenueSource === 'combined' && 'Combined Revenue by Asset'}
+                      {revenueSource === 'cdp' && 'CDP Revenue by Asset'}
+                      {revenueSource === 'swap' && 'Swap Pool Revenue by Asset'}
+                    </CardTitle>
                     <CardDescription>
-                      Protocol revenue breakdown by collateral asset for selected period
+                      {revenueSource === 'combined' && 'Total protocol revenue from both CDP and swap pools by asset'}
+                      {revenueSource === 'cdp' && 'Protocol revenue from CDP operations by collateral asset'}
+                      {revenueSource === 'swap' && 'Protocol revenue from swap pool fees by token'}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -471,7 +640,7 @@ const MercataStats = () => {
                           <Skeleton key={i} className="h-16 w-full" />
                         ))}
                       </div>
-                    ) : revenueByPeriod[selectedPeriod].byAsset.length === 0 ? (
+                    ) : getRevenueData(revenueSource).byPeriod[selectedPeriod].byAsset.length === 0 ? (
                       <div className="text-center text-gray-500 py-8">No revenue data available for this period</div>
                     ) : (
                       <div className="overflow-x-auto">
@@ -479,23 +648,54 @@ const MercataStats = () => {
                           <TableHeader>
                             <TableRow>
                               <TableHead>Asset</TableHead>
+                              <TableHead className="text-center">Source</TableHead>
                               <TableHead className="text-right">Revenue (USDST)</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {revenueByPeriod[selectedPeriod].byAsset.map((item) => (
-                              <TableRow key={item.asset}>
-                                <TableCell>
-                                  <div>
-                                    <div className="font-semibold">{item.symbol}</div>
-                                    <div className="text-sm text-gray-500">{item.asset.slice(0, 6)}...{item.asset.slice(-4)}</div>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-right font-semibold">
-                                  ${formatLargeNumber(parseFloat(formatUnits(BigInt(item.revenue || '0'), 18)))}
-                                </TableCell>
-                              </TableRow>
-                            ))}
+                            {getRevenueData(revenueSource).byPeriod[selectedPeriod].byAsset.map((item) => {
+                              // For combined view, show which source(s) contributed
+                              const hasCdpRevenue = cdpRevenueByPeriod[selectedPeriod].byAsset.some(
+                                cdpItem => cdpItem.asset === item.asset && BigInt(cdpItem.revenue) > 0n
+                              );
+                              const hasSwapRevenue = swapRevenueByPeriod[selectedPeriod].byAsset.some(
+                                swapItem => swapItem.asset === item.asset && BigInt(swapItem.revenue) > 0n
+                              );
+                              
+                              return (
+                                <TableRow key={item.asset}>
+                                  <TableCell>
+                                    <div>
+                                      <div className="font-semibold">{item.symbol}</div>
+                                      <div className="text-sm text-gray-500">{item.asset.slice(0, 6)}...{item.asset.slice(-4)}</div>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    {revenueSource === 'combined' ? (
+                                      <div className="flex justify-center gap-2">
+                                        {hasCdpRevenue && (
+                                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">CDP</span>
+                                        )}
+                                        {hasSwapRevenue && (
+                                          <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">Swap</span>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <span className={`text-xs px-2 py-1 rounded ${
+                                        revenueSource === 'cdp' 
+                                          ? 'bg-blue-100 text-blue-800'
+                                          : 'bg-purple-100 text-purple-800'
+                                      }`}>
+                                        {revenueSource === 'cdp' ? 'CDP' : 'Swap'}
+                                      </span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="text-right font-semibold">
+                                    ${formatLargeNumber(parseFloat(formatUnits(BigInt(item.revenue || '0'), 18)))}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
                           </TableBody>
                         </Table>
                       </div>

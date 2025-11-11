@@ -11,6 +11,7 @@ import {
   swap,
   getSwapHistory,
   setPoolRates,
+  getSwapProtocolRevenue,
 } from "../services/swapping.service";
 import { getBalance } from "../services/tokens.service";
 import {
@@ -263,6 +264,22 @@ class SwappingController {
 
       const result = await setPoolRates(accessToken, body, userAddress as string);
       res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Analytics
+  static async getProtocolRevenue(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken } = req;
+
+      const revenue = await getSwapProtocolRevenue(accessToken);
+      res.status(RestStatus.OK).json(revenue);
     } catch (error) {
       next(error);
     }

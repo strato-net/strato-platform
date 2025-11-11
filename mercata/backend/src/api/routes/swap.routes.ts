@@ -174,6 +174,109 @@ router.get("/swap-pools/:tokenAddress1/:tokenAddress2", authHandler.authorizeReq
 
 /**
  * @openapi
+ * /swap-pools/protocol-revenue:
+ *   get:
+ *     summary: Get protocol revenue from swap pools
+ *     tags: [Swap]
+ *     responses:
+ *       200:
+ *         description: Protocol revenue breakdown by time period and asset
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 totalRevenue:
+ *                   type: string
+ *                   description: Total all-time revenue
+ *                 revenueByPeriod:
+ *                   type: object
+ *                   properties:
+ *                     daily:
+ *                       type: object
+ *                       properties:
+ *                         total:
+ *                           type: string
+ *                         byAsset:
+ *                           type: array
+ *                           items:
+ *                             type: object
+ *                             properties:
+ *                               asset:
+ *                                 type: string
+ *                               symbol:
+ *                                 type: string
+ *                               revenue:
+ *                                 type: string
+ *                     weekly:
+ *                       type: object
+ *                       properties:
+ *                         total:
+ *                           type: string
+ *                         byAsset:
+ *                           type: array
+ *                           items:
+ *                             type: object
+ *                             properties:
+ *                               asset:
+ *                                 type: string
+ *                               symbol:
+ *                                 type: string
+ *                               revenue:
+ *                                 type: string
+ *                     monthly:
+ *                       type: object
+ *                       properties:
+ *                         total:
+ *                           type: string
+ *                         byAsset:
+ *                           type: array
+ *                           items:
+ *                             type: object
+ *                             properties:
+ *                               asset:
+ *                                 type: string
+ *                               symbol:
+ *                                 type: string
+ *                               revenue:
+ *                                 type: string
+ *                     ytd:
+ *                       type: object
+ *                       properties:
+ *                         total:
+ *                           type: string
+ *                         byAsset:
+ *                           type: array
+ *                           items:
+ *                             type: object
+ *                             properties:
+ *                               asset:
+ *                                 type: string
+ *                               symbol:
+ *                                 type: string
+ *                               revenue:
+ *                                 type: string
+ *                     allTime:
+ *                       type: object
+ *                       properties:
+ *                         total:
+ *                           type: string
+ *                         byAsset:
+ *                           type: array
+ *                           items:
+ *                             type: object
+ *                             properties:
+ *                               asset:
+ *                                 type: string
+ *                               symbol:
+ *                                 type: string
+ *                               revenue:
+ *                                 type: string
+ */
+router.get("/swap-pools/protocol-revenue", authHandler.authorizeRequest(true), SwappingController.getProtocolRevenue);
+
+/**
+ * @openapi
  * /swap-pools/{poolAddress}:
  *   get:
  *     summary: Fetch a swap pool by address

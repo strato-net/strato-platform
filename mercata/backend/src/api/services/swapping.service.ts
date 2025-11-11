@@ -495,3 +495,279 @@ export const setPoolRates = async (
 
   return executeTransaction(accessToken, tx);
 };
+
+// ============================================================================
+// REVENUE OPERATIONS
+// ============================================================================
+
+/**
+ * Helper function to get token info
+ */
+const getTokenInfo = async (
+  accessToken: string,
+  tokenAddress: string
+): Promise<{ symbol: string }> => {
+  const { data } = await cirrus.get(accessToken, `/${constants.Token}`, {
+    params: {
+      address: "eq." + tokenAddress,
+      select: "_symbol",
+    }
+  });
+  const token = data?.[0];
+  return {
+    symbol: token?._symbol || "UNKNOWN"
+  };
+};
+
+/**
+ * Get fee collector address from PoolFactory
+ */
+const getFeeCollector = async (
+  accessToken: string
+): Promise<string> => {
+  const { data: factoryData } = await cirrus.get(accessToken, `/${PoolFactory}`, {
+    params: { 
+      address: `eq.${config.poolFactory}`, 
+      select: "feeCollector" 
+    }
+  });
+  
+  if (!factoryData || factoryData.length === 0 || !factoryData[0].feeCollector) {
+    throw new Error("Fee collector address not found in PoolFactory");
+  }
+  
+  return factoryData[0].feeCollector;
+};
+
+/**
+ * Get protocol revenue from swap pool operations
+ * Queries Transfer events from pools to feeCollector
+ */
+export const getSwapProtocolRevenue = async (
+  accessToken: string,
+): Promise<{ 
+  totalRevenue: string; 
+  revenueByPeriod: {
+    daily: {
+      total: string;
+      byAsset: Array<{asset: string; symbol: string; revenue: string;}>;
+    };
+    weekly: {
+      total: string;
+      byAsset: Array<{asset: string; symbol: string; revenue: string;}>;
+    };
+    monthly: {
+      total: string;
+      byAsset: Array<{asset: string; symbol: string; revenue: string;}>;
+    };
+    ytd: {
+      total: string;
+      byAsset: Array<{asset: string; symbol: string; revenue: string;}>;
+    };
+    allTime: {
+      total: string;
+      byAsset: Array<{asset: string; symbol: string; revenue: string;}>;
+    };
+  };
+}> => {
+  try {
+    // Get fee collector address
+    const feeCollector = await getFeeCollector(accessToken);
+    
+    // Get all pools from the factory's allPools array
+    const { data: allPoolsData } = await cirrus.get(accessToken, `/${PoolFactory}-allPools`, {
+      params: {
+        address: `eq.${config.poolFactory}`,
+        select: "value"
+      }
+    });
+    
+    if (!allPoolsData || allPoolsData.length === 0) {
+      return {
+        totalRevenue: "0",
+        revenueByPeriod: {
+          daily: { total: "0", byAsset: [] },
+          weekly: { total: "0", byAsset: [] },
+          monthly: { total: "0", byAsset: [] },
+          ytd: { total: "0", byAsset: [] },
+          allTime: { total: "0", byAsset: [] }
+        }
+      };
+    }
+    // Extract pool addresses from the allPools array
+    const poolAddresses = allPoolsData.map((entry: any) => entry.value);
+    // Query all Transfer events where 'from' is any pool and 'to' is feeCollector
+    const { data: tokenTransferEvents } = await cirrus.get(accessToken, `/event`, {
+      params: {
+        event_name: `eq.Transfer`,
+        select: "address,attributes,block_timestamp",
+        "attributes->>from": `in.(${poolAddresses.join(',')})`,
+        "attributes->>to": `eq.${feeCollector}`,
+        order: "block_timestamp.desc"
+      }
+    });
+    
+    if (!tokenTransferEvents || tokenTransferEvents.length === 0) {
+      console.log("No transfer events found for fee collector");
+      return {
+        totalRevenue: "0",
+        revenueByPeriod: {
+          daily: { total: "0", byAsset: [] },
+          weekly: { total: "0", byAsset: [] },
+          monthly: { total: "0", byAsset: [] },
+          ytd: { total: "0", byAsset: [] },
+          allTime: { total: "0", byAsset: [] }
+        }
+      };
+    }
+    
+    
+    // Calculate time cutoffs
+    const now = Math.floor(Date.now() / 1000); // Current timestamp in seconds
+    const oneDayAgo = now - (24 * 60 * 60);
+    const oneWeekAgo = now - (7 * 24 * 60 * 60);
+    const oneMonthAgo = now - (30 * 24 * 60 * 60);
+    // Calculate YTD cutoff (January 1st of current year)
+    const currentYear = new Date().getFullYear();
+    const ytdCutoff = Math.floor(new Date(currentYear, 0, 1).getTime() / 1000);
+    
+    // Revenue tracking structures - by token address
+    let totalRevenue = 0n;
+    const revenueByToken: Record<string, bigint> = {};
+    
+    // Revenue by token for each time period
+    const dailyRevenueByToken: Record<string, bigint> = {};
+    const weeklyRevenueByToken: Record<string, bigint> = {};
+    const monthlyRevenueByToken: Record<string, bigint> = {};
+    const ytdRevenueByToken: Record<string, bigint> = {};
+    
+    tokenTransferEvents.forEach((event: any) => {
+      const value = BigInt(event.attributes?.value || "0");
+      const tokenAddress = event.address.toLowerCase(); // The token that emitted the Transfer event
+      
+      // Convert block_timestamp string to Unix timestamp in seconds
+      const timestampDate = new Date(event.block_timestamp);
+      if (isNaN(timestampDate.getTime())) {
+        console.error(`Invalid timestamp format: ${event.block_timestamp}`);
+        return;
+      }
+      const timestamp = Math.floor(timestampDate.getTime() / 1000);
+      
+      // Skip if value is 0
+      if (value === 0n) {
+        return;
+      }
+      
+      totalRevenue += value;
+      
+      // Track all-time by token
+      if (!revenueByToken[tokenAddress]) {
+        revenueByToken[tokenAddress] = 0n;
+      }
+      revenueByToken[tokenAddress] += value;
+      
+      // Track by time period and token
+      if (timestamp >= oneDayAgo) {
+        if (!dailyRevenueByToken[tokenAddress]) dailyRevenueByToken[tokenAddress] = 0n;
+        dailyRevenueByToken[tokenAddress] += value;
+      }
+      if (timestamp >= oneWeekAgo) {
+        if (!weeklyRevenueByToken[tokenAddress]) weeklyRevenueByToken[tokenAddress] = 0n;
+        weeklyRevenueByToken[tokenAddress] += value;
+      }
+      if (timestamp >= oneMonthAgo) {
+        if (!monthlyRevenueByToken[tokenAddress]) monthlyRevenueByToken[tokenAddress] = 0n;
+        monthlyRevenueByToken[tokenAddress] += value;
+      }
+      if (timestamp >= ytdCutoff) {
+        if (!ytdRevenueByToken[tokenAddress]) ytdRevenueByToken[tokenAddress] = 0n;
+        ytdRevenueByToken[tokenAddress] += value;
+      }
+    });
+    
+    // Get unique tokens and fetch their info
+    const uniqueTokens = Object.keys(revenueByToken);
+    const tokenInfoPromises = uniqueTokens.map(async (token) => {
+      try {
+        const info = await getTokenInfo(accessToken, token);
+        return { asset: token, symbol: info.symbol };
+      } catch (error) {
+        console.error(`Error fetching token info for ${token}:`, error);
+        return { asset: token, symbol: 'Unknown' };
+      }
+    });
+    
+    const tokenInfos = await Promise.all(tokenInfoPromises);
+    const tokenSymbolMap: Record<string, string> = {};
+    tokenInfos.forEach(({ asset, symbol }) => {
+      tokenSymbolMap[asset] = symbol;
+    });
+    
+    // Helper function to build asset array with symbols
+    const buildAssetArray = (tokenRevenue: Record<string, bigint>) => {
+      const arr = Object.entries(tokenRevenue).map(([token, revenue]) => ({
+        asset: token,
+        symbol: tokenSymbolMap[token] || 'Unknown',
+        revenue: revenue.toString()
+      }));
+      
+      // Sort by revenue descending
+      arr.sort((a, b) => {
+        const revenueA = BigInt(a.revenue);
+        const revenueB = BigInt(b.revenue);
+        if (revenueA > revenueB) return -1;
+        if (revenueA < revenueB) return 1;
+        return 0;
+      });
+      
+      return arr;
+    };
+    
+    // Build response arrays for all periods
+    const allTimeArray = buildAssetArray(revenueByToken);
+    const dailyArray = buildAssetArray(dailyRevenueByToken);
+    const weeklyArray = buildAssetArray(weeklyRevenueByToken);
+    const monthlyArray = buildAssetArray(monthlyRevenueByToken);
+    const ytdArray = buildAssetArray(ytdRevenueByToken);
+    
+    // Calculate totals for each period
+    const dailyTotal = Object.values(dailyRevenueByToken).reduce((sum, val) => sum + val, 0n);
+    const weeklyTotal = Object.values(weeklyRevenueByToken).reduce((sum, val) => sum + val, 0n);
+    const monthlyTotal = Object.values(monthlyRevenueByToken).reduce((sum, val) => sum + val, 0n);
+    const ytdTotal = Object.values(ytdRevenueByToken).reduce((sum, val) => sum + val, 0n);
+    
+    console.log("Total revenue by token:", Object.entries(revenueByToken).map(([token, revenue]) => ({ token, revenue: revenue.toString() })));
+    console.log("Total revenue:", totalRevenue.toString());
+    
+    return {
+      totalRevenue: totalRevenue.toString(),
+      revenueByPeriod: {
+        daily: {
+          total: dailyTotal.toString(),
+          byAsset: dailyArray
+        },
+        weekly: {
+          total: weeklyTotal.toString(),
+          byAsset: weeklyArray
+        },
+        monthly: {
+          total: monthlyTotal.toString(),
+          byAsset: monthlyArray
+        },
+        ytd: {
+          total: ytdTotal.toString(),
+          byAsset: ytdArray
+        },
+        allTime: {
+          total: totalRevenue.toString(),
+          byAsset: allTimeArray
+        }
+      }
+    };
+  } catch (error: any) {
+    console.error("Error fetching swap protocol revenue:", {
+      error: error.response?.data || error.message
+    });
+    throw new Error("Failed to fetch swap protocol revenue");
+  }
+};
