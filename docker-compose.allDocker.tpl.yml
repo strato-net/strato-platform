@@ -44,8 +44,6 @@ services:
       - mercata-backend
     build: ./mercata/ui
     image: ${MERCATAUI_IMAGE:-<REPO_URL>mercata-ui:<VERSION>}
-    environment:
-      - LUCKY_ORANGE_SITE_ID=${LUCKY_ORANGE_SITE_ID}
     restart: unless-stopped
     logging:
       driver: "json-file"
