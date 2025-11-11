@@ -704,16 +704,19 @@ insertDelegatecall ::
   PGConnection ->
   Delegatecall ->
   ConduitM () SlipstreamQuery m ()
-insertDelegatecall conn (Delegatecall s _ c n) = do
+insertDelegatecall conn (Delegatecall s _ Nothing n) = do
   --ValueString $ fromMaybe (error $ "delegate call = " ++ show dc) c,
   -- TODO: Hardcoding "BlockApps" IS A HACK!! I've hardcoded the creator to "BlockApps" to get things working in the app,
   --       but this needs to be fixed ASAP so that Slipstream can use the real creator name
   lift $ performSQLQueries conn [insert_ $
                                  Contract
                                  (StorageKey s)
-                                 (fromMaybe "BlockApps" c)
+                                 "BlockApps"
                                  n
                                 ]
+insertDelegatecall conn (Delegatecall s _ (Just c) n) = do
+  lift $ performSQLQueries conn
+    [insert_ $ Contract (StorageKey s) c n]
 
 insertCollectionTable ::
   OutputM m =>
