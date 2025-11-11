@@ -3,6 +3,8 @@ import { constants } from "../../config/constants";
 
 const { Token } = constants;
 
+export const toUTCTime = (d: Date) => d.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, ' UTC');
+
 export const fetchTokenBalances = (accessToken: string, userAddress: string, tokenAddrs: string[]) =>
   cirrus.get(accessToken, `/${constants.Token}-_balances`, {
     params: { 

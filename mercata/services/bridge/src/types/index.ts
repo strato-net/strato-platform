@@ -78,13 +78,6 @@ export interface SafeTransactionData {
   externalChainId: number;
 }
 
-export interface AssetInfo {
-  externalToken: string;
-  externalDecimals: number;
-  permissions: number;
-  externalChainId: string;
-}
-
 export interface PreparedWithdrawal {
   externalTokenAmount: string;
   externalRecipient: string;
@@ -146,8 +139,30 @@ export interface WithdrawalInfo {
 export interface ChainInfo {
   externalChainId: number;
   depositRouter: string;
-  lastProcessedBlock: string;
+  lastProcessedBlock: number;
   enabled: boolean;
   custody: string;
   chainName: string;
+}
+
+export interface AssetInfo {
+  enabled: boolean;
+  stratoToken: string;
+  externalName: string;
+  externalToken: string;
+  externalSymbol: string;
+  externalChainId: number;
+  externalDecimals: number;
+  maxPerWithdrawal: number;
+}
+
+export interface BridgeInfo {
+  DECIMAL_PLACES: number;
+  USDST_ADDRESS: string;
+  WITHDRAWAL_ABORT_DELAY: number;
+  _owner: string;
+  depositsPaused: boolean;
+  tokenFactory: string;
+  withdrawalCounter: number;
+  withdrawalsPaused: boolean;
 }

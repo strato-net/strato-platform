@@ -317,4 +317,38 @@ export const formatDecimalToWeiHP = (
   return isNegative ? `-${totalWei.toString()}` : totalWei.toString();
 };
 
+/**
+ * Calculates the dollar value of a token by multiplying balance and price.
+ * Both values are expected to be in 18-decimal wei format.
+ * 
+ * @param rawBalance - Token balance in wei (18 decimals)
+ * @param rawPrice - Token price in wei (18 decimals)
+ * @param rawCollateral - Optional collateral balance in wei (18 decimals)
+ * @returns Dollar value as a formatted string with 2 decimal places
+ */
+export const calculateTokenValue = (
+  rawBalance: string | number | bigint,
+  rawPrice: string | number | bigint,
+  rawCollateral?: string | number | bigint
+): string => {
+  if (!rawPrice || rawPrice === "0" || rawPrice === 0 || rawPrice === 0n) return "0.00";
+
+  try {
+    const balance = rawBalance 
+      ? parseFloat(formatUnits(BigInt(rawBalance.toString()), 18))
+      : 0;
+    const price = parseFloat(formatUnits(BigInt(rawPrice.toString()), 18));
+    const collateral = rawCollateral 
+      ? parseFloat(formatUnits(BigInt(rawCollateral.toString()), 18))
+      : 0;
+    
+    const totalBalance = balance + collateral;
+    const value = totalBalance * price;
+
+    return value.toFixed(2);
+  } catch (error) {
+    return "0.00";
+  }
+};
+
 export { formatUnits } from "ethers";
