@@ -13,4 +13,23 @@ if (siteId && siteId.trim() !== '') {
   document.head.appendChild(script);
 }
 
+// Conditionally load Google Analytics
+// Use runtime config (from /config.js) if available, fallback to build-time env var
+const gaId = (window as any).ENV?.GOOGLE_ANALYTICS_ID || import.meta.env.VITE_GOOGLE_ANALYTICS_ID;
+if (gaId && gaId.trim() !== '') {
+  // Load gtag.js library
+  const gtagScript = document.createElement('script');
+  gtagScript.src = `https://www.googletagmanager.com/gtag/js?id=${gaId}`;
+  gtagScript.async = true;
+  document.head.appendChild(gtagScript);
+
+  // Initialize dataLayer and gtag
+  (window as any).dataLayer = (window as any).dataLayer || [];
+  function gtag(...args: any[]) {
+    (window as any).dataLayer.push(args);
+  }
+  gtag('js', new Date());
+  gtag('config', gaId);
+}
+
 createRoot(document.getElementById("root")!).render(<App />);
