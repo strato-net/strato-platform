@@ -56,6 +56,7 @@ import qualified Data.Text                       as T
 import           Bloc.Server.Utils               (partitionWith)
 import           BlockApps.Logging
 import           Blockchain.Slipstream.Data.Action
+import           Blockchain.Slipstream.Data.CirrusTables
 import qualified Blockchain.Slipstream.Events               as E
 import           Blockchain.Slipstream.Options
 import           Blockchain.Slipstream.QueryFormatHelper
@@ -66,8 +67,10 @@ import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Stream.Action        (Delegatecall(..))
 import           Data.Text.Encoding              (decodeUtf8, decodeUtf8', encodeUtf8)
 import           Data.Time
+import           Database.Persist                (insert_)
+import           Database.Persist.Postgresql     (runSqlPool, SqlPersistT)
 import           Blockchain.Slipstream.PostgresqlTypedShim
-import           SolidVM.Model.CodeCollection    hiding (contractName, contracts, parents)
+import           SolidVM.Model.CodeCollection    hiding (Contract, contractName, contracts, parents)
 import qualified SolidVM.Model.CodeCollection.VarDef as VarDef
 import           SolidVM.Model.SolidString
 import           SolidVM.Model.Storable
@@ -131,11 +134,16 @@ data SlipstreamQuery = CreateTable
 slipstreamQueryPostgres :: SlipstreamQuery -> Text
 slipstreamQueryPostgres = slipstreamQueryText sqlTypePostgres
 
-performSQLQueries :: (MonadLogger m, MonadUnliftIO m) =>
-                     PGConnection -> [SlipstreamQuery] -> m ()
-performSQLQueries conn slipstreamQueries = do
+performSQLQueriesFromQuery :: (MonadLogger m, MonadUnliftIO m) =>
+                              PGConnection -> [SlipstreamQuery] -> m ()
+performSQLQueriesFromQuery conn slipstreamQueries = do
   forM_ slipstreamQueries $ \slipstreamQuery -> do
     dbQueryCatchError conn . slipstreamQueryPostgres $ slipstreamQuery
+
+performSQLQueries :: (MonadLogger m, MonadUnliftIO m) =>
+                     PGConnection -> [SqlPersistT m ()] -> m ()
+performSQLQueries conn slipstreamQueries = do
+  handle handlePostgresError $ runSqlPool (sequence_ slipstreamQueries) conn
 
 slipstreamQueryText :: (SqlType -> Text) -> SlipstreamQuery -> Text
 slipstreamQueryText sqlTypeText CreateTable{..} = T.concat $
@@ -499,7 +507,7 @@ dedupC :: (MonadUnliftIO m, MonadLogger m) => PGConnection -> ConduitM Slipstrea
 dedupC conn = go Set.empty
   where go seen = await >>= \case
           Just a | not (a `Set.member` seen) -> do
-                     lift $ performSQLQueries conn [a]
+                     lift $ performSQLQueriesFromQuery conn [a]
                      go (Set.insert a seen)
           Just _ -> go seen
           Nothing -> pure ()
@@ -511,7 +519,7 @@ outputDataDedup ::
   ConduitM i [SlipstreamQuery] m a
 outputDataDedup conn c = do
   (a, cmds) <- lift . runConduit $ c `fuseBoth` (dedupC conn .| sinkList) -- mapM_C (dbQueryCatchError conn))
-  lift $ performSQLQueries conn cmds
+  lift $ performSQLQueriesFromQuery conn cmds
   pure a
 
 baseColumns :: TableColumns
@@ -553,7 +561,7 @@ notifyPostgREST ::
   OutputM m =>
   PGConnection ->
   ConduitM i SlipstreamQuery m ()
-notifyPostgREST conn = lift $ performSQLQueries conn [NotifyPostgREST]
+notifyPostgREST conn = lift $ performSQLQueriesFromQuery conn [NotifyPostgREST]
 
 createIndexTable ::
   OutputM m=>
@@ -571,7 +579,7 @@ createIndexTable conn contract cc (creator, n) inherited = do
       contractCols = ["creator", "contract_name"]
       cols' = (\(x, t, _) -> (x, t)) <$> cols
       fkeys = mapMaybe (\(x, t, mf) -> (\f -> ForeignKeyInfo tableName (indexTableName creator f) x t) <$> mf) cols
-  lift $ performSQLQueries conn [CreateView
+  lift $ performSQLQueriesFromQuery conn [CreateView
     tableName
     inherited
     storageTableName
@@ -610,7 +618,7 @@ createCollectionTable conn (creator, n) c cc inherited (collectionName, keyTypes
         )) <$> (structDef c cc =<< mStructName)
       mappingCols = (fst <$> baseMappingColumns)
         ++ maybe ["value"] (const []) mStructVal
-  lift $ performSQLQueries conn [CreateView
+  lift $ performSQLQueriesFromQuery conn [CreateView
     tableName
     inherited
     mappingTableName
@@ -649,7 +657,7 @@ createEventArrayTable conn (creator, n, e) cc inherited (arr, arrType) = do
   $logInfoS "createEventArrayTable/tableExists"  $ T.pack ( "Table Name: " ++ show tableName ++ ", table exists: ")
   $logInfoS "createEventArrayTable/(creator, n, e) " (T.pack $ show (creator, n, e))
   $logInfoS "createEventArrayTable/(arr, arrType) " (T.pack $ show (arr, arrType))
-  lift $ performSQLQueries conn [CreateView
+  lift $ performSQLQueriesFromQuery conn [CreateView
     tableName
     inherited
     eventArrayTableName
@@ -689,7 +697,7 @@ insertIndexTable conn cs =
               dataUpdateSQL = jsonbUpdateClause tblText "data"
           in [ InsertTable storageTableName keySt [valsForSQL] . Just $ OnConflict ["address"] conflictUpdateCols (Just dataUpdateSQL)
              ]
-   in lift $ performSQLQueries conn $ processContract cs'
+   in lift $ performSQLQueriesFromQuery conn $ processContract cs'
 
 insertDelegatecall ::
   OutputM m =>
@@ -697,16 +705,15 @@ insertDelegatecall ::
   Delegatecall ->
   ConduitM () SlipstreamQuery m ()
 insertDelegatecall conn (Delegatecall s _ c n) = do
-  let contractKeySt = (,SqlText) <$> ["address", "creator", "contract_name"]
-      contractValsForSQL = map (Just . SimpleValue)
-        [ ValueAddress s,
-          --ValueString $ fromMaybe (error $ "delegate call = " ++ show dc) c,
-          -- TODO: THIS IS A HACK!! I've hardcoded the creator to "BlockApps" to get things working in the app,
-          --       but this needs to be fixed ASAP so that Slipstream can use the real creator name
-          ValueString $ fromMaybe "BlockApps" c,
-          ValueString n
-        ]
-    in lift $ performSQLQueries conn [InsertTable contractTableName contractKeySt [contractValsForSQL] (Just DoNothing)]
+  --ValueString $ fromMaybe (error $ "delegate call = " ++ show dc) c,
+  -- TODO: Hardcoding "BlockApps" IS A HACK!! I've hardcoded the creator to "BlockApps" to get things working in the app,
+  --       but this needs to be fixed ASAP so that Slipstream can use the real creator name
+  lift $ performSQLQueries conn [insert_ $
+                                 Contract
+                                 (StorageKey s)
+                                 (fromMaybe "BlockApps" c)
+                                 n
+                                ]
 
 insertCollectionTable ::
   OutputM m =>
@@ -716,7 +723,7 @@ insertCollectionTable ::
 insertCollectionTable _ [] = error "insertCollectionTable: unhandled empty list"
 insertCollectionTable conn maps = do
   let results = processGroupedData maps
-  lift $ performSQLQueries conn results
+  lift $ performSQLQueriesFromQuery conn results
 
 refreshMaterializedView ::
   -- OutputM m =>
@@ -738,7 +745,7 @@ createFkeyFunctions ::
   PGConnection ->
   [ForeignKeyInfo] ->
   ConduitM () SlipstreamQuery m ()
-createFkeyFunctions conn rows = lift $ performSQLQueries conn $ CreateFkeyFunction <$> rows
+createFkeyFunctions conn rows = lift $ performSQLQueriesFromQuery conn $ CreateFkeyFunction <$> rows
 
 eventBaseColumnsQuery :: [(Text, SqlType)]
 eventBaseColumnsQuery =
@@ -914,7 +921,7 @@ createEventTable conn (creator, n) evName ev cc inherited = do
       fcols = mapMaybe (\(x, t, mf) -> (\f -> ForeignKeyInfo eventTable (indexTableName creator f) x t) <$> mf) cols
       arrayNamesAndTypes = [(key, entry) | (key, IndexedType _ (SVMType.Array entry _)) <- map evLogToPair $ ev ^. eventLogs]
   $logInfoS "keys" (T.pack $ show arrayNamesAndTypes)
-  lift $ performSQLQueries conn $
+  lift $ performSQLQueriesFromQuery conn $
     (\i ->
       let tableName' = if i then indexedEventTableName eventTable else eventTable
           cols' = (\(x, v, _) -> (x, v)) <$> cols
@@ -971,7 +978,7 @@ getArraysFromEvents evArgs = do
 pipeInsertGlobalEventTable :: OutputM m => PGConnection -> [AggregateEvent] -> ConduitM () SlipstreamQuery m ()
 pipeInsertGlobalEventTable conn aggregatedEvents = do
   queries <- lift (mapM insertGlobalEventTable aggregatedEvents)
-  lift $ performSQLQueries conn queries
+  lift $ performSQLQueriesFromQuery conn queries
 
 insertGlobalEventTable :: OutputM m => AggregateEvent -> m SlipstreamQuery
 insertGlobalEventTable agEv = do
