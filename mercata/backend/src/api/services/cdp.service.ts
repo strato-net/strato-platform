@@ -1944,3 +1944,211 @@ export const openJuniorNote = async (
     throw new Error("Failed to open junior note");
   }
 };
+
+/**
+ * Get protocol revenue from CDP operations
+ * Sums all toCollector values from FeesRouted events
+ */
+export const getProtocolRevenue = async (
+  accessToken: string,
+  userAddress: string
+): Promise<{ 
+  totalRevenue: string; 
+  revenueByPeriod: {
+    daily: {
+      total: string;
+      byAsset: Array<{asset: string; symbol: string; revenue: string;}>;
+    };
+    weekly: {
+      total: string;
+      byAsset: Array<{asset: string; symbol: string; revenue: string;}>;
+    };
+    monthly: {
+      total: string;
+      byAsset: Array<{asset: string; symbol: string; revenue: string;}>;
+    };
+    ytd: {
+      total: string;
+      byAsset: Array<{asset: string; symbol: string; revenue: string;}>;
+    };
+    allTime: {
+      total: string;
+      byAsset: Array<{asset: string; symbol: string; revenue: string;}>;
+    };
+  };
+}> => {
+  try {
+    // Get registry to find CDPEngine address
+    const registry = await getCDPRegistry(accessToken, userAddress, {}, "getProtocolRevenue");
+    
+    if (!registry?.cdpEngine) {
+      throw new Error("CDP Engine not found");
+    }
+    const cdpEngineAddress = registry.cdpEngine.address;
+    // Fetch all FeesRouted events from CDPEngine
+    const { data: feesRoutedEvents } = await cirrus.get(
+      accessToken,
+      `/${CDPEngine}-FeesRouted`,
+      {
+        params: {
+          select: "asset,toCollector,block_timestamp,block_number",
+          address: `eq.${cdpEngineAddress}`
+        
+        }
+      }
+    );
+
+    if (!feesRoutedEvents || feesRoutedEvents.length === 0) {
+      return {
+        totalRevenue: "0",
+        revenueByPeriod: {
+          daily: { total: "0", byAsset: [] },
+          weekly: { total: "0", byAsset: [] },
+          monthly: { total: "0", byAsset: [] },
+          ytd: { total: "0", byAsset: [] },
+          allTime: { total: "0", byAsset: [] }
+        }
+      };
+    }
+
+    // Calculate time cutoffs
+    const now = Math.floor(Date.now() / 1000); // Current timestamp in seconds
+    const oneDayAgo = now - (24 * 60 * 60);
+    const oneWeekAgo = now - (7 * 24 * 60 * 60);
+    const oneMonthAgo = now - (30 * 24 * 60 * 60);
+    // Calculate YTD cutoff (January 1st of current year)
+    const currentYear = new Date().getFullYear();
+    const ytdCutoff = Math.floor(new Date(currentYear, 0, 1).getTime() / 1000);
+
+    // Revenue tracking structures
+    let totalRevenue = 0n;
+    const revenueByAsset: Record<string, bigint> = {};
+    
+    // Revenue by asset for each time period
+    const dailyRevenueByAsset: Record<string, bigint> = {};
+    const weeklyRevenueByAsset: Record<string, bigint> = {};
+    const monthlyRevenueByAsset: Record<string, bigint> = {};
+    const ytdRevenueByAsset: Record<string, bigint> = {};
+
+    feesRoutedEvents.forEach((event: any) => {
+      const toCollector = BigInt(event.toCollector || "0");
+      const asset = event.asset.toLowerCase();
+      
+      // Convert block_timestamp string to Unix timestamp in seconds
+      const timestampDate = new Date(event.block_timestamp);
+      if (isNaN(timestampDate.getTime())) {
+        console.error(`Invalid timestamp format: ${event.block_timestamp}`);
+        return; // Skip this event
+      }
+      const timestamp = Math.floor(timestampDate.getTime() / 1000);
+      
+      totalRevenue += toCollector;
+      
+      // Track all-time by asset
+      if (!revenueByAsset[asset]) {
+        revenueByAsset[asset] = 0n;
+      }
+      revenueByAsset[asset] += toCollector;
+      
+      // Track by time period and asset
+      if (timestamp >= oneDayAgo) {
+        if (!dailyRevenueByAsset[asset]) dailyRevenueByAsset[asset] = 0n;
+        dailyRevenueByAsset[asset] += toCollector;
+      }
+      if (timestamp >= oneWeekAgo) {
+        if (!weeklyRevenueByAsset[asset]) weeklyRevenueByAsset[asset] = 0n;
+        weeklyRevenueByAsset[asset] += toCollector;
+      }
+      if (timestamp >= oneMonthAgo) {
+        if (!monthlyRevenueByAsset[asset]) monthlyRevenueByAsset[asset] = 0n;
+        monthlyRevenueByAsset[asset] += toCollector;
+      }
+      if (timestamp >= ytdCutoff) {
+        if (!ytdRevenueByAsset[asset]) ytdRevenueByAsset[asset] = 0n;
+        ytdRevenueByAsset[asset] += toCollector;
+      }
+    });
+
+    // Get unique assets and fetch their token info
+    const uniqueAssets = Object.keys(revenueByAsset);
+    const tokenInfoPromises = uniqueAssets.map(async (asset) => {
+      try {
+        const info = await getTokenInfo(accessToken, asset);
+        return { asset, symbol: info.symbol };
+      } catch (error) {
+        console.error(`Error fetching token info for ${asset}:`, error);
+        return { asset, symbol: 'Unknown' };
+      }
+    });
+    
+    const tokenInfos = await Promise.all(tokenInfoPromises);
+    const tokenSymbolMap: Record<string, string> = {};
+    tokenInfos.forEach(({ asset, symbol }) => {
+      tokenSymbolMap[asset] = symbol;
+    });
+
+    // Helper function to build asset array with symbols
+    const buildAssetArray = (assetRevenue: Record<string, bigint>) => {
+      const arr = Object.entries(assetRevenue).map(([asset, revenue]) => ({
+        asset,
+        symbol: tokenSymbolMap[asset] || 'Unknown',
+        revenue: revenue.toString()
+      }));
+      
+      // Sort by revenue descending
+      arr.sort((a, b) => {
+        const revenueA = BigInt(a.revenue);
+        const revenueB = BigInt(b.revenue);
+        if (revenueA > revenueB) return -1;
+        if (revenueA < revenueB) return 1;
+        return 0;
+      });
+      
+      return arr;
+    };
+
+    // Build response arrays for all periods
+    const allTimeArray = buildAssetArray(revenueByAsset);
+    const dailyArray = buildAssetArray(dailyRevenueByAsset);
+    const weeklyArray = buildAssetArray(weeklyRevenueByAsset);
+    const monthlyArray = buildAssetArray(monthlyRevenueByAsset);
+    const ytdArray = buildAssetArray(ytdRevenueByAsset);
+
+    // Calculate totals for each period
+    const dailyTotal = Object.values(dailyRevenueByAsset).reduce((sum, val) => sum + val, 0n);
+    const weeklyTotal = Object.values(weeklyRevenueByAsset).reduce((sum, val) => sum + val, 0n);
+    const monthlyTotal = Object.values(monthlyRevenueByAsset).reduce((sum, val) => sum + val, 0n);
+    const ytdTotal = Object.values(ytdRevenueByAsset).reduce((sum, val) => sum + val, 0n);
+
+    return {
+      totalRevenue: totalRevenue.toString(),
+      revenueByPeriod: {
+        daily: {
+          total: dailyTotal.toString(),
+          byAsset: dailyArray
+        },
+        weekly: {
+          total: weeklyTotal.toString(),
+          byAsset: weeklyArray
+        },
+        monthly: {
+          total: monthlyTotal.toString(),
+          byAsset: monthlyArray
+        },
+        ytd: {
+          total: ytdTotal.toString(),
+          byAsset: ytdArray
+        },
+        allTime: {
+          total: totalRevenue.toString(),
+          byAsset: allTimeArray
+        }
+      }
+    };
+  } catch (error: any) {
+    console.error("Error fetching protocol revenue:", {
+      error: error.response?.data || error.message
+    });
+    throw new Error("Failed to fetch protocol revenue");
+  }
+};

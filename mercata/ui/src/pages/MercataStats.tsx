@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/lib/axios";
 import { formatUnits } from '@/utils/numberUtils';
-import { TrendingUp, Coins, Vault, Activity } from 'lucide-react';
+import { TrendingUp, Coins, Vault, Activity, DollarSign } from 'lucide-react';
 
 interface TokenWithStats {
   address: string;
@@ -41,6 +41,30 @@ interface CDPStatsResponse {
   assets: CDPAssetStats[];
 }
 
+interface AssetRevenue {
+  asset: string;
+  symbol: string;
+  revenue: string;
+}
+
+interface PeriodRevenue {
+  total: string;
+  byAsset: AssetRevenue[];
+}
+
+interface RevenuePeriod {
+  daily: PeriodRevenue;
+  weekly: PeriodRevenue;
+  monthly: PeriodRevenue;
+  ytd: PeriodRevenue;
+  allTime: PeriodRevenue;
+}
+
+interface ProtocolRevenueResponse {
+  totalRevenue: string;
+  revenueByPeriod: RevenuePeriod;
+}
+
 const MercataStats = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [tokens, setTokens] = useState<TokenWithStats[]>([]);
@@ -56,9 +80,23 @@ const MercataStats = () => {
   const [cdpLoading, setCdpLoading] = useState(true);
   const [cdpError, setCdpError] = useState<string | null>(null);
 
+  // Protocol Revenue state
+  const [totalRevenue, setTotalRevenue] = useState<string>('0');
+  const [revenueByPeriod, setRevenueByPeriod] = useState<RevenuePeriod>({
+    daily: { total: '0', byAsset: [] },
+    weekly: { total: '0', byAsset: [] },
+    monthly: { total: '0', byAsset: [] },
+    ytd: { total: '0', byAsset: [] },
+    allTime: { total: '0', byAsset: [] }
+  });
+  const [selectedPeriod, setSelectedPeriod] = useState<keyof RevenuePeriod>('allTime');
+  const [revenueLoading, setRevenueLoading] = useState(true);
+  const [revenueError, setRevenueError] = useState<string | null>(null);
+
   useEffect(() => {
     fetchTokenStats();
     fetchCDPStats();
+    fetchProtocolRevenue();
   }, []);
 
   const fetchTokenStats = async () => {
@@ -91,6 +129,21 @@ const MercataStats = () => {
       setCdpError('Failed to load CDP statistics');
     } finally {
       setCdpLoading(false);
+    }
+  };
+
+  const fetchProtocolRevenue = async () => {
+    try {
+      setRevenueLoading(true);
+      const response = await api.get<ProtocolRevenueResponse>('/cdp/protocol-revenue');
+      
+      setTotalRevenue(response.data.totalRevenue);
+      setRevenueByPeriod(response.data.revenueByPeriod);
+    } catch (err) {
+      console.error('Failed to fetch protocol revenue:', err);
+      setRevenueError('Failed to load protocol revenue');
+    } finally {
+      setRevenueLoading(false);
     }
   };
 
@@ -127,7 +180,7 @@ const MercataStats = () => {
         <main className="p-6">
           <div className="max-w-7xl mx-auto">
             <Tabs defaultValue="tokens" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 mb-6">
+              <TabsList className="grid w-full grid-cols-3 mb-6">
                 <TabsTrigger value="tokens">
                   <Coins className="h-4 w-4 mr-2" />
                   Token Stats
@@ -135,6 +188,10 @@ const MercataStats = () => {
                 <TabsTrigger value="cdp">
                   <Vault className="h-4 w-4 mr-2" />
                   CDP Stats
+                </TabsTrigger>
+                <TabsTrigger value="revenue">
+                  <DollarSign className="h-4 w-4 mr-2" />
+                  Protocol Revenue
                 </TabsTrigger>
               </TabsList>
 
@@ -301,6 +358,141 @@ const MercataStats = () => {
                                 </TableCell>
                                 <TableCell className="text-right">
                                   {formatCR(asset.collateralizationRatio)}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="revenue">
+                {/* Time Period Selector */}
+                <div className="flex flex-col sm:flex-row gap-4 mb-6">
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setSelectedPeriod('daily')}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        selectedPeriod === 'daily' 
+                          ? 'bg-blue-600 text-white' 
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}
+                    >
+                      Daily
+                    </button>
+                    <button
+                      onClick={() => setSelectedPeriod('weekly')}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        selectedPeriod === 'weekly' 
+                          ? 'bg-blue-600 text-white' 
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}
+                    >
+                      Weekly
+                    </button>
+                    <button
+                      onClick={() => setSelectedPeriod('monthly')}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        selectedPeriod === 'monthly' 
+                          ? 'bg-blue-600 text-white' 
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}
+                    >
+                      Monthly
+                    </button>
+                    <button
+                      onClick={() => setSelectedPeriod('ytd')}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        selectedPeriod === 'ytd' 
+                          ? 'bg-blue-600 text-white' 
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}
+                    >
+                      YTD
+                    </button>
+                    <button
+                      onClick={() => setSelectedPeriod('allTime')}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        selectedPeriod === 'allTime' 
+                          ? 'bg-blue-600 text-white' 
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}
+                    >
+                      All Time
+                    </button>
+                  </div>
+                </div>
+
+                {/* Revenue Summary Card */}
+                <div className="grid grid-cols-1 gap-6 mb-6">
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">
+                        {selectedPeriod === 'daily' && 'Daily Revenue (Last 24 Hours)'}
+                        {selectedPeriod === 'weekly' && 'Weekly Revenue (Last 7 Days)'}
+                        {selectedPeriod === 'monthly' && 'Monthly Revenue (Last 30 Days)'}
+                        {selectedPeriod === 'ytd' && 'Year-to-Date Revenue'}
+                        {selectedPeriod === 'allTime' && 'All-Time Revenue'}
+                      </CardTitle>
+                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">
+                        {revenueLoading ? (
+                          <Skeleton className="h-8 w-24" />
+                        ) : (
+                          `$${formatLargeNumber(parseFloat(formatUnits(BigInt(revenueByPeriod[selectedPeriod].total || '0'), 18)))}`
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Total CDP protocol revenue for selected period
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Revenue by Asset Table */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Revenue by Asset</CardTitle>
+                    <CardDescription>
+                      Protocol revenue breakdown by collateral asset for selected period
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {revenueError ? (
+                      <div className="text-center text-red-500 py-8">{revenueError}</div>
+                    ) : revenueLoading ? (
+                      <div className="space-y-3">
+                        {[...Array(3)].map((_, i) => (
+                          <Skeleton key={i} className="h-16 w-full" />
+                        ))}
+                      </div>
+                    ) : revenueByPeriod[selectedPeriod].byAsset.length === 0 ? (
+                      <div className="text-center text-gray-500 py-8">No revenue data available for this period</div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Asset</TableHead>
+                              <TableHead className="text-right">Revenue (USDST)</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {revenueByPeriod[selectedPeriod].byAsset.map((item) => (
+                              <TableRow key={item.asset}>
+                                <TableCell>
+                                  <div>
+                                    <div className="font-semibold">{item.symbol}</div>
+                                    <div className="text-sm text-gray-500">{item.asset.slice(0, 6)}...{item.asset.slice(-4)}</div>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-right font-semibold">
+                                  ${formatLargeNumber(parseFloat(formatUnits(BigInt(item.revenue || '0'), 18)))}
                                 </TableCell>
                               </TableRow>
                             ))}
