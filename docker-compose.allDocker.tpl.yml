@@ -31,7 +31,7 @@ services:
       - LENDING_REGISTRY=${LENDING_REGISTRY}
       - TOKEN_FACTORY=${TOKEN_FACTORY}
       - ADMIN_REGISTRY=${ADMIN_REGISTRY}
-      - BRIDGE_API_BASE_URL=${BRIDGE_API_BASE_URL}
+      - MERCATA_BRIDGE=${MERCATA_BRIDGE}
       - WAGMI_PROJECT_ID=${WAGMI_PROJECT_ID}
     restart: unless-stopped
     logging:
@@ -287,7 +287,7 @@ services:
         max-size: "100m"
         max-file: "3"
   zookeeper:
-    image: zookeeper:3.4.14
+    image: zookeeper:3.9.3
     restart: unless-stopped
     volumes:
       - zookeeperdata:/data
