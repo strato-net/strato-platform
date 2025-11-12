@@ -43,13 +43,21 @@ const isValidInputAmount = (amount: string): boolean => {
 };
 
 const calculateExchangeRates = (pool: Pool | null, fromAsset: SwapToken | null) => {
-  if (!pool || !fromAsset?.address) return { exchangeRate: "0", oracleExchangeRate: "0" };
+  if (!pool || !fromAsset?.address) return { 
+    exchangeRateRaw: "0", 
+    exchangeRate: "0", 
+    oracleExchangeRate: "0" 
+  };
   
   const isAToB = pool.tokenA?.address === fromAsset.address;
   const poolRate = isAToB ? pool.aToBRatio : pool.bToARatio;
   const oracleRate = isAToB ? pool.oracleAToBRatio : pool.oracleBToARatio;
   
+  // Strip commas from raw rate in case backend sends pre-formatted data
+  const cleanRate = String(poolRate || "0").replace(/,/g, '');
+  
   return {
+    exchangeRateRaw: cleanRate,
     exchangeRate: poolRate && poolRate !== "0" ? formatAmount(poolRate) : "0",
     oracleExchangeRate: oracleRate && oracleRate !== "0" ? formatAmount(oracleRate) : "0"
   };
@@ -475,12 +483,12 @@ const SwapWidget = () => {
   // ========================================================================
   
   // Exchange rates (both pool and oracle)
-  const { exchangeRate, oracleExchangeRate } = calculateExchangeRates(pool, fromAsset);
+  const { exchangeRateRaw, exchangeRate, oracleExchangeRate } = calculateExchangeRates(pool, fromAsset);
 
-  // Impact calculations (price and pool)
+  // Impact calculations (price and pool) - use raw rate for calculations
   const { priceImpact, poolImpact } = useMemo(() => {
-    return calculateImpact(exchangeRate, fromAmount, toAmount) ?? { priceImpact: null, poolImpact: null };
-  }, [exchangeRate, fromAmount, toAmount]);
+    return calculateImpact(exchangeRateRaw, fromAmount, toAmount) ?? { priceImpact: null, poolImpact: null };
+  }, [exchangeRateRaw, fromAmount, toAmount]);
 
   // Minimum received calculation (after slippage)
   const toAmountMinWei = useMemo(() => {
@@ -963,4 +971,4 @@ const SwapWidget = () => {
 // ============================================================================
 // EXPORT
 // ============================================================================
-export default SwapWidget; 
+export default SwapWidget;

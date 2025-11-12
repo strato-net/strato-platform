@@ -124,11 +124,11 @@ export const calculateImpact = (
     return null;
   }
 
-  const poolPrice = parseFloat(currentPoolPrice);
-  const from = parseFloat(fromAmount);
-  const to = parseFloat(toAmount);
+  const poolPrice = Number(currentPoolPrice);
+  const from = Number(fromAmount);
+  const to = Number(toAmount);
 
-  if (isNaN(poolPrice) || isNaN(from) || isNaN(to) || poolPrice === 0 || from === 0) {
+  if (!Number.isFinite(poolPrice) || !Number.isFinite(from) || !Number.isFinite(to) || poolPrice === 0 || from === 0) {
     return null;
   }
 
@@ -136,9 +136,7 @@ export const calculateImpact = (
   const priceImpact = Math.abs((effectivePrice - poolPrice) / poolPrice) * 100;
   
   // I_pool = (1 + I_user)^2 - 1
-  const priceImpactDecimal = priceImpact / 100;
-  const poolImpactDecimal = Math.pow(1 + priceImpactDecimal, 2) - 1;
-  const poolImpact = poolImpactDecimal * 100;
+  const poolImpact = ((1 + priceImpact / 100) ** 2 - 1) * 100;
   
   return { priceImpact, poolImpact };
 };
