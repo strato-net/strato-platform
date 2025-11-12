@@ -99,8 +99,17 @@ const MercataStats = () => {
     allTime: { total: '0', byAsset: [] }
   });
   
+  const [lendingTotalRevenue, setLendingTotalRevenue] = useState<string>('0');
+  const [lendingRevenueByPeriod, setLendingRevenueByPeriod] = useState<RevenuePeriod>({
+    daily: { total: '0', byAsset: [] },
+    weekly: { total: '0', byAsset: [] },
+    monthly: { total: '0', byAsset: [] },
+    ytd: { total: '0', byAsset: [] },
+    allTime: { total: '0', byAsset: [] }
+  });
+  
   const [selectedPeriod, setSelectedPeriod] = useState<keyof RevenuePeriod>('allTime');
-  const [revenueSource, setRevenueSource] = useState<'cdp' | 'swap' | 'combined'>('combined');
+  const [revenueSource, setRevenueSource] = useState<'cdp' | 'swap' | 'lending' | 'combined'>('combined');
   const [revenueLoading, setRevenueLoading] = useState(true);
   const [revenueError, setRevenueError] = useState<string | null>(null);
 
@@ -147,10 +156,11 @@ const MercataStats = () => {
     try {
       setRevenueLoading(true);
       
-      // Fetch both CDP and Swap revenue in parallel
-      const [cdpResponse, swapResponse] = await Promise.all([
+      // Fetch CDP, Swap, and Lending revenue in parallel
+      const [cdpResponse, swapResponse, lendingResponse] = await Promise.all([
         api.get<ProtocolRevenueResponse>('/cdp/protocol-revenue'),
-        api.get<ProtocolRevenueResponse>('/swap-pools/protocol-revenue')
+        api.get<ProtocolRevenueResponse>('/swap-pools/protocol-revenue'),
+        api.get<ProtocolRevenueResponse>('/lending/protocol-revenue')
       ]);
       
       setCdpTotalRevenue(cdpResponse.data.totalRevenue);
@@ -158,6 +168,9 @@ const MercataStats = () => {
       
       setSwapTotalRevenue(swapResponse.data.totalRevenue);
       setSwapRevenueByPeriod(swapResponse.data.revenueByPeriod);
+      
+      setLendingTotalRevenue(lendingResponse.data.totalRevenue);
+      setLendingRevenueByPeriod(lendingResponse.data.revenueByPeriod);
     } catch (err) {
       console.error('Failed to fetch protocol revenue:', err);
       setRevenueError('Failed to load protocol revenue');
@@ -185,13 +198,14 @@ const MercataStats = () => {
     return `${cr.toFixed(2)}%`;
   };
   
-  // Helper to combine revenue data from CDP and Swap
+  // Helper to combine revenue data from CDP, Swap, and Lending
   const getCombinedRevenue = (period: keyof RevenuePeriod): PeriodRevenue => {
     const cdpPeriod = cdpRevenueByPeriod[period];
     const swapPeriod = swapRevenueByPeriod[period];
+    const lendingPeriod = lendingRevenueByPeriod[period];
     
     // Combine totals
-    const combinedTotal = (BigInt(cdpPeriod.total) + BigInt(swapPeriod.total)).toString();
+    const combinedTotal = (BigInt(cdpPeriod.total) + BigInt(swapPeriod.total) + BigInt(lendingPeriod.total)).toString();
     
     // Combine by asset
     const assetMap = new Map<string, { symbol: string; revenue: bigint }>();
@@ -207,6 +221,15 @@ const MercataStats = () => {
     
     // Add Swap revenue
     swapPeriod.byAsset.forEach(item => {
+      const existing = assetMap.get(item.asset) || { symbol: item.symbol, revenue: 0n };
+      assetMap.set(item.asset, {
+        symbol: item.symbol,
+        revenue: existing.revenue + BigInt(item.revenue)
+      });
+    });
+    
+    // Add Lending revenue
+    lendingPeriod.byAsset.forEach(item => {
       const existing = assetMap.get(item.asset) || { symbol: item.symbol, revenue: 0n };
       assetMap.set(item.asset, {
         symbol: item.symbol,
@@ -241,9 +264,11 @@ const MercataStats = () => {
       return { total: cdpTotalRevenue, byPeriod: cdpRevenueByPeriod };
     } else if (source === 'swap') {
       return { total: swapTotalRevenue, byPeriod: swapRevenueByPeriod };
+    } else if (source === 'lending') {
+      return { total: lendingTotalRevenue, byPeriod: lendingRevenueByPeriod };
     } else {
       // Combined
-      const combinedTotal = (BigInt(cdpTotalRevenue) + BigInt(swapTotalRevenue)).toString();
+      const combinedTotal = (BigInt(cdpTotalRevenue) + BigInt(swapTotalRevenue) + BigInt(lendingTotalRevenue)).toString();
       const combinedByPeriod: RevenuePeriod = {
         daily: getCombinedRevenue('daily'),
         weekly: getCombinedRevenue('weekly'),
@@ -492,6 +517,16 @@ const MercataStats = () => {
                     >
                       Swap Pool Revenue
                     </button>
+                    <button
+                      onClick={() => setRevenueSource('lending')}
+                      className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+                        revenueSource === 'lending' 
+                          ? 'bg-green-600 text-white' 
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}
+                    >
+                      Lending Revenue
+                    </button>
                   </div>
                   
                   {/* Time Period Selector */}
@@ -550,8 +585,8 @@ const MercataStats = () => {
                 </div>
 
                 {/* Revenue Summary Cards */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-                  <Card className={revenueSource !== 'swap' ? '' : 'opacity-50'}>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                  <Card className={revenueSource !== 'swap' && revenueSource !== 'lending' ? '' : 'opacity-50'}>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium">CDP Revenue</CardTitle>
                       <Vault className="h-4 w-4 text-muted-foreground" />
@@ -570,7 +605,7 @@ const MercataStats = () => {
                     </CardContent>
                   </Card>
                   
-                  <Card className={revenueSource !== 'cdp' ? '' : 'opacity-50'}>
+                  <Card className={revenueSource !== 'cdp' && revenueSource !== 'lending' ? '' : 'opacity-50'}>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium">Swap Pool Revenue</CardTitle>
                       <Activity className="h-4 w-4 text-muted-foreground" />
@@ -589,12 +624,32 @@ const MercataStats = () => {
                     </CardContent>
                   </Card>
                   
+                  <Card className={revenueSource !== 'cdp' && revenueSource !== 'swap' ? '' : 'opacity-50'}>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Lending Revenue</CardTitle>
+                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">
+                        {revenueLoading ? (
+                          <Skeleton className="h-8 w-24" />
+                        ) : (
+                          `$${formatLargeNumber(parseFloat(formatUnits(BigInt(lendingRevenueByPeriod[selectedPeriod].total || '0'), 18)))}`
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} lending fees
+                      </p>
+                    </CardContent>
+                  </Card>
+                  
                   <Card className="border-2 border-green-500">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium">
                         {revenueSource === 'combined' && 'Combined Revenue'}
                         {revenueSource === 'cdp' && 'CDP Revenue'}
                         {revenueSource === 'swap' && 'Swap Pool Revenue'}
+                        {revenueSource === 'lending' && 'Lending Revenue'}
                       </CardTitle>
                       <DollarSign className="h-4 w-4 text-green-600" />
                     </CardHeader>
@@ -661,6 +716,9 @@ const MercataStats = () => {
                               const hasSwapRevenue = swapRevenueByPeriod[selectedPeriod].byAsset.some(
                                 swapItem => swapItem.asset === item.asset && BigInt(swapItem.revenue) > 0n
                               );
+                              const hasLendingRevenue = lendingRevenueByPeriod[selectedPeriod].byAsset.some(
+                                lendingItem => lendingItem.asset === item.asset && BigInt(lendingItem.revenue) > 0n
+                              );
                               
                               return (
                                 <TableRow key={item.asset}>
@@ -679,14 +737,19 @@ const MercataStats = () => {
                                         {hasSwapRevenue && (
                                           <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">Swap</span>
                                         )}
+                                        {hasLendingRevenue && (
+                                          <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Lending</span>
+                                        )}
                                       </div>
                                     ) : (
                                       <span className={`text-xs px-2 py-1 rounded ${
                                         revenueSource === 'cdp' 
                                           ? 'bg-blue-100 text-blue-800'
-                                          : 'bg-purple-100 text-purple-800'
+                                          : revenueSource === 'swap'
+                                          ? 'bg-purple-100 text-purple-800'
+                                          : 'bg-green-100 text-green-800'
                                       }`}>
-                                        {revenueSource === 'cdp' ? 'CDP' : 'Swap'}
+                                        {revenueSource === 'cdp' ? 'CDP' : revenueSource === 'swap' ? 'Swap' : 'Lending'}
                                       </span>
                                     )}
                                   </TableCell>

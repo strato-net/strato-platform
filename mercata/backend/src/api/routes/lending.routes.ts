@@ -741,4 +741,107 @@ router.post("/safety/redeem", authHandler.authorizeRequest(), SafetyController.r
  */
 router.post("/safety/redeem-all", authHandler.authorizeRequest(), SafetyController.redeemAll);
 
+/**
+ * @openapi
+ * /lending/protocol-revenue:
+ *   get:
+ *     summary: Get protocol revenue from lending operations
+ *     tags: [Lending]
+ *     responses:
+ *       200:
+ *         description: Protocol revenue breakdown by time period and asset
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 totalRevenue:
+ *                   type: string
+ *                   description: Total all-time revenue
+ *                 revenueByPeriod:
+ *                   type: object
+ *                   properties:
+ *                     daily:
+ *                       type: object
+ *                       properties:
+ *                         total:
+ *                           type: string
+ *                         byAsset:
+ *                           type: array
+ *                           items:
+ *                             type: object
+ *                             properties:
+ *                               asset:
+ *                                 type: string
+ *                               symbol:
+ *                                 type: string
+ *                               revenue:
+ *                                 type: string
+ *                     weekly:
+ *                       type: object
+ *                       properties:
+ *                         total:
+ *                           type: string
+ *                         byAsset:
+ *                           type: array
+ *                           items:
+ *                             type: object
+ *                             properties:
+ *                               asset:
+ *                                 type: string
+ *                               symbol:
+ *                                 type: string
+ *                               revenue:
+ *                                 type: string
+ *                     monthly:
+ *                       type: object
+ *                       properties:
+ *                         total:
+ *                           type: string
+ *                         byAsset:
+ *                           type: array
+ *                           items:
+ *                             type: object
+ *                             properties:
+ *                               asset:
+ *                                 type: string
+ *                               symbol:
+ *                                 type: string
+ *                               revenue:
+ *                                 type: string
+ *                     ytd:
+ *                       type: object
+ *                       properties:
+ *                         total:
+ *                           type: string
+ *                         byAsset:
+ *                           type: array
+ *                           items:
+ *                             type: object
+ *                             properties:
+ *                               asset:
+ *                                 type: string
+ *                               symbol:
+ *                                 type: string
+ *                               revenue:
+ *                                 type: string
+ *                     allTime:
+ *                       type: object
+ *                       properties:
+ *                         total:
+ *                           type: string
+ *                         byAsset:
+ *                           type: array
+ *                           items:
+ *                             type: object
+ *                             properties:
+ *                               asset:
+ *                                 type: string
+ *                               symbol:
+ *                                 type: string
+ *                               revenue:
+ *                                 type: string
+ */
+router.get("/protocol-revenue", authHandler.authorizeRequest(true), LendingController.getProtocolRevenue);
+
 export default router;

@@ -22,6 +22,7 @@ import {
   withdrawCollateralMax,
   pauseLendingPool,
   unpauseLendingPool,
+  getLendingProtocolRevenue,
 } from "../services/lending.service";
 import {
   validateDepositLiquidityArgs,
@@ -393,6 +394,21 @@ class LendingController {
       return next();
     } catch (error) {
       return next(error);
+    }
+  }
+
+  static async getProtocolRevenue(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken } = req;
+
+      const revenue = await getLendingProtocolRevenue(accessToken);
+      res.status(RestStatus.OK).json(revenue);
+    } catch (error) {
+      next(error);
     }
   }
 }
