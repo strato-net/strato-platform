@@ -43,9 +43,9 @@ class ProtocolFeeController {
       const { period } = req.query;
       
       // Validate protocol
-      if (!['cdp', 'lending', 'swap'].includes(protocol)) {
+      if (!['cdp', 'lending', 'swap', 'gas'].includes(protocol)) {
         res.status(RestStatus.BAD_REQUEST).json({ 
-          error: "Invalid protocol. Must be one of: cdp, lending, swap" 
+          error: "Invalid protocol. Must be one of: cdp, lending, swap, gas" 
         });
       }
       
@@ -74,6 +74,9 @@ class ProtocolFeeController {
           break;
         case 'swap':
           revenue = await protocolFeeService.getSwapProtocolRevenue(accessToken!);
+          break;
+        case 'gas':
+          revenue = await protocolFeeService.getGasCostRevenue(accessToken!);
           break;
       }
       
@@ -104,9 +107,9 @@ class ProtocolFeeController {
       }
       
       // Validate protocol if specified
-      if (protocol && !['cdp', 'lending', 'swap'].includes(protocol as string)) {
+      if (protocol && !['cdp', 'lending', 'swap', 'gas'].includes(protocol as string)) {
         res.status(RestStatus.BAD_REQUEST).json({ 
-          error: "Invalid protocol. Must be one of: cdp, lending, swap" 
+          error: "Invalid protocol. Must be one of: cdp, lending, swap, gas" 
         });
       }
       

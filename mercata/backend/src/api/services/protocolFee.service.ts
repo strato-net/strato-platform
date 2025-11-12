@@ -51,6 +51,7 @@ export interface AggregatedProtocolRevenue {
     cdp: ProtocolRevenue;
     lending: ProtocolRevenue;
     swap: ProtocolRevenue;
+    gas: ProtocolRevenue;
   };
   aggregated: RevenueByPeriod;
 }
@@ -512,6 +513,166 @@ export const getSwapProtocolRevenue = async (
 };
 
 /**
+ * Get gas cost revenue from transaction fees
+ */
+export const getGasCostRevenue = async (
+  accessToken: string,
+): Promise<ProtocolRevenue> => {
+  try {
+    // Get fee collector address (same as swap)
+    const feeCollector = await getSwapFeeCollector(accessToken);
+    
+    // Query all Transfer events where 'to' is feeCollector and 'from' is not a zero/system address
+    const { data: tokenTransferEvents } = await cirrus.get(accessToken, `/event`, {
+      params: {
+        event_name: `eq.Transfer`,
+        select: "address,attributes,block_timestamp",
+        "attributes->>to": `eq.${feeCollector}`,
+        // Exclude transfers from zero/system addresses (000000000000000000000000000000000000%)
+        "attributes->>from": `not.like.000000000000000000000000000000000000%`,
+        order: "block_timestamp.desc"
+      }
+    });
+    
+    // Also need to exclude transfers from pools (since those are already counted in swap revenue)
+    // Get all pool addresses to exclude
+    const { data: allPoolsData } = await cirrus.get(accessToken, `/${PoolFactory}-allPools`, {
+      params: {
+        address: `eq.${config.poolFactory}`,
+        select: "value"
+      }
+    });
+    const poolAddresses = allPoolsData ? allPoolsData.map((entry: any) => entry.value) : [];
+    
+    // Get lending pool liquidityPool address to exclude (already counted in lending revenue)
+    const { lendingPool: lendingPoolAddress, liquidityPool: liquidityPoolAddress } = await getPool(accessToken, { 
+      select: "lendingPool,liquidityPool" 
+    });
+    
+    // Filter out transfers from pools and liquidity pool
+    const excludedAddresses = new Set([...poolAddresses, liquidityPoolAddress].filter(Boolean));
+    const gasTransferEvents = tokenTransferEvents?.filter((event: any) => 
+      !excludedAddresses.has(event.attributes.from)
+    ) || [];
+    
+    if (!gasTransferEvents || gasTransferEvents.length === 0) {
+      return {
+        totalRevenue: "0",
+        revenueByPeriod: {
+          daily: { total: "0", byAsset: [] },
+          weekly: { total: "0", byAsset: [] },
+          monthly: { total: "0", byAsset: [] },
+          ytd: { total: "0", byAsset: [] },
+          allTime: { total: "0", byAsset: [] }
+        }
+      };
+    }
+    
+    // Aggregate by token and time period
+    const { oneDayAgo, oneWeekAgo, oneMonthAgo, ytdCutoff } = getTimeCutoffs();
+    
+    const revenueByAsset: Record<string, {
+      symbol: string;
+      daily: bigint;
+      weekly: bigint;
+      monthly: bigint;
+      ytd: bigint;
+      allTime: bigint;
+    }> = {};
+    
+    // Process each transfer event
+    for (const event of gasTransferEvents) {
+      const tokenAddress = event.address;
+      const amount = BigInt(event.attributes.amount || "0");
+      const timestamp = parseTimestamp(event.block_timestamp);
+      
+      // Initialize token entry if not exists
+      if (!revenueByAsset[tokenAddress]) {
+        const tokenInfo = await getTokenInfo(accessToken, tokenAddress);
+        revenueByAsset[tokenAddress] = {
+          symbol: tokenInfo.symbol,
+          daily: 0n,
+          weekly: 0n,
+          monthly: 0n,
+          ytd: 0n,
+          allTime: 0n
+        };
+      }
+      
+      // Add to appropriate time buckets
+      revenueByAsset[tokenAddress].allTime += amount;
+      if (timestamp >= ytdCutoff) revenueByAsset[tokenAddress].ytd += amount;
+      if (timestamp >= oneMonthAgo) revenueByAsset[tokenAddress].monthly += amount;
+      if (timestamp >= oneWeekAgo) revenueByAsset[tokenAddress].weekly += amount;
+      if (timestamp >= oneDayAgo) revenueByAsset[tokenAddress].daily += amount;
+    }
+    
+    // Convert to result format
+    const formatRevenueByAsset = (selector: keyof typeof revenueByAsset[string]): RevenueByAsset[] => {
+      return Object.entries(revenueByAsset)
+        .map(([asset, data]) => ({
+          asset,
+          symbol: data.symbol,
+          revenue: data[selector].toString()
+        }))
+        .filter(item => item.revenue !== "0")
+        .sort((a, b) => {
+          const revenueA = BigInt(a.revenue);
+          const revenueB = BigInt(b.revenue);
+          if (revenueA > revenueB) return -1;
+          if (revenueA < revenueB) return 1;
+          return 0;
+        });
+    };
+    
+    // Calculate totals
+    const calculateTotal = (items: RevenueByAsset[]): string => {
+      return items.reduce((sum, item) => sum + BigInt(item.revenue), 0n).toString();
+    };
+    
+    const revenueByPeriod: RevenueByPeriod = {
+      daily: {
+        byAsset: formatRevenueByAsset('daily'),
+        total: "0"
+      },
+      weekly: {
+        byAsset: formatRevenueByAsset('weekly'),
+        total: "0"
+      },
+      monthly: {
+        byAsset: formatRevenueByAsset('monthly'),
+        total: "0"
+      },
+      ytd: {
+        byAsset: formatRevenueByAsset('ytd'),
+        total: "0"
+      },
+      allTime: {
+        byAsset: formatRevenueByAsset('allTime'),
+        total: "0"
+      }
+    };
+    
+    // Set totals
+    revenueByPeriod.daily.total = calculateTotal(revenueByPeriod.daily.byAsset);
+    revenueByPeriod.weekly.total = calculateTotal(revenueByPeriod.weekly.byAsset);
+    revenueByPeriod.monthly.total = calculateTotal(revenueByPeriod.monthly.byAsset);
+    revenueByPeriod.ytd.total = calculateTotal(revenueByPeriod.ytd.byAsset);
+    revenueByPeriod.allTime.total = calculateTotal(revenueByPeriod.allTime.byAsset);
+    
+    return {
+      totalRevenue: revenueByPeriod.allTime.total,
+      revenueByPeriod
+    };
+  } catch (error: any) {
+    console.error("Error fetching gas cost revenue:", {
+      error: error.response?.data || error.message
+    });
+    throw new Error("Failed to fetch gas cost revenue");
+  }
+};
+
+/**
  * Get aggregated protocol revenue across all protocols
  */
 export const getAggregatedProtocolRevenue = async (
@@ -520,10 +681,11 @@ export const getAggregatedProtocolRevenue = async (
 ): Promise<AggregatedProtocolRevenue> => {
   try {
     // Fetch revenue data from all protocols in parallel
-    const [cdpRevenue, lendingRevenue, swapRevenue] = await Promise.all([
+    const [cdpRevenue, lendingRevenue, swapRevenue, gasRevenue] = await Promise.all([
       getCDPProtocolRevenue(accessToken, userAddress),
       getLendingProtocolRevenue(accessToken),
-      getSwapProtocolRevenue(accessToken)
+      getSwapProtocolRevenue(accessToken),
+      getGasCostRevenue(accessToken)
     ]);
     
     // Helper to aggregate revenues across protocols
@@ -558,7 +720,8 @@ export const getAggregatedProtocolRevenue = async (
     const totalRevenue = (
       BigInt(cdpRevenue.totalRevenue) +
       BigInt(lendingRevenue.totalRevenue) +
-      BigInt(swapRevenue.totalRevenue)
+      BigInt(swapRevenue.totalRevenue) +
+      BigInt(gasRevenue.totalRevenue)
     ).toString();
     
     // Aggregate each time period
@@ -567,60 +730,70 @@ export const getAggregatedProtocolRevenue = async (
         total: (
           BigInt(cdpRevenue.revenueByPeriod.daily.total) +
           BigInt(lendingRevenue.revenueByPeriod.daily.total) +
-          BigInt(swapRevenue.revenueByPeriod.daily.total)
+          BigInt(swapRevenue.revenueByPeriod.daily.total) +
+          BigInt(gasRevenue.revenueByPeriod.daily.total)
         ).toString(),
         byAsset: aggregateRevenues(
           cdpRevenue.revenueByPeriod.daily.byAsset,
           lendingRevenue.revenueByPeriod.daily.byAsset,
-          swapRevenue.revenueByPeriod.daily.byAsset
+          swapRevenue.revenueByPeriod.daily.byAsset,
+          gasRevenue.revenueByPeriod.daily.byAsset
         )
       },
       weekly: {
         total: (
           BigInt(cdpRevenue.revenueByPeriod.weekly.total) +
           BigInt(lendingRevenue.revenueByPeriod.weekly.total) +
-          BigInt(swapRevenue.revenueByPeriod.weekly.total)
+          BigInt(swapRevenue.revenueByPeriod.weekly.total) +
+          BigInt(gasRevenue.revenueByPeriod.weekly.total)
         ).toString(),
         byAsset: aggregateRevenues(
           cdpRevenue.revenueByPeriod.weekly.byAsset,
           lendingRevenue.revenueByPeriod.weekly.byAsset,
-          swapRevenue.revenueByPeriod.weekly.byAsset
+          swapRevenue.revenueByPeriod.weekly.byAsset,
+          gasRevenue.revenueByPeriod.weekly.byAsset
         )
       },
       monthly: {
         total: (
           BigInt(cdpRevenue.revenueByPeriod.monthly.total) +
           BigInt(lendingRevenue.revenueByPeriod.monthly.total) +
-          BigInt(swapRevenue.revenueByPeriod.monthly.total)
+          BigInt(swapRevenue.revenueByPeriod.monthly.total) +
+          BigInt(gasRevenue.revenueByPeriod.monthly.total)
         ).toString(),
         byAsset: aggregateRevenues(
           cdpRevenue.revenueByPeriod.monthly.byAsset,
           lendingRevenue.revenueByPeriod.monthly.byAsset,
-          swapRevenue.revenueByPeriod.monthly.byAsset
+          swapRevenue.revenueByPeriod.monthly.byAsset,
+          gasRevenue.revenueByPeriod.monthly.byAsset
         )
       },
       ytd: {
         total: (
           BigInt(cdpRevenue.revenueByPeriod.ytd.total) +
           BigInt(lendingRevenue.revenueByPeriod.ytd.total) +
-          BigInt(swapRevenue.revenueByPeriod.ytd.total)
+          BigInt(swapRevenue.revenueByPeriod.ytd.total) +
+          BigInt(gasRevenue.revenueByPeriod.ytd.total)
         ).toString(),
         byAsset: aggregateRevenues(
           cdpRevenue.revenueByPeriod.ytd.byAsset,
           lendingRevenue.revenueByPeriod.ytd.byAsset,
-          swapRevenue.revenueByPeriod.ytd.byAsset
+          swapRevenue.revenueByPeriod.ytd.byAsset,
+          gasRevenue.revenueByPeriod.ytd.byAsset
         )
       },
       allTime: {
         total: (
           BigInt(cdpRevenue.revenueByPeriod.allTime.total) +
           BigInt(lendingRevenue.revenueByPeriod.allTime.total) +
-          BigInt(swapRevenue.revenueByPeriod.allTime.total)
+          BigInt(swapRevenue.revenueByPeriod.allTime.total) +
+          BigInt(gasRevenue.revenueByPeriod.allTime.total)
         ).toString(),
         byAsset: aggregateRevenues(
           cdpRevenue.revenueByPeriod.allTime.byAsset,
           lendingRevenue.revenueByPeriod.allTime.byAsset,
-          swapRevenue.revenueByPeriod.allTime.byAsset
+          swapRevenue.revenueByPeriod.allTime.byAsset,
+          gasRevenue.revenueByPeriod.allTime.byAsset
         )
       }
     };
@@ -630,7 +803,8 @@ export const getAggregatedProtocolRevenue = async (
       byProtocol: {
         cdp: cdpRevenue,
         lending: lendingRevenue,
-        swap: swapRevenue
+        swap: swapRevenue,
+        gas: gasRevenue
       },
       aggregated
     };
@@ -649,7 +823,7 @@ export const getProtocolRevenueByPeriod = async (
   accessToken: string,
   userAddress: string,
   period: 'daily' | 'weekly' | 'monthly' | 'ytd' | 'allTime',
-  protocol?: 'cdp' | 'lending' | 'swap'
+  protocol?: 'cdp' | 'lending' | 'swap' | 'gas'
 ): Promise<RevenuePeriod> => {
   try {
     if (protocol) {
@@ -664,6 +838,9 @@ export const getProtocolRevenueByPeriod = async (
           break;
         case 'swap':
           revenue = await getSwapProtocolRevenue(accessToken);
+          break;
+        case 'gas':
+          revenue = await getGasCostRevenue(accessToken);
           break;
       }
       return revenue.revenueByPeriod[period];

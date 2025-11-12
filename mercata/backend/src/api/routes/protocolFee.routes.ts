@@ -36,6 +36,8 @@ const router = Router();
  *                       $ref: '#/components/schemas/ProtocolRevenue'
  *                     swap:
  *                       $ref: '#/components/schemas/ProtocolRevenue'
+ *                     gas:
+ *                       $ref: '#/components/schemas/ProtocolRevenue'
  *                 aggregated:
  *                   $ref: '#/components/schemas/RevenueByPeriod'
  */
@@ -55,7 +57,7 @@ router.get("/revenue", authHandler.authorizeRequest(true), ProtocolFeeController
  *         required: true
  *         schema:
  *           type: string
- *           enum: [cdp, lending, swap]
+ *           enum: [cdp, lending, swap, gas]
  *         description: Protocol to get revenue for
  *       - name: period
  *         in: query
@@ -99,7 +101,7 @@ router.get("/revenue/:protocol", authHandler.authorizeRequest(true), ProtocolFee
  *         required: false
  *         schema:
  *           type: string
- *           enum: [cdp, lending, swap]
+ *           enum: [cdp, lending, swap, gas]
  *         description: Optional protocol filter
  *     responses:
  *       200:
