@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/lib/axios";
 import { formatUnits } from '@/utils/numberUtils';
-import { TrendingUp, Coins, Vault, Activity, DollarSign } from 'lucide-react';
+import { TrendingUp, Coins, Vault, Activity, DollarSign, Flame } from 'lucide-react';
 
 interface TokenWithStats {
   address: string;
@@ -65,6 +65,42 @@ interface ProtocolRevenueResponse {
   revenueByPeriod: RevenuePeriod;
 }
 
+interface AggregatedRevenueResponse {
+  totalRevenue: string;
+  byProtocol: {
+    cdp: ProtocolRevenueResponse;
+    lending: ProtocolRevenueResponse;
+    swap: ProtocolRevenueResponse;
+    gas: ProtocolRevenueResponse;
+  };
+  aggregated: RevenuePeriod;
+}
+
+type RevenueSource = 'combined' | 'cdp' | 'swap' | 'lending' | 'gas';
+type NonCombinedRevenueSource = Exclude<RevenueSource, 'combined'>;
+
+const createEmptyRevenuePeriod = (): RevenuePeriod => ({
+  daily: { total: '0', byAsset: [] },
+  weekly: { total: '0', byAsset: [] },
+  monthly: { total: '0', byAsset: [] },
+  ytd: { total: '0', byAsset: [] },
+  allTime: { total: '0', byAsset: [] }
+});
+
+const REVENUE_SOURCE_LABELS: Record<NonCombinedRevenueSource, string> = {
+  cdp: 'CDP',
+  swap: 'Swap',
+  lending: 'Lending',
+  gas: 'Gas'
+};
+
+const REVENUE_SOURCE_BADGES: Record<NonCombinedRevenueSource, string> = {
+  cdp: 'bg-blue-100 text-blue-800',
+  swap: 'bg-purple-100 text-purple-800',
+  lending: 'bg-green-100 text-green-800',
+  gas: 'bg-yellow-100 text-yellow-800'
+};
+
 const MercataStats = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [tokens, setTokens] = useState<TokenWithStats[]>([]);
@@ -82,34 +118,22 @@ const MercataStats = () => {
 
   // Protocol Revenue state
   const [cdpTotalRevenue, setCdpTotalRevenue] = useState<string>('0');
-  const [cdpRevenueByPeriod, setCdpRevenueByPeriod] = useState<RevenuePeriod>({
-    daily: { total: '0', byAsset: [] },
-    weekly: { total: '0', byAsset: [] },
-    monthly: { total: '0', byAsset: [] },
-    ytd: { total: '0', byAsset: [] },
-    allTime: { total: '0', byAsset: [] }
-  });
+  const [cdpRevenueByPeriod, setCdpRevenueByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
   
   const [swapTotalRevenue, setSwapTotalRevenue] = useState<string>('0');
-  const [swapRevenueByPeriod, setSwapRevenueByPeriod] = useState<RevenuePeriod>({
-    daily: { total: '0', byAsset: [] },
-    weekly: { total: '0', byAsset: [] },
-    monthly: { total: '0', byAsset: [] },
-    ytd: { total: '0', byAsset: [] },
-    allTime: { total: '0', byAsset: [] }
-  });
+  const [swapRevenueByPeriod, setSwapRevenueByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
   
   const [lendingTotalRevenue, setLendingTotalRevenue] = useState<string>('0');
-  const [lendingRevenueByPeriod, setLendingRevenueByPeriod] = useState<RevenuePeriod>({
-    daily: { total: '0', byAsset: [] },
-    weekly: { total: '0', byAsset: [] },
-    monthly: { total: '0', byAsset: [] },
-    ytd: { total: '0', byAsset: [] },
-    allTime: { total: '0', byAsset: [] }
-  });
+  const [lendingRevenueByPeriod, setLendingRevenueByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
+  
+  const [gasTotalRevenue, setGasTotalRevenue] = useState<string>('0');
+  const [gasRevenueByPeriod, setGasRevenueByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
+  
+  const [aggregatedTotalRevenue, setAggregatedTotalRevenue] = useState<string>('0');
+  const [aggregatedRevenueByPeriod, setAggregatedRevenueByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
   
   const [selectedPeriod, setSelectedPeriod] = useState<keyof RevenuePeriod>('allTime');
-  const [revenueSource, setRevenueSource] = useState<'cdp' | 'swap' | 'lending' | 'combined'>('combined');
+  const [revenueSource, setRevenueSource] = useState<RevenueSource>('combined');
   const [revenueLoading, setRevenueLoading] = useState(true);
   const [revenueError, setRevenueError] = useState<string | null>(null);
 
@@ -157,17 +181,12 @@ const MercataStats = () => {
       setRevenueLoading(true);
       
       // Fetch aggregated protocol revenue from the new centralized endpoint
-      const response = await api.get<{
-        totalRevenue: string;
-        byProtocol: {
-          cdp: ProtocolRevenueResponse;
-          lending: ProtocolRevenueResponse;
-          swap: ProtocolRevenueResponse;
-        };
-        aggregated: RevenuePeriod;
-      }>('/protocol-fees/revenue');
+      const response = await api.get<AggregatedRevenueResponse>('/protocol-fees/revenue');
       
       // Extract data for each protocol from the aggregated response
+      setAggregatedTotalRevenue(response.data.totalRevenue);
+      setAggregatedRevenueByPeriod(response.data.aggregated);
+      
       setCdpTotalRevenue(response.data.byProtocol.cdp.totalRevenue);
       setCdpRevenueByPeriod(response.data.byProtocol.cdp.revenueByPeriod);
       
@@ -176,6 +195,9 @@ const MercataStats = () => {
       
       setLendingTotalRevenue(response.data.byProtocol.lending.totalRevenue);
       setLendingRevenueByPeriod(response.data.byProtocol.lending.revenueByPeriod);
+      
+      setGasTotalRevenue(response.data.byProtocol.gas.totalRevenue);
+      setGasRevenueByPeriod(response.data.byProtocol.gas.revenueByPeriod);
     } catch (err) {
       console.error('Failed to fetch protocol revenue:', err);
       setRevenueError('Failed to load protocol revenue');
@@ -203,85 +225,22 @@ const MercataStats = () => {
     return `${cr.toFixed(2)}%`;
   };
   
-  // Helper to combine revenue data from CDP, Swap, and Lending
-  const getCombinedRevenue = (period: keyof RevenuePeriod): PeriodRevenue => {
-    const cdpPeriod = cdpRevenueByPeriod[period];
-    const swapPeriod = swapRevenueByPeriod[period];
-    const lendingPeriod = lendingRevenueByPeriod[period];
-    
-    // Combine totals
-    const combinedTotal = (BigInt(cdpPeriod.total) + BigInt(swapPeriod.total) + BigInt(lendingPeriod.total)).toString();
-    
-    // Combine by asset
-    const assetMap = new Map<string, { symbol: string; revenue: bigint }>();
-    
-    // Add CDP revenue
-    cdpPeriod.byAsset.forEach(item => {
-      const existing = assetMap.get(item.asset) || { symbol: item.symbol, revenue: 0n };
-      assetMap.set(item.asset, {
-        symbol: item.symbol,
-        revenue: existing.revenue + BigInt(item.revenue)
-      });
-    });
-    
-    // Add Swap revenue
-    swapPeriod.byAsset.forEach(item => {
-      const existing = assetMap.get(item.asset) || { symbol: item.symbol, revenue: 0n };
-      assetMap.set(item.asset, {
-        symbol: item.symbol,
-        revenue: existing.revenue + BigInt(item.revenue)
-      });
-    });
-    
-    // Add Lending revenue
-    lendingPeriod.byAsset.forEach(item => {
-      const existing = assetMap.get(item.asset) || { symbol: item.symbol, revenue: 0n };
-      assetMap.set(item.asset, {
-        symbol: item.symbol,
-        revenue: existing.revenue + BigInt(item.revenue)
-      });
-    });
-    
-    // Convert back to array and sort by revenue
-    const combinedAssets = Array.from(assetMap.entries())
-      .map(([asset, data]) => ({
-        asset,
-        symbol: data.symbol,
-        revenue: data.revenue.toString()
-      }))
-      .sort((a, b) => {
-        const revenueA = BigInt(a.revenue);
-        const revenueB = BigInt(b.revenue);
-        if (revenueA > revenueB) return -1;
-        if (revenueA < revenueB) return 1;
-        return 0;
-      });
-    
-    return {
-      total: combinedTotal,
-      byAsset: combinedAssets
-    };
-  };
-  
+  const shouldDimCard = (card: NonCombinedRevenueSource): boolean =>
+    revenueSource !== 'combined' && revenueSource !== card;
+
   // Helper to get the appropriate revenue data based on source
-  const getRevenueData = (source: typeof revenueSource): { total: string; byPeriod: RevenuePeriod } => {
-    if (source === 'cdp') {
-      return { total: cdpTotalRevenue, byPeriod: cdpRevenueByPeriod };
-    } else if (source === 'swap') {
-      return { total: swapTotalRevenue, byPeriod: swapRevenueByPeriod };
-    } else if (source === 'lending') {
-      return { total: lendingTotalRevenue, byPeriod: lendingRevenueByPeriod };
-    } else {
-      // Combined
-      const combinedTotal = (BigInt(cdpTotalRevenue) + BigInt(swapTotalRevenue) + BigInt(lendingTotalRevenue)).toString();
-      const combinedByPeriod: RevenuePeriod = {
-        daily: getCombinedRevenue('daily'),
-        weekly: getCombinedRevenue('weekly'),
-        monthly: getCombinedRevenue('monthly'),
-        ytd: getCombinedRevenue('ytd'),
-        allTime: getCombinedRevenue('allTime')
-      };
-      return { total: combinedTotal, byPeriod: combinedByPeriod };
+  const getRevenueData = (source: RevenueSource): { total: string; byPeriod: RevenuePeriod } => {
+    switch (source) {
+      case 'cdp':
+        return { total: cdpTotalRevenue, byPeriod: cdpRevenueByPeriod };
+      case 'swap':
+        return { total: swapTotalRevenue, byPeriod: swapRevenueByPeriod };
+      case 'lending':
+        return { total: lendingTotalRevenue, byPeriod: lendingRevenueByPeriod };
+      case 'gas':
+        return { total: gasTotalRevenue, byPeriod: gasRevenueByPeriod };
+      default:
+        return { total: aggregatedTotalRevenue, byPeriod: aggregatedRevenueByPeriod };
     }
   };
 
@@ -532,6 +491,16 @@ const MercataStats = () => {
                     >
                       Lending Revenue
                     </button>
+                    <button
+                      onClick={() => setRevenueSource('gas')}
+                      className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+                        revenueSource === 'gas' 
+                          ? 'bg-green-600 text-white' 
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}
+                    >
+                      Gas Revenue
+                    </button>
                   </div>
                   
                   {/* Time Period Selector */}
@@ -590,8 +559,8 @@ const MercataStats = () => {
                 </div>
 
                 {/* Revenue Summary Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                  <Card className={revenueSource !== 'swap' && revenueSource !== 'lending' ? '' : 'opacity-50'}>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-6">
+                  <Card className={shouldDimCard('cdp') ? 'opacity-50' : ''}>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium">CDP Revenue</CardTitle>
                       <Vault className="h-4 w-4 text-muted-foreground" />
@@ -610,7 +579,7 @@ const MercataStats = () => {
                     </CardContent>
                   </Card>
                   
-                  <Card className={revenueSource !== 'cdp' && revenueSource !== 'lending' ? '' : 'opacity-50'}>
+                  <Card className={shouldDimCard('swap') ? 'opacity-50' : ''}>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium">Swap Pool Revenue</CardTitle>
                       <Activity className="h-4 w-4 text-muted-foreground" />
@@ -629,7 +598,7 @@ const MercataStats = () => {
                     </CardContent>
                   </Card>
                   
-                  <Card className={revenueSource !== 'cdp' && revenueSource !== 'swap' ? '' : 'opacity-50'}>
+                  <Card className={shouldDimCard('lending') ? 'opacity-50' : ''}>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium">Lending Revenue</CardTitle>
                       <DollarSign className="h-4 w-4 text-muted-foreground" />
@@ -647,14 +616,32 @@ const MercataStats = () => {
                       </p>
                     </CardContent>
                   </Card>
+
+                  <Card className={shouldDimCard('gas') ? 'opacity-50' : ''}>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Gas Fee Revenue</CardTitle>
+                      <Flame className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">
+                        {revenueLoading ? (
+                          <Skeleton className="h-8 w-24" />
+                        ) : (
+                          `$${formatLargeNumber(parseFloat(formatUnits(BigInt(gasRevenueByPeriod[selectedPeriod].total || '0'), 18)))}`
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} gas fees
+                      </p>
+                    </CardContent>
+                  </Card>
                   
                   <Card className="border-2 border-green-500">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium">
-                        {revenueSource === 'combined' && 'Combined Revenue'}
-                        {revenueSource === 'cdp' && 'CDP Revenue'}
-                        {revenueSource === 'swap' && 'Swap Pool Revenue'}
-                        {revenueSource === 'lending' && 'Lending Revenue'}
+                        {revenueSource === 'combined'
+                          ? 'Combined Revenue'
+                          : `${REVENUE_SOURCE_LABELS[revenueSource as NonCombinedRevenueSource]} Revenue`}
                       </CardTitle>
                       <DollarSign className="h-4 w-4 text-green-600" />
                     </CardHeader>
@@ -724,6 +711,10 @@ const MercataStats = () => {
                               const hasLendingRevenue = lendingRevenueByPeriod[selectedPeriod].byAsset.some(
                                 lendingItem => lendingItem.asset === item.asset && BigInt(lendingItem.revenue) > 0n
                               );
+                              const hasGasRevenue = gasRevenueByPeriod[selectedPeriod].byAsset.some(
+                                gasItem => gasItem.asset === item.asset && BigInt(gasItem.revenue) > 0n
+                              );
+                              const isCombinedSource = revenueSource === 'combined';
                               
                               return (
                                 <TableRow key={item.asset}>
@@ -734,27 +725,24 @@ const MercataStats = () => {
                                     </div>
                                   </TableCell>
                                   <TableCell className="text-center">
-                                    {revenueSource === 'combined' ? (
-                                      <div className="flex justify-center gap-2">
+                                    {isCombinedSource ? (
+                                      <div className="flex justify-center gap-2 flex-wrap">
                                         {hasCdpRevenue && (
-                                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">CDP</span>
+                                          <span className={`text-xs px-2 py-1 rounded ${REVENUE_SOURCE_BADGES.cdp}`}>CDP</span>
                                         )}
                                         {hasSwapRevenue && (
-                                          <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">Swap</span>
+                                          <span className={`text-xs px-2 py-1 rounded ${REVENUE_SOURCE_BADGES.swap}`}>Swap</span>
                                         )}
                                         {hasLendingRevenue && (
-                                          <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Lending</span>
+                                          <span className={`text-xs px-2 py-1 rounded ${REVENUE_SOURCE_BADGES.lending}`}>Lending</span>
+                                        )}
+                                        {hasGasRevenue && (
+                                          <span className={`text-xs px-2 py-1 rounded ${REVENUE_SOURCE_BADGES.gas}`}>Gas</span>
                                         )}
                                       </div>
                                     ) : (
-                                      <span className={`text-xs px-2 py-1 rounded ${
-                                        revenueSource === 'cdp' 
-                                          ? 'bg-blue-100 text-blue-800'
-                                          : revenueSource === 'swap'
-                                          ? 'bg-purple-100 text-purple-800'
-                                          : 'bg-green-100 text-green-800'
-                                      }`}>
-                                        {revenueSource === 'cdp' ? 'CDP' : revenueSource === 'swap' ? 'Swap' : 'Lending'}
+                                      <span className={`text-xs px-2 py-1 rounded ${REVENUE_SOURCE_BADGES[revenueSource as NonCombinedRevenueSource]}`}>
+                                        {REVENUE_SOURCE_LABELS[revenueSource as NonCombinedRevenueSource]}
                                       </span>
                                     )}
                                   </TableCell>

@@ -533,7 +533,6 @@ export const getGasCostRevenue = async (
         order: "block_timestamp.desc"
       }
     });
-    
     // Also need to exclude transfers from pools (since those are already counted in swap revenue)
     // Get all pool addresses to exclude
     const { data: allPoolsData } = await cirrus.get(accessToken, `/${PoolFactory}-allPools`, {
@@ -567,7 +566,6 @@ export const getGasCostRevenue = async (
         }
       };
     }
-    
     // Aggregate by token and time period
     const { oneDayAgo, oneWeekAgo, oneMonthAgo, ytdCutoff } = getTimeCutoffs();
     
@@ -583,7 +581,7 @@ export const getGasCostRevenue = async (
     // Process each transfer event
     for (const event of gasTransferEvents) {
       const tokenAddress = event.address;
-      const amount = BigInt(event.attributes.amount || "0");
+      const amount = BigInt(event.attributes.value || "0");
       const timestamp = parseTimestamp(event.block_timestamp);
       
       // Initialize token entry if not exists
@@ -606,7 +604,6 @@ export const getGasCostRevenue = async (
       if (timestamp >= oneWeekAgo) revenueByAsset[tokenAddress].weekly += amount;
       if (timestamp >= oneDayAgo) revenueByAsset[tokenAddress].daily += amount;
     }
-    
     // Convert to result format
     const formatRevenueByAsset = (selector: keyof typeof revenueByAsset[string]): RevenueByAsset[] => {
       return Object.entries(revenueByAsset)
@@ -624,7 +621,6 @@ export const getGasCostRevenue = async (
           return 0;
         });
     };
-    
     // Calculate totals
     const calculateTotal = (items: RevenueByAsset[]): string => {
       return items.reduce((sum, item) => sum + BigInt(item.revenue), 0n).toString();
@@ -659,7 +655,6 @@ export const getGasCostRevenue = async (
     revenueByPeriod.monthly.total = calculateTotal(revenueByPeriod.monthly.byAsset);
     revenueByPeriod.ytd.total = calculateTotal(revenueByPeriod.ytd.byAsset);
     revenueByPeriod.allTime.total = calculateTotal(revenueByPeriod.allTime.byAsset);
-    
     return {
       totalRevenue: revenueByPeriod.allTime.total,
       revenueByPeriod
