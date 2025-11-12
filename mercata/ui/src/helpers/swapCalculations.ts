@@ -104,3 +104,41 @@ export const hasSufficientLiquidity = (
 
   return inputReserve > 0n && outputReserve > 0n && amountBigInt <= inputReserve;
 };
+
+/**
+ * Calculate both price impact and pool impact
+ * Price impact: I_user = (P_eff - P_before) / P_before
+ * Pool impact: I_pool = (1 + I_user)^2 - 1 (constant product AMM relationship)
+ * @param currentPoolPrice Current pool exchange rate (as string)
+ * @param fromAmount Amount being swapped in (as string, in human-readable format)
+ * @param toAmount Amount being received out (as string, in human-readable format)
+ * @returns Object with priceImpact and poolImpact as percentages, or null if calculation not possible
+ */
+export const calculateImpact = (
+  currentPoolPrice: string,
+  fromAmount: string,
+  toAmount: string
+): { priceImpact: number; poolImpact: number } | null => {
+  if (!currentPoolPrice || !fromAmount || !toAmount || 
+      currentPoolPrice === "0" || fromAmount === "0" || toAmount === "0") {
+    return null;
+  }
+
+  const poolPrice = parseFloat(currentPoolPrice);
+  const from = parseFloat(fromAmount);
+  const to = parseFloat(toAmount);
+
+  if (isNaN(poolPrice) || isNaN(from) || isNaN(to) || poolPrice === 0 || from === 0) {
+    return null;
+  }
+
+  const effectivePrice = to / from;
+  const priceImpact = Math.abs((effectivePrice - poolPrice) / poolPrice) * 100;
+  
+  // I_pool = (1 + I_user)^2 - 1
+  const priceImpactDecimal = priceImpact / 100;
+  const poolImpactDecimal = Math.pow(1 + priceImpactDecimal, 2) - 1;
+  const poolImpact = poolImpactDecimal * 100;
+  
+  return { priceImpact, poolImpact };
+};
