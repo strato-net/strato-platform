@@ -485,9 +485,9 @@ const SwapWidget = () => {
   // Exchange rates (both pool and oracle)
   const { exchangeRateRaw, exchangeRate, oracleExchangeRate } = calculateExchangeRates(pool, fromAsset);
 
-  // Impact calculations (price and pool) - use raw rate for calculations
-  const { priceImpact, poolImpact } = useMemo(() => {
-    return calculateImpact(exchangeRateRaw, fromAmount, toAmount) ?? { priceImpact: null, poolImpact: null };
+  // Price impact calculation - use raw rate for calculations
+  const priceImpact = useMemo(() => {
+    return calculateImpact(exchangeRateRaw, fromAmount, toAmount);
   }, [exchangeRateRaw, fromAmount, toAmount]);
 
   // Minimum received calculation (after slippage)
@@ -899,22 +899,6 @@ const SwapWidget = () => {
             'text-red-600'
           }`}>
             {priceImpact === null ? '—' : `${priceImpact.toFixed(2)}% ${priceImpact < 1 ? '(Low)' : priceImpact < 5 ? '(Medium)' : '(High)'}`}
-          </span>
-        </div>
-        <div className="flex justify-between text-sm items-center">
-          <div className="flex items-center gap-1">
-            <span className="text-gray-600">Pool Price Change</span>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <HelpCircle className="h-3.5 w-3.5 text-gray-400 hover:text-gray-600 cursor-help" />
-              </TooltipTrigger>
-              <TooltipContent className="max-w-xs">
-                <p>The shift in the pool's spot price after your trade executes.</p>
-              </TooltipContent>
-            </Tooltip>
-          </div>
-          <span className="font-medium text-gray-600">
-            {poolImpact === null ? '—' : `${poolImpact.toFixed(2)}%`}
           </span>
         </div>
         {priceImpact !== null && priceImpact >= 5 && (
