@@ -736,9 +736,6 @@ export const getSwapProtocolRevenue = async (
     const monthlyTotal = Object.values(monthlyRevenueByToken).reduce((sum, val) => sum + val, 0n);
     const ytdTotal = Object.values(ytdRevenueByToken).reduce((sum, val) => sum + val, 0n);
     
-    console.log("Total revenue by token:", Object.entries(revenueByToken).map(([token, revenue]) => ({ token, revenue: revenue.toString() })));
-    console.log("Total revenue:", totalRevenue.toString());
-    
     return {
       totalRevenue: totalRevenue.toString(),
       revenueByPeriod: {
