@@ -35,6 +35,9 @@ const router = Router();
  *                 additionalProperties: true
  */
 router.get("/balance", authHandler.authorizeRequest(), TokensController.getBalance);
+router.get("/tokenBalance", authHandler.authorizeRequest(), TokensController.getTokenBalance);
+router.get("/tokenCollateral", authHandler.authorizeRequest(), TokensController.getTokenCollateral);
+router.get("/tokenValue/:tokenAddress", authHandler.authorizeRequest(), TokensController.getTokenValueData);
 
 /**
  * @openapi
