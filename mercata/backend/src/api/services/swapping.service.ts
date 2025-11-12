@@ -13,14 +13,12 @@ import {
   buildPoolList,
   fetchPoolTokenAddresses,
   fetchPoolBalances,
-  fetchPoolDataForSingleTokenLiquidity,
   fetchLPTokenAddress,
   buildTokenApprovalTx,
   getTradingVolume24hForPools,
   getTokenBalance,
   stakeNewLPTokens
 } from "../helpers/swapping.helper";
-import { getOptimalSwapAmount, calculateSwapOutput } from "../helpers/pools.helper";
 import { getOraclePrices } from "./oracle.service";
 import { getPools as getRewardsChefPools } from "./rewardsChef.service";
 import { getStakedBalance, findPoolByLpToken } from "../helpers/rewards/rewardsChef.helpers";
@@ -326,45 +324,8 @@ export const addLiquiditySingleToken = async (
 ): Promise<TransactionResponse> => {
   const { poolAddress, singleTokenAmount, isAToB, deadline, stakeLPToken } = params;
 
-  // Fetch pool data including balances and swap fee rate
-  const poolData = await fetchPoolDataForSingleTokenLiquidity(accessToken, poolAddress);
   const pool = await fetchPoolTokenAddresses(accessToken, poolAddress);
-  
   const depositTokenAddress = isAToB ? pool.tokenA : pool.tokenB;
-  const singleTokenAmountBigInt = BigInt(singleTokenAmount);
-  
-  // Check that pool has liquidity (LP token supply > 0)
-  if (BigInt(poolData.lpTokenTotalSupply) === 0n) {
-    throw new Error("POOL_EMPTY");
-  }
-
-  // Calculate optimal swap amount
-  const reserveIn = BigInt(isAToB ? poolData.tokenABalance : poolData.tokenBBalance);
-  const swapFeeRateBigInt = BigInt(poolData.swapFeeRate);
-  const optimalSwapAmount = getOptimalSwapAmount(reserveIn, singleTokenAmountBigInt, swapFeeRateBigInt);
-
-  // Calculate swap output
-  const inputReserve = isAToB ? BigInt(poolData.tokenABalance) : BigInt(poolData.tokenBBalance);
-  const outputReserve = isAToB ? BigInt(poolData.tokenBBalance) : BigInt(poolData.tokenABalance);
-  const swapOutput = calculateSwapOutput(optimalSwapAmount, inputReserve, outputReserve, swapFeeRateBigInt);
-
-  // Calculate token amounts after swap for liquidity provision
-  // Remaining input token after swap + swapped output token
-  let tokenAAmount: bigint;
-  let tokenBAmount: bigint;
-  
-  if (isAToB) {
-    // Depositing tokenA: swap some A for B, then add liquidity with remaining A + received B
-    tokenAAmount = singleTokenAmountBigInt - optimalSwapAmount;
-    tokenBAmount = swapOutput;
-  } else {
-    // Depositing tokenB: swap some B for A, then add liquidity with remaining B + received A
-    tokenBAmount = singleTokenAmountBigInt - optimalSwapAmount;
-    tokenAAmount = swapOutput;
-  }
-
-  // Add 2% slippage tolerance for tokenA (matching dual token logic)
-  const maxTokenAAmount = (tokenAAmount * 102n) / 100n;
 
   // Prepare for LP token staking if requested
   let lpTokenAddress: string | undefined;
@@ -380,60 +341,18 @@ export const addLiquiditySingleToken = async (
     }
   }
 
-  // Build swap transaction with slippage protection (1% tolerance)
-  const minSwapOutput = (swapOutput * 99n) / 100n;
-  const swapTx = await buildFunctionTx([
-    buildTokenApprovalTx(depositTokenAddress, poolAddress, optimalSwapAmount.toString()),
+  // Execute liquidity deposit
+  const tx = await buildFunctionTx([
+    buildTokenApprovalTx(depositTokenAddress, poolAddress, singleTokenAmount),
     {
       contractName: extractContractName(Pool),
       contractAddress: poolAddress,
-      method: "swap",
-      args: {
-        isAToB,
-        amountIn: optimalSwapAmount.toString(),
-        minAmountOut: minSwapOutput.toString(),
-        deadline
-      }
+      method: "addLiquiditySingleToken",
+      args: { isAToB, amountIn: singleTokenAmount, deadline }
     }
   ], userAddress, accessToken);
 
-  // Execute swap first
-  const swapResult = await executeTransaction(accessToken, swapTx);
-  
-  if (swapResult.status !== "Success") {
-    return swapResult;
-  }
-
-  // Build addLiquidity transaction
-  // Need to approve both tokens for liquidity add
-  const liquidityTxArray: any[] = [];
-  
-  if (isAToB) {
-    // Approve remaining tokenA
-    liquidityTxArray.push(buildTokenApprovalTx(pool.tokenA, poolAddress, tokenAAmount.toString()));
-    // Approve received tokenB (from swap)
-    liquidityTxArray.push(buildTokenApprovalTx(pool.tokenB, poolAddress, tokenBAmount.toString()));
-  } else {
-    // Approve remaining tokenB
-    liquidityTxArray.push(buildTokenApprovalTx(pool.tokenB, poolAddress, tokenBAmount.toString()));
-    // Approve received tokenA (from swap)
-    liquidityTxArray.push(buildTokenApprovalTx(pool.tokenA, poolAddress, tokenAAmount.toString()));
-  }
-
-  // Add liquidity
-  liquidityTxArray.push({
-    contractName: extractContractName(Pool),
-    contractAddress: poolAddress,
-    method: "addLiquidity",
-    args: {
-      tokenBAmount: tokenBAmount.toString(),
-      maxTokenAAmount: maxTokenAAmount.toString(),
-      deadline
-    }
-  });
-
-  const liquidityTx = await buildFunctionTx(liquidityTxArray, userAddress, accessToken);
-  const depositResult = await executeTransaction(accessToken, liquidityTx);
+  const depositResult = await executeTransaction(accessToken, tx);
 
   // Stake newly minted LP tokens if requested and deposit succeeded
   if (stakeLPToken && depositResult.status === "Success" && lpTokenAddress && rewardsPool) {
