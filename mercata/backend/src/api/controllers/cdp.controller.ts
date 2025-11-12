@@ -29,7 +29,6 @@ import {
   topUpJuniorNote,
   claimJuniorNote,
   getCDPStats,
-  getProtocolRevenue,
 } from "../services/cdp.service";
 import {
   validateDepositArgs,
@@ -458,19 +457,6 @@ class CDPController {
     }
   }
 
-  static async getProtocolRevenue(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { accessToken, address: userAddress } = req;
-      const revenue = await getProtocolRevenue(accessToken, userAddress as string);
-      res.status(RestStatus.OK).json(revenue);
-    } catch (error) {
-      next(error);
-    }
-  }
 }
 
 export default CDPController;

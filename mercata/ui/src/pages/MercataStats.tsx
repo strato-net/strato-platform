@@ -156,21 +156,26 @@ const MercataStats = () => {
     try {
       setRevenueLoading(true);
       
-      // Fetch CDP, Swap, and Lending revenue in parallel
-      const [cdpResponse, swapResponse, lendingResponse] = await Promise.all([
-        api.get<ProtocolRevenueResponse>('/cdp/protocol-revenue'),
-        api.get<ProtocolRevenueResponse>('/swap-pools/protocol-revenue'),
-        api.get<ProtocolRevenueResponse>('/lending/protocol-revenue')
-      ]);
+      // Fetch aggregated protocol revenue from the new centralized endpoint
+      const response = await api.get<{
+        totalRevenue: string;
+        byProtocol: {
+          cdp: ProtocolRevenueResponse;
+          lending: ProtocolRevenueResponse;
+          swap: ProtocolRevenueResponse;
+        };
+        aggregated: RevenuePeriod;
+      }>('/protocol-fees/revenue');
       
-      setCdpTotalRevenue(cdpResponse.data.totalRevenue);
-      setCdpRevenueByPeriod(cdpResponse.data.revenueByPeriod);
+      // Extract data for each protocol from the aggregated response
+      setCdpTotalRevenue(response.data.byProtocol.cdp.totalRevenue);
+      setCdpRevenueByPeriod(response.data.byProtocol.cdp.revenueByPeriod);
       
-      setSwapTotalRevenue(swapResponse.data.totalRevenue);
-      setSwapRevenueByPeriod(swapResponse.data.revenueByPeriod);
+      setSwapTotalRevenue(response.data.byProtocol.swap.totalRevenue);
+      setSwapRevenueByPeriod(response.data.byProtocol.swap.revenueByPeriod);
       
-      setLendingTotalRevenue(lendingResponse.data.totalRevenue);
-      setLendingRevenueByPeriod(lendingResponse.data.revenueByPeriod);
+      setLendingTotalRevenue(response.data.byProtocol.lending.totalRevenue);
+      setLendingRevenueByPeriod(response.data.byProtocol.lending.revenueByPeriod);
     } catch (err) {
       console.error('Failed to fetch protocol revenue:', err);
       setRevenueError('Failed to load protocol revenue');

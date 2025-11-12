@@ -10,8 +10,7 @@ import {
   removeLiquidity,
   swap,
   getSwapHistory,
-  setPoolRates,
-  getSwapProtocolRevenue,
+  setPoolRates
 } from "../services/swapping.service";
 import { getBalance } from "../services/tokens.service";
 import {
@@ -269,21 +268,6 @@ class SwappingController {
     }
   }
 
-  // Analytics
-  static async getProtocolRevenue(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { accessToken } = req;
-
-      const revenue = await getSwapProtocolRevenue(accessToken);
-      res.status(RestStatus.OK).json(revenue);
-    } catch (error) {
-      next(error);
-    }
-  }
 }
 
 export default SwappingController;
