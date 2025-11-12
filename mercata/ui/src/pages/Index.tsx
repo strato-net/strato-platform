@@ -2,6 +2,9 @@
 import { useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import Hero from '../components/home/Hero';
+import Services from '../components/home/Services';
+import YieldCalculator from '../components/home/YieldCalculator';
+import CallToAction from '../components/home/CallToAction';
 import MERCATALOGO from '@/assets/mercata.png';
 
 const Index = () => {
@@ -13,7 +16,10 @@ const Index = () => {
     <div className="min-h-screen relative bg-white">
       <Navbar />
       <Hero />
-      
+      <Services />
+      <YieldCalculator />
+      <CallToAction />
+
       <footer className="bg-strato-dark text-white py-16">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
