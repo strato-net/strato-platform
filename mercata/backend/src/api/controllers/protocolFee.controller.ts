@@ -44,7 +44,7 @@ class ProtocolFeeController {
       
       // Validate protocol
       if (!['cdp', 'lending', 'swap'].includes(protocol)) {
-        return res.status(RestStatus.BAD_REQUEST).json({ 
+        res.status(RestStatus.BAD_REQUEST).json({ 
           error: "Invalid protocol. Must be one of: cdp, lending, swap" 
         });
       }
@@ -57,7 +57,7 @@ class ProtocolFeeController {
           period as any,
           protocol as any
         );
-        return res.status(RestStatus.OK).json(periodRevenue);
+        res.status(RestStatus.OK).json(periodRevenue);
       }
       
       // Otherwise get all revenue data for the protocol
@@ -98,14 +98,14 @@ class ProtocolFeeController {
       
       // Validate period
       if (!['daily', 'weekly', 'monthly', 'ytd', 'allTime'].includes(period)) {
-        return res.status(RestStatus.BAD_REQUEST).json({ 
+        res.status(RestStatus.BAD_REQUEST).json({ 
           error: "Invalid period. Must be one of: daily, weekly, monthly, ytd, allTime" 
         });
       }
       
       // Validate protocol if specified
       if (protocol && !['cdp', 'lending', 'swap'].includes(protocol as string)) {
-        return res.status(RestStatus.BAD_REQUEST).json({ 
+        res.status(RestStatus.BAD_REQUEST).json({ 
           error: "Invalid protocol. Must be one of: cdp, lending, swap" 
         });
       }
