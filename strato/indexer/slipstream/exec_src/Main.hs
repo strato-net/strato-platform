@@ -35,10 +35,6 @@ main = do
   blockappsInit "slipstream_main"
   runInstrumentation "slipstream"
 
-  runNoLoggingT $ do
-    pool <- createPostgresqlPool cirrusConnStr 1
-    liftIO $ runSqlPersistMPool (runMigration migrateAll) pool
-
   runLoggingT
     . runResourceT
     . runKafkaM ("slipstream" :: KafkaClientId) (fromString flags_kafkahost, fromIntegral flags_kafkaport)
@@ -48,6 +44,7 @@ main = do
       $logInfoS "main" "Serving metrics on port 10777"
 
       conn <- createPostgresqlPool cirrusConnStr 10
+      liftIO $ runSqlPersistMPool (runMigration migrateAll) conn
 
       _ <- traverse (liftIO . pgQuery conn . encodeUtf8 . slipstreamQueryPostgres) initialSlipstreamQueries
 
