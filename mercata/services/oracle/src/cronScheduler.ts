@@ -211,10 +211,9 @@ export async function startCronScheduler(): Promise<void> {
     const resolvedFeeds = configLoader.getResolvedFeeds();
     
     // Read update interval from environment
-    const updateIntervalSeconds = await getUpdateInterval();
-    const updateIntervalMinutes = Math.ceil(updateIntervalSeconds / 60);
+    const cronMinutePattern = await getUpdateInterval();
     
-    logInfo('CronScheduler', `Starting Oracle Service with ${resolvedFeeds.length} feeds (update interval: ${updateIntervalMinutes} minutes from env: ${process.env.UPDATE_INTERVAL_MINUTES || '15'})`);
+    logInfo('CronScheduler', `Starting Oracle Service with ${resolvedFeeds.length} feeds (update interval: ${cronMinutePattern})`);
 
     // Single cron job that processes all feeds in parallel
     const jobFunction = async () => {
@@ -227,8 +226,8 @@ export async function startCronScheduler(): Promise<void> {
     };
 
     // Schedule the job based on update interval from contract
-    const cronSchedule = `*/${updateIntervalMinutes} * * * *`;
-    logInfo('CronScheduler', `Scheduling oracle updates every ${updateIntervalMinutes} minutes (cron: ${cronSchedule})`);
+    const cronSchedule = `${cronMinutePattern} * * * *`;
+    logInfo('CronScheduler', `Scheduling oracle updates (cron: ${cronSchedule})`);
     
     cron.schedule(cronSchedule, jobFunction);
     

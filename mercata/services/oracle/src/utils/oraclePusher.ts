@@ -5,12 +5,26 @@ import { TransactionResult, CallListArg } from '../types';
 import { checkBalances } from './balanceChecker';
 import { GAS_PARAMS, TIMEOUTS, RETRY_DELAYS } from './constants';
 
-export async function getUpdateInterval(): Promise<number> {
-    const minutes = parseInt(process.env.UPDATE_INTERVAL_MINUTES || '15');
-    if (minutes < 1 || minutes > 60) {
-        throw new Error(`Invalid UPDATE_INTERVAL_MINUTES: ${minutes}. Must be 1-60.`);
-    }
-    return minutes * 60;
+export async function getUpdateInterval(): Promise<string> {
+  const pattern = process.env.CRON_MINUTE_PATTERN || "*/15";
+
+  // Validate pattern format: matches */N (every N minutes) or X-Y/N (range with step)
+  if (!/^(\*\/\d+|[\d-]+\/\d+)$/.test(pattern)) {
+    throw new Error(
+      `Invalid CRON_MINUTE_PATTERN: ${pattern}. Must be a valid cron minute pattern (e.g., '*/15' or '7-59/15').`
+    );
+  }
+
+  // Extract and validate interval number (must be 1-60)
+  const intervalMatch = pattern.match(/\/(\d+)$/);
+  const minutes = parseInt(intervalMatch![1]);
+  if (minutes < 1 || minutes > 60) {
+    throw new Error(
+      `Invalid CRON_MINUTE_PATTERN: ${pattern}. Interval must be 1-60.`
+    );
+  }
+
+  return pattern;
 }
 
 async function callListAndWait(callListArgs: CallListArg[]): Promise<TransactionResult> {
