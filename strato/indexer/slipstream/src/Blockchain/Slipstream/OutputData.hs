@@ -32,6 +32,7 @@ module Blockchain.Slipstream.OutputData (
   createExpandEventTables,
   notifyPostgREST,
   cirrusInfo,
+  cirrusConnStr,
   aggEventToCollectionRows,
   dbQueryCatchError,
   initialSlipstreamQueries
@@ -46,6 +47,7 @@ import           Control.Monad
 import qualified Data.Aeson                      as Aeson
 import           Data.Bool                       (bool)
 import qualified Data.Set as Set
+import           Data.ByteString                 (ByteString)
 import qualified Data.ByteString.Base16         as Base16
 import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString                 as B
@@ -483,6 +485,15 @@ cirrusInfo =
       pgDBLogMessage = runLoggingT . $logInfoLS "pglog",
       pgDBParams = []
     }
+
+cirrusConnStr :: ByteString
+cirrusConnStr =
+    BC.pack $
+        "host="     ++ flags_pghost     ++ " " ++
+        "port="     ++ show flags_pgport ++ " " ++
+        "user="     ++ flags_pguser     ++ " " ++
+        "password=" ++ flags_password ++ " " ++
+        "dbname="   ++ flags_database
 
 dbQueryCatchError :: (MonadLogger m, MonadUnliftIO m) => PGConnection -> Text -> m ()
 dbQueryCatchError conn insrt = handle handlePostgresError $ dbQuery conn insrt

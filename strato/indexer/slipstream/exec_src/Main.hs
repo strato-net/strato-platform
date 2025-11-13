@@ -35,10 +35,8 @@ main = do
   blockappsInit "slipstream_main"
   runInstrumentation "slipstream"
 
-  let connStr = "host=localhost dbname=cirrus user=postgres password=api port=5432"
-
   runNoLoggingT $ do
-    pool <- createPostgresqlPool connStr 1
+    pool <- createPostgresqlPool cirrusConnStr 1
     liftIO $ runSqlPersistMPool (runMigration migrateAll) pool
 
   runLoggingT
@@ -49,7 +47,7 @@ main = do
       void . liftIO . forkIO . run 10777 $ metricsApp
       $logInfoS "main" "Serving metrics on port 10777"
 
-      conn <- createPostgresqlPool connStr 10
+      conn <- createPostgresqlPool cirrusConnStr 10
 
       _ <- traverse (liftIO . pgQuery conn . encodeUtf8 . slipstreamQueryPostgres) initialSlipstreamQueries
 
