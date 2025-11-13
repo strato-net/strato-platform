@@ -76,9 +76,6 @@ interface AggregatedRevenueResponse {
   aggregated: RevenuePeriod;
 }
 
-type RevenueSource = 'combined' | 'cdp' | 'swap' | 'lending' | 'gas';
-type NonCombinedRevenueSource = Exclude<RevenueSource, 'combined'>;
-
 const createEmptyRevenuePeriod = (): RevenuePeriod => ({
   daily: { total: '0', byAsset: [] },
   weekly: { total: '0', byAsset: [] },
@@ -86,20 +83,6 @@ const createEmptyRevenuePeriod = (): RevenuePeriod => ({
   ytd: { total: '0', byAsset: [] },
   allTime: { total: '0', byAsset: [] }
 });
-
-const REVENUE_SOURCE_LABELS: Record<NonCombinedRevenueSource, string> = {
-  cdp: 'CDP',
-  swap: 'Swap',
-  lending: 'Lending',
-  gas: 'Gas'
-};
-
-const REVENUE_SOURCE_BADGES: Record<NonCombinedRevenueSource, string> = {
-  cdp: 'bg-blue-100 text-blue-800',
-  swap: 'bg-purple-100 text-purple-800',
-  lending: 'bg-green-100 text-green-800',
-  gas: 'bg-yellow-100 text-yellow-800'
-};
 
 const MercataStats = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -129,11 +112,9 @@ const MercataStats = () => {
   const [gasTotalRevenue, setGasTotalRevenue] = useState<string>('0');
   const [gasRevenueByPeriod, setGasRevenueByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
   
-  const [aggregatedTotalRevenue, setAggregatedTotalRevenue] = useState<string>('0');
   const [aggregatedRevenueByPeriod, setAggregatedRevenueByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
   
   const [selectedPeriod, setSelectedPeriod] = useState<keyof RevenuePeriod>('allTime');
-  const [revenueSource, setRevenueSource] = useState<RevenueSource>('combined');
   const [revenueLoading, setRevenueLoading] = useState(true);
   const [revenueError, setRevenueError] = useState<string | null>(null);
 
@@ -184,7 +165,6 @@ const MercataStats = () => {
       const response = await api.get<AggregatedRevenueResponse>('/protocol-fees/revenue');
       
       // Extract data for each protocol from the aggregated response
-      setAggregatedTotalRevenue(response.data.totalRevenue);
       setAggregatedRevenueByPeriod(response.data.aggregated);
       
       setCdpTotalRevenue(response.data.byProtocol.cdp.totalRevenue);
@@ -225,26 +205,6 @@ const MercataStats = () => {
     return `${cr.toFixed(2)}%`;
   };
   
-  const shouldDimCard = (card: NonCombinedRevenueSource): boolean =>
-    revenueSource !== 'combined' && revenueSource !== card;
-
-  // Helper to get the appropriate revenue data based on source
-  const getRevenueData = (source: RevenueSource): { total: string; byPeriod: RevenuePeriod } => {
-    switch (source) {
-      case 'cdp':
-        return { total: cdpTotalRevenue, byPeriod: cdpRevenueByPeriod };
-      case 'swap':
-        return { total: swapTotalRevenue, byPeriod: swapRevenueByPeriod };
-      case 'lending':
-        return { total: lendingTotalRevenue, byPeriod: lendingRevenueByPeriod };
-      case 'gas':
-        return { total: gasTotalRevenue, byPeriod: gasRevenueByPeriod };
-      default:
-        return { total: aggregatedTotalRevenue, byPeriod: aggregatedRevenueByPeriod };
-    }
-  };
-
-
   return (
     <div className="min-h-screen bg-gray-50">
       <DashboardSidebar />
@@ -448,63 +408,8 @@ const MercataStats = () => {
               </TabsContent>
 
               <TabsContent value="revenue">
-                {/* Revenue Source Selector */}
-                <div className="flex flex-col gap-4 mb-6">
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    <button
-                      onClick={() => setRevenueSource('combined')}
-                      className={`px-6 py-3 rounded-lg font-medium transition-colors ${
-                        revenueSource === 'combined' 
-                          ? 'bg-green-600 text-white' 
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                      }`}
-                    >
-                      Combined Revenue
-                    </button>
-                    <button
-                      onClick={() => setRevenueSource('cdp')}
-                      className={`px-6 py-3 rounded-lg font-medium transition-colors ${
-                        revenueSource === 'cdp' 
-                          ? 'bg-green-600 text-white' 
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                      }`}
-                    >
-                      CDP Revenue
-                    </button>
-                    <button
-                      onClick={() => setRevenueSource('swap')}
-                      className={`px-6 py-3 rounded-lg font-medium transition-colors ${
-                        revenueSource === 'swap' 
-                          ? 'bg-green-600 text-white' 
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                      }`}
-                    >
-                      Swap Pool Revenue
-                    </button>
-                    <button
-                      onClick={() => setRevenueSource('lending')}
-                      className={`px-6 py-3 rounded-lg font-medium transition-colors ${
-                        revenueSource === 'lending' 
-                          ? 'bg-green-600 text-white' 
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                      }`}
-                    >
-                      Lending Revenue
-                    </button>
-                    <button
-                      onClick={() => setRevenueSource('gas')}
-                      className={`px-6 py-3 rounded-lg font-medium transition-colors ${
-                        revenueSource === 'gas' 
-                          ? 'bg-green-600 text-white' 
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                      }`}
-                    >
-                      Gas Revenue
-                    </button>
-                  </div>
-                  
-                  {/* Time Period Selector */}
-                  <div className="flex flex-wrap gap-2">
+                {/* Time Period Selector */}
+                <div className="flex flex-wrap gap-2 mb-6">
                     <button
                       onClick={() => setSelectedPeriod('daily')}
                       className={`px-4 py-2 rounded-lg font-medium transition-colors ${
@@ -556,11 +461,10 @@ const MercataStats = () => {
                       All Time
                     </button>
                   </div>
-                </div>
 
                 {/* Revenue Summary Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-6">
-                  <Card className={shouldDimCard('cdp') ? 'opacity-50' : ''}>
+                  <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium">CDP Revenue</CardTitle>
                       <Vault className="h-4 w-4 text-muted-foreground" />
@@ -579,7 +483,7 @@ const MercataStats = () => {
                     </CardContent>
                   </Card>
                   
-                  <Card className={shouldDimCard('swap') ? 'opacity-50' : ''}>
+                  <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium">Swap Pool Revenue</CardTitle>
                       <Activity className="h-4 w-4 text-muted-foreground" />
@@ -598,7 +502,7 @@ const MercataStats = () => {
                     </CardContent>
                   </Card>
                   
-                  <Card className={shouldDimCard('lending') ? 'opacity-50' : ''}>
+                  <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium">Lending Revenue</CardTitle>
                       <DollarSign className="h-4 w-4 text-muted-foreground" />
@@ -617,7 +521,7 @@ const MercataStats = () => {
                     </CardContent>
                   </Card>
 
-                  <Card className={shouldDimCard('gas') ? 'opacity-50' : ''}>
+                  <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium">Gas Fee Revenue</CardTitle>
                       <Flame className="h-4 w-4 text-muted-foreground" />
@@ -638,11 +542,7 @@ const MercataStats = () => {
                   
                   <Card className="border-2 border-green-500">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">
-                        {revenueSource === 'combined'
-                          ? 'Combined Revenue'
-                          : `${REVENUE_SOURCE_LABELS[revenueSource as NonCombinedRevenueSource]} Revenue`}
-                      </CardTitle>
+                      <CardTitle className="text-sm font-medium">Combined Revenue</CardTitle>
                       <DollarSign className="h-4 w-4 text-green-600" />
                     </CardHeader>
                     <CardContent>
@@ -650,7 +550,7 @@ const MercataStats = () => {
                         {revenueLoading ? (
                           <Skeleton className="h-8 w-24" />
                         ) : (
-                          `$${formatLargeNumber(parseFloat(formatUnits(BigInt(getRevenueData(revenueSource).byPeriod[selectedPeriod].total || '0'), 18)))}`
+                          `$${formatLargeNumber(parseFloat(formatUnits(BigInt(aggregatedRevenueByPeriod[selectedPeriod].total || '0'), 18)))}`
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground">
@@ -667,15 +567,9 @@ const MercataStats = () => {
                 {/* Revenue by Asset Table */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>
-                      {revenueSource === 'combined' && 'Combined Revenue by Asset'}
-                      {revenueSource === 'cdp' && 'CDP Revenue by Asset'}
-                      {revenueSource === 'swap' && 'Swap Pool Revenue by Asset'}
-                    </CardTitle>
+                    <CardTitle>Combined Revenue by Asset</CardTitle>
                     <CardDescription>
-                      {revenueSource === 'combined' && 'Total protocol revenue from both CDP and swap pools by asset'}
-                      {revenueSource === 'cdp' && 'Protocol revenue from CDP operations by collateral asset'}
-                      {revenueSource === 'swap' && 'Protocol revenue from swap pool fees by token'}
+                      Total protocol revenue across all sources by asset
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -687,7 +581,7 @@ const MercataStats = () => {
                           <Skeleton key={i} className="h-16 w-full" />
                         ))}
                       </div>
-                    ) : getRevenueData(revenueSource).byPeriod[selectedPeriod].byAsset.length === 0 ? (
+                    ) : aggregatedRevenueByPeriod[selectedPeriod].byAsset.length === 0 ? (
                       <div className="text-center text-gray-500 py-8">No revenue data available for this period</div>
                     ) : (
                       <div className="overflow-x-auto">
@@ -695,27 +589,11 @@ const MercataStats = () => {
                           <TableHeader>
                             <TableRow>
                               <TableHead>Asset</TableHead>
-                              <TableHead className="text-center">Source</TableHead>
                               <TableHead className="text-right">Revenue (USDST)</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {getRevenueData(revenueSource).byPeriod[selectedPeriod].byAsset.map((item) => {
-                              // For combined view, show which source(s) contributed
-                              const hasCdpRevenue = cdpRevenueByPeriod[selectedPeriod].byAsset.some(
-                                cdpItem => cdpItem.asset === item.asset && BigInt(cdpItem.revenue) > 0n
-                              );
-                              const hasSwapRevenue = swapRevenueByPeriod[selectedPeriod].byAsset.some(
-                                swapItem => swapItem.asset === item.asset && BigInt(swapItem.revenue) > 0n
-                              );
-                              const hasLendingRevenue = lendingRevenueByPeriod[selectedPeriod].byAsset.some(
-                                lendingItem => lendingItem.asset === item.asset && BigInt(lendingItem.revenue) > 0n
-                              );
-                              const hasGasRevenue = gasRevenueByPeriod[selectedPeriod].byAsset.some(
-                                gasItem => gasItem.asset === item.asset && BigInt(gasItem.revenue) > 0n
-                              );
-                              const isCombinedSource = revenueSource === 'combined';
-                              
+                            {aggregatedRevenueByPeriod[selectedPeriod].byAsset.map((item) => {
                               return (
                                 <TableRow key={item.asset}>
                                   <TableCell>
@@ -723,28 +601,6 @@ const MercataStats = () => {
                                       <div className="font-semibold">{item.symbol}</div>
                                       <div className="text-sm text-gray-500">{item.asset.slice(0, 6)}...{item.asset.slice(-4)}</div>
                                     </div>
-                                  </TableCell>
-                                  <TableCell className="text-center">
-                                    {isCombinedSource ? (
-                                      <div className="flex justify-center gap-2 flex-wrap">
-                                        {hasCdpRevenue && (
-                                          <span className={`text-xs px-2 py-1 rounded ${REVENUE_SOURCE_BADGES.cdp}`}>CDP</span>
-                                        )}
-                                        {hasSwapRevenue && (
-                                          <span className={`text-xs px-2 py-1 rounded ${REVENUE_SOURCE_BADGES.swap}`}>Swap</span>
-                                        )}
-                                        {hasLendingRevenue && (
-                                          <span className={`text-xs px-2 py-1 rounded ${REVENUE_SOURCE_BADGES.lending}`}>Lending</span>
-                                        )}
-                                        {hasGasRevenue && (
-                                          <span className={`text-xs px-2 py-1 rounded ${REVENUE_SOURCE_BADGES.gas}`}>Gas</span>
-                                        )}
-                                      </div>
-                                    ) : (
-                                      <span className={`text-xs px-2 py-1 rounded ${REVENUE_SOURCE_BADGES[revenueSource as NonCombinedRevenueSource]}`}>
-                                        {REVENUE_SOURCE_LABELS[revenueSource as NonCombinedRevenueSource]}
-                                      </span>
-                                    )}
                                   </TableCell>
                                   <TableCell className="text-right font-semibold">
                                     ${formatLargeNumber(parseFloat(formatUnits(BigInt(item.revenue || '0'), 18)))}
