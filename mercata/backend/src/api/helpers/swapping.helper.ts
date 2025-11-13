@@ -6,6 +6,7 @@ import { safeBigInt, safeBigIntDivide } from "../../utils/bigIntUtils";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { executeTransaction } from "../../utils/txHelper";
 import { waitForBalanceUpdate } from "./rewards/rewardsChef.helpers";
+import { toUTCTime } from "./cirrusHelpers";
 
 const { Pool, PoolSwap, swapHistorySelectFields } = constants;
 
@@ -152,7 +153,7 @@ export const getTradingVolume24hForPools = async (
       address: `in.(${poolAddresses.join(',')})`,
       "pool.poolFactory": `eq.${constants.poolFactory}`,
       select: swapHistorySelectFields.join(','),
-      block_timestamp: `gte.${new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()}`,
+      block_timestamp: `gte.${toUTCTime(new Date(Date.now() - 24 * 60 * 60 * 1000))}`,
     }
   });
 

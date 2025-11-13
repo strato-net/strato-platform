@@ -1,5 +1,5 @@
 import { logInfo, logError } from "./logger";
-import { getEnabledChains, getEnabledAssets } from "../services/cirrusService";
+import { getEnabledChains } from "../services/cirrusService";
 import { config } from "../config";
 
 export async function validateBridgeConfig(): Promise<boolean> {
@@ -148,10 +148,10 @@ export async function validateBridgeConfig(): Promise<boolean> {
   // Validate chain RPC URLs (only if OAuth is initialized)
   if (oauthInitialized) {
     try {
-      const enabledChains = await getEnabledChains();
+      const enabledChainsArr = Array.from((await getEnabledChains()).values());
       const missingChainRpcUrls: string[] = [];
 
-      for (const chainInfo of enabledChains) {
+      for (const chainInfo of enabledChainsArr) {
         const externalChainId = chainInfo?.externalChainId;
         if (!externalChainId) {
           continue;
@@ -204,56 +204,9 @@ export async function validateBridgeConfig(): Promise<boolean> {
         );
       }
 
-      // Validate assets configuration
-      const enabledAssets = await getEnabledAssets();
-      for (const asset of enabledAssets) {
-        const stratoToken = asset?.stratoToken;
-        const assetPrefix = `   Asset ${stratoToken || "unknown"}:`;
-
-        if (!stratoToken) {
-          errors.push(`${assetPrefix} Missing stratoToken address`);
-        } else if (!/^(0x)?[a-fA-F0-9]{40}$/.test(stratoToken)) {
-          errors.push(
-            `${assetPrefix} Invalid stratoToken address format: ${stratoToken}`,
-          );
-        }
-
-        if (!asset.externalToken) {
-          errors.push(`${assetPrefix} Missing externalToken address`);
-        } else if (!/^(0x)?[a-fA-F0-9]{40}$/.test(asset.externalToken)) {
-          errors.push(
-            `${assetPrefix} Invalid externalToken address format: ${asset.externalToken}`,
-          );
-        }
-
-        if (!asset.externalChainId) {
-          errors.push(`${assetPrefix} Missing externalChainId`);
-        }
-
-        if (asset.permissions === undefined) {
-          errors.push(`${assetPrefix} Missing permissions flag`);
-        }
-
-        if (!asset.externalSymbol) {
-          errors.push(`${assetPrefix} Missing externalSymbol`);
-        }
-
-        if (!asset.externalName) {
-          errors.push(`${assetPrefix} Missing externalName`);
-        }
-
-        if (!asset.externalDecimals) {
-          errors.push(`${assetPrefix} Missing externalDecimals`);
-        } else if (isNaN(Number(asset.externalDecimals))) {
-          errors.push(
-            `${assetPrefix} Invalid externalDecimals format: ${asset.externalDecimals}`,
-          );
-        }
-      }
-
       logInfo(
         "ConfigValidator",
-        `Found ${enabledChains.length} enabled chains and ${enabledAssets.length} enabled assets`,
+        `Found ${enabledChainsArr.length} enabled chains`,
       );
     } catch (error) {
       errors.push(

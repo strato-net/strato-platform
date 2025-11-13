@@ -5,6 +5,7 @@ import { StratoPaths, constants } from "../../config/constants";
 import { extractContractName } from "../../utils/utils";
 import { getPool } from "./lending.service";
 import { PriceHistoryEntry, PriceHistoryResponse, OraclePriceEntry, OraclePriceMap } from "@mercata/shared-types";
+import { toUTCTime } from "../helpers/cirrusHelpers";
 
 const {
   PriceOracle,
@@ -101,11 +102,10 @@ export const getPriceHistory = async (
     // Calculate time range for the last month
     const oneMonthAgo = new Date();
     oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-    const oneMonthAgoISO = oneMonthAgo.toISOString();
 
     const params = {
       address: `eq.${oracleAddress}`,
-      block_timestamp: `gte.${oneMonthAgoISO}`,
+      block_timestamp: `gte.${toUTCTime(oneMonthAgo)}`,
       order: rawParams.order || "block_timestamp.asc",
     };
 
