@@ -163,7 +163,7 @@ instance PersistField Address where
   fromPersistValue x = Left . T.pack $ "PersistField Address: expected PersistText: " ++ show x
 
 instance PersistFieldSql Address where
-  sqlType _ = SqlOther "text"
+  sqlType _ = SqlString
 
 --  sqlType _ = SqlOther "varchar(64)"
 
