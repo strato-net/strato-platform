@@ -8,7 +8,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/lib/axios";
 import { formatUnits } from '@/utils/numberUtils';
-import { TrendingUp, Coins, Vault, Activity, DollarSign, Flame } from 'lucide-react';
 
 interface TokenWithStats {
   address: string;
@@ -218,20 +217,17 @@ const MercataStats = () => {
         <main className="p-6">
           <div className="max-w-7xl mx-auto">
             <Tabs defaultValue="tokens" className="w-full">
-              <TabsList className="grid w-full grid-cols-3 mb-6">
-                <TabsTrigger value="tokens">
-                  <Coins className="h-4 w-4 mr-2" />
-                  Token Stats
-                </TabsTrigger>
-                <TabsTrigger value="cdp">
-                  <Vault className="h-4 w-4 mr-2" />
-                  CDP Stats
-                </TabsTrigger>
-                <TabsTrigger value="revenue">
-                  <DollarSign className="h-4 w-4 mr-2" />
-                  Protocol Revenue
-                </TabsTrigger>
-              </TabsList>
+                <TabsList className="grid w-full grid-cols-3 mb-6">
+                  <TabsTrigger value="tokens">
+                    Token Stats
+                  </TabsTrigger>
+                  <TabsTrigger value="cdp">
+                    CDP Stats
+                  </TabsTrigger>
+                  <TabsTrigger value="revenue">
+                    Protocol Revenue
+                  </TabsTrigger>
+                </TabsList>
 
               <TabsContent value="tokens">
                 {/* Summary Cards */}
@@ -239,7 +235,6 @@ const MercataStats = () => {
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium">Total Market Cap</CardTitle>
-                      <TrendingUp className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">
@@ -306,7 +301,6 @@ const MercataStats = () => {
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium">Total Collateral Value</CardTitle>
-                      <Vault className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">
@@ -321,7 +315,6 @@ const MercataStats = () => {
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium">Total Debt</CardTitle>
-                      <TrendingUp className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">
@@ -336,7 +329,6 @@ const MercataStats = () => {
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium">Global CR</CardTitle>
-                      <Activity className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">
@@ -467,7 +459,6 @@ const MercataStats = () => {
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium">CDP Revenue</CardTitle>
-                      <Vault className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">
@@ -486,7 +477,6 @@ const MercataStats = () => {
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium">Swap Pool Revenue</CardTitle>
-                      <Activity className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">
@@ -505,7 +495,6 @@ const MercataStats = () => {
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium">Lending Revenue</CardTitle>
-                      <DollarSign className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">
@@ -524,7 +513,6 @@ const MercataStats = () => {
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium">Gas Fee Revenue</CardTitle>
-                      <Flame className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">
@@ -543,7 +531,6 @@ const MercataStats = () => {
                   <Card className="border-2 border-green-500">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium">Combined Revenue</CardTitle>
-                      <DollarSign className="h-4 w-4 text-green-600" />
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold text-green-600">
