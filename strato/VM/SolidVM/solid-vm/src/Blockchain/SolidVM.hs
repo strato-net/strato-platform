@@ -541,17 +541,13 @@ call' from to' fnCalltype functionName valList = do
           _ -> unknownFunction "logFunctionCall" (functionName, "asdf5" :: String) -- ^. CC.contractName)
 
   when (fnCalltype == CC.DelegateCall) $ do
-    (codeContractName, codeContractParentName) <- do
+    codeContractName <- do
       ch <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) codeAddress
       let n = case ch of
                 SolidVMCode n' _ -> n'
                 _ -> ""
-      case ch of
-        SolidVMCode name _ -> pure (n, stringToLabel name) -- Name of the parent
-        _ -> pure (n, "")
-    -- TODO: THIS IS A HACK!! I've hardcoded the creator to "BlockApps" to get things working in the app,
-    --       but this needs to be fixed ASAP so that Slipstream can use the real creator name
-    addDelegatecall storageAddress codeAddress "BlockApps" (T.pack codeContractParentName) (T.pack codeContractName)
+      return n
+    addDelegatecall storageAddress codeAddress Nothing (T.pack codeContractName)
   logFunctionCall valList storageAddress contract functionName f
   where
     convertValueToStoragePathPiece :: Value -> Maybe MS.StoragePathPiece
@@ -2297,10 +2293,7 @@ runTheConstructors from to hsh cc contractName' argVals' = do
         _ <- runModifiersAndStatements modContentsList commands
         pure ()
       Nothing -> return ()
-
-    -- TODO: THIS IS A HACK!! I've hardcoded the creator to "BlockApps" to get things working in the app,
-    --       but this needs to be fixed ASAP so that Slipstream can use the real creator name
-    let getUsername []     = pure "BlockApps" -- I'm cheating
+    let getUsername []     = pure "BlockApps"
         getUsername (x:xs) = do
           userNameValue <- getSolidStorageKeyVal' x $ MS.StoragePath [MS.Field "username"]
           case userNameValue of
@@ -2310,7 +2303,7 @@ runTheConstructors from to hsh cc contractName' argVals' = do
     cs <- Mod.get (Mod.Proxy @[CallInfo])
     userName <- getUsername $ currentAddress <$> cs
     addNewCodeCollection userName cc
-    addDelegatecall to to userName "Mercata" $ T.pack contractName'
+    addDelegatecall to to (Just userName) $ T.pack contractName'
 
   return ()
 
