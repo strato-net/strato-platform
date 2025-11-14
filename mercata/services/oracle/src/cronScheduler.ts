@@ -1,10 +1,20 @@
 import cron from 'node-cron';
 import { logInfo, logError, logFeedUpdate } from './utils/logger';
 import { fetchBatchPrices, generateConstantPrices } from './adapters/genericRestAdapter';
-import { pushAssetPrices, getUpdateInterval } from './utils/oraclePusher';
+import { pushAssetPrices } from './utils/oraclePusher';
 import { ConfigLoader } from './utils/configLoader';
-import { healthMonitor } from './utils/healthMonitor';
 import { Asset } from './types';
+
+export async function getCronSchedule(): Promise<string> {
+    const schedule = process.env.CRON_SCHEDULE || "0 */15 * * * *";
+    if (!cron.validate(schedule)) {
+        throw new Error(
+            `Invalid CRON_SCHEDULE: ${schedule}. See https://nodecron.com/cron-syntax.html for cron schedule syntax.`
+        );
+    }
+    
+    return schedule;
+}
 
 // Process all feeds in parallel and combine results
 async function processAllFeeds(configLoader: ConfigLoader): Promise<void> {
@@ -210,10 +220,7 @@ export async function startCronScheduler(): Promise<void> {
     const configLoader = new ConfigLoader();
     const resolvedFeeds = configLoader.getResolvedFeeds();
     
-    // Read update interval from environment
-    const cronMinutePattern = await getUpdateInterval();
-    
-    logInfo('CronScheduler', `Starting Oracle Service with ${resolvedFeeds.length} feeds (update interval: ${cronMinutePattern})`);
+    logInfo('CronScheduler', `Starting Oracle Service with ${resolvedFeeds.length} feeds`);
 
     // Single cron job that processes all feeds in parallel
     const jobFunction = async () => {
@@ -225,8 +232,8 @@ export async function startCronScheduler(): Promise<void> {
         }
     };
 
-    // Schedule the job based on update interval from contract
-    const cronSchedule = `${cronMinutePattern} * * * *`;
+    // Schedule the job based on cron schedule provided.
+    const cronSchedule = await getCronSchedule();
     logInfo('CronScheduler', `Scheduling oracle updates (cron: ${cronSchedule})`);
     
     cron.schedule(cronSchedule, jobFunction);

@@ -5,7 +5,7 @@ Fetches asset prices from multiple sources and pushes them to the STRATO blockch
 ## Features
 
 - **Batch Updates**: Multiple assets updated in single transaction
-- **Configurable Interval**: Update frequency via `CRON_MINUTE_PATTERN` cron pattern (e.g., `*/15` for :00, :15, :30, :45 or `7-59/15` for :07, :22, :37, :52)
+- **Configurable Interval**: Update schedule via `CRON_SCHEDULE` cron pattern (e.g., '0 */15 * * * *' for :00, :15, :30, :45 or '30 7,22,37,52 * * * *' for :07:30, :22:30, :37:30, :52:30)
 - **Parallel Processing**: All feeds run simultaneously
 - **Automatic Retry**: All API calls retry twice on failure
 - **Health Monitoring**: Service marks itself unhealthy on persistent failures
@@ -30,7 +30,7 @@ METALS_DEV_API_KEY=your-metals-dev-key
 METALS_API_API_KEY=your-metals-api-key
 
 # Oracle Configuration
-CRON_MINUTE_PATTERN=*/15  # Cron minute pattern (e.g., '*/15' for :00, :15, :30, :45 or '7-59/15' for :07, :22, :37, :52)
+CRON_SCHEDULE="0 */15 * * * *"
 
 # Token Configuration (Optional)
 USDST_ADDRESS=86a5ae535ded415203c3e27d654f9a1d454c553b  # USDST contract address
