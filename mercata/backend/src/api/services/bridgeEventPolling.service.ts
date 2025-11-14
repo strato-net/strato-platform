@@ -129,13 +129,16 @@ export const pollBridgeEvents = async (): Promise<void> => {
 
       const intent = intents.get(eventId);
       if (intent) {
+        // Delete intent immediately to prevent race condition from overlapping polls
+        intents.delete(eventId);
         try {
           await intent.callback(intent.userToken, event);
-          intents.delete(eventId);
           seenEvents.add(eventId); // Only mark as seen after successful processing
         } catch (error) {
           console.error(`[BridgeEventPolling] Error executing intent callback:`, error);
-          // Don't delete intent or mark as seen on error - allow retry on next poll
+          // Re-add intent on error to allow retry on next poll
+          intents.set(eventId, intent);
+          // Don't mark as seen on error - allow retry on next poll
         }
       } else {
         // No intent for this event, mark as seen to skip in future polls
