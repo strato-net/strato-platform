@@ -19,12 +19,12 @@ interface BridgeAdminContextType {
   withdrawalsTotalCount: number;
   loadingWithdrawals: boolean;
   errorWithdrawals: string | null;
-  fetchWithdrawals: (page?: number, limit?: number) => Promise<void>;
+  fetchWithdrawals: (page?: number, limit?: number, status?: number | null) => Promise<void>;
   deposits: Deposit[];
   depositsTotalCount: number;
   loadingDeposits: boolean;
   errorDeposits: string | null;
-  fetchDeposits: (page?: number, limit?: number) => Promise<void>;
+  fetchDeposits: (page?: number, limit?: number, status?: number | null) => Promise<void>;
 }
 
 const BridgeAdminContext = createContext<BridgeAdminContextType | undefined>(undefined);
@@ -36,14 +36,19 @@ const createFetchHandler = (
   setLoading: (loading: boolean) => void,
   setError: (error: string | null) => void,
   errorMessage: string
-) => async (page: number = 1, limit: number = 10) => {
+) => async (page: number = 1, limit: number = 10, status?: number | null) => {
   try {
     setLoading(true);
     setError(null);
     const offset = (page - 1) * limit;
-    const { data } = await api.get(endpoint, {
-      params: { limit: limit.toString(), offset: offset.toString() },
-    });
+    const params: Record<string, string> = {
+      limit: limit.toString(),
+      offset: offset.toString(),
+    };
+    if (status !== null && status !== undefined) {
+      params.status = status.toString();
+    }
+    const { data } = await api.get(endpoint, { params });
     setData(data.data || []);
     setTotalCount(data.totalCount || 0);
   } catch (error: any) {
