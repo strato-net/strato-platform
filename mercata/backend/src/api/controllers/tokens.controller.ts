@@ -3,9 +3,6 @@ import RestStatus from "http-status-codes";
 import {
   getTokens,
   getBalance,
-  getTokenBalance,
-  getTokenCollateral,
-  getTokenValueData,
   createToken,
   transferToken,
   approveToken,
@@ -111,77 +108,12 @@ class TokensController {
       const { accessToken, query, address: userAddress } = req;
       validateQueryParams(query);
 
-      const balances = await getBalance(
+      const result = await getBalance(
         accessToken,
         userAddress,
         query as Record<string, string | undefined>
       );
-      res.status(RestStatus.OK).json(balances);
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  static async getTokenBalance(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { accessToken, query, address: userAddress } = req;
-      validateQueryParams(query);
-
-      const balances = await getTokenBalance(
-        accessToken,
-        userAddress,
-        query as Record<string, string | undefined>
-      );
-      res.status(RestStatus.OK).json(balances);
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  static async getTokenCollateral(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { accessToken, query, address: userAddress } = req;
-      validateQueryParams(query);
-
-      const collaterals = await getTokenCollateral(
-        accessToken,
-        userAddress,
-        query as Record<string, string | undefined>
-      );
-      res.status(RestStatus.OK).json(collaterals);
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  static async getTokenValueData(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { accessToken, params, address: userAddress } = req;
-      const { tokenAddress } = params;
-
-      if (!tokenAddress) {
-        res.status(RestStatus.BAD_REQUEST).json({ error: "Token address is required" });
-        return;
-      }
-
-      const valueData = await getTokenValueData(
-        accessToken,
-        userAddress,
-        tokenAddress
-      );
-      res.status(RestStatus.OK).json(valueData);
+      res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
     }

@@ -206,7 +206,7 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const fetchBalanceTokens = useCallback(async (signal?: AbortSignal) => {
     await fetchTokenData(
-      `/tokens/tokenBalance`,
+      `/tokens/balance?mode=balance`,
       setLoadingBalance,
       setBalanceTokens,
       setBalanceInactiveTokens,
@@ -216,7 +216,7 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const fetchCollateralTokens = useCallback(async (signal?: AbortSignal) => {
     await fetchTokenData(
-      `/tokens/tokenCollateral`,
+      `/tokens/balance?mode=collateral`,
       setLoadingCollateral,
       setCollateralTokens,
       setCollateralInactiveTokens,

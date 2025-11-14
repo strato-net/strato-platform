@@ -49,7 +49,7 @@ const AssetsList = ({
     }));
 
     try {
-      const response = await api.get(`/tokens/tokenValue/${tokenAddress}`);
+      const response = await api.get(`/tokens/balance?tokenAddress=${tokenAddress}`);
       setTokenValueData(prev => ({
         ...prev,
         [tokenAddress]: {
