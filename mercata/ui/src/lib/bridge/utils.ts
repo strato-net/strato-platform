@@ -205,6 +205,27 @@ export const BRIDGE_STATUS_OPTIONS = [
 ];
 
 /**
+ * Deposit status options for filter dropdowns (excludes Aborted)
+ */
+export const DEPOSIT_STATUS_OPTIONS = [
+  { value: null, label: "All Statuses" },
+  { value: 1, label: "Initiated" },
+  { value: 2, label: "Pending Review" },
+  { value: 3, label: "Completed" },
+];
+
+/**
+ * Withdrawal status options for filter dropdowns (includes all statuses)
+ */
+export const WITHDRAWAL_STATUS_OPTIONS = [
+  { value: null, label: "All Statuses" },
+  { value: 1, label: "Initiated" },
+  { value: 2, label: "Pending Review" },
+  { value: 3, label: "Completed" },
+  { value: 4, label: "Aborted" },
+];
+
+/**
  * Chain options for filter dropdowns
  */
 export const CHAIN_OPTIONS = [
