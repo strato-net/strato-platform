@@ -50,7 +50,8 @@ const DepositsPage = () => {
   });
   const [searchParams] = useSearchParams();
 
-  const initialTab = searchParams.get('tab') === 'convert' ? 'usdc' : undefined;
+  const initialTabParam = searchParams.get('tab');
+  const initialTab = initialTabParam === 'bridge-in' ? 'bridge-in' : 'easy-saving';
 
   // Add visibility state to prevent flashing
   const [isComponentMounted, setIsComponentMounted] = useState(false);
