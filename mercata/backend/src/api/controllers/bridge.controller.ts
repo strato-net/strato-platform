@@ -95,10 +95,16 @@ class BridgeController {
     try {
       const { accessToken, address: userAddress } = req;
       const { type } = req.params;
-      const queryParams = validateRawParams(req.query);
+      const rawQueryParams = validateRawParams(req.query);
+      
+      // Extract 'all' parameter for admin view control, exclude it from query params
+      const { all, ...queryParams } = rawQueryParams;
       
       const validatedType = validateTransactionType(type);
-      const result: BridgeTransactionResponse = await getBridgeTransactions(accessToken, validatedType, userAddress, queryParams);
+      // If 'all' query param is true, don't filter by userAddress (admin view)
+      // Otherwise, filter by the authenticated user's address
+      const addressToUse = all === 'true' ? undefined : userAddress;
+      const result: BridgeTransactionResponse = await getBridgeTransactions(accessToken, validatedType, addressToUse, queryParams);
       res.json(result);
     } catch (error: any) {
       next(error);

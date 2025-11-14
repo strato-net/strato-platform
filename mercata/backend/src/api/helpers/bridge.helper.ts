@@ -23,7 +23,7 @@ const QUERY_CONFIGS: Record<string, QueryConfig> = {
 
 export function buildQueryParams(
   rawParams: Record<string, string | undefined>,
-  userAddress: string,
+  userAddress: string | undefined,
   excludeFields: string[],
   queryType: 'withdrawal' | 'deposit'
 ): Record<string, string> {
@@ -36,9 +36,12 @@ export function buildQueryParams(
     )
   };
 
-  // For withdrawals, use stratoSender; for deposits, use stratoRecipient
-  const userField = queryType === 'deposit' ? 'stratoRecipient' : 'stratoSender';
-  baseParams[`value->>${userField}`] = `eq.${userAddress}`;
+  // Only filter by user address if provided (for admin view, userAddress is undefined)
+  if (userAddress) {
+    // For withdrawals, use stratoSender; for deposits, use stratoRecipient
+    const userField = queryType === 'deposit' ? 'stratoRecipient' : 'stratoSender';
+    baseParams[`value->>${userField}`] = `eq.${userAddress}`;
+  }
 
   return baseParams;
 }
