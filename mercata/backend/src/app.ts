@@ -3,6 +3,7 @@ import cors from "cors";
 import routes from "./api/routes";
 import { initOpenIdConfig } from "./config/config";
 import { errorHandler, notFoundHandler } from "./api/middleware/errorHandler";
+import { startBridgeEventPolling } from "./api/services/bridgeEventPolling.service";
 
 const PORT = process.env.PORT || 3001;
 
@@ -23,6 +24,9 @@ app.use(errorHandler);
     await initOpenIdConfig();
     app.listen(PORT, () => {
       console.log(`Server running at http://localhost:${PORT}`);
+      
+      // Start polling for bridge events
+      startBridgeEventPolling(5000); // Poll every 5 seconds
     });
   } catch (error) {
     console.error("Failed to initialize server:", error);

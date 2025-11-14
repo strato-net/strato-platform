@@ -342,50 +342,27 @@ const MintWidget: React.FC = () => {
       });
 
       toast({ title: "Mint transaction sent", description: `Tx: ${txHash.slice(0,10)}…` });
+      
+      // Register intent for auto-save if enabled
+      if (autoDeposit) {
+        try {
+          await api.post("/bridge/autoSave", {
+            externalChainId: selectedNetworkConfig.chainId,
+            externalTxHash: txHash,
+          });
+        } catch (err) {
+          console.error("Failed to register auto-save intent:", err);
+          // Don't fail the whole flow if intent registration fails
+        }
+      }
+      
       // Clear input early to reflect submitted state
       setAmount("");
 
       // Kick a quick balance refresh for immediate UI update
       await fetchUsdstBalance(userAddress);
 
-      // Auto-deposit: poll for USDST balance increase and deposit (TODO this is a really hacky way to do this)
-      if (autoDeposit) {
-        const beforeWei = BigInt(usdstBalance || "0");
-        await fetchUsdstBalance(userAddress)
-        const targetIncreaseWei = safeParseUnits(amount, 18);
-        const start = Date.now();
-        const timeoutMs = 8 * 60 * 1000; // 8 minutes
-        let deposited = false;
-
-        while (Date.now() - start < timeoutMs) {
-          await new Promise(r => setTimeout(r, 4000));
-          await fetchUsdstBalance(userAddress);
-          try {
-            // Get fresh balance directly from API instead of using React state
-            const nowRes = await api.get(`/tokens/balance?address=eq.${usdstAddress}`);
-            const nowBalanceFromAPI = nowRes?.data?.[0]?.balance || "0";
-            const nowWei = BigInt(nowBalanceFromAPI);
-
-            if (nowWei - beforeWei == targetIncreaseWei) {
-              // Deposit the minted amount
-              const amtDec = safeParseUnits(amount, 18).toString();
-              // Note that we will not stake for rewards when autoDeposit
-              await depositLiquidity({ amount: amtDec, stakeMToken: false });
-              await refreshLiquidity();
-              // Also update the React state
-              await fetchUsdstBalance(userAddress);
-              toast({ title: "Auto-deposit complete", description: `Supplied ${amtDec} USDST to lending pool` });
-              deposited = true;
-              break;
-            }
-          } catch (balanceErr) {
-            console.error("Error checking balance:", balanceErr);
-          }
-        }
-        if (!deposited) {
-          toast({ title: "Auto-deposit pending", description: "We'll deposit after USDST arrives. If it takes too long, deposit from Lending section.", variant: "default" });
-        }
-      }
+    
     } catch (err: any) {
       console.error("Error minting:", err);
       const msg = err?.message || "Transaction failed";
@@ -487,10 +464,10 @@ const MintWidget: React.FC = () => {
         />
       </div>
 
-      {/* <label className="flex items-center gap-2 text-sm text-gray-700">
+      <label className="flex items-center gap-2 text-sm text-gray-700">
         <input type="checkbox" className="accent-blue-600" checked={autoDeposit} onChange={e => setAutoDeposit(e.target.checked)} />
         Automatically deposit minted USDST into lending pool
-      </label> */}
+      </label>
 
       <div className="rounded-xl border bg-gray-50 p-4 space-y-3">
         {autoDeposit && (
