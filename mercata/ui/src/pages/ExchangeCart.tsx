@@ -63,26 +63,10 @@ const ExchangeCart: React.FC<ExchangeCartProps> = ({ onVaultActionSuccess, initi
 
         <TabsContent value="easy-saving">
           <div className="w-full">
-            <div className="flex items-center justify-between mb-4">
-              {/* <h2 className="text-lg font-semibold text-gray-900">USDST</h2> */}
-              <Button
-                variant="ghost"
-                size="sm"
-                className="flex items-center gap-2 ml-auto"
-                onClick={() => {
-                  setTargetTransactionTab('USDSTDeposit');
-                  navigate("/dashboard/bridge-transactions");
-                }}
-              >
-                <History className="h-4 w-4" />
-                View Transactions
-              </Button>
-            </div>
             <div className="bg-white rounded-xl p-4 shadow-sm mt-4">
               <div className="mb-4">
-                <h3 className="text-lg font-semibold text-center">Get USDST</h3>
-                <p className="text-sm text-gray-600 text-center mb-10">Bridge stablecoins and get USDST</p>
-                
+                <h2 className="text-lg font-semibold text-gray-900 mb-3">Easy Savings</h2>
+                <p className="text-sm text-gray-600">Access high saving rates by converting stablecoins to USDST and lending</p>
               </div>
               <MintWidget />
             </div>

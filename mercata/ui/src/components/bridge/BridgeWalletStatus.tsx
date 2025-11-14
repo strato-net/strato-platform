@@ -61,8 +61,21 @@ const BridgeWalletStatus = () => {
           </TooltipProvider>
         </>
       ) : (
-        <div className="[&>button]:bg-gradient-to-r [&>button]:from-[#1f1f5f] [&>button]:via-[#293b7d] [&>button]:to-[#16737d] [&>button]:text-white [&>button]:px-4 [&>button]:py-2 [&>button]:rounded-xl [&>button]:font-semibold [&>button]:hover:opacity-90 [&>button]:transition-all">
-          <ConnectButton label={"Connect Wallet"} />
+        <div className="w-full">
+          <ConnectButton.Custom>
+            {({ openConnectModal, mounted }) => {
+              return (
+                <button
+                  type="button"
+                  onClick={openConnectModal}
+                  disabled={!mounted}
+                  className="w-full bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white px-4 py-2 rounded-xl font-semibold hover:opacity-90 transition-all"
+                >
+                  Connect Wallet
+                </button>
+              );
+            }}
+          </ConnectButton.Custom>
         </div>
       )}
     </div>
