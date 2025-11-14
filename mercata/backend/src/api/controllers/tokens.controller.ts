@@ -108,12 +108,12 @@ class TokensController {
       const { accessToken, query, address: userAddress } = req;
       validateQueryParams(query);
 
-      const balances = await getBalance(
+      const result = await getBalance(
         accessToken,
         userAddress,
         query as Record<string, string | undefined>
       );
-      res.status(RestStatus.OK).json(balances);
+      res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
     }

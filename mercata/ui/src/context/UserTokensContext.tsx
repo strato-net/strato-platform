@@ -23,6 +23,16 @@ type UserTokensContextType = {
   fetchTokens: (signal?: AbortSignal) => Promise<void>;
   fetchAllActiveTokens: (page?: number, limit?: number, signal?: AbortSignal) => Promise<void>;
   
+  // Balance and Collateral tokens
+  balanceTokens: Token[];
+  collateralTokens: Token[];
+  balanceInactiveTokens: Token[];
+  collateralInactiveTokens: Token[];
+  loadingBalance: boolean;
+  loadingCollateral: boolean;
+  fetchBalanceTokens: (signal?: AbortSignal) => Promise<void>;
+  fetchCollateralTokens: (signal?: AbortSignal) => Promise<void>;
+  
   // USDST balance
   usdstBalance: string;
   loadingUsdstBalance: boolean;
@@ -43,6 +53,14 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
   const [loading, setLoading] = useState(false);
   const [allActiveLoading, setAllActiveLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Balance and Collateral tokens state
+  const [balanceTokens, setBalanceTokens] = useState<Token[]>([]);
+  const [collateralTokens, setCollateralTokens] = useState<Token[]>([]);
+  const [balanceInactiveTokens, setBalanceInactiveTokens] = useState<Token[]>([]);
+  const [collateralInactiveTokens, setCollateralInactiveTokens] = useState<Token[]>([]);
+  const [loadingBalance, setLoadingBalance] = useState(false);
+  const [loadingCollateral, setLoadingCollateral] = useState(false);
   const [allActivePagination, setAllActivePagination] = useState({
     total: 0,
     page: 1,
@@ -134,6 +152,78 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, []);
 
+  // Helper to filter tokens into active/inactive
+  const filterTokens = useCallback((tokens: Token[]) => {
+    const active = tokens.filter((token: Token) =>
+      token.token.status === '2' &&
+      token.address !== mUsdstAddress &&
+      token.address !== sUsdstAddress &&
+      token.address !== cataAddress
+    );
+    const inactive = tokens.filter((token: Token) =>
+      token.token.status !== '2' ||
+      token.address === mUsdstAddress ||
+      token.address === sUsdstAddress ||
+      token.address === cataAddress
+    );
+    return { active, inactive };
+  }, []);
+
+  // Helper to handle fetch with error handling
+  const fetchTokenData = useCallback(async (
+    endpoint: string,
+    setLoading: (loading: boolean) => void,
+    setActive: React.Dispatch<React.SetStateAction<Token[]>>,
+    setInactive: React.Dispatch<React.SetStateAction<Token[]>>,
+    signal?: AbortSignal
+  ) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await api.get(endpoint, { signal });
+      if (signal?.aborted) return;
+
+      const { active, inactive } = filterTokens(response.data || []);
+      setActive(prev => (isEqual(prev, active) ? prev : active));
+      setInactive(prev => (isEqual(prev, inactive) ? prev : inactive));
+    } catch (err) {
+      if (
+        axios.isCancel?.(err) ||
+        err?.name === "CanceledError" ||
+        err?.code === "ERR_CANCELED" ||
+        err?.message === "canceled"
+      ) {
+        return;
+      }
+      setActive([]);
+      setInactive([]);
+    } finally {
+      if (!signal?.aborted) {
+        setLoading(false);
+      }
+    }
+  }, [filterTokens]);
+
+  const fetchBalanceTokens = useCallback(async (signal?: AbortSignal) => {
+    await fetchTokenData(
+      `/tokens/balance?mode=balance`,
+      setLoadingBalance,
+      setBalanceTokens,
+      setBalanceInactiveTokens,
+      signal
+    );
+  }, [fetchTokenData]);
+
+  const fetchCollateralTokens = useCallback(async (signal?: AbortSignal) => {
+    await fetchTokenData(
+      `/tokens/balance?mode=collateral`,
+      setLoadingCollateral,
+      setCollateralTokens,
+      setCollateralInactiveTokens,
+      signal
+    );
+  }, [fetchTokenData]);
+
   // Modified to work like fetchTokens - storing in state
   const fetchAllActiveTokens = useCallback(async (page = 1, limit = 10, signal?: AbortSignal): Promise<void> => {
     setAllActiveLoading(true);
@@ -187,13 +277,23 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
       fetchTokens,
       fetchAllActiveTokens,
       
+      // Balance and Collateral tokens
+      balanceTokens,
+      collateralTokens,
+      balanceInactiveTokens,
+      collateralInactiveTokens,
+      loadingBalance,
+      loadingCollateral,
+      fetchBalanceTokens,
+      fetchCollateralTokens,
+      
       // USDST balance
       usdstBalance,
       loadingUsdstBalance,
       voucherBalance,
       fetchUsdstBalance,
     }),
-    [activeTokens, inactiveTokens, allActiveTokens, loading, allActiveLoading, error, allActivePagination, fetchTokens, fetchAllActiveTokens, usdstBalance, voucherBalance, loadingUsdstBalance, fetchUsdstBalance]
+    [activeTokens, inactiveTokens, allActiveTokens, loading, allActiveLoading, error, allActivePagination, fetchTokens, fetchAllActiveTokens, balanceTokens, collateralTokens, balanceInactiveTokens, collateralInactiveTokens, loadingBalance, loadingCollateral, fetchBalanceTokens, fetchCollateralTokens, usdstBalance, voucherBalance, loadingUsdstBalance, fetchUsdstBalance]
   );
 
   return (
