@@ -62,7 +62,6 @@ module Blockchain.VMContext
     getContextBestBlockInfo,
     putContextBestBlockInfo,
     checkIfRunningTests,
-    lookupX509AddrFromCBHash,
     knownFailedTxs,
     knownExpensiveTxs,
   )
@@ -112,7 +111,6 @@ import Data.Default
 import qualified Data.Map as M
 import qualified Data.NibbleString as N
 import qualified Data.Set as S
-import Data.String
 import qualified Data.Text as T
 import qualified Database.LevelDB as DB
 import qualified Database.Persist.Sqlite as Lite
@@ -361,19 +359,6 @@ withCurrentBlockHash bh f = do
 
 instance Show Context where
   show = const "<context>"
-
-lookupX509AddrFromCBHash ::
-  ( MonadLogger m,
-    (A.Alters (Address, StoragePath) BasicValue) m
-  ) =>
-  Address ->
-  m (Maybe Address)
-lookupX509AddrFromCBHash k = do
-  mAccount <- A.lookup (A.Proxy) (Address 0x509,  fromString $ ".addressToCertMap<a:" ++ show k ++ ">" :: StoragePath)
-  $logDebugS "lookupX509AddrFromCBHash" $ T.pack $ "Looking up certificate for address: " ++ (show mAccount)
-  case mAccount of
-    Just (BAddress a) -> pure . Just $ a
-    _ -> pure Nothing
 
 runTestContextM ::
   ( MonadUnliftIO m,

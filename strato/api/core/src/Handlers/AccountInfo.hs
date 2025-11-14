@@ -17,7 +17,6 @@ module Handlers.AccountInfo where
 --import           Servant.Swagger.Tags
 
 import Blockchain.DB.SQLDB
-import Blockchain.Data.CirrusDefs
 import Blockchain.Data.DataDefs
 import Blockchain.Model.JsonBlock
 import Blockchain.Strato.Model.Address
@@ -267,10 +266,3 @@ getCodeFromPostgres' cHash =
         E.from $ \(codeRef) -> do
           E.where_ (codeRef E.^. CodeRefCodeHash E.==. E.val cHash)
           return codeRef
-
-getX509CertForAccount :: HasCirrus m => Address -> m (Maybe Certificate)
-getX509CertForAccount addr = do
-  fmap (listToMaybe . map E.entityVal) . cirrusQuery . E.select $
-    E.from $ \(certificate) -> do
-      E.where_ (certificate E.^. CertificateUserAddress E.==. E.val addr)
-      return $ certificate

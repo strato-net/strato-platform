@@ -16,8 +16,12 @@
 {-# OPTIONS -fno-warn-deprecations #-}
 
 module Blockchain.Slipstream.OutputData (
+  SqlType(..),
+  TableConstraint(..),
+  OnConflict(..),
   SlipstreamQuery(..),
   slipstreamQueryPostgres,
+  slipstreamQueryText,
   outputData,
   outputDataDedup,
   ProcessedCollectionRow(..),
@@ -35,6 +39,7 @@ module Blockchain.Slipstream.OutputData (
   cirrusConnStr,
   aggEventToCollectionRows,
   dbQueryCatchError,
+  valueToSQLText',
   initialSlipstreamQueries
   ) where
 

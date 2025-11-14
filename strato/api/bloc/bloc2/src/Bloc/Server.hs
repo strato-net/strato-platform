@@ -16,7 +16,6 @@ import Bloc.Server.Transaction
 import Bloc.Server.TransactionResult
 import Blockchain.DB.CodeDB
 import Blockchain.Data.AddressStateDB
-import Blockchain.Data.CirrusDefs
 import Blockchain.Model.SyncState (BestBlock, WorldBestBlock)
 import Blockchain.Strato.Model.Address
 import Blockchain.SyncDB
@@ -36,7 +35,6 @@ type MonadBlocAPI m =
     Mod.Accessible (Maybe BestBlock) m,
     Mod.Accessible (Maybe WorldBestBlock) m,
     Selectable Address AddressState m,
-    Selectable Address Certificate m,
     HasCodeDB m
   )
 

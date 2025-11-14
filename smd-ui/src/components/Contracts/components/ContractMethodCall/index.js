@@ -77,53 +77,28 @@ class ContractMethodCall extends Component {
       }
   }
 
-  renderUsername = (isModeOauth) => {
+  renderUsername = () => {
     const users = Object.getOwnPropertyNames(this.props.accounts);
-    return (<div className={isModeOauth ? "" : "pt-select"}>
+    return (
       <Field
-        className="pt-input"
         name="modalUsername"
-        component="select"
-        disabled={isModeOauth}
-        required
-      >
-        <option value={isModeOauth && this.props.oAuthUser ? this.props.oAuthUser.username : "STRATO Mercata User"}>
-          {isModeOauth && this.props.oAuthUser ? this.props.oAuthUser.username : "STRATO Mercata User"}
-        </option>
-        {
-          users.map((user, i) => {
-            return (
-              <option key={'user' + i} value={user.commonName}>{user.commonName}</option>
-            )
-          })
-        }
-      </Field>
-    </div>)
+        component="input"
+        type="text"
+        placeholder="username"
+        className="pt-input"
+      />
+    )
   }
 
-  renderAddress = () => {
-    const userAddresses = Object.keys(this.props.accounts).length && this.props.modalUsername ?
-      Object.getOwnPropertyNames(this.props.accounts[this.props.modalUsername])
-      : [];
+  renderAddress = (isModeOauth) => {
     return (<div className={"pt-select"}>
       <Field
         className="pt-input"
         component="select"
         name="modalAddress"
         disabled={true}
-        required
-      >
-        <option value={this.props.address}>
-          {this.props.oAuthUser ? this.props.oAuthUser.address : this.props.address}
-        </option>
-        {
-          userAddresses.map((address, i) => {
-            return (
-              <option key={address.address} value={address.address}>{address.address}</option>
-            )
-          })
-        }
-      </Field>
+        placeholder={isModeOauth && this.props.oAuthUser ? this.props.oAuthUser.address : this.props.address}
+      />
     </div>)
   }
 
@@ -232,7 +207,6 @@ class ContractMethodCall extends Component {
         </tr>
       );
     }
-    console.log('HERE')
     return (
       <div>
         <AnchorButton
@@ -270,7 +244,7 @@ class ContractMethodCall extends Component {
                   </label>
                 </div>
                 <div className="col-sm-9 smd-pad-4">
-                  {this.renderUsername(isModeOauth)}
+                  {this.renderUsername()}
                 </div>
               </div>
               <div className="row">

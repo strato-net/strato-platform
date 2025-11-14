@@ -115,13 +115,7 @@ exports[`ContractMethodCall: index renders contracts card (Oauth mode) 1`] = `
             </label>
           </div>
           <div className=\\"col-sm-9 smd-pad-4\\">
-            <div className=\\"\\">
-              <Field className=\\"pt-input\\" name=\\"modalUsername\\" component=\\"select\\" disabled={true} required={true}>
-                <option value=\\"Supplier1\\">
-                  Supplier1
-                </option>
-              </Field>
-            </div>
+            <Field name=\\"modalUsername\\" component=\\"input\\" type=\\"text\\" placeholder=\\"username\\" className=\\"pt-input\\" />
           </div>
         </div>
         <div className=\\"row\\">
@@ -132,11 +126,7 @@ exports[`ContractMethodCall: index renders contracts card (Oauth mode) 1`] = `
           </div>
           <div className=\\"col-sm-9 smd-pad-4\\">
             <div className=\\"pt-select\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"modalAddress\\" disabled={true} required={true}>
-                <option value={[undefined]}>
-                  370adf114257cb0e0025eedf0a96261b51af23e3
-                </option>
-              </Field>
+              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"modalAddress\\" disabled={true} placeholder=\\"370adf114257cb0e0025eedf0a96261b51af23e3\\" />
             </div>
           </div>
         </div>
