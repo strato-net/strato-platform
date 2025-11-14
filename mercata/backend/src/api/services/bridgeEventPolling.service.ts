@@ -39,8 +39,7 @@ export const createIntent = (
       const userAddress = await createOrGetKey(token);
       
       // Query deposit info to get the amount
-      const serviceToken = await getServiceToken();
-      const { data: deposits } = await cirrus.get(serviceToken, `/${MercataBridge}-deposits`, {
+      const { data: deposits } = await cirrus.get(token, `/${MercataBridge}-deposits`, {
         params: {
           address: `eq.${mercataBridge}`,
           select: "externalChainId:key,externalTxHash:key2,DepositInfo:value",
