@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { formatUnits } from 'viem';
-import { Token } from '@/interface';
+import { Token, EarningAsset } from '@mercata/shared-types';
 
 interface UseNetBalanceProps {
-  tokens: Token[];
+  tokens: EarningAsset[];
   cataToken?: Token | null;
   loans: any;
   liquidityInfo: any;
@@ -67,14 +67,12 @@ export const useNetBalance = ({
     // Calculate CATA balance from the provided cataToken (if it exists)
     if (cataToken) {
       const rawBalance = cataToken?.balance || "0";
-      const rawCollateralBalance = cataToken?.collateralBalance || "0";
 
-      if (rawBalance || rawCollateralBalance) {
+      if (rawBalance) {
         const balance = parseFloat(formatUnits(BigInt(rawBalance || 0), 18));
-        const collateralBalance = parseFloat(formatUnits(BigInt(rawCollateralBalance || 0), 18));
 
         // For CATA, track the actual token balance, not USD value
-        cataTotal = balance + collateralBalance;
+        cataTotal = balance;
       }
     }
 

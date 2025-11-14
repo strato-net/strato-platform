@@ -7,14 +7,11 @@ import AssetsList from "../components/dashboard/AssetsList";
 import DashboardFAQ from "../components/dashboard/DashboardFAQ";
 import BorrowingSection from "../components/dashboard/BorrowingSection";
 import { Wallet, Coins, Shield, Banknote, Loader2 } from "lucide-react";
-import { useUserTokens } from "@/context/UserTokensContext";
+import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
-import { useLendingMetrics } from "@/hooks/useLendingMetrics";
 import { usePendingRewards } from "@/hooks/usePendingRewards";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-import { formatUnits } from "viem";
-import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
 import { useNetBalance } from "@/hooks/useNetBalance";
 import MyPoolParticipationSection from "@/components/dashboard/MyPoolParticipationSection";
 import { useLendingContext } from "@/context/LendingContext";
@@ -29,12 +26,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { userAddress } = useUser();
-  const { activeTokens: tokens, inactiveTokens, loading, fetchTokens } = useUserTokens();
-  const { 
-    availableBorrowingPower, 
-    currentBorrowed, 
-    averageInterestRate, 
-  } = useLendingMetrics();
+  const { earningAssets, getEarningAssets, inactiveTokens, getInactiveTokens, loading } = useTokenContext();
   const { loans } = useLendingContext();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const { loadingLiquidity, liquidityInfo, refreshLoans } = useLendingContext();
@@ -52,7 +44,7 @@ const Dashboard = () => {
 
   // Use centralized net balance calculation hook
   const { netBalance: totalBalance, cataBalance, totalBorrowed } = useNetBalance({
-    tokens,
+    tokens: earningAssets,
     cataToken,
     loans,
     liquidityInfo,
@@ -72,7 +64,8 @@ const Dashboard = () => {
     setIsComponentMounted(true);
     
     // Remove the timeout to prevent loading flash
-    fetchTokens();
+    getEarningAssets();
+    getInactiveTokens();
     refreshLoans();
     fetchUserPositions();
 
@@ -117,7 +110,8 @@ const Dashboard = () => {
 
       // Refresh data after successful claim
       await Promise.all([
-        fetchTokens(),
+        getEarningAssets(),
+        getInactiveTokens(),
         refetchPendingRewards(),
       ]);
     } finally {
@@ -185,7 +179,7 @@ const Dashboard = () => {
               <div className="mb-8">
                 <AssetsList 
                   loading={loading} 
-                  tokens={tokens} 
+                  tokens={earningAssets.filter(token => !token.isPoolToken)} 
                   inActiveTokens={inactiveTokens} 
                   shouldPreventFlash={true}
                 />

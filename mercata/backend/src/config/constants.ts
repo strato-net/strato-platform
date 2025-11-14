@@ -5,6 +5,10 @@ import {
   SWAP_POOL_SELECT_FIELDS,
   SWAP_HISTORY_SELECT_FIELDS
 } from "./swapConstants";
+import {
+  TOKENS_V2_SELECT_FIELDS,
+  TOKENS_V2_BALANCES_FIELD
+} from "./tokensConstants";
 
 export enum StratoPaths {
   transactionParallel = "/transaction/parallel?resolve=true",
@@ -149,6 +153,8 @@ export const constants = (() => {
     swapTokenSelectFields: SWAP_TOKEN_SELECT_FIELDS,
     swapSelectFields: SWAP_POOL_SELECT_FIELDS,
     swapHistorySelectFields: SWAP_HISTORY_SELECT_FIELDS,
+    tokensV2SelectFields: TOKENS_V2_SELECT_FIELDS,
+    tokensV2BalancesField: TOKENS_V2_BALANCES_FIELD,
     registrySelectFields,
     cdpRegistrySelectFields,
     priceHistorySelectFields,
