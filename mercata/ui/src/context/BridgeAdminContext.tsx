@@ -29,6 +29,11 @@ interface BridgeAdminContextType {
 
 const BridgeAdminContext = createContext<BridgeAdminContextType | undefined>(undefined);
 
+/**
+ * Creates a fetch handler for admin bridge transactions.
+ * Uses the unified /bridge/transactions/{type} endpoint with all=true parameter
+ * to fetch all transactions (not filtered by user address).
+ */
 const createFetchHandler = (
   endpoint: string,
   setData: (data: any[]) => void,
@@ -44,11 +49,15 @@ const createFetchHandler = (
     const params: Record<string, string> = {
       limit: limit.toString(),
       offset: offset.toString(),
+      order: 'block_timestamp.desc',
+      all: 'true', // Admin view - bypasses user address filter to get all transactions
     };
     if (status !== null && status !== undefined) {
-      params.status = status.toString();
+      // PostgREST requires the operator prefix (eq.) for filter values
+      params['value->>bridgeStatus'] = `eq.${status.toString()}`;
     }
     const { data } = await api.get(endpoint, { params });
+    // Response structure: { data: BridgeTransaction[], totalCount: number }
     setData(data.data || []);
     setTotalCount(data.totalCount || 0);
   } catch (error: any) {
@@ -73,7 +82,7 @@ export const BridgeAdminProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchWithdrawals = useCallback(
     createFetchHandler(
-      '/bridge/admin/withdrawals',
+      '/bridge/transactions/withdrawal',
       setWithdrawals,
       setWithdrawalsTotalCount,
       setLoadingWithdrawals,
@@ -85,7 +94,7 @@ export const BridgeAdminProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchDeposits = useCallback(
     createFetchHandler(
-      '/bridge/admin/deposits',
+      '/bridge/transactions/deposit',
       setDeposits,
       setDepositsTotalCount,
       setLoadingDeposits,

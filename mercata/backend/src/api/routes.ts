@@ -16,7 +16,6 @@ import swapRoutes from "./routes/swap.routes";
 import lendingRoutes from "./routes/lending.routes";
 import eventsRoutes from "./routes/events.routes";
 import bridgeRoutes from "./routes/bridge.routes";
-import bridgeAdminRoutes from "./routes/bridgeAdmin.routes";
 import cdpRoutes from "./routes/cdp.routes";
 import rewardsRoutes from "./routes/rewards.routes";
 import protocolFeeRoutes from "./routes/protocolFee.routes";
@@ -70,7 +69,6 @@ router.use("/events", eventsRoutes);
 
 // ----- Bridge Routes -----
 router.use("/bridge", bridgeRoutes);
-router.use("/bridge/admin", bridgeAdminRoutes);
 
 // ----- CDP Routes -----
 router.use("/cdp", cdpRoutes);
