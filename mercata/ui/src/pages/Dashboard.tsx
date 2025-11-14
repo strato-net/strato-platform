@@ -47,9 +47,7 @@ const Dashboard = () => {
     tokens: earningAssets,
     cataToken,
     loans,
-    liquidityInfo,
-    totalCDPDebt,
-    safetyInfo
+    totalCDPDebt
   });
 
 

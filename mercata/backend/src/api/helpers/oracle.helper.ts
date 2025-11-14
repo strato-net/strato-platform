@@ -7,6 +7,20 @@ import { getExchangeRateFromCirrus } from "../services/lending.service";
 
 const { Token } = constants;
 
+const getSafetyModuleConfig = () => {
+  return {
+    safetyModule: {
+      address: process.env.SAFETY_MODULE || "0000000000000000000000000000000000001015"
+    },
+    asset: {
+      address: process.env.USDST_ADDRESS || "937efa7e3a77e20bbdbd7c0d32b6514f368c1010"
+    },
+    sToken: {
+      address: process.env.SUSDST_ADDRESS || "0000000000000000000000000000000000001016"
+    }
+  };
+};
+
 /**
  * Converts a number to string without scientific notation
  * For very large numbers (like wei values), this ensures proper integer string representation
@@ -87,5 +101,45 @@ export const createCompletePriceMap = async (
     console.error("Error calculating mToken price:", error);
   }
 
+  // Add sUSDST price using SafetyModule exchange rate
+  try {
+    const safetyModuleConfig = getSafetyModuleConfig();
+    const safetyModuleAddress = safetyModuleConfig.safetyModule.address;
+    const sTokenAddress = safetyModuleConfig.sToken.address;
+    const assetAddress = safetyModuleConfig.asset.address;
+
+    const [usdstBalanceResponse, sTokenSupplyResponse] = await Promise.all([
+      cirrus.get(accessToken, `/${Token}`, {
+        params: {
+          address: `eq.${assetAddress}`,
+          select: `balances:${Token}-_balances(user:key,balance:value::text)`,
+          "balances.key": `eq.${safetyModuleAddress}`
+        }
+      }),
+      cirrus.get(accessToken, `/${Token}`, {
+        params: {
+          address: `eq.${sTokenAddress}`,
+          select: "_totalSupply::text"
+        }
+      })
+    ]);
+
+    const usdstBalance = usdstBalanceResponse.data?.[0]?.balances?.[0]?.balance || "0";
+    const totalShares = sTokenSupplyResponse.data?.[0]?._totalSupply || "0";
+    const assetPrice = priceMap.get(assetAddress) || "0";
+
+    if (assetPrice !== "0" && totalShares !== "0" && BigInt(totalShares) > 0n) {
+      // Calculate exchange rate: (totalAssets * 1e18) / totalShares
+      const exchangeRate = (BigInt(usdstBalance) * BigInt("1000000000000000000")) / BigInt(totalShares);
+      
+      // sUSDST price = USDST price * exchange rate / 1e18
+      const sTokenPrice = (BigInt(assetPrice.toString()) * exchangeRate) / BigInt("1000000000000000000");
+      
+      priceMap.set(sTokenAddress, sTokenPrice.toString());
+    }
+  } catch (error) {
+    console.error("Error calculating sUSDST price:", error);
+  }
+  console.log("priceMap", priceMap);
   return priceMap;
 }; 

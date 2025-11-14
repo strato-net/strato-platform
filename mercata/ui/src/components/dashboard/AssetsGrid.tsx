@@ -1,28 +1,12 @@
-import { Token } from '@/interface';
+import { EarningAsset } from '@mercata/shared-types';
 import AssetCard from './AssetCard';
-import { useUser } from '@/context/UserContext';
 
 interface AssetsGridProps {
-  assets: Token[];
+  assets: EarningAsset[];
   loading: boolean;
 }
 
 const AssetsGrid = ({ assets, loading }: AssetsGridProps) => {
-  const { userAddress } = useUser();
-
-  // Helper to get user balance from balances array
-  function getUserBalance(token: Token, userAddress: string | null): string {
-    if (!userAddress) return '0';
-    const entry = token.balances?.find(b => b.user.toLowerCase() === userAddress.toLowerCase());
-    return entry ? entry.balance : '0';
-  }
-
-  // Helper to get user collateral from balances array
-  function getUserCollateral(token: Token, userAddress: string | null): string {
-    if (!userAddress) return '0';
-    const entry = token.balances?.find(b => b.user.toLowerCase() === userAddress.toLowerCase());
-    return entry?.collateralBalance || '0';
-  }
 
   return (
     loading ?
@@ -41,8 +25,8 @@ const AssetsGrid = ({ assets, loading }: AssetsGridProps) => {
               name={asset?._name || ''}
               symbol={asset?._symbol || ''}
               price={asset?.price?.toString() || '0'}
-              deposit={getUserBalance(asset, userAddress)}
-              collateralBalance={getUserCollateral(asset, userAddress)}
+              deposit={asset?.balance || '0'}
+              collateralBalance={asset?.collateralBalance || '0'}
               image={asset.images?.[0]?.value}
               customDecimals={asset?.customDecimals || 18}
             />
