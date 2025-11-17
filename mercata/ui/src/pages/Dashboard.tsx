@@ -189,7 +189,6 @@ const Dashboard = () => {
                   loading={loading} 
                   tokens={nonPoolTokens} 
                   inActiveTokens={inactiveTokens} 
-                  shouldPreventFlash={true}
                 />
               </div>
 
@@ -200,11 +199,10 @@ const Dashboard = () => {
               </div>
 
               <div className="mb-8">
-                <MyPoolParticipationSection 
-                  poolTokens={poolTokens}
-                  loading={loading}
-                  shouldPreventFlash={true}
-                /> 
+                  <MyPoolParticipationSection 
+                      poolTokens={poolTokens}
+                      loading={loading}
+                    />
               </div>
 
               <div className="mb-8">

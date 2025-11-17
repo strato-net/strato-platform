@@ -21,6 +21,7 @@ export interface SwapContextState {
   swappableTokens: SwapToken[];
   pairableTokens: SwapToken[];
   userPools: Pool[];
+  pools: Pool[];
   
   // Loading states
   loading: boolean;

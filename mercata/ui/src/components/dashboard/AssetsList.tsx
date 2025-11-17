@@ -11,7 +11,6 @@ interface AssetsProps {
   tokens: EarningAsset[];
   isDashboard?: boolean;
   inActiveTokens: TokenType[];
-  shouldPreventFlash?: boolean;
 }
 
 const AssetsList = ({
@@ -19,13 +18,14 @@ const AssetsList = ({
   tokens,
   inActiveTokens,
   isDashboard = true,
-  shouldPreventFlash = false,
 }: AssetsProps) => {
   const [showNonEarningAssetsTable, setShowNonEarningAssetsTable] =
     useState(false);
 
-  // Don't show loading indicator immediately if shouldPreventFlash is true
-  const shouldShowLoading = loading && !shouldPreventFlash;
+  const hasEarningAssets = tokens.length > 0;
+  const hasInactiveTokens = inActiveTokens.length > 0;
+  const shouldShowLoading = loading && !hasEarningAssets;
+  const shouldShowInactiveLoading = loading && !hasInactiveTokens;
 
   const sortedTokens = useMemo(() => {
     return [...tokens].sort((a, b) => {
@@ -252,7 +252,7 @@ const AssetsList = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {shouldShowLoading ? (
+                  {shouldShowInactiveLoading ? (
                     <tr className="hover:bg-gray-50 transition-colors">
                       <td
                         colSpan={5}

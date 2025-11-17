@@ -208,18 +208,14 @@ export const LendingProvider = ({
   };
 
 
-  const initialize = () => {
-    fetchLoans();
-    fetchLiquidityInfo();
-    fetchCollateralInfo();
-  };
-
   // Run initialization only when the user is logged in
   useEffect(() => {
     if (isLoggedIn) {
-      initialize();
+      fetchLoans();
+      fetchLiquidityInfo();
+      fetchCollateralInfo();
     }
-  }, [isLoggedIn]);
+  }, [isLoggedIn, fetchLoans, fetchLiquidityInfo, fetchCollateralInfo]);
 
   const contextValue = useMemo(
     () => ({

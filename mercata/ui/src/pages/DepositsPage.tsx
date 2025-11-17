@@ -137,7 +137,6 @@ const DepositsPage = () => {
                 tokens={nonPoolTokens} 
                 inActiveTokens={inactiveTokens} 
                 isDashboard={false}
-                shouldPreventFlash={true}
               />
             </div>
           </div>
