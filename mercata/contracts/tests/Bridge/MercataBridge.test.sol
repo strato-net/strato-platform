@@ -7,6 +7,7 @@ import "../../abstract/ERC20/access/Ownable.sol";
 import "../../abstract/ERC20/utils/StringUtils.sol";
 import "../../concrete/Admin/AdminRegistry.sol";
 import "../../libraries/Bridge/BridgeTypes.sol";
+import "../../concrete/Lending/LendingRegistry.sol";
 
 
 contract TestERC20 is ERC20, Ownable {
@@ -57,6 +58,7 @@ contract Describe_MercataBridge is Authorizable {
     MercataBridge bridge;
     TokenFactory tokenFactory;
     AdminRegistry adminRegistry;
+    LendingRegistry lendingRegistry;
     TestERC20 testToken;
     TestUSDST usdstToken;
     User user1;
@@ -90,8 +92,9 @@ contract Describe_MercataBridge is Authorizable {
         adminRegistry = new AdminRegistry();
         adminRegistry.initialize([owner]);
         tokenFactory = new TokenFactory(address(adminRegistry));
+        lendingRegistry = new LendingRegistry(owner);
         bridge = new MercataBridge(address(adminRegistry));
-        bridge.initialize(address(tokenFactory));
+        bridge.initialize(address(tokenFactory), address(lendingRegistry));
 
         // Whitelist relayer for all functions
         adminRegistry.addWhitelist(address(bridge), "setLastProcessedBlock", address(relayer));
@@ -166,11 +169,19 @@ contract Describe_MercataBridge is Authorizable {
     function it_bridge_reverts_with_zero_addresses() {
         bool reverted = false;
         try {
-            new MercataBridge(owner).initialize(address(0));
+            new MercataBridge(owner).initialize(address(0), address(lendingRegistry));
         } catch {
             reverted = true;
         }
         require(reverted, "Should revert with zero token factory");
+        
+        reverted = false;
+        try {
+            new MercataBridge(owner).initialize(address(tokenFactory), address(0));
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should revert with zero lending registry");
     }
 
     // ============ CHAIN MANAGEMENT TESTS ============
@@ -343,7 +354,7 @@ contract Describe_MercataBridge is Authorizable {
         relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount, txHash, recipient);
 
         // Then confirm it
-        relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash);
+        relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash, false);
 
         // Check that deposit was confirmed
         (,,,,, address stratoToken,,) = bridge.deposits(externalChainId, txHash.normalizeHex());
@@ -406,10 +417,12 @@ contract Describe_MercataBridge is Authorizable {
         // Batch confirm
         uint256[] memory chainIds = new uint256[](1);
         string[] memory txHashes = new string[](1);
+        bool[] memory autoSaves = new bool[](1);
         chainIds[0] = externalChainId;
         txHashes[0] = txHash;
+        autoSaves[0] = false;
 
-        relayer.do(address(bridge), "confirmDepositBatch", chainIds, txHashes);
+        relayer.do(address(bridge), "confirmDepositBatch", chainIds, txHashes, autoSaves);
 
         (,,,,, address stratoToken,,) = bridge.deposits(externalChainId, txHash.normalizeHex());
         require(stratoToken == address(testToken), "Token should be set");
@@ -927,11 +940,11 @@ contract Describe_MercataBridge is Authorizable {
         relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount, txHash, recipient);
 
         // Try to confirm twice (should fail on second attempt)
-        relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash);
+        relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash, false);
 
         bool reverted = false;
         try {
-            relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash);
+            relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash, false);
         } catch {
             reverted = true;
         }
@@ -1129,7 +1142,7 @@ contract Describe_MercataBridge is Authorizable {
         
         // First deposit should succeed
         relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), depositAmount, variant1, recipient);
-        relayer.do(address(bridge), "confirmDeposit", externalChainId, variant1);
+        relayer.do(address(bridge), "confirmDeposit", externalChainId, variant1, false);
         
         // Subsequent deposits with case variations should fail due to normalization
         bool reverted2 = false;
@@ -1177,7 +1190,7 @@ contract Describe_MercataBridge is Authorizable {
             txHashLower,
             victim
         );
-        relayer.do(address(bridge), "confirmDeposit", externalChainId, txHashLower);
+        relayer.do(address(bridge), "confirmDeposit", externalChainId, txHashLower, false);
         
         require(IERC20(address(testToken)).balanceOf(victim) == depositAmount, "First mint successful");
         
@@ -1218,7 +1231,7 @@ contract Describe_MercataBridge is Authorizable {
             hashWith0x,
             recipient
         );
-        relayer.do(address(bridge), "confirmDeposit", externalChainId, hashWith0x);
+        relayer.do(address(bridge), "confirmDeposit", externalChainId, hashWith0x, false);
         
         require(IERC20(address(testToken)).balanceOf(recipient) == depositAmount, "First deposit should succeed");
         
@@ -1258,7 +1271,7 @@ contract Describe_MercataBridge is Authorizable {
         relayer.do(address(bridge), "reviewDeposit", externalChainId, txHash);
 
         // Confirm the reviewed deposit
-        relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash);
+        relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash, false);
 
         // Verify deposit was completed
         (BridgeStatus status,,,,,,,) = bridge.deposits(externalChainId, txHash.normalizeHex());
@@ -1510,4 +1523,5 @@ contract Describe_MercataBridge is Authorizable {
         (,,,,, uint256 recordedExternalAmount4,,,,,) = bridge.withdrawals(withdrawalId4);
         require(recordedExternalAmount4 == expectedExternalAmount4, "USDC precision loss rounding down failed");
     }
+
 }

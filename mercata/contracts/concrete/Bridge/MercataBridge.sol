@@ -30,6 +30,9 @@ contract record MercataBridge is Ownable {
     
     /// @notice Emitted when the token factory address is updated
     event TokenFactoryUpdated(address newFactory, address oldFactory);
+
+    /// @notice Emitted when the lending registry address is updated
+    event LendingRegistryUpdated(address newRegistry, address oldRegistry);
     
     /// @notice Emitted when the USDST address is updated
     event USDSTAddressUpdated(address newAddress, address oldAddress);
@@ -215,11 +218,8 @@ contract record MercataBridge is Ownable {
         USDST_ADDRESS = address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010);
         WITHDRAWAL_ABORT_DELAY = 172800;
 
-        require(_tokenFactory != address(0), "MB: zero");
-        tokenFactory = _tokenFactory;
-
-        require(_lendingRegistry != address(0), "MB: zero");
-        lendingRegistry = _lendingRegistry;
+        setTokenFactory(_tokenFactory);
+        setLendingRegistry(_lendingRegistry);
     }
 
     // ───────────── Admin related functions ─────────────
@@ -368,10 +368,21 @@ contract record MercataBridge is Ownable {
      * @notice Only the owner can update the token factory address
      * @param newFactory The new token factory address (must not be zero address)
      */
-    function setTokenFactory(address newFactory) external onlyOwner {
+    function setTokenFactory(address newFactory) public onlyOwner {
         require(newFactory != address(0), "MB: zero");
         emit TokenFactoryUpdated(newFactory, tokenFactory);
         tokenFactory = newFactory;
+    }
+
+    /**
+     * @dev Sets the lending registry address
+     * @notice Only the owner can update the lending registry address
+     * @param newLendingRegistry The new lending registry address (must not be zero address)
+     */
+    function setLendingRegistry(address newLendingRegistry) public onlyOwner {
+        require(newLendingRegistry != address(0), "MB: zero lending registry address");
+        emit LendingRegistryUpdated(newLendingRegistry, lendingRegistry);
+        lendingRegistry = newLendingRegistry;
     }
 
     /**
@@ -583,10 +594,14 @@ contract record MercataBridge is Ownable {
         DepositInfo d = deposits[externalChainId][normalizedTxHash];
         require(d.bridgeStatus == BridgeStatus.INITIATED || d.bridgeStatus == BridgeStatus.PENDING_REVIEW, "MB: bad state");
 
+        bool didAutoSave = false;
         if (autoSave && d.stratoToken == LendingRegistry(lendingRegistry).lendingPool().borrowableAsset()) {
-            _autoSave(d, externalChainId, normalizedTxHash);
+            try {
+                _autoSave(d, externalChainId, normalizedTxHash);
+                didAutoSave = true;
+            } catch {} // On failure, mint stratoToken to the recipient instead
         }
-        else {
+        if (!didAutoSave) {
             uint256 actualMintedAmount = _mintFunds(d.stratoToken, d.stratoRecipient, d.stratoTokenAmount);
             require(actualMintedAmount > 0, "MB: no tokens minted");
         }
@@ -603,14 +618,15 @@ contract record MercataBridge is Ownable {
      * @notice Each deposit follows the same validation rules as individual confirmDeposit function
      * @param externalChainIds Array of external chain identifiers
      * @param externalTxHashes Array of external transaction hashes
+     * @param autoSaves Array of boolean values indicating whether to auto save the deposit to the lending pool
      */
     function confirmDepositBatch(
-        uint256[] externalChainIds, string[] externalTxHashes
+        uint256[] externalChainIds, string[] externalTxHashes, bool[] autoSaves
     ) external onlyOwner whenDepositsOpen {   
         uint256 n = externalChainIds.length;
-        require(n > 0 && n == externalTxHashes.length, "MB: len");
+        require(n > 0 && n == externalTxHashes.length && n == autoSaves.length, "MB: len");
         for (uint256 i = 0; i < n; i++) {
-            confirmDeposit(externalChainIds[i], externalTxHashes[i]);
+            confirmDeposit(externalChainIds[i], externalTxHashes[i], autoSaves[i]);
         }
     }
 
