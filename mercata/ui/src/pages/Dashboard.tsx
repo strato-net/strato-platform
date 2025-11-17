@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import MobileSidebar from "../components/dashboard/MobileSidebar";
@@ -15,9 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useNetBalance } from "@/hooks/useNetBalance";
 import MyPoolParticipationSection from "@/components/dashboard/MyPoolParticipationSection";
 import { useLendingContext } from "@/context/LendingContext";
-import { useSwapContext } from "@/context/SwapContext";
 import { useCDP } from "@/context/CDPContext";
-import { useSafetyContext } from "@/context/SafetyContext";
 import { cataAddress, rewardsEnabled } from "@/lib/constants";
 import { api } from "@/lib/axios";
 
@@ -27,13 +25,10 @@ const Dashboard = () => {
   const { toast } = useToast();
   const { userAddress } = useUser();
   const { earningAssets, getEarningAssets, inactiveTokens, getInactiveTokens, loading } = useTokenContext();
-  const { loans } = useLendingContext();
+  const { loans, refreshLoans } = useLendingContext();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const { loadingLiquidity, liquidityInfo, refreshLoans } = useLendingContext();
 
   const { totalCDPDebt } = useCDP();
-  const { poolsLoading: loadingUserPools, userPools, fetchUserPositions } = useSwapContext();
-  const { safetyInfo } = useSafetyContext();
   const { pendingRewards, refetch: refetchPendingRewards } = usePendingRewards(rewardsEnabled, 30000);
   const [isClaiming, setIsClaiming] = useState(false);
 
@@ -42,6 +37,25 @@ const Dashboard = () => {
     token.address === cataAddress
   );
 
+  // Sort earning assets by value, then categorize in a single pass
+  const { nonPoolTokens, poolTokens } = useMemo(() => {
+    const sorted = [...earningAssets].sort((a, b) => {
+      const valueA = parseFloat(a.value || "0");
+      const valueB = parseFloat(b.value || "0");
+      return valueB - valueA;
+    });
+    const nonPool: typeof earningAssets = [];
+    const pool: typeof earningAssets = [];
+    for (const token of sorted) {
+      if (token.isPoolToken) {
+        pool.push(token);
+      } else {
+        nonPool.push(token);
+      }
+    }
+    return { nonPoolTokens: nonPool, poolTokens: pool };
+  }, [earningAssets]);
+
   // Use centralized net balance calculation hook
   const { netBalance: totalBalance, cataBalance, totalBorrowed } = useNetBalance({
     tokens: earningAssets,
@@ -49,7 +63,6 @@ const Dashboard = () => {
     loans,
     totalCDPDebt
   });
-
 
   // Add visibility states to prevent flashing
   const [isComponentMounted, setIsComponentMounted] = useState(false);
@@ -65,7 +78,6 @@ const Dashboard = () => {
     getEarningAssets();
     getInactiveTokens();
     refreshLoans();
-    fetchUserPositions();
 
     // Mark data as initialized after a brief delay to ensure proper rendering
     const initTimer = setTimeout(() => {
@@ -89,8 +101,6 @@ const Dashboard = () => {
       navigate("/dashboard", { replace: true });
     }
   }, [searchParams]);
-
-  // Net balance calculation is now handled by the useNetBalance hook above
 
   const handleClaimRewards = async () => {
     if (isClaiming || parseFloat(pendingRewards) <= 0) {
@@ -177,7 +187,7 @@ const Dashboard = () => {
               <div className="mb-8">
                 <AssetsList 
                   loading={loading} 
-                  tokens={earningAssets.filter(token => !token.isPoolToken)} 
+                  tokens={nonPoolTokens} 
                   inActiveTokens={inactiveTokens} 
                   shouldPreventFlash={true}
                 />
@@ -191,13 +201,9 @@ const Dashboard = () => {
 
               <div className="mb-8">
                 <MyPoolParticipationSection 
-                  loadingUserPools={loadingUserPools} 
-                  loadingLiquidity={loadingLiquidity} 
-                  liquidityInfo={liquidityInfo} 
-                  userPools={userPools}
+                  poolTokens={poolTokens}
+                  loading={loading}
                   shouldPreventFlash={true}
-                  safetyInfo={safetyInfo}
-                  loadingSafety={loading}
                 /> 
               </div>
 

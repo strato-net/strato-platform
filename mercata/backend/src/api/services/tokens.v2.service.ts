@@ -1,7 +1,6 @@
 import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
-import { createCompletePriceMap } from "../helpers/oracle.helper";
-import { getOraclePrices } from "./oracle.service";
+import { getCompletePriceMap } from "../helpers/oracle.helper";
 import { Token, EarningAsset } from "@mercata/shared-types";
 
 const { tokensV2SelectFields, tokensV2BalancesField, tokenSelectFields, Token, CollateralVault, CDPEngine, DECIMALS } = constants;
@@ -30,13 +29,7 @@ export const getTokens = async (
   const [response, countResponse, rawPrices] = await Promise.all([
     cirrus.get(accessToken, "/" + Token, { params }),
     cirrus.get(accessToken, "/" + Token, { params: countQuery }),
-    getOraclePrices(accessToken).then(async (priceMap) => {
-      const rawPriceArray = Array.from(priceMap.entries()).map(([key, value]) => ({
-        key,
-        value: parseFloat(value)
-      }));
-      return await createCompletePriceMap(accessToken, rawPriceArray);
-    })
+    getCompletePriceMap(accessToken)
   ]);
 
   if (response.status !== 200 || !response.data) {
@@ -77,13 +70,7 @@ export const getEarningAssets = async (accessToken: string, userAddress: string)
         "value->>collateral": `gt.0`
       }
     }),
-    getOraclePrices(accessToken).then(async (priceMap) => {
-      const rawPriceArray = Array.from(priceMap.entries()).map(([key, value]) => ({
-        key,
-        value: parseFloat(value)
-      }));
-      return await createCompletePriceMap(accessToken, rawPriceArray);
-    })
+    getCompletePriceMap(accessToken)
   ]);
 
   const collateralMap = new Map<string, bigint>();

@@ -121,19 +121,6 @@ export interface SwapWidgetProps {
 }
 
 /**
- * Props for pool participation components
- */
-export interface PoolParticipationProps {
-  liquidityInfo: any;
-  loadingLiquidity: any;
-  userPools: Pool[];
-  loadingUserPools: boolean;
-  shouldPreventFlash?: boolean;
-  safetyInfo?: SafetyModuleData | null;
-  loadingSafety?: boolean;
-}
-
-/**
  * Props for LP token dropdown components
  */
 export interface LPTokenDropdownProps {

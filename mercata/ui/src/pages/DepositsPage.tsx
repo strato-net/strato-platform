@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import MobileSidebar from '../components/dashboard/MobileSidebar';
@@ -32,6 +32,22 @@ const DepositsPage = () => {
   const cataToken = inactiveTokens?.find(token =>
     token.address === cataAddress
   );
+
+  // Sort earning assets by value first, then categorize
+  const { nonPoolTokens, sortedEarningAssets } = useMemo(() => {
+    const sorted = [...earningAssets].sort((a, b) => {
+      const valueA = parseFloat(a.value || "0");
+      const valueB = parseFloat(b.value || "0");
+      return valueB - valueA;
+    });
+    const nonPool: typeof earningAssets = [];
+    for (const token of sorted) {
+      if (!token.isPoolToken) {
+        nonPool.push(token);
+      }
+    }
+    return { nonPoolTokens: nonPool, sortedEarningAssets: sorted };
+  }, [earningAssets]);
 
   // Use centralized net balance calculation hook
   const { netBalance: totalBalance } = useNetBalance({
@@ -118,7 +134,7 @@ const DepositsPage = () => {
               {/* Render AssetsList when data is loaded */}
               <AssetsList 
                 loading={loading} 
-                tokens={earningAssets.filter(token => !token.isPoolToken)} 
+                tokens={nonPoolTokens} 
                 inActiveTokens={inactiveTokens} 
                 isDashboard={false}
                 shouldPreventFlash={true}
@@ -131,7 +147,7 @@ const DepositsPage = () => {
               <CardTitle>Available Assets</CardTitle>
             </CardHeader>
             <CardContent>
-              <AssetsGrid loading={loading} assets={earningAssets.filter(token => !token.isPoolToken)} />
+              <AssetsGrid loading={loading} assets={sortedEarningAssets} />
             </CardContent>
           </Card>
         </main>
