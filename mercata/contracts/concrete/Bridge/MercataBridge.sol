@@ -5,6 +5,7 @@ import "../Tokens/TokenFactory.sol";
 import "../Tokens/Token.sol";
 import "../Admin/AdminRegistry.sol";
 import "../../libraries/Bridge/BridgeTypes.sol";
+import "../Lending/LendingRegistry.sol";
 
 /**
  * @title MercataBridge
@@ -98,6 +99,13 @@ contract record MercataBridge is Ownable {
     /// @param stratoToken The corresponding STRATO token address
     event AssetUpdated(bool enabled, uint256 externalChainId, uint256 externalDecimals, string externalName, string externalSymbol, address externalToken, uint256 maxPerWithdrawal, address stratoToken);
 
+    /// @notice Emitted when a deposit is auto saved to the lending pool
+    /// @param externalChainId The external chain identifier where the deposit occurred
+    /// @param externalTxHash The transaction hash on the external chain
+    /// @param mintedAmount The amount of USDST minted and supplied as liquidity
+    /// @param mTokenAmount The amount of mUSDST LP tokens for the deposit
+    event AutoSaved(uint256 externalChainId, string externalTxHash, uint256 mintedAmount, uint256 mTokenAmount);
+    
     /* ===================================================================== */
     /*                            STATE VARIABLES                            */
     /* ===================================================================== */
@@ -114,6 +122,9 @@ contract record MercataBridge is Ownable {
     /// @notice Token factory contract for creating new STRATO tokens
     /// @dev Single source of truth for active token creation
     address public tokenFactory;
+
+    /// @notice Lending registry contract for managing auto earning
+    address public lendingRegistry;
     
     /// @notice USDST token address for cross-chain minting/redeeming
     /// @dev Default USDST address: 0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010
@@ -197,7 +208,8 @@ contract record MercataBridge is Ownable {
      * @param _tokenFactory The token factory contract address for creating STRATO tokens
      */
     function initialize(
-        address _tokenFactory
+        address _tokenFactory,
+        address _lendingRegistry
     ) external onlyOwner {
         DECIMAL_PLACES = 18;
         USDST_ADDRESS = address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010);
@@ -205,6 +217,9 @@ contract record MercataBridge is Ownable {
 
         require(_tokenFactory != address(0), "MB: zero");
         tokenFactory = _tokenFactory;
+
+        require(_lendingRegistry != address(0), "MB: zero");
+        lendingRegistry = _lendingRegistry;
     }
 
     // ───────────── Admin related functions ─────────────
@@ -530,9 +545,10 @@ contract record MercataBridge is Ownable {
      * @notice Mints the corresponding STRATO tokens to the recipient
      * @param externalChainId The external chain identifier where the deposit occurred
      * @param externalTxHash The transaction hash on the external chain
+     * @param autoSave Whether to auto save the deposit to the lending pool
      */
     function confirmDeposit(
-        uint256 externalChainId, string externalTxHash
+        uint256 externalChainId, string externalTxHash, bool autoSave
     ) public onlyOwner whenDepositsOpen {
         require(externalChainId > 0, "MB: invalid external chain id");
         require(chains[externalChainId].enabled, "MB: chain not enabled");
@@ -544,12 +560,32 @@ contract record MercataBridge is Ownable {
         DepositInfo d = deposits[externalChainId][normalizedTxHash];
         require(d.bridgeStatus == BridgeStatus.INITIATED || d.bridgeStatus == BridgeStatus.PENDING_REVIEW, "MB: bad state");
 
-        uint256 actualMintedAmount = _mintFunds(d.stratoToken, d.stratoRecipient, d.stratoTokenAmount);
-        require(actualMintedAmount > 0, "MB: no tokens minted");
+        if (autoSave && d.stratoToken == LendingRegistry(lendingRegistry).lendingPool().borrowableAsset()) {
+            // Mint funds to this contract temporarily to deposit into the liquidity pool
+            uint256 actualMintedAmount = _mintFunds(d.stratoToken, this, d.stratoTokenAmount);
+            require(actualMintedAmount > 0, "MB: no tokens minted");
+            
+            Token mToken = Token(LendingRegistry(lendingRegistry).lendingPool().mToken());
+
+            uint beforeAmount = mToken.balanceOf(this);
+            Token(d.stratoToken).approve(address(LendingRegistry(lendingRegistry).liquidityPool()), actualMintedAmount);
+            LendingPool(LendingRegistry(lendingRegistry).lendingPool()).depositLiquidity(actualMintedAmount);
+            uint afterAmount = mToken.balanceOf(this);
+            require(afterAmount > beforeAmount, "MB: no mToken minted");
+            uint depositedAmount = afterAmount - beforeAmount;
+
+            mToken.transfer(d.stratoRecipient, depositedAmount);
+
+            emit AutoSaved(externalChainId, normalizedTxHash, actualMintedAmount, depositedAmount);
+        }
+        else {
+
+            uint256 actualMintedAmount = _mintFunds(d.stratoToken, d.stratoRecipient, d.stratoTokenAmount);
+            require(actualMintedAmount > 0, "MB: no tokens minted");
+        }
 
         d.bridgeStatus = BridgeStatus.COMPLETED;
         d.timestamp = block.timestamp;
-
         emit DepositCompleted(externalChainId, normalizedTxHash);
     }
 
