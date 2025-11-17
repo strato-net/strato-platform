@@ -235,13 +235,21 @@ flush scope = do
   txsDroppedCallback rejections txShas
   return flushedTxs
 
+-- This will be rounded in RLPEncode, but just for consistency.
+--
+-- Really, it should just be Int and then we wouldn't need to worry about leap
+-- seconds.
+currentTimeRounded :: MonadIO m => m UTCTime
+currentTimeRounded = posixSecondsToUTCTime
+                   . fromInteger
+                   . round
+                   . utcTimeToPOSIXSeconds <$> liftIO getCurrentTime
+
 processNewBestBlock :: MonadBagger m => Keccak256 -> BlockHeader -> [Keccak256] -> m ()
 processNewBestBlock bh bd txShas = do
   $logDebugS "Bagger.processNewBestBlock" . T.pack $ "called with " ++ show (length txShas) ++ " txs"
   state <- getBaggerState
-  -- This will be rounded in RLPEncode, but just for consistency.
-  -- Really, it should just be Int and then we wouldn't need to worry about leap seconds.
-  time <- posixSecondsToUTCTime . fromInteger . round . utcTimeToPOSIXSeconds <$> liftIO getCurrentTime
+  time <- currentTimeRounded
   let pHashes = B.privateHashes $ B.miningCache state
       shaSet = S.fromList txShas
       f = not . (`S.member` shaSet) . txHash . otBaseTx
