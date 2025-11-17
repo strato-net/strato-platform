@@ -487,18 +487,18 @@ contract record MercataBridge is Ownable {
         LiquidityPool liquidityPool = LendingRegistry(lendingRegistry).liquidityPool();
         Token mToken = Token(lendingPool.mToken());
 
-        // Mint funds to this contract temporarily to deposit into the liquidity pool
+        // Mint funds to this contract temporarily to deposit into the lending pool
         uint256 actualMintedAmount = _mintFunds(d.stratoToken, this, d.stratoTokenAmount);
         require(actualMintedAmount > 0, "MB: no tokens minted");
 
-        // Deposit into the liquidity pool
+        // Deposit into the lending pool
         uint balanceBefore = mToken.balanceOf(this);
         Token(d.stratoToken).approve(address(liquidityPool), actualMintedAmount);
         lendingPool.depositLiquidity(actualMintedAmount);
         uint depositedAmount = mToken.balanceOf(this) - balanceBefore;
         require(depositedAmount > 0, "MB: no mToken minted");
 
-        // Transfer the liquidity pool tokens to the recipient
+        // Transfer the lending pool tokens to the recipient
         mToken.transfer(d.stratoRecipient, depositedAmount);
 
         emit AutoSaved(externalChainId, normalizedTxHash, actualMintedAmount, depositedAmount);

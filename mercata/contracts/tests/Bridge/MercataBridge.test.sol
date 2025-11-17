@@ -8,6 +8,7 @@ import "../../abstract/ERC20/utils/StringUtils.sol";
 import "../../concrete/Admin/AdminRegistry.sol";
 import "../../libraries/Bridge/BridgeTypes.sol";
 import "../../concrete/Lending/LendingRegistry.sol";
+import "../../concrete/BaseCodeCollection.sol";
 
 
 contract TestERC20 is ERC20, Ownable {
@@ -55,12 +56,14 @@ contract Describe_MercataBridge is Authorizable {
     using BridgeTypes for *;
     using StringUtils for string;
 
+    Mercata mercata;
     MercataBridge bridge;
     TokenFactory tokenFactory;
     AdminRegistry adminRegistry;
     LendingRegistry lendingRegistry;
     TestERC20 testToken;
     TestUSDST usdstToken;
+    TestERC20 mUSDST;
     User user1;
     User user2;
     User relayer;
@@ -89,12 +92,11 @@ contract Describe_MercataBridge is Authorizable {
     }
 
     function beforeEach() {
-        adminRegistry = new AdminRegistry();
-        adminRegistry.initialize([owner]);
-        tokenFactory = new TokenFactory(address(adminRegistry));
-        lendingRegistry = new LendingRegistry(owner);
-        bridge = new MercataBridge(address(adminRegistry));
-        bridge.initialize(address(tokenFactory), address(lendingRegistry));
+        mercata = new Mercata();
+        adminRegistry = mercata.adminRegistry();
+        lendingRegistry = mercata.lendingRegistry();
+        tokenFactory = mercata.tokenFactory();
+        bridge = mercata.mercataBridge();
 
         // Whitelist relayer for all functions
         adminRegistry.addWhitelist(address(bridge), "setLastProcessedBlock", address(relayer));
@@ -114,10 +116,12 @@ contract Describe_MercataBridge is Authorizable {
         // Create test tokens through token factory with AdminRegistry as owner
         testToken = TestERC20(tokenFactory.createTokenWithInitialOwner("Test Token", "TEST", [], [], [], "TEST", 0, 18, address(adminRegistry)));
         usdstToken = TestUSDST(tokenFactory.createTokenWithInitialOwner("USDST", "USDST", [], [], [], "USDST", 0, 18, address(adminRegistry)));
+        mUSDST = TestERC20(tokenFactory.createTokenWithInitialOwner("mUSDST", "mUSDST", [], [], [], "mUSDST", 0, 18, address(adminRegistry)));
 
         // Set tokens to ACTIVE status
         Token(address(testToken)).setStatus(2); // ACTIVE
         Token(address(usdstToken)).setStatus(2); // ACTIVE
+        Token(address(mUSDST)).setStatus(2); // ACTIVE
 
         // AdminRegistry is already the owner of tokens, no need to transfer
 
@@ -126,6 +130,8 @@ contract Describe_MercataBridge is Authorizable {
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(testToken), "burn", address(bridge));
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(usdstToken), "mint", address(bridge));
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(usdstToken), "burn", address(bridge));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(mUSDST), "mint", address(mercata.liquidityPool()));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(mUSDST), "burn", address(mercata.liquidityPool()));
 
         // Set up chain
         bridge.setChain(chainName, custody, true, externalChainId, 1000, depositRouter);
@@ -155,6 +161,9 @@ contract Describe_MercataBridge is Authorizable {
             1000000e18, // max per tx
             address(usdstToken) // strato token
         );
+
+        mercata.poolConfigurator().setBorrowableAsset(address(usdstToken));
+        mercata.poolConfigurator().setMToken(address(mUSDST));
     }
 
     // ============ CONSTRUCTOR TESTS ============
@@ -1522,6 +1531,44 @@ contract Describe_MercataBridge is Authorizable {
         // Check the fourth withdrawal was recorded with correct conversion (should round down)
         (,,,,, uint256 recordedExternalAmount4,,,,,) = bridge.withdrawals(withdrawalId4);
         require(recordedExternalAmount4 == expectedExternalAmount4, "USDC precision loss rounding down failed");
+    }
+
+    function it_bridge_autosave_and_withdrawal_successful() {
+        uint256 amount = 1000e18;
+        address recipient = address(new User());
+        string memory txHash = keccak256("example transaction hash");
+
+        // First initiate deposit
+        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x6666), amount, txHash, recipient);
+
+        // Confirm the deposit with auto save
+        relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash, true);
+
+        // Verify deposit was completed
+        (BridgeStatus status,,,,,,,) = bridge.deposits(externalChainId, txHash.normalizeHex());
+        require(status == BridgeStatus.COMPLETED, "Deposit should be completed");
+        require(IERC20(address(mUSDST)).balanceOf(recipient) == amount, "Tokens should be minted");
+
+        User(recipient).do(address(mercata.lendingPool()), "withdrawLiquidityAll");
+        require(IERC20(address(usdstToken)).balanceOf(recipient) == amount, "mUSDST should be exchangable");
+    }
+
+    function it_bridge_autosave_reversion_causes_mint_to_recipient() {
+        uint256 amount = 1000e18;
+        address recipient = address(new User());
+        string memory txHash = keccak256("example transaction hash");
+
+        // First initiate deposit
+        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x6666), amount, txHash, recipient);
+
+        // Confirm the deposit with auto save, which will fail due to disabled minting of mUSDST
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "removeWhitelist", address(mUSDST), "mint", address(mercata.liquidityPool()));
+        relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash, true);
+
+        // Verify deposit was completed
+        (BridgeStatus status,,,,,,,) = bridge.deposits(externalChainId, txHash.normalizeHex());
+        require(status == BridgeStatus.COMPLETED, "Deposit should be completed");
+        require(IERC20(address(usdstToken)).balanceOf(recipient) == amount, "Tokens should be minted");
     }
 
 }
