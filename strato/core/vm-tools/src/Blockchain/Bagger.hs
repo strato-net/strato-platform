@@ -82,6 +82,7 @@ data TxMiningResult = TxMiningResult
 
 type MineTransactions m = BlockHeader -> Integer -> [OutputTx] -> Address -> m TxMiningResult
 
+
 isBlockstanbul :: (Functor m, Mod.Accessible IsBlockstanbul m) => m Bool
 isBlockstanbul = unIsBlockstanbul <$> Mod.access (Mod.Proxy @IsBlockstanbul)
 
@@ -158,7 +159,7 @@ cacheRunResults bd (sr, gasRemaining, trrs) = do
   liftIO $ TRC.insert cache bhash (sr, gasRemaining, trrs)
 
 getCachedRunResults :: MonadBagger m => BlockHeader -> m (Maybe (StateRoot, Integer, [TxRunResult]))
-getCachedRunResults bd = do 
+getCachedRunResults bd = do
     cache <- Mod.access (Mod.Proxy @TRC.Cache)
     let pHash = blockHeaderPartialHash bd
     mres <- liftIO $ TRC.lookup cache pHash
