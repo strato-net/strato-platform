@@ -105,7 +105,7 @@ contract record MercataBridge is Ownable {
     /// @param mintedAmount The amount of USDST minted and supplied as liquidity
     /// @param mTokenAmount The amount of mUSDST LP tokens for the deposit
     event AutoSaved(uint256 externalChainId, string externalTxHash, uint256 mintedAmount, uint256 mTokenAmount);
-    
+
     /* ===================================================================== */
     /*                            STATE VARIABLES                            */
     /* ===================================================================== */
@@ -470,6 +470,29 @@ contract record MercataBridge is Ownable {
         require(actualAmount > 0, "MB: no tokens sent");
     }
 
+    function _autoSave(DepositInfo d, uint256 externalChainId, string normalizedTxHash) internal {
+        require(address(lendingRegistry) != address(0), "MB: lending registry not set");
+        LendingPool lendingPool = LendingRegistry(lendingRegistry).lendingPool();
+        LiquidityPool liquidityPool = LendingRegistry(lendingRegistry).liquidityPool();
+        Token mToken = Token(lendingPool.mToken());
+
+        // Mint funds to this contract temporarily to deposit into the liquidity pool
+        uint256 actualMintedAmount = _mintFunds(d.stratoToken, this, d.stratoTokenAmount);
+        require(actualMintedAmount > 0, "MB: no tokens minted");
+
+        // Deposit into the liquidity pool
+        uint balanceBefore = mToken.balanceOf(this);
+        Token(d.stratoToken).approve(address(liquidityPool), actualMintedAmount);
+        lendingPool.depositLiquidity(actualMintedAmount);
+        uint depositedAmount = mToken.balanceOf(this) - balanceBefore;
+        require(depositedAmount > 0, "MB: no mToken minted");
+
+        // Transfer the liquidity pool tokens to the recipient
+        mToken.transfer(d.stratoRecipient, depositedAmount);
+
+        emit AutoSaved(externalChainId, normalizedTxHash, actualMintedAmount, depositedAmount);
+    }
+
     // ───────────── Deposit & withdrawal related functions ─────────────
     // ───────────── Deposit flow functions ─────────────
     /**
@@ -561,25 +584,9 @@ contract record MercataBridge is Ownable {
         require(d.bridgeStatus == BridgeStatus.INITIATED || d.bridgeStatus == BridgeStatus.PENDING_REVIEW, "MB: bad state");
 
         if (autoSave && d.stratoToken == LendingRegistry(lendingRegistry).lendingPool().borrowableAsset()) {
-            // Mint funds to this contract temporarily to deposit into the liquidity pool
-            uint256 actualMintedAmount = _mintFunds(d.stratoToken, this, d.stratoTokenAmount);
-            require(actualMintedAmount > 0, "MB: no tokens minted");
-            
-            Token mToken = Token(LendingRegistry(lendingRegistry).lendingPool().mToken());
-
-            uint beforeAmount = mToken.balanceOf(this);
-            Token(d.stratoToken).approve(address(LendingRegistry(lendingRegistry).liquidityPool()), actualMintedAmount);
-            LendingPool(LendingRegistry(lendingRegistry).lendingPool()).depositLiquidity(actualMintedAmount);
-            uint afterAmount = mToken.balanceOf(this);
-            require(afterAmount > beforeAmount, "MB: no mToken minted");
-            uint depositedAmount = afterAmount - beforeAmount;
-
-            mToken.transfer(d.stratoRecipient, depositedAmount);
-
-            emit AutoSaved(externalChainId, normalizedTxHash, actualMintedAmount, depositedAmount);
+            _autoSave(d, externalChainId, normalizedTxHash);
         }
         else {
-
             uint256 actualMintedAmount = _mintFunds(d.stratoToken, d.stratoRecipient, d.stratoTokenAmount);
             require(actualMintedAmount > 0, "MB: no tokens minted");
         }
