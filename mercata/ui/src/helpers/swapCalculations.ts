@@ -104,3 +104,35 @@ export const hasSufficientLiquidity = (
 
   return inputReserve > 0n && outputReserve > 0n && amountBigInt <= inputReserve;
 };
+
+/**
+ * Calculate price impact
+ * Price impact: I_user = (P_eff - P_before) / P_before
+ * @param currentPoolPrice Current pool exchange rate (as string)
+ * @param fromAmount Amount being swapped in (as string, in human-readable format)
+ * @param toAmount Amount being received out (as string, in human-readable format)
+ * @returns Price impact as percentage, or null if calculation not possible
+ */
+export const calculateImpact = (
+  currentPoolPrice: string,
+  fromAmount: string,
+  toAmount: string
+): number | null => {
+  if (!currentPoolPrice || !fromAmount || !toAmount || 
+      currentPoolPrice === "0" || fromAmount === "0" || toAmount === "0") {
+    return null;
+  }
+
+  const poolPrice = Number(currentPoolPrice);
+  const from = Number(fromAmount);
+  const to = Number(toAmount);
+
+  if (!Number.isFinite(poolPrice) || !Number.isFinite(from) || !Number.isFinite(to) || poolPrice === 0 || from === 0) {
+    return null;
+  }
+
+  const effectivePrice = to / from;
+  const priceImpact = Math.abs((effectivePrice - poolPrice) / poolPrice) * 100;
+  
+  return priceImpact;
+};
