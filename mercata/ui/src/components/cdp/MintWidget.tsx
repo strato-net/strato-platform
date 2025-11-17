@@ -821,14 +821,9 @@ const MintWidget: React.FC<MintWidgetProps> = ({ onSuccess }) => {
             )}
           </div>
 
-          <Select value="USDST" disabled>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select borrow asset" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="USDST">USDST</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg text-center">
+            <span className="text-sm font-medium text-gray-700">USDST</span>
+          </div>
 
           {/* Spacer to align with deposit side's balance display */}
           <div className="text-xs text-gray-500 text-left" style={{ height: "5px" }}>
