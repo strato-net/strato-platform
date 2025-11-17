@@ -733,10 +733,12 @@ contract Describe_LendingPool_Basic is Authorizable {
 
         LendingPool pool = m.lendingPool();
         PoolConfigurator configurator = m.poolConfigurator();
+        SafetyModule sm = m.safetyModule();
 
         uint amount = 100e18;
         require(amount <= pool.reservesAccrued(), "Amount should be greater than reserves accrued");
 
+        uint256 smManagedAssetsBefore = sm.totalAssets();
         configurator.sweepReserves(amount);
 
         uint toSafety = amount * pool.safetyShareBps() / 10000;
@@ -744,6 +746,9 @@ contract Describe_LendingPool_Basic is Authorizable {
 
         require_equal(IERC20(USDST).balanceOf(address(m.feeCollector())), fees, "Wrong FeeCollector balance after sweep");
         require_equal(IERC20(USDST).balanceOf(address(m.safetyModule())), toSafety, "Wrong SafetyModule balance after sweep");
+        
+        uint256 smManagedAssetsAfter = sm.totalAssets();
+        require_equal(smManagedAssetsAfter, smManagedAssetsBefore + toSafety, "SafetyModule managed assets should increase by safety share amount");
     }
 
     /// @dev please enable following clock winding implementation for solid-vm-cli
@@ -752,8 +757,10 @@ contract Describe_LendingPool_Basic is Authorizable {
 
         LendingPool pool = m.lendingPool();
         PoolConfigurator configurator = m.poolConfigurator();
+        SafetyModule sm = m.safetyModule();
 
         uint amount = pool.reservesAccrued();
+        uint256 smManagedAssetsBefore = sm.totalAssets();
         configurator.sweepReserves(amount);
 
         uint toSafety = amount * pool.safetyShareBps() / 10000;
@@ -761,6 +768,9 @@ contract Describe_LendingPool_Basic is Authorizable {
 
         require_equal(IERC20(USDST).balanceOf(address(m.feeCollector())), fees, "Wrong FeeCollector balance after sweep");
         require_equal(IERC20(USDST).balanceOf(address(m.safetyModule())), toSafety, "Wrong SafetyModule balance after sweep");
+        
+        uint256 smManagedAssetsAfter = sm.totalAssets();
+        require_equal(smManagedAssetsAfter, smManagedAssetsBefore + toSafety, "SafetyModule managed assets should increase by safety share amount");
     }
 
     /// @dev please enable following clock winding implementation for solid-vm-cli
@@ -769,8 +779,10 @@ contract Describe_LendingPool_Basic is Authorizable {
 
         LendingPool pool = m.lendingPool();
         PoolConfigurator configurator = m.poolConfigurator();
+        SafetyModule sm = m.safetyModule();
 
         uint amount = pool.reservesAccrued() + 100e18;
+        uint256 smManagedAssetsBefore = sm.totalAssets();
         configurator.sweepReserves(amount);
 
         uint toSafety = pool.reservesAccrued() * pool.safetyShareBps() / 10000;
@@ -778,6 +790,9 @@ contract Describe_LendingPool_Basic is Authorizable {
 
         require_equal(IERC20(USDST).balanceOf(address(m.feeCollector())), fees, "Wrong FeeCollector balance after sweep");
         require_equal(IERC20(USDST).balanceOf(address(m.safetyModule())), toSafety, "Wrong SafetyModule balance after sweep");
+        
+        uint256 smManagedAssetsAfter = sm.totalAssets();
+        require_equal(smManagedAssetsAfter, smManagedAssetsBefore + toSafety, "SafetyModule managed assets should increase by safety share amount");
     }
 
     function property_lending_fa_handles_50_pct_liquidation(uint a_collatAmount, uint b_collatStartPrice) public {
