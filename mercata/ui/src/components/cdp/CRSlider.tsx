@@ -95,18 +95,20 @@ const CRSlider: React.FC<CRSliderProps> = ({
         {/* CR Display with Tooltip */}
         <Tooltip>
           <TooltipTrigger asChild>
-            <div className="flex justify-between items-center text-sm font-medium cursor-help">
-              <span>Collateralization Ratio (CR)</span>
+            <div className="flex justify-between items-start cursor-help">
+              <span className="text-base font-bold">Collateralization Ratio (CR)</span>
               <span className={
-                projectedCR >= 999999 
-                  ? 'text-green-600' 
-                  : isAtMinCR
-                    ? 'text-yellow-600 font-bold'
-                    : isPositionDangerous 
-                      ? 'text-red-600 font-bold' 
-                      : ''
+                `text-3xl font-bold ${
+                  projectedCR >= 999999 
+                    ? 'text-green-600' 
+                    : isAtMinCR
+                      ? 'text-yellow-600'
+                      : isPositionDangerous 
+                        ? 'text-red-600' 
+                        : 'text-gray-900'
+                }`
               }>
-                {projectedCR >= 999999 ? '∞' : projectedCR > 0 ? formatPercentage(projectedCR, 1) : '0.0%'}
+                {projectedCR >= 999999 ? '∞' : projectedCR > 0 ? formatPercentage(projectedCR, 0) : '0%'}
               </span>
             </div>
           </TooltipTrigger>
@@ -142,14 +144,14 @@ const CRSlider: React.FC<CRSliderProps> = ({
       </div>
       
       {/* Slider Labels */}
-      <div className="flex justify-between text-xs text-gray-500">
+      <div className="flex justify-between text-sm text-gray-500 mt-2">
         <span>{formatPercentage(minCR)}</span>
         <span>{formatPercentage(sliderMax)}</span>
       </div>
       
       {/* Status message */}
       {isOutOfBounds && !isSliderDisabled && (
-        <div className="text-center text-sm text-blue-600">
+        <div className="text-center text-base text-blue-600">
           {projectedCR+0.1 < sliderMin 
             ? `CR below minimum safe threshold (${formatPercentage(sliderMin)}) - Click slider to set new CR`
             : projectedCR > sliderMax 
@@ -160,7 +162,7 @@ const CRSlider: React.FC<CRSliderProps> = ({
       )}
       
       {isSliderDisabled && (
-        <div className="text-center text-sm text-gray-500">
+        <div className="text-center text-base text-gray-500">
           {isInfinite 
             ? "No debt - CR is infinite"
             : "Slider disabled"

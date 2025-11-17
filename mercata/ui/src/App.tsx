@@ -20,7 +20,7 @@ import SwapAsset from "./pages/SwapAsset";
 import Transfer from "./pages/Transfer";
 import DepositsPage from "./pages/DepositsPage";
 import AssetDetail from "./pages/AssetDetail";
-import Pools from "./pages/Pools";
+import Advanced from "./pages/Advanced";
 import ActivityFeed from "./pages/ActivityFeed";
 import NotFound from "./pages/NotFound";
 
@@ -176,11 +176,11 @@ const App = () => {
                                   }
                                 />
                                 <Route
-                                  path="/dashboard/pools"
+                                  path="/dashboard/advanced"
                                   element={
                                     <ProtectedRoute>
                                       <DashboardWrapper>
-                                        <Pools />
+                                        <Advanced />
                                       </DashboardWrapper>
                                     </ProtectedRoute>
                                   }

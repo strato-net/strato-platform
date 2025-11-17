@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import CRSlider from "./CRSlider";
 import { cdpService, AssetConfig, TransactionResponse } from "@/services/cdpService";
@@ -10,11 +9,11 @@ import { useUserTokens } from "@/context/UserTokensContext";
 import { formatBalance as formatBalanceUtil, formatWeiToDecimalHP, formatNumber, formatDecimalToWeiHP } from "@/utils/numberUtils";
 import { api } from "@/lib/axios";
 
-interface BorrowWidgetProps {
+interface MintWidgetProps {
   onSuccess?: () => void; // Callback fired when borrow operation succeeds
 }
 
-const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
+const MintWidget: React.FC<MintWidgetProps> = ({ onSuccess }) => {
   const [supportedAssets, setSupportedAssets] = useState<AssetConfig[]>([]);
   const [depositAsset, setDepositAsset] = useState<AssetConfig | null>(null);
   const [depositAmount, setDepositAmount] = useState("");
@@ -738,13 +737,13 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
           -moz-appearance: textfield;
         }
       `}</style>
-      <h2 className="text-xl font-semibold text-gray-900">Borrow Against Collateral</h2>
+      <h2 className="text-2xl font-bold text-gray-900">Mint Against Collateral</h2>
       {/* Deposit / Borrow Panels */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Deposit */}
-        <div className="border border-gray-200 rounded-xl p-4 space-y-4">
+        <div className="p-4 space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="font-semibold">Deposit <span className="text-sm text-gray-500 font-normal"></span></h3>
+            <h3 className="text-base font-bold">Deposit <span className="text-sm text-gray-500 font-normal"></span></h3>
           </div>
 
           <Select 
@@ -766,7 +765,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
 
           {/* Balance display under asset selector */}
           {depositAsset && (
-            <div className="text-xs text-gray-500 text-left">
+            <div className="text-sm text-gray-500 text-left">
               Available: {userDepositBalance && parseFloat(userDepositBalance) > 0 
                 ? formatBalanceUtil(userDepositBalance, undefined, 18, 1, 4) 
                 : "0"
@@ -799,7 +798,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
               MAX
             </Button>
           </div>
-          <p className="text-xs text-gray-500">
+          <p className="text-sm text-gray-500">
             {getAssetPrice() > 0 
               ? `Collateral: $${formatNumber(getTotalCollateralValue())} total ${parseFloat(existingVaultCollateral) > 0 ? `(+$${formatNumber(parseFloat(depositAmount || "0") * getAssetPrice())} new)` : ""}`
               : "Price unavailable"
@@ -808,11 +807,11 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
         </div>
 
         {/* Borrow */}
-        <div className="border border-gray-200 rounded-xl p-4 space-y-4">
+        <div className="p-4 space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="font-semibold">Borrow</h3>
+            <h3 className="text-base font-bold">Borrow</h3>
             {depositAsset && (
-              <span className="text-xs text-gray-500">
+              <span className="text-sm text-gray-500">
                 {maxBorrowLoading ? (
                   "Loading..."
                 ) : (
@@ -822,9 +821,14 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
             )}
           </div>
 
-          <div className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg text-center">
-            <span className="text-sm font-medium text-gray-700">USDST</span>
-          </div>
+          <Select value="USDST" disabled>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select borrow asset" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="USDST">USDST</SelectItem>
+            </SelectContent>
+          </Select>
 
           {/* Spacer to align with deposit side's balance display */}
           <div className="text-xs text-gray-500 text-left" style={{ height: "5px" }}>
@@ -871,15 +875,15 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
               </div>
             )}
           </div>
-          <p className="text-xs text-gray-500">
+          <p className="text-sm text-gray-500">
             ${formatNumber(parseFloat(borrowAmount || "0"))}
           </p>
         </div>
       </div>
 
       {/* CR Slider & Borrow Rate */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-center">
-        <div className="lg:col-span-2 border border-gray-200 rounded-xl p-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+        <div className="p-4">
           <CRSlider
             projectedCR={projectedCR}
             minCR={minCR}
@@ -894,9 +898,9 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
           />
         </div>
 
-        <div className="border border-gray-200 rounded-xl p-6 bg-gray-50 text-center">
-          <p className="text-sm text-gray-600 mb-2">Stability Fee</p>
-          <p className="text-3xl font-semibold">{formatPercentage(borrowRate)}</p>
+        <div className="p-4 text-left">
+          <h3 className="text-base font-bold mb-2">Stability Fee</h3>
+          <p className="text-4xl font-bold">{formatPercentage(borrowRate)}</p>
         </div>
       </div>
 
@@ -961,4 +965,4 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
   );
 };
 
-export default BorrowWidget;
+export default MintWidget;
