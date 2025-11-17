@@ -5,13 +5,6 @@ import { TransactionResult, CallListArg } from '../types';
 import { checkBalances } from './balanceChecker';
 import { GAS_PARAMS, TIMEOUTS, RETRY_DELAYS } from './constants';
 
-export async function getUpdateInterval(): Promise<number> {
-    const minutes = parseInt(process.env.UPDATE_INTERVAL_MINUTES || '15');
-    if (minutes < 1 || minutes > 60) {
-        throw new Error(`Invalid UPDATE_INTERVAL_MINUTES: ${minutes}. Must be 1-60.`);
-    }
-    return minutes * 60;
-}
 
 async function callListAndWait(callListArgs: CallListArg[]): Promise<TransactionResult> {
     const accessToken = await oauthClient().getAccessToken();
