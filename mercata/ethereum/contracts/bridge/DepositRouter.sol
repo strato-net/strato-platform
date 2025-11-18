@@ -52,6 +52,7 @@ contract DepositRouter is
         uint256 amount,
         address indexed sender,
         address indexed stratoAddress,
+        bool autoSave,
         uint96 depositId
     );
     event TokenConfigUpdated(
@@ -92,6 +93,7 @@ contract DepositRouter is
         address token,
         uint256 amount,
         address stratoAddress,
+        bool autoSave,
         uint256 nonce,
         uint256 deadline,
         bytes calldata signature
@@ -140,6 +142,7 @@ contract DepositRouter is
             depositedAmount,
             msg.sender,
             stratoAddress,
+            autoSave,
             depositId
         );
     }
@@ -168,6 +171,7 @@ contract DepositRouter is
             msg.value,
             msg.sender,
             stratoAddress,
+            false,
             depositId
         );
     }

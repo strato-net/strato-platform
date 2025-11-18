@@ -6,9 +6,9 @@ export const ERC20_ABI = [
   "function transfer(address to, uint256 amount) public returns (bool)",
 ];
 
-// DepositRouted(address indexed token, uint256 amount, address indexed sender, address indexed stratoAddress, uint96 depositId)
+// DepositRouted(address,uint256,address,address,bool,uint96)
 export const DEPOSIT_EVENT_SIGNATURE =
-  "0x97968ffb53b74828f5a31cffca247ee14443247de34e1220399e6f9f56b9d33e";
+  "0x1bea429159037d4ba1d3ec1a2287a8fe5bcab17837e40c966aac3e5094830fb5";
 
 // Transfer(address,address,uint256)
 export const TRANSFER_EVENT_SIGNATURE =

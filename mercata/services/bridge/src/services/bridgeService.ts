@@ -13,6 +13,7 @@ export const depositBatch = async (depositArgs: NonEmptyArray<DepositArgs>) => {
   const externalTokenAmounts = depositArgs.map((deposit) => deposit.externalTokenAmount);
   const externalTxHashes = depositArgs.map((deposit) => deposit.externalTxHash);
   const stratoRecipients = depositArgs.map((deposit) => deposit.stratoRecipient);
+  const autoSaves = depositArgs.map((deposit) => deposit.autoSave);
 
   try {
     await execute({
@@ -26,6 +27,7 @@ export const depositBatch = async (depositArgs: NonEmptyArray<DepositArgs>) => {
         externalTokenAmounts,
         stratoRecipients,
         externalSenders,
+        autoSaves,
       },
     });
 

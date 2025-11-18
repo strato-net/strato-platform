@@ -18,6 +18,7 @@ library BridgeTypes {
         address stratoToken;       // STRATO token to mint
         uint256 stratoTokenAmount; // STRATO token amount to mint
         uint256 timestamp;         // timestamp of the deposit
+        bool autoSave;             // whether to auto save the deposit to the lending pool
     }
 
     struct WithdrawalInfo {

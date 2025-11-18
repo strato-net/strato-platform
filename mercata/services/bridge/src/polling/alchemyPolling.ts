@@ -22,9 +22,10 @@ const parseDepositEvents = async (logs: any[], externalChainId: number): Promise
     const externalToken = normalizeAddress(log.topics[1]);
     const externalSender = normalizeAddress(log.topics[2]);
     const stratoRecipient = normalizeAddress(log.topics[3]);
-    // Event: DepositRouted(address indexed token, uint256 amount, address indexed sender, address indexed stratoAddress, uint96 depositId)
-    // Data layout: [amount(32 bytes)][depositId(32 bytes)]
+    // Event: DepositRouted(address indexed token, uint256 amount, address indexed sender, address indexed stratoAddress, bool autoSave, uint96 depositId)
+    // Data layout: [amount(32 bytes)][autoSave(32 bytes)][depositId(32 bytes)]
     const externalTokenAmount = BigInt("0x" + log.data.substring(2, 66)).toString();
+    const autoSave = BigInt(log.data.substring(66, 66+32*2)) === 1n;
 
     return {
       externalChainId,
@@ -32,7 +33,8 @@ const parseDepositEvents = async (logs: any[], externalChainId: number): Promise
       externalToken,
       externalTokenAmount,
       externalTxHash: log.transactionHash,
-      stratoRecipient
+      stratoRecipient,
+      autoSave
     };
   });
 };

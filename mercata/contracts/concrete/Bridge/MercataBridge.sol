@@ -518,9 +518,10 @@ contract record MercataBridge is Ownable {
      * @param externalTokenAmount The amount of external tokens to deposit (in external token decimals)
      * @param externalTxHash The transaction hash on the external chain
      * @param stratoRecipient The STRATO address to receive the minted tokens
+     * @param autoSave Whether to auto save the deposit to the lending pool
      */
     function deposit(
-        uint256 externalChainId, address externalSender, address externalToken, uint256 externalTokenAmount, string externalTxHash, address stratoRecipient
+        uint256 externalChainId, address externalSender, address externalToken, uint256 externalTokenAmount, string externalTxHash, address stratoRecipient, bool autoSave
     ) public onlyOwner whenDepositsOpen {
         require(externalChainId > 0, "MB: invalid external chain id");
         require(externalSender != address(0), "MB: invalid external sender");
@@ -543,7 +544,7 @@ contract record MercataBridge is Ownable {
         require(stratoTokenAmount > 0, "MB: invalid strato token amount");
 
         deposits[externalChainId][normalizedTxHash] = DepositInfo(
-            BridgeStatus.INITIATED, externalSender, externalToken, block.timestamp, stratoRecipient, a.stratoToken, stratoTokenAmount, block.timestamp
+            BridgeStatus.INITIATED, externalSender, externalToken, block.timestamp, stratoRecipient, a.stratoToken, stratoTokenAmount, block.timestamp, autoSave
         );
 
         emit DepositInitiated(externalChainId, externalSender, normalizedTxHash, stratoRecipient, a.stratoToken, stratoTokenAmount);
@@ -561,14 +562,15 @@ contract record MercataBridge is Ownable {
      * @param externalTokenAmounts Array of external token amounts (in external token decimals)
      * @param externalTxHashes Array of external transaction hashes
      * @param stratoRecipients Array of STRATO recipient addresses
+     * @param autoSaves Array of booleans for whether to auto save the deposit to the lending pool
      */
     function depositBatch(
-        uint256[] externalChainIds, address[] externalSenders, address[] externalTokens, uint256[] externalTokenAmounts, string[] externalTxHashes, address[] stratoRecipients
+        uint256[] externalChainIds, address[] externalSenders, address[] externalTokens, uint256[] externalTokenAmounts, string[] externalTxHashes, address[] stratoRecipients, bool[] autoSaves
     ) external onlyOwner whenDepositsOpen {
         uint256 n = externalChainIds.length;
         require(n > 0 && n == externalSenders.length && n == externalTokens.length && n == externalTokenAmounts.length && n == externalTxHashes.length && n == stratoRecipients.length, "MB: len");
         for (uint256 i = 0; i < n; i++) {
-            deposit(externalChainIds[i], externalSenders[i], externalTokens[i], externalTokenAmounts[i], externalTxHashes[i], stratoRecipients[i]);
+            deposit(externalChainIds[i], externalSenders[i], externalTokens[i], externalTokenAmounts[i], externalTxHashes[i], stratoRecipients[i], autoSaves[i]);
         }
     }
 
@@ -579,10 +581,9 @@ contract record MercataBridge is Ownable {
      * @notice Mints the corresponding STRATO tokens to the recipient
      * @param externalChainId The external chain identifier where the deposit occurred
      * @param externalTxHash The transaction hash on the external chain
-     * @param autoSave Whether to auto save the deposit to the lending pool
      */
     function confirmDeposit(
-        uint256 externalChainId, string externalTxHash, bool autoSave
+        uint256 externalChainId, string externalTxHash
     ) public onlyOwner whenDepositsOpen {
         require(externalChainId > 0, "MB: invalid external chain id");
         require(chains[externalChainId].enabled, "MB: chain not enabled");
@@ -595,7 +596,7 @@ contract record MercataBridge is Ownable {
         require(d.bridgeStatus == BridgeStatus.INITIATED || d.bridgeStatus == BridgeStatus.PENDING_REVIEW, "MB: bad state");
 
         bool didAutoSave = false;
-        if (autoSave && d.stratoToken == LendingRegistry(lendingRegistry).lendingPool().borrowableAsset()) {
+        if (d.autoSave && d.stratoToken == LendingRegistry(lendingRegistry).lendingPool().borrowableAsset()) {
             try {
                 _autoSave(d, externalChainId, normalizedTxHash);
                 didAutoSave = true;
@@ -618,15 +619,14 @@ contract record MercataBridge is Ownable {
      * @notice Each deposit follows the same validation rules as individual confirmDeposit function
      * @param externalChainIds Array of external chain identifiers
      * @param externalTxHashes Array of external transaction hashes
-     * @param autoSaves Array of boolean values indicating whether to auto save the deposit to the lending pool
      */
     function confirmDepositBatch(
-        uint256[] externalChainIds, string[] externalTxHashes, bool[] autoSaves
+        uint256[] externalChainIds, string[] externalTxHashes
     ) external onlyOwner whenDepositsOpen {   
         uint256 n = externalChainIds.length;
-        require(n > 0 && n == externalTxHashes.length && n == autoSaves.length, "MB: len");
+        require(n > 0 && n == externalTxHashes.length, "MB: len");
         for (uint256 i = 0; i < n; i++) {
-            confirmDeposit(externalChainIds[i], externalTxHashes[i], autoSaves[i]);
+            confirmDeposit(externalChainIds[i], externalTxHashes[i]);
         }
     }
 
