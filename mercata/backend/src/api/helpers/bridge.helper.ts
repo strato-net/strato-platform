@@ -11,7 +11,7 @@ interface QueryConfig {
 const QUERY_CONFIGS: Record<string, QueryConfig> = {
   withdrawal: {
     tableName: `${constants.MercataBridge}-withdrawals`,
-    selectFields: "withdrawalId:key,WithdrawalInfo:value,block_timestamp",
+    selectFields: "withdrawalId:key,WithdrawalInfo:value,block_timestamp,block_hash",
     countField: "count()",
   },
   deposit: {

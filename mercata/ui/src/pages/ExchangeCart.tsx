@@ -6,7 +6,6 @@ import BadDebtView from '@/components/cdp/BadDebtView';
 import BridgeWidget from '@/components/bridge/BridgeWidget';
 import SwapWidget from '@/components/swap/SwapWidget';
 import MintWidget from '../components/mint/MintWidget'; // Bridge deposit widget
-import WithdrawWidget from '../components/mint/WithdrawWidget';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Tabs as AntdTabs } from 'antd';
@@ -21,7 +20,6 @@ interface ExchangeCartProps {
 }
 
 const ExchangeCart: React.FC<ExchangeCartProps> = ({ onVaultActionSuccess, initialTab }) => {
-  const [usdcActiveTab, setUsdcActiveTab] = useState('deposit');
   const [borrowActiveTab, setBorrowActiveTab] = useState('vaults');
   // Use localStorage to persist tab state across re-renders, but prioritize initialTab if provided
   const [activeTab, setActiveTab] = useState(() => {
@@ -160,9 +158,7 @@ const ExchangeCart: React.FC<ExchangeCartProps> = ({ onVaultActionSuccess, initi
                 size="sm"
                 className="flex items-center gap-2"
                 onClick={() => {
-                  // Set the target tab based on the current USDC active tab
-                  const targetTab = usdcActiveTab === 'deposit' ? 'USDSTDeposit' : 'RedemptionInitiated';
-                  setTargetTransactionTab(targetTab);
+                  setTargetTransactionTab('USDSTDeposit');
                   navigate("/dashboard/bridge-transactions");
                 }}
               >
@@ -171,43 +167,12 @@ const ExchangeCart: React.FC<ExchangeCartProps> = ({ onVaultActionSuccess, initi
               </Button>
             </div>
             <div className="w-full bg-white/90 p-1.5 rounded-xl border border-gray-200 shadow-sm">
-              <AntdTabs
-                activeKey={usdcActiveTab}
-                items={[
-                  {
-                    key: 'deposit',
-                    label: 'Deposit',
-                  },
-                  {
-                    key: 'withdraw',
-                    label: 'Withdraw',
-                  },
-                ]}
-                onChange={(value) => setUsdcActiveTab(value)}
-                className="custom-tabs"
-                style={{
-                  '--ant-primary-color': '#3b82f6',
-                  '--ant-primary-color-hover': '#2563eb',
-                } as React.CSSProperties}
-              />
               <div className="bg-white rounded-xl p-4 shadow-sm mt-4">
-                {usdcActiveTab === 'deposit' ? (
-                  <div>
-                    <div className="mb-4">
-                      <h3 className="text-lg font-semibold text-center">Get USDST</h3>
-                      <p className="text-sm text-gray-600 text-center">Bridge stablecoins and get USDST</p>
-                    </div>
-                    <MintWidget />
-                  </div>
-                ) : (
-                  <div>
-                    <div className="mb-4">
-                      <h3 className="text-lg font-semibold text-center">Redeem to Stablecoins</h3>
-                      <p className="text-sm text-gray-600 text-center">Redeem USDST back to external stablecoins</p>
-                    </div>
-                    <WithdrawWidget />
-                  </div>
-                )}
+                <div className="mb-4">
+                  <h3 className="text-lg font-semibold text-center">Get USDST</h3>
+                  <p className="text-sm text-gray-600 text-center">Bridge stablecoins and get USDST</p>
+                </div>
+                <MintWidget />
               </div>
             </div>
           </div>

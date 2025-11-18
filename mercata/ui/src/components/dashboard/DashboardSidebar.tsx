@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Wallet, Database, LogOut, ArrowLeft, ArrowRight, Book, ArrowRightLeft, Send, Shield, Activity } from 'lucide-react';
+import { LayoutDashboard, Wallet, Database, LogOut, ArrowLeft, ArrowRight, Book, ArrowRightLeft, Send, Shield, Activity, ArrowDownToLine } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import MERCATALOGO from '@/assets/mercata.png';
 import MERCATAICON from '@/assets/icon.png';
@@ -38,6 +38,7 @@ const DashboardSidebar = () => {
   const allNavItems = [
     { icon: <LayoutDashboard size={20} />, label: 'Overview', path: '/dashboard' },
     { icon: <Wallet size={20} />, label: 'Deposits', path: '/dashboard/deposits' },
+    { icon: <ArrowDownToLine size={20} />, label: 'Withdrawals', path: '/dashboard/withdrawals' },
     { icon: <Send size={20} />, label: 'Transfer', path: '/dashboard/transfer' },
     { icon: <Book size={20} />, label: 'Borrow', path: '/dashboard/borrow' },
     { icon: <ArrowRightLeft size={20} />, label: 'Swap', path: '/dashboard/swap' },

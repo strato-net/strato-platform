@@ -52,6 +52,8 @@ const BridgeOut: React.FC = () => {
   const {
     data: balanceData,
     isLoading: isBalanceLoading,
+    isError: isBalanceError,
+    error: balanceError,
     refetch: refetchBalance,
   } = useBalance(selectedToken?.stratoToken || null);
 
@@ -253,7 +255,7 @@ const BridgeOut: React.FC = () => {
                 <p className="text-sm text-gray-500">Fetching balance...</p>
               </div>
             ) : (
-              maxAmount && (
+              selectedToken && maxAmount !== undefined ? (
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <p className="text-sm text-gray-500">
@@ -261,7 +263,7 @@ const BridgeOut: React.FC = () => {
                     </p>
                   </div>
                 </div>
-              )
+              ) : null
             )}
           </div>
         

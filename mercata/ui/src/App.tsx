@@ -19,6 +19,7 @@ import Dashboard from "./pages/Dashboard";
 import SwapAsset from "./pages/SwapAsset";
 import Transfer from "./pages/Transfer";
 import DepositsPage from "./pages/DepositsPage";
+import WithdrawalsPage from "./pages/WithdrawalsPage";
 import AssetDetail from "./pages/AssetDetail";
 import Pools from "./pages/Pools";
 import ActivityFeed from "./pages/ActivityFeed";
@@ -161,6 +162,16 @@ const App = () => {
                                     <ProtectedRoute>
                                       <DashboardWrapper>
                                         <AssetDetail />
+                                      </DashboardWrapper>
+                                    </ProtectedRoute>
+                                  }
+                                />
+                                <Route
+                                  path="/dashboard/withdrawals"
+                                  element={
+                                    <ProtectedRoute>
+                                      <DashboardWrapper>
+                                        <WithdrawalsPage />
                                       </DashboardWrapper>
                                     </ProtectedRoute>
                                   }
