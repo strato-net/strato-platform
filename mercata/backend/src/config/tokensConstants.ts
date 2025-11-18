@@ -1,24 +1,14 @@
 // ============================================================================
-// TOKENS V2 CONSTANTS
+// CONSTANTS
 // ============================================================================
 
-/**
- * Contract name constants for tokens
- */
 const CONTRACT_PREFIX = "BlockApps-";
 
 export const TOKENS_CONTRACTS = {
   Token: `${CONTRACT_PREFIX}Token`,
 } as const;
 
-// ============================================================================
-// DATABASE SELECT FIELDS
-// ============================================================================
-
-/**
- * Base fields for token selection in database queries (v2)
- */
-export const TOKENS_V2_SELECT_FIELDS = [
+const TOKENS_V2_BASE_FIELDS = [
   "address",
   "_name",
   "_symbol",
@@ -28,12 +18,40 @@ export const TOKENS_V2_SELECT_FIELDS = [
   "description",
   "status",
   "_paused",
-  `images:${TOKENS_CONTRACTS.Token}-images(value)`,
-  `attributes:${TOKENS_CONTRACTS.Token}-attributes(key,value)`,
 ] as const;
 
-/**
- * Balances field for token selection (only include when filtering by balances)
- */
-export const TOKENS_V2_BALANCES_FIELD = `balances:${TOKENS_CONTRACTS.Token}-_balances!inner(user:key,balance:value::text)`;
+// ============================================================================
+// TYPES
+// ============================================================================
 
+export interface TokenSelectOptions {
+  images?: boolean;
+  imagesInner?: boolean;
+  attributes?: boolean;
+  attributesInner?: boolean;
+  balance?: boolean;
+  balanceInner?: boolean;
+}
+
+// ============================================================================
+// FUNCTIONS
+// ============================================================================
+
+export const buildTokenSelectFields = (options: TokenSelectOptions = {}): string[] => {
+  const fields: string[] = [...TOKENS_V2_BASE_FIELDS];
+  const { Token } = TOKENS_CONTRACTS;
+  
+  if (options.images || options.imagesInner) {
+    fields.push(`images:${Token}-images${options.imagesInner ? "!inner" : ""}(value)`);
+  }
+  
+  if (options.attributes || options.attributesInner) {
+    fields.push(`attributes:${Token}-attributes${options.attributesInner ? "!inner" : ""}(key,value)`);
+  }
+  
+  if (options.balance || options.balanceInner) {
+    fields.push(`balances:${Token}-_balances${options.balanceInner ? "!inner" : ""}(user:key,balance:value::text)`);
+  }
+  
+  return fields;
+};

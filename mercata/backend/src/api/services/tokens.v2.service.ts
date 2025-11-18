@@ -2,9 +2,9 @@ import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
 import { getCompletePriceMap } from "../helpers/oracle.helper";
 import { Token, EarningAsset } from "@mercata/shared-types";
+import { buildTokenSelectFields } from "../../config/tokensConstants";
 
-const { tokenSelectFields, Token, CollateralVault, CDPEngine, DECIMALS } =
-  constants;
+const { Token, CollateralVault, CDPEngine, DECIMALS } = constants;
 
 export const getTokens = async (
   accessToken: string,
@@ -48,7 +48,11 @@ export const getEarningAssets = async (
     cirrus.get(accessToken, "/" + Token, {
       params: {
         "balances.key": `eq.${userAddress}`,
-        select: tokenSelectFields.join(","),
+        select: buildTokenSelectFields({
+          images: true,
+          attributes: true,
+          balance: true,
+        }).join(","),
         status: "eq.2",
       },
     }),
@@ -84,7 +88,9 @@ export const getEarningAssets = async (
     const totalBalance = BigInt(balance) + BigInt(collateralBalance);
     const value =
       price && price !== "0"
-        ? (Number((totalBalance * BigInt(price)) / DECIMALS) / Number(DECIMALS)).toFixed(2)
+        ? (
+            Number((totalBalance * BigInt(price)) / DECIMALS) / Number(DECIMALS)
+          ).toFixed(2)
         : "0.00";
 
     return {
