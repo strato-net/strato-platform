@@ -57,6 +57,42 @@ router.get("/transferable", authHandler.authorizeRequest(true), TokensController
 
 /**
  * @openapi
+ * /tokens/stats:
+ *   get:
+ *     summary: Get token statistics including total supply and market cap
+ *     tags: [Tokens]
+ *     responses:
+ *       200:
+ *         description: Token statistics with total market cap
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 totalMarketCap:
+ *                   type: string
+ *                   description: Total market cap across all tokens
+ *                 tokens:
+ *                   type: array
+ *                   description: Array of tokens sorted by market cap descending
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       address:
+ *                         type: string
+ *                       name:
+ *                         type: string
+ *                       symbol:
+ *                         type: string
+ *                       totalSupply:
+ *                         type: string
+ *                       marketCap:
+ *                         type: string
+ */
+router.get("/stats", authHandler.authorizeRequest(true), TokensController.getStats);
+
+/**
+ * @openapi
  * /tokens/{address}:
  *   get:
  *     summary: Fetch token metadata by address
