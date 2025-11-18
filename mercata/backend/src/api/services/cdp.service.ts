@@ -234,6 +234,40 @@ const isTokenActive = async (
   );
 };
 
+// Helper function to get only active tokens (status === 2) with their info
+const getActiveTokens = async (
+  accessToken: string,
+  tokenAddresses: string[]
+): Promise<Record<string, { symbol: string; decimals: number }>> => {
+  if (tokenAddresses.length === 0) {
+    return {};
+  }
+
+  // Fetch all tokens in parallel
+  const tokenResults = await Promise.all(
+    tokenAddresses.map(async (address) => {
+      const { data } = await cirrus.get(accessToken, `/${Token}`, {
+        params: {
+          address: "eq." + address,
+          select: "_symbol,customDecimals,status",
+        }
+      });
+      return { address, token: data?.[0] };
+    })
+  );
+
+  // Filter for only active tokens (status = '2') and build the map
+  return tokenResults.reduce((map, { address, token }) => {
+    if (token && token.status === '2') {
+      map[address] = {
+        symbol: token._symbol || "UNKNOWN",
+        decimals: token.customDecimals || 18,
+      };
+    }
+    return map;
+  }, {} as Record<string, { symbol: string; decimals: number }>);
+};
+
 
 
 interface VaultData {
@@ -1750,18 +1784,8 @@ export const getCDPStats = async (
     const uniqueAssets = [...new Set(vaults.map((v: any) => v.asset))] as string[];
     // Get token info, prices, and configs for all assets in parallel
     const [tokenInfoMap, priceMap, configMap, globalStateMap] = await Promise.all([
-      // Get token info for all assets
-      Promise.all(
-        uniqueAssets.map(async (asset: string) => {
-          const info = await getTokenInfo(accessToken, asset);
-          return { asset, info };
-        })
-      ).then(results => 
-        results.reduce((map, { asset, info }) => {
-          map[asset] = info;
-          return map;
-        }, {} as Record<string, any>)
-      ),
+      // Get only active tokens (status = '2')
+      getActiveTokens(accessToken, uniqueAssets),
 
       // Get prices from registry
       Promise.resolve(
@@ -1797,6 +1821,11 @@ export const getCDPStats = async (
     vaults.forEach((vault: any) => {
       const asset = vault.asset.toLowerCase();
       const vaultData = vault.Vault || {};
+      
+      // Skip inactive tokens (not in tokenInfoMap means status !== '2')
+      if (!tokenInfoMap[asset]) {
+        return;
+      }
       
       if (!assetStats[asset]) {
         assetStats[asset] = {
