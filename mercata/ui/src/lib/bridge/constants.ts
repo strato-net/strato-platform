@@ -61,6 +61,7 @@ export const DEPOSIT_ROUTER_ABI = [
       { name: 'token', type: 'address' },
       { name: 'amount', type: 'uint256' },
       { name: 'stratoAddress', type: 'address' },
+      { name: 'autoSave', type: 'bool' },
       { name: 'nonce', type: 'uint256' },
       { name: 'deadline', type: 'uint256' },
       { name: 'signature', type: 'bytes' }

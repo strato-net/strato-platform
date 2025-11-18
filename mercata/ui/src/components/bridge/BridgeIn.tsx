@@ -489,6 +489,7 @@ const BridgeIn: React.FC = () => {
           ensureHexPrefix(ctx.selectedToken.externalToken),  
           ctx.depositAmount,
           ensureHexPrefix(ctx.userAddress),
+          ctx.autoSave,
           permitData!.nonce,
           permitData!.deadline,
           permitData!.signature as `0x${string}`
@@ -505,6 +506,7 @@ const BridgeIn: React.FC = () => {
           ensureHexPrefix(ctx.selectedToken.externalToken),
           ctx.depositAmount,
           ensureHexPrefix(ctx.userAddress),
+          ctx.autoSave,
           permitData!.nonce,
           permitData!.deadline,
           permitData!.signature as `0x${string}`
