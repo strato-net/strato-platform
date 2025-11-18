@@ -154,7 +154,17 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
     const mountedRef = useRef(true);
 
     const refetch = useCallback(async () => {
-      if (!tokenAddress || !mountedRef.current) return;
+      if (!tokenAddress) {
+        setIsLoading(false);
+        setData(null);
+        setIsError(false);
+        setError(null);
+        return;
+      }
+      
+      if (!mountedRef.current) {
+        return;
+      }
 
       // Cancel previous request
       if (abortControllerRef.current) {
@@ -168,6 +178,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
 
       try {
         const { balance } = await fetchBalance(tokenAddress);
+        
         if (mountedRef.current && !abortControllerRef.current.signal.aborted) {
           const formatted = formatBalance(balance);
           setData({ balance, formatted });
