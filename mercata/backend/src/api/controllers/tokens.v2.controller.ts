@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
 import { getEarningAssets, getTokens } from "../services/tokens.v2.service";
 import { validateQueryParams } from "../validators/tokens.validator";
+import { TOKENS_V2_SELECT_FIELDS, TOKENS_V2_BALANCES_FIELD } from "../../config/tokensConstants";
 
 class TokensV2Controller {
   static async getUserTokens(
@@ -13,19 +14,16 @@ class TokensV2Controller {
       const { accessToken, query, address: userAddress } = req;
       validateQueryParams(query);
 
-      const limit = Math.min(parseInt(query.limit as string) || 10, 50);
-      const offset = parseInt(query.offset as string) || 0;
-      const { select, ...queryWithoutSelect } = query;
-
       const queryParams: Record<string, string | undefined> = {
-        ...queryWithoutSelect,
+        ...query,
         "balances.key": `eq.${userAddress}`,
-        limit: limit.toString(),
-        offset: offset.toString(),
+        select: [...TOKENS_V2_SELECT_FIELDS, TOKENS_V2_BALANCES_FIELD].join(","),
+        limit: Math.min(parseInt(query.limit as string) || 10, 50).toString(),
+        offset: (parseInt(query.offset as string) || 0).toString(),
       };
 
-      const { tokens, totalCount } = await getTokens(accessToken, queryParams);
-      res.status(RestStatus.OK).json({ tokens, totalCount });
+      const result = await getTokens(accessToken, queryParams);
+      res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
     }

@@ -3,121 +3,101 @@ import { constants } from "../../config/constants";
 import { getCompletePriceMap } from "../helpers/oracle.helper";
 import { Token, EarningAsset } from "@mercata/shared-types";
 
-const { tokensV2SelectFields, tokensV2BalancesField, tokenSelectFields, Token, CollateralVault, CDPEngine, DECIMALS } = constants;
+const { tokenSelectFields, Token, CollateralVault, CDPEngine, DECIMALS } =
+  constants;
 
-// Get tokens v2 - no collateral data
 export const getTokens = async (
   accessToken: string,
   rawParams: Record<string, string | undefined> = {}
 ): Promise<{ tokens: Token[]; totalCount: number }> => {
   const params = Object.fromEntries(
-    Object.entries(rawParams).filter(([key, v]) => v !== undefined && key !== "select")
+    Object.entries(rawParams).filter(([key, v]) => v !== undefined)
   ) as Record<string, string>;
 
-  const hasBalanceFilter = Object.keys(params).some(key => key.startsWith("balances."));
-  const selectFields = hasBalanceFilter 
-    ? [...tokensV2SelectFields, tokensV2BalancesField]
-    : tokensV2SelectFields;
-
-  params.select = selectFields.join(",");
-  const { limit, offset, ...countParams } = params;
+  const { limit, offset, select, ...countParams } = params;
   const countQuery = {
     ...countParams,
-    select: hasBalanceFilter ? `count(),${tokensV2BalancesField}` : "count()",
+    select: select ? `count(),${select}` : "count()",
   };
 
   const [response, countResponse, rawPrices] = await Promise.all([
     cirrus.get(accessToken, "/" + Token, { params }),
     cirrus.get(accessToken, "/" + Token, { params: countQuery }),
-    getCompletePriceMap(accessToken)
+    getCompletePriceMap(accessToken),
   ]);
 
   if (response.status !== 200 || !response.data) {
     throw new Error(`Error fetching tokens: ${response.statusText}`);
   }
 
-  const totalCount = countResponse.data?.[0]?.count || 0;
-  const tokens = (response.data as any[]).map((token) => ({
-    ...token,
-    balance: token.balances?.[0]?.balance || "0",
-    price: rawPrices.get(token.address) || "0",
-  })) as Token[];
-
-  return { tokens, totalCount };
+  return {
+    tokens: (response.data as any[]).map((token) => ({
+      ...token,
+      balance: token.balances?.[0]?.balance || "0",
+      price: rawPrices.get(token.address) || "0",
+    })) as Token[],
+    totalCount: countResponse.data?.[0]?.count || 0,
+  };
 };
 
-// Get earning assets v2
-export const getEarningAssets = async (accessToken: string, userAddress: string): Promise<EarningAsset[]> => {
-  const params = {
-    "balances.key": `eq.${userAddress}`,
-    select: tokenSelectFields.join(","),
-    status: "eq.2",
-  } as Record<string, string>;
-
+export const getEarningAssets = async (
+  accessToken: string,
+  userAddress: string
+): Promise<EarningAsset[]> => {
   const [tokens, collaterals, cdps, rawPrices] = await Promise.all([
-    cirrus.get(accessToken, "/" + Token, { params }),
+    cirrus.get(accessToken, "/" + Token, {
+      params: {
+        "balances.key": `eq.${userAddress}`,
+        select: tokenSelectFields.join(","),
+        status: "eq.2",
+      },
+    }),
     cirrus.get(accessToken, "/" + CollateralVault + "-userCollaterals", {
       params: {
         select: "user:key,asset:key2,amount:value::text",
         key: `eq.${userAddress}`,
-        value: `gt.0`
-      }
+        value: `gt.0`,
+      },
     }),
     cirrus.get(accessToken, `/${CDPEngine}-vaults`, {
       params: {
         select: "user:key,asset:key2,amount:value->>collateral::text",
         key: `eq.${userAddress}`,
-        "value->>collateral": `gt.0`
-      }
+        "value->>collateral": `gt.0`,
+      },
     }),
-    getCompletePriceMap(accessToken)
+    getCompletePriceMap(accessToken),
   ]);
 
   const collateralMap = new Map<string, bigint>();
-  for (const c of collaterals.data || [])
-    collateralMap.set(c.asset, BigInt(c.amount));
-  for (const v of cdps.data || [])
+  [...(collaterals.data || []), ...(cdps.data || [])].forEach((item: any) =>
     collateralMap.set(
-      v.asset,
-      (collateralMap.get(v.asset) || 0n) + BigInt(v.amount || "0")
-    );
+      item.asset,
+      (collateralMap.get(item.asset) || 0n) + BigInt(item.amount || "0")
+    )
+  );
 
-  const tokenData = tokens.data || [];
-  
-  return tokenData.map((t: any) => {
-    const isPoolToken = 
-      t._symbol?.endsWith("-LP") || 
-      t._symbol === "SUSDST" || 
-      t._symbol === "MUSDST" ||
-      t.description === "Liquidity Provider Token";
-    
+  return (tokens.data || []).map((t: any) => {
     const balance = t.balances?.[0]?.balance || "0";
     const price = rawPrices.get(t.address) || "0";
     const collateralBalance = (collateralMap.get(t.address) || 0n).toString();
-    
-    let value = "0.00";
-    if (price && price !== "0") {
-      try {
-        const balanceBigInt = BigInt(balance);
-        const collateralBigInt = BigInt(collateralBalance);
-        const priceBigInt = BigInt(price);
-        const totalBalance = balanceBigInt + collateralBigInt;
-        const valueWei = (totalBalance * priceBigInt) / DECIMALS;
-        const valueDecimal = Number(valueWei) / Number(DECIMALS);
-        value = valueDecimal.toFixed(2);
-      } catch (error) {
-        value = "0.00";
-      }
-    }
-    
+    const totalBalance = BigInt(balance) + BigInt(collateralBalance);
+    const value =
+      price && price !== "0"
+        ? (Number((totalBalance * BigInt(price)) / DECIMALS) / Number(DECIMALS)).toFixed(2)
+        : "0.00";
+
     return {
       ...t,
       balance,
       price,
       collateralBalance,
-      isPoolToken,
+      isPoolToken:
+        t._symbol?.endsWith("-LP") ||
+        t._symbol === "SUSDST" ||
+        t._symbol === "MUSDST" ||
+        t.description === "Liquidity Provider Token",
       value,
     };
   });
 };
-
