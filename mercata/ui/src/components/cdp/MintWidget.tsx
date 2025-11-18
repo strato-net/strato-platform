@@ -11,9 +11,10 @@ import { api } from "@/lib/axios";
 
 interface MintWidgetProps {
   onSuccess?: () => void; // Callback fired when borrow operation succeeds
+  title?: string; // Title to display, defaults to "Mint Against Collateral"
 }
 
-const MintWidget: React.FC<MintWidgetProps> = ({ onSuccess }) => {
+const MintWidget: React.FC<MintWidgetProps> = ({ onSuccess, title = "Mint Against Collateral" }) => {
   const [supportedAssets, setSupportedAssets] = useState<AssetConfig[]>([]);
   const [depositAsset, setDepositAsset] = useState<AssetConfig | null>(null);
   const [depositAmount, setDepositAmount] = useState("");
@@ -737,7 +738,7 @@ const MintWidget: React.FC<MintWidgetProps> = ({ onSuccess }) => {
           -moz-appearance: textfield;
         }
       `}</style>
-      <h2 className="text-2xl font-bold text-gray-900">Mint Against Collateral</h2>
+      <h2 className="text-2xl font-bold text-gray-900">{title}</h2>
       {/* Deposit / Borrow Panels */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Deposit */}
