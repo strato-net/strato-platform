@@ -108,6 +108,7 @@ executables:
       - -with-rtsopts=-N8
     dependencies:
       - strato
+      - http-types
       - jsaddle
     when:
       - condition: os(linux)

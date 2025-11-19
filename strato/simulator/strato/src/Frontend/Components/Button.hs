@@ -8,7 +8,6 @@ module Frontend.Components.Button where
 
 import Control.Lens
 import Data.Default
-import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Reflex.Dom
@@ -36,8 +35,8 @@ instance Default ButtonSize where
   def = BSDefault
 
 data ButtonProps = ButtonProps
-  { _bpVariant   :: Maybe ButtonVariant
-  , _bpSize      :: Maybe ButtonSize
+  { _bpVariant   :: ButtonVariant
+  , _bpSize      :: ButtonSize
   , _bpAsChild   :: Bool
   , _bpClassName :: Text
   }
@@ -45,7 +44,7 @@ data ButtonProps = ButtonProps
 makeLenses ''ButtonProps
 
 instance Default ButtonProps where
-  def = ButtonProps Nothing Nothing False ""
+  def = ButtonProps BVDefault BSDefault False ""
 
 buttonVariantClass :: ButtonVariant -> Text
 buttonVariantClass BVDefault = "bg-primary text-primary-foreground hover:bg-primary/90"
@@ -63,8 +62,9 @@ buttonSizeClass BSIcon = "h-10 w-10"
 
 buttonPropsClass :: ButtonProps -> Text
 buttonPropsClass (ButtonProps bv bs _ cn) = T.intercalate " "
-  [ buttonVariantClass $ fromMaybe BVDefault bv
-  , buttonSizeClass $ fromMaybe BSDefault bs
+  [ "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0"
+  , buttonVariantClass bv
+  , buttonSizeClass bs
   , cn
   ]
 

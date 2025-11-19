@@ -14,10 +14,12 @@ import Control.Monad.IO.Class
 import Control.Monad (void)
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
-import Data.Text (Text)
 import Frontend.Components.Button
 import Frontend.Components.Card
 import Frontend.Components.Input
+import Frontend.Components.SVG.ArrowDown
+import Frontend.Components.SVG.ArrowRight
+import Frontend.Components.SVG.BitcoinLogo
 import Frontend.Types.State
 import Frontend.Utils
 import Text.Read (readMaybe)
@@ -42,7 +44,7 @@ bridgeTabWidget _ = mdo
       card (constDyn "bg-gradient-to-br from-amber-50 to-amber-100 shadow-md border-amber-200") $ do
         cardHeader (constDyn "pb-2") $ do
           cardTitle (constDyn "text-lg flex items-center gap-2") $ do
-            bitcoinLogo "h-5 w-5 text-amber-500"
+            bitcoinLogo $ def & svg_class .~ "h-5 w-5 text-amber-500"
             el "span" $ text "BTC Wallet Balance"
           cardDescription (constDyn "") $ do
             text "Your Bitcoin holdings"
@@ -54,7 +56,7 @@ bridgeTabWidget _ = mdo
       card (constDyn "bg-gradient-to-br from-blue-50 to-blue-100 shadow-md border-blue-200") $ do
         cardHeader (constDyn "pb-2") $ do
           cardTitle (constDyn "text-lg flex items-center gap-2") $ do
-            arrowRight "h-5 w-5 text-blue-500"
+            arrowRight $ def & svg_class .~ "h-5 w-5 text-blue-500"
             el "span" $ text "Total BTC Bridged"
           cardDescription (constDyn "") $ do
             text "To Mercata"
@@ -66,7 +68,7 @@ bridgeTabWidget _ = mdo
       card (constDyn "bg-gradient-to-br from-purple-50 to-purple-100 shadow-md border-purple-200") $ do
         cardHeader (constDyn "pb-2") $ do
           cardTitle (constDyn "text-lg flex items-center gap-2") $ do
-            arrowRight "h-5 w-5 text-purple-500"
+            arrowRight $ def & svg_class .~ "h-5 w-5 text-purple-500"
             el "span" $ text "BTCST Balance"
           cardDescription (constDyn "") $ do
             text "On Mercata"
@@ -106,7 +108,7 @@ bridgeTabWidget _ = mdo
             elClass "div" "flex items-center gap-2" $ do
               elClass "hr" "flex-1" $ blank
               elClass "div" "bg-blue-100 p-2 rounded-full" $ do
-                arrowDown "h-4 w-4 text-blue-600"
+                arrowDown $ def & svg_class .~ "h-4 w-4 text-blue-600"
               elClass "hr" "flex-1" $ blank
             el "div" $ do
               elClass "label" "block text-sm font-medium text-gray-700 mb-1" $ do
@@ -179,7 +181,7 @@ bridgeTabWidget _ = mdo
             elClass "div" "flex items-center gap-2" $ do
               elClass "hr" "flex-1" $ blank
               elClass "div" "bg-purple-100 p-2 rounded-full" $ do
-                arrowDown "h-4 w-4 text-purple-600"
+                arrowDown $ def & svg_class .~ "h-4 w-4 text-purple-600"
               elClass "hr" "flex-1" $ blank
             el "div" $ do
               elClass "label" "block text-sm font-medium text-gray-700 mb-1" $ do
@@ -224,65 +226,3 @@ bridgeTabWidget _ = mdo
         pure resultEv
       pure (bridgeInEv', bridgeOutEv')
   pure ()
-
-elSvgAttr :: MonadWidget t m => Text -> M.Map Text Text -> m a -> m a
-elSvgAttr elTag attrs = fmap snd . elDynAttrNS' (Just "http://www.w3.org/2000/svg") elTag (constDyn attrs)
-
-arrowDown :: MonadWidget t m => Text -> m ()
-arrowDown className =
-  elSvgAttr "svg" ( ("width" =: "24")
-                 <> ("height" =: "24")
-                 <> ("viewBox" =: "0 0 24 24")
-                 <> ("fill" =: "none")
-                 <> ("stroke" =: "currentColor")
-                 <> ("stroke-width" =: "2")
-                 <> ("stroke-linecap" =: "round")
-                 <> ("stroke-linejoin" =: "round")
-                 <> ("class" =: className)
-                  ) $ do
-    elSvgAttr "path" ("d" =: "M12 5v14") $ blank
-    elSvgAttr "path" ("d" =: "m19 12-7 7-7-7") $ blank
-
-arrowLeft :: MonadWidget t m => Text -> m ()
-arrowLeft className =
-  elSvgAttr "svg" ( ("width" =: "24")
-                 <> ("height" =: "24")
-                 <> ("viewBox" =: "0 0 24 24")
-                 <> ("fill" =: "none")
-                 <> ("stroke" =: "currentColor")
-                 <> ("stroke-width" =: "2")
-                 <> ("stroke-linecap" =: "round")
-                 <> ("stroke-linejoin" =: "round")
-                 <> ("class" =: className)
-                  ) $ do
-    elSvgAttr "path" ("d" =: "m12 19-7-7") $ blank
-    elSvgAttr "path" ("d" =: "M19 12H5") $ blank
-
-arrowRight :: MonadWidget t m => Text -> m ()
-arrowRight className =
-  elSvgAttr "svg" ( ("width" =: "24")
-                 <> ("height" =: "24")
-                 <> ("viewBox" =: "0 0 24 24")
-                 <> ("fill" =: "none")
-                 <> ("stroke" =: "currentColor")
-                 <> ("stroke-width" =: "2")
-                 <> ("stroke-linecap" =: "round")
-                 <> ("stroke-linejoin" =: "round")
-                 <> ("class" =: className)
-                  ) $ do
-    elSvgAttr "path" ("d" =: "M5 12h14") $ blank
-    elSvgAttr "path" ("d" =: "m12 5 7 7-7 7") $ blank
-
-bitcoinLogo :: MonadWidget t m => Text -> m ()
-bitcoinLogo className =
-  elSvgAttr "svg" ( ("width" =: "24")
-                 <> ("height" =: "24")
-                 <> ("viewBox" =: "0 0 24 24")
-                 <> ("fill" =: "none")
-                 <> ("stroke" =: "currentColor")
-                 <> ("stroke-width" =: "2")
-                 <> ("stroke-linecap" =: "round")
-                 <> ("stroke-linejoin" =: "round")
-                 <> ("class" =: className)
-                  ) $ do
-    elSvgAttr "path" ("d" =: "M11.767 19.089c4.924.868 6.14-6.025 1.216-6.894m-1.216 6.894L5.86 18.047m5.908 1.042-.347 1.97m1.563-8.864c4.924.869 6.14-6.025 1.215-6.893m-1.215 6.893-3.94-.694m5.155-6.2L8.29 4.26m5.908 1.042.348-1.97M7.48 20.364l3.126-17.727") $ blank

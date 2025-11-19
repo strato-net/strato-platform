@@ -83,15 +83,11 @@ createHaskoinMultiSigScript = do
 css :: BS.ByteString
 css = $(embedFile "static/style.css")
 
-appCss :: BS.ByteString
-appCss = $(embedFile "static/App.css")
-
 header :: MonadWidget t m => m ()
 header = do
   elAttr "meta" ("charset" =: "UTF-8") blank
   elAttr "meta" (("name" =: "viewport") <> ("content" =: "width=device-width, initial-scale=1.0")) blank
   elAttr "script" ("src" =: "https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4") blank
-  el "style" $ text $ decodeUtf8 appCss
   el "style" $ text $ decodeUtf8 css
 
 -- Default main function (can be changed to mainBrowser or mainNative)
@@ -146,7 +142,10 @@ runStratoNode runUI = do
           putStrLn "Cancelling threads..."
           traverse_ cancel $ a:as
           putStrLn "Done cancelling threads"
-    finally (liftIO . runUI $ mainWidgetWithHead header App.mainWidget) $ liftIO finalize
+    finally (liftIO $ runStratoUI runUI) $ liftIO finalize
+
+runStratoUI :: (JSM () -> IO ()) -> IO ()
+runStratoUI runUI = runUI $ mainWidgetWithHead header App.mainWidget
 
 fullServer :: FilesystemPeer -> CorePeer -> BlocEnv -> UrlMap -> Server (BitcoinBridgeAPI :<|> MercataAPI :<|> (CombinedAPI :<|> CirrusAPI))
 fullServer f c blocEnv urlMap = bitcoinBridgeServer :<|> mercataServer :<|> (singleNodeRestServer f c blocEnv urlMap)

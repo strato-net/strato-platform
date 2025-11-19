@@ -28,19 +28,8 @@ bridgeRouteTab label icon route routeDyn = do
   (e, _) <- elClass' "button" "text-sm px-4 data-[state=active]:bg-blue-600 data-[state=active]:text-white text-gray-300" $ navItem label icon isActive
   pure $ route <$ domEvent Click e
 
-topRouteTabs :: MonadWidget t m => m (Dynamic t TopRoute)
-topRouteTabs = do
-  elClass "div" "top-tabs" $ mdo
-    clicks <- fmap leftmost . traverse ($ routeDyn) $
-      [ routeTab "SMD" "fa-chart-line" RouteSMD
-      , routeTab "Marketplace" "fa-user" RouteMarketplace
-      , routeTab "Bitcoin Bridge" "fa-random" RouteBridge
-      ]
-    routeDyn <- holdDyn RouteSMD clicks
-    pure routeDyn
-
-smdTabs :: MonadWidget t m => m (Dynamic t SMDRoute)
-smdTabs = do
+smdTabs :: MonadWidget t m => SMDRoute -> m ()
+smdTabs r = do
   elClass "div" "nav-items" $ mdo
     clicks <- fmap leftmost . traverse ($ routeDyn) $
       [ routeTab "Dashboard" "fa-chart-line" SMDDashboard
@@ -50,29 +39,16 @@ smdTabs = do
       , routeTab "Blocks" "fa-cube" SMDBlocks
       , routeTab "Contract Editor" "fa-code" SMDContractEditor
       ]
-    routeDyn <- holdDyn SMDDashboard clicks
-    pure routeDyn
+    routeDyn <- holdDyn r clicks
+    pure ()
 
-marketplaceTabs :: MonadWidget t m => m (Dynamic t MarketplaceRoute)
-marketplaceTabs = do
-  elClass "div" "nav-items" $ mdo
-    clicks <- fmap leftmost . traverse ($ routeDyn) $
-      [ routeTab "Home" "fa-chart-line" MarketHome
-      , routeTab "My Transactions" "fa-user" MarketTransactions
-      , routeTab "My Wallet" "fa-random" MarketWallet
-      , routeTab "Activity Feed" "fa-file-contract" MarketFeed
-      , routeTab "Stake" "fa-cube" MarketStake
-      ]
-    routeDyn <- holdDyn MarketHome clicks
-    pure routeDyn
-
-bridgeTabs :: MonadWidget t m => m (Dynamic t BridgeRoute)
-bridgeTabs = do
+bridgeTabs :: MonadWidget t m => BridgeRoute -> m ()
+bridgeTabs r = do
   elClass "div" "nav-items" $ mdo
     clicks <- fmap leftmost . traverse ($ routeDyn) $
       [ bridgeRouteTab "Overview" "fa-chart-line" BridgeOverview
       , bridgeRouteTab "Bridge" "fa-user" BridgeBridge
       , bridgeRouteTab "RPC" "fa-random" BridgeRPC
       ]
-    routeDyn <- holdDyn BridgeOverview clicks
-    pure routeDyn
+    routeDyn <- holdDyn r clicks
+    pure ()
