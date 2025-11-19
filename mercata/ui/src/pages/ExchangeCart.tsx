@@ -120,7 +120,7 @@ const ExchangeCart: React.FC<ExchangeCartProps> = ({ onVaultActionSuccess, initi
                 {borrowActiveTab === 'vaults' ? (
                   <div className="space-y-6">
                     <div className="border-2 border-gray-300 rounded-xl p-4 pb-[60px] flex flex-col">
-                      <CDPBorrowWidget onSuccess={handleBorrowSuccess} />
+                      <CDPBorrowWidget onSuccess={handleBorrowSuccess} title="Borrow Against Collateral" />
                     </div>
                     <VaultsList 
                       refreshTrigger={vaultsRefreshTrigger} 

@@ -18,6 +18,7 @@ import eventsRoutes from "./routes/events.routes";
 import bridgeRoutes from "./routes/bridge.routes";
 import cdpRoutes from "./routes/cdp.routes";
 import rewardsRoutes from "./routes/rewards.routes";
+import protocolFeeRoutes from "./routes/protocolFee.routes";
 
 const router = Router();
 
@@ -74,6 +75,9 @@ router.use("/cdp", cdpRoutes);
 
 // ----- Rewards Routes -----
 router.use("/rewards", rewardsRoutes);
+
+// ----- Protocol Fee Routes -----
+router.use("/protocol-fees", protocolFeeRoutes);
 
 // ----- Documentation Routes -----
 // Serve static files for Swagger customizations

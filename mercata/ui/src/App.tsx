@@ -20,9 +20,10 @@ import SwapAsset from "./pages/SwapAsset";
 import Transfer from "./pages/Transfer";
 import DepositsPage from "./pages/DepositsPage";
 import AssetDetail from "./pages/AssetDetail";
-import Pools from "./pages/Pools";
+import Advanced from "./pages/Advanced";
 import ActivityFeed from "./pages/ActivityFeed";
 import NotFound from "./pages/NotFound";
+import MercataStats from "./pages/MercataStats";
 
 // Import dashboard components
 
@@ -176,11 +177,11 @@ const App = () => {
                                   }
                                 />
                                 <Route
-                                  path="/dashboard/pools"
+                                  path="/dashboard/advanced"
                                   element={
                                     <ProtectedRoute>
                                       <DashboardWrapper>
-                                        <Pools />
+                                        <Advanced />
                                       </DashboardWrapper>
                                     </ProtectedRoute>
                                   }
@@ -224,6 +225,17 @@ const App = () => {
                                     <ProtectedRoute>
                                       <DashboardWrapper>
                                         <BridgeTransactionsPage />
+                                      </DashboardWrapper>
+                                    </ProtectedRoute>
+                                  }
+                                />
+
+                                <Route
+                                  path="/dashboard/stats"
+                                  element={
+                                    <ProtectedRoute>
+                                      <DashboardWrapper>
+                                        <MercataStats />
                                       </DashboardWrapper>
                                     </ProtectedRoute>
                                   }
