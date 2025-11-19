@@ -90,8 +90,9 @@ const CollateralConfigManager = () => {
   const loadAssets = useCallback(async () => {
     try {
       setLoading(true);
-      const supportedAssets = await cdpService.getSupportedAssets();
-      setAssets(supportedAssets);
+      // Use getAllCollateralConfigs to get all assets (including unsupported) for admin view
+      const allAssets = await cdpService.getAllCollateralConfigs();
+      setAssets(allAssets);
     } catch (error) {
       console.error('Failed to load assets:', error);
       toast.error('Failed to load assets');
