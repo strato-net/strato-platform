@@ -623,8 +623,9 @@ contract record MercataBridge is Ownable {
             try {
                 _autoSave(d, externalChainId, normalizedTxHash);
                 didAutoSave = true;
-                delete autoSaveRequested[d.stratoRecipient][externalChainId][normalizedTxHash];
             } catch {} // On failure, mint stratoToken to the recipient instead
+            // Delete the auto save request regardless of success or failure
+            delete autoSaveRequested[d.stratoRecipient][externalChainId][normalizedTxHash];
         }
         if (!didAutoSave) {
             uint256 actualMintedAmount = _mintFunds(d.stratoToken, d.stratoRecipient, d.stratoTokenAmount);

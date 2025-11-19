@@ -132,12 +132,6 @@ contract record LendingPool is Ownable, Pausable {
         _;
     }
 
-    modifier onlyWhitelisted() {
-        AdminRegistry admin = AdminRegistry(Ownable(owner()).owner());
-        require(admin.whitelist(address(this), msg.sig, msg.sender), "not whitelisted");
-        _;
-    }
-
     /**
      * @dev Override to provide custom error message when contract is paused
      */
@@ -225,7 +219,8 @@ contract record LendingPool is Ownable, Pausable {
         emit Deposited(msg.sender, borrowableAsset, amount);
     }
 
-    function depositLiquidityOnBehalfOf(address user, uint amount) external onlyWhitelisted onlyTokenFactory(borrowableAsset) {
+    //TODO comment
+    function depositLiquidityOnBehalfOf(address user, uint amount) external onlyTokenFactory(borrowableAsset) {
         require(amount > 0, "Invalid amount");
         require(mToken != address(0), "mToken not set");
 
