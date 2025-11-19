@@ -1,5 +1,5 @@
 // src/context/UserTokensContext.tsx
-import React, { createContext, useContext, useState, useMemo, useCallback } from "react";
+import React, { createContext, useContext, useState, useMemo, useCallback, useEffect } from "react";
 import { api, axios } from "@/lib/axios";
 import { Token } from "@/interface";
 import isEqual from "lodash.isequal";
@@ -144,6 +144,13 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
       }
     }
   }, []);
+
+  // We didn't really need this but here we are...
+  useEffect(() => {
+    const abortController = new AbortController();
+    fetchTokens(abortController.signal);
+    return () => abortController.abort();
+  }, [fetchTokens]);
 
   const contextValue = useMemo(
     () => ({

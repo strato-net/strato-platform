@@ -8,17 +8,22 @@ import {
 } from 'react';
 import { api } from '@/lib/axios';
 import { Token, CreateTokenPayload } from '@/interface';
+import { Token as TokenType, EarningAsset } from '@mercata/shared-types';
 
 type TokenContextType = {
   tokens: Token[];
   activeTokens: Token[];
+  inactiveTokens: TokenType[];
+  earningAssets: EarningAsset[];
   loading: boolean;
   error: string | null;
   getAllTokens: (query?: Record<string, string>) => Promise<void>;
   getActiveTokens: () => Promise<void>;
+  getInactiveTokens: () => Promise<void>;
   getToken: (address: string) => Promise<Token | null>;
   getUserTokensWithBalance: () => Promise<Token[]>;
   getTransferableTokens: () => Promise<Token[]>;
+  getEarningAssets: () => Promise<void>;
   createToken: (token: CreateTokenPayload) => Promise<void>;
   transferToken: (payload: { address: string; to: string; value: string }) => Promise<void>;
   approveToken: (payload: { address: string; spender: string; value: string }) => Promise<void>;
@@ -31,6 +36,8 @@ const TokenContext = createContext<TokenContextType | undefined>(undefined);
 export const TokenProvider = ({ children }: { children: ReactNode }) => {
   const [tokens, setTokens] = useState<Token[]>([]);
   const [activeTokens, setActiveTokens] = useState<Token[]>([]);
+  const [inactiveTokens, setInactiveTokens] = useState<TokenType[]>([]);
+  const [earningAssets, setEarningAssets] = useState<EarningAsset[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,6 +57,17 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     try {
       const res = await api.get<Token[]>('/tokens', { params: { status: 'eq.2' } });
       setActiveTokens(res.data || []);
+    } catch (err) {
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const getInactiveTokens = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.get<{ tokens: TokenType[]; totalCount: number }>(`/tokens/v2`, { params: { status: 'neq.2' } });
+      setInactiveTokens(res.data?.tokens || []);
     } catch (err) {
     } finally {
       setLoading(false);
@@ -87,6 +105,17 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
       return res.data || [];
     } catch (err) {
       return [];
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const getEarningAssets = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.get<EarningAsset[]>(`/tokens/v2/earning-assets`);
+      setEarningAssets(res.data || []);
+    } catch (err) {
     } finally {
       setLoading(false);
     }
@@ -168,13 +197,17 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
       value={{
         tokens,
         activeTokens,
+        inactiveTokens,
+        earningAssets,
         loading,
         error,
         getAllTokens,
         getActiveTokens,
+        getInactiveTokens,
         getToken,
         getUserTokensWithBalance,
         getTransferableTokens,
+        getEarningAssets,
         createToken,
         transferToken,
         approveToken,

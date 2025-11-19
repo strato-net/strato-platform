@@ -45,7 +45,7 @@ interface SafetyModuleConfig {
 }
 
 // Get SafetyModule contract info from constants
-const getSafetyModuleConfig = (): SafetyModuleConfig => {
+export const getSafetyModuleConfig = (): SafetyModuleConfig => {
   // For now, using placeholder addresses - these should be configured via environment variables
   // similar to how lendingRegistry, poolFactory, etc. are configured
   return {

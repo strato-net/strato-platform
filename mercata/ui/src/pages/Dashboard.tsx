@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import MobileSidebar from "../components/dashboard/MobileSidebar";
@@ -7,20 +7,15 @@ import AssetsList from "../components/dashboard/AssetsList";
 import DashboardFAQ from "../components/dashboard/DashboardFAQ";
 import BorrowingSection from "../components/dashboard/BorrowingSection";
 import { Wallet, Coins, Shield, Banknote, Loader2 } from "lucide-react";
-import { useUserTokens } from "@/context/UserTokensContext";
+import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
-import { useLendingMetrics } from "@/hooks/useLendingMetrics";
 import { usePendingRewards } from "@/hooks/usePendingRewards";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-import { formatUnits } from "viem";
-import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
 import { useNetBalance } from "@/hooks/useNetBalance";
 import MyPoolParticipationSection from "@/components/dashboard/MyPoolParticipationSection";
 import { useLendingContext } from "@/context/LendingContext";
-import { useSwapContext } from "@/context/SwapContext";
 import { useCDP } from "@/context/CDPContext";
-import { useSafetyContext } from "@/context/SafetyContext";
 import { cataAddress, rewardsEnabled } from "@/lib/constants";
 import { api } from "@/lib/axios";
 
@@ -29,19 +24,11 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { userAddress } = useUser();
-  const { activeTokens: tokens, inactiveTokens, loading, fetchTokens } = useUserTokens();
-  const { 
-    availableBorrowingPower, 
-    currentBorrowed, 
-    averageInterestRate, 
-  } = useLendingMetrics();
-  const { loans } = useLendingContext();
+  const { earningAssets, getEarningAssets, inactiveTokens, getInactiveTokens, loading } = useTokenContext();
+  const { loans, refreshLoans } = useLendingContext();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const { loadingLiquidity, liquidityInfo, refreshLoans } = useLendingContext();
 
   const { totalCDPDebt } = useCDP();
-  const { poolsLoading: loadingUserPools, userPools, fetchUserPositions } = useSwapContext();
-  const { safetyInfo } = useSafetyContext();
   const { pendingRewards, refetch: refetchPendingRewards } = usePendingRewards(rewardsEnabled, 30000);
   const [isClaiming, setIsClaiming] = useState(false);
 
@@ -50,16 +37,32 @@ const Dashboard = () => {
     token.address === cataAddress
   );
 
+  // Sort earning assets by value, then categorize in a single pass
+  const { nonPoolTokens, poolTokens } = useMemo(() => {
+    const sorted = [...earningAssets].sort((a, b) => {
+      const valueA = parseFloat(a.value || "0");
+      const valueB = parseFloat(b.value || "0");
+      return valueB - valueA;
+    });
+    const nonPool: typeof earningAssets = [];
+    const pool: typeof earningAssets = [];
+    for (const token of sorted) {
+      if (token.isPoolToken) {
+        pool.push(token);
+      } else {
+        nonPool.push(token);
+      }
+    }
+    return { nonPoolTokens: nonPool, poolTokens: pool };
+  }, [earningAssets]);
+
   // Use centralized net balance calculation hook
   const { netBalance: totalBalance, cataBalance, totalBorrowed } = useNetBalance({
-    tokens,
+    tokens: earningAssets,
     cataToken,
     loans,
-    liquidityInfo,
-    totalCDPDebt,
-    safetyInfo
+    totalCDPDebt
   });
-
 
   // Add visibility states to prevent flashing
   const [isComponentMounted, setIsComponentMounted] = useState(false);
@@ -72,9 +75,9 @@ const Dashboard = () => {
     setIsComponentMounted(true);
     
     // Remove the timeout to prevent loading flash
-    fetchTokens();
+    getEarningAssets();
+    getInactiveTokens();
     refreshLoans();
-    fetchUserPositions();
 
     // Mark data as initialized after a brief delay to ensure proper rendering
     const initTimer = setTimeout(() => {
@@ -99,8 +102,6 @@ const Dashboard = () => {
     }
   }, [searchParams]);
 
-  // Net balance calculation is now handled by the useNetBalance hook above
-
   const handleClaimRewards = async () => {
     if (isClaiming || parseFloat(pendingRewards) <= 0) {
       return;
@@ -117,7 +118,8 @@ const Dashboard = () => {
 
       // Refresh data after successful claim
       await Promise.all([
-        fetchTokens(),
+        getEarningAssets(),
+        getInactiveTokens(),
         refetchPendingRewards(),
       ]);
     } finally {
@@ -185,9 +187,8 @@ const Dashboard = () => {
               <div className="mb-8">
                 <AssetsList 
                   loading={loading} 
-                  tokens={tokens} 
+                  tokens={nonPoolTokens} 
                   inActiveTokens={inactiveTokens} 
-                  shouldPreventFlash={true}
                 />
               </div>
 
@@ -198,15 +199,10 @@ const Dashboard = () => {
               </div>
 
               <div className="mb-8">
-                <MyPoolParticipationSection 
-                  loadingUserPools={loadingUserPools} 
-                  loadingLiquidity={loadingLiquidity} 
-                  liquidityInfo={liquidityInfo} 
-                  userPools={userPools}
-                  shouldPreventFlash={true}
-                  safetyInfo={safetyInfo}
-                  loadingSafety={loading}
-                /> 
+                  <MyPoolParticipationSection 
+                      poolTokens={poolTokens}
+                      loading={loading}
+                    />
               </div>
 
               <div className="mb-8">
