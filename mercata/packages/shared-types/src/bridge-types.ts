@@ -1,3 +1,5 @@
+import {TransactionResponse} from "./common-types";
+
 // ============================================================================
 // NETWORK CONFIG TYPES
 // ============================================================================
@@ -99,10 +101,7 @@ export interface WithdrawalRequestParams {
 /**
  * Response from withdrawal request
  */
-export interface WithdrawalRequestResponse {
-  status: string;
-  hash: string;
-}
+export type WithdrawalRequestResponse = TransactionResponse;
 
 /**
  * Parameters for requesting automatic supply of liquidity
@@ -116,7 +115,4 @@ export interface AutoSaveRequestParams {
 /**
  * Response from auto save request
  */
-export interface AutoSaveRequestResponse {
-  status: string;
-  hash: string;
-}
+export type AutoSaveRequestResponse = TransactionResponse;
