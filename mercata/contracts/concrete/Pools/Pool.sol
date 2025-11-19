@@ -445,7 +445,7 @@ contract record Pool is Ownable {
         uint256 reserveIn,
         uint256 userIn,
         uint256 feeBps
-    ) public pure returns (uint256) {
+    ) public internal returns (uint256) {
         require(feeBps < 10000, "Fee too high");
         uint256 a = 10000 - feeBps; // effective multipler (e.g., 9970 for 0.3%)
         uint256 b = 10000;
