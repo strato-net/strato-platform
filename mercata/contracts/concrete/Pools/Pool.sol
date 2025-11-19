@@ -264,9 +264,13 @@ contract record Pool is Ownable {
         uint256 mintAmount;
         
         if (totalLiquidity > 0) {
-            tokenAAmount = (tokenBAmount * tokenABalance / tokenBBalance) + 1;
-            mintAmount = tokenBAmount * totalLiquidity / tokenBBalance;
+            // Compute the required tokenA to match current pool ratio
+            tokenAAmount = (tokenBAmount * tokenABalance) / tokenBBalance;
             require(maxTokenAAmount >= tokenAAmount, "Insufficient tokenA amount");
+            // Min-of-both rule for LP minting (consistent with single-token path)
+            uint256 mintAmountA = (tokenAAmount * totalLiquidity) / tokenABalance;
+            uint256 mintAmountB = (tokenBAmount * totalLiquidity) / tokenBBalance;
+            mintAmount = mintAmountA < mintAmountB ? mintAmountA : mintAmountB;
         } else {
             tokenAAmount = maxTokenAAmount;
             mintAmount = tokenBAmount;
@@ -377,9 +381,9 @@ contract record Pool is Ownable {
 
         // Update balances: net input stays in pool, output is sent out
         if (isAToB) {
-            _updateStateVars(tokenABalance + netInput, tokenBBalance - amountOut);
+            _updateStateVars(tokenABalance + amountIn - protocolFee, tokenBBalance - amountOut);
         } else {
-            _updateStateVars(tokenABalance - amountOut, tokenBBalance + netInput);
+            _updateStateVars(tokenABalance - amountOut, tokenBBalance + amountIn - protocolFee);
         }
 
         emit Swap(msg.sender, address(inputToken), address(outputToken), amountIn, amountOut);
@@ -420,7 +424,10 @@ contract record Pool is Ownable {
         zapSwapFeesEnabled = enabled;
     }
 
+    // ===========================================================
     // ============ ZAP-IN (SINGLE TOKEN LIQUIDITY) ============
+    // ===========================================================
+
     /// @notice Calculate integer square root of a uint256 (Babylonian method)
     function _sqrt(uint256 y) internal pure returns (uint256 z) {
         if (y > 3) {
@@ -441,7 +448,7 @@ contract record Pool is Ownable {
         uint256 reserveIn,
         uint256 userIn,
         uint256 feeBps
-    ) internal pure returns (uint256) {
+    ) public internal returns (uint256) {
         require(feeBps < 10000, "Fee too high");
         uint256 a = 10000 - feeBps; // effective multipler (e.g., 9970 for 0.3%)
         uint256 b = 10000;
@@ -453,80 +460,61 @@ contract record Pool is Ownable {
         return numerator / (2 * a);
     }
 
-    function _internalSwapForZap(
-        bool isAToB,
-        uint256 amountIn
-    ) internal returns (uint256 amountOut) {
-        uint256 inputReserve = isAToB ? tokenABalance : tokenBBalance;
-        uint256 outputReserve = isAToB ? tokenBBalance : tokenABalance;
-
-        uint256 netInput;
-        if (zapSwapFeesEnabled) {
-            uint256 fee = (amountIn * _swapFeeRate()) / 10000;
-            uint256 lpFee = (fee * _lpSharePercent()) / 10000;
-            uint256 protocolFee = fee - lpFee;
-            netInput = amountIn - fee;
-
-            // protocol fee sent to collector
-            Token inputToken = isAToB ? tokenA : tokenB;
-            require(inputToken.transfer(_feeCollector(), protocolFee), "Fee transfer failed");
-        } else {
-            netInput = amountIn; // no fees charged
-        }
-
-        amountOut = getInputPrice(netInput, inputReserve, outputReserve);
-
-        // Note: For internal zap swaps, we don't update balances here since all tokens
-        // stay in the pool. The balance updates happen in the calling function.
-    }
-
-    function _mintLiquidityAfterZap(
-        uint256 tokenBContribution,
-        uint256 tokenAContribution
-    ) internal returns (uint256 liquidityMinted) {
-        uint256 totalLiquidity = lpToken.totalSupply();
-        uint256 tokenBReserve = tokenBBalance;
-        liquidityMinted = tokenBContribution * totalLiquidity / tokenBReserve;
-        
-        lpToken.mint(msg.sender, liquidityMinted);
-        emit AddLiquidity(msg.sender, tokenBContribution, tokenAContribution);
-    }
-
-    /// @notice Add liquidity with a single token (zap-in)
-    /// @param isAToB True if depositing tokenA only, false if depositing tokenB only
-    /// @param amountIn Amount of the single token supplied by the user
-    /// @param deadline Expiry timestamp
-    /// @return liquidityMinted Amount of LP tokens minted to the user
     function addLiquiditySingleToken(
         bool isAToB,
         uint256 amountIn,
         uint256 deadline
     ) external returns (uint256 liquidityMinted) {
-        require(amountIn > 0, "Invalid inputs");
+        require(amountIn > 0, "Invalid input");
         require(block.timestamp <= deadline, "EXPIRED");
         require(lpToken.totalSupply() > 0, "POOL_EMPTY");
 
-        // Transfer full amount from user to pool
         Token depositToken = isAToB ? tokenA : tokenB;
-        uint256 reserveIn = isAToB ? tokenABalance : tokenBBalance; // reserve before deposit
-        require(depositToken.transferFrom(msg.sender, address(this), amountIn), "Deposit transfer failed");
         
+        // 1) Precompute swap and fees (no upfront transfer)
+        uint256 reserveIn = isAToB ? tokenABalance : tokenBBalance;
+        uint256 reserveOut = isAToB ? tokenBBalance : tokenABalance;
         uint256 feeBps = zapSwapFeesEnabled ? _swapFeeRate() : 0;
-        uint256 swapAmt = _getOptimalSwapAmount(reserveIn, amountIn, feeBps);
-
-        uint256 amountOut = _internalSwapForZap(isAToB, swapAmt);
-
-        uint256 tokenAContribution;
-        uint256 tokenBContribution;
-        if (isAToB) {
-            tokenAContribution = amountIn - swapAmt;
-            tokenBContribution = amountOut;
-        } else {
-            tokenBContribution = amountIn - swapAmt;
-            tokenAContribution = amountOut;
+        uint256 swapAmount = _getOptimalSwapAmount(reserveIn, amountIn, feeBps);
+        uint256 fee = zapSwapFeesEnabled ? (swapAmount * _swapFeeRate()) / 10000 : 0;
+        uint256 lpFee = zapSwapFeesEnabled ? (fee * _lpSharePercent()) / 10000 : 0;
+        uint256 protocolFee = fee - lpFee;
+        uint256 netInput = swapAmount - fee;
+        uint256 amountOut = getInputPrice(netInput, reserveIn, reserveOut);
+        
+        // 2) Post-swap reserves and required counterpart at ratio
+        uint256 postA = isAToB ? (tokenABalance + swapAmount - protocolFee) : (tokenABalance - amountOut);
+        uint256 postB = isAToB ? (tokenBBalance - amountOut) : (tokenBBalance + swapAmount - protocolFee);
+        uint256 requiredA = isAToB ? (amountOut * postA) / postB : amountOut;
+        uint256 requiredB = isAToB ? amountOut : (amountOut * postB) / postA;
+        
+        // 3) Pull only what is needed (pseudo-refund by avoiding over-pull)
+        uint256 totalNeeded = isAToB ? (swapAmount + requiredA) : (swapAmount + requiredB);
+        require(totalNeeded <= amountIn, "INSUFFICIENT_INPUT");
+        require(depositToken.transferFrom(msg.sender, address(this), totalNeeded), "Transfer failed");
+        if (zapSwapFeesEnabled && protocolFee > 0) {
+            require(depositToken.transfer(_feeCollector(), protocolFee), "Fee failed");
         }
-
-        liquidityMinted = _mintLiquidityAfterZap(tokenBContribution, tokenAContribution);
-        _updateStateVars(tokenABalance + tokenAContribution, tokenBBalance + tokenBContribution);
+        
+        // 4) Mint LP via min-of-both on post-swap reserves
+        uint256 totalLiquidity = lpToken.totalSupply();
+        uint256 tokenAAmount = isAToB ? requiredA : amountOut;
+        uint256 tokenBAmount = isAToB ? amountOut : requiredB;
+        uint256 liquidityA = (tokenAAmount * totalLiquidity) / postA;
+        uint256 liquidityB = (tokenBAmount * totalLiquidity) / postB;
+        liquidityMinted = liquidityA < liquidityB ? liquidityA : liquidityB;
+        require(liquidityMinted > 0, "Insufficient liquidity");
+        lpToken.mint(msg.sender, liquidityMinted);
+        
+        // 5) Update final reserves (opposite side unchanged)
+        if (isAToB) {
+            _updateStateVars(tokenABalance + totalNeeded - protocolFee, tokenBBalance);
+        } else {
+            _updateStateVars(tokenABalance, tokenBBalance + totalNeeded - protocolFee);
+        }
+        
+        emit AddLiquidity(msg.sender, tokenBAmount, tokenAAmount);
+        return liquidityMinted;
     }
+
 }
