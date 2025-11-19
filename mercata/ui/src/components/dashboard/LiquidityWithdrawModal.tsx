@@ -254,6 +254,14 @@ const LiquidityWithdrawModal = ({
                   (Number(BigInt(totalLiquidityBalance || "0") * BigInt(selectedPool?.tokenA.poolBalance || "0") / BigInt(selectedPool?.lpToken?._totalSupply || "1")) / 1e18).toFixed(10)}
               </span>
             </div>
+            {selectedPool && withdrawPercent && selectedPool.lpToken._totalSupply !== "0" && (
+              <div className="flex justify-between items-center text-sm mt-1">
+                <span></span>
+                <span className="font-medium text-blue-600">
+                  {(Number(BigInt(availableLPBalance || "0") * BigInt(selectedPool.tokenA.poolBalance || "0") * (BigInt(10000) - BigInt(Math.floor(Number(withdrawPercent) * 100 || 0))) / (BigInt(selectedPool.lpToken._totalSupply || "1") * BigInt(10000))) / 1e18).toFixed(10)}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between items-center text-sm mt-1">
               <span className="text-gray-500">{tokenBLabel} position</span>
               <span className="font-medium">
@@ -261,7 +269,15 @@ const LiquidityWithdrawModal = ({
                   (Number(BigInt(totalLiquidityBalance || "0") * BigInt(selectedPool?.tokenB.poolBalance || "0") / BigInt(selectedPool?.lpToken?._totalSupply || "1")) / 1e18).toFixed(10)}
               </span>
             </div>
-            <div className="flex justify-between items-center text-sm mt-2 text-gray-500">
+            {selectedPool && withdrawPercent && selectedPool.lpToken._totalSupply !== "0" && (
+              <div className="flex justify-between items-center text-sm mt-1">
+                <span></span>
+                <span className="font-medium text-blue-600">
+                  {(Number(BigInt(availableLPBalance || "0") * BigInt(selectedPool.tokenB.poolBalance || "0") * (BigInt(10000) - BigInt(Math.floor(Number(withdrawPercent) * 100))) / (BigInt(selectedPool.lpToken._totalSupply || "1") * BigInt(10000))) / 1e18).toFixed(10)}
+                </span>
+              </div>
+            )}
+            <div className="flex justify-between items-center text-sm mt-5 text-gray-500">
               <span>Transaction fee</span>
               <span>{WITHDRAW_FEE} USDST ({parseFloat(WITHDRAW_FEE) * 100} voucher)</span>
             </div>
@@ -281,26 +297,6 @@ const LiquidityWithdrawModal = ({
                 </p>
               ) : null;
             })()}
-            {selectedPool && withdrawPercent && selectedPool.lpToken._totalSupply !== "0" && (
-              <>
-                <div className="w-full flex justify-between">
-                  <span className='text-gray-500'>
-                    New {tokenALabel} position
-                  </span>
-                  <span>
-                    {(Number(BigInt(availableLPBalance || "0") * BigInt(selectedPool.tokenA.poolBalance || "0") * (BigInt(10000) - BigInt(Math.floor(Number(withdrawPercent) * 100 || 0))) / (BigInt(selectedPool.lpToken._totalSupply || "1") * BigInt(10000))) / 1e18).toFixed(10)}
-                  </span>
-                </div>
-                <div className="w-full flex justify-between">
-                  <span className='text-gray-500'>
-                    New {tokenBLabel} position
-                  </span>
-                  <span>
-                    {(Number(BigInt(availableLPBalance || "0") * BigInt(selectedPool.tokenB.poolBalance || "0") * (BigInt(10000) - BigInt(Math.floor(Number(withdrawPercent) * 100))) / (BigInt(selectedPool.lpToken._totalSupply || "1") * BigInt(10000))) / 1e18).toFixed(10)}
-                  </span>
-                </div>
-              </>
-            )}
           </div>
 
           {/* Include Staked LP Token Checkbox - only show if pool has rewards program AND rewards are enabled */}
