@@ -58,7 +58,7 @@ export const requestWithdrawal = async (
 export const getBridgeTransactions = async (
   accessToken: string,
   type: 'withdrawal' | 'deposit',
-  userAddress: string,
+  userAddress: string | undefined,
   rawParams: Record<string, string | undefined> = {}
 ): Promise<BridgeTransactionResponse> => {
   const externalAssets = await getBridgeAssets(accessToken);

@@ -1,4 +1,4 @@
-![logo](https://www.stratomercata.com/lovable-uploads/3f84e7ae-d3e1-4921-8478-2ce97ef95cad.png)
+[![STRATO Mercata logo](https://www.stratomercata.com/images/stratomercata.com/2025.10.11/strato-mercata-logo.png)](https://stratomercata.com)
 
 # STRATO Mercata Platform
 
@@ -72,7 +72,7 @@
 - Start:
   - `cp docker-compose.allDocker.yml bootstrap-docker/docker-compose.yml`
   - `cd bootstrap-docker`
-  - Update `strato-run.sh` with your credentials, e.g. for testnet:
+  - Update `strato-run.sh` with your credentials:
     ```
     NODE_HOST='localhost' \
     network='helium' \
@@ -80,8 +80,8 @@
     OAUTH_CLIENT_SECRET='client-secret-here' \
     ./strato
     ```
-    (for mainnet use `network=upquark`)
-  - `chmod +x strato-run.sh`
+    - Use `network='helium'` for testnet
+    - Use `network='upquark'` for mainnet
   - `sudo ./strato-run.sh`
 
 - Wipe:

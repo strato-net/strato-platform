@@ -766,4 +766,62 @@ router.post("/bad-debt/top-up-junior-note", authHandler.authorizeRequest(), CDPC
  */
 router.post("/bad-debt/claim-junior-note", authHandler.authorizeRequest(), CDPController.claimJuniorNote);
 
+/**
+ * @openapi
+ * /cdp/stats:
+ *   get:
+ *     summary: Get aggregated CDP statistics by asset
+ *     tags: [CDP]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: CDP statistics aggregated by asset
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 totalCollateralValueUSD:
+ *                   type: string
+ *                   description: Total collateral value across all CDPs in USD
+ *                 totalDebtUSD:
+ *                   type: string
+ *                   description: Total debt across all CDPs in USD
+ *                 globalCollateralizationRatio:
+ *                   type: number
+ *                   description: Global collateralization ratio as percentage (collateral / debt * 100)
+ *                 assets:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       asset:
+ *                         type: string
+ *                         description: Asset contract address
+ *                       symbol:
+ *                         type: string
+ *                         description: Asset symbol (e.g., WBTC, ETHST)
+ *                       totalCollateral:
+ *                         type: string
+ *                         description: Total collateral amount (raw integer string)
+ *                       totalScaledDebt:
+ *                         type: string
+ *                         description: Total scaled debt amount
+ *                       totalDebtUSD:
+ *                         type: string
+ *                         description: Total debt in USD for this asset
+ *                       collateralValueUSD:
+ *                         type: string
+ *                         description: Total collateral value in USD for this asset
+ *                       collateralizationRatio:
+ *                         type: number
+ *                         description: Collateralization ratio as percentage (collateral / debt * 100)
+ *                       numberOfVaults:
+ *                         type: integer
+ *                         description: Number of vaults for this asset
+ */
+router.get("/stats", authHandler.authorizeRequest(), CDPController.getCDPStats);
+
+
 export default router;

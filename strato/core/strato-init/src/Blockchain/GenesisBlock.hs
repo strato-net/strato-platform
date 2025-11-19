@@ -253,8 +253,7 @@ populateStorageDBs' genesisInfo genesisBlock genesisChainId sr pub = do
           SolidVMCode name _ -> S.singleton $ A.Delegatecall
             { A._delegatecallStorageAddress = address
             , A._delegatecallCodeAddress = address
-            , A._delegatecallOrganization = "BlockApps"
-            , A._delegatecallApplication = "Mercata"
+            , A._delegatecallOrganization = Just "BlockApps"
             , A._delegatecallContractName = T.pack name
             }
     let addressDelegatecalls = dc S.>< Map.findWithDefault S.empty address delegatecalls

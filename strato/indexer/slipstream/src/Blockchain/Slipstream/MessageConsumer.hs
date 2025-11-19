@@ -6,16 +6,14 @@
 {-# LANGUAGE TypeApplications #-}
 
 module Blockchain.Slipstream.MessageConsumer
-  ( getAndProcessMessages,
+  ( getAndProcessMessages
   )
 where
 
 import BlockApps.Logging
-import Blockchain.Data.TransactionResult
 import Blockchain.EthConf
 import Blockchain.Slipstream.Data.Action (AggregateEvent)
 import Blockchain.Slipstream.Metrics
-import Blockchain.Slipstream.OutputData
 import Blockchain.Slipstream.Processor
 import Conduit
 import Control.Monad
@@ -38,11 +36,7 @@ getAndProcessMessages conn = do
   consume "getAndProcessMessages'" "slipstream" "vmevents" $ \() messages -> do
     recordKafkaMessages messages
     emittedEvents <- runConduit $
-      processTheMessages messages `fuseUpstream`
-        awaitForever (\case
-          Left txr -> void . lift $ putTransactionResult txr
-          Right cmds -> lift $ mapM_ (dbQueryCatchError conn . slipstreamQueryPostgres) cmds
-        )
+      processTheMessages conn messages `fuseUpstream` sinkNull
     _ <- produceSolidVmEvents emittedEvents
     return ()
 

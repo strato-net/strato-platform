@@ -10,7 +10,7 @@ import {
   removeLiquidity,
   swap,
   getSwapHistory,
-  setPoolRates,
+  setPoolRates
 } from "../services/swapping.service";
 import { getBalance } from "../services/tokens.service";
 import {
@@ -267,6 +267,7 @@ class SwappingController {
       next(error);
     }
   }
+
 }
 
 export default SwappingController;
