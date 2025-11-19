@@ -1126,11 +1126,50 @@ export const getSupportedAssets = async (
   accessToken: string,
   userAddress: string
 ): Promise<AssetConfig[]> => {
-  // Get all collateral assets first
-  const allAssets = await getAllCollateralAssets(accessToken, userAddress);
-  
-  // Filter to only return assets that are actually supported (isSupported === true)
-  return allAssets.filter((config: AssetConfig) => config.isSupported === true);
+  const { data: [registryData] } = await cirrus.get(
+    accessToken,
+    `/${CDPRegistry}`,
+    {
+      params: {
+        select: `cdpEngine:cdpEngine_fkey(collateralConfigs:${CDPEngine}-collateralConfigs(asset:key,CollateralConfig:value),isSupportedAsset:${CDPEngine}-isSupportedAsset!inner(asset:key,value))`,
+        "cdpEngine.isSupportedAsset.value": "eq.true",
+        address: `eq.${cdpRegistry}`,
+      },
+    }
+  );
+
+  const supportedAssetAddresses = registryData.cdpEngine.isSupportedAsset.map(
+    (asset: any) => asset.asset
+  );
+
+  const { data: symbols } = await cirrus.get(accessToken, `/${Token}`, {
+    params: {
+      select: "address,_symbol",
+      address: `in.(${supportedAssetAddresses.join(",")})`,
+    },
+  });
+
+  const symbolMap = new Map(symbols.map((s: any) => [s.address, s._symbol]));
+
+  return registryData.cdpEngine.collateralConfigs
+    .filter((config: any) => supportedAssetAddresses.includes(config.asset))
+    .map((config: any) => {
+      const cfg = config.CollateralConfig;
+      return {
+        asset: config.asset,
+        symbol: symbolMap.get(config.asset),
+        liquidationRatio: Number(cfg.liquidationRatio) / Number(WAD) * 100,
+        minCR: Number(cfg.minCR) / Number(WAD) * 100,
+        liquidationPenaltyBps: parseInt(cfg.liquidationPenaltyBps),
+        closeFactorBps: parseInt(cfg.closeFactorBps),
+        stabilityFeeRate: convertStabilityFeeRateToAnnualPercentage(cfg.stabilityFeeRate),
+        debtFloor: cfg.debtFloor,
+        debtCeiling: cfg.debtCeiling,
+        unitScale: cfg.unitScale,
+        isPaused: cfg.isPaused,
+        isSupported: true,
+      };
+    });
 };
 
 export const getMaxLiquidatable = async (
