@@ -86,6 +86,7 @@ export interface SwapContextActions {
   removeLiquidity: (data: {
     poolAddress: string;
     lpTokenAmount: string;
+    includeStakedLPToken?: boolean;
   }) => Promise<void>;
   
   // Utility functions
