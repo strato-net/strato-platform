@@ -37,7 +37,6 @@ import { LendingProvider } from "./context/LendingContext";
 import { CDPProvider } from "./context/CDPContext";
 import { TokenProvider } from "./context/TokenContext";
 import { BridgeProvider } from "@/context/BridgeContext";
-import { BridgeAdminProvider } from "@/context/BridgeAdminContext";
 import { LiquidationProvider } from "./context/LiquidationContext";
 import { SafetyProvider } from "./context/SafetyContext";
 import Borrow from "./pages/Borrow";
@@ -212,11 +211,9 @@ const App = () => {
                                   element={
                                     <ProtectedRoute>
                                       <AdminRoute>
-                                        <BridgeAdminProvider>
-                                          <DashboardWrapper>
-                                            <Admin />
-                                          </DashboardWrapper>
-                                        </BridgeAdminProvider>
+                                        <DashboardWrapper>
+                                          <Admin />
+                                        </DashboardWrapper>
                                       </AdminRoute>
                                     </ProtectedRoute>
                                   }

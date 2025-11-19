@@ -10,7 +10,7 @@ import { formatWeiToDecimalHP } from '@/utils/numberUtils';
 import { ensureHexPrefix } from '@/utils/numberUtils';
 import { usdstAddress } from '@/lib/constants';
 
-const WithdrawTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean }) => {
+const WithdrawTransactionDetails = ({ mintUSDST = false, context }: { mintUSDST?: boolean; context?: string }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [withdrawalStatus, setWithdrawalStatus] = useState<number | null>(null);
@@ -42,7 +42,7 @@ const WithdrawTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean
           (params as any)["value->>externalChainId"] = `eq.${selectedChainId}`;
         }
         
-        const result = await fetchWithdrawTransactions(params);
+        const result = await fetchWithdrawTransactions(params, context);
         setTransactions(result.data);
         setTotalCount(result.totalCount);
       } catch (error) {
@@ -53,7 +53,7 @@ const WithdrawTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean
     };
 
     loadTransactions();
-  }, [currentPage, withdrawalStatus, selectedChainId, fetchWithdrawTransactions]);
+  }, [currentPage, withdrawalStatus, selectedChainId, fetchWithdrawTransactions, context]);
 
   const columns = [
     {

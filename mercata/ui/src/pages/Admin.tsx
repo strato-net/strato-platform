@@ -14,7 +14,7 @@ import SwapPoolsTable from '@/components/admin/SwapPoolsTable';
 import LendingTab from '@/components/admin/LendingTab';
 import CollateralConfigManager from '@/components/admin/CollateralConfigManager';
 import VoteTab from '@/components/admin/VoteTab';
-import BridgeManagementTab from '@/components/admin/BridgeManagementTab';
+import BridgeTransactionsPage from '@/components/dashboard/BridgeTransactionsPage';
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -197,7 +197,7 @@ const Admin = () => {
             <VoteTab />
           </TabsContent>
           <TabsContent value="bridge" className="space-y-6">
-            <BridgeManagementTab />
+            <BridgeTransactionsPage isAdmin={true} />
           </TabsContent>
         </Tabs>
       </div>
