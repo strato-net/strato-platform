@@ -172,6 +172,7 @@ router.get("/swap-pools/positions", authHandler.authorizeRequest(), SwappingCont
  */
 router.get("/swap-pools/:tokenAddress1/:tokenAddress2", authHandler.authorizeRequest(true), SwappingController.getPoolByTokenPair);
 
+
 /**
  * @openapi
  * /swap-pools/{poolAddress}:

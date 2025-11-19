@@ -172,4 +172,19 @@ contract Describe_SafetyModule_Attacks is Authorizable {
         require(sm.totalAssets() == 1 + 1000e18, "Total assets updated correctly");
     }
 
+    function it_recordTransfer_reverts_when_called_by_non_lendingPool() public {
+        SafetyModule sm = freshSM;
+        
+        // Attempt to call recordTransfer from test contract (not LendingPool)
+        // This should revert immediately due to access control
+        bool reverted = false;
+        try sm.recordTransfer(100e18, 0) {
+            // Should not reach here
+        } catch Error(string memory errorMessage) {
+            log(errorMessage);
+            reverted = true;
+        }
+        require(reverted, "recordTransfer should revert when called by non-LendingPool");
+    }
+
 }

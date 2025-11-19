@@ -71,27 +71,25 @@ export const getSafetyModuleInfo = async (
 
   try {
     // Note: We need to query multiple sources for complete SafetyModule data:
-    // 1. SafetyModule contract config (COOLDOWN_SECONDS, UNSTAKE_WINDOW, etc.)
-    // 2. USDST balance of SafetyModule contract (this is totalAssets)
-    // 3. sToken totalSupply (this is totalShares)
-    // 4. User's sToken balance
-    // 5. User's cooldown start time
+    // 1. SafetyModule contract config and _managedAssets (COOLDOWN_SECONDS, UNSTAKE_WINDOW, _managedAssets, etc.)
+    // 2. sToken totalSupply (this is totalShares)
+    // 3. User's sToken balance
+    // 4. User's cooldown start time
     
     let safetyModuleData: any[] = [];
-    let usdstContractBalance: any[] = [];
     let sTokenTotalSupply: any[] = [];
     let userTokenBalance: any[] = [];
     let cooldownData: any[] = [];
 
     try {
-      // Query SafetyModule contract configuration
+      // Query SafetyModule contract configuration and _managedAssets
       const response1 = await cirrus.get(
         accessToken,
         `/BlockApps-SafetyModule`,
         {
           params: {
             address: `eq.${safetyModuleAddress}`,
-            select: "*"
+            select: "*,_managedAssets::text"
           }
         }
       );
@@ -101,28 +99,8 @@ export const getSafetyModuleInfo = async (
     }
 
     try {
-      // Query USDST balance of SafetyModule contract (this represents totalAssets)
-      // Use the nested relationship pattern like other services
-      const response2 = await cirrus.get(
-        accessToken,
-        `/BlockApps-Token`,
-        {
-          params: {
-            address: `eq.${safetyModuleConfig.asset.address}`,
-            select: `address,balances:BlockApps-Token-_balances(user:key,balance:value::text)`,
-            "balances.key": `eq.${safetyModuleAddress}`
-          }
-        }
-      );
-      const tokenData = response2.data || [];
-      usdstContractBalance = tokenData?.[0]?.balances || [];
-    } catch (error) {
-      console.warn("USDST balance of SafetyModule query failed:", error);
-    }
-
-    try {
       // Query sToken total supply (this represents totalShares)
-      const response3 = await cirrus.get(
+      const response2 = await cirrus.get(
         accessToken,
         `/BlockApps-Token`,
         {
@@ -132,14 +110,14 @@ export const getSafetyModuleInfo = async (
           }
         }
       );
-      sTokenTotalSupply = response3.data || [];
+      sTokenTotalSupply = response2.data || [];
     } catch (error) {
       console.warn("sToken total supply query failed:", error);
     }
 
     try {
       // Query user's sUSDST token balance using nested relationship pattern
-      const response4 = await cirrus.get(
+      const response3 = await cirrus.get(
         accessToken,
         `/BlockApps-Token`,
         {
@@ -150,7 +128,7 @@ export const getSafetyModuleInfo = async (
           }
         }
       );
-      const tokenData = response4.data || [];
+      const tokenData = response3.data || [];
       userTokenBalance = tokenData?.[0]?.balances || [];
     } catch (error) {
       console.warn("sUSDST token balance query failed:", error);
@@ -158,7 +136,7 @@ export const getSafetyModuleInfo = async (
 
     try {
       // Query user's cooldown start from SafetyModule
-      const response5 = await cirrus.get(
+      const response4 = await cirrus.get(
         accessToken,
         `/BlockApps-SafetyModule-cooldownStart`,
         {
@@ -168,7 +146,7 @@ export const getSafetyModuleInfo = async (
           }
         }
       );
-      cooldownData = response5.data || [];
+      cooldownData = response4.data || [];
     } catch (error) {
       console.warn("SafetyModule cooldown data query failed:", error);
     }
@@ -176,8 +154,8 @@ export const getSafetyModuleInfo = async (
     // Extract data from responses
     const safetyModule = safetyModuleData?.[0] || {};
     
-    // Get totalAssets from SafetyModule's USDST balance (nested structure)
-    const totalAssets = usdstContractBalance?.[0]?.balance || "0";
+    // Get totalAssets from SafetyModule's _managedAssets state variable
+    const totalAssets = safetyModule._managedAssets || "0";
     
     // Get totalShares from sToken's total supply
     const totalShares = sTokenTotalSupply?.[0]?._totalSupply || "0";

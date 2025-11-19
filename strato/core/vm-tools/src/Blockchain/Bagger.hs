@@ -82,6 +82,7 @@ data TxMiningResult = TxMiningResult
 
 type MineTransactions m = BlockHeader -> Integer -> [OutputTx] -> Address -> m TxMiningResult
 
+
 isBlockstanbul :: (Functor m, Mod.Accessible IsBlockstanbul m) => m Bool
 isBlockstanbul = unIsBlockstanbul <$> Mod.access (Mod.Proxy @IsBlockstanbul)
 
@@ -158,7 +159,7 @@ cacheRunResults bd (sr, gasRemaining, trrs) = do
   liftIO $ TRC.insert cache bhash (sr, gasRemaining, trrs)
 
 getCachedRunResults :: MonadBagger m => BlockHeader -> m (Maybe (StateRoot, Integer, [TxRunResult]))
-getCachedRunResults bd = do 
+getCachedRunResults bd = do
     cache <- Mod.access (Mod.Proxy @TRC.Cache)
     let pHash = blockHeaderPartialHash bd
     mres <- liftIO $ TRC.lookup cache pHash
@@ -234,13 +235,21 @@ flush scope = do
   txsDroppedCallback rejections txShas
   return flushedTxs
 
+-- This will be rounded in RLPEncode, but just for consistency.
+--
+-- Really, it should just be Int and then we wouldn't need to worry about leap
+-- seconds.
+currentTimeRounded :: MonadIO m => m UTCTime
+currentTimeRounded = posixSecondsToUTCTime
+                   . fromInteger
+                   . round
+                   . utcTimeToPOSIXSeconds <$> liftIO getCurrentTime
+
 processNewBestBlock :: MonadBagger m => Keccak256 -> BlockHeader -> [Keccak256] -> m ()
 processNewBestBlock bh bd txShas = do
   $logDebugS "Bagger.processNewBestBlock" . T.pack $ "called with " ++ show (length txShas) ++ " txs"
   state <- getBaggerState
-  -- This will be rounded in RLPEncode, but just for consistency.
-  -- Really, it should just be Int and then we wouldn't need to worry about leap seconds.
-  time <- posixSecondsToUTCTime . fromInteger . round . utcTimeToPOSIXSeconds <$> liftIO getCurrentTime
+  time <- currentTimeRounded
   let pHashes = B.privateHashes $ B.miningCache state
       shaSet = S.fromList txShas
       f = not . (`S.member` shaSet) . txHash . otBaseTx
@@ -266,11 +275,13 @@ processNewBestBlock bh bd txShas = do
     demoteUnexecutables
     promoteExecutables
 
+-- | The makeNewBlock function can be called multiple times before a block is
+-- actually proposed.
 makeNewBlock :: MonadBagger m => MineTransactions m -> Address -> m OutputBlock
 makeNewBlock mineTransactions mSelfAddress = do
   state <- getBaggerState
   let seen' = B.seen state
-  let cache = B.miningCache state
+  cache <- getCacheWithUpdatedTimestamp
   let lastExec = B.lastExecutedTxs cache
   let lastExecLen = length lastExec
   let lastExecGuardLen = length [t | t <- lastExec, otHash (trrTransaction t) `S.member` seen']
@@ -329,6 +340,39 @@ makeNewBlock mineTransactions mSelfAddress = do
       processNewBestBlock sha header txShas
       !nb <- makeNewBlock mineTransactions mSelfAddress
       return nb
+  where
+    --  We update startTimestamp in 'makeNewBlock' despite 'processNewBestBlock'
+    --  already setting it to the current timestamp. The reason is as follows:
+    --  There's a time gap between the call to processNewBestBlock and the call to
+    --  makeNewBlock. The gap can be arbitrarily long, because until at least one
+    --  transaction is submitted to any of the nodes, the gap continues to grow.
+    getCacheWithUpdatedTimestamp = do
+      state <- getBaggerState
+      let cache0 = B.miningCache state
+      let lastExec = B.lastExecutedTxs cache0
+      now <- currentTimeRounded
+      case lastExec of
+        --  When lastExecutedTxs is empty (fresh state), the block building
+        --  process is just starting. At this point, we want to set the
+        --  startTimestamp to the current time.
+        [] -> return $ cache0 { B.startTimestamp = now }
+
+        --  If lastExecutedTxs is NOT empty, it means makeNewBlock was already
+        --  called before and started building a block (executed some
+        --  transactions), but the block hasn't been proposed/committed yet.
+        --
+        --  This means that when this happens, the newly promoted transactions
+        --  will have slightly different block.timestamp, then the last executed
+        --  transactions. This should not have implications on the system, since
+        --  the time window for a node to propose a block is small, but we still
+        --  want to alert the node operator with a warning when this happens.
+        _ -> do
+          let timeDiff = diffUTCTime (B.startTimestamp cache0) now
+          $logWarnS "Bagger.makeNewBlock" . T.pack $
+            "The 'makeNewBlock' was called another time before the block was proposed. " ++
+            "The time difference between calls is " ++
+            show timeDiff
+          return cache0
 
 setCalculateIntrinsicGas :: MonadBagger m => (Integer -> OutputTx -> Integer) -> m ()
 setCalculateIntrinsicGas cig = putBaggerState =<< (\s -> s {B.calculateIntrinsicGas = cig}) <$> getBaggerState
