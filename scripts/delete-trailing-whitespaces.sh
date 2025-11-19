@@ -15,24 +15,24 @@ STAGED_MODE=0
 TARGET_DIR="."
 
 
-
+# Extensions that will be included to delete trailing whitespaces
 EXTENSIONS=(
   hs
-  html
-  js
-  json
-  lua
-  md
-  markdown
-  nix
-  sh
-  sol
-  tpl
-  ts
-  txt
-  xml
-  yaml
-  yml
+  # html
+  # js
+  # json
+  # lua
+  # md
+  # markdown
+  # nix
+  # sh
+  # sol
+  # tpl
+  # ts
+  # txt
+  # xml
+  # yaml
+  # yml
 )
 
 # Parse options
