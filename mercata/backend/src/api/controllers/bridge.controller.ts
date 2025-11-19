@@ -9,6 +9,7 @@ import {
 import { validateRequestWithdrawal, validateTransactionType } from "../validators/bridge.validators";
 import { validateRawParams } from "../validators/common.validators";
 import { NetworkConfig, BridgeToken, BridgeTransactionResponse, WithdrawalRequestParams, WithdrawalRequestResponse } from "@mercata/shared-types";
+import { isUserAdmin } from "../services/user.service";
 
 class BridgeController {
   static async requestWithdrawal(
@@ -97,13 +98,19 @@ class BridgeController {
       const { type } = req.params;
       const rawQueryParams = validateRawParams(req.query);
       
-      // Extract 'all' parameter for admin view control, exclude it from query params
-      const { all, ...queryParams } = rawQueryParams;
+      // Extract 'context' parameter for admin view control, exclude it from query params
+      const { context, ...queryParams } = rawQueryParams;
       
       const validatedType = validateTransactionType(type);
-      // If 'all' query param is true, don't filter by userAddress (admin view)
-      // Otherwise, filter by the authenticated user's address
-      const addressToUse = all === 'true' ? undefined : userAddress;
+      
+      // Check if user is admin using existing admin verification logic
+      const isAdmin = await isUserAdmin(accessToken, userAddress);
+      
+      // Only show all transactions if:
+      // 1. Context is explicitly 'admin' (from admin dashboard)
+      // 2. AND user is actually an admin (verified)
+      const addressToUse = (context === 'admin' && isAdmin) ? undefined : userAddress;
+      
       const result: BridgeTransactionResponse = await getBridgeTransactions(accessToken, validatedType, addressToUse, queryParams);
       res.json(result);
     } catch (error: any) {

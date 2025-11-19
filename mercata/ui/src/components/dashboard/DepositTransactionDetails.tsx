@@ -11,7 +11,7 @@ import { formatWeiToDecimalHP } from "@/utils/numberUtils";
 import { ensureHexPrefix } from "@/utils/numberUtils";
 import { usdstAddress } from "@/lib/constants";
 
-const DepositTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean }) => {
+const DepositTransactionDetails = ({ mintUSDST = false, context }: { mintUSDST?: boolean; context?: string }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [depositStatus, setDepositStatus] = useState<number | null>(null);
@@ -44,7 +44,7 @@ const DepositTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean 
           (params as any)["key"] = `eq.${selectedChainId}`;
         }
         
-        const result = await fetchDepositTransactions(params);
+        const result = await fetchDepositTransactions(params, context);
         setTransactions(result.data);
         setTotalCount(result.totalCount);
       } catch (error) {
@@ -55,7 +55,7 @@ const DepositTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean 
     };
 
     loadTransactions();
-  }, [currentPage, depositStatus, selectedChainId, fetchDepositTransactions]);
+  }, [currentPage, depositStatus, selectedChainId, fetchDepositTransactions, context]);
 
   
 
