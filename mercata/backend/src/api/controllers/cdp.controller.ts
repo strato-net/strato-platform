@@ -275,14 +275,14 @@ class CDPController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, address: userAddress, query } = req;
+      const { accessToken, query } = req;
       // Check for optional 'supported' query parameter
       // If true, return only supported assets. If false or omitted, return all assets.
-      const supportedOnly = query.supported === 'true' || query.supported === true;
+      const supportedOnly = query.supported === 'true';
       
       const assets = supportedOnly
-        ? await getSupportedAssets(accessToken, userAddress as string)
-        : await getAllCollateralAssets(accessToken, userAddress as string);
+        ? await getSupportedAssets(accessToken)
+        : await getAllCollateralAssets(accessToken);
       res.status(RestStatus.OK).json(assets);
     } catch (error) {
       next(error);
@@ -384,8 +384,8 @@ class CDPController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, address: userAddress } = req;
-      const result = await getAllCollateralConfigs(accessToken, userAddress as string);
+      const { accessToken } = req;
+      const result = await getAllCollateralAssets(accessToken);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);

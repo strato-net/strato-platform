@@ -1092,39 +1092,49 @@ export const getAssetConfig = async (
 // Get all collateral assets (regardless of support status) - used by admin
 export const getAllCollateralAssets = async (
   accessToken: string,
-  userAddress: string
 ): Promise<AssetConfig[]> => {
-  const registry = await getCDPRegistry(accessToken, userAddress, {}, "getAllCollateralAssets");
-  
-  if (!registry?.cdpEngine) {
-    throw new Error("CDP Engine not found");
-  }
+  const [{ data: [registryData] }, { data: symbols }] = await Promise.all([
+    cirrus.get(accessToken, `/${CDPRegistry}`, {
+      params: {
+        select: `cdpEngine:cdpEngine_fkey(collateralConfigs:${CDPEngine}-collateralConfigs(asset:key,CollateralConfig:value),isSupportedAsset:${CDPEngine}-isSupportedAsset!inner(asset:key,value))`,
+        address: `eq.${cdpRegistry}`,
+      },
+    }),
+    cirrus.get(accessToken, `/${Token}`, {
+      params: {
+        select: "address,_symbol",
+        "status": "eq.2",
+      },
+    }),
+  ]);
 
-  const configEntries = registry.cdpEngine.collateralConfigs || [];
-  if (configEntries.length === 0) return [];
+  const supportedMap = new Map(registryData.cdpEngine.isSupportedAsset.map((a: any) => [a.asset, a.value]));
+  const symbolMap = new Map(symbols.map((s: any) => [s.address, s._symbol]));
 
-  // Check each asset individually and filter to only active tokens
-  const activeConfigPromises = configEntries.map(async (entry: any) => {
-    const isActive = await isTokenActive(accessToken, entry.asset);
-    return isActive ? entry : null;
-  });
-  
-  const activeConfigEntries = (await Promise.all(activeConfigPromises))
-    .filter((entry: any) => entry !== null);
-
-  // Build asset configs for active tokens
-  const configPromises = activeConfigEntries.map(async (entry: any) => 
-    getAssetConfig(accessToken, userAddress, entry.asset)
-  );
-  
-  const configs = await Promise.all(configPromises);
-  return configs.filter((config: AssetConfig | null): config is AssetConfig => config !== null);
+  return registryData.cdpEngine.collateralConfigs
+    .filter((config: any) => symbolMap.has(config.asset))
+    .map((config: any) => {
+      const cfg = config.CollateralConfig;
+      return {
+        asset: config.asset,
+        symbol: symbolMap.get(config.asset),
+        liquidationRatio: Number(cfg.liquidationRatio) / Number(WAD) * 100,
+        minCR: Number(cfg.minCR) / Number(WAD) * 100,
+        liquidationPenaltyBps: parseInt(cfg.liquidationPenaltyBps),
+        closeFactorBps: parseInt(cfg.closeFactorBps),
+        stabilityFeeRate: convertStabilityFeeRateToAnnualPercentage(cfg.stabilityFeeRate),
+        debtFloor: cfg.debtFloor,
+        debtCeiling: cfg.debtCeiling,
+        unitScale: cfg.unitScale,
+        isPaused: cfg.isPaused,
+        isSupported: supportedMap.get(config.asset),
+      };
+    });
 };
 
 // Get only supported collateral assets (isSupported === true) - used by user-facing components
 export const getSupportedAssets = async (
   accessToken: string,
-  userAddress: string
 ): Promise<AssetConfig[]> => {
   const { data: [registryData] } = await cirrus.get(
     accessToken,
@@ -1145,6 +1155,7 @@ export const getSupportedAssets = async (
   const { data: symbols } = await cirrus.get(accessToken, `/${Token}`, {
     params: {
       select: "address,_symbol",
+      "status": "eq.2",
       address: `in.(${supportedAssetAddresses.join(",")})`,
     },
   });
@@ -1152,7 +1163,7 @@ export const getSupportedAssets = async (
   const symbolMap = new Map(symbols.map((s: any) => [s.address, s._symbol]));
 
   return registryData.cdpEngine.collateralConfigs
-    .filter((config: any) => supportedAssetAddresses.includes(config.asset))
+    .filter((config: any) => symbolMap.has(config.asset))
     .map((config: any) => {
       const cfg = config.CollateralConfig;
       return {
@@ -1403,7 +1414,7 @@ export const getAllCollateralConfigs = async (
   userAddress: string
 ): Promise<AssetConfig[]> => {
   // Return all collateral assets (regardless of support status) for admin view
-  return getAllCollateralAssets(accessToken, userAddress);
+  return getAllCollateralAssets(accessToken);
 };
 
 export const getBadDebt = async (
