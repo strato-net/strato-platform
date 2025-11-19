@@ -1,14 +1,22 @@
 import { Request, Response, NextFunction } from "express";
 import { 
-  requestWithdrawal, 
+  requestWithdrawal,
+  requestAutoSave,
   getBridgeableTokens,
   getRedeemableTokens,
   getNetworkConfigs,
   getBridgeTransactions
 } from "../services/bridge.service";
-import { validateRequestWithdrawal, validateTransactionType } from "../validators/bridge.validators";
+import { validateRequestWithdrawal, validateAutoSave, validateTransactionType } from "../validators/bridge.validators";
 import { validateRawParams } from "../validators/common.validators";
-import { NetworkConfig, BridgeToken, BridgeTransactionResponse, WithdrawalRequestParams, WithdrawalRequestResponse } from "@mercata/shared-types";
+import {
+  NetworkConfig,
+  BridgeToken,
+  BridgeTransactionResponse,
+  WithdrawalRequestParams,
+  WithdrawalRequestResponse,
+  AutoSaveRequestParams
+} from "@mercata/shared-types";
 import { isUserAdmin } from "../services/user.service";
 
 class BridgeController {
@@ -27,6 +35,23 @@ class BridgeController {
         success: true,
         data: result,
       });
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
+  static async requestAutoSave(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, body, address: userAddress } = req;
+      validateAutoSave(body);
+   
+      await requestAutoSave(accessToken, body as AutoSaveRequestParams, userAddress as string);
+   
+      res.json({ success: true });
     } catch (error: any) {
       next(error);
     }

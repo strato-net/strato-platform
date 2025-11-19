@@ -103,3 +103,20 @@ export interface WithdrawalRequestResponse {
   status: string;
   hash: string;
 }
+
+/**
+ * Parameters for requesting automatic supply of liquidity
+ * to the lending pool upon deposit completion
+ */
+export interface AutoSaveRequestParams {
+  externalChainId: string;
+  externalTxHash: string;
+}
+
+/**
+ * Response from auto save request
+ */
+export interface AutoSaveRequestResponse {
+  status: string;
+  hash: string;
+}

@@ -59,6 +59,9 @@ const router = Router();
  */
 router.post("/requestWithdrawal", authHandler.authorizeRequest(), BridgeController.requestWithdrawal);
 
+// TODO openapi comment
+router.post("/requestAutoSave", authHandler.authorizeRequest(), BridgeController.requestAutoSave);
+
 /**
  * @openapi
  * /bridge/bridgeableTokens/{chainId}:

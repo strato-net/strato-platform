@@ -22,6 +22,7 @@ contract record LendingPool is Ownable, Pausable {
     // ═══════════════════════════════════════════════════════════════════════════════
 
     event Deposited(address indexed user, address indexed asset, uint amount);
+    event DepositedOnBehalfOf(address indexed depositor, address indexed recipient, address indexed borrowableAsset, uint amount);
     event Withdrawn(address indexed user, address indexed asset, uint amount);
     event Borrowed(address indexed user, address indexed asset, uint amount);
     event Repaid(address indexed user, address indexed asset, uint amount);
@@ -131,6 +132,12 @@ contract record LendingPool is Ownable, Pausable {
         _;
     }
 
+    modifier onlyWhitelisted() {
+        AdminRegistry admin = AdminRegistry(Ownable(owner()).owner());
+        require(admin.whitelist(address(this), msg.sig, msg.sender), "not whitelisted");
+        _;
+    }
+
     /**
      * @dev Override to provide custom error message when contract is paused
      */
@@ -216,6 +223,28 @@ contract record LendingPool is Ownable, Pausable {
         // cash ↑ (after deposit)
         emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
         emit Deposited(msg.sender, borrowableAsset, amount);
+    }
+
+    function depositLiquidityOnBehalfOf(address user, uint amount) external onlyWhitelisted onlyTokenFactory(borrowableAsset) {
+        require(amount > 0, "Invalid amount");
+        require(mToken != address(0), "mToken not set");
+
+        // 1) bring index & reserves current
+        _accrue();
+
+        // 2) compute mTokens to mint from exchange rate
+        uint exchangeRate = getExchangeRate();
+        require(exchangeRate > 0, "Invalid rate");
+        uint mTokenAmount = (amount * 1e18) / exchangeRate;
+        require(mTokenAmount > 0, "Mint calc");
+
+        // 3) move funds & mint
+        LiquidityPool(_liquidityPool()).depositOnBehalfOf(user, amount, mTokenAmount, msg.sender);
+
+        // cash ↑ (after deposit)
+        emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
+        emit DepositedOnBehalfOf(msg.sender, user, borrowableAsset, amount);
+        emit Deposited(user, borrowableAsset, amount); // Recipient gets credit for the deposit
     }
 
     /**

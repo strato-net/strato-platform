@@ -47,6 +47,21 @@ export function validateRequestWithdrawal(args: any) {
   }
 }
 
+export function validateAutoSave(args: any) {
+  if (!args || typeof args !== "object") {
+    throw new Error("Invalid input: args must be an object.");
+  }
+
+  const { externalChainId, externalTxHash } = args;
+  
+  if (!externalChainId || !externalTxHash) {
+    throw new Error("RequestAutoSave Argument Validation Error");
+  }
+
+  // TODO improve validation
+
+}
+
 export function validateTransactionType(type: string): 'withdrawal' | 'deposit' {
   if (!type || typeof type !== 'string') {
     throw new Error("Transaction type is required and must be a string");

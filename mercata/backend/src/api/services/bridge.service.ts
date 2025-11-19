@@ -11,7 +11,16 @@ import {
   enrichAssetsWithTokenData,
   QUERY_CONFIGS 
 } from "../helpers/bridge.helper";
-import { NetworkConfig, BridgeToken, BridgeTransactionResponse, WithdrawalRequestParams, WithdrawalRequestResponse } from "@mercata/shared-types";
+import {
+  NetworkConfig,
+  BridgeToken,
+  BridgeTransactionResponse,
+  WithdrawalRequestParams,
+  WithdrawalRequestResponse,
+  AutoSaveRequestParams,
+  AutoSaveRequestResponse
+} from "@mercata/shared-types";
+
 
 const { MercataBridge, Token, mercataBridge, USDST } = constants;
 
@@ -46,6 +55,30 @@ export const requestWithdrawal = async (
         },
       },
     ],
+    userAddress,
+    accessToken
+  );
+
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, tx)
+  );
+};
+
+export const requestAutoSave = async (
+  accessToken: string,
+  {
+    externalChainId,
+    externalTxHash,
+  }: AutoSaveRequestParams,
+  userAddress: string
+) : Promise<AutoSaveRequestResponse> => {
+  const tx = await buildFunctionTx(
+    {
+      contractName: extractContractName(MercataBridge),
+      contractAddress: constants.mercataBridge,
+      method: "requestAutoSave",
+      args: { externalChainId, externalTxHash },
+    },
     userAddress,
     accessToken
   );
