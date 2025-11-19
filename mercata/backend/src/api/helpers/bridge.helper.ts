@@ -34,8 +34,6 @@ export function buildQueryParams(
         v !== undefined && !excludeFields.includes(key)
       )
     ),
- // Only filter by user address if provided (for admin view, userAddress is undefined)
- // For withdrawals, use stratoSender; for deposits, use stratoRecipient
     ...(userAddress && {
       [`value->>${queryType === 'deposit' ? 'stratoRecipient' : 'stratoSender'}`]:
         `eq.${userAddress}`
