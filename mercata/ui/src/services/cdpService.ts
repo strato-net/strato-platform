@@ -239,6 +239,12 @@ export const cdpService = {
     return response.data;
   },
 
+  // Toggle asset support status
+  async setAssetSupported(asset: string, supported: boolean): Promise<TransactionResponse> {
+    const response = await api.post("/cdp/admin/set-asset-supported", { asset, supported });
+    return response.data;
+  },
+
   // Get global pause status
   async getGlobalPaused(): Promise<{ isPaused: boolean }> {
     const response = await api.get("/cdp/admin/global-paused");
