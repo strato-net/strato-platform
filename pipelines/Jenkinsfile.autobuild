@@ -27,6 +27,15 @@ pipeline {
       }
     }
 
+    stage('Code Quality Checks') {
+      steps {
+        sh '''#!/bin/bash -le
+          echo "Checking for trailing whitespaces..."
+          ./scripts/delete-trailing-whitespaces.sh --check
+        '''
+      }
+    }
+
     stage('Build') {
       steps {
         sh 'rm -rf .docker-work'
