@@ -69,11 +69,11 @@ getContracts mName mOffset mLimit = do
                 pure $ Map.insertWith (++) (Text.pack n) [addressToVal ts addressStateRefAddress] m
           )
           Map.empty
-  
+
   -- Step 1: Get all unique contract names (without pagination)
   let contractLimit = fromIntegral $ fromMaybe 10 mLimit
       contractOffset = fromIntegral $ fromMaybe 0 mOffset
-  
+
   -- Get all records to extract unique contract names
   allAddrStateRefs <-
     getAccount'
@@ -83,19 +83,19 @@ getContracts mName mOffset mLimit = do
           _qaOffset = Nothing,  -- No offset - get all records
           _qaLimit = Nothing    -- No limit - get all records
         }
-  
+
   -- Group by contract name to get unique contracts
   allContractsMap <- addressesToMap allAddrStateRefs
   let allContractNames = Map.keys allContractsMap
       sortedContractNames = sort allContractNames
-      
+
   -- Apply pagination to contract names (exactly 10 contracts per page)
   let paginatedContractNames = take contractLimit $ drop contractOffset sortedContractNames
-  
+
   -- Step 2: Get all instances for the paginated contract names
   -- Filter the original map to only include the paginated contracts
   let paginatedContractsMap = Map.filterWithKey (\k _ -> k `elem` paginatedContractNames) allContractsMap
-  
+
   return . GetContractsResponse $ paginatedContractsMap
 
 getContractsData ::

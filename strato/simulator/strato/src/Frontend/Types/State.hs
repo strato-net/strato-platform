@@ -135,7 +135,7 @@ defaultNetworkStats = NetworkStats
   , connectedNodes = 0
   , networkLatency = 0
   , networkThroughput = 0
-  } 
+  }
 
 -- State manager function
 stateManager :: MonadWidget t m => m (Dynamic t AppState)

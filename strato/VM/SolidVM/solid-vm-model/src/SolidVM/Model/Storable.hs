@@ -98,7 +98,7 @@ instance SWAGGER.ToSchema BasicValue where
 
 instance JSON.ToJSON BasicValue where
   toJSON v = JSON.toJSON $ format v
-  
+
 instance JSON.FromJSON BasicValue where
   parseJSON v =
     fmap readOrError $ JSON.parseJSON v
@@ -393,7 +393,7 @@ unparsePath (StoragePath (Field p : rest)) =
     go (Field q) = [".", q]
     go (Index i) = ["[", escapeKey i, "]"]
 unparsePath v = error $ "StoragePath must always start with a Field: " ++ show v
-    
+
 instance RLPSerializable BasicValue where
   rlpEncode = \case
     BDefault -> RLPString ""

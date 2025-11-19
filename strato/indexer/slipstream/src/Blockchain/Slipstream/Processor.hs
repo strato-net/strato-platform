@@ -123,7 +123,7 @@ processedContractToProcessedCollectionRows state row =
           ) $ extractValues value
         ) $ Map.toList state
       processRecord (n, t, ks, v) = processedCollectionRow n t row ks v
-   in processRecord <$> recordVMs  
+   in processRecord <$> recordVMs
 
 processedCollectionRow :: Text -> Text -> AggregateAction -> [Value] -> Value ->  ProcessedCollectionRow
 processedCollectionRow collection ttype AggregateAction {..} ks v =
@@ -137,7 +137,7 @@ processedCollectionRow collection ttype AggregateAction {..} ks v =
       blockTimestamp = actionBlockTimestamp,
       blockNumber = actionBlockNumber,
       collectionDataKeys = ks,
-      collectionDataValue = v 
+      collectionDataValue = v
     }
 
 parseActions :: [VME.VMEvent] -> [(Address, [AggregateAction])]
@@ -158,7 +158,7 @@ parseEvents = concatMap parseEvent
           eventBlockTimestamp = Action._blockTimestamp a,
           eventBlockNumber = Action._blockNumber a,
           eventTxSender = Action._transactionSender a,
-          eventEvent = e, 
+          eventEvent = e,
           eventIndex = idx
         }
 
@@ -243,7 +243,7 @@ processTheMessages conn messages = do
   let insertsByCodeHash = rights inserts
 
   forM_ (rights inserts) $ $logDebugLS "processTheMessages/toInsert"
-  
+
   mapOutput Right . outputData $ do
     forM_ insertsByCodeHash $ \ins -> do
 --      lift $ insertIndexTable2 $ insertToStorage $ indexInsert ins

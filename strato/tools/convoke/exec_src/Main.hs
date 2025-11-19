@@ -99,7 +99,7 @@ tailFile n path = do
     contents <- readFile path
     let linesToPrint = tailN n (lines contents)
     putStrLn $ unlines linesToPrint
-    
+
 main :: IO ()
 main = do
   -- Clear previous PID file

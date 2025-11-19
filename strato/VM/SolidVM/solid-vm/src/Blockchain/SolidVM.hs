@@ -551,7 +551,7 @@ call' from to' fnCalltype functionName valList = do
   logFunctionCall valList storageAddress contract functionName f
   where
     convertValueToStoragePathPiece :: Value -> Maybe MS.StoragePathPiece
-    convertValueToStoragePathPiece v = 
+    convertValueToStoragePathPiece v =
       case v of
         SInteger i -> Just $ MS.Index $ BC.pack $ show i
         SString s -> Just $ MS.Index $ DT.encodeUtf8 $ T.pack s
@@ -927,8 +927,8 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
           -- pair up field names with values one-by-one (no type checking tho, lol)
           -- let pairs = zip (map (T.unpack . fst) $ CC._eventLogs ev) expStrs
 
-          let evArgs = zipWith (\(CC.EventLog name _ (CC.IndexedType _ idxType)) value -> 
-                        (T.unpack name, value, if isTypeArray idxType then "Array" else "Other")) 
+          let evArgs = zipWith (\(CC.EventLog name _ (CC.IndexedType _ idxType)) value ->
+                        (T.unpack name, value, if isTypeArray idxType then "Array" else "Other"))
                      (CC._eventLogs ev) expStrs
                 where
                   isTypeArray :: SVMType.Type -> Bool
@@ -1857,11 +1857,11 @@ decMod a b = fromRational (toRational a `mod'` toRational b)
   where
     mod' x y = x - (fromIntegral (floor (x / y) :: Integer)) * y
 
-expToVarArith :: MonadSM m => 
-  (Integer -> Integer -> Integer) -> 
-  (Decimal -> Decimal -> Decimal) -> 
-  CC.Expression -> 
-  CC.Expression -> 
+expToVarArith :: MonadSM m =>
+  (Integer -> Integer -> Integer) ->
+  (Decimal -> Decimal -> Decimal) ->
+  CC.Expression ->
+  CC.Expression ->
   m Variable
 expToVarArith intOp decOp expr1 expr2 = do
   i1 <- getVar =<< expToVar expr1
@@ -1881,12 +1881,12 @@ expToVarArith intOp decOp expr1 expr2 = do
           result = (Decimal 0 a) `decOp` b
       return $ Constant $ SDecimal $ roundTo maxDecimalPlaces result
     _ -> typeError "expToVarArith" (i1, i2)
-  
-expToVarDivide :: MonadSM m => 
-  (Integer -> Integer -> Integer) -> 
-  (Decimal -> Decimal -> Decimal) -> 
-  CC.Expression -> 
-  CC.Expression -> 
+
+expToVarDivide :: MonadSM m =>
+  (Integer -> Integer -> Integer) ->
+  (Decimal -> Decimal -> Decimal) ->
+  CC.Expression ->
+  CC.Expression ->
   m Variable
 expToVarDivide intOp decOp expr1 expr2 = do
   i1 <- getVar =<< expToVar expr1
@@ -1913,11 +1913,11 @@ expToVarInteger expr1 o expr2 retType = do
   i2 <- getInt =<< expToVar expr2
   return . Constant . retType $ i1 `o` i2
 
-binopAssign' :: MonadSM m => 
-  (Integer -> Integer -> Integer) -> 
-  (Decimal -> Decimal -> Decimal) -> 
-  CC.Expression -> 
-  CC.Expression -> 
+binopAssign' :: MonadSM m =>
+  (Integer -> Integer -> Integer) ->
+  (Decimal -> Decimal -> Decimal) ->
+  CC.Expression ->
+  CC.Expression ->
   m Variable
 binopAssign' intOp decOp lhs rhs = do
   let readVal e = getVar =<< expToVar e
@@ -1943,10 +1943,10 @@ binopAssign' intOp decOp lhs rhs = do
   return $ Constant next
 
 binopDivide :: MonadSM m =>
-  (Integer -> Integer -> Integer) -> 
-  (Decimal -> Decimal -> Decimal) -> 
-  CC.Expression -> 
-  CC.Expression -> 
+  (Integer -> Integer -> Integer) ->
+  (Decimal -> Decimal -> Decimal) ->
+  CC.Expression ->
+  CC.Expression ->
   m Variable
 binopDivide intOp decOp lhs rhs = do
   let readVal e = getVar =<< expToVar e
@@ -2252,7 +2252,7 @@ runTheConstructors from to hsh cc contractName' argVals' = do
             go ((t,n):tns) (v:vs') = do
               let correctedVal = coerceType contract' t v
               var <- createVar correctedVal
-              ((n,(t,var)):) <$> go tns vs' 
+              ((n,(t,var)):) <$> go tns vs'
         map (fmap snd) <$> go argTypeNames argVals
 
   void . withCallInfo to to contract' "constructor" hsh cc (M.fromList zipped) False False . pushSender from $ do
@@ -2353,7 +2353,7 @@ runTheCall address' codeAddr contract' funcName hsh cc theFunction argVals' ro f
   argVals <- validateFunctionArguments theFunction argVals' >>= \case
     Just (_, av) -> pure av
     Nothing -> typeError
-      "the argument values do not match up with the function signature" 
+      "the argument values do not match up with the function signature"
       (show $ zip argVals' (map (CC.indexedTypeType . snd) (CC._funcArgs theFunction)))
 
   let !args =
@@ -2366,7 +2366,7 @@ runTheCall address' codeAddr contract' funcName hsh cc theFunction argVals' ro f
               go _ [] = []
               go ((n,t):nts) (v:vs') =
                 let v' = coerceType contract' t v
-                 in (n,(t,v')) : go nts vs' 
+                 in (n,(t,v')) : go nts vs'
            in fmap snd <$> go argMeta argVals
   let locals = args ++ returns
   localVars1 <-
@@ -2492,7 +2492,7 @@ encodeForReturn' (STuple items) = do
   encodedItems <- mapM (encodeForReturn' <=< getVar) $ V.toList items
 
   return $ "(" ++ (intercalate "," encodedItems) ++ ")"
-encodeForReturn' (SDecimal d) = return $ show d 
+encodeForReturn' (SDecimal d) = return $ show d
 encodeForReturn' (SStruct _ vs) = do
   let encodePair k v = fmap (\v' -> show (labelToString k) ++ ": " ++ v')
                      . encodeForReturn' =<< getVar v
@@ -2603,7 +2603,7 @@ solidityExceptionHandlerHelperAssert cbm  = do
               return res
 {- BEN WILL REFACTOR THIS SOMEDAY -}
 solidityExceptionHandler :: MonadSM m => (M.Map String (Maybe (String, SVMType.Type), [CC.Statement])) -> SolidException -> m (Maybe Value)
-solidityExceptionHandler catchBlockMap ex = 
+solidityExceptionHandler catchBlockMap ex =
   case ex of
     (InternalError s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 1 internalError
@@ -2648,7 +2648,7 @@ solidityExceptionHandler catchBlockMap ex =
       res <- solidityExceptionHandlerHelperRequire catchBlockMap s1
       return res
     (Assert) -> do
-      res <- solidityExceptionHandlerHelperAssert catchBlockMap 
+      res <- solidityExceptionHandlerHelperAssert catchBlockMap
       return res
     (MissingCodeCollection s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 13 missingCodeCollection
@@ -2710,8 +2710,8 @@ solidityExceptionHandler catchBlockMap ex =
     (CustomError s1 s2 vals) -> do
       let name = T.unpack $ T.replace "\"" "" $ T.pack s2
       case M.lookup name catchBlockMap of
-        Nothing -> solidityExceptionHandlerHelper'' catchBlockMap s1 name vals 34 customError 
-        Just (Nothing, _) -> solidityExceptionHandlerHelper'' catchBlockMap s1 name vals 34 customError 
+        Nothing -> solidityExceptionHandlerHelper'' catchBlockMap s1 name vals 34 customError
+        Just (Nothing, _) -> solidityExceptionHandlerHelper'' catchBlockMap s1 name vals 34 customError
         Just (Just (name', _), block) -> do
           mapM_ (\x -> addLocalVariable name' x) $ map fromBasic vals
           res <- runStatementBlock block
@@ -2978,7 +2978,7 @@ solidVMExceptionHandler catchBlockMap ex =
         Nothing -> solidVMExceptionHelper catchBlockMap $ oldForeignPragmaError s1 s2
         Just (_, block) -> do
           res <- runStatementBlock block
-          return res   
+          return res
     (UserDefinedError s1 s2) -> do
       case M.lookup "UserDefinedError" catchBlockMap of
         Nothing -> solidVMExceptionHelper catchBlockMap $ userDefinedError s1 s2
@@ -2992,7 +2992,7 @@ validateFunctionArguments func argVals = checkFunc $ func : CC._funcOverload fun
   where
     checkFunc [] = pure Nothing
     checkFunc (x:xs) = testMatch x >>= \case
-      Just argVals' -> pure $ Just (x, argVals') 
+      Just argVals' -> pure $ Just (x, argVals')
       Nothing -> checkFunc xs
     argValsLength = length argVals
     testMatch :: MonadSM m => CC.Func -> m (Maybe ValList)
@@ -3004,7 +3004,7 @@ validateFunctionArguments func argVals = checkFunc $ func : CC._funcOverload fun
     testValidVariadic :: CC.Func -> Bool
     testValidVariadic tf =
       case unsnoc (map snd (CC._funcArgs tf)) of
-        Just ([], x) | CC.indexedTypeType x == SVMType.Variadic -> True  
+        Just ([], x) | CC.indexedTypeType x == SVMType.Variadic -> True
         Just (xs, x) | CC.indexedTypeType x == SVMType.Variadic -> argValsLength >= length xs
         _ -> False
     marshalValue :: MonadSM m => (SVMType.Type, Value) -> m (Maybe Value)

@@ -142,12 +142,12 @@ bridgeTabWidget _ = mdo
               res <- try @SomeException $ sendToMultisig addrTxt amt
               cb $ either (Left . show) Right res
             Nothing -> cb $ Left "Invalid amount"
-  
+
         -- Display result
         -- dyn_ =<< holdDyn (text "") (ffor resultEv $ \case
         --   Left err -> elClass "div" "tx-error" $ text $ "Error: " <> T.pack err
         --   Right txid -> elClass "div" "tx-success" $ text $ "Sent! TXID: " <> txid)
-    
+
         pure resultEv
       bridgeOutEv' <- card (constDyn "shadow-lg border-purple-200") $ mdo
         cardHeader (constDyn "bg-gradient-to-r from-purple-500 to-purple-600 text-white") $ do
@@ -215,12 +215,12 @@ bridgeTabWidget _ = mdo
               res <- try @SomeException $ sendToMultisig addrTxt amt
               cb $ either (Left . show) Right res
             Nothing -> cb $ Left "Invalid amount"
-  
+
         -- Display result
         -- dyn_ =<< holdDyn (text "") (ffor resultEv $ \case
         --   Left err -> elClass "div" "tx-error" $ text $ "Error: " <> T.pack err
         --   Right txid -> elClass "div" "tx-success" $ text $ "Sent! TXID: " <> txid)
-    
+
         pure resultEv
       pure (bridgeInEv', bridgeOutEv')
   pure ()

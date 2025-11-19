@@ -15,11 +15,11 @@ deriveFormat :: Name -> Q [Dec]
 deriveFormat typName = do
   (TyConI d) <- reify typName -- Get all the information on the type
   (type_name,_,_,constructors) <- typeInfo (return d) -- extract name and constructors
-  
+
   let getFields c = map show $ catMaybes $ (map fst . snd) c
       getName (Name (OccName theName) _) = theName
-      theFunction' = funD (mkName "format") $ map (\c -> theClause (getName $ fst c) $ getFields c) constructors 
-      
+      theFunction' = funD (mkName "format") $ map (\c -> theClause (getName $ fst c) $ getFields c) constructors
+
   x <-instanceD (cxt []) (appT (conT (mkName "Format")) (conT typName)) [theFunction']
   return [x]
 

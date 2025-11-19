@@ -38,24 +38,24 @@ renderTransaction tx = do
   elClass "div" "transaction" $ do
     -- Transaction hash
     elClass "div" "transaction-hash" $ text (TS.txHash tx)
-    
+
     -- Transaction details
     elClass "div" "transaction-details" $ do
       -- From address
       elClass "div" "transaction-from" $ do
         elClass "span" "label" $ text "From: "
         elClass "span" "address" $ text (TS.txFrom tx)
-      
+
       -- To address
       elClass "div" "transaction-to" $ do
         elClass "span" "label" $ text "To: "
         elClass "span" "address" $ text (TS.txTo tx)
-      
+
       -- Amount
       elClass "div" "transaction-amount" $ do
         elClass "span" "label" $ text "Amount: "
         elClass "span" "amount" $ text $ T.pack $ show (TS.txValue tx)
-      
+
       -- Status
       elClass "div" "transaction-status" $ do
         elClass "span" "label" $ text "Status: "
@@ -74,4 +74,4 @@ statusText :: TS.TransactionStatus -> T.Text
 statusText status = case status of
   TS.TxPending -> "Pending"
   TS.TxSuccess -> "Confirmed"
-  TS.TxFailed -> "Failed" 
+  TS.TxFailed -> "Failed"
