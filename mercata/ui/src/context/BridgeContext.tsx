@@ -206,16 +206,20 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
   }, [fetchBalance]);
 
   const fetchDepositTransactions = useCallback(
-    async (rawParams: Record<string, string | undefined> = {}): Promise<BridgeTransactionResponse> => {
+    async (rawParams: Record<string, string | undefined> = {}, context?: string): Promise<BridgeTransactionResponse> => {
       setLoading(true);
       
       try {
-        const params = new URLSearchParams(
-          Object.fromEntries(
-            Object.entries(rawParams).filter(([_, v]) => v !== undefined)
-          )
+        const paramsObj: Record<string, string> = Object.fromEntries(
+          Object.entries(rawParams).filter(([_, v]) => v !== undefined)
         );
+        
+        // Add 'context' parameter for admin view (only if explicitly provided)
+        if (context === 'admin') {
+          paramsObj.context = 'admin';
+        }
 
+        const params = new URLSearchParams(paramsObj);
         const response = await api.get(`/bridge/transactions/deposit?${params}`);
         const responseData = response.data;
 
@@ -236,16 +240,20 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const fetchWithdrawTransactions = useCallback(
-    async (rawParams: Record<string, string | undefined> = {}): Promise<BridgeTransactionResponse> => {
+    async (rawParams: Record<string, string | undefined> = {}, context?: string): Promise<BridgeTransactionResponse> => {
       setLoading(true);
       
       try {
-        const params = new URLSearchParams(
-          Object.fromEntries(
-            Object.entries(rawParams).filter(([_, v]) => v !== undefined)
-          )
+        const paramsObj: Record<string, string> = Object.fromEntries(
+          Object.entries(rawParams).filter(([_, v]) => v !== undefined)
         );
+        
+        // Add 'context' parameter for admin view (only if explicitly provided)
+        if (context === 'admin') {
+          paramsObj.context = 'admin';
+        }
 
+        const params = new URLSearchParams(paramsObj);
         const response = await api.get(`/bridge/transactions/withdrawal?${params}`);
         const responseData = response.data;
 
