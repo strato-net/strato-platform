@@ -219,7 +219,11 @@ contract record LendingPool is Ownable, Pausable {
         emit Deposited(msg.sender, borrowableAsset, amount);
     }
 
-    //TODO comment
+    /**
+     * @notice Deposit liquidity on another's behalf
+     * @param user The user for whom to deposit; will receive the mTokens
+     * @param amount The amount of the underlying asset to deposit
+     */
     function depositLiquidityOnBehalfOf(address user, uint amount) external onlyTokenFactory(borrowableAsset) {
         require(amount > 0, "Invalid amount");
         require(mToken != address(0), "mToken not set");

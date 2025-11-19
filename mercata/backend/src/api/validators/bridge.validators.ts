@@ -1,5 +1,5 @@
 import Joi from "@hapi/joi";
-import { validateAddressField, numericStringField } from "./common.validators";
+import { validateAddressField, numericStringField, validateHashField } from "./common.validators";
 
 export function validateRequestWithdrawal(args: any) {
   if (!args || typeof args !== "object") {
@@ -58,8 +58,39 @@ export function validateAutoSave(args: any) {
     throw new Error("RequestAutoSave Argument Validation Error");
   }
 
-  // TODO improve validation
+  // Step 1: Basic presence and types
+  const baseSchema = Joi.object({
+    externalChainId: Joi.string().required(),
+    externalTxHash: Joi.string().required(),
+  }).strict();
 
+  const { error: baseError } = baseSchema.validate(args);
+  if (baseError) {
+    throw new Error("RequestWithdrawal Argument Validation Error: " + baseError.message);
+  }
+
+  // Step 2: Format and logic checks
+  const finalSchema = Joi.object({
+    externalChainId: Joi.string()
+      .required()
+      .custom((value, helpers) => {
+        const chainId = parseInt(value);
+        if (isNaN(chainId) || chainId <= 0) {
+          return helpers.error("any.invalid");
+        }
+        return value;
+      }, "Chain ID validation")
+      .messages({
+        "any.invalid": "externalChainId must be a positive integer.",
+        "any.required": "externalChainId is required.",
+      }),
+    externalTxHash: validateHashField("externalTxHash"),
+  }).strict();
+
+  const { error } = finalSchema.validate(args);
+  if (error) {
+    throw new Error("RequestWithdrawal Argument Validation Error: " + error.message);
+  }
 }
 
 export function validateTransactionType(type: string): 'withdrawal' | 'deposit' {
