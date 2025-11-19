@@ -7,6 +7,8 @@ import AssetsList from "../components/dashboard/AssetsList";
 import DashboardFAQ from "../components/dashboard/DashboardFAQ";
 import BorrowingSection from "../components/dashboard/BorrowingSection";
 import { Wallet, Coins, Shield, Banknote, Loader2 } from "lucide-react";
+import Icon1 from "@/assets/home/icon1.png";
+import Icon2 from "@/assets/home/icon2.png";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useUser } from "@/context/UserContext";
 import { useLendingMetrics } from "@/hooks/useLendingMetrics";
@@ -145,6 +147,51 @@ const Dashboard = () => {
         />
 
         <main className="p-6">
+          {/* Promotional Cards */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            {/* Save Card */}
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-6 shadow-sm border border-blue-200">
+              <div className="flex items-start gap-4 mb-6">
+                <div className="flex-shrink-0">
+                  <img src={Icon1} alt="Save" className="w-16 h-16" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-2xl font-bold text-blue-700 mb-2">
+                    Save 6% APY with Confidence
+                  </h3>
+                  <p className="text-gray-600">
+                    Safe and Secure Savings
+                  </p>
+                </div>
+              </div>
+              <button className="w-full bg-yellow-500 hover:bg-yellow-600 text-blue-700 font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-2">
+                START SAVING
+                <span>→</span>
+              </button>
+            </div>
+
+            {/* Borrow Card */}
+            <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-2xl p-6 shadow-sm border border-red-200">
+              <div className="flex items-start gap-4 mb-6">
+                <div className="flex-shrink-0">
+                  <img src={Icon2} alt="Borrow" className="w-16 h-16" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-2xl font-bold text-red-700 mb-2">
+                    Borrow 80% Against Your Assets
+                  </h3>
+                  <p className="text-gray-600">
+                    Advanced Strategies for higher returns
+                  </p>
+                </div>
+              </div>
+              <button className="w-full bg-yellow-500 hover:bg-yellow-600 text-red-700 font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-2">
+                START BORROWING
+                <span>→</span>
+              </button>
+            </div>
+          </div>
+
           <div className={`grid grid-cols-1 ${rewardsEnabled ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-6 mb-8`}>
             <AssetSummary
               title="Net Balance"
