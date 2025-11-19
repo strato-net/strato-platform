@@ -168,41 +168,9 @@ export function getChainName(chainId: number | string): string {
 }
 
 /**
- * Bridge status map for UI display
- */
-export const BRIDGE_STATUS_MAP: Record<string, { label: string; color: string }> = {
-  '0': { label: 'None', color: 'bg-gray-500' },
-  '1': { label: 'Initiated', color: 'bg-blue-500' },
-  '2': { label: 'Pending Review', color: 'bg-yellow-500' },
-  '3': { label: 'Completed', color: 'bg-green-500' },
-  '4': { label: 'Aborted', color: 'bg-red-500' },
-};
-
-/**
  * Bridge status options for filter dropdowns
  */
 export const BRIDGE_STATUS_OPTIONS = [
-  { value: null, label: "All Statuses" },
-  { value: 1, label: "Initiated" },
-  { value: 2, label: "Pending Review" },
-  { value: 3, label: "Completed" },
-  { value: 4, label: "Aborted" },
-];
-
-/**
- * Deposit status options for filter dropdowns (excludes Aborted)
- */
-export const DEPOSIT_STATUS_OPTIONS = [
-  { value: null, label: "All Statuses" },
-  { value: 1, label: "Initiated" },
-  { value: 2, label: "Pending Review" },
-  { value: 3, label: "Completed" },
-];
-
-/**
- * Withdrawal status options for filter dropdowns (includes all statuses)
- */
-export const WITHDRAWAL_STATUS_OPTIONS = [
   { value: null, label: "All Statuses" },
   { value: 1, label: "Initiated" },
   { value: 2, label: "Pending Review" },

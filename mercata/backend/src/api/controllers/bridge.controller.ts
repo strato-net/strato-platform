@@ -98,17 +98,12 @@ class BridgeController {
       const { type } = req.params;
       const rawQueryParams = validateRawParams(req.query);
       
-      // Extract 'context' parameter for admin view control, exclude it from query params
       const { context, ...queryParams } = rawQueryParams;
       
       const validatedType = validateTransactionType(type);
       
-      // Check if user is admin using existing admin verification logic
       const isAdmin = await isUserAdmin(accessToken, userAddress);
       
-      // Only show all transactions if:
-      // 1. Context is explicitly 'admin' (from admin dashboard)
-      // 2. AND user is actually an admin (verified)
       const addressToUse = (context === 'admin' && isAdmin) ? undefined : userAddress;
       
       const result: BridgeTransactionResponse = await getBridgeTransactions(accessToken, validatedType, addressToUse, queryParams);
