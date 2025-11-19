@@ -1063,6 +1063,16 @@ export const getAssetConfig = async (
   const config = configEntry.CollateralConfig;
   const tokenInfo = await getTokenInfo(accessToken, asset);
   
+  // Check isSupportedAsset mapping - if asset is not in the mapping, it's disabled (false)
+  // The Cirrus query returns entries with 'key' field (asset address) and 'value' field (boolean)
+  const supportedAssetEntry = registry.cdpEngine.isSupportedAsset?.find(
+    (entry: any) => {
+      const entryKey = entry.key || entry.asset;
+      return entryKey?.toLowerCase() === asset.toLowerCase();
+    }
+  );
+  const isSupported = supportedAssetEntry?.value === true;
+  
   return {
     asset,
     symbol: tokenInfo.symbol,
@@ -1075,7 +1085,7 @@ export const getAssetConfig = async (
     debtCeiling: config.debtCeiling,
     unitScale: config.unitScale,
     isPaused: config.isPaused,
-    isSupported: true,
+    isSupported,
   };
 };
 
@@ -1287,6 +1297,33 @@ export const setGlobalPaused = async (
     method: "setPausedGlobal",
     args: {
       isPaused: body.isPaused,
+    },
+  };
+
+  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
+  );
+};
+
+export const setAssetSupported = async (
+  accessToken: string,
+  userAddress: string,
+  body: { asset: string; supported: boolean }
+): Promise<{ status: string; hash: string }> => {
+  const registry = await getCDPRegistry(accessToken, userAddress, {}, "setAssetSupported");
+  
+  if (!registry?.cdpEngine) {
+    throw new Error("CDP Engine not found");
+  }
+
+  const tx: FunctionInput = {
+    contractName: extractContractName(CDPEngine),
+    contractAddress: registry.cdpEngine.address,
+    method: "setSupportedAsset",
+    args: {
+      asset: body.asset,
+      supported: body.supported,
     },
   };
 
