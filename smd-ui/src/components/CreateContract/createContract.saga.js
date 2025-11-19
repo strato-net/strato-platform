@@ -24,7 +24,9 @@ const blocCompileUrl = env.BLOC_URL + "/contracts/compile";
 
 export function createContractApiCall(contract, src, username, address, password, args, chainid, metadata, useWallet) {
   const isOauth = isOauthEnabled();
-  const options = isOauth ? { query: { resolve: true, chainid, use_wallet: useWallet } } : { params: { username, address }, query: { resolve: true, chainid } };
+  const walletUsername = useWallet ? username : '';
+  const options = isOauth ? { query: { resolve: true, chainid, username: walletUsername } }
+    : { params: { username, address }, query: { resolve: true, chainid, username: walletUsername } };
   const prefix = isOauth ? env.STRATO_URL_V23 : env.BLOC_URL;
   const url = prefix + createUrl(isOauth ? "/transaction" : "/users/::username/::address/contract", options);
 

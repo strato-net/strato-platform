@@ -44,6 +44,9 @@ services:
       - mercata-backend
     build: ./mercata/ui
     image: ${MERCATAUI_IMAGE:-<REPO_URL>mercata-ui:<VERSION>}
+    environment:
+      - LUCKY_ORANGE_SITE_ID=${LUCKY_ORANGE_SITE_ID}
+      - GOOGLE_ANALYTICS_ID=${GOOGLE_ANALYTICS_ID}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -128,7 +131,6 @@ services:
     - FULL_DEBUG_LOG=${FULL_DEBUG_LOG:-false}
     - gasLimit=${gasLimit}
     - generateKey=${generateKey:-true}
-    # - idServerUrl=${idServerUrl}
     - INSTRUMENTATION=${INSTRUMENTATION:-false}
     - kafkaHost=kafka
     - kafkaPort=9092
@@ -173,11 +175,7 @@ services:
     - svmDev=${svmDev}
     - test_mode_bypass_blockstanbul=${test_mode_bypass_blockstanbul:-false} \
     - txSizeLimit=${txSizeLimit}
-    - userRegistryAddress=${userRegistryAddress}
-    - userRegistryCodeHash=${userRegistryCodeHash}
-    - useBuiltinUserRegistry=${useBuiltinUserRegistry}
     - useCustomGenesis=${useCustomGenesis}
-    - useWalletsByDefault=${useWalletsByDefault}
     - VAULT_URL=${VAULT_URL}
     - VAULT_PROXY_DEBUG=${VAULT_PROXY_DEBUG}
     - VM_DEBUGGER=${VM_DEBUGGER}

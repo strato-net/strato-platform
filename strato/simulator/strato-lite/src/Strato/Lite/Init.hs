@@ -16,7 +16,6 @@ where
 import Bloc.Monad
 import BlockApps.Logging
 import Blockchain.Strato.Discovery.Data.Peer
-import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Host
 import Blockchain.Strato.Model.Secp256k1
 import Control.Monad.IO.Class
@@ -47,9 +46,6 @@ runStratoLite nodes' = do
             gasLimit = 10000000,
             stateFetchLimit = stateFetchLimit',
             globalNonceCounter = nonceCache,
-            userRegistryAddress = Address 0x100,
-            userRegistryCodeHash = Nothing,
-            useWalletsByDefault = False,
             nodePubKey = derivePublicKey $ privKeys !! 0
           }
 

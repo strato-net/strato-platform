@@ -58,7 +58,7 @@ transactionType (BlocFunction _) = FUNCTION
 type PostBlocTransactionParallel = 
   "transaction"
     :> "parallel"
-    :> QueryParam "use_wallet" Bool -- Using QueryParam here to distinguish between Nothing and Just False
+    :> QueryParam "username" String
     :> QueryFlag "resolve"
     :> ReqBody '[JSON] PostBlocTransactionRequest
     :> Post '[JSON] [BlocTransactionResult]
@@ -67,7 +67,7 @@ type PostBlocTransactionParallelExternal = S.Header "Authorization" Text :> Post
 
 type PostBlocTransaction =
   "transaction"
-    :> QueryParam "use_wallet" Bool -- Using QueryParam here to distinguish between Nothing and Just False
+    :> QueryParam "username" String
     :> QueryFlag "resolve"
     :> ReqBody '[JSON] PostBlocTransactionRequest
     :> Post '[JSON] [BlocTransactionResult]

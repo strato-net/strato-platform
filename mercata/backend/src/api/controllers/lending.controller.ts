@@ -395,6 +395,7 @@ class LendingController {
       return next(error);
     }
   }
+
 }
 
 export default LendingController;

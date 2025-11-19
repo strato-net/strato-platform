@@ -6,7 +6,6 @@
 module Strato.Lite.Base where
 
 import BlockApps.Logging
-import BlockApps.X509.Certificate as X509
 import Blockchain.Context
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
@@ -22,7 +21,6 @@ import Blockchain.Slipstream.OutputData
 import Blockchain.Strato.Discovery.ContextLite (MonadDiscovery)
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Indexer.IContext (API (..), P2P (..))
-import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Host
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
@@ -52,7 +50,6 @@ type MonadBase m = ( MonadFail m
                    , RunsServer m
                    , MonadDiscovery m
                    , (Keccak256 `A.Alters` DBDB.DependentBlockEntry) m
-                   , (Address `A.Alters` X509CertInfoState) m
                    , (Keccak256 `A.Alters` OutputBlock) m
                    -- , (Keccak256 `A.Alters` BlockHeader) m
                    , A.Selectable (Host, UDPPort, BC.ByteString) Point m

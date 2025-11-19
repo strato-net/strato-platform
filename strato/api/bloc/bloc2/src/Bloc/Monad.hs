@@ -29,7 +29,6 @@ where
 
 import BlockApps.Logging
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Nonce
 import Control.Monad.Change.Modify hiding (modify)
 import Control.Monad.Composable.Vault hiding (httpManager)
@@ -55,9 +54,6 @@ data BlocEnv = BlocEnv
     txSizeLimit :: Int,
     gasLimit :: Integer,
     globalNonceCounter :: Cache Address Nonce,
-    userRegistryAddress :: Address,
-    userRegistryCodeHash :: Maybe Keccak256,
-    useWalletsByDefault :: Bool,
     nodePubKey :: V.PublicKey
   }
 

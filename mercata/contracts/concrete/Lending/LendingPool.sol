@@ -977,11 +977,14 @@ contract record LendingPool is Ownable, Pausable {
         uint toSafety = (toSend * safetyShareBps) / 10000;
         uint toTreas  = toSend - toSafety;
 
-        // Pay SM directly from LiquidityPool
+        // Pay SM directly from LiquidityPool and update its managed assets
         if (toSafety > 0 && address(safetyModule) != address(0)) {
+            uint256 smBalBefore = IERC20(borrowableAsset).balanceOf(address(safetyModule));
+            
             LiquidityPool(_liquidityPool()).transferReserve(toSafety, address(safetyModule));
-            // Optional: if you want a log inside SM, you could later have governance call SM.notifyReward(toSafety).
-            // Not required for accounting; SM.totalAssets() reads its balance directly.
+            
+            // Update SafetyModule's internal state by passing balanceBefore for validation
+            safetyModule.recordTransfer(toSafety, smBalBefore);
         }
 
         // Pay treasury/feeCollector as usual

@@ -6,6 +6,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 module Blockchain.Init.Generator (
+  createGenesisInfo,
   mkAll
   ) where
 

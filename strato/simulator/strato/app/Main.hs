@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE CPP #-}
 
 import Blockchain.Blockstanbul.Options ()
 import Blockchain.Options ()
@@ -7,7 +8,13 @@ import Blockchain.VMOptions ()
 import Executable.EVMFlags ()
 import HFlags
 import Language.Javascript.JSaddle.Monad (JSM)
+
+#ifdef darwin
 import qualified Language.Javascript.JSaddle.WKWebView as Native
+#else
+import qualified Language.Javascript.JSaddle.WebKitGTK as Native
+#endif
+
 import qualified Language.Javascript.JSaddle.Warp as Browser
 import Strato.Options (flags_frontend_port, flags_gui)
 import Strato.Run (runStrato)
