@@ -3,15 +3,18 @@
 # Usage:
 #   ./delete_trailing_whitespaces.sh [-v] [TARGET_DIR]
 #   ./delete_trailing_whitespaces.sh --staged [-v]
+#   ./delete_trailing_whitespaces.sh --check [-v] [TARGET_DIR]
 # Description:
 #   Removes trailing whitespace from *.hs, *.js, *.txt files.
 #   If --staged is provided, only staged files are processed (for use in pre-commit hooks).
+#   If --check is provided, exits with status 1 if any files were modified (for CI checks).
 #   If -v is provided, verbose output is shown.
 
 set -euo pipefail
 
 VERBOSE=0
 STAGED_MODE=0
+CHECK_MODE=0
 TARGET_DIR="."
 
 
@@ -44,6 +47,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --staged)
       STAGED_MODE=1
+      shift
+      ;;
+    --check)
+      CHECK_MODE=1
       shift
       ;;
     *)
@@ -97,3 +104,12 @@ else
 fi
 
 vlog "Done."
+
+# Check if --check flag is set and if any files were modified
+if [[ "$CHECK_MODE" -eq 1 ]]; then
+  if ! git diff --exit-code > /dev/null 2>&1; then
+    echo "Error: Trailing whitespace was found and removed. Please commit the changes." >&2
+    exit 1
+  fi
+  vlog "No trailing whitespace found."
+fi
