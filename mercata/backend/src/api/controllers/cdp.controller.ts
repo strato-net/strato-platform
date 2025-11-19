@@ -17,6 +17,7 @@ import {
   getMaxLiquidatable,
   getAssetConfig,
   getSupportedAssets,
+  getAllCollateralAssets,
   getAssetDebtInfo,
   setCollateralConfig,
   setAssetPaused,
@@ -268,14 +269,20 @@ class CDPController {
     }
   }
 
-  static async getSupportedAssets(
+  static async getAssets(
     req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, address: userAddress } = req;
-      const assets = await getSupportedAssets(accessToken, userAddress as string);
+      const { accessToken, address: userAddress, query } = req;
+      // Check for optional 'supported' query parameter
+      // If true, return only supported assets. If false or omitted, return all assets.
+      const supportedOnly = query.supported === 'true' || query.supported === true;
+      
+      const assets = supportedOnly
+        ? await getSupportedAssets(accessToken, userAddress as string)
+        : await getAllCollateralAssets(accessToken, userAddress as string);
       res.status(RestStatus.OK).json(assets);
     } catch (error) {
       next(error);

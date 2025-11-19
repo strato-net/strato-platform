@@ -1089,11 +1089,12 @@ export const getAssetConfig = async (
   };
 };
 
-export const getSupportedAssets = async (
+// Get all collateral assets (regardless of support status) - used by admin
+export const getAllCollateralAssets = async (
   accessToken: string,
   userAddress: string
 ): Promise<AssetConfig[]> => {
-  const registry = await getCDPRegistry(accessToken, userAddress, {}, "getSupportedAssets");
+  const registry = await getCDPRegistry(accessToken, userAddress, {}, "getAllCollateralAssets");
   
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
@@ -1118,6 +1119,18 @@ export const getSupportedAssets = async (
   
   const configs = await Promise.all(configPromises);
   return configs.filter((config: AssetConfig | null): config is AssetConfig => config !== null);
+};
+
+// Get only supported collateral assets (isSupported === true) - used by user-facing components
+export const getSupportedAssets = async (
+  accessToken: string,
+  userAddress: string
+): Promise<AssetConfig[]> => {
+  // Get all collateral assets first
+  const allAssets = await getAllCollateralAssets(accessToken, userAddress);
+  
+  // Filter to only return assets that are actually supported (isSupported === true)
+  return allAssets.filter((config: AssetConfig) => config.isSupported === true);
 };
 
 export const getMaxLiquidatable = async (
@@ -1350,8 +1363,8 @@ export const getAllCollateralConfigs = async (
   accessToken: string,
   userAddress: string
 ): Promise<AssetConfig[]> => {
-  // This is the same as getSupportedAssets but with a different name for clarity
-  return getSupportedAssets(accessToken, userAddress);
+  // Return all collateral assets (regardless of support status) for admin view
+  return getAllCollateralAssets(accessToken, userAddress);
 };
 
 export const getBadDebt = async (
