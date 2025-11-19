@@ -2,16 +2,23 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { PollingConfig, PollingReturn, PoolPollingConfig } from "@/interface";
 
 export const useSmartPolling = (config: PollingConfig): PollingReturn => {
-  const { fetchFn, shouldPoll = () => true, onDataUpdate, interval = 10000, autoStart = false, transformData, onError, enabled = true } = config;
+  const { fetchFn, shouldPoll = () => true, onDataUpdate, interval = 10000, autoStart = false, transformData, onError, enabled = true, onVisibilityChange } = config;
   const [isPolling, setIsPolling] = useState(false);
   const [lastData, setLastData] = useState<any>(null);
   const [error, setError] = useState<any>(null);
   const intervalRef = useRef<NodeJS.Timeout>();
   const abortRef = useRef<AbortController>();
   const isMountedRef = useRef(true);
-  const configRef = useRef({ fetchFn, transformData, onDataUpdate, onError, enabled });
+  const visibilityTimeoutRef = useRef<NodeJS.Timeout>();
+  const isPollingRef = useRef(false);
+  const configRef = useRef({ fetchFn, transformData, onDataUpdate, onError, enabled, shouldPoll, onVisibilityChange });
 
-  useEffect(() => { configRef.current = { fetchFn, transformData, onDataUpdate, onError, enabled }; });
+  useEffect(() => {
+    configRef.current = { fetchFn, transformData, onDataUpdate, onError, enabled, shouldPoll, onVisibilityChange };
+  });
+  useEffect(() => {
+    isPollingRef.current = isPolling;
+  }, [isPolling]);
 
   const fetchData = useCallback(async () => {
     const { fetchFn, transformData, onDataUpdate, onError, enabled } = configRef.current;
@@ -36,21 +43,64 @@ export const useSmartPolling = (config: PollingConfig): PollingReturn => {
   }, []);
 
   const startPolling = useCallback(() => {
-    if (!configRef.current.enabled || isPolling) return;
+    if (!configRef.current.enabled || isPollingRef.current) return;
     setIsPolling(true);
     fetchData();
     intervalRef.current = setInterval(fetchData, interval);
-  }, [isPolling, fetchData, interval]);
+  }, [fetchData, interval]);
 
   const stopPolling = useCallback(() => {
-    if (!isPolling) return;
+    if (!isPollingRef.current) return;
     setIsPolling(false);
     if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = undefined; }
     if (abortRef.current) { abortRef.current.abort(); abortRef.current = undefined; }
-  }, [isPolling]);
+  }, []);
 
-  useEffect(() => { if (autoStart && enabled && !isPolling) startPolling(); }, [autoStart, enabled]);
-  useEffect(() => { isMountedRef.current = true; return () => { isMountedRef.current = false; stopPolling(); }; }, []);
+  const resumePolling = useCallback(() => {
+    const { enabled, shouldPoll } = configRef.current;
+    if (enabled && (!shouldPoll || shouldPoll("")) && !isPollingRef.current) {
+      fetchData();
+      setIsPolling(true);
+      intervalRef.current = setInterval(fetchData, interval);
+    }
+  }, [fetchData, interval]);
+
+  // Visibility-aware polling: pause when hidden, resume and refresh when visible
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      const isHidden = document.hidden;
+      configRef.current.onVisibilityChange?.(!isHidden);
+      
+      if (isHidden) {
+        if (isPollingRef.current && intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = undefined;
+          setIsPolling(false);
+        }
+      } else {
+        if (visibilityTimeoutRef.current) clearTimeout(visibilityTimeoutRef.current);
+        visibilityTimeoutRef.current = setTimeout(resumePolling, 200);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (visibilityTimeoutRef.current) clearTimeout(visibilityTimeoutRef.current);
+    };
+  }, [resumePolling]);
+
+  useEffect(() => {
+    if (autoStart && enabled && !isPolling) startPolling();
+  }, [autoStart, enabled, isPolling, startPolling]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      stopPolling();
+    };
+  }, [stopPolling]);
 
   return { startPolling, stopPolling, isPolling, fetchData, lastData, error };
 };
@@ -62,7 +112,7 @@ export const useBalancePolling = (userAddress: string, fetchBalance: (address: s
 // Optimized focused hooks
 
 // Hook for managing pool data fetching and state
-export const usePoolPolling = ({ fromAsset, toAsset, getPoolByTokenPair, fetchUsdstBalance, userAddress, interval = 10000 }: PoolPollingConfig) =>
+export const usePoolPolling = ({ fromAsset, toAsset, getPoolByTokenPair, fetchUsdstBalance, userAddress, interval = 10000, onVisibilityChange }: PoolPollingConfig) =>
   useSmartPolling({
     fetchFn: async () => {
       if (!fromAsset?.address || !toAsset?.address) return null;
@@ -75,5 +125,6 @@ export const usePoolPolling = ({ fromAsset, toAsset, getPoolByTokenPair, fetchUs
     },
     shouldPoll: () => !!(fromAsset?.address && toAsset?.address),
     interval,
-    onError: (error) => console.error("Pool polling error:", error)
+    onError: (error) => console.error("Pool polling error:", error),
+    onVisibilityChange
   });

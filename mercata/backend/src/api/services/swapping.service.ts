@@ -73,6 +73,8 @@ export const getPools = async (
     select: "asset:key,price:value::text",
     key: `in.(${tokenAddresses.join(',')})`
   });
+
+
   const volumeMap = await getTradingVolume24hForPools(accessToken, validatedPools.map(pool => pool.address), priceMap);
 
   // Fetch staked balances from RewardsChef if userAddress is provided

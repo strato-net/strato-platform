@@ -37,6 +37,9 @@ export interface SwapContextState {
   fromAsset: SwapToken | undefined;
   toAsset: SwapToken | undefined;
   pool: Pool | null;
+  lastPoolFetchTime: number;
+  isRefreshingAfterVisibility: boolean;
+  pollCountAfterVisibility: number;
   
   // Swap history
   swapHistory: SwapHistoryEntry[];
@@ -51,6 +54,8 @@ export interface SwapContextActions {
   setFromAsset: (asset: SwapToken | undefined) => void;
   setToAsset: (asset: SwapToken | undefined) => void;
   setPool: (pool: Pool | null) => void;
+  setIsRefreshingAfterVisibility: (value: boolean) => void;
+  setPollCountAfterVisibility: (value: number | ((prev: number) => number)) => void;
   
   // Token fetching
   refetchSwappableTokens: () => void;

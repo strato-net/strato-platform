@@ -345,6 +345,7 @@ export interface PollingConfig {
   transformData?: (data: any) => any;
   onError?: (error: any) => void;
   enabled?: boolean;
+  onVisibilityChange?: (isVisible: boolean) => void;
 }
 
 export interface PollingReturn {
@@ -363,6 +364,7 @@ export interface PoolPollingConfig {
   fetchUsdstBalance: (userAddress: string) => Promise<void>;
   userAddress: string;
   interval?: number;
+  onVisibilityChange?: (isVisible: boolean) => void;
 }
 
 export interface SafetyModuleData {
