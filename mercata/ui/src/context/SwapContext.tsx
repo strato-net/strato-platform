@@ -60,7 +60,6 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [pool?.address]);
 
-
   // Cleanup on unmount
   useEffect(() => {
     return () => {
