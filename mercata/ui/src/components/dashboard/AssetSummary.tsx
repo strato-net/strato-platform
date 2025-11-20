@@ -8,9 +8,10 @@ interface AssetSummaryProps {
   color: string;
   tooltip?: string;
   onClick?: () => void;
+  isLoading?: boolean;
 }
 
-const AssetSummary = ({ title, value, icon, color, tooltip, onClick }: AssetSummaryProps) => {
+const AssetSummary = ({ title, value, icon, color, tooltip, onClick, isLoading }: AssetSummaryProps) => {
   return (
     <div className="bg-white rounded-xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition-shadow">
       <div className="flex justify-between items-start">
@@ -28,7 +29,13 @@ const AssetSummary = ({ title, value, icon, color, tooltip, onClick }: AssetSumm
               </Tooltip>
             )}
           </div>
-          <h3 className="text-2xl font-bold mt-1">{value}</h3>
+          {isLoading ? (
+            <div className="flex items-center gap-2 mt-1">
+              <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
+            </div>
+          ) : (
+            <h3 className="text-2xl font-bold mt-1">{value}</h3>
+          )}
         </div>
 
         <div

@@ -51,7 +51,7 @@ const Dashboard = () => {
   );
 
   // Use centralized net balance calculation hook
-  const { netBalance: totalBalance, cataBalance, totalBorrowed } = useNetBalance({
+  const { netBalance: totalBalance, cataBalance, totalBorrowed, isLoading: isNetBalanceLoading } = useNetBalance({
     tokens,
     cataToken,
     loans,
@@ -151,6 +151,7 @@ const Dashboard = () => {
               value={`$${totalBalance.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`}
               icon={<Wallet className="text-white" size={18} />}
               color="bg-blue-500"
+              isLoading={isNetBalanceLoading}
             />
 
             <AssetSummary

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { formatUnits } from 'viem';
 import { Token } from '@/interface';
 
@@ -15,6 +15,7 @@ interface NetBalanceResult {
   netBalance: number;
   cataBalance: number;
   totalBorrowed: number;
+  isLoading: boolean;
 }
 
 export const useNetBalance = ({
@@ -28,18 +29,53 @@ export const useNetBalance = ({
   const [result, setResult] = useState<NetBalanceResult>({
     netBalance: 0,
     cataBalance: 0,
-    totalBorrowed: 0
+    totalBorrowed: 0,
+    isLoading: true
   });
 
-  useEffect(() => {
-    const hasTokens = tokens && tokens.length > 0;
-    const hasCata = !!cataToken;
-    const hasLendingPool = !!(liquidityInfo?.withdrawable as any)?.withdrawValue;
-    const hasSafety = !!(safetyInfo?.userShares && safetyInfo?.exchangeRate);
+  // Track if we've ever seen tokens with data to distinguish between "loading" vs "genuinely empty"
+  const hasSeenTokensWithData = useRef(false);
+  const calculationAttempted = useRef(false);
 
-    if (!hasTokens && !hasCata && !hasLendingPool && !hasSafety) {
+  useEffect(() => {
+    // Check if all critical data sources are loaded (not undefined)
+    // tokens should be an array (even if empty []), loans, liquidityInfo, and totalCDPDebt should be defined
+    const isTokensLoaded = Array.isArray(tokens);
+    const isLoansLoaded = loans !== undefined;
+    const isLiquidityInfoLoaded = liquidityInfo !== undefined;
+    const isTotalCDPDebtLoaded = totalCDPDebt !== undefined;
+    // Note: safetyInfo is optional, so we don't require it to be loaded
+
+    // Track if we've seen tokens with data (to distinguish "loading" vs "genuinely empty")
+    if (tokens?.length > 0) {
+      hasSeenTokensWithData.current = true;
+    }
+
+    // Check if we have any debt (lending pool or CDP)
+    const hasLendingPoolDebt = loans?.totalAmountOwed && BigInt(loans.totalAmountOwed) > 1n;
+    const hasCDPDebt = totalCDPDebt && BigInt(totalCDPDebt) > 1n;
+    const hasAnyDebt = hasLendingPoolDebt || hasCDPDebt;
+
+    // If tokens array is empty but we have debt, it might be still loading
+    // However, if we've already calculated before OR we've seen tokens with data before,
+    // then tokens being empty is likely genuine (user has no tokens)
+    const tokensIsEmpty = !tokens || tokens.length === 0;
+    const shouldWaitForTokens = tokensIsEmpty && hasAnyDebt && !hasSeenTokensWithData.current && !calculationAttempted.current;
+
+    const allDataLoaded = isTokensLoaded && isLoansLoaded && isLiquidityInfoLoaded && isTotalCDPDebtLoaded;
+
+    // If data is still loading OR we should wait for tokens, show loading state
+    if (!allDataLoaded || shouldWaitForTokens) {
+      setResult({
+        netBalance: 0,
+        cataBalance: 0,
+        totalBorrowed: 0,
+        isLoading: true
+      });
       return;
     }
+
+    calculationAttempted.current = true;
 
     let total = 0;
     let cataTotal = 0;
@@ -126,7 +162,8 @@ export const useNetBalance = ({
     setResult({
       netBalance,
       cataBalance: cataTotal,
-      totalBorrowed: totalDebt
+      totalBorrowed: totalDebt,
+      isLoading: false
     });
 
   }, [tokens, cataToken, loans, liquidityInfo, totalCDPDebt, safetyInfo]);
