@@ -507,6 +507,10 @@ const MintWidget: React.FC = () => {
           <span>Outcome</span>
           <span className="font-medium">{amount || "0.00"} USDST deposited {autoDeposit ? "and lent" : ""}</span>
         </div>
+        <div className="flex items-center justify-between text-gray-600 text-sm">
+          <span>Current Saving Rate</span>
+          <span className="font-medium text-green-600">{apr ? `${apr}%` : "N/A"}</span>
+        </div>
       </div>
 
 
@@ -517,7 +521,7 @@ const MintWidget: React.FC = () => {
           disabled={isLoading || !selectedMintToken || !amount || !isConnected || !isCorrectNetwork}
           className="bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
         >
-          {isLoading ? "Processing..." : "Get USDST"}
+          {isLoading ? "Processing..." : "Deposit + Get USDST"}
         </Button>
       </div>
 
