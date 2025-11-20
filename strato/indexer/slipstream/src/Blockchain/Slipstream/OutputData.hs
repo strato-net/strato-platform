@@ -185,7 +185,7 @@ slipstreamQueryText sqlTypeText CreateTable{..} = T.concat $
         ]
   , ");"
   ] ++ (case tableName of
-    HistoryTableName c n ->
+    HistoryTableName c n@"storage" ->
       let normalTableName = indexTableName c n
           triggerFunctionName = "\"" <> "insert_or_update_" <> tableNameToText normalTableName <> "_history_table" <> "\""
        in [ "\n\n",
@@ -193,16 +193,70 @@ slipstreamQueryText sqlTypeText CreateTable{..} = T.concat $
             "CREATE OR REPLACE FUNCTION ", triggerFunctionName, "() RETURNS TRIGGER AS $$\n",
             "BEGIN\n",
             "    RAISE NOTICE 'Trigger fired for % on table ", tableNameToText normalTableName, ": %', TG_OP, NEW.address;\n",
+            "  UPDATE ",
+            tableNameToDoubleQuoteText tableName <> " h\n",
+            "  SET valid_to = CAST(NEW.block_timestamp AS timestamp)\n",
+            "  WHERE h.address = NEW.address\n",
+            "    AND h.valid_to = 'infinity'::timestamp;\n",
             "    IF TG_OP = 'INSERT' THEN\n",
             "        RAISE NOTICE 'Inserting into history table ", tableNameToText tableName, " for address: %', NEW.address;\n",
             "        INSERT INTO ",
             tableNameToDoubleQuoteText tableName,
-            " VALUES (NEW.*);\n",
+            "  SELECT NEW.*,\n",
+            "         CAST(NEW.block_timestamp AS timestamp),\n",
+            "         'infinity'::timestamp;\n",
             "    ELSIF TG_OP = 'UPDATE' THEN\n",
             "        RAISE NOTICE 'Updating history table ", tableNameToText tableName, " for address: %', NEW.address;\n",
             "        INSERT INTO ",
             tableNameToDoubleQuoteText tableName,
-            " VALUES (NEW.*);\n",
+            "  SELECT NEW.*,\n",
+            "         CAST(NEW.block_timestamp AS timestamp),\n",
+            "         'infinity'::timestamp;\n",
+            "    END IF;\n",
+            "    RETURN NEW;\n",
+            "END;\n",
+            "$$ LANGUAGE plpgsql;\n\n",
+            -- Create trigger for insert operations
+            "CREATE OR REPLACE TRIGGER \"after_insert_on_",
+            tableNameToText normalTableName, "\"",
+            "\nAFTER INSERT ON ",
+            tableNameToDoubleQuoteText normalTableName,
+            "\nFOR EACH ROW EXECUTE PROCEDURE ", triggerFunctionName, "();\n\n",
+            -- Create trigger for update operations
+            "CREATE OR REPLACE TRIGGER \"after_update_on_",
+            tableNameToText normalTableName, "\"",
+            "\nAFTER UPDATE ON ",
+            tableNameToDoubleQuoteText normalTableName,
+            "\nFOR EACH ROW EXECUTE PROCEDURE ", triggerFunctionName, "();"
+          ]
+    HistoryTableName c n@"mapping" ->
+      let normalTableName = indexTableName c n
+          triggerFunctionName = "\"" <> "insert_or_update_" <> tableNameToText normalTableName <> "_history_table" <> "\""
+       in [ "\n\n",
+            -- Create or replace the function for handling insert and update triggers
+            "CREATE OR REPLACE FUNCTION ", triggerFunctionName, "() RETURNS TRIGGER AS $$\n",
+            "BEGIN\n",
+            "    RAISE NOTICE 'Trigger fired for % on table ", tableNameToText normalTableName, ": %', TG_OP, NEW.address;\n",
+            "  UPDATE ",
+            tableNameToDoubleQuoteText tableName <> " h\n",
+            "  SET valid_to = CAST(NEW.block_timestamp AS timestamp)\n",
+            "  WHERE h.address = NEW.address\n",
+            "    AND (h.key #>> '{}') = (NEW.key #>> '{}')\n",
+            "    AND h.valid_to = 'infinity'::timestamp;\n",
+            "    IF TG_OP = 'INSERT' THEN\n",
+            "        RAISE NOTICE 'Inserting into history table ", tableNameToText tableName, " for address: %', NEW.address;\n",
+            "        INSERT INTO ",
+            tableNameToDoubleQuoteText tableName,
+            "  SELECT NEW.*,\n",
+            "         CAST(NEW.block_timestamp AS timestamp),\n",
+            "         'infinity'::timestamp;\n",
+            "    ELSIF TG_OP = 'UPDATE' THEN\n",
+            "        RAISE NOTICE 'Updating history table ", tableNameToText tableName, " for address: %', NEW.address;\n",
+            "        INSERT INTO ",
+            tableNameToDoubleQuoteText tableName,
+            "  SELECT NEW.*,\n",
+            "         CAST(NEW.block_timestamp AS timestamp),\n",
+            "         'infinity'::timestamp;\n",
             "    END IF;\n",
             "    RETURN NEW;\n",
             "END;\n",
@@ -273,11 +327,12 @@ slipstreamQueryText _ CreateView{..} =
                 _ -> ""
             , " ELSE "
             , case t of
-                SqlBool    -> "false::boolean"
-                SqlDecimal -> "0::numeric"
-                SqlText    -> "''::text"
-                SqlJsonb   -> "to_jsonb(''::text)"
-                SqlSerial  -> "0::numeric"
+                SqlBool      -> "false::boolean"
+                SqlDecimal   -> "0::numeric"
+                SqlText      -> "''::text"
+                SqlJsonb     -> "to_jsonb(''::text)"
+                SqlTimestamp -> "'1970-01-01 00:00:00.000'::timestamp)"
+                SqlSerial    -> "0::numeric"
             , " END AS "
             , wrapEscapeDouble $ if c `Set.member` baseColumnSet then "arg_" <> c else c
             ]) <$> cols') viewColumns
@@ -310,11 +365,12 @@ slipstreamQueryText _ CreateView{..} =
                   _ -> ""
               , " ELSE "
               , case t of
-                  SqlBool    -> "false::boolean"
-                  SqlDecimal -> "'0'::text"
-                  SqlText    -> "''::text"
-                  SqlJsonb   -> "to_jsonb(''::text)"
-                  SqlSerial  -> "0::numeric"
+                  SqlBool      -> "false::boolean"
+                  SqlDecimal   -> "'0'::text"
+                  SqlText      -> "''::text"
+                  SqlJsonb     -> "to_jsonb(''::text)"
+                  SqlTimestamp -> "'1970-01-01 00:00:00.000'::timestamp)"
+                  SqlSerial    -> "0::numeric"
               , " END)"
               ]
             ]) cols') <$> jsonbColumns)
@@ -1150,6 +1206,9 @@ contractTableName = indexTableName "" "contract"
 mappingTableName :: TableName
 mappingTableName = indexTableName "" "mapping"
 
+mappingHistoryTableName :: TableName
+mappingHistoryTableName = historyTableName "" "mapping"
+
 eventArrayTableName :: TableName
 eventArrayTableName = indexTableName "" "event_array"
 
@@ -1173,6 +1232,8 @@ initialSlipstreamQueries =
       , ("block_timestamp", SqlText)
       , ("block_number", SqlText)
       , ("data", SqlJsonb)
+      , ("valid_from", SqlTimestamp)
+      , ("valid_to", SqlTimestamp)
       ]
       []
       Nothing
@@ -1197,6 +1258,21 @@ initialSlipstreamQueries =
       ]
       ["address", "collection_name", "key"]
       (Just $ Foreign "contract_mapping" ["address"] storageTableName ["address"])
+  , CreateTable
+      mappingHistoryTableName
+      [ ("address", SqlText)
+      , ("block_hash", SqlText)
+      , ("block_timestamp", SqlText)
+      , ("block_number", SqlText)
+      , ("collection_name", SqlText)
+      , ("collection_type", SqlText)
+      , ("key", SqlJsonb)
+      , ("value", SqlJsonb)
+      , ("valid_from", SqlTimestamp)
+      , ("valid_to", SqlTimestamp)
+      ]
+      []
+      Nothing
   , CreateTable
       globalEventTableName
       [ ("id", SqlSerial)
