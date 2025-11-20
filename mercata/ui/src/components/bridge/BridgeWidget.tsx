@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { History } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useBridgeContext } from "@/context/BridgeContext";
-import BridgeIn from './BridgeIn';
-import BridgeOut from './BridgeOut';
+import UnifiedBridgeIn from './UnifiedBridgeIn';
+import UnifiedBridgeOut from './UnifiedBridgeOut';
+import { BridgeTransactionTab } from '@mercata/shared-types';
 
 const BridgeWidget = () => {
   const [activeTab, setActiveTab] = useState('bridgeIn');
@@ -40,14 +41,14 @@ const BridgeWidget = () => {
   return (
     <div className="w-full">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gray-900">Bridge Assets</h2>
+        <h2 className="text-lg font-semibold text-gray-900">Bridge</h2>
         <Button
           variant="ghost"
           size="sm"
           className="flex items-center gap-2"
           onClick={() => {
             // Set the target tab based on the current active tab
-            const targetTab = activeTab === 'bridgeIn' ? 'DepositRecorded' : 'WithdrawalInitiated';
+            const targetTab: BridgeTransactionTab = activeTab === 'bridgeIn' ? 'DepositRecorded' : 'WithdrawalInitiated';
             setTargetTransactionTab(targetTab);
             navigate("/dashboard/bridge-transactions");
           }}
@@ -78,9 +79,9 @@ const BridgeWidget = () => {
         />
         <div className="bg-white rounded-xl p-4 shadow-sm mt-4">
           {activeTab === 'bridgeIn' ? (
-            <BridgeIn />
+            <UnifiedBridgeIn />
           ) : (
-            <BridgeOut />
+            <UnifiedBridgeOut />
           )}
         </div>
       </div>
