@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, ChevronDown } from "lucide-react";
 import PercentageButtons from "@/components/ui/PercentageButtons";
 import { useAccount, useBalance, useChainId, useSignTypedData, useSwitchChain, useWriteContract } from "wagmi";
 import { createPublicClient, http } from "viem";
@@ -22,6 +22,7 @@ import { useUserTokens } from "@/context/UserTokensContext";
 import { useLendingContext } from "@/context/LendingContext";
 import { safeParseUnits, formatBalance, ensureHexPrefix } from "@/utils/numberUtils";
 import BridgeWalletStatus from "@/components/bridge/BridgeWalletStatus";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 const DECIMAL_PATTERN = /^\d*\.?\d*$/;
 
@@ -62,6 +63,7 @@ const MintWidget: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{ amount?: string; network?: string }>({});
   const [autoDeposit, setAutoDeposit] = useState<boolean>(true);
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState<boolean>(false);
   const [minDepositInfo, setMinDepositInfo] = useState<{ 
     amount: string; 
     amountWei: bigint; 
@@ -365,32 +367,6 @@ const MintWidget: React.FC = () => {
     <div className="space-y-6">
       <BridgeWalletStatus />
 
-      <div className="flex items-center gap-4">
-        <div className="flex-1 space-y-1.5">
-          <Label>From Network</Label>
-          <Select
-            value={selectedNetwork || ""}
-            onValueChange={(v) => {
-              setSelectedNetwork(v);
-              setSelectedMintToken(null);
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select network" />
-            </SelectTrigger>
-            <SelectContent>
-              {availableNetworks.map(n => (
-                <SelectItem key={n.chainId} value={n.chainName}>{n.chainName}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex-1 space-y-1.5">
-          <Label>To Network</Label>
-          <Input value="STRATO" disabled className="bg-gray-50" />
-        </div>
-      </div>
-
       <div className="space-y-1.5">
         <Label>Select Stablecoin</Label>
         <Select
@@ -452,25 +428,14 @@ const MintWidget: React.FC = () => {
         />
       </div>
 
-      <label className="flex items-center gap-2 text-sm text-gray-700">
-        <input type="checkbox" className="accent-blue-600" checked={autoDeposit} onChange={e => setAutoDeposit(e.target.checked)} />
-        Earn saving rate by offering USDST for lending
-      </label>
-
       <div className="rounded-xl border bg-gray-50 p-4 space-y-3">
-        {autoDeposit && (
-          <div className="flex items-center justify-between text-gray-600 text-sm">
-            <span>Current APY</span>
-            <span className="font-medium">{apr ? `${apr}%` : "N/A"}</span>
-          </div>
-        )}
         <div className="flex items-center justify-between text-gray-600 text-sm">
           <span>USDST {autoDeposit ? "Supplied" : "Balance"}</span>
           <span className="font-medium">{autoDeposit ? formattedSuppliedBalance : formattedUsdstBalance || "0"} → {afterBalance}</span>
         </div>
         <div className="flex items-center justify-between text-gray-600 text-sm">
           <span>Outcome</span>
-          <span className="font-medium">{amount || "0.00"} USDST deposited {autoDeposit ? "and lent" : ""}</span>
+          <span className="font-medium">{amount || "0.00"} USDST deposited</span>
         </div>
         <div className="flex items-center justify-between text-gray-600 text-sm">
           <span>Current Saving Rate</span>
@@ -478,7 +443,44 @@ const MintWidget: React.FC = () => {
         </div>
       </div>
 
+      <label className="flex items-center gap-2 text-sm text-gray-700">
+        <input type="checkbox" className="accent-blue-600" checked={autoDeposit} onChange={e => setAutoDeposit(e.target.checked)} />
+        Earn saving rate by offering USDST for lending
+      </label>
 
+      <Collapsible open={showAdvancedOptions} onOpenChange={setShowAdvancedOptions}>
+        <CollapsibleTrigger className="flex items-center justify-between w-full text-sm text-gray-600 hover:text-gray-900 transition-colors">
+          <span>See Advanced Options</span>
+          <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showAdvancedOptions ? 'rotate-180' : ''}`} />
+        </CollapsibleTrigger>
+        <CollapsibleContent className="mt-4">
+          <div className="flex items-center gap-4">
+            <div className="flex-1 space-y-1.5">
+              <Label>From Network</Label>
+              <Select
+                value={selectedNetwork || ""}
+                onValueChange={(v) => {
+                  setSelectedNetwork(v);
+                  setSelectedMintToken(null);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select network" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableNetworks.map(n => (
+                    <SelectItem key={n.chainId} value={n.chainName}>{n.chainName}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex-1 space-y-1.5">
+              <Label>To Network</Label>
+              <Input value="STRATO" disabled className="bg-gray-50" />
+            </div>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
 
       <div className="flex justify-end">
         <Button
