@@ -1,4 +1,4 @@
-import { BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, TransactionResponse } from "@mercata/shared-types";
+import { BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, AutoSaveRequestParams, TransactionResponse } from "@mercata/shared-types";
 
 export interface BalanceResponse {
   balance: string;
@@ -29,6 +29,7 @@ export type BridgeContextType = {
   targetTransactionTab: BridgeTransactionTab | null;
   setTargetTransactionTab: (tab: BridgeTransactionTab | null) => void;
   requestWithdrawal: (params: WithdrawalRequestParams) => Promise<BridgeResponse>;
+  requestAutoSave: (params: AutoSaveRequestParams) => Promise<TransactionResponse>;
   useBalance: (tokenAddress: string | null) => {
     data: { 
       balance: string; 

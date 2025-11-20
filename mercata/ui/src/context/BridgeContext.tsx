@@ -15,7 +15,7 @@ import {
   NetworkSummary,
   BridgeContextType,
 } from "@/lib/bridge/types";
-import { NetworkConfig, BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, WithdrawalRequestResponse } from "@mercata/shared-types";
+import { NetworkConfig, BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, TransactionResponse, AutoSaveRequestParams } from "@mercata/shared-types";
 
 const BridgeContext = createContext<BridgeContextType | undefined>(undefined);
 
@@ -104,10 +104,26 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
     async (params: WithdrawalRequestParams): Promise<BridgeResponse> => {
       setLoading(true);
       try {
-        const { data } = await api.post<WithdrawalRequestResponse>(`/bridge/requestWithdrawal`, params);
+        const { data } = await api.post<TransactionResponse>(`/bridge/requestWithdrawal`, params);
         return { success: true, data };
       } catch (e) {
         setError("Withdrawal request failed");
+        throw e;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [],
+  );
+
+  const requestAutoSave = useCallback(
+    async (params: AutoSaveRequestParams): Promise<TransactionResponse> => {
+      setLoading(true);
+      try {
+        const { data } = await api.post<TransactionResponse>(`/bridge/requestAutoSave`, params);
+        return data;
+      } catch (e) {
+        setError("Auto save request failed");
         throw e;
       } finally {
         setLoading(false);
@@ -306,6 +322,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         targetTransactionTab,
         setTargetTransactionTab,
         requestWithdrawal,
+        requestAutoSave,
         useBalance,
         setSelectedNetwork: handleSetSelectedNetwork,
         setSelectedToken,
