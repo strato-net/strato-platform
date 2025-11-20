@@ -492,9 +492,6 @@ const SwapWidget = () => {
 
   // Price impact calculation - use raw rate for calculations
   const priceImpact = useMemo(() => {
-    if (exchangeRateRaw === undefined) {
-      return null;
-    }
     return calculateImpact(exchangeRateRaw, fromAmount, toAmount);
   }, [exchangeRateRaw, fromAmount, toAmount]);
 
