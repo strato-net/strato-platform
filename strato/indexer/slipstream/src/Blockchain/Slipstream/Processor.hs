@@ -173,13 +173,11 @@ getCollectionsFromContract = mapMaybe (uncurry filterAndExtract) . Map.toList . 
 
 processTheMessages ::
   ( MonadIO m
-  , HasSQL m
   , MonadLogger m
   ) =>
-  PGConnection ->
   [VME.VMEvent] ->
   ConduitM i (Either TransactionResult [SlipstreamQuery]) m [AggregateEvent]
-processTheMessages conn messages = do
+processTheMessages messages = do
   case length messages of
     0 -> return ()
     1 -> $logInfoS "processTheMessages" "1 message has arrived"
@@ -220,9 +218,9 @@ processTheMessages conn messages = do
           $logWarnS "processTheMessages" $ "Failed to get inherited contracts for " <> T.pack (_contractName c) <> ": " <> T.pack (show err)
           pure []
         Right inheritedContracts -> pure $ map (T.pack . _contractName) inheritedContracts
-      indexFkeys <- createIndexTable conn c cc nameParts inherited
-      collectionFkeys <- catMaybes <$> traverse (createCollectionTable conn nameParts c cc inherited) collectionNamesAndTypes
-      eventFkeys <- createExpandEventTables conn c cc nameParts inherited
+      indexFkeys <- createIndexTable c cc nameParts inherited
+      collectionFkeys <- catMaybes <$> traverse (createCollectionTable nameParts c cc inherited) collectionNamesAndTypes
+      eventFkeys <- createExpandEventTables c cc nameParts inherited
       pure $ indexFkeys ++ collectionFkeys ++ eventFkeys
 
   inserts <- fmap concat $ do
@@ -244,32 +242,31 @@ processTheMessages conn messages = do
 
   forM_ (rights inserts) $ $logDebugLS "processTheMessages/toInsert"
   
-  mapOutput Right . outputData $ do
+  mapOutput Right . outputDataDedup $ do
     forM_ insertsByCodeHash $ \ins -> do
 --      lift $ insertIndexTable2 $ insertToStorage $ indexInsert ins
-      insertIndexTable conn $ indexInsert ins
+      insertIndexTable $ indexInsert ins
       unless (null $ collectionInserts ins) $
-        insertCollectionTable conn $ collectionInserts ins
+        insertCollectionTable $ collectionInserts ins
 
-    forM_ delegatecalls $ insertDelegatecall conn
+    forM_ delegatecalls insertDelegatecall
 
   let processedEventArrays = concatMap aggEventToCollectionRows events'
 
   when (not (null events')) $ do
-    mapOutput Right . outputData $ pipeInsertGlobalEventTable conn events'
+    mapOutput Right . outputDataDedup $ pipeInsertGlobalEventTable events'
     unless (null processedEventArrays) $
-      mapOutput Right . outputData $ insertCollectionTable conn processedEventArrays
+      mapOutput Right . outputDataDedup $ insertCollectionTable processedEventArrays
 
   when (not $ null fkeys) $ do
     $logDebugLS "processTheMessages" $ T.pack $ "Updating PostgREST schema cache for " ++ show (length fkeys) ++ " foreign keys"
-    mapOutput Right . outputData $ createFkeyFunctions conn fkeys
-    mapOutput Right . outputData $ notifyPostgREST conn
+    mapOutput Right . outputDataDedup $ createFkeyFunctions fkeys
+    mapOutput Right . outputData $ notifyPostgREST
 
   $logInfoS "processTheMessages" . T.pack $
     "Inserting " ++ show (length transactionResults) ++ " transaction results"
 
-  forM_ transactionResults $ \txr -> do
-    void . lift $ putTransactionResult txr
+  yieldMany $ Left <$> transactionResults
 
   return events'
 {-

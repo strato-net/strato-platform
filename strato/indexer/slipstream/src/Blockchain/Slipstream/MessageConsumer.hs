@@ -5,20 +5,26 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
 
+{-# OPTIONS -fno-warn-deprecations #-}
+
 module Blockchain.Slipstream.MessageConsumer
   ( getAndProcessMessages
   )
 where
 
 import BlockApps.Logging
+import Blockchain.Data.TransactionResult
 import Blockchain.EthConf
 import Blockchain.Slipstream.Data.Action (AggregateEvent)
 import Blockchain.Slipstream.Metrics
 import Blockchain.Slipstream.Processor
+import Blockchain.Slipstream.OutputData
+import Blockchain.Slipstream.SQL
 import Conduit
 import Control.Monad
 import Control.Monad.Composable.Kafka
 import Control.Monad.Composable.SQL
+import Data.Foldable (for_)
 import Data.String
 import Blockchain.Slipstream.PostgresqlTypedShim
 import Prelude hiding (lookup)
@@ -36,7 +42,13 @@ getAndProcessMessages conn = do
   consume "getAndProcessMessages'" "slipstream" "vmevents" $ \() messages -> do
     recordKafkaMessages messages
     emittedEvents <- runConduit $
-      processTheMessages conn messages `fuseUpstream` sinkNull
+      processTheMessages messages `fuseUpstream`
+        awaitForever (\case
+          Left txr -> void . lift $ putTransactionResult txr
+          Right cmds -> lift . for_ cmds $ \case
+            InsertDelegatecall dc -> insertDelegatecallPostgres conn dc
+            q -> dbQueryCatchError conn $ slipstreamQueryPostgres q
+        )
     _ <- produceSolidVmEvents emittedEvents
     return ()
 
