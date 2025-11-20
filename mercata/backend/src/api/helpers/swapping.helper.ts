@@ -227,6 +227,10 @@ export const calculatePoolMetrics = (
 
 export const calculateOracleRatios = (tokenAPrice: string, tokenBPrice: string): { aToB: string; bToA: string } => {
   if (tokenAPrice === "0" || tokenBPrice === "0") return { aToB: "0", bToA: "0" };
+  console.log("tokenAPrice", tokenAPrice);
+  console.log("tokenBPrice", tokenBPrice);
+  console.log("aToB", (Number(tokenAPrice) / Number(tokenBPrice)).toFixed(18));
+  console.log("bToA", (Number(tokenBPrice) / Number(tokenAPrice)).toFixed(18));
   return {
     aToB: (Number(tokenAPrice) / Number(tokenBPrice)).toFixed(18),
     bToA: (Number(tokenBPrice) / Number(tokenAPrice)).toFixed(18)

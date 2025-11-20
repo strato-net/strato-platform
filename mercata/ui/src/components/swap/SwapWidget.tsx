@@ -444,7 +444,7 @@ const SwapWidget = () => {
   // ========================================================================
   // CONTEXT & HOOKS
   // ========================================================================
-  const { swappableTokens, pairableTokens, fetchPairableTokens, swap, getPoolByTokenPair, fromAsset, toAsset, pool, poolLoading, loading: swapLoading, setFromAsset, setToAsset, refreshSwapHistory, lastPoolFetchTime, isRefreshingAfterVisibility, pollCountAfterVisibility, setPollCountAfterVisibility, setIsRefreshingAfterVisibility } = useSwapContext();
+  const { swappableTokens, pairableTokens, fetchPairableTokens, swap, getPoolByTokenPair, fromAsset, toAsset, pool, poolLoading, loading: swapLoading, setFromAsset, setToAsset, refreshSwapHistory } = useSwapContext();
 
   // ========================================================================
   // DERIVED STATE
@@ -484,9 +484,6 @@ const SwapWidget = () => {
   
   // Exchange rates (both pool and oracle)
   const { exchangeRateRaw, exchangeRate, oracleExchangeRate } = calculateExchangeRates(pool, fromAsset);
-  
-  // Show updating indicator when refreshing after visibility change and poll count < 2 (only 1st poll)
-  const isPoolDataStale = pool && isRefreshingAfterVisibility && pollCountAfterVisibility < 2;
 
   // Price impact calculation - use raw rate for calculations
   const priceImpact = useMemo(() => {
@@ -530,14 +527,7 @@ const SwapWidget = () => {
     getPoolByTokenPair,
     fetchUsdstBalance,
     userAddress,
-    interval: POLL_INTERVAL,
-    onVisibilityChange: (isVisible) => {
-      if (isVisible) {
-        setIsRefreshingAfterVisibility(true);
-        // Reset counter when visibility refresh starts
-        setPollCountAfterVisibility(0);
-      }
-    }
+    interval: POLL_INTERVAL
   });
 
   // ========================================================================
@@ -871,19 +861,13 @@ const SwapWidget = () => {
         <div className="flex justify-between text-sm">
           <span className="text-gray-600 decoration-2">Exchange Rate</span>
           <span className="font-medium">
-            {isPoolDataStale ? (
-              <span className="text-yellow-600">(updating...)</span>
-            ) : (
-              <>1 {fromAsset?._symbol || ""} ≈ <AnimatedNumber value={exchangeRate} isLoading={poolLoading} /> {toAsset?._symbol || ""}</>
-            )}
+            1 {fromAsset?._symbol || ""} ≈ <AnimatedNumber value={exchangeRate} isLoading={poolLoading} /> {toAsset?._symbol || ""}
           </span>
         </div>
         <div className="flex justify-between text-sm">
           <span className="text-gray-400">Exchange Rate (Spot)</span>
           <span className="font-medium text-gray-400">
-            {isPoolDataStale ? (
-              <span className="text-yellow-600">(updating...)</span>
-            ) : oracleExchangeRate === "0" ? (
+            {oracleExchangeRate === "0" ? (
               "Price data unavailable"
             ) : (
               <>1 {fromAsset?._symbol || ""} ≈ <AnimatedNumber value={oracleExchangeRate} isLoading={poolLoading} /> {toAsset?._symbol || ""}</>

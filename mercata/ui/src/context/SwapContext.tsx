@@ -35,9 +35,6 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
   const [fromAsset, setFromAsset] = useState<SwapToken | undefined>();
   const [toAsset, setToAsset] = useState<SwapToken | undefined>();
   const [pool, setPool] = useState<Pool | null>(null);
-  const [lastPoolFetchTime, setLastPoolFetchTime] = useState<number>(0);
-  const [isRefreshingAfterVisibility, setIsRefreshingAfterVisibility] = useState<boolean>(false);
-  const [pollCountAfterVisibility, setPollCountAfterVisibility] = useState<number>(0);
   
   // Swap history
   const [swapHistory, setSwapHistory] = useState<SwapHistoryEntry[]>([]);
@@ -122,40 +119,22 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
       const poolData: Pool | null = data?.[0] || null;
       if (!poolData) return null;
 
-      // Increment counter and check if we should update (2nd poll onwards)
-      const shouldUpdate = !isRefreshingAfterVisibility || pollCountAfterVisibility >= 1;
+      setPool(poolData);
 
-      if (isRefreshingAfterVisibility) {
-        setPollCountAfterVisibility(prev => {
-          const newCount = prev + 1;
-          if (newCount >= 2) setIsRefreshingAfterVisibility(false);
-          return newCount;
-        });
-      }
+      const read = (addr?: string) => {
+        if (!addr) return { balance: "0", poolBalance: "0", price: "0" };
+        const token = poolData.tokenA?.address === addr ? poolData.tokenA : poolData.tokenB?.address === addr ? poolData.tokenB : null;
+        return token ? { balance: token.balance || "0", poolBalance: token.poolBalance || "0", price: token.price || "0" } : { balance: "0", poolBalance: "0", price: "0" };
+      };
 
-      if (shouldUpdate) {
-        setPool(poolData);
-        setLastPoolFetchTime(Date.now());
-        
-        const getTokenData = (addr?: string) => {
-          if (!addr) return { balance: "0", poolBalance: "0", price: "0" };
-          const token = [poolData.tokenA, poolData.tokenB].find(t => t?.address === addr);
-          return token ? { 
-            balance: token.balance || "0", 
-            poolBalance: token.poolBalance || "0", 
-            price: token.price || "0" 
-          } : { balance: "0", poolBalance: "0", price: "0" };
-        };
-
-        setFromAsset(prev => prev ? { ...prev, ...getTokenData(prev.address) } : prev);
-        setToAsset(prev => prev ? { ...prev, ...getTokenData(prev.address) } : prev);
-      }
+      setFromAsset(prev => prev ? { ...prev, ...read(prev.address) } : prev);
+      setToAsset(prev => prev ? { ...prev, ...read(prev.address) } : prev);
 
       return poolData;
     } finally {
       setPoolLoading(false);
     }
-  }, [setPool, setFromAsset, setToAsset, isRefreshingAfterVisibility, pollCountAfterVisibility]);
+  }, [setPool, setFromAsset, setToAsset]);
 
   const getPoolByAddress = useCallback(async (address: string) => {
     try {
@@ -356,14 +335,9 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
         fromAsset,
         toAsset,
         pool,
-        lastPoolFetchTime,
-        isRefreshingAfterVisibility,
-        pollCountAfterVisibility,
-        setPollCountAfterVisibility,
         setFromAsset,
         setToAsset,
         setPool,
-        setIsRefreshingAfterVisibility,
         // Functions
         refetchSwappableTokens: fetchSwappableTokens,
         fetchPairableTokens,
