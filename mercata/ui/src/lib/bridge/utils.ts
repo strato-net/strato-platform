@@ -159,9 +159,9 @@ export function getExplorerUrl(chainId: string, txHash: string): string {
 }
 
 /**
- * Gets chain name from chain ID
+ * Gets chain name from chain ID (supports both number and string)
  */
-export function getChainName(chainId: number): string {
+export function getChainName(chainId: number | string): string {
   const chainEntries = Object.entries(SUPPORTED_CHAINS);
   const chainEntry = chainEntries.find(([_, id]) => id === chainId);
   return chainEntry ? chainEntry[0] : "Unknown Chain";

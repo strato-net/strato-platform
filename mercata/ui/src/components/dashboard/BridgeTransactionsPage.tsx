@@ -8,7 +8,7 @@ import WithdrawTransactionDetails from './WithdrawTransactionDetails';
 import { useBridgeContext } from '@/context/BridgeContext';
 import { BridgeTransactionTab } from '@mercata/shared-types';
 
-const BridgeTransactionsPage = () => {
+const BridgeTransactionsPage = ({ isAdmin = false }: { isAdmin?: boolean }) => {
   const { loadNetworksAndTokens, targetTransactionTab, setTargetTransactionTab } = useBridgeContext();
   const [transactionType, setTransactionType] = useState<BridgeTransactionTab>('DepositRecorded');
 
@@ -45,7 +45,7 @@ const BridgeTransactionsPage = () => {
 
   return (
     <>
-      <div className="container mx-auto max-w-full py-8 px-4">
+      <div className="container mx-auto max-w-full py-2 px-0">
         <div className="w-full overflow-x-hidden">
           <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl shadow-lg p-4">
             <div className="space-y-4">
@@ -69,20 +69,20 @@ const BridgeTransactionsPage = () => {
               </div>
 
               {transactionType === 'DepositRecorded' ? (
-                <DepositTransactionDetails key="deposit" mintUSDST={false} />
+                <DepositTransactionDetails key="deposit" mintUSDST={false} context={isAdmin ? 'admin' : undefined} />
               ):
               transactionType === 'WithdrawalInitiated' ? (
-                <WithdrawTransactionDetails key="withdrawal" mintUSDST={false} />
+                <WithdrawTransactionDetails key="withdrawal" mintUSDST={false} context={isAdmin ? 'admin' : undefined} />
               ):
               transactionType === 'RedemptionInitiated' ? (
-                <WithdrawTransactionDetails key="redemption" mintUSDST={true} />
+                <WithdrawTransactionDetails key="redemption" mintUSDST={true} context={isAdmin ? 'admin' : undefined} />
               ):
               transactionType === 'USDSTDeposit' ? (
-                <DepositTransactionDetails key="usdst" mintUSDST={true} />
+                <DepositTransactionDetails key="usdst" mintUSDST={true} context={isAdmin ? 'admin' : undefined} />
               ):
               // default to bridge out
               (
-                <WithdrawTransactionDetails key="default" mintUSDST={false} />
+                <WithdrawTransactionDetails key="default" mintUSDST={false} context={isAdmin ? 'admin' : undefined} />
               )}
             </div>
           </div>

@@ -1063,6 +1063,16 @@ export const getAssetConfig = async (
   const config = configEntry.CollateralConfig;
   const tokenInfo = await getTokenInfo(accessToken, asset);
   
+  // Check isSupportedAsset mapping - if asset is not in the mapping, it's disabled (false)
+  // The Cirrus query returns entries with 'key' field (asset address) and 'value' field (boolean)
+  const supportedAssetEntry = registry.cdpEngine.isSupportedAsset?.find(
+    (entry: any) => {
+      const entryKey = entry.key || entry.asset;
+      return entryKey?.toLowerCase() === asset.toLowerCase();
+    }
+  );
+  const isSupported = supportedAssetEntry?.value === true;
+  
   return {
     asset,
     symbol: tokenInfo.symbol,
@@ -1075,39 +1085,102 @@ export const getAssetConfig = async (
     debtCeiling: config.debtCeiling,
     unitScale: config.unitScale,
     isPaused: config.isPaused,
-    isSupported: true,
+    isSupported,
   };
 };
 
+// Get all collateral assets (regardless of support status) - used by admin
+export const getAllCollateralAssets = async (
+  accessToken: string,
+): Promise<AssetConfig[]> => {
+  const [{ data: [registryData] }, { data: symbols }] = await Promise.all([
+    cirrus.get(accessToken, `/${CDPRegistry}`, {
+      params: {
+        select: `cdpEngine:cdpEngine_fkey(collateralConfigs:${CDPEngine}-collateralConfigs(asset:key,CollateralConfig:value),isSupportedAsset:${CDPEngine}-isSupportedAsset!inner(asset:key,value))`,
+        address: `eq.${cdpRegistry}`,
+      },
+    }),
+    cirrus.get(accessToken, `/${Token}`, {
+      params: {
+        select: "address,_symbol",
+        "status": "eq.2",
+      },
+    }),
+  ]);
+
+  const supportedMap = new Map(registryData.cdpEngine.isSupportedAsset.map((a: any) => [a.asset, a.value]));
+  const symbolMap = new Map(symbols.map((s: any) => [s.address, s._symbol]));
+
+  return registryData.cdpEngine.collateralConfigs
+    .filter((config: any) => symbolMap.has(config.asset))
+    .map((config: any) => {
+      const cfg = config.CollateralConfig;
+      return {
+        asset: config.asset,
+        symbol: symbolMap.get(config.asset),
+        liquidationRatio: Number(cfg.liquidationRatio) / Number(WAD) * 100,
+        minCR: Number(cfg.minCR) / Number(WAD) * 100,
+        liquidationPenaltyBps: parseInt(cfg.liquidationPenaltyBps),
+        closeFactorBps: parseInt(cfg.closeFactorBps),
+        stabilityFeeRate: convertStabilityFeeRateToAnnualPercentage(cfg.stabilityFeeRate),
+        debtFloor: cfg.debtFloor,
+        debtCeiling: cfg.debtCeiling,
+        unitScale: cfg.unitScale,
+        isPaused: cfg.isPaused,
+        isSupported: supportedMap.get(config.asset),
+      };
+    });
+};
+
+// Get only supported collateral assets (isSupported === true) - used by user-facing components
 export const getSupportedAssets = async (
   accessToken: string,
-  userAddress: string
 ): Promise<AssetConfig[]> => {
-  const registry = await getCDPRegistry(accessToken, userAddress, {}, "getSupportedAssets");
-  
-  if (!registry?.cdpEngine) {
-    throw new Error("CDP Engine not found");
-  }
-
-  const configEntries = registry.cdpEngine.collateralConfigs || [];
-  if (configEntries.length === 0) return [];
-
-  // Check each asset individually and filter to only active tokens
-  const activeConfigPromises = configEntries.map(async (entry: any) => {
-    const isActive = await isTokenActive(accessToken, entry.asset);
-    return isActive ? entry : null;
-  });
-  
-  const activeConfigEntries = (await Promise.all(activeConfigPromises))
-    .filter((entry: any) => entry !== null);
-
-  // Build asset configs for active tokens
-  const configPromises = activeConfigEntries.map(async (entry: any) => 
-    getAssetConfig(accessToken, userAddress, entry.asset)
+  const { data: [registryData] } = await cirrus.get(
+    accessToken,
+    `/${CDPRegistry}`,
+    {
+      params: {
+        select: `cdpEngine:cdpEngine_fkey(collateralConfigs:${CDPEngine}-collateralConfigs(asset:key,CollateralConfig:value),isSupportedAsset:${CDPEngine}-isSupportedAsset!inner(asset:key,value))`,
+        "cdpEngine.isSupportedAsset.value": "eq.true",
+        address: `eq.${cdpRegistry}`,
+      },
+    }
   );
-  
-  const configs = await Promise.all(configPromises);
-  return configs.filter((config: AssetConfig | null): config is AssetConfig => config !== null);
+
+  const supportedAssetAddresses = registryData.cdpEngine.isSupportedAsset.map(
+    (asset: any) => asset.asset
+  );
+
+  const { data: symbols } = await cirrus.get(accessToken, `/${Token}`, {
+    params: {
+      select: "address,_symbol",
+      "status": "eq.2",
+      address: `in.(${supportedAssetAddresses.join(",")})`,
+    },
+  });
+
+  const symbolMap = new Map(symbols.map((s: any) => [s.address, s._symbol]));
+
+  return registryData.cdpEngine.collateralConfigs
+    .filter((config: any) => symbolMap.has(config.asset))
+    .map((config: any) => {
+      const cfg = config.CollateralConfig;
+      return {
+        asset: config.asset,
+        symbol: symbolMap.get(config.asset),
+        liquidationRatio: Number(cfg.liquidationRatio) / Number(WAD) * 100,
+        minCR: Number(cfg.minCR) / Number(WAD) * 100,
+        liquidationPenaltyBps: parseInt(cfg.liquidationPenaltyBps),
+        closeFactorBps: parseInt(cfg.closeFactorBps),
+        stabilityFeeRate: convertStabilityFeeRateToAnnualPercentage(cfg.stabilityFeeRate),
+        debtFloor: cfg.debtFloor,
+        debtCeiling: cfg.debtCeiling,
+        unitScale: cfg.unitScale,
+        isPaused: cfg.isPaused,
+        isSupported: true,
+      };
+    });
 };
 
 export const getMaxLiquidatable = async (
@@ -1296,6 +1369,33 @@ export const setGlobalPaused = async (
   );
 };
 
+export const setAssetSupported = async (
+  accessToken: string,
+  userAddress: string,
+  body: { asset: string; supported: boolean }
+): Promise<{ status: string; hash: string }> => {
+  const registry = await getCDPRegistry(accessToken, userAddress, {}, "setAssetSupported");
+  
+  if (!registry?.cdpEngine) {
+    throw new Error("CDP Engine not found");
+  }
+
+  const tx: FunctionInput = {
+    contractName: extractContractName(CDPEngine),
+    contractAddress: registry.cdpEngine.address,
+    method: "setSupportedAsset",
+    args: {
+      asset: body.asset,
+      supported: body.supported,
+    },
+  };
+
+  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
+  );
+};
+
 export const getGlobalPaused = async (
   accessToken: string,
   userAddress: string
@@ -1313,8 +1413,8 @@ export const getAllCollateralConfigs = async (
   accessToken: string,
   userAddress: string
 ): Promise<AssetConfig[]> => {
-  // This is the same as getSupportedAssets but with a different name for clarity
-  return getSupportedAssets(accessToken, userAddress);
+  // Return all collateral assets (regardless of support status) for admin view
+  return getAllCollateralAssets(accessToken);
 };
 
 export const getBadDebt = async (
