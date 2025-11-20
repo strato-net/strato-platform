@@ -66,6 +66,16 @@ vlog() {
   fi
 }
 
+# If in check mode, verify working directory is clean before proceeding
+if [[ "$CHECK_MODE" -eq 1 ]]; then
+  if ! git diff --exit-code > /dev/null 2>&1; then
+    echo "Error: Working directory is not clean. Please commit or stash changes before running with --check." >&2
+    echo "This ensures accurate detection of trailing whitespace violations." >&2
+    exit 1
+  fi
+  vlog "Working directory is clean. Proceeding with check..."
+fi
+
 process_file() {
   local file="$1"
   if git check-ignore -q "$file"; then
