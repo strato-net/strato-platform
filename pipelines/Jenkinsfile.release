@@ -4,9 +4,8 @@ pipeline {
   }
   options { disableConcurrentBuilds() }
   parameters {
-    string(name: 'GIT_TAG', defaultValue: 'tags/10.0-rc0', description: 'The strato-platform git tag to build as a release candidate. Use `tags/<tag_name>` format. NOTE: Other Refspec types are not supported.')
-    string(name: 'RELEASE_VERSION', defaultValue: '10.0', description: 'The version tag for the future release')
-    string(name: 'RELEASE_TYPE', defaultValue: 'master', description: 'The type of release to perform. Use \'master\' for validator releases and \'marketplace-master\' for marketplace releases')
+    string(name: 'GIT_TAG', defaultValue: 'tags/15.0.3-rc0', description: 'The strato-platform git tag to build as a release candidate. Use `tags/<tag_name>` format. NOTE: Other Refspec types are not supported.')
+    string(name: 'RELEASE_VERSION', defaultValue: '15.0.3', description: 'The version tag for the future release')
   }
   stages {
     stage('Prepare') {
@@ -17,25 +16,22 @@ pipeline {
             currentBuild.result = 'FAILURE'
             sh "exit 1"
           }
-          if(env.RELEASE_TYPE != 'master' && env.RELEASE_TYPE != 'marketplace-master') {
-            echo "Unexpected RELEASE_TYPE: ${env.RELEASE_TYPE}, expected 'master' or 'marketplace-master'. Exit 1."
-            currentBuild.result = 'FAILURE'
-            sh "exit 1"
-          }
           lib = load("${env.WORKSPACE}/pipelines/Jenkinsfile.library")
         }
         sh '''#!/bin/bash -le
           set -x
 
-          # Install prerequisites if required (assuming VM has docker, docker-compose, git and npm + nodeJS v.6+ by default
+          # Install a github-release and golang prerequisites if required
           if [ ! $(command -v github-release) ]; then
             if [ ! $(command -v go) ]; then
-              wget -qO- https://dl.google.com/go/go1.11.1.linux-amd64.tar.gz | sudo tar -C /usr/local -xz
+              curl -LO https://go.dev/dl/go1.23.0.linux-amd64.tar.gz
+              sudo tar -C /usr/local -xzf go1.23.0.linux-amd64.tar.gz
+              echo "export PATH=\$PATH:/usr/local/go/bin" >> ~/.profile
               echo "export GOPATH=\$HOME/go" >> ~/.profile
-              echo "export PATH=\$PATH:/usr/local/go/bin:\$HOME/go/bin:" >> ~/.profile
-              . ~/.profile # to reload profile
+              echo "export PATH=\$PATH:\$GOPATH/bin" >> ~/.profile
+              source ~/.profile # to reload profile
             fi
-            go get github.com/aktau/github-release
+            go install github.com/github-release/github-release@v0.11.0
           fi
         '''
         sh 'git worktree remove --force strato-worktree || true'
@@ -63,110 +59,100 @@ pipeline {
     stage('Deploy') {
 
       steps {
-        sh '''#!/bin/bash -le
-          set -x
-          rm -rf strato-getting-started
-          git clone https://github.com/blockapps/strato-getting-started
-          cp strato-worktree/docker-compose.yml strato-getting-started/
-          cp strato-worktree/docker-compose.vault.yml strato-getting-started/
-          cp strato-worktree/docker-compose.highway.yml strato-getting-started/
-        '''
-        dir("strato-getting-started") {
-          // Copy .pem and .key for SSL
-          sh 'cp /home/ubuntu/letsencrypt-ssl/server.pem ssl/certs/'
-          sh 'cp /home/ubuntu/letsencrypt-ssl/server.key ssl/private/'
+        dir ('strato-worktree') {
+          dir('bootstrap-docker') {
+            // Copy .pem and .key for SSL
+            sh 'cp /home/ubuntu/letsencrypt-ssl/server.pem ssl/certs/'
+            sh 'cp /home/ubuntu/letsencrypt-ssl/server.key ssl/private/'
+            
+            sh 'cp ../docker-compose.allDocker.yml docker-compose.yml'
+            // sh 'cp ../docker-compose.vault.yml .'
+            // sh 'cp ../docker-compose.highway.yml .'
+            script {
+              lib.spinUpVault()
+              lib.replaceServerPortsDocker()
+              lib.spinUpFileServer()
+            }
 
+            // TODO: run node on https (also update check_availability function)
+            withCredentials([
+              usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID'),
+            ]) {
+              writeFile file: "run.sh", text: """#!/bin/bash
+                sudo \\
+                  NODE_HOST=\$(</host) \\
+                  OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \\
+                  OAUTH_CLIENT_ID='${KEYCLOAK_STRATODEVEL_DEV_ID}' \\
+                  OAUTH_CLIENT_SECRET='${KEYCLOAK_STRATODEVEL_DEV_SECRET}' \\
+                  VAULT_URL=https://\$(</host):8093 \\
+                  VAULT_PROXY_DEBUG=false \\
+                  FILE_SERVER_URL=https://\$(</host):44300/highway \\
+                  useCustomGenesis=false \\
+                  POOL_FACTORY=000000000000000000000000000000000000100a \\
+                  LENDING_REGISTRY=0000000000000000000000000000000000001007 \\
+                  TOKEN_FACTORY=000000000000000000000000000000000000100b \\
+                  ADMIN_REGISTRY=000000000000000000000000000000000000100c \\
+                  ./strato --single
+              """
+            }
+            sh 'chmod +x run.sh'
+            sh './run.sh'
+
+            sh 'docker ps'
+            writeFile file: "check_availability.sh", text: '''#!/bin/bash -le
+              check_availability() {
+                counter=0
+                until curl --silent --fail --location $(</host)/health | jq .health | grep true
+                do
+                  if [[ "$counter" -gt 300 ]]; then
+                    echo "STRATO node took longer than 5 minutes to initialize! aborting."
+                    exit 73
+                  fi
+                  echo "waiting for STRATO health endpoint to be available through nginx"
+                  counter=$((counter+1))
+                  sleep 1
+                done
+                echo "STRATO health endpoint is available through nginx - node is running"
+              }
+  
+              check_availability
+            '''
+            sh 'chmod +x check_availability.sh'
+            sh './check_availability.sh'
+          }
           script {
-            lib.spinUpVault()
-            lib.replaceServerPortsDocker()
-            lib.spinUpFileServer()
+            lib.generateGenesisBlock()
           }
 
-          // TODO: run node on https (also update check_availability function)
+          dir("bootstrap-docker") {
+            sh './strato --wipe'
+            
+            sh 'sed -i "s|useCustomGenesis=false|useCustomGenesis=true|" run.sh'
+            sh './run.sh'
+            sh 'docker cp genesis-block.json strato-strato-1:/var/lib/strato/genesis.json'
+            sh 'docker ps'
+
+            // Few quick tests
+            sh './check_availability.sh'
+
+            echo "Restarting docker containers to simulate computer reboot..."
+            sh 'docker compose -p strato stop'
+            sh 'docker compose -p strato start'
+
+            sh './check_availability.sh'
+          }
+          
           withCredentials([
               usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID'),
           ]) {
-            writeFile file: "run.sh", text: """#!/bin/bash
-              sudo \\
-                NODE_HOST=\$(</host) \\
-                OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \\
-                OAUTH_CLIENT_ID='${KEYCLOAK_STRATODEVEL_DEV_ID}' \\
-                OAUTH_CLIENT_SECRET='${KEYCLOAK_STRATODEVEL_DEV_SECRET}' \\
-                VAULT_URL=https://\$(</host):8093 \\
-                VAULT_PROXY_DEBUG=false \\
-                FILE_SERVER_URL=https://\$(</host):44300/highway \\
-                useCustomGenesis=false \\
-                POOL_FACTORY=000000000000000000000000000000000000100a \\
-                LENDING_REGISTRY=0000000000000000000000000000000000001007 \\
-                TOKEN_FACTORY=000000000000000000000000000000000000100b \\
-                ADMIN_REGISTRY=000000000000000000000000000000000000100c \\
-                BRIDGE_API_BASE_URL=bridge.mercata-testnet.blockapps.net \\
-                ./strato --single
-            """
-          }
-          sh 'chmod +x run.sh'
-
-          sh './run.sh'
-
-          sh 'docker ps'
-
-          // Few quick tests
-          writeFile file: "check_availability.sh", text: '''#!/bin/bash -le
-            check_availability() {
-              counter=0
-              until curl --silent --fail --location $(</host)/health | jq .health | grep true
-              do
-                if [[ "$counter" -gt 120 ]]; then
-                  echo "STRATO node took longer than 2 minutes to initialize! aborting."
-                  exit 73
-                fi
-                echo "waiting for STRATO health endpoint to be available through nginx"
-                counter=$((counter+1))
-                sleep 1
-              done
-              echo "STRATO health endpoint is available through nginx - node is running"
-            }
-
-            check_availability
-          '''
-          sh 'chmod +x check_availability.sh'
-          sh './check_availability.sh'
-        }
-
-        script {
-          lib.generateGenesisBlock('strato-worktree', 'strato-getting-started')
-        }
-
-        dir("strato-getting-started") {
-          sh './strato --wipe'
-          
-          sh 'sed -i "s|useCustomGenesis=false|useCustomGenesis=true|" run.sh'
-          sh './run.sh'
-          sh 'docker cp genesis-block.json strato-strato-1:/var/lib/strato/genesis.json'
-
-          sh 'docker ps'
-
-          // Few quick tests
-          sh './check_availability.sh'
-
-          echo "Restarting docker containers to simulate computer reboot..."
-          sh 'docker compose -p strato stop'
-          sh 'docker compose -p strato start'
-
-          sh './check_availability.sh'
-        }
-        withCredentials([
-          usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID'),
-          usernamePassword(credentialsId: 'keycloak-strato-devel-dev-testing2-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEVTESTING2_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEVTESTING2_ID'),
-        ]) {
-          script {
-            lib.registerStratoUserKey(
-                'https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration',
-                "${KEYCLOAK_STRATODEVEL_DEV_ID}",
-                "${KEYCLOAK_STRATODEVEL_DEV_SECRET}",
-                'user1',
-                '1234'
-            )
+            script {
+              lib.registerStratoUserKey(
+                  'https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration',
+                  "${KEYCLOAK_STRATODEVEL_DEV_ID}",
+                  "${KEYCLOAK_STRATODEVEL_DEV_SECRET}",
+                  'user1',
+                  '1234'
+              )
           }
         }
       }
@@ -175,9 +161,23 @@ pipeline {
     stage('Some quick tests') {
       parallel {
         stage('Node Status') {
-          steps {
-            script {
+          steps{
+            script{
               lib.checkNodeStatusHealth()
+            }
+          }
+        }
+        stage('Contract tests') {
+          steps {
+            dir ('strato-worktree') {
+              script {
+                def WORKDIR = pwd()
+                catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+                  sh """#!/bin/bash -lex
+                    find mercata/contracts/tests -name '*.test.sol' -print0 | xargs -0 -I {} sh -c 'echo "Running test: {}" && cd "\$(dirname "{}")" && $WORKDIR/.docker-work/usr/local/bin/solid-vm-cli test "\$(basename "{}")"'
+                  """
+                }
+              }
             }
           }
         }
@@ -196,45 +196,26 @@ pipeline {
             sh '''#!/bin/bash -le
               set -x
               docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
-              docker compose -f docker-compose.push.yml push 2>&1
-              docker compose -f docker-compose.vault.push.yml push 2>&1
-              docker compose -f docker-compose.highway.push.yml push 2>&1
-              AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} AWS_DEFAULT_REGION="us-east-1" aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 406773134706.dkr.ecr.us-east-1.amazonaws.com
-              docker compose -f docker-compose.push.ecr.yml push 2>&1
-              docker compose -f docker-compose.vault.push.ecr.yml push 2>&1
-              docker compose -f docker-compose.highway.push.ecr.yml push 2>&1
+              docker compose -f docker-compose.allDocker.push.yml push 2>&1
+              # docker compose -f docker-compose.vault.push.yml push 2>&1
+              # docker compose -f docker-compose.highway.push.yml push 2>&1
+              #
+              # AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} AWS_DEFAULT_REGION="us-east-1" aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 406773134706.dkr.ecr.us-east-1.amazonaws.com
+              # docker compose -f docker-compose.allDocker.push.ecr.yml push 2>&1
+              # docker compose -f docker-compose.vault.push.ecr.yml push 2>&1
+              # docker compose -f docker-compose.highway.push.ecr.yml push 2>&1
             '''
 
-            // Release to blockapps/strato-getting-started
-            sh '''#!/bin/bash -le
-              set -x
-              RELEASE_VERSION=$(<VERSION)
-              RELEASE_SUFFIX=""
-              if [ "${RELEASE_TYPE}" == "marketplace-master" ]; then
-                RELEASE_SUFFIX="-marketplace"
-              fi
-              STRATOGS_RELEASE_DETAILS_STABLE="--user blockapps --repo strato-getting-started --tag ${RELEASE_VERSION}"
-              github-release delete $STRATOGS_RELEASE_DETAILS_STABLE || true
-              github-release release $STRATOGS_RELEASE_DETAILS_STABLE --name "${RELEASE_VERSION}${RELEASE_SUFFIX}"
-              sleep 5
-              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.yml" --file ./docker-compose.yml
-              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.vault.yml" --file ./docker-compose.vault.yml
-              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.highway.yml" --file ./docker-compose.highway.yml
-              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.ecr.yml" --file ./docker-compose.ecr.yml
-              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.vault.ecr.yml" --file ./docker-compose.vault.ecr.yml
-              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.highway.ecr.yml" --file ./docker-compose.highway.ecr.yml
-            '''
-
-            // Merge release code to ${env.RELEASE_TYPE}
+            // Merge release code to master
             sh 'git checkout VERSION'
-            // Make sure no ${env.RELEASE_TYPE} branch exists with random/old code, we want code from origin/${env.RELEASE_TYPE}
-            sh "git branch -D ${env.RELEASE_TYPE} || true"
-            sh "git checkout ${env.RELEASE_TYPE}"
+            // Make sure no master branch exists with random/old code, we want code from origin/master
+            sh 'git branch -D master || true'
+            sh 'git checkout master'
             sh "git merge ${env.GIT_TAG}"
             sh "echo ${env.RELEASE_VERSION} > VERSION"
             sh 'git add VERSION'
             sh "git -c user.name=${GITHUB_USERNAME} -c user.email=\'cd@blockapps\' commit VERSION -m 'Update latest release version to ${env.RELEASE_VERSION}' --allow-empty"
-            sh "git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform ${env.RELEASE_TYPE}"
+            sh 'git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform master'
             sh "git tag ${env.RELEASE_VERSION}"
             sh 'git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform --tags'
 
@@ -244,21 +225,43 @@ pipeline {
             // Merge VERSION change back to develop
             sh 'git checkout develop'
             sh 'git pull https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform develop'
-            sh "git merge ${env.RELEASE_TYPE}"
+            sh 'git merge master'
+            
             // The following step requires `cd-blockapps` user to be able to push directly to develop bypassing the required Status Check to pass ("continuous-integration/jenkins/pr-merge")
             // This can't be bypassed based on the GitHub branch settings as it is done for pull requests. So we are manually temporary disabling that check ("Require status checks to pass before merging") for develop branch on Github to execute it.
             // any ideas how to avoid that?
             sh 'git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform develop'
             
-            script {
-              if(env.RELEASE_TYPE == 'master') {
-                // Merge changes into marketplace-master
-                sh 'git checkout marketplace-master'
-                sh 'git pull https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform marketplace-master'
-                sh "git merge master"
-                sh 'git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform marketplace-master'
-              }
-            }
+            // Release to blockapps/strato-getting-started
+            sh '''#!/bin/bash -le
+              set -x
+              RELEASE_VERSION=$(<VERSION)
+              STRATOGS_RELEASE_DETAILS_STABLE="--user blockapps --repo strato-getting-started --tag ${RELEASE_VERSION}"
+              github-release delete $STRATOGS_RELEASE_FLAGS || true
+              github-release release $STRATOGS_RELEASE_FLAGS --name "${RELEASE_VERSION}"
+              sleep 5
+              github-release upload $STRATOGS_RELEASE_FLAGS --name "docker-compose.yml" --file ./docker-compose.allDocker.yml
+              # github-release upload $STRATOGS_RELEASE_FLAGS --name "docker-compose.vault.yml" --file ./docker-compose.vault.yml
+              # github-release upload $STRATOGS_RELEASE_FLAGS --name "docker-compose.highway.yml" --file ./docker-compose.highway.yml
+              # github-release upload $STRATOGS_RELEASE_FLAGS --name "docker-compose.ecr.yml" --file ./docker-compose.allDocker.ecr.yml
+              # github-release upload $STRATOGS_RELEASE_FLAGS --name "docker-compose.vault.ecr.yml" --file ./docker-compose.vault.ecr.yml
+              # github-release upload $STRATOGS_RELEASE_FLAGS --name "docker-compose.highway.ecr.yml" --file ./docker-compose.highway.ecr.yml
+            '''
+            // Release to blockapps/strato-platform
+            sh '''#!/bin/bash -le
+              set -x
+              RELEASE_VERSION=$(<VERSION)
+              STRATOPLATFORM_RELEASE_FLAGS="--user blockapps --repo strato-platform --tag ${RELEASE_VERSION}"
+              github-release delete $STRATOPLATFORM_RELEASE_FLAGS || true
+              github-release release $STRATOPLATFORM_RELEASE_FLAGS --name "${RELEASE_VERSION} --generate-release-notes"
+              sleep 5
+              github-release upload $STRATOPLATFORM_RELEASE_FLAGS --name "docker-compose.yml" --file ./docker-compose.allDocker.yml
+              # github-release upload $STRATOPLATFORM_RELEASE_FLAGS --name "docker-compose.vault.yml" --file ./docker-compose.vault.yml
+              # github-release upload $STRATOPLATFORM_RELEASE_FLAGS --name "docker-compose.highway.yml" --file ./docker-compose.highway.yml
+              # github-release upload $STRATOPLATFORM_RELEASE_FLAGS --name "docker-compose.ecr.yml" --file ./docker-compose.allDocker.ecr.yml
+              # github-release upload $STRATOPLATFORM_RELEASE_FLAGS --name "docker-compose.vault.ecr.yml" --file ./docker-compose.vault.ecr.yml
+              # github-release upload $STRATOPLATFORM_RELEASE_FLAGS --name "docker-compose.highway.ecr.yml" --file ./docker-compose.highway.ecr.yml
+            '''
           }
         }
       }
@@ -267,7 +270,7 @@ pipeline {
 
   post {
     always {
-      dir ('strato-getting-started') {
+      dir ('strato-worktree/bootstrap-docker') {
         sh 'rm -rf strato_logs*'
         sh './fetchlogs'
         sh 'sudo chmod 777 strato_logs.zip'
