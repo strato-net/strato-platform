@@ -1,4 +1,4 @@
-import { BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, WithdrawalRequestResponse } from "@mercata/shared-types";
+import { BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, TransactionResponse } from "@mercata/shared-types";
 
 export interface BalanceResponse {
   balance: string;
@@ -6,7 +6,7 @@ export interface BalanceResponse {
 
 export interface BridgeResponse {
   success: boolean;
-  data?: WithdrawalRequestResponse;
+  data?: TransactionResponse;
 }
 
 export type NetworkSummary = {

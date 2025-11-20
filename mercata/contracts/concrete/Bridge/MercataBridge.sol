@@ -497,11 +497,12 @@ contract record MercataBridge is Ownable {
 
     function _autoSave(DepositInfo d, uint256 externalChainId, string normalizedTxHash) internal {
         // Autosaving is disabled if lendingRegistry is null
-        require(address(lendingRegistry) != address(0), "MB: lending registry not set");
-
-        LendingPool lendingPool = LendingRegistry(lendingRegistry).lendingPool();
-        LiquidityPool liquidityPool = LendingRegistry(lendingRegistry).liquidityPool();
-        Token mToken = Token(lendingPool.mToken());
+        require(lendingRegistry != address(0), "MB: lending registry not set");
+        
+        LendingRegistry registry = LendingRegistry(lendingRegistry);
+        LendingPool lendingPool = registry.lendingPool();
+        LiquidityPool liquidityPool = registry.liquidityPool();
+        IERC20 mToken = IERC20(lendingPool.mToken());
 
         // Can only autosave the underlying asset of the lending pool
         require(d.stratoToken == lendingPool.borrowableAsset(), "MB: cannot autosave token");
@@ -511,10 +512,10 @@ contract record MercataBridge is Ownable {
         require(actualMintedAmount > 0, "MB: no tokens minted");
 
         // Deposit into the lending pool on behalf of the recipient
-        Token(d.stratoToken).approve(address(liquidityPool), actualMintedAmount);
-        uint balanceBefore = Token(mToken).balanceOf(d.stratoRecipient);
+        IERC20(d.stratoToken).approve(address(liquidityPool), actualMintedAmount);
+        uint balanceBefore = mToken.balanceOf(d.stratoRecipient);
         lendingPool.depositLiquidityOnBehalfOf(d.stratoRecipient, actualMintedAmount);
-        uint mTokenAmount = Token(mToken).balanceOf(d.stratoRecipient) - balanceBefore;
+        uint mTokenAmount = mToken.balanceOf(d.stratoRecipient) - balanceBefore;
         require(mTokenAmount > 0, "MB: autosave failed");
 
         emit AutoSaved(externalChainId, normalizedTxHash, actualMintedAmount, mTokenAmount);
@@ -589,6 +590,10 @@ contract record MercataBridge is Ownable {
     }
 
     function requestAutoSave(uint externalChainId, string externalTxHash) external {
+        require(externalChainId > 0, "MB: invalid external chain id");
+        require(chains[externalChainId].enabled, "MB: chain not enabled");
+        require(externalTxHash.length > 0, "MB: invalid external tx hash");
+        
         string normalizedTxHash = externalTxHash.normalizeHex();
 
         require(deposits[externalChainId][normalizedTxHash].bridgeStatus != BridgeStatus.COMPLETED, "MB: Already completed");
@@ -618,16 +623,20 @@ contract record MercataBridge is Ownable {
         DepositInfo d = deposits[externalChainId][normalizedTxHash];
         require(d.bridgeStatus == BridgeStatus.INITIATED || d.bridgeStatus == BridgeStatus.PENDING_REVIEW, "MB: bad state");
 
-        bool didAutoSave = false;
         if (autoSaveRequested[d.stratoRecipient][externalChainId][normalizedTxHash]) {
             try {
                 _autoSave(d, externalChainId, normalizedTxHash);
-                didAutoSave = true;
-            } catch {} // On failure, mint stratoToken to the recipient instead
+            }
+            catch {
+                // On failure, just mint stratoToken to the recipient instead
+                uint256 actualMintedAmount = _mintFunds(d.stratoToken, d.stratoRecipient, d.stratoTokenAmount);
+                require(actualMintedAmount > 0, "MB: no tokens minted");
+            } 
             // Delete the auto save request regardless of success or failure
             delete autoSaveRequested[d.stratoRecipient][externalChainId][normalizedTxHash];
         }
-        if (!didAutoSave) {
+        else {
+            // If auto save is not requested, just mint stratoToken to the recipient
             uint256 actualMintedAmount = _mintFunds(d.stratoToken, d.stratoRecipient, d.stratoTokenAmount);
             require(actualMintedAmount > 0, "MB: no tokens minted");
         }

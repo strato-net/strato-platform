@@ -16,9 +16,8 @@ import {
   BridgeToken,
   BridgeTransactionResponse,
   WithdrawalRequestParams,
-  WithdrawalRequestResponse,
   AutoSaveRequestParams,
-  AutoSaveRequestResponse
+  TransactionResponse
 } from "@mercata/shared-types";
 
 
@@ -34,7 +33,7 @@ export const requestWithdrawal = async (
     stratoTokenAmount,
   }: WithdrawalRequestParams,
   userAddress: string
-): Promise<WithdrawalRequestResponse> => {
+): Promise<TransactionResponse> => {
   const tx = await buildFunctionTx(
     [
       {
@@ -71,7 +70,7 @@ export const requestAutoSave = async (
     externalTxHash,
   }: AutoSaveRequestParams,
   userAddress: string
-) : Promise<AutoSaveRequestResponse> => {
+) : Promise<TransactionResponse> => {
   const tx = await buildFunctionTx(
     {
       contractName: extractContractName(MercataBridge),

@@ -99,11 +99,6 @@ export interface WithdrawalRequestParams {
 }
 
 /**
- * Response from withdrawal request
- */
-export type WithdrawalRequestResponse = TransactionResponse;
-
-/**
  * Parameters for requesting automatic supply of liquidity
  * to the lending pool upon deposit completion
  */
@@ -111,8 +106,3 @@ export interface AutoSaveRequestParams {
   externalChainId: string;
   externalTxHash: string;
 }
-
-/**
- * Response from auto save request
- */
-export type AutoSaveRequestResponse = TransactionResponse;

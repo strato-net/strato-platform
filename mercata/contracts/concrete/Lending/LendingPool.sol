@@ -225,8 +225,10 @@ contract record LendingPool is Ownable, Pausable {
      * @param amount The amount of the underlying asset to deposit
      */
     function depositLiquidityOnBehalfOf(address user, uint amount) external onlyTokenFactory(borrowableAsset) {
-        require(amount > 0, "Invalid amount");
         require(mToken != address(0), "mToken not set");
+        require(amount > 0, "Invalid amount");
+        require(user != address(0), "Invalid user address");
+        require(user != msg.sender, "Please call depositLiquidity instead");
 
         // 1) bring index & reserves current
         _accrue();

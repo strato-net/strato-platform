@@ -14,9 +14,8 @@ import {
   BridgeToken,
   BridgeTransactionResponse,
   WithdrawalRequestParams,
-  WithdrawalRequestResponse,
   AutoSaveRequestParams,
-  AutoSaveRequestResponse
+  TransactionResponse,
 } from "@mercata/shared-types";
 import { isUserAdmin } from "../services/user.service";
 
@@ -30,7 +29,7 @@ class BridgeController {
       const { accessToken, body, address: userAddress } = req;
       validateRequestWithdrawal(body);
       
-      const result: WithdrawalRequestResponse = await requestWithdrawal(accessToken, body as WithdrawalRequestParams, userAddress as string);
+      const result: TransactionResponse = await requestWithdrawal(accessToken, body as WithdrawalRequestParams, userAddress as string);
 
       res.json({
         success: true,
@@ -50,7 +49,7 @@ class BridgeController {
       const { accessToken, body, address: userAddress } = req;
       validateAutoSave(body);
    
-      const result: AutoSaveRequestResponse = await requestAutoSave(accessToken, body as AutoSaveRequestParams, userAddress as string);
+      const result: TransactionResponse = await requestAutoSave(accessToken, body as AutoSaveRequestParams, userAddress as string);
    
       res.json({
         success: true,
