@@ -21,9 +21,15 @@ import Transfer from "./pages/Transfer";
 import DepositsPage from "./pages/DepositsPage";
 import AssetDetail from "./pages/AssetDetail";
 import Pools from "./pages/Pools";
+import LendingPools from "./pages/LendingPools";
+import SwapPools from "./pages/SwapPools";
+import SafetyModule from "./pages/SafetyModule";
+import Liquidations from "./pages/Liquidations";
 import ActivityFeed from "./pages/ActivityFeed";
 import NotFound from "./pages/NotFound";
 import MercataStats from "./pages/MercataStats";
+import LendingPoolBorrow from "./pages/LendingPoolBorrow";
+import CDPVaults from "./pages/CDPVaults";
 
 // Import dashboard components
 
@@ -177,11 +183,71 @@ const App = () => {
                                   }
                                 />
                                 <Route
+                                  path="/dashboard/borrow/lending"
+                                  element={
+                                    <ProtectedRoute>
+                                      <DashboardWrapper>
+                                        <LendingPoolBorrow />
+                                      </DashboardWrapper>
+                                    </ProtectedRoute>
+                                  }
+                                />
+                                <Route
+                                  path="/dashboard/borrow/cdp"
+                                  element={
+                                    <ProtectedRoute>
+                                      <DashboardWrapper>
+                                        <CDPVaults />
+                                      </DashboardWrapper>
+                                    </ProtectedRoute>
+                                  }
+                                />
+                                <Route
                                   path="/dashboard/pools"
                                   element={
                                     <ProtectedRoute>
                                       <DashboardWrapper>
                                         <Pools />
+                                      </DashboardWrapper>
+                                    </ProtectedRoute>
+                                  }
+                                />
+                                <Route
+                                  path="/dashboard/pools/lending"
+                                  element={
+                                    <ProtectedRoute>
+                                      <DashboardWrapper>
+                                        <LendingPools />
+                                      </DashboardWrapper>
+                                    </ProtectedRoute>
+                                  }
+                                />
+                                <Route
+                                  path="/dashboard/pools/swap"
+                                  element={
+                                    <ProtectedRoute>
+                                      <DashboardWrapper>
+                                        <SwapPools />
+                                      </DashboardWrapper>
+                                    </ProtectedRoute>
+                                  }
+                                />
+                                <Route
+                                  path="/dashboard/pools/safety"
+                                  element={
+                                    <ProtectedRoute>
+                                      <DashboardWrapper>
+                                        <SafetyModule />
+                                      </DashboardWrapper>
+                                    </ProtectedRoute>
+                                  }
+                                />
+                                <Route
+                                  path="/dashboard/pools/liquidations"
+                                  element={
+                                    <ProtectedRoute>
+                                      <DashboardWrapper>
+                                        <Liquidations />
                                       </DashboardWrapper>
                                     </ProtectedRoute>
                                   }
