@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CircleArrowDown, CircleArrowUp, Search } from "lucide-react";
+import { CircleArrowDown, CircleArrowUp, Search, ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useUser } from '@/context/UserContext';
 import { useUserTokens } from '@/context/UserTokensContext';
@@ -14,6 +15,7 @@ import LiquidityWithdrawModal from './LiquidityWithdrawModal';
 
 
 const SwapPoolsSection = () => {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPool, setSelectedPool] = useState<Pool | null>(null);
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
@@ -155,10 +157,13 @@ const SwapPoolsSection = () => {
           </div>
         ) : (
           filteredPools.map((pool, id) => (
-            <Card key={id} className="hover:shadow-md transition-shadow">
+            <Card key={id} className="hover:shadow-md transition-shadow cursor-pointer group">
               <CardContent className="p-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
-                  <div className="flex items-center">
+                  <div
+                    className="flex items-center flex-1 cursor-pointer"
+                    onClick={() => navigate(`/dashboard/pools/swap/${pool.address}`)}
+                  >
                     <div className="flex items-center -space-x-2 mr-3">
                       {pool.tokenA?.images?.[0]?.value ? (
                         <img
@@ -189,8 +194,11 @@ const SwapPoolsSection = () => {
                         </div>
                       )}
                     </div>
-                    <div>
-                      <h3 className="font-medium">{pool.poolName}</h3>
+                    <div className="flex-1">
+                      <div className="flex items-center">
+                        <h3 className="font-medium group-hover:text-strato-blue transition-colors">{pool.poolName}</h3>
+                        <ChevronRight className="ml-2 h-4 w-4 text-gray-400 group-hover:text-strato-blue transition-colors" />
+                      </div>
                       <div className="flex items-center text-xs text-gray-500 mt-1">
                         <span>Liquidity: {formatBalance(pool.lpToken._totalSupply, undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
                       </div>
@@ -214,11 +222,14 @@ const SwapPoolsSection = () => {
                       <div className="text-sm text-gray-500">APY</div>
                       <div className="font-medium">{pool.apy ? `${pool.apy}%` : "N/A"}</div>
                     </div>
-                    <div className="flex space-x-2">
+                    <div className="flex space-x-2" onClick={(e) => e.stopPropagation()}>
                       <Button
                         size="sm"
                         className="bg-strato-blue hover:bg-strato-blue/90"
-                        onClick={() => handleOpenDepositModal(pool)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenDepositModal(pool);
+                        }}
                       >
                         <CircleArrowDown className="mr-1 h-4 w-4" />
                         <span className="hidden sm:inline">Deposit</span>
@@ -228,7 +239,10 @@ const SwapPoolsSection = () => {
                         size="sm"
                         variant="outline"
                         className="border-strato-blue text-strato-blue hover:bg-strato-blue/10"
-                        onClick={() => handleOpenWithdrawModal(pool)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenWithdrawModal(pool);
+                        }}
                         disabled={BigInt(pool.lpToken.totalBalance || "0") === BigInt(0)}
                         title={BigInt(pool.lpToken.totalBalance || "0") === BigInt(0) ? "No LP tokens to withdraw" : "Withdraw"}
                       >

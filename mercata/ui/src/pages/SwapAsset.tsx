@@ -18,18 +18,21 @@ const SwapAsset = () => {
       <div className="transition-all duration-300 md:pl-64" style={{ paddingLeft: 'var(--sidebar-width, 0rem)' }}>
         <DashboardHeader title="Swap Assets" onMenuClick={() => setIsMobileSidebarOpen(true)} />
         <main className="p-6">
-          <div className="max-w-2xl mx-auto space-y-6">
-            {/* Main Swap Widget */}
-            <div className="bg-white shadow-md rounded-lg p-6">
-              <h2 className="text-xl font-semibold mb-6">Exchange your digital assets</h2>
-              <SwapWidget />
+          {/* Desktop: Side-by-side layout, Mobile: Stacked */}
+          <div className="max-w-7xl mx-auto lg:flex lg:gap-6 lg:items-start">
+            {/* Swap Widget - Left Side (Smaller on Desktop) */}
+            <div className="lg:w-[400px] lg:flex-shrink-0 mb-6 lg:mb-0">
+              <div className="bg-white shadow-md rounded-lg p-6">
+                <h2 className="text-xl font-semibold mb-6">Exchange your digital assets</h2>
+                <SwapWidget />
+              </div>
             </div>
-          </div>
-          
-          {/* Separate Swap History Section - Full Width */}
-          <div className="mt-8 max-w-6xl mx-auto">
-            <div className="bg-white shadow-md rounded-lg p-6">
-              <SwapHistory />
+
+            {/* Swap History - Right Side (Takes remaining space) */}
+            <div className="lg:flex-1">
+              <div className="bg-white shadow-md rounded-lg p-6">
+                <SwapHistory />
+              </div>
             </div>
           </div>
         </main>

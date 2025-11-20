@@ -30,6 +30,7 @@ import NotFound from "./pages/NotFound";
 import MercataStats from "./pages/MercataStats";
 import LendingPoolBorrow from "./pages/LendingPoolBorrow";
 import CDPVaults from "./pages/CDPVaults";
+import SwapPoolDetail from "./pages/SwapPoolDetail";
 
 // Import dashboard components
 
@@ -45,6 +46,7 @@ import { TokenProvider } from "./context/TokenContext";
 import { BridgeProvider } from "@/context/BridgeContext";
 import { LiquidationProvider } from "./context/LiquidationContext";
 import { SafetyProvider } from "./context/SafetyContext";
+import { SwapProvider } from "./context/SwapContext";
 import Borrow from "./pages/Borrow";
 import { getConfig } from "./lib/config";
 import { useState, useEffect } from "react";
@@ -120,12 +122,12 @@ const App = () => {
           <UserTokensProvider>
             <LendingProvider>
               <CDPProvider>
-                {/* <SwapProvider> */}
-                <OracleProvider>
-                  <TokenProvider>
-                    <LiquidationProvider>
-                      <SafetyProvider>
-                        <BridgeProvider>
+                <SwapProvider>
+                  <OracleProvider>
+                    <TokenProvider>
+                      <LiquidationProvider>
+                        <SafetyProvider>
+                          <BridgeProvider>
                               <TooltipProvider>
                               <Toaster />
                             <BrowserRouter>
@@ -233,6 +235,16 @@ const App = () => {
                                   }
                                 />
                                 <Route
+                                  path="/dashboard/pools/swap/:poolId"
+                                  element={
+                                    <ProtectedRoute>
+                                      <DashboardWrapper>
+                                        <SwapPoolDetail />
+                                      </DashboardWrapper>
+                                    </ProtectedRoute>
+                                  }
+                                />
+                                <Route
                                   path="/dashboard/pools/safety"
                                   element={
                                     <ProtectedRoute>
@@ -317,7 +329,7 @@ const App = () => {
                     </LiquidationProvider>
                   </TokenProvider>
                 </OracleProvider>
-                {/* </SwapProvider> */}
+              </SwapProvider>
               </CDPProvider>
             </LendingProvider>
           </UserTokensProvider>
