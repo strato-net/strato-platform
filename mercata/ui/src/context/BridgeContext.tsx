@@ -26,10 +26,8 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
     [],
   );
   const [bridgeableTokens, setBridgeableTokens] = useState<BridgeToken[]>([]);
-  const [redeemableTokens, setRedeemableTokens] = useState<BridgeToken[]>([]);
   const [selectedNetwork, setSelectedNetwork] = useState<string | null>(null);
   const [selectedToken, setSelectedToken] = useState<BridgeToken | null>(null);
-  const [selectedMintToken, setSelectedMintToken] = useState<BridgeToken | null>(null);
   const [networksLoaded, setNetworksLoaded] = useState(false);
   const [targetTransactionTab, setTargetTransactionTab] = useState<BridgeTransactionTab | null>(null);
 
@@ -118,12 +116,14 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
 
   // Internal balance fetching function used by useBalance hook
   const fetchBalance = useCallback(
-    async (tokenAddress: string): Promise<BalanceResponse> => {
+    async (tokenAddress: string, signal?: AbortSignal): Promise<BalanceResponse> => {
       try {
         const addr = tokenAddress.startsWith("0x")
           ? tokenAddress.slice(2)
           : tokenAddress;
-        const { data } = await api.get(`/tokens/balance?address=eq.${addr}`);
+        const { data } = await api.get(`/tokens/balance?address=eq.${addr}`, {
+          signal,
+        });
         
         if (Array.isArray(data) && data[0]) {
           const tokenData = data[0];
@@ -133,7 +133,10 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         }
         
         return { balance: "0" };
-      } catch (e) {
+      } catch (e: any) {
+        if (e.name === 'AbortError' || e.code === 'ERR_CANCELED') {
+          throw e;
+        }
         setError("Failed to fetch balance");
         throw e;
       }
@@ -151,6 +154,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
     const [isError, setIsError] = useState(false);
     const [error, setError] = useState<Error | null>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
+    const intervalRef = useRef<NodeJS.Timeout | null>(null);
     const mountedRef = useRef(true);
 
     const refetch = useCallback(async () => {
@@ -167,12 +171,15 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
       setError(null);
 
       try {
-        const { balance } = await fetchBalance(tokenAddress);
+        const { balance } = await fetchBalance(tokenAddress, abortControllerRef.current.signal);
         if (mountedRef.current && !abortControllerRef.current.signal.aborted) {
           const formatted = formatBalance(balance);
           setData({ balance, formatted });
         }
-      } catch (err) {
+      } catch (err: any) {
+        if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') {
+          return;
+        }
         if (mountedRef.current && !abortControllerRef.current.signal.aborted) {
           setIsError(true);
           setError(err instanceof Error ? err : new Error('Failed to fetch balance'));
@@ -188,13 +195,23 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
       mountedRef.current = true;
       refetch();
       
+      intervalRef.current = setInterval(() => {
+        if (mountedRef.current && tokenAddress) {
+          refetch();
+        }
+      }, 15000);
+      
       return () => {
         mountedRef.current = false;
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
         if (abortControllerRef.current) {
           abortControllerRef.current.abort();
         }
       };
-    }, [refetch]);
+    }, [refetch, tokenAddress]);
 
     return {
       data,
@@ -273,24 +290,6 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
     []
   );
 
-  const fetchRedeemableTokens = useCallback(
-    async (chainId: string) => {
-      try {
-        const { data } = await api.get<BridgeToken[]>(`/bridge/redeemableTokens/${chainId}`);
-        const tokens = Array.isArray(data) ? data : [];
-        setRedeemableTokens(tokens);
-
-        // Set initial token if none is selected
-        if (tokens.length > 0 && !selectedMintToken) {
-          setSelectedMintToken(tokens[0]);
-        }
-      } catch (e) {
-        setRedeemableTokens([]);
-        setError("Failed to load tokens for selected network");
-      }
-    },
-    [selectedMintToken]
-  );
 
   return (
     <BridgeContext.Provider
@@ -299,21 +298,17 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         error,
         availableNetworks,
         bridgeableTokens,
-        redeemableTokens,
         selectedNetwork,
         selectedToken,
-        selectedMintToken,
         targetTransactionTab,
         setTargetTransactionTab,
         requestWithdrawal,
         useBalance,
         setSelectedNetwork: handleSetSelectedNetwork,
         setSelectedToken,
-        setSelectedMintToken,
         loadNetworksAndTokens,
         fetchDepositTransactions,
         fetchWithdrawTransactions,
-        fetchRedeemableTokens,
       }}
     >
       {children}

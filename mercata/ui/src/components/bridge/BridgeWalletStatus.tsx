@@ -22,9 +22,9 @@ const BridgeWalletStatus = () => {
   };
 
   return (
-    <div className="flex items-center gap-3 mb-4">
+    <div className="w-full mb-4">
       {isConnected ? (
-        <>
+        <div className="flex items-center gap-3">
           <div
             onClick={() => disconnect()}
             className="relative group cursor-pointer"
@@ -59,9 +59,9 @@ const BridgeWalletStatus = () => {
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
-        </>
+        </div>
       ) : (
-        <div className="[&>button]:bg-gradient-to-r [&>button]:from-[#1f1f5f] [&>button]:via-[#293b7d] [&>button]:to-[#16737d] [&>button]:text-white [&>button]:px-4 [&>button]:py-2 [&>button]:rounded-xl [&>button]:font-semibold [&>button]:hover:opacity-90 [&>button]:transition-all">
+        <div className="w-full [&>button]:w-full [&>button]:bg-gradient-to-r [&>button]:from-[#1f1f5f] [&>button]:via-[#293b7d] [&>button]:to-[#16737d] [&>button]:text-white [&>button]:px-4 [&>button]:py-2 [&>button]:rounded-xl [&>button]:font-semibold [&>button]:hover:opacity-90 [&>button]:transition-all">
           <ConnectButton label={"Connect Wallet"} />
         </div>
       )}

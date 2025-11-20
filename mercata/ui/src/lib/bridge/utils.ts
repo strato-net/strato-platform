@@ -171,7 +171,7 @@ export function getChainName(chainId: number | string): string {
  * Bridge status options for filter dropdowns
  */
 export const BRIDGE_STATUS_OPTIONS = [
-  { value: null, label: "All Statuses" },
+  { value: 0, label: "All Statuses" },
   { value: 1, label: "Initiated" },
   { value: 2, label: "Pending Review" },
   { value: 3, label: "Completed" },

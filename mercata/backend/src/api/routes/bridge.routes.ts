@@ -101,46 +101,6 @@ router.get("/bridgeableTokens/:chainId", authHandler.authorizeRequest(false), Br
 
 /**
  * @openapi
- * /bridge/redeemableTokens/{chainId}:
- *   get:
- *     summary: List tokens eligible for redemption
- *     tags: [Bridge]
- *     parameters:
- *       - name: chainId
- *         in: path
- *         required: true
- *         description: External chain identifier (numeric string)
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Tokens that can be redeemed on the target chain
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   stratoToken:
- *                     type: string
- *                   stratoTokenName:
- *                     type: string
- *                   stratoTokenSymbol:
- *                     type: string
- *                   externalToken:
- *                     type: string
- *                   externalName:
- *                     type: string
- *                   externalSymbol:
- *                     type: string
- *                   externalChainId:
- *                     type: string
- */
-router.get("/redeemableTokens/:chainId", authHandler.authorizeRequest(false), BridgeController.getRedeemableTokens);
-
-/**
- * @openapi
  * /bridge/networkConfigs:
  *   get:
  *     summary: Fetch enabled bridge networks

@@ -2,7 +2,6 @@ import { Request, Response, NextFunction } from "express";
 import { 
   requestWithdrawal, 
   getBridgeableTokens,
-  getRedeemableTokens,
   getNetworkConfigs,
   getBridgeTransactions
 } from "../services/bridge.service";
@@ -47,27 +46,6 @@ class BridgeController {
       }
       
       const result: BridgeToken[] = await getBridgeableTokens(accessToken, chainId);
-      res.json(result);
-    } catch (error: any) {
-      next(error);
-    }
-  }
-
-  static async getRedeemableTokens(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { accessToken } = req;
-      const { chainId } = req.params;
-      
-      if (!chainId) {
-        res.status(400).json({ error: "chainId parameter is required" });
-        return;
-      }
-      
-      const result: BridgeToken[] = await getRedeemableTokens(accessToken, chainId);
       res.json(result);
     } catch (error: any) {
       next(error);

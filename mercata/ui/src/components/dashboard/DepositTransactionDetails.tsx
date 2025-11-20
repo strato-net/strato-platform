@@ -11,11 +11,12 @@ import { formatWeiToDecimalHP } from "@/utils/numberUtils";
 import { ensureHexPrefix } from "@/utils/numberUtils";
 import { usdstAddress } from "@/lib/constants";
 
-const DepositTransactionDetails = ({ mintUSDST = false, context }: { mintUSDST?: boolean; context?: string }) => {
+const DepositTransactionDetails = ({ context }: { context?: string }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
-  const [depositStatus, setDepositStatus] = useState<number | null>(null);
-  const [selectedChainId, setSelectedChainId] = useState<number | null>(null);
+  const [depositStatus, setDepositStatus] = useState<number>(0);
+  const [selectedChainId, setSelectedChainId] = useState<number>(0);
+  const [selectedType, setSelectedType] = useState<'bridge' | 'convert' | ''>('');
   const [transactions, setTransactions] = useState<DepositTransaction[]>([]);
   const DEPOSIT_STATUS_OPTIONS = BRIDGE_STATUS_OPTIONS.filter((o) => o.value !== 4);
 
@@ -33,14 +34,18 @@ const DepositTransactionDetails = ({ mintUSDST = false, context }: { mintUSDST?:
           offset: ((currentPage - 1) * ITEMS_PER_PAGE).toString(),
           order: 'block_timestamp.desc',
         };
-        console.log('mintUSDST', mintUSDST);
-        (params as any)["value->>stratoToken"] = mintUSDST ? `eq.${usdstAddress}` : `neq.${usdstAddress}`;
         
-        if (depositStatus !== null) {
+        if (selectedType === 'convert') {
+          (params as any)["value->>stratoToken"] = `eq.${usdstAddress}`;
+        } else if (selectedType === 'bridge') {
+          (params as any)["value->>stratoToken"] = `neq.${usdstAddress}`;
+        }
+        
+        if (depositStatus !== 0) {
           (params as any)["value->>bridgeStatus"] = `eq.${depositStatus}`;
         }
         
-        if (selectedChainId !== null) {
+        if (selectedChainId !== 0) {
           (params as any)["key"] = `eq.${selectedChainId}`;
         }
         
@@ -55,7 +60,7 @@ const DepositTransactionDetails = ({ mintUSDST = false, context }: { mintUSDST?:
     };
 
     loadTransactions();
-  }, [currentPage, depositStatus, selectedChainId, fetchDepositTransactions, context]);
+  }, [currentPage, depositStatus, selectedChainId, fetchDepositTransactions, context, selectedType]);
 
   
 
@@ -123,7 +128,7 @@ const DepositTransactionDetails = ({ mintUSDST = false, context }: { mintUSDST?:
       key: "token",
       render: (_: any, record: any) => (
         <div className="flex flex-col gap-1">
-          <span className="text-sm text-gray-700">{mintUSDST ? 'USDST' : record.stratoTokenSymbol || '-'}</span>
+          <span className="text-sm text-gray-700">{record.stratoTokenSymbol || '-'}</span>
         </div>
       ),
       width: 150,
@@ -187,12 +192,30 @@ const DepositTransactionDetails = ({ mintUSDST = false, context }: { mintUSDST?:
         <Space size="large">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
+              Type
+            </label>
+            <Select
+              value={selectedType || ''}
+              onChange={(v) => {
+                setSelectedType(v === '' ? '' : v as 'bridge' | 'convert');
+                setCurrentPage(1);
+              }}
+              style={{ width: 150 }}
+              options={[
+                { value: '', label: 'All Types' },
+                { value: 'bridge', label: 'Bridge' },
+                { value: 'convert', label: 'Convert' },
+              ]}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Status Filter
             </label>
             <Select
-              value={depositStatus}
+              value={depositStatus || 0}
               onChange={(v) => {
-                setDepositStatus(v);
+                setDepositStatus(v || 0);
                 setCurrentPage(1);
               }}
               style={{ width: 150 }}
@@ -204,14 +227,14 @@ const DepositTransactionDetails = ({ mintUSDST = false, context }: { mintUSDST?:
               Chain Filter
             </label>
             <Select
-              value={selectedChainId}
+              value={selectedChainId || 0}
               onChange={(v) => {
-                setSelectedChainId(v);
+                setSelectedChainId(v || 0);
                 setCurrentPage(1);
               }}
               style={{ width: 150 }}
               options={[
-                { value: null, label: "All Chains" },
+                  { value: 0, label: "All Chains" },
                 ...availableNetworks.map((n) => ({ value: parseInt(n.chainId), label: n.chainName }))
               ]}
             />
@@ -245,7 +268,7 @@ const DepositTransactionDetails = ({ mintUSDST = false, context }: { mintUSDST?:
               </div>
             ),
           }}
-          rowKey={(_, index) => `${index}`}
+          rowKey={(_, index) => index}
         />
       </div>
     </div>

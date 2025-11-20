@@ -34,13 +34,6 @@ const BridgeTransactionsPage = ({ isAdmin = false }: { isAdmin?: boolean }) => {
       key: 'WithdrawalInitiated',
       label: 'Withdrawal',
     },
-    {
-      key: 'RedemptionInitiated',
-      label: 'Redemption',
-    },
-    { key: 'USDSTDeposit',
-      label: 'USDST',
-    },
   ];
 
   return (
@@ -69,20 +62,9 @@ const BridgeTransactionsPage = ({ isAdmin = false }: { isAdmin?: boolean }) => {
               </div>
 
               {transactionType === 'DepositRecorded' ? (
-                <DepositTransactionDetails key="deposit" mintUSDST={false} context={isAdmin ? 'admin' : undefined} />
-              ):
-              transactionType === 'WithdrawalInitiated' ? (
-                <WithdrawTransactionDetails key="withdrawal" mintUSDST={false} context={isAdmin ? 'admin' : undefined} />
-              ):
-              transactionType === 'RedemptionInitiated' ? (
-                <WithdrawTransactionDetails key="redemption" mintUSDST={true} context={isAdmin ? 'admin' : undefined} />
-              ):
-              transactionType === 'USDSTDeposit' ? (
-                <DepositTransactionDetails key="usdst" mintUSDST={true} context={isAdmin ? 'admin' : undefined} />
-              ):
-              // default to bridge out
-              (
-                <WithdrawTransactionDetails key="default" mintUSDST={false} context={isAdmin ? 'admin' : undefined} />
+                <DepositTransactionDetails key="deposit" context={isAdmin ? 'admin' : undefined} />
+              ) : (
+                <WithdrawTransactionDetails key="withdrawal" context={isAdmin ? 'admin' : undefined} />
               )}
             </div>
           </div>

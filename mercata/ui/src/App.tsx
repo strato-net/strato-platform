@@ -28,11 +28,13 @@ import MercataStats from "./pages/MercataStats";
 // Import dashboard components
 
 import BridgeTransactionsPage from "./pages/BridgeTransactionsPage";
+import WithdrawalsPage from "./pages/WithdrawalsPage";
 import Admin from "./pages/Admin";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { coinbaseWallet, metaMaskWallet, walletConnectWallet } from "@rainbow-me/rainbowkit/wallets";
 import AdminRoute from "./components/AdminRoute";
 import DashboardWrapper from "./components/layouts/DashboardWrapper";
+import { WithdrawalsProviders } from "./components/layouts/WithdrawalsProviders";
 import { LendingProvider } from "./context/LendingContext";
 import { CDPProvider } from "./context/CDPContext";
 import { TokenProvider } from "./context/TokenContext";
@@ -238,6 +240,17 @@ const App = () => {
                                         <MercataStats />
                                       </DashboardWrapper>
                                     </ProtectedRoute>
+                                  }
+                                />
+
+                                <Route
+                                  path="/withdrawals"
+                                  element={
+                                    <WithdrawalsProviders>
+                                      <ProtectedRoute>
+                                        <WithdrawalsPage />
+                                      </ProtectedRoute>
+                                    </WithdrawalsProviders>
                                   }
                                 />
 

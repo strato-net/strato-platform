@@ -20,11 +20,9 @@ export type BridgeContextType = {
   loading: boolean;
   error: string | null;
   availableNetworks: NetworkSummary[];
-  bridgeableTokens: BridgeToken[];
-  redeemableTokens: BridgeToken[];
+  bridgeableTokens: BridgeToken[]; // All tokens for the selected network (filter by bridgeable flag)
   selectedNetwork: string | null;
   selectedToken: BridgeToken | null;
-  selectedMintToken: BridgeToken | null;
   // Navigation state for bridge transactions
   targetTransactionTab: BridgeTransactionTab | null;
   setTargetTransactionTab: (tab: BridgeTransactionTab | null) => void;
@@ -41,12 +39,10 @@ export type BridgeContextType = {
   };
   setSelectedNetwork: (networkName: string) => void;
   setSelectedToken: (token: BridgeToken | null) => void;
-  setSelectedMintToken: (token: BridgeToken | null) => void;
   loadNetworksAndTokens: () => Promise<void>;
   // Bridge transaction functions
   fetchDepositTransactions: (rawParams?: Record<string, string | undefined>, context?: string) => Promise<BridgeTransactionResponse>;
   fetchWithdrawTransactions: (rawParams?: Record<string, string | undefined>, context?: string) => Promise<BridgeTransactionResponse>;
-  fetchRedeemableTokens: (chainId: string) => void;
 };
 
 export interface ContractValidationResult {

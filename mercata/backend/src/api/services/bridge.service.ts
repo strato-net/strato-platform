@@ -91,7 +91,6 @@ export const getBridgeableTokens = async (accessToken: string, chainId: string):
   const params = {
     select: "externalToken:key,externalChainId:key2,AssetInfo:value",
     "value->>enabled": "eq.true",
-    "value->>stratoToken": `neq.${USDST}`,
     key2: `eq.${chainId}`,
     address: `eq.${mercataBridge}`
   };
@@ -102,26 +101,9 @@ export const getBridgeableTokens = async (accessToken: string, chainId: string):
   const tokenAddresses = assets.map((a: any) => a.AssetInfo.stratoToken).filter(Boolean);
   const tokenMap = await getTokenMetadata(accessToken, tokenAddresses);
   
-  return enrichAssetsWithTokenData(assets, tokenMap);
-};
-
-export const getRedeemableTokens = async (accessToken: string, chainId: string): Promise<BridgeToken[]> => {
-  const params = {
-    select: "externalToken:key,externalChainId:key2,AssetInfo:value",
-    "value->>enabled": "eq.true",
-    "value->>stratoToken": `eq.${USDST}`,
-    key2: `eq.${chainId}`,
-    address: `eq.${mercataBridge}`
-  };
-  
-  const { data: assets } = await cirrus.get(accessToken, `/${MercataBridge}-assets`, { params });
-  if (!assets?.length) return [];
-  
-  return assets.map((asset: any) => ({
-    ...asset.AssetInfo,
-    stratoTokenName: "USDST",
-    stratoTokenSymbol: "USDST",
-    id: `${asset.externalToken}-${asset.externalChainId}`
+  return enrichAssetsWithTokenData(assets, tokenMap).map((token) => ({
+    ...token,
+    bridgeable: token.stratoToken !== USDST
   }));
 };
 

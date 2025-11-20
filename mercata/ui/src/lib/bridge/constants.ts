@@ -9,6 +9,19 @@ export const PERMIT2_ADDRESS = '0x000000000022D473030F116dDEE9F6B43aC78BA3' as c
 // UI Constants
 export const ITEMS_PER_PAGE = 10;
 
+export const BRIDGE_MODE_LABELS = {
+  convert: {
+    title: "Redeem to Stablecoins",
+    description: "Redeem USDST back to external stablecoins",
+    amountLabel: "Amount (USDST to withdraw)",
+  },
+  bridge: {
+    title: "Bridge Out Your Tokens",
+    description: "Bridge your tokens from STRATO to external networks",
+    amountLabel: "Amount",
+  },
+} as const;
+
 // Contract ABIs
 export const ERC20_ABI = [
   {

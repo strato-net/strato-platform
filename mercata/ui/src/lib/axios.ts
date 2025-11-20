@@ -59,6 +59,11 @@ function extractApiErrorMessage(error: any): string {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Skip error handling for aborted/canceled requests
+    if (error.name === 'AbortError' || error.name === 'CanceledError' || error.code === 'ERR_CANCELED') {
+      return Promise.reject(error);
+    }
+    
     const url = error?.config?.url || "";
     
     // Handle CSRF validation errors (403 with CSRF message)
