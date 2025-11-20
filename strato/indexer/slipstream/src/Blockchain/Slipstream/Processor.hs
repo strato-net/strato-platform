@@ -242,7 +242,7 @@ processTheMessages messages = do
 
   forM_ (rights inserts) $ $logDebugLS "processTheMessages/toInsert"
   
-  mapOutput Right . outputDataDedup $ do
+  mapOutput Right . outputData $ do
     forM_ insertsByCodeHash $ \ins -> do
 --      lift $ insertIndexTable2 $ insertToStorage $ indexInsert ins
       insertIndexTable $ indexInsert ins
@@ -254,13 +254,13 @@ processTheMessages messages = do
   let processedEventArrays = concatMap aggEventToCollectionRows events'
 
   when (not (null events')) $ do
-    mapOutput Right . outputDataDedup $ pipeInsertGlobalEventTable events'
+    mapOutput Right . outputData $ pipeInsertGlobalEventTable events'
     unless (null processedEventArrays) $
-      mapOutput Right . outputDataDedup $ insertCollectionTable processedEventArrays
+      mapOutput Right . outputData $ insertCollectionTable processedEventArrays
 
   when (not $ null fkeys) $ do
     $logDebugLS "processTheMessages" $ T.pack $ "Updating PostgREST schema cache for " ++ show (length fkeys) ++ " foreign keys"
-    mapOutput Right . outputDataDedup $ createFkeyFunctions fkeys
+    mapOutput Right . outputData $ createFkeyFunctions fkeys
     mapOutput Right . outputData $ notifyPostgREST
 
   $logInfoS "processTheMessages" . T.pack $

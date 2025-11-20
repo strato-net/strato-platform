@@ -318,7 +318,7 @@ slipstreamQueryText _ CreateView{..} =
                 SqlDecimal   -> "0::numeric"
                 SqlText      -> "''::text"
                 SqlJsonb     -> "to_jsonb(''::text)"
-                SqlTimestamp -> "'1970-01-01 00:00:00.000'::timestamp)"
+                SqlTimestamp -> "'infinity'::timestamp)"
                 SqlSerial    -> "0::numeric"
             , " END AS "
             , wrapEscapeDouble $ if c `Set.member` baseColumnSet then "arg_" <> c else c
@@ -356,7 +356,7 @@ slipstreamQueryText _ CreateView{..} =
                   SqlDecimal   -> "'0'::text"
                   SqlText      -> "''::text"
                   SqlJsonb     -> "to_jsonb(''::text)"
-                  SqlTimestamp -> "'1970-01-01 00:00:00.000'::timestamp)"
+                  SqlTimestamp -> "'infinity'::timestamp)"
                   SqlSerial    -> "0::numeric"
               , " END)"
               ]
@@ -524,7 +524,8 @@ outputData ::
   ConduitM () SlipstreamQuery m a ->
   ConduitM i [SlipstreamQuery] m a
 outputData c = do
-  (a, _) <- lift . runConduit $ c `fuseBoth` sinkList
+  (a, cmds) <- lift . runConduit $ c `fuseBoth` sinkList
+  yield cmds
   pure a
 
 dedupC :: MonadLogger m => ConduitM SlipstreamQuery SlipstreamQuery m ()
