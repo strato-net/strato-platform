@@ -29,6 +29,7 @@ const MobileSidebar = ({ isOpen, onClose }: MobileSidebarProps) => {
       items: [
         { icon: <Building2 size={20} />, label: 'Lending Pool', path: '/dashboard/borrow/lending' },
         { icon: <Vault size={20} />, label: 'CDP Vaults', path: '/dashboard/borrow/cdp' },
+        { icon: <AlertTriangle size={20} />, label: 'Liquidations', path: '/dashboard/pools/liquidations' },
       ]
     },
     { icon: <ArrowRightLeft size={20} />, label: 'Swap', path: '/dashboard/swap' },
@@ -36,10 +37,9 @@ const MobileSidebar = ({ isOpen, onClose }: MobileSidebarProps) => {
       icon: <Database size={20} />,
       label: 'Pools',
       items: [
-        { icon: <Droplets size={20} />, label: 'Lending Pools', path: '/dashboard/pools/lending' },
-        { icon: <TrendingUp size={20} />, label: 'Swap Pools', path: '/dashboard/pools/swap' },
+        { icon: <Droplets size={20} />, label: 'Savings', path: '/dashboard/pools/lending' },
+        { icon: <TrendingUp size={20} />, label: 'Add Liquidity', path: '/dashboard/pools/swap' },
         { icon: <ShieldCheck size={20} />, label: 'Safety Module', path: '/dashboard/pools/safety' },
-        { icon: <AlertTriangle size={20} />, label: 'Liquidations', path: '/dashboard/pools/liquidations' },
       ]
     },
     {
