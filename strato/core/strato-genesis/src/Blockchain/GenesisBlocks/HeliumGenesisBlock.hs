@@ -410,7 +410,7 @@ wbtc = BridgeAssetInfo
   0x29f2d40b0605204364af54ec677bd022da425d03
   0
   0x7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9
-  
+
 
 paxg :: BridgeAssetInfo
 paxg = BridgeAssetInfo

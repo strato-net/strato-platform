@@ -56,7 +56,7 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => HasPeerDB (MemPeerDBM m) where
     peerMap <- fmap stringPPeerMap accessEnv
     atomicModifyIORef' peerMap $ (,()) . (ix host %~ \p -> p {pPeerActiveState = fromActivityState a})
 
-  getActivePeers = try $ do 
+  getActivePeers = try $ do
     peerMap <- readIORef . stringPPeerMap =<< accessEnv
     return . filter ((== Active) . toActivityState . pPeerActiveState) $ M.elems peerMap
 

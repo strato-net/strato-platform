@@ -252,7 +252,7 @@ instance {-# OVERLAPPING #-} MonadIO m => (MonadSimulator m) `Mod.Yields` DataDe
   yield txr = simulatorContextTransactionResults %= (txr:)
 
 instance {-# OVERLAPPING #-} Monad m => (MonadSimulator m) `Mod.Outputs` StateDiff where
-  output _ = pure () 
+  output _ = pure ()
 
 instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m) => (MonadSimulator m) `Mod.Outputs` SlipstreamQuery where
   output = traverse_ ($logInfoS ("slipstream/cmds") . T.pack) . lines . show
@@ -468,7 +468,7 @@ instance {-# OVERLAPPING #-} MonadIO m => A.Selectable Address Integer (MonadSim
   select _ _ = pure $ Just 0
 
 instance {-# OVERLAPPING #-} MonadIO m => A.Selectable Keccak256 SourceMap (MonadSimulator m) where
-  select _ ch = A.lookup (A.Proxy @DBCode) ch >>= \case 
+  select _ ch = A.lookup (A.Proxy @DBCode) ch >>= \case
     Nothing -> pure Nothing
     Just codeBS -> case Aeson.decode' $ BL.fromStrict codeBS of
       Just codeMap -> pure . Just . SourceMap $ M.toList codeMap

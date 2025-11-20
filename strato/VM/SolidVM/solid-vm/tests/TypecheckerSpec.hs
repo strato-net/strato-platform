@@ -893,7 +893,7 @@ contract qq {
   uint x = 0;
 
   constructor() {
-    x = f(6,5);   
+    x = f(6,5);
   }
   function f(string, uint) public returns (uint) {
     return 7;
@@ -970,7 +970,7 @@ contract A {
   uint public x = 75;
   function f() {
     g = x;
-  } 
+  }
 }
 |]
 
@@ -1046,7 +1046,7 @@ contract qq {
   uint immutable d = 22;
   constructor() public {
     d = g;
-  } 
+  }
 }|]
 
     length anns `shouldBe` 1
@@ -1698,7 +1698,7 @@ contract B {
         liftIO $
           runTypechecker
             [r|
-  
+
   type MagicInt is int;
   type MysticalString is string;
     type UBool is bool;
@@ -1709,7 +1709,7 @@ contract B {
     MagicInt cayley1        = MagicInt.wrap(helper);  //Should Error -- passing string var into int alias wrap function
     MagicInt cayley2        = MagicInt.wrap("12");   //Should Error  -- passing string literal into int alias wrap function
     MagicInt cayley3        = 12;                   //Should Error   -- assigning int literal to user defined type
-    MagicInt yoneda         = MagicInt.wrap(12);        
+    MagicInt yoneda         = MagicInt.wrap(12);
     MysticalString shakeYo2 = MysticalString.wrap(yoneda); //Should Error -- passing user defined type to alias wrap function
     MagicInt felixKlein     = MagicInt.wrap(yoneda);      //Should Error  -- passing user defined type to alias wrap function
     MagicInt mrBool         = UBool.wrap(true);          //Error          -- passing wrong type to alias wrap function
@@ -1723,8 +1723,8 @@ contract B {
         liftIO $
           runTypechecker
             [r|
-  
-  
+
+
   type MagicInt       is int;
   type MysticalString is string;
   type UBool          is bool;
@@ -1735,13 +1735,13 @@ contract B {
     bool  fermet       =  UBool.unwrap(UBool.wrap(true));
     bool  felixKlein   =  UBool.unwrap(UBool.wrap(mrBool));
 
-    
+
     //Int
     MagicInt cayley   =  MagicInt.wrap(123);
     int      yoneda   =  MagicInt.unwrap(cayley);
     int      lagrange =  MagicInt.unwrap(MagicInt.wrap(123));
     MagicInt gauss    =  MagicInt.wrap(MagicInt.unwrap(MagicInt.wrap(123)));
-    
+
     //String
     MysticalString hilbert  = MysticalString.wrap("vector");
     string         banach   = MysticalString.unwrap(hilbert);
@@ -1755,7 +1755,7 @@ contract B {
         liftIO $
           runTypechecker
             [r|
-  
+
   type UBool is bool;
   type MagicInt is int;
   type MysticalString is string;
@@ -2096,7 +2096,7 @@ contract qq {
 }
 |]
       length anns `shouldBe` 0
-    
+
     it "can't use index access on an array accessor" $ do
       anns <-
         liftIO $
@@ -2118,7 +2118,7 @@ contract qq {
 }
 |]
       length anns `shouldBe` 0
-    
+
     it "can index access a contract array returned from a function" $ do
       anns <-
         liftIO $

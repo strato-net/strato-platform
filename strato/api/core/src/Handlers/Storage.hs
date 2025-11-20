@@ -152,7 +152,7 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable StorageFilterParams [
                     -- Note: a join is done in StorageInfo
                     fmap (\v -> addrStRef E.^. AddressStateRefAddress E.==. E.val v) qsAddress
                   ]
-          
+
           unless (null criteria2) $
             E.where_ (foldl1 (E.&&.) criteria2)
 

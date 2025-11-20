@@ -245,7 +245,7 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
 
         postRewardSR <- A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
         verifyBlockResult <- verifyBlock (outputBlockToBlock b) (trrs, postRewardSR) bSum
-        case verifyBlockResult of 
+        case verifyBlockResult of
           failures@(_:_) -> do
             lift $ P.incCounter vmBlocksInvalid
             pure $ map (\r -> BlockVerificationFailure (bSumNumber bSum) (bSumParentHash bSum) r) failures
@@ -265,10 +265,10 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
             pure []
 
 -- TODO: If we add more verifications, refactor tuple into a proper data type
-verifyBlock :: 
+verifyBlock ::
   HasStateDB m =>
-  Block -> 
-  ([TxRunResult], Maybe MP.StateRoot) -> 
+  Block ->
+  ([TxRunResult], Maybe MP.StateRoot) ->
   BlockSummary ->
   m [BlockVerificationFailureDetails]
 verifyBlock b@Block{blockBlockData = bh} (trrs, derivedSR) parentBSum = do
@@ -297,7 +297,7 @@ addBlockTransactions b@OutputBlock {obBlockData = bd, obReceiptTransactions = tr
   flushMemStorageTxDBToBlockDB
 
   yield . OutVMEvents =<< sendNewActionMessage b trrs
-  
+
   lift $ timeit "flushMemStorageDB" (Just vmBlockInsertionMined) flushMemStorageDB
   flushMemAddressStateTxToBlockDB
   flushMemAddressStateTxToBlockDB
@@ -393,7 +393,7 @@ mineTransactions' header remGas ran unran@(tx : txs) mSelfAddress = do
               putAddressStateTxDBMap M.empty
               putMemRawStorageTxMap M.empty
               return $ Bagger.TxMiningResult (Just $ TFInvalidPragma invalidPragmas tx) (DL.toList ran) unran remGas -- use invalidPragmasUsed here
-            else do 
+            else do
               case erException execResult of
                 Just (Left (TooMuchGas limit actual)) -> do
                   putAddressStateTxDBMap M.empty
@@ -416,7 +416,7 @@ addTransaction ::
   BlockHeader ->
   Integer ->
   OutputTx ->
-  Address -> 
+  Address ->
   ExceptT TransactionFailureCause m ExecResults
 addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
   nonceValid <- lift $ isNonceValid t
