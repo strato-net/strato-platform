@@ -67,7 +67,7 @@ const calculateExchangeRates = (pool: Pool | null, fromAsset: SwapToken | null) 
 // UI COMPONENTS
 // ============================================================================
 const LoadingSpinner = () => (
-  <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary" />
+  <span className="inline-flex items-center animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary" />
 );
 
 const AnimatedNumber = ({ value, isLoading }: { value: string | undefined; isLoading: boolean }) => {
@@ -868,13 +868,13 @@ const SwapWidget = () => {
       <div className="flex flex-col gap-2 bg-gray-50 p-4 rounded-lg">
         <div className="flex justify-between text-sm">
           <span className="text-gray-600 decoration-2">Exchange Rate</span>
-          <span className="font-medium">
+          <span className="font-medium inline-flex items-center gap-1">
             1 {fromAsset?._symbol || ""} ≈ <AnimatedNumber value={exchangeRate} isLoading={poolLoading} /> {toAsset?._symbol || ""}
           </span>
         </div>
         <div className="flex justify-between text-sm">
           <span className="text-gray-400">Exchange Rate (Spot)</span>
-          <span className="font-medium text-gray-400">
+          <span className="font-medium text-gray-400 inline-flex items-center gap-1">
             1 {fromAsset?._symbol || ""} ≈ <AnimatedNumber value={oracleExchangeRate} isLoading={poolLoading} /> {toAsset?._symbol || ""}
           </span>
         </div>
