@@ -55,6 +55,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
   const [maxValues, setMaxValues] = useState<Record<string, number>>({});  // Store max values for comparison
   const [isGlobalPaused, setIsGlobalPaused] = useState<boolean>(false);
   const [assetPauseStates, setAssetPauseStates] = useState<Record<string, boolean>>({});
+  const [assetSupportedStates, setAssetSupportedStates] = useState<Record<string, boolean>>({});
 
   // Fetch positions from backend
   useEffect(() => {
@@ -73,13 +74,14 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
           setIsGlobalPaused(true); // Default to paused if we can't fetch
         }
         
-        // Initialize state for each position and check asset pause status
+        // Initialize state for each position and check asset pause/support status
         const initialActiveActions: Record<string, null> = {};
         const initialAmounts: Record<string, string> = {};
         const initialMaxStates: Record<string, boolean> = {};
         const initialAssetPauseStates: Record<string, boolean> = {};
+        const initialAssetSupportedStates: Record<string, boolean> = {};
         
-        // Check pause status for each asset
+        // Check pause and support status for each asset
         for (const position of fetchedPositions) {
           initialActiveActions[position.asset] = null;
           initialAmounts[position.asset] = "";
@@ -88,9 +90,11 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
           try {
             const assetConfig = await cdpService.getAssetConfig(position.asset);
             initialAssetPauseStates[position.asset] = assetConfig?.isPaused || false;
+            initialAssetSupportedStates[position.asset] = assetConfig?.isSupported !== false; // Default to true if not found
           } catch (error) {
-            console.error(`Failed to fetch pause status for ${position.symbol}:`, error);
+            console.error(`Failed to fetch asset config for ${position.symbol}:`, error);
             initialAssetPauseStates[position.asset] = true; // Default to paused if we can't fetch
+            initialAssetSupportedStates[position.asset] = false; // Default to unsupported if we can't fetch
           }
         }
         
@@ -98,6 +102,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
         setInputAmounts(initialAmounts);
         setMaxStates(initialMaxStates);
         setAssetPauseStates(initialAssetPauseStates);
+        setAssetSupportedStates(initialAssetSupportedStates);
       } catch (error) {
         console.error("Failed to fetch positions:", error);
         toast({
@@ -634,28 +639,42 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                   </div>
                 </div>
                 
-                {/* 3-dot options menu */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => handleActionSelect(position.asset, 'deposit')}>
-                      Deposit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleActionSelect(position.asset, 'withdraw')}>
-                      Withdraw
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleActionSelect(position.asset, 'borrow')}>
-                      Borrow
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleActionSelect(position.asset, 'repay')}>
-                      Repay
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                {/* 3-dot options menu - only render if asset is supported */}
+                {assetSupportedStates[position.asset] !== false && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-8 w-8 p-0"
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem 
+                        onClick={() => handleActionSelect(position.asset, 'deposit')}
+                      >
+                        Deposit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => handleActionSelect(position.asset, 'withdraw')}
+                      >
+                        Withdraw
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => handleActionSelect(position.asset, 'borrow')}
+                      >
+                        Borrow
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => handleActionSelect(position.asset, 'repay')}
+                      >
+                        Repay
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
               </div>
 
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
@@ -692,6 +711,15 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                   <p className="font-semibold">{formatPercentage(position.stabilityFeeRate)}</p>
                 </div>
               </div>
+
+              {/* Warning for disabled/unsupported assets */}
+              {assetSupportedStates[position.asset] === false && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-700 font-medium text-center">
+                    ⚠️ Admin has disabled {position.symbol} at this time. All operations are disabled.
+                  </p>
+                </div>
+              )}
 
               {/* Preview Values */}
               {previewValues && (
@@ -737,9 +765,14 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
               {/* Conditional Action Input/Button */}
               {activeActions[position.asset] && (
                 <div className="mt-4">
-                  {/* Show pause message only for borrow/withdraw when paused */}
-                  {/* Note: deposit and repay are NOT affected by pause (no whenNotPaused modifier) */}
-                  {(isGlobalPaused || assetPauseStates[position.asset]) && (activeActions[position.asset] === 'borrow' || activeActions[position.asset] === 'withdraw') ? (
+                  {/* Show unsupported message for all actions when asset is unsupported */}
+                  {assetSupportedStates[position.asset] === false ? (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-center">
+                      <p className="text-sm text-red-700 font-medium">
+                        {activeActions[position.asset]!.charAt(0).toUpperCase() + activeActions[position.asset]!.slice(1)} disabled - {position.symbol} is not supported
+                      </p>
+                    </div>
+                  ) : (isGlobalPaused || assetPauseStates[position.asset]) && (activeActions[position.asset] === 'borrow' || activeActions[position.asset] === 'withdraw') ? (
                     <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-center">
                       <p className="text-sm text-yellow-700 font-medium">
                         {isGlobalPaused 

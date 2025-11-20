@@ -178,10 +178,16 @@ export const cdpService = {
     return response.data;
   },
 
-  // Get all supported assets
-  async getSupportedAssets(): Promise<AssetConfig[]> {
-    const response = await api.get("/cdp/assets");
+  // Get assets (all by default, or only supported if supportedOnly is true)
+  async getAssets(supportedOnly?: boolean): Promise<AssetConfig[]> {
+    const params = supportedOnly ? { supported: 'true' } : {};
+    const response = await api.get("/cdp/assets", { params });
     return response.data;
+  },
+
+  // Get all supported assets (backward compatibility - calls getAssets with supportedOnly=true)
+  async getSupportedAssets(): Promise<AssetConfig[]> {
+    return this.getAssets(true);
   },
 
   async getAssetDebtInfo(asset: string): Promise<{
@@ -236,6 +242,12 @@ export const cdpService = {
   // Set global pause status
   async setGlobalPaused(isPaused: boolean): Promise<TransactionResponse> {
     const response = await api.post("/cdp/admin/set-global-paused", { isPaused });
+    return response.data;
+  },
+
+  // Toggle asset support status
+  async setAssetSupported(asset: string, supported: boolean): Promise<TransactionResponse> {
+    const response = await api.post("/cdp/admin/set-asset-supported", { asset, supported });
     return response.data;
   },
 
