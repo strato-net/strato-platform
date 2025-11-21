@@ -9,8 +9,10 @@ import { ITEMS_PER_PAGE } from '@/lib/bridge/constants';
 import { formatWeiToDecimalHP } from '@/utils/numberUtils';
 import { ensureHexPrefix } from '@/utils/numberUtils';
 import { usdstAddress } from '@/lib/constants';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
+  const isMobile = useIsMobile();
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [withdrawalStatus, setWithdrawalStatus] = useState<number>(0);
@@ -195,8 +197,13 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
   return (
     <div className="space-y-4">
       <Card className="bg-white/80 rounded-xl shadow-sm border border-gray-200">
-        <Space size="large">
-          <div>
+        <Space 
+          size="large" 
+          direction={isMobile ? "vertical" : "horizontal"} 
+          className={isMobile ? "w-full" : ""}
+          style={isMobile ? { width: '100%' } : {}}
+        >
+          <div className={isMobile ? "w-full" : ""}>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Type
             </label>
@@ -206,7 +213,7 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
                 setSelectedType(v === '' ? '' : v as 'bridge' | 'convert');
                 setCurrentPage(1);
               }}
-              style={{ width: 150 }}
+              style={{ width: isMobile ? '100%' : 150 }}
               options={[
                 { value: '', label: 'All Types' },
                 { value: 'bridge', label: 'Bridge' },
@@ -214,7 +221,7 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
               ]}
             />
           </div>
-          <div>
+          <div className={isMobile ? "w-full" : ""}>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Status Filter
             </label>
@@ -224,11 +231,11 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
                 setWithdrawalStatus(v || 0);
                 setCurrentPage(1);
               }}
-              style={{ width: 150 }}
+              style={{ width: isMobile ? '100%' : 150 }}
               options={BRIDGE_STATUS_OPTIONS}
             />
           </div>
-          <div>
+          <div className={isMobile ? "w-full" : ""}>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Chain Filter
             </label>
@@ -238,7 +245,7 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
                 setSelectedChainId(v || 0);
                 setCurrentPage(1);
               }}
-              style={{ width: 150 }}
+              style={{ width: isMobile ? '100%' : 150 }}
               options={[
                 { value: 0, label: 'All Chains' },
                 ...availableNetworks.map((n) => ({ value: parseInt(n.chainId), label: n.chainName }))
@@ -248,11 +255,12 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
         </Space>
       </Card>
       
-      <div className="bg-white/80 rounded-xl shadow-sm border border-gray-200">
+      <div className="bg-white/80 rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
         <Table
           columns={columns}
           dataSource={transactions}
           loading={isLoading}
+          scroll={isMobile ? { x: 'max-content' } : undefined}
           pagination={{
             current: currentPage,
             total: totalCount,
@@ -260,6 +268,7 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
             onChange: (page) => setCurrentPage(page),
             showSizeChanger: false,
             showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
+            simple: isMobile,
           }}
           locale={{
             emptyText: (
