@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import MobileSidebar from '../components/dashboard/MobileSidebar';
@@ -24,8 +24,9 @@ import { useBridgeContext } from '@/context/BridgeContext';
 import { cataAddress } from '@/lib/constants';
 
 const DepositsPage = () => {
+  const location = useLocation();
   const { userAddress } = useUser();
-  const { earningAssets, getEarningAssets, inactiveTokens, getInactiveTokens, loadingEarningAssets, loadingInactiveTokens } = useTokenContext();
+  const { earningAssets, getEarningAssets, inactiveTokens, loadingEarningAssets } = useTokenContext();
   const { loans } = useLendingContext();
   const { totalCDPDebt } = useCDP();
   const { loadNetworksAndTokens, setTargetTransactionTab } = useBridgeContext();
@@ -62,12 +63,11 @@ const DepositsPage = () => {
   });
 
   useEffect(() => {
-    // Only show loading if we don't have existing data
-    const hasExistingData = earningAssets.length > 0;
-    getEarningAssets(!hasExistingData);
-    getInactiveTokens(!hasExistingData);
+    const hasExistingEarningAssets = earningAssets.length > 0;
+    
+    getEarningAssets(!hasExistingEarningAssets);
     loadNetworksAndTokens().catch(() => {});
-  }, [userAddress, earningAssets.length]);
+  }, [location.pathname, userAddress]);
 
   return (
     <div className="h-screen bg-gray-50 overflow-hidden">
@@ -149,7 +149,7 @@ const DepositsPage = () => {
               </div>
               {/* My Deposits (Earning Assets) */}
               <AssetsList 
-                loading={loadingEarningAssets || loadingInactiveTokens} 
+                loading={loadingEarningAssets} 
                 tokens={nonPoolTokens} 
                 inActiveTokens={inactiveTokens} 
                 isDashboard={false}

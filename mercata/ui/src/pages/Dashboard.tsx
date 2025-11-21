@@ -10,7 +10,7 @@ import { Wallet, Coins, Shield, Banknote, Loader2 } from "lucide-react";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
 import { usePendingRewards } from "@/hooks/usePendingRewards";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams, useNavigate, useLocation } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useNetBalance } from "@/hooks/useNetBalance";
 import MyPoolParticipationSection from "@/components/dashboard/MyPoolParticipationSection";
@@ -22,13 +22,13 @@ import { api } from "@/lib/axios";
 const Dashboard = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const { userAddress } = useUser();
   const { earningAssets, getEarningAssets, inactiveTokens, getInactiveTokens, loadingEarningAssets, loadingInactiveTokens } = useTokenContext();
   const { loans, refreshLoans } = useLendingContext();
+  const { totalCDPDebt, refreshVaults } = useCDP();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-
-  const { totalCDPDebt } = useCDP();
   const { pendingRewards, refetch: refetchPendingRewards } = usePendingRewards(rewardsEnabled, 30000);
   const [isClaiming, setIsClaiming] = useState(false);
 
@@ -67,11 +67,14 @@ const Dashboard = () => {
   useEffect(() => {
     document.title = "Dashboard | STRATO Mercata";
     
-    // Show loading on initial load only
-    getEarningAssets(true);
-    getInactiveTokens(true);
+    const hasExistingEarningAssets = earningAssets.length > 0;
+    const hasExistingInactiveTokens = inactiveTokens.length > 0;
+    
+    getEarningAssets(!hasExistingEarningAssets);
+    getInactiveTokens(!hasExistingInactiveTokens);
     refreshLoans();
-  }, [userAddress]);
+    refreshVaults();
+  }, [location.pathname, userAddress]);
 
   useEffect(() => {
     if (!searchParams) return;

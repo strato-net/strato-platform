@@ -35,7 +35,8 @@ const WithdrawalsPage = () => {
 
   // Withdrawal summary polling (15s interval)
   useEffect(() => {
-    fetchWithdrawalSummary(true);
+    const hasExistingData = !!withdrawalSummary;
+    fetchWithdrawalSummary(!hasExistingData);
 
     withdrawalSummaryIntervalRef.current = setInterval(() => {
       fetchWithdrawalSummary(false);

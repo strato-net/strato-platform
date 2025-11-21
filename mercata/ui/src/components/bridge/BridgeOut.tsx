@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -72,6 +72,8 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isConvert = false }) => {
       availableNetworks.find((n) => n.chainName === selectedNetwork) || null
     );
   }, [availableNetworks, selectedNetwork]);
+
+  const balancePollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const {
     data: balanceData,
@@ -175,9 +177,29 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isConvert = false }) => {
     setSelectedToken,
   ]);
 
+  // Balance polling (15s interval)
   useEffect(() => {
-    fetchUsdstBalance();
-  }, [fetchUsdstBalance]);
+    if (!selectedToken?.stratoToken) {
+      if (balancePollingIntervalRef.current) {
+        clearInterval(balancePollingIntervalRef.current);
+        balancePollingIntervalRef.current = null;
+      }
+      return;
+    }
+
+    refetchBalance();
+
+    balancePollingIntervalRef.current = setInterval(() => {
+      refetchBalance();
+    }, 15000);
+
+    return () => {
+      if (balancePollingIntervalRef.current) {
+        clearInterval(balancePollingIntervalRef.current);
+        balancePollingIntervalRef.current = null;
+      }
+    };
+  }, [selectedToken?.stratoToken, refetchBalance]);
 
   // Handlers
   const handleAmountChange = useCallback(

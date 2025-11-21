@@ -232,7 +232,7 @@ const UsdstBalanceBox: React.FC = () => {
                     : "Warning: Low gas funds - add USDST to continue transacting"}
                 </p>
                 <Link
-                  to="/deposits/?tab=convert"
+                  to="/dashboard/deposits/?tab=convert"
                   className="underline hover:no-underline font-medium"
                 >
                   Add funds →

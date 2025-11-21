@@ -265,7 +265,7 @@ const AssetDetail = () => {
               <div className="text-center py-12">
                 <h2 className="text-2xl font-bold mb-4">Asset Not Found</h2>
                 <p className="text-gray-600 mb-6">The asset you are looking for does not exist or has been removed.</p>
-                <Link to="/deposits">
+                <Link to="/dashboard/deposits">
                   <Button>Back to Deposits</Button>
                 </Link>
               </div>

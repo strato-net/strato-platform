@@ -133,7 +133,6 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
     const [isError, setIsError] = useState(false);
     const [error, setError] = useState<Error | null>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
-    const intervalRef = useRef<NodeJS.Timeout | null>(null);
     const mountedRef = useRef(true);
 
     const refetch = useCallback(async () => {
@@ -174,23 +173,13 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
       mountedRef.current = true;
       refetch();
       
-      intervalRef.current = setInterval(() => {
-        if (mountedRef.current && tokenAddress) {
-          refetch();
-        }
-      }, 15000);
-      
       return () => {
         mountedRef.current = false;
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current);
-          intervalRef.current = null;
-        }
         if (abortControllerRef.current) {
           abortControllerRef.current.abort();
         }
       };
-    }, [refetch, tokenAddress]);
+    }, [refetch]);
 
     return {
       data,
