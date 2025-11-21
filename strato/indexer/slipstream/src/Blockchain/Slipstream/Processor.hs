@@ -176,7 +176,7 @@ processTheMessages ::
   , MonadLogger m
   ) =>
   [VME.VMEvent] ->
-  ConduitM i (Either TransactionResult [SlipstreamQuery]) m [AggregateEvent]
+  ConduitM () (Either TransactionResult SlipstreamQuery) m [AggregateEvent]
 processTheMessages messages = do
   case length messages of
     0 -> return ()
@@ -193,7 +193,7 @@ processTheMessages messages = do
         [Action._delegatecalls a | VME.NewAction a <- messages]
       transactionResults = [tr | VME.NewTransactionResult tr <- messages]
 
-  fkeys <- mapOutput Right . outputData . fmap concat . forM creates $ \(cc, cr) -> do
+  fkeys <- mapOutput Right . fmap concat . forM creates $ \(cc, cr) -> do
     $logInfoS "processTheMessages" $ "CodeCollection Added"
     multilineLog "processTheMessages/contracts" $ boringBox $ map show (Map.keys $ cc ^. contracts)
 
@@ -242,7 +242,7 @@ processTheMessages messages = do
 
   forM_ (rights inserts) $ $logDebugLS "processTheMessages/toInsert"
   
-  mapOutput Right . outputData $ do
+  mapOutput Right $ do
     forM_ insertsByCodeHash $ \ins -> do
 --      lift $ insertIndexTable2 $ insertToStorage $ indexInsert ins
       insertIndexTable $ indexInsert ins
@@ -254,14 +254,14 @@ processTheMessages messages = do
   let processedEventArrays = concatMap aggEventToCollectionRows events'
 
   when (not (null events')) $ do
-    mapOutput Right . outputData $ pipeInsertGlobalEventTable events'
+    mapOutput Right $ pipeInsertGlobalEventTable events'
     unless (null processedEventArrays) $
-      mapOutput Right . outputData $ insertCollectionTable processedEventArrays
+      mapOutput Right $ insertCollectionTable processedEventArrays
 
   when (not $ null fkeys) $ do
     $logDebugLS "processTheMessages" $ T.pack $ "Updating PostgREST schema cache for " ++ show (length fkeys) ++ " foreign keys"
-    mapOutput Right . outputData $ createFkeyFunctions fkeys
-    mapOutput Right . outputData $ notifyPostgREST
+    mapOutput Right $ createFkeyFunctions fkeys
+    mapOutput Right $ notifyPostgREST
 
   $logInfoS "processTheMessages" . T.pack $
     "Inserting " ++ show (length transactionResults) ++ " transaction results"

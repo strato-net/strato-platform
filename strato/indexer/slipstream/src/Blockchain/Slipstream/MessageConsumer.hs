@@ -24,7 +24,6 @@ import Conduit
 import Control.Monad
 import Control.Monad.Composable.Kafka
 import Control.Monad.Composable.SQL
-import Data.Foldable (for_)
 import Data.String
 import Blockchain.Slipstream.PostgresqlTypedShim
 import Prelude hiding (lookup)
@@ -43,11 +42,12 @@ getAndProcessMessages conn = do
     recordKafkaMessages messages
     emittedEvents <- runConduit $
       processTheMessages messages `fuseUpstream`
+        dedupC `fuseUpstream`
         awaitForever (\case
           Left txr -> void . lift $ putTransactionResult txr
-          Right cmds -> lift . for_ cmds $ \case
+          Right cmd -> lift $ case cmd of
             InsertDelegatecall dc -> insertDelegatecallPostgres conn dc
-            q -> dbQueryCatchError conn $ slipstreamQueryPostgres q
+            _ -> dbQueryCatchError conn $ slipstreamQueryPostgres cmd
         )
     _ <- produceSolidVmEvents emittedEvents
     return ()

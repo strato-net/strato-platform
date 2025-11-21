@@ -57,7 +57,7 @@ dbQueryCatchError conn insrt = handle handlePostgresError $ dbQuery conn insrt
 
 dbQuery :: (MonadLogger m, MonadUnliftIO m) => PGConnection -> Text -> m ()
 dbQuery conn insrt = do
-  $logDebugS "outputData" insrt
+  $logDebugS "dbQuery" insrt
   liftIO . void . pgQuery conn $! encodeUtf8 insrt
 
 handlePostgresError :: MonadLogger m => SomeException -> m ()

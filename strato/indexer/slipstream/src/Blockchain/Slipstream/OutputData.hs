@@ -22,8 +22,7 @@ module Blockchain.Slipstream.OutputData (
   SlipstreamQuery(..),
   slipstreamQueryPostgres,
   slipstreamQueryText,
-  outputData,
-  outputDataDedup,
+  dedupC,
   ProcessedCollectionRow(..),
   pipeInsertGlobalEventTable,
   insertIndexTable,
@@ -519,16 +518,7 @@ tableUpsert = csv . map go
       let y = wrapDoubleQuotes $ escapeQuotes x
        in wrap1 y " = excluded."
 
-outputData ::
-  OutputM m =>
-  ConduitM () SlipstreamQuery m a ->
-  ConduitM i [SlipstreamQuery] m a
-outputData c = do
-  (a, cmds) <- lift . runConduit $ c `fuseBoth` sinkList
-  yield cmds
-  pure a
-
-dedupC :: MonadLogger m => ConduitM SlipstreamQuery SlipstreamQuery m ()
+dedupC :: (MonadLogger m, Ord a) => ConduitM a a m ()
 dedupC = go Set.empty
   where go seen = await >>= \case
           Just a | not (a `Set.member` seen) -> do
@@ -536,15 +526,6 @@ dedupC = go Set.empty
                      go (Set.insert a seen)
           Just _ -> go seen
           Nothing -> pure ()
-
-outputDataDedup ::
-  OutputM m =>
-  ConduitM () SlipstreamQuery m a ->
-  ConduitM i [SlipstreamQuery] m a
-outputDataDedup c = do
-  (a, cmds) <- lift . runConduit $ c `fuseBoth` (dedupC .| sinkList)
-  yield cmds
-  pure a
 
 baseColumns :: TableColumns
 baseColumns =
