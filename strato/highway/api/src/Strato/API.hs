@@ -81,7 +81,7 @@ instance MimeUnrender Web (Status,ContentTypeAndBody) where
       Right decodedbs ->
         Right $ ( Status { statusCode    = 200
                          , statusMessage = DBC8.pack ""
-                         } 
+                         }
                 , ContentTypeAndBody { contentTypeHeader = DBL.empty
                                      , contentTypeBody   = DBL.fromStrict $ encodeUtf8 decodedbs
                                      }

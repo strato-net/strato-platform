@@ -14,7 +14,7 @@ contractsWidget :: (MonadWidget t m) => Dynamic t TS.AppState -> m ()
 contractsWidget stateDyn = do
   el "div" $ do
     el "h1" $ text "Contracts"
-    
+
     -- Contract statistics
     el "div" $ do
       el "h2" $ text "Contract Statistics"
@@ -26,14 +26,14 @@ contractsWidget stateDyn = do
             , iconClass = "contract"
             , mode = "primary"
             }
-          
+
           numberCard $ NumberCardConfig
             { number = "0"  -- TODO: Add active contracts count
             , description = "Active Contracts"
             , iconClass = "active"
             , mode = "secondary"
             }
-    
+
     -- Contract usage
     el "div" $ do
       el "h2" $ text "Contract Usage"
@@ -44,7 +44,7 @@ contractsWidget stateDyn = do
           , bgIdentifier = "contract-usage"
           , bgUnits = Just "calls"
           }
-    
+
     -- Recent contract activity
     el "div" $ do
       el "h2" $ text "Recent Contract Activity"

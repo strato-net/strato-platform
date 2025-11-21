@@ -89,7 +89,7 @@ instance PersistField CodePtr where
     let s = T.unpack t
         !cp = case readEither s of
                 Right r -> Right r
-                Left _ -> 
+                Left _ ->
                     bimap
                       T.pack
                       (ExternallyOwned . unsafeCreateKeccak256FromWord256)

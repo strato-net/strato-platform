@@ -4,7 +4,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Blockchain.Strato.Model.Validator
-  ( 
+  (
     Validator (..)
   )
 where

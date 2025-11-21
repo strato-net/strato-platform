@@ -54,7 +54,7 @@ multilineLog ::
 multilineLog source theLines = do
   forM_ (lines theLines) $ \theLine ->
     $logInfoS source $ T.pack theLine
-  
+
 multilineDebugLog ::
   MonadLogger m =>
   T.Text ->

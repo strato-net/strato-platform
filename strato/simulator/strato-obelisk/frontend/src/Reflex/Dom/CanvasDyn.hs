@@ -107,7 +107,7 @@ applyCanvasWithCx tagFn dContext dAction eApply =
     RD.performEvent (tagFn (nextFrame <$> dContext <*> dAction) eApply)
 
 applyCanvasAsyncWithCx
-  :: forall t m a c. 
+  :: forall t m a c.
     ( MonadWidget t m
     , RD.DomRenderHook t m
     , HasRenderFn c (RenderContext c)

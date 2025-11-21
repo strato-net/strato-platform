@@ -55,7 +55,7 @@ transactionType (BlocTransfer _) = TRANSFER
 transactionType (BlocContract _) = CONTRACT
 transactionType (BlocFunction _) = FUNCTION
 
-type PostBlocTransactionParallel = 
+type PostBlocTransactionParallel =
   "transaction"
     :> "parallel"
     :> QueryParam "username" String

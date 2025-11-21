@@ -177,7 +177,7 @@ postBlocTransactionBody (PostBlocTransactionRequest mAddr txList txParams msrcs)
           let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
               xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) $ _constructor contract
           argsAsSource <- lift $ constructArgValuesAndSource (Just args) xabiArgs
-          
+
           tx <- lift . signAndPrepare addr $
               TransactionHeader
                 Nothing
@@ -310,7 +310,7 @@ postBlocTransactionUnsigned (PostBlocTransactionRequest mAddr txList txParams ms
           let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
               xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) $ _constructor contract
           argsAsSource <- lift $ constructArgValuesAndSource (Just args) xabiArgs
-          
+
           lift . prepareUnsignedRawTx name argsAsSource $
               TransactionHeader
                 Nothing
@@ -339,7 +339,7 @@ postBlocTransactionUnsigned (PostBlocTransactionRequest mAddr txList txParams ms
           case M.lookup (Text.unpack methodcallMethodName) (contract ^. functions) of
             Just _ -> pure ()
             Nothing -> throwIO . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
-          
+
           let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
               xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) . Map.lookup (Text.unpack methodcallMethodName) $ contract ^. functions
           argsAsSource <- lift $ constructArgValuesAndSource (Just methodcallArgs) xabiArgs
@@ -447,10 +447,10 @@ postBlocTransaction' cacheNonce mUsername resolve (PostBlocTransactionRequest mA
         pure . keccak256ToByteString $ case addressStateCodeHash s of
           ExternallyOwned h -> h
           SolidVMCode _ h   -> h
-      $logInfoS "postBlocTransactions'/userRegistry" . Text.pack $ show (userRegistry, ch) 
+      $logInfoS "postBlocTransactions'/userRegistry" . Text.pack $ show (userRegistry, ch)
       pure $ getNewAddressWithSalt_unsafe userRegistry u ch [SMV.SString "User", SMV.SString u]
     _ -> pure addr
-  $logInfoS "postBlocTransactions'/userContractAddr" . Text.pack $ show (useWallet, mUsername, userContractAddr) 
+  $logInfoS "postBlocTransactions'/userContractAddr" . Text.pack $ show (useWallet, mUsername, userContractAddr)
   let src' :: ContractPayload -> Maybe SourceMap
       src' p =
         if contractpayloadSrc p == mempty
@@ -553,10 +553,10 @@ postBlocTransaction' cacheNonce mUsername resolve (PostBlocTransactionRequest mA
                                 userContractAddr
                                 "createContract"
                                 (M.fromList $ [("contractName", ArgString cn), ("contractSrc", ArgString $ sourceBlob $ contractSrc), ("args", ArgArray . V.fromList $ ArgString <$> argsAsSource)])
-                                (mergeTxParams x txParams) 
+                                (mergeTxParams x txParams)
                                 (maybe (Just metadata) (\m' -> Just $ metadata `Map.union` m') m)
                           ) ps
-            let bcp = 
+            let bcp =
                   FunctionListParameters
                     addr
                     methodList
@@ -579,7 +579,7 @@ postBlocTransaction' cacheNonce mUsername resolve (PostBlocTransactionRequest mA
                           )
                   )
                   ps
-            let bclp = 
+            let bclp =
                   ContractListParameters
                     addr
                     payloadList
@@ -632,11 +632,11 @@ postBlocTransaction' cacheNonce mUsername resolve (PostBlocTransactionRequest mA
                         xabiArgs = Map.fromList . catMaybes $ maybe [] (map f . _funcArgs) $
                           Map.lookup (Text.unpack m) _functions
                     map ArgString <$> constructArgValuesAndSource (Just r) xabiArgs
-                pure $ MethodCall 
-                  userContractAddr 
-                  "callContract"  
+                pure $ MethodCall
+                  userContractAddr
+                  "callContract"
                   (M.fromList $ [("contractToCall",ArgString $ Text.pack $ show a), ("functionName",ArgString m), ("args", ArgArray $ V.fromList args')])
-                  (mergeTxParams x txParams) 
+                  (mergeTxParams x txParams)
                   md
               else pure $ MethodCall a m r (mergeTxParams x txParams) md
           ) p
@@ -812,7 +812,7 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters {..} = do
       let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
           xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) $ _constructor contract
       argsAsSource <- lift $ constructArgValuesAndSource (Just args) xabiArgs
-      
+
       tx <-
         lift . signAndPrepare fromAddr $
           TransactionHeader
@@ -1152,7 +1152,7 @@ genNonces cacheNonce fromAddr l items = do
       cacheKey = fromAddr
       viewNonce :: a -> Maybe Nonce
       viewNonce = txparamsNonce <=< view l
-      
+
   nonceCache <- fmap globalNonceCounter getBlocEnv
   now <- liftIO $ getTime Monotonic
   cachedItem <- case cacheNonce of

@@ -14,7 +14,7 @@ usersWidget :: (MonadWidget t m) => Dynamic t TS.AppState -> m ()
 usersWidget stateDyn = do
   el "div" $ do
     el "h1" $ text "Users"
-    
+
     -- User statistics
     el "div" $ do
       el "h2" $ text "User Statistics"
@@ -26,14 +26,14 @@ usersWidget stateDyn = do
             , iconClass = "user"
             , mode = "primary"
             }
-          
+
           numberCard $ NumberCardConfig
             { number = "0"  -- TODO: Add active users count
             , description = "Active Users"
             , iconClass = "active"
             , mode = "secondary"
             }
-    
+
     -- User distribution
     el "div" $ do
       el "h2" $ text "User Distribution"
@@ -44,7 +44,7 @@ usersWidget stateDyn = do
                      , PieData 10 "System" "#6c757d"]
           , pcTitle = "User Types"
           }
-    
+
     -- Recent user activity
     el "div" $ do
       el "h2" $ text "Recent User Activity"
