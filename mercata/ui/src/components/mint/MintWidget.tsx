@@ -41,22 +41,26 @@ const MintWidget: React.FC = () => {
 
   const {
     availableNetworks,
-    redeemableTokens,
+    bridgeableTokens,
     selectedNetwork,
     setSelectedNetwork,
-    selectedMintToken,
-    setSelectedMintToken,
+    selectedToken,
+    setSelectedToken,
     loadNetworksAndTokens,
-    fetchRedeemableTokens,
   } = useBridgeContext();
+
+  const redeemableTokens = useMemo(() => 
+    (bridgeableTokens || []).filter(token => !token.bridgeable),
+    [bridgeableTokens]
+  );
 
   // Get external token balance for percentage buttons
   const { data: externalTokenBalance } = useBalance({
     address: address,
-    token: ensureHexPrefix(selectedMintToken?.externalToken),
-    chainId: selectedMintToken ? parseInt(availableNetworks.find(n => n.chainName === selectedNetwork)?.chainId || "0") : undefined,
+    token: ensureHexPrefix(selectedToken?.externalToken),
+    chainId: selectedToken ? parseInt(availableNetworks.find(n => n.chainName === selectedNetwork)?.chainId || "0") : undefined,
     query: {
-      enabled: !!address && !!selectedMintToken?.externalToken && !!isConnected,
+      enabled: !!address && !!selectedToken?.externalToken && !!isConnected,
     },
   });
 
@@ -82,20 +86,11 @@ const MintWidget: React.FC = () => {
   }, [loadNetworksAndTokens]);
 
   useEffect(() => {
-    // When switching networks, choose first token by default
-    if (!selectedMintToken && redeemableTokens.length > 0) {
-      setSelectedMintToken(redeemableTokens[0]);
+    // When switching networks, choose first redeemable token by default
+    if (!selectedToken && redeemableTokens.length > 0) {
+      setSelectedToken(redeemableTokens[0]);
     }
-  }, [redeemableTokens, selectedMintToken, setSelectedMintToken]);
-
-  // Load mintable tokens when network changes
-  useEffect(() => {
-    if (!selectedNetwork) return;
-    const networkConfig = availableNetworks.find(n => n.chainName === selectedNetwork);
-    if (!networkConfig) return;
-
-    fetchRedeemableTokens(networkConfig.chainId);
-  }, [selectedNetwork, availableNetworks, fetchRedeemableTokens]);
+  }, [redeemableTokens, selectedToken, setSelectedToken]);
 
   useEffect(() => {
     const ensureNetwork = async () => {
@@ -136,11 +131,11 @@ const MintWidget: React.FC = () => {
 
   useEffect(() => {
     setAmount("");
-    if (selectedMintToken && selectedNetworkConfig) {
-      const d = parseInt(selectedMintToken.externalDecimals || "18");
-      fetchMinDepositAmount(selectedMintToken.externalToken, d);
+    if (selectedToken && selectedNetworkConfig) {
+      const d = parseInt(selectedToken.externalDecimals || "18");
+      fetchMinDepositAmount(selectedToken.externalToken, d);
     }
-  }, [selectedMintToken, selectedNetworkConfig]);
+  }, [selectedToken, selectedNetworkConfig]);
 
   const validateAmount = (value: string): boolean => {
     if (!value) {
@@ -162,18 +157,18 @@ const MintWidget: React.FC = () => {
 
     // Check minimum amount using stored wei value
     if (minDepositInfo.amountWei > 0n) {
-      const inputAmountWei = safeParseUnits(value, parseInt(selectedMintToken?.externalDecimals || "18"));
+      const inputAmountWei = safeParseUnits(value, parseInt(selectedToken?.externalDecimals || "18"));
       
       if (inputAmountWei < minDepositInfo.amountWei) {
         setErrors((e) => ({
           ...e,
-          amount: `Amount must be at least ${minDepositInfo.amount} ${selectedMintToken?.externalSymbol}`,
+          amount: `Amount must be at least ${minDepositInfo.amount} ${selectedToken?.externalSymbol}`,
         }));
         return false;
       }
     }
 
-    const tokenDecimals = parseInt(selectedMintToken?.externalDecimals || "18");
+    const tokenDecimals = parseInt(selectedToken?.externalDecimals || "18");
     const decimalIndex = value.indexOf('.');
     
     if (decimalIndex !== -1) {
@@ -192,7 +187,7 @@ const MintWidget: React.FC = () => {
     if (num > bal) {
       setErrors((e) => ({
         ...e,
-        amount: `Insufficient balance. Maximum: ${externalTokenBalance?.formatted || "0"} ${selectedMintToken?.externalSymbol}`,
+        amount: `Insufficient balance. Maximum: ${externalTokenBalance?.formatted || "0"} ${selectedToken?.externalSymbol}`,
       }));
       return false;
     }
@@ -275,26 +270,26 @@ const MintWidget: React.FC = () => {
     inFlightRef.current = true;
     setIsLoading(true);
     try {
-      if (!selectedMintToken || !selectedNetworkConfig || !userAddress || !address) throw new Error("Missing configuration");
+      if (!selectedToken || !selectedNetworkConfig || !userAddress || !address) throw new Error("Missing configuration");
 
       // Validate router allows mint
       const validation = await bridgeContractService.validateRouterContract({
         depositRouterAddress: selectedNetworkConfig.depositRouter,
         amount,
-        decimals: selectedMintToken.externalDecimals,
+        decimals: selectedToken.externalDecimals,
         chainId: selectedNetworkConfig.chainId,
-        tokenAddress: selectedMintToken.externalToken
+        tokenAddress: selectedToken.externalToken
       });
       if (!validation.isValid) throw new Error(validation.error || "Validation failed");
 
       // Build permit2
-      const depositAmount = safeParseUnits(amount, parseInt(selectedMintToken.externalDecimals || "18"));
+      const depositAmount = safeParseUnits(amount, parseInt(selectedToken.externalDecimals || "18"));
       // Ensure Permit2 approval on external token
-      await ensurePermit2Approval(selectedMintToken.externalToken, depositAmount, selectedNetworkConfig.chainId);
+      await ensurePermit2Approval(selectedToken.externalToken, depositAmount, selectedNetworkConfig.chainId);
       const deadline = BigInt(Math.floor(Date.now() / 1000) + 900);
       const nonce = bridgeContractService.getPermit2Nonce();
       const permitMessage = bridgeContractService.createPermit2Message({
-        token: selectedMintToken.externalToken,
+        token: selectedToken.externalToken,
         amount: depositAmount,
         spender: selectedNetworkConfig.depositRouter,
         nonce,
@@ -315,7 +310,7 @@ const MintWidget: React.FC = () => {
         abi: DEPOSIT_ROUTER_ABI,
         functionName: "deposit",
         args: [
-          ensureHexPrefix(selectedMintToken.externalToken),
+          ensureHexPrefix(selectedToken.externalToken),
           depositAmount,
           ensureHexPrefix(userAddress),
           nonce,
@@ -330,7 +325,7 @@ const MintWidget: React.FC = () => {
         abi: DEPOSIT_ROUTER_ABI,
         functionName: "deposit",
         args: [
-          ensureHexPrefix(selectedMintToken.externalToken),
+          ensureHexPrefix(selectedToken.externalToken),
           depositAmount,
           ensureHexPrefix(userAddress),
           nonce,
@@ -407,7 +402,7 @@ const MintWidget: React.FC = () => {
             value={selectedNetwork || ""}
             onValueChange={(v) => {
               setSelectedNetwork(v);
-              setSelectedMintToken(null);
+              setSelectedToken(null);
             }}
           >
             <SelectTrigger>
@@ -429,8 +424,8 @@ const MintWidget: React.FC = () => {
       <div className="space-y-1.5">
         <Label>Select Stablecoin</Label>
         <Select
-          value={selectedMintToken?.externalToken || ""}
-          onValueChange={(v) => setSelectedMintToken(redeemableTokens.find(t => t.externalToken === v) || null)}
+          value={selectedToken?.externalToken || ""}
+          onValueChange={(v) => setSelectedToken(redeemableTokens.find(t => t.externalToken === v) || null)}
         >
           <SelectTrigger>
             <SelectValue placeholder="Choose token" />
@@ -457,21 +452,21 @@ const MintWidget: React.FC = () => {
           disabled={!isConnected}
         />
         {errors.amount && <p className="text-sm text-red-500">{errors.amount}</p>}
-        {selectedMintToken && (
+        {selectedToken && (
           <div className="flex justify-between items-center text-xs text-gray-500 mt-1">
             <span>
               {minDepositInfo.loading ? (
                 <span className="inline-flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Min</span>
               ) : (
-                <>Min: {minDepositInfo.amount} {selectedMintToken.externalSymbol}</>
+                <>Min: {minDepositInfo.amount} {selectedToken.externalSymbol}</>
               )}
             </span>
           </div>
         )}
-        {isConnected && selectedMintToken && (
+        {isConnected && selectedToken && (
           <div className="flex justify-between items-center text-xs text-gray-500">
             <span>
-              Balance: {externalTokenBalance?.formatted || "0"} {selectedMintToken.externalSymbol}
+              Balance: {externalTokenBalance?.formatted || "0"} {selectedToken.externalSymbol}
             </span>
           </div>
         )}
@@ -479,11 +474,11 @@ const MintWidget: React.FC = () => {
           value={amount}
           maxValue={safeParseUnits(
             externalTokenBalance?.formatted || "0",
-            parseInt(selectedMintToken?.externalDecimals || "18")
+            parseInt(selectedToken?.externalDecimals || "18")
           ).toString()}
           onChange={setAmount}
           className="mt-2"
-          decimals={parseInt(selectedMintToken?.externalDecimals || "18")}
+          decimals={parseInt(selectedToken?.externalDecimals || "18")}
         />
       </div>
 
@@ -514,7 +509,7 @@ const MintWidget: React.FC = () => {
       <div className="flex justify-end">
         <Button
           onClick={handleMint}
-          disabled={isLoading || !selectedMintToken || !amount || !isConnected || !isCorrectNetwork}
+          disabled={isLoading || !selectedToken || !amount || !isConnected || !isCorrectNetwork}
           className="bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
         >
           {isLoading ? "Processing..." : "Get USDST"}

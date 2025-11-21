@@ -5,8 +5,8 @@ import LiquidationsView from '@/components/cdp/LiquidationsView';
 import BadDebtView from '@/components/cdp/BadDebtView';
 import BridgeWidget from '@/components/bridge/BridgeWidget';
 import SwapWidget from '@/components/swap/SwapWidget';
-import MintWidget from '../components/mint/MintWidget'; // Bridge deposit widget
-import WithdrawWidget from '../components/mint/WithdrawWidget';
+import MintWidget from '../components/mint/MintWidget';
+import BridgeOut from '@/components/bridge/BridgeOut';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Tabs as AntdTabs } from 'antd';
@@ -200,13 +200,7 @@ const ExchangeCart: React.FC<ExchangeCartProps> = ({ onVaultActionSuccess, initi
                     <MintWidget />
                   </div>
                 ) : (
-                  <div>
-                    <div className="mb-4">
-                      <h3 className="text-lg font-semibold text-center">Redeem to Stablecoins</h3>
-                      <p className="text-sm text-gray-600 text-center">Redeem USDST back to external stablecoins</p>
-                    </div>
-                    <WithdrawWidget />
-                  </div>
+                  <BridgeOut isConvert={true} />
                 )}
               </div>
             </div>
