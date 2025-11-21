@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { Clock, CheckCircle2, AlertCircle } from "lucide-react";
 import { Table, Select, Space, Card } from "antd";
 import { FrownOutlined, CopyOutlined } from "@ant-design/icons";
@@ -18,45 +18,54 @@ const DepositTransactionDetails = ({ mintUSDST = false, context, refreshTrigger,
   const [depositStatus, setDepositStatus] = useState<number | null>(null);
   const [selectedChainId, setSelectedChainId] = useState<number | null>(null);
   const [transactions, setTransactions] = useState<DepositTransaction[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const isInitialMount = useRef(true);
+  const lastRefreshTrigger = useRef(0);
   const DEPOSIT_STATUS_OPTIONS = BRIDGE_STATUS_OPTIONS.filter((o) => o.value !== 4);
 
-  const {
-    loading: isLoading,
-    fetchDepositTransactions,
-    availableNetworks,
-  } = useBridgeContext();
+  const { fetchDepositTransactions, availableNetworks } = useBridgeContext();
+
+  const loadTransactions = useCallback(async (isRefresh = false) => {
+    setIsLoading(true);
+    if (isRefresh) setIsRefreshing(true);
+    try {
+      const params: Record<string, string> = {
+        limit: ITEMS_PER_PAGE.toString(),
+        offset: ((currentPage - 1) * ITEMS_PER_PAGE).toString(),
+        order: 'block_timestamp.desc',
+      };
+      (params as any)["value->>stratoToken"] = mintUSDST ? `eq.${usdstAddress}` : `neq.${usdstAddress}`;
+      if (depositStatus !== null) (params as any)["value->>bridgeStatus"] = `eq.${depositStatus}`;
+      if (selectedChainId !== null) (params as any)["key"] = `eq.${selectedChainId}`;
+      
+      const result = await fetchDepositTransactions(params, context);
+      setTransactions(result.data);
+      setTotalCount(result.totalCount);
+    } catch (error) {
+      console.error("Error loading transactions:", error);
+      setTransactions([]);
+      setTotalCount(0);
+    } finally {
+      setIsLoading(false);
+      if (isRefresh) setIsRefreshing(false);
+    }
+  }, [currentPage, depositStatus, selectedChainId, fetchDepositTransactions, context, mintUSDST]);
 
   useEffect(() => {
-    const loadTransactions = async () => {
-      try {
-        const params: Record<string, string> = {
-          limit: ITEMS_PER_PAGE.toString(),
-          offset: ((currentPage - 1) * ITEMS_PER_PAGE).toString(),
-          order: 'block_timestamp.desc',
-        };
-        console.log('mintUSDST', mintUSDST);
-        (params as any)["value->>stratoToken"] = mintUSDST ? `eq.${usdstAddress}` : `neq.${usdstAddress}`;
-        
-        if (depositStatus !== null) {
-          (params as any)["value->>bridgeStatus"] = `eq.${depositStatus}`;
-        }
-        
-        if (selectedChainId !== null) {
-          (params as any)["key"] = `eq.${selectedChainId}`;
-        }
-        
-        const result = await fetchDepositTransactions(params, context);
-        setTransactions(result.data);
-        setTotalCount(result.totalCount);
-      } catch (error) {
-        console.error("Error loading transactions:", error);
-        setTransactions([]);
-        setTotalCount(0);
-      }
-    };
-
-    loadTransactions();
-  }, [currentPage, depositStatus, selectedChainId, fetchDepositTransactions, context, refreshTrigger]);
+    if (isInitialMount.current) {
+      loadTransactions(false);
+      isInitialMount.current = false;
+      return;
+    }
+    if (refreshTrigger && refreshTrigger !== lastRefreshTrigger.current) {
+      lastRefreshTrigger.current = refreshTrigger;
+      loadTransactions(true);
+      return;
+    }
+    setIsRefreshing(false);
+    loadTransactions(false);
+  }, [currentPage, depositStatus, selectedChainId, refreshTrigger, loadTransactions]);
 
   
 
@@ -219,7 +228,7 @@ const DepositTransactionDetails = ({ mintUSDST = false, context, refreshTrigger,
               />
             </div>
           </Space>
-          <RefreshButton onRefresh={onRefresh} loading={isLoading} />
+          <RefreshButton onRefresh={onRefresh} loading={isRefreshing} disabled={isRefreshing} />
         </Space>
       </Card>
       

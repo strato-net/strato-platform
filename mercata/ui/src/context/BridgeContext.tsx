@@ -207,8 +207,6 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchDepositTransactions = useCallback(
     async (rawParams: Record<string, string | undefined> = {}, context?: string): Promise<BridgeTransactionResponse> => {
-      setLoading(true);
-      
       try {
         const paramsObj: Record<string, string> = Object.fromEntries(
           Object.entries(rawParams).filter(([_, v]) => v !== undefined)
@@ -232,8 +230,6 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
           data: [],
           totalCount: 0
         };
-      } finally {
-        setLoading(false);
       }
     },
     []
@@ -241,14 +237,11 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchWithdrawTransactions = useCallback(
     async (rawParams: Record<string, string | undefined> = {}, context?: string): Promise<BridgeTransactionResponse> => {
-      setLoading(true);
-      
       try {
         const paramsObj: Record<string, string> = Object.fromEntries(
           Object.entries(rawParams).filter(([_, v]) => v !== undefined)
         );
         
-        // Add 'context' parameter for admin view (only if explicitly provided)
         if (context === 'admin') {
           paramsObj.context = 'admin';
         }
@@ -266,8 +259,6 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
           data: [],
           totalCount: 0
         };
-      } finally {
-        setLoading(false);
       }
     },
     []
