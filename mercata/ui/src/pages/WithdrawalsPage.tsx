@@ -30,7 +30,9 @@ const WithdrawalsPage = () => {
   }, [searchParams]);
 
   useEffect(() => {
-    loadNetworksAndTokens().catch(() => {});
+    loadNetworksAndTokens().catch((error) => {
+      console.error('Failed to load networks and tokens:', error);
+    });
   }, [loadNetworksAndTokens]);
 
   // Withdrawal summary polling (15s interval)

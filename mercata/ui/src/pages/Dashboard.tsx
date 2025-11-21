@@ -74,7 +74,7 @@ const Dashboard = () => {
     getInactiveTokens(!hasExistingInactiveTokens);
     refreshLoans();
     refreshVaults();
-  }, [location.pathname, userAddress]);
+  }, [location.pathname, userAddress, getEarningAssets, getInactiveTokens, refreshLoans, refreshVaults]);
 
   useEffect(() => {
     if (!searchParams) return;

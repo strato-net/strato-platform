@@ -66,8 +66,10 @@ const DepositsPage = () => {
     const hasExistingEarningAssets = earningAssets.length > 0;
     
     getEarningAssets(!hasExistingEarningAssets);
-    loadNetworksAndTokens().catch(() => {});
-  }, [location.pathname, userAddress]);
+    loadNetworksAndTokens().catch((error) => {
+      console.error('Failed to load networks and tokens:', error);
+    });
+  }, [location.pathname, userAddress, getEarningAssets, loadNetworksAndTokens]);
 
   return (
     <div className="h-screen bg-gray-50 overflow-hidden">
