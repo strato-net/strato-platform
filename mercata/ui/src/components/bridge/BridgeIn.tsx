@@ -40,7 +40,7 @@ import { ensureHexPrefix, formatBalance, safeParseUnits, formatUnits } from "@/u
 import { handleAmountInputChange } from "@/utils/transferValidation";
 import { useBridgeContext } from "@/context/BridgeContext";
 import { useUser } from "@/context/UserContext";
-import { useUserTokens } from "@/context/UserTokensContext";
+import { useTokenContext } from "@/context/TokenContext";
 import { useLendingContext } from "@/context/LendingContext";
 import BridgeWalletStatus from "./BridgeWalletStatus";
 import NetworkSelector from "./NetworkSelector";
@@ -61,7 +61,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
   const { signTypedDataAsync } = useSignTypedData();
   const { toast } = useToast();
   const { userAddress } = useUser();
-  const { fetchUsdstBalance } = useUserTokens();
+  const { fetchUsdstBalance } = useTokenContext();
   const { liquidityInfo } = useLendingContext();
   const {
     availableNetworks,
@@ -307,7 +307,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
       
       if (value && minDepositInfo.amountWei > 0n) {
         const inputAmountWei = safeParseUnits(value, tokenDecimals);
-        if (inputAmountWei < minDepositInfo.amountWei) {
+      if (inputAmountWei < minDepositInfo.amountWei) {
           setAmountError(`Amount must be at least ${minDepositInfo.amount} ${selectedToken?.externalSymbol}`);
         }
       }
@@ -318,7 +318,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
   const ensureAllowanceOrPermit = async ({
     tokenAddress,
     owner,
-    amount,
+      amount,
     chainId,
   }: {
     tokenAddress: string;
@@ -339,18 +339,18 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
         description: "Approving Permit2 to spend your tokens...",
       });
 
-      const approveTx = await writeContractAsync({
+        const approveTx = await writeContractAsync({
         address: ensureHexPrefix(tokenAddress),
-        abi: ERC20_ABI,
-        functionName: "approve",
+          abi: ERC20_ABI,
+          functionName: "approve",
         args: [PERMIT2_ADDRESS as `0x${string}`, BigInt(2) ** BigInt(256) - BigInt(1)],
         chain: await resolveViemChain(chainId),
         account: owner as `0x${string}`,
-      });
+        });
 
       await waitForTransaction(approveTx, chainId);
-      toast({
-        title: "Approval Successful",
+        toast({
+          title: "Approval Successful",
         description: "Approval confirmed. Processing transaction...",
       });
     }
@@ -461,33 +461,33 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
       if (isNative) {
         txHash = await writeContractAsync({
           address: depositRouter as `0x${string}`,
-          abi: DEPOSIT_ROUTER_ABI,
-          functionName: "depositETH",
+        abi: DEPOSIT_ROUTER_ABI,
+        functionName: "depositETH",
           args: [ensureHexPrefix(userAddress)],
           value: depositAmount,
-          chain,
+        chain,
           account: address as `0x${string}`,
-        });
-      } else {
-        if (!permitData) {
-          throw new Error("Permit data is required for ERC20 deposits");
-        }
+      });
+    } else {
+      if (!permitData) {
+        throw new Error("Permit data is required for ERC20 deposits");
+      }
 
         txHash = await writeContractAsync({
           address: depositRouter as `0x${string}`,
-          abi: DEPOSIT_ROUTER_ABI,
-          functionName: "deposit",
-          args: [
+        abi: DEPOSIT_ROUTER_ABI,
+        functionName: "deposit",
+        args: [
             ensureHexPrefix(selectedToken.externalToken),
             depositAmount,
             ensureHexPrefix(userAddress),
             permitData.nonce,
             permitData.deadline,
             permitData.signature as `0x${string}`,
-          ],
-          chain,
+        ],
+        chain,
           account: address as `0x${string}`,
-        });
+      });
       }
 
       const explorerUrl = getExplorerUrl(activeChainId, txHash);
@@ -523,7 +523,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
 
       await Promise.all([
         isNative ? refetchNative() : refetchToken(),
-        userAddress ? fetchUsdstBalance(userAddress) : Promise.resolve(),
+        fetchUsdstBalance(),
         autoDeposit
           ? requestAutoSave({
               externalChainId: activeChainId,
@@ -542,7 +542,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
       setIsLoading(false);
     }
   };
-
+  
   return (
     <div className="space-y-6">
       <div className="space-y-2 text-center">
@@ -573,7 +573,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
 
       <div className="space-y-1.5">
         <div className="flex justify-between items-center">
-          <Label>Amount</Label>
+        <Label>Amount</Label>
           {maxAmount && (
             <div className="flex items-center gap-3">
               <p className="text-sm text-gray-500">
@@ -606,7 +606,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
           disabled={!isConnected || isLoading}
         />
         {amountError && <p className="text-sm text-red-500">{amountError}</p>}
-
+        
         {isConnected && (
           <PercentageButtons
             value={amount}
@@ -616,7 +616,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
             className="mt-2"
             disabled={isLoading}
           />
-        )}
+                    )}
       </div>
 
       <DepositTransactionSummary
@@ -627,6 +627,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
         formatBalanceDisplay={formatBalanceDisplay}
         savingRate={liquidityInfo?.supplyAPY}
         isConvert={isConvert}
+        autoDeposit={autoDeposit}
       />
 
       {isConvert && (
@@ -641,13 +642,13 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
         </label>
       )}
 
-      <Button
-        onClick={handleBridge}
+        <Button
+          onClick={handleBridge}
         disabled={isButtonDisabled}
         className="w-full bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
-      >
+        >
         {isLoading ? "Processing..." : isConvert && autoDeposit ? "Deposit and Earn" : "Deposit"}
-      </Button>
+        </Button>
 
       {networkError && (
         <p className="text-sm text-red-500">{networkError}</p>

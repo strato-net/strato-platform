@@ -35,7 +35,6 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
   const [loadingWithdrawalSummary, setLoadingWithdrawalSummary] = useState(false);
 
   // ========== REFS ==========
-  const withdrawalSummaryIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const withdrawalSummaryAbortControllerRef = useRef<AbortController | null>(null);
 
   // ========== NETWORK & TOKEN FUNCTIONS ==========
@@ -331,26 +330,6 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
     },
     []
   );
-
-  // ========== POLLING EFFECTS ==========
-  // Withdrawal summary polling (15s interval)
-  useEffect(() => {
-    fetchWithdrawalSummary(true);
-
-    withdrawalSummaryIntervalRef.current = setInterval(() => {
-      fetchWithdrawalSummary(false);
-    }, 15000);
-
-    return () => {
-      if (withdrawalSummaryIntervalRef.current) {
-        clearInterval(withdrawalSummaryIntervalRef.current);
-        withdrawalSummaryIntervalRef.current = null;
-      }
-      if (withdrawalSummaryAbortControllerRef.current) {
-        withdrawalSummaryAbortControllerRef.current.abort();
-      }
-    };
-  }, [fetchWithdrawalSummary]);
 
   // Note: Balance polling is handled inside the useBalance hook (15s interval per token)
 

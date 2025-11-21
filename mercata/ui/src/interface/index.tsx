@@ -227,6 +227,8 @@ export interface TokenInfo {
   _totalSupply: string;
   exchangeRate?: string;
   maxWithdrawableUSDST?: string;
+  userBalanceStaked?: string; // Staked balance from RewardsChef
+  userBalanceTotal?: string; // Total = wallet + staked
 }
 
 export interface LiquidityData {
@@ -360,8 +362,7 @@ export interface PoolPollingConfig {
   fromAsset: any;
   toAsset: any;
   getPoolByTokenPair: (tokenA: string, tokenB: string, signal?: AbortSignal) => Promise<any>;
-  fetchUsdstBalance: (userAddress: string) => Promise<void>;
-  userAddress: string;
+  fetchUsdstBalance: () => Promise<void>;
   interval?: number;
 }
 

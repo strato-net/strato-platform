@@ -9,6 +9,7 @@ interface DepositTransactionSummaryProps {
   formatBalanceDisplay: (valueWei: string) => string;
   savingRate?: number;
   isConvert: boolean;
+  autoDeposit?: boolean;
 }
 
 const DepositTransactionSummary: React.FC<DepositTransactionSummaryProps> = ({
@@ -19,6 +20,7 @@ const DepositTransactionSummary: React.FC<DepositTransactionSummaryProps> = ({
   formatBalanceDisplay,
   savingRate,
   isConvert,
+  autoDeposit,
 }) => {
   return (
     <div className="rounded-xl border bg-gray-50 p-4 space-y-3 text-sm text-gray-600">
@@ -37,11 +39,11 @@ const DepositTransactionSummary: React.FC<DepositTransactionSummaryProps> = ({
           {amount || "0.00"} {selectedToken?.stratoTokenSymbol || "USDST"} deposited
         </span>
       </div>
-      {isConvert && savingRate !== undefined && (
+      {isConvert && (
         <div className="flex items-center justify-between">
           <span>Current Saving Rate</span>
-          <span className="font-medium text-green-600">
-            {savingRate.toFixed(2)}%
+          <span className={`font-medium ${autoDeposit && savingRate !== undefined ? 'text-green-600' : 'text-gray-600'}`}>
+            {autoDeposit && savingRate !== undefined ? `${savingRate.toFixed(2)}%` : "—"}
           </span>
         </div>
       )}

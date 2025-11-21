@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import MobileSidebar from "../components/dashboard/MobileSidebar";
@@ -17,8 +17,10 @@ const WithdrawalsPage = () => {
     "from-savings"
   );
   const [searchParams] = useSearchParams();
-  const { loadNetworksAndTokens, withdrawalSummary, loadingWithdrawalSummary } =
+  const { loadNetworksAndTokens, withdrawalSummary, loadingWithdrawalSummary, fetchWithdrawalSummary } =
     useBridgeContext();
+
+  const withdrawalSummaryIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const tabParam = searchParams.get("tab");
@@ -30,6 +32,22 @@ const WithdrawalsPage = () => {
   useEffect(() => {
     loadNetworksAndTokens().catch(() => {});
   }, [loadNetworksAndTokens]);
+
+  // Withdrawal summary polling (15s interval)
+  useEffect(() => {
+    fetchWithdrawalSummary(true);
+
+    withdrawalSummaryIntervalRef.current = setInterval(() => {
+      fetchWithdrawalSummary(false);
+    }, 15000);
+
+    return () => {
+      if (withdrawalSummaryIntervalRef.current) {
+        clearInterval(withdrawalSummaryIntervalRef.current);
+        withdrawalSummaryIntervalRef.current = null;
+      }
+    };
+  }, [fetchWithdrawalSummary]);
 
   return (
     <div className="h-screen bg-gray-50 overflow-hidden">

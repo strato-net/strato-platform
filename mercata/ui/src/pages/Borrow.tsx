@@ -4,7 +4,7 @@ import { formatUnits } from "ethers";
 import { useToast } from "@/hooks/use-toast";
 import { useLendingContext } from "@/context/LendingContext";
 import { useUser } from "@/context/UserContext";
-import { useUserTokens } from "@/context/UserTokensContext";
+import { useTokenContext } from "@/context/TokenContext";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import MobileSidebar from "../components/dashboard/MobileSidebar";
@@ -17,11 +17,11 @@ import { WITHDRAW_COLLATERAL_FEE, SUPPLY_COLLATERAL_FEE } from "@/lib/constants"
 import BorrowForm from "@/components/borrow/BorrowForm";
 import RepayForm from "@/components/borrow/RepayForm";
 import CollateralManagementTable from "@/components/borrow/CollateralManagementTable";
-import { useBalancePolling } from "@/hooks/useSmartPolling";
+import { useSmartPolling } from "@/hooks/useSmartPolling";
 
 const Borrow = () => {
   const { userAddress } = useUser();
-  const { usdstBalance, voucherBalance, fetchUsdstBalance } = useUserTokens();
+  const { usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
   const [selectedAsset, setSelectedAsset] = useState<CollateralData | null>(null);
   const [borrowLoading, setBorrowLoading] = useState(false);
   const [modalState, setModalState] = useState<{
@@ -50,33 +50,32 @@ const Borrow = () => {
   } = useLendingContext();
 
   // Use the new smart polling hook for balance updates
-  const { startPolling, stopPolling } = useBalancePolling(
-    userAddress || "",
-    fetchUsdstBalance,
-    (amount) => amount && parseFloat(amount) > 0
-  );
+  const { startPolling, stopPolling } = useSmartPolling({
+    fetchFn: fetchUsdstBalance,
+    shouldPoll: () => true,
+    interval: 10000,
+    onError: (error) => console.error("Balance polling error:", error)
+  });
 
   useEffect(() => {
     document.title = "Borrow Assets | STRATO Mercata";
   }, []);
 
 
-  // Refresh data when page loads and when userAddress changes
+  // Refresh data when page loads
   useEffect(() => {
-    if (userAddress) {
-      const refreshData = async () => {
-        try {
-          await Promise.all([
-            refreshLoans(),
-            refreshCollateral(),
-            fetchUsdstBalance(userAddress),
-          ]);
+    const refreshData = async () => {
+      try {
+        await Promise.all([
+          refreshLoans(),
+          refreshCollateral(),
+          fetchUsdstBalance(),
+        ]);
         } catch (error) {
           console.error("Error refreshing data:", error);
         }
       };
       refreshData();
-    }
   }, [userAddress, refreshLoans, refreshCollateral, fetchUsdstBalance]);
 
     useEffect(() => {
@@ -122,7 +121,7 @@ const Borrow = () => {
       await Promise.all([
         refreshLoans(),
         refreshCollateral(),
-        fetchUsdstBalance(userAddress || ""),
+        fetchUsdstBalance(),
       ]);
     } catch (error) {
       setModalLoading(false);
@@ -152,7 +151,7 @@ const Borrow = () => {
       await Promise.all([
         refreshLoans(),
         refreshCollateral(),
-        fetchUsdstBalance(userAddress || ""),
+        fetchUsdstBalance(),
       ]);
     } catch (error) {
       console.log(error, "error");
@@ -185,7 +184,7 @@ const Borrow = () => {
       await Promise.all([
         refreshLoans(),
         refreshCollateral(),
-        fetchUsdstBalance(userAddress || ""),
+        fetchUsdstBalance(),
       ]);
     } catch (error) {
       setBorrowLoading(false);
@@ -216,7 +215,7 @@ const Borrow = () => {
       await Promise.all([
         refreshLoans(),
         refreshCollateral(),
-        fetchUsdstBalance(userAddress || ""),
+        fetchUsdstBalance(),
       ]);
     } catch (error) {
       console.error("Error repaying loan:", error);

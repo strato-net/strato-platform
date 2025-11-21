@@ -18,7 +18,7 @@ import {
   handleAmountInputChange,
   computeMaxTransferable,
 } from "@/utils/transferValidation";
-import { useUserTokens } from "@/context/UserTokensContext";
+import { useTokenContext } from "@/context/TokenContext";
 import {
   NATIVE_TOKEN_ADDRESS,
   BRIDGE_MODE_LABELS,
@@ -36,7 +36,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isConvert = false }) => {
   // Hooks & Context
   const { address, isConnected } = useAccount();
   const { toast } = useToast();
-  const { usdstBalance, voucherBalance, fetchUsdstBalance } = useUserTokens();
+  const { usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
   const { userAddress } = useUser();
 
   const {
@@ -176,10 +176,8 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isConvert = false }) => {
   ]);
 
   useEffect(() => {
-    if (userAddress) {
-      fetchUsdstBalance(userAddress);
-    }
-  }, [userAddress, fetchUsdstBalance]);
+    fetchUsdstBalance();
+  }, [fetchUsdstBalance]);
 
   // Handlers
   const handleAmountChange = useCallback(
@@ -231,10 +229,10 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isConvert = false }) => {
     setIsLoading(true);
 
     if (!isConvert) {
-      toast({
-        title: "Preparing transaction...",
-        description: "Please wait while we prepare your transaction",
-      });
+    toast({
+      title: "Preparing transaction...",
+      description: "Please wait while we prepare your transaction",
+    });
     }
 
     try {
@@ -254,15 +252,15 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isConvert = false }) => {
         throw new Error("Failed to request withdrawal");
       }
 
-      toast({
+        toast({
         title: "Withdrawal requested",
-        description: `Your withdrawal request is pending approval. The approved amount of ${selectedToken.externalSymbol} will be transferred to ${address}.`,
-      });
+          description: `Your withdrawal request is pending approval. The approved amount of ${selectedToken.externalSymbol} will be transferred to ${address}.`,
+        });
 
-      setAmount("");
+        setAmount("");
 
       await Promise.all([
-        userAddress ? fetchUsdstBalance(userAddress) : Promise.resolve(),
+        fetchUsdstBalance(),
         refetchBalance(),
         fetchWithdrawalSummary(false),
       ]);
@@ -356,13 +354,13 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isConvert = false }) => {
         formatBalanceDisplay={formatBalanceDisplay}
       />
 
-      <Button
-        onClick={showConfirmModal}
+        <Button
+          onClick={showConfirmModal}
         disabled={isButtonDisabled}
         className="w-full bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
-      >
+        >
         {isLoading ? "Processing..." : "Withdraw"}
-      </Button>
+        </Button>
 
       <BridgeConfirmationModal
         open={isModalOpen}

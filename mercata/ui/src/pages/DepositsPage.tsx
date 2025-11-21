@@ -96,7 +96,7 @@ const DepositsPage = () => {
                   <div className="flex items-center justify-between">
                     <CardTitle>Deposit Assets</CardTitle>
                     <Link
-                      to="/dashboard/bridge-transactions"
+                      to="/bridge-transactions"
                       onClick={() => setTargetTransactionTab('DepositRecorded')}
                       className="flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors"
                     >

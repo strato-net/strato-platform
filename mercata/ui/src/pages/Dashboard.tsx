@@ -162,30 +162,30 @@ const Dashboard = () => {
             />
           </div>
 
-          <div className="mb-8">
-            <AssetsList 
+              <div className="mb-8">
+                <AssetsList 
               loading={loadingEarningAssets || loadingInactiveTokens} 
-              tokens={nonPoolTokens} 
-              inActiveTokens={inactiveTokens} 
-            />
-          </div>
+                  tokens={nonPoolTokens} 
+                  inActiveTokens={inactiveTokens} 
+                />
+              </div>
 
-          <div className="mb-8">
-            <BorrowingSection 
-              loanData={loans}
-            />
-          </div>
+              <div className="mb-8">
+                <BorrowingSection 
+                  loanData={loans}
+                />
+              </div>
 
-          <div className="mb-8">
-            <MyPoolParticipationSection 
-              poolTokens={poolTokens}
+              <div className="mb-8">
+                  <MyPoolParticipationSection 
+                      poolTokens={poolTokens}
               loading={loadingEarningAssets || loadingInactiveTokens}
-            />
-          </div>
+                    />
+              </div>
 
-          <div className="mb-8">
-            <DashboardFAQ />
-          </div>
+              <div className="mb-8">
+                <DashboardFAQ />
+              </div>
         </main>
       </div>
     </div>
