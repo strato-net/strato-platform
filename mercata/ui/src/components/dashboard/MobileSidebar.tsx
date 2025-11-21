@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Wallet, Database, Book, ArrowRightLeft, Send, Shield, X, Activity, BarChart3,Droplets } from 'lucide-react';
+import { LayoutDashboard, Wallet, Book, ArrowRightLeft, Send, Shield, X, Activity, BarChart3,Droplets, Download } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import MERCATALOGO from '@/assets/mercata.png';
 
@@ -14,12 +14,13 @@ const MobileSidebar = ({ isOpen, onClose }: MobileSidebarProps) => {
 
   const allNavItems = [
     { icon: <LayoutDashboard size={20} />, label: 'Overview', path: '/dashboard' },
-    { icon: <Wallet size={20} />, label: 'Deposits', path: '/dashboard/deposits' },
+    { icon: <Wallet size={20} />, label: 'Deposits', path: '/deposits' },
     { icon: <Send size={20} />, label: 'Transfer', path: '/dashboard/transfer' },
     { icon: <Book size={20} />, label: 'Borrow', path: '/dashboard/borrow' },
     { icon: <ArrowRightLeft size={20} />, label: 'Swap', path: '/dashboard/swap' },
     { icon: <Droplets size={20} />, label: 'Advanced', path: '/dashboard/advanced' },
     { icon: <BarChart3 size={20} />, label: 'Mercata Stats', path: '/dashboard/stats' },
+    { icon: <Download size={20} />, label: 'Withdrawals', path: '/withdrawals' },
     { icon: <Activity size={20} />, label: 'Activity Feed', path: '/dashboard/activity' },
     { icon: <Shield size={20} />, label: 'Admin', path: '/dashboard/admin' },
   ];

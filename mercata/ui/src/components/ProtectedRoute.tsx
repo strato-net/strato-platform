@@ -16,20 +16,12 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     }
   }, [isLoggedIn, loading]);
 
-  // Show loading state while checking authentication
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-lg">Loading...</div>
-      </div>
-    );
-  }
-
   // Don't render anything if not authenticated (will redirect)
-  if (!isLoggedIn) {
+  if (!loading && !isLoggedIn) {
     return null;
   }
 
+  // Render children even while loading - let them handle their own loading states
   return <>{children}</>;
 };
 

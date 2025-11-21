@@ -3,7 +3,8 @@ import React, { createContext, useContext, useState, useMemo, useCallback, useEf
 import { api, axios } from "@/lib/axios";
 import { Token } from "@/interface";
 import isEqual from "lodash.isequal";
-import { usdstAddress, sUsdstAddress, mUsdstAddress, cataAddress } from "@/lib/constants";
+import { sUsdstAddress, mUsdstAddress, cataAddress } from "@/lib/constants";
+import { useUser } from "@/context/UserContext";
 
 type UserTokensContextType = {
   activeTokens: Token[];
@@ -14,12 +15,6 @@ type UserTokensContextType = {
   error: string | null;
   fetchTokens: (signal?: AbortSignal) => Promise<void>;
   fetchAllActiveTokens: (signal?: AbortSignal) => Promise<void>;
-  
-  // USDST balance
-  usdstBalance: string;
-  loadingUsdstBalance: boolean;
-  fetchUsdstBalance: (userAddress: string, signal?: AbortSignal) => Promise<void>;
-  voucherBalance: string;
 };
 
 const UserTokensContext = createContext<UserTokensContextType | undefined>(
@@ -29,47 +24,13 @@ const UserTokensContext = createContext<UserTokensContextType | undefined>(
 export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
   children
 }) => {
+  const { isLoggedIn } = useUser();
   const [activeTokens, setActiveTokens] = useState<Token[]>([]);
   const [inactiveTokens, setInactiveTokens] = useState<Token[]>([]);
   const [allActiveTokens, setAllActiveTokens] = useState<Token[]>([]);
   const [loading, setLoading] = useState(false);
   const [allActiveLoading, setAllActiveLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
-  // USDST balance state
-  const [usdstBalance, setUsdstBalance] = useState("0");
-  const [voucherBalance, setVoucherBalance] = useState("0");
-  const [loadingUsdstBalance, setLoadingUsdstBalance] = useState(false);
-
-  const fetchUsdstBalance = useCallback(async (userAddress: string, signal?: AbortSignal) => {
-    if (!userAddress) return;
-    
-    setLoadingUsdstBalance(true);
-    try {
-      const [usdstResponse, voucherResponse] = await Promise.all([
-        api.get(`/tokens/balance`, {
-          signal,
-          params: { address: `eq.${usdstAddress}` },
-        }),
-        api.get(`/vouchers/balance`, {
-          signal,
-        }),
-      ]);
-
-      if (signal?.aborted) return;
-
-      setUsdstBalance(usdstResponse?.data?.[0]?.balance || "0");
-      setVoucherBalance(voucherResponse?.data?.balance || "0");
-    } catch (err) {
-      if (signal?.aborted) return;
-      setUsdstBalance("0");
-      setVoucherBalance("0");
-    } finally {
-      if (!signal?.aborted) {
-        setLoadingUsdstBalance(false);
-      }
-    }
-  }, []);
 
   const fetchTokens = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
@@ -145,12 +106,13 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, []);
 
-  // We didn't really need this but here we are...
+  // Fetch tokens on mount, but only if logged in
   useEffect(() => {
+    if (!isLoggedIn) return;
     const abortController = new AbortController();
     fetchTokens(abortController.signal);
     return () => abortController.abort();
-  }, [fetchTokens]);
+  }, [fetchTokens, isLoggedIn]);
 
   const contextValue = useMemo(
     () => ({
@@ -162,14 +124,8 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
       error,
       fetchTokens,
       fetchAllActiveTokens,
-      
-      // USDST balance
-      usdstBalance,
-      loadingUsdstBalance,
-      voucherBalance,
-      fetchUsdstBalance,
     }),
-    [activeTokens, inactiveTokens, allActiveTokens, loading, allActiveLoading, error, fetchTokens, fetchAllActiveTokens, usdstBalance, voucherBalance, loadingUsdstBalance, fetchUsdstBalance]
+    [activeTokens, inactiveTokens, allActiveTokens, loading, allActiveLoading, error, fetchTokens, fetchAllActiveTokens]
   );
 
   return (

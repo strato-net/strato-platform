@@ -7,16 +7,15 @@ interface AssetsGridProps {
 }
 
 const AssetsGrid = ({ assets, loading }: AssetsGridProps) => {
+  const shouldShowLoading = loading && assets.length === 0;
+  const hasAssets = assets.length > 0;
 
   return (
-    loading ?
+    shouldShowLoading ? (
       <div className="flex justify-center items-center h-12">
         <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
       </div>
-      :
-      assets.length === 0 ?
-        <div className='w-full flex justify-center items-center'>No data to show</div>
-        :
+    ) : hasAssets ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {assets.map((asset, id) => (
             <AssetCard
@@ -32,6 +31,9 @@ const AssetsGrid = ({ assets, loading }: AssetsGridProps) => {
             />
           ))}
         </div>
+    ) : (
+      <div className='w-full flex justify-center items-center'>No data to show</div>
+    )
   );
 };
 

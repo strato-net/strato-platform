@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { useUserTokens } from "@/context/UserTokensContext";
 import { useUser } from "@/context/UserContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { Card, CardContent } from "@/components/ui/card";
@@ -54,19 +53,18 @@ const InfoTooltip = ({ children, content }: { children: React.ReactNode; content
 };
 
 const UsdstBalanceBox: React.FC = () => {
-  const { userAddress } = useUser();
-  const { usdstBalance, voucherBalance, loadingUsdstBalance, fetchUsdstBalance } =
-    useUserTokens();
-  const { getToken } = useTokenContext();
+  const { userAddress, isLoggedIn } = useUser();
+  const { usdstBalance, voucherBalance, loadingUsdstBalance, fetchUsdstBalance, getToken } =
+    useTokenContext();
   const location = useLocation();
   const [isMinimized, setIsMinimized] = useState(false);
   const [usdstToken, setUsdstToken] = useState<Token | null>(null);
 
   useEffect(() => {
-    if (userAddress) {
-      fetchUsdstBalance(userAddress);
+    if (isLoggedIn) {
+      fetchUsdstBalance();
     }
-  }, [userAddress, fetchUsdstBalance]);
+  }, [fetchUsdstBalance, isLoggedIn]);
 
   // Fetch USDST token info for image
   useEffect(() => {
@@ -234,7 +232,7 @@ const UsdstBalanceBox: React.FC = () => {
                     : "Warning: Low gas funds - add USDST to continue transacting"}
                 </p>
                 <Link
-                  to="/dashboard/deposits/?tab=convert"
+                  to="/deposits/?tab=convert"
                   className="underline hover:no-underline font-medium"
                 >
                   Add funds →

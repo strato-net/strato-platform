@@ -28,13 +28,15 @@ import MercataStats from "./pages/MercataStats";
 // Import dashboard components
 
 import BridgeTransactionsPage from "./pages/BridgeTransactionsPage";
+import WithdrawalsPage from "./pages/WithdrawalsPage";
 import Admin from "./pages/Admin";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { coinbaseWallet, metaMaskWallet, walletConnectWallet } from "@rainbow-me/rainbowkit/wallets";
 import AdminRoute from "./components/AdminRoute";
 import DashboardWrapper from "./components/layouts/DashboardWrapper";
-import { LendingProvider } from "./context/LendingContext";
-import { CDPProvider } from "./context/CDPContext";
+import { WithdrawalsProviders } from "./components/layouts/WithdrawalsProviders";
+import { DepositsProviders } from "./components/layouts/DepositsProviders";
+import { DashboardProviders } from "./components/layouts/DashboardProviders";
 import { TokenProvider } from "./context/TokenContext";
 import { BridgeProvider } from "@/context/BridgeContext";
 import { LiquidationProvider } from "./context/LiquidationContext";
@@ -112,14 +114,11 @@ const App = () => {
       <RainbowKitProvider>
         <UserProvider>
           <UserTokensProvider>
-            <LendingProvider>
-              <CDPProvider>
                 {/* <SwapProvider> */}
                 <OracleProvider>
                   <TokenProvider>
                     <LiquidationProvider>
                       <SafetyProvider>
-                        <BridgeProvider>
                               <TooltipProvider>
                               <Toaster />
                             <BrowserRouter>
@@ -129,86 +128,101 @@ const App = () => {
                                 <Route
                                   path="/dashboard"
                                   element={
+                                    <DashboardProviders>
                                     <ProtectedRoute>
                                       <DashboardWrapper>
                                         <Dashboard />
                                       </DashboardWrapper>
                                     </ProtectedRoute>
+                                    </DashboardProviders>
                                   }
                                 />
                                 <Route
                                   path="/dashboard/swap"
                                   element={
+                                    <DashboardProviders>
                                     <ProtectedRoute>
                                       <DashboardWrapper>
                                         <SwapAsset />
                                       </DashboardWrapper>
                                     </ProtectedRoute>
+                                    </DashboardProviders>
                                   }
                                 />
                                 <Route
-                                  path="/dashboard/deposits"
+                                  path="/deposits"
                                   element={
+                                    <DepositsProviders>
                                     <ProtectedRoute>
-                                      <DashboardWrapper>
                                         <DepositsPage />
-                                      </DashboardWrapper>
                                     </ProtectedRoute>
+                                    </DepositsProviders>
                                   }
                                 />
                                 <Route
-                                  path="/dashboard/deposits/:id"
+                                  path="/deposits/:id"
                                   element={
+                                    <DashboardProviders>
                                     <ProtectedRoute>
                                       <DashboardWrapper>
                                         <AssetDetail />
                                       </DashboardWrapper>
                                     </ProtectedRoute>
+                                    </DashboardProviders>
                                   }
                                 />
                                 <Route
                                   path="/dashboard/borrow"
                                   element={
+                                    <DashboardProviders>
                                     <ProtectedRoute>
                                       <DashboardWrapper>
                                         <Borrow />
                                       </DashboardWrapper>
                                     </ProtectedRoute>
+                                    </DashboardProviders>
                                   }
                                 />
                                 <Route
                                   path="/dashboard/advanced"
                                   element={
+                                    <DashboardProviders>
                                     <ProtectedRoute>
                                       <DashboardWrapper>
                                         <Advanced />
                                       </DashboardWrapper>
                                     </ProtectedRoute>
+                                    </DashboardProviders>
                                   }
                                 />
                                 <Route
                                   path="/dashboard/activity"
                                   element={
+                                    <DashboardProviders>
                                     <ProtectedRoute>
                                       <DashboardWrapper>
                                         <ActivityFeed />
                                       </DashboardWrapper>
                                     </ProtectedRoute>
+                                    </DashboardProviders>
                                   }
                                 />
                                 <Route
                                   path="/dashboard/transfer"
                                   element={
+                                    <DashboardProviders>
                                     <ProtectedRoute>
                                       <DashboardWrapper>
                                         <Transfer />
                                       </DashboardWrapper>
                                     </ProtectedRoute>
+                                    </DashboardProviders>
                                   }
                                 />
                                 <Route
                                   path="/dashboard/admin"
                                   element={
+                                    <DashboardProviders>
                                     <ProtectedRoute>
                                       <AdminRoute>
                                         <DashboardWrapper>
@@ -216,28 +230,42 @@ const App = () => {
                                         </DashboardWrapper>
                                       </AdminRoute>
                                     </ProtectedRoute>
+                                    </DashboardProviders>
                                   }
                                 />
 
                                 <Route
-                                  path="/dashboard/bridge-transactions"
+                                  path="/bridge-transactions"
                                   element={
+                                    <BridgeProvider>
                                     <ProtectedRoute>
-                                      <DashboardWrapper>
                                         <BridgeTransactionsPage />
-                                      </DashboardWrapper>
                                     </ProtectedRoute>
+                                    </BridgeProvider>
                                   }
                                 />
 
                                 <Route
                                   path="/dashboard/stats"
                                   element={
+                                    <DashboardProviders>
                                     <ProtectedRoute>
                                       <DashboardWrapper>
                                         <MercataStats />
                                       </DashboardWrapper>
                                     </ProtectedRoute>
+                                    </DashboardProviders>
+                                  }
+                                />
+
+                                <Route
+                                  path="/withdrawals"
+                                  element={
+                                    <WithdrawalsProviders>
+                                      <ProtectedRoute>
+                                        <WithdrawalsPage />
+                                      </ProtectedRoute>
+                                    </WithdrawalsProviders>
                                   }
                                 />
 
@@ -246,14 +274,11 @@ const App = () => {
                               </Routes>
                             </BrowserRouter>
                           </TooltipProvider>
-                        </BridgeProvider>
                       </SafetyProvider>
                     </LiquidationProvider>
                   </TokenProvider>
                 </OracleProvider>
                 {/* </SwapProvider> */}
-              </CDPProvider>
-            </LendingProvider>
           </UserTokensProvider>
         </UserProvider>
       </RainbowKitProvider>

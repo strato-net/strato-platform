@@ -10,11 +10,12 @@ import { formatWeiToDecimalHP } from '@/utils/numberUtils';
 import { ensureHexPrefix } from '@/utils/numberUtils';
 import { usdstAddress } from '@/lib/constants';
 
-const WithdrawTransactionDetails = ({ mintUSDST = false, context }: { mintUSDST?: boolean; context?: string }) => {
+const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
-  const [withdrawalStatus, setWithdrawalStatus] = useState<number | null>(null);
-  const [selectedChainId, setSelectedChainId] = useState<number | null>(null);
+  const [withdrawalStatus, setWithdrawalStatus] = useState<number>(0);
+  const [selectedChainId, setSelectedChainId] = useState<number>(0);
+  const [selectedType, setSelectedType] = useState<'bridge' | 'convert' | ''>('');
   const [transactions, setTransactions] = useState<any[]>([]);
 
   const {
@@ -32,13 +33,17 @@ const WithdrawTransactionDetails = ({ mintUSDST = false, context }: { mintUSDST?
           order: 'block_timestamp.desc',
         };
         
-        (params as any)["value->>stratoToken"] = mintUSDST ? `eq.${usdstAddress}` : `neq.${usdstAddress}`;
+        if (selectedType === 'convert') {
+          (params as any)["value->>stratoToken"] = `eq.${usdstAddress}`;
+        } else if (selectedType === 'bridge') {
+          (params as any)["value->>stratoToken"] = `neq.${usdstAddress}`;
+        }
         
-        if (withdrawalStatus !== null) {
+        if (withdrawalStatus !== 0) {
           (params as any)["value->>bridgeStatus"] = `eq.${withdrawalStatus}`;
         }
         
-        if (selectedChainId !== null) {
+        if (selectedChainId !== 0) {
           (params as any)["value->>externalChainId"] = `eq.${selectedChainId}`;
         }
         
@@ -53,7 +58,7 @@ const WithdrawTransactionDetails = ({ mintUSDST = false, context }: { mintUSDST?
     };
 
     loadTransactions();
-  }, [currentPage, withdrawalStatus, selectedChainId, fetchWithdrawTransactions, context]);
+  }, [currentPage, withdrawalStatus, selectedChainId, fetchWithdrawTransactions, context, selectedType]);
 
   const columns = [
     {
@@ -124,7 +129,7 @@ const WithdrawTransactionDetails = ({ mintUSDST = false, context }: { mintUSDST?
         const symbol = record?.stratoTokenSymbol || '-';
         return (
           <div className="flex flex-col gap-1">
-            <span className="text-sm text-gray-700">{mintUSDST ? 'USDST' : symbol}</span>
+            <span className="text-sm text-gray-700">{symbol}</span>
           </div>
         );
       },
@@ -193,12 +198,30 @@ const WithdrawTransactionDetails = ({ mintUSDST = false, context }: { mintUSDST?
         <Space size="large">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
+              Type
+            </label>
+            <Select
+              value={selectedType || ''}
+              onChange={(v) => {
+                setSelectedType(v === '' ? '' : v as 'bridge' | 'convert');
+                setCurrentPage(1);
+              }}
+              style={{ width: 150 }}
+              options={[
+                { value: '', label: 'All Types' },
+                { value: 'bridge', label: 'Bridge' },
+                { value: 'convert', label: 'Convert' },
+              ]}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Status Filter
             </label>
             <Select
-              value={withdrawalStatus}
+              value={withdrawalStatus || 0}
               onChange={(v) => {
-                setWithdrawalStatus(v);
+                setWithdrawalStatus(v || 0);
                 setCurrentPage(1);
               }}
               style={{ width: 150 }}
@@ -210,14 +233,14 @@ const WithdrawTransactionDetails = ({ mintUSDST = false, context }: { mintUSDST?
               Chain Filter
             </label>
             <Select
-              value={selectedChainId}
+              value={selectedChainId || 0}
               onChange={(v) => {
-                setSelectedChainId(v);
+                setSelectedChainId(v || 0);
                 setCurrentPage(1);
               }}
               style={{ width: 150 }}
               options={[
-                { value: null, label: 'All Chains' },
+                { value: 0, label: 'All Chains' },
                 ...availableNetworks.map((n) => ({ value: parseInt(n.chainId), label: n.chainName }))
               ]}
             />
@@ -250,7 +273,7 @@ const WithdrawTransactionDetails = ({ mintUSDST = false, context }: { mintUSDST?
               </div>
             ),
           }}
-          rowKey={(_, index) => `${index}`}
+          rowKey={(_, index) => index}
         />
       </div>
     </div>

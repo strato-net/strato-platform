@@ -16,8 +16,8 @@ import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
 
 const SafetyModuleSection = () => {
   const { userAddress } = useUser();
-  const { activeTokens: tokens, loading: tokensLoading, fetchTokens, fetchUsdstBalance, usdstBalance } = useUserTokens();
-  const { approveToken } = useTokenContext();
+  const { activeTokens: tokens, loading: tokensLoading, fetchTokens } = useUserTokens();
+  const { fetchUsdstBalance, usdstBalance, approveToken } = useTokenContext();
   const {
     safetyInfo,
     loading,
@@ -36,21 +36,19 @@ const SafetyModuleSection = () => {
 
 
   const refreshData = (signal?: AbortSignal) => {
-    if (!userAddress) return;
     fetchTokens(signal);
     refreshSafetyInfo(signal);
-    fetchUsdstBalance(userAddress);
+    fetchUsdstBalance();
   };
 
-  // Fetch on userAddress change only, with abort controller
+  // Fetch on mount, with abort controller
   useEffect(() => {
-    if (!userAddress) return;
     const abortController = new AbortController();
     refreshData(abortController.signal);
     return () => {
       abortController.abort();
     };
-  }, [userAddress]);
+  }, []);
 
   // usdstBalance is now coming directly from useUserTokens() context
 
