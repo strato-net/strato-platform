@@ -47,6 +47,7 @@ import NetworkSelector from "./NetworkSelector";
 import TokenSelector from "./TokenSelector";
 import PercentageButtons from "@/components/ui/PercentageButtons";
 import DepositTransactionSummary from "./DepositTransactionSummary";
+import AdvancedOptionsDropdown from "./AdvancedOptionsDropdown";
 
 interface BridgeInProps {
   isConvert?: boolean;
@@ -537,6 +538,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
         title: "Transaction Failed",
         description: bridgeError.userMessage,
         variant: "destructive",
+        duration: 3000,
       });
     } finally {
       setIsLoading(false);
@@ -555,14 +557,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
       <div className="w-full">
         <BridgeWalletStatus />
       </div>
-
-      <NetworkSelector
-        selectedNetwork={selectedNetwork}
-        availableNetworks={availableNetworks}
-        onNetworkChange={setSelectedNetwork}
-        direction="in"
-        disabled={isLoading}
-      />
 
       <TokenSelector
         selectedToken={selectedToken}
@@ -649,6 +643,14 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
         >
         {isLoading ? "Processing..." : isConvert && autoDeposit ? "Deposit and Earn" : "Deposit"}
         </Button>
+
+      <AdvancedOptionsDropdown
+        selectedNetwork={selectedNetwork}
+        availableNetworks={availableNetworks}
+        onNetworkChange={setSelectedNetwork}
+        direction="in"
+        disabled={isLoading}
+      />
 
       {networkError && (
         <p className="text-sm text-red-500">{networkError}</p>

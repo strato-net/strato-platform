@@ -24,6 +24,7 @@ import {
   BRIDGE_MODE_LABELS,
 } from "@/lib/bridge/constants";
 import { useUser } from "@/context/UserContext";
+import AdvancedOptionsDropdown from "./AdvancedOptionsDropdown";
 
 // Constants
 const FEE_WEI = safeParseUnits(BRIDGE_OUT_FEE).toString();
@@ -304,13 +305,6 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isConvert = false }) => {
         <BridgeWalletStatus />
       </div>
 
-      <NetworkSelector
-        selectedNetwork={selectedNetwork}
-        availableNetworks={availableNetworks}
-        onNetworkChange={setSelectedNetwork}
-        disabled={isLoading}
-      />
-
       <TokenSelector
         selectedToken={selectedToken}
         tokens={currentTokens}
@@ -383,6 +377,13 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isConvert = false }) => {
         >
         {isLoading ? "Processing..." : "Withdraw"}
         </Button>
+
+      <AdvancedOptionsDropdown
+        selectedNetwork={selectedNetwork}
+        availableNetworks={availableNetworks}
+        onNetworkChange={setSelectedNetwork}
+        disabled={isLoading}
+      />
 
       <BridgeConfirmationModal
         open={isModalOpen}

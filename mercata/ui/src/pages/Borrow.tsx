@@ -71,11 +71,11 @@ const Borrow = () => {
           refreshCollateral(),
           fetchUsdstBalance(),
         ]);
-        } catch (error) {
-          console.error("Error refreshing data:", error);
-        }
-      };
-      refreshData();
+      } catch (error) {
+        console.error("Error refreshing data:", error);
+      }
+    };
+    refreshData();
   }, [userAddress, refreshLoans, refreshCollateral, fetchUsdstBalance]);
 
     useEffect(() => {

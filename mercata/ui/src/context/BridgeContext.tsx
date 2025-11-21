@@ -104,24 +104,27 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
 
   // ========== BALANCE FUNCTIONS ==========
   const fetchBalance = useCallback(
-    async (tokenAddress: string, signal?: AbortSignal): Promise<BalanceResponse> => {
+    async (
+      tokenAddress: string,
+      signal?: AbortSignal
+    ): Promise<BalanceResponse> => {
       const addr = tokenAddress.startsWith("0x")
         ? tokenAddress.slice(2)
         : tokenAddress;
       const { data } = await api.get(`/tokens/balance?address=eq.${addr}`, {
         signal,
       });
-      
+
       if (Array.isArray(data) && data[0]) {
         const tokenData = data[0];
         const balance = tokenData.balance ? String(tokenData.balance) : "0";
-        
+
         return { balance };
       }
-      
+
       return { balance: "0" };
     },
-    [],
+    []
   );
 
   const useBalance = useCallback((tokenAddress: string | null) => {

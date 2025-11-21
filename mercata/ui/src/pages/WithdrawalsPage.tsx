@@ -82,14 +82,14 @@ const WithdrawalsPage = () => {
         />
 
         <main className="flex-1 p-6 overflow-y-auto">
-          <div className="mb-8 flex flex-col lg:flex-row gap-6 items-start">
-            <div className="w-full lg:w-[60%] lg:min-w-[500px]">
-              <Card className="shadow-sm">
+          <div className="mb-8 flex flex-col lg:flex-row gap-6 items-stretch">
+            <div className="w-full lg:w-[50%] flex">
+              <Card className="shadow-sm flex-1 flex flex-col">
                 <CardHeader>
                   <CardTitle>Withdraw Assets</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="w-full bg-white/90 p-1.5 rounded-xl border border-gray-200 shadow-sm">
+                <CardContent className="flex-1 flex flex-col min-h-0">
+                  <div className="w-full bg-white/90 p-1.5 rounded-xl border border-gray-200 shadow-sm flex-1 flex flex-col min-h-0">
                     <AntdTabs
                       activeKey={activeTab}
                       items={[
@@ -113,7 +113,7 @@ const WithdrawalsPage = () => {
                         } as React.CSSProperties
                       }
                     />
-                    <div className="bg-white rounded-xl p-4 shadow-sm mt-4">
+                    <div className="bg-white rounded-xl p-4 shadow-sm mt-4 flex-1 min-h-0 overflow-auto">
                       <BridgeOut isConvert={activeTab === "from-savings"} />
                     </div>
                   </div>
@@ -121,8 +121,8 @@ const WithdrawalsPage = () => {
               </Card>
             </div>
 
-            <div className="w-full lg:w-[40%] lg:min-w-[300px] lg:max-w-[400px] space-y-6">
-              <Card className="shadow-sm">
+            <div className="w-full lg:w-[50%] flex flex-col gap-6">
+              <Card className="shadow-sm flex flex-col">
                 <CardHeader>
                   <CardTitle>Withdrawal Summary</CardTitle>
                 </CardHeader>
@@ -180,7 +180,7 @@ const WithdrawalsPage = () => {
                 </CardContent>
               </Card>
 
-              <Card className="shadow-sm">
+              <Card className="shadow-sm flex flex-col">
                 <CardHeader>
                   <CardTitle>Important Notes</CardTitle>
                 </CardHeader>

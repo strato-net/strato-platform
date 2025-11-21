@@ -91,9 +91,9 @@ const DepositsPage = () => {
               width: 100% !important;
             }
           `}</style>
-          <div className="mb-8 flex flex-col lg:flex-row gap-6 items-start">
-            <div className="w-full lg:w-[40%] lg:min-w-[400px] lg:max-w-[600px] lg:sticky lg:top-0">
-              <Card className="shadow-sm">
+          <div className="mb-8 flex flex-col lg:flex-row gap-6 items-stretch">
+            <div className="w-full lg:w-[50%] flex">
+              <Card className="shadow-sm flex-1 flex flex-col">
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle>Deposit Assets</CardTitle>
@@ -107,8 +107,8 @@ const DepositsPage = () => {
                     </Link>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <div className="w-full bg-white/90 p-1.5 rounded-xl border border-gray-200 shadow-sm">
+                <CardContent className="flex-1 flex flex-col min-h-0">
+                  <div className="w-full bg-white/90 p-1.5 rounded-xl border border-gray-200 shadow-sm flex-1 flex flex-col min-h-0">
                   <AntdTabs
                     activeKey={activeTab}
                     items={[
@@ -132,30 +132,37 @@ const DepositsPage = () => {
                       } as React.CSSProperties
                     }
                   />
-                    <div className="bg-white rounded-xl p-4 shadow-sm mt-4">
+                    <div className="bg-white rounded-xl p-4 shadow-sm mt-4 flex-1 min-h-0 overflow-auto">
                       <BridgeIn isConvert={activeTab === "convert"} />
                     </div>
                   </div>
                 </CardContent>
               </Card>
             </div>
-            <div className="flex-1 min-w-0 max-w-full">
+            <div className="w-full lg:w-[50%] flex flex-col gap-6">
               {/* Net Balance moved to right column */}
-              <div className="mb-6">
-                <AssetSummary 
-                  title="Net Balance" 
+              <div className="flex-[0.5] flex">
+                <AssetSummary
+                  title="Net Balance"
                   value={`$${totalBalance.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`}
                   icon={<Wallet className="text-white" size={18} />}
                   color="bg-blue-500"
                 />
               </div>
               {/* My Deposits (Earning Assets) */}
-              <AssetsList 
-                loading={loadingEarningAssets} 
-                tokens={nonPoolTokens} 
-                inActiveTokens={inactiveTokens} 
-                isDashboard={false}
-              />
+              <Card className="shadow-sm flex-[4.5] flex flex-col min-h-0">
+                <CardHeader>
+                  <CardTitle>My Deposits</CardTitle>
+                </CardHeader>
+                <CardContent className="flex-1 min-h-0 overflow-auto">
+                  <AssetsList 
+                    loading={loadingEarningAssets} 
+                    tokens={nonPoolTokens} 
+                    inActiveTokens={inactiveTokens} 
+                    isDashboard={false}
+                  />
+                </CardContent>
+              </Card>
             </div>
           </div>
           {/* Assets List */}
