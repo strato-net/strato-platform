@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Clock, CheckCircle2, AlertCircle } from "lucide-react";
 import { Table, Select, Space, Card } from "antd";
 import { FrownOutlined, CopyOutlined } from "@ant-design/icons";
@@ -12,60 +12,62 @@ import { formatWeiToDecimalHP } from "@/utils/numberUtils";
 import { ensureHexPrefix } from "@/utils/numberUtils";
 import { usdstAddress } from "@/lib/constants";
 
-const DepositTransactionDetails = ({ mintUSDST = false, context, refreshTrigger, onRefresh }: { mintUSDST?: boolean; context?: string; refreshTrigger?: number; onRefresh?: () => void }) => {
+const DepositTransactionDetails = ({ mintUSDST = false, context }: { mintUSDST?: boolean; context?: string }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [depositStatus, setDepositStatus] = useState<number | null>(null);
   const [selectedChainId, setSelectedChainId] = useState<number | null>(null);
   const [transactions, setTransactions] = useState<DepositTransaction[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const isInitialMount = useRef(true);
-  const lastRefreshTrigger = useRef(0);
+  const prevRefreshTrigger = useRef(refreshTrigger);
   const DEPOSIT_STATUS_OPTIONS = BRIDGE_STATUS_OPTIONS.filter((o) => o.value !== 4);
 
-  const { fetchDepositTransactions, availableNetworks } = useBridgeContext();
-
-  const loadTransactions = useCallback(async (isRefresh = false) => {
-    setIsLoading(true);
-    if (isRefresh) setIsRefreshing(true);
-    try {
-      const params: Record<string, string> = {
-        limit: ITEMS_PER_PAGE.toString(),
-        offset: ((currentPage - 1) * ITEMS_PER_PAGE).toString(),
-        order: 'block_timestamp.desc',
-      };
-      (params as any)["value->>stratoToken"] = mintUSDST ? `eq.${usdstAddress}` : `neq.${usdstAddress}`;
-      if (depositStatus !== null) (params as any)["value->>bridgeStatus"] = `eq.${depositStatus}`;
-      if (selectedChainId !== null) (params as any)["key"] = `eq.${selectedChainId}`;
-      
-      const result = await fetchDepositTransactions(params, context);
-      setTransactions(result.data);
-      setTotalCount(result.totalCount);
-    } catch (error) {
-      console.error("Error loading transactions:", error);
-      setTransactions([]);
-      setTotalCount(0);
-    } finally {
-      setIsLoading(false);
-      if (isRefresh) setIsRefreshing(false);
-    }
-  }, [currentPage, depositStatus, selectedChainId, fetchDepositTransactions, context, mintUSDST]);
+  const {
+    loading: isLoading,
+    fetchDepositTransactions,
+    availableNetworks,
+  } = useBridgeContext();
 
   useEffect(() => {
-    if (isInitialMount.current) {
-      loadTransactions(false);
-      isInitialMount.current = false;
-      return;
-    }
-    if (refreshTrigger && refreshTrigger !== lastRefreshTrigger.current) {
-      lastRefreshTrigger.current = refreshTrigger;
-      loadTransactions(true);
-      return;
-    }
-    setIsRefreshing(false);
-    loadTransactions(false);
-  }, [currentPage, depositStatus, selectedChainId, refreshTrigger, loadTransactions]);
+    const loadTransactions = async () => {
+      try {
+        if (refreshTrigger !== prevRefreshTrigger.current) {
+          setIsRefreshing(true);
+          prevRefreshTrigger.current = refreshTrigger;
+        }
+        const params: Record<string, string> = {
+          limit: ITEMS_PER_PAGE.toString(),
+          offset: ((currentPage - 1) * ITEMS_PER_PAGE).toString(),
+          order: 'block_timestamp.desc',
+        };
+        console.log('mintUSDST', mintUSDST);
+        (params as any)["value->>stratoToken"] = mintUSDST ? `eq.${usdstAddress}` : `neq.${usdstAddress}`;
+        
+        if (depositStatus !== null) {
+          (params as any)["value->>bridgeStatus"] = `eq.${depositStatus}`;
+        }
+        
+        if (selectedChainId !== null) {
+          (params as any)["key"] = `eq.${selectedChainId}`;
+        }
+        
+        const result = await fetchDepositTransactions(params, context);
+        setTransactions(result.data);
+        setTotalCount(result.totalCount);
+      } catch (error) {
+        console.error("Error loading transactions:", error);
+        setTransactions([]);
+        setTotalCount(0);
+      } finally {
+        setIsRefreshing(false);
+      }
+    };
+
+    loadTransactions();
+  }, [currentPage, depositStatus, selectedChainId, fetchDepositTransactions, context, refreshTrigger]);
+
+  const handleRefresh = () => setRefreshTrigger(prev => prev + 1);
 
   
 
@@ -228,7 +230,7 @@ const DepositTransactionDetails = ({ mintUSDST = false, context, refreshTrigger,
               />
             </div>
           </Space>
-          <RefreshButton onRefresh={onRefresh} loading={isRefreshing} disabled={isRefreshing} />
+          <RefreshButton onRefresh={handleRefresh} loading={isRefreshing} />
         </Space>
       </Card>
       

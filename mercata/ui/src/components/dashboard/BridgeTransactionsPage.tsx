@@ -11,7 +11,6 @@ import { BridgeTransactionTab } from '@mercata/shared-types';
 const BridgeTransactionsPage = ({ isAdmin = false }: { isAdmin?: boolean }) => {
   const { loadNetworksAndTokens, targetTransactionTab, setTargetTransactionTab } = useBridgeContext();
   const [transactionType, setTransactionType] = useState<BridgeTransactionTab>('DepositRecorded');
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useEffect(() => {
     loadNetworksAndTokens();
@@ -70,20 +69,20 @@ const BridgeTransactionsPage = ({ isAdmin = false }: { isAdmin?: boolean }) => {
               </div>
 
               {transactionType === 'DepositRecorded' ? (
-                <DepositTransactionDetails key="deposit" mintUSDST={false} context={isAdmin ? 'admin' : undefined} refreshTrigger={refreshTrigger} onRefresh={() => setRefreshTrigger(prev => prev + 1)} />
+                <DepositTransactionDetails key="deposit" mintUSDST={false} context={isAdmin ? 'admin' : undefined} />
               ):
               transactionType === 'WithdrawalInitiated' ? (
-                <WithdrawTransactionDetails key="withdrawal" mintUSDST={false} context={isAdmin ? 'admin' : undefined} refreshTrigger={refreshTrigger} onRefresh={() => setRefreshTrigger(prev => prev + 1)} />
+                <WithdrawTransactionDetails key="withdrawal" mintUSDST={false} context={isAdmin ? 'admin' : undefined} />
               ):
               transactionType === 'RedemptionInitiated' ? (
-                <WithdrawTransactionDetails key="redemption" mintUSDST={true} context={isAdmin ? 'admin' : undefined} refreshTrigger={refreshTrigger} onRefresh={() => setRefreshTrigger(prev => prev + 1)} />
+                <WithdrawTransactionDetails key="redemption" mintUSDST={true} context={isAdmin ? 'admin' : undefined} />
               ):
               transactionType === 'USDSTDeposit' ? (
-                <DepositTransactionDetails key="usdst" mintUSDST={true} context={isAdmin ? 'admin' : undefined} refreshTrigger={refreshTrigger} onRefresh={() => setRefreshTrigger(prev => prev + 1)} />
+                <DepositTransactionDetails key="usdst" mintUSDST={true} context={isAdmin ? 'admin' : undefined} />
               ):
               // default to bridge out
               (
-                <WithdrawTransactionDetails key="default" mintUSDST={false} context={isAdmin ? 'admin' : undefined} refreshTrigger={refreshTrigger} onRefresh={() => setRefreshTrigger(prev => prev + 1)} />
+                <WithdrawTransactionDetails key="default" mintUSDST={false} context={isAdmin ? 'admin' : undefined} />
               )}
             </div>
           </div>
