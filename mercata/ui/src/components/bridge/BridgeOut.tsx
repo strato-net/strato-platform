@@ -342,6 +342,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isConvert = false }) => {
             maxValue={maxAmount}
             onChange={handleAmountChange}
             className="mt-2"
+            disabled={isLoading}
           />
         )}
       </div>

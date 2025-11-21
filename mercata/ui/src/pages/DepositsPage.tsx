@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import MobileSidebar from '../components/dashboard/MobileSidebar';
@@ -25,11 +25,10 @@ import { cataAddress } from '@/lib/constants';
 
 const DepositsPage = () => {
   const { userAddress } = useUser();
-  const { earningAssets, getEarningAssets, inactiveTokens, getInactiveTokens, loading } = useTokenContext();
+  const { earningAssets, getEarningAssets, inactiveTokens, getInactiveTokens, loadingEarningAssets, loadingInactiveTokens } = useTokenContext();
   const { loans } = useLendingContext();
   const { totalCDPDebt } = useCDP();
   const { loadNetworksAndTokens, setTargetTransactionTab } = useBridgeContext();
-  const navigate = useNavigate();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"convert" | "bridge-in">("convert");
 
@@ -63,10 +62,12 @@ const DepositsPage = () => {
   });
 
   useEffect(() => {
-    getEarningAssets();
-    getInactiveTokens();
+    // Only show loading if we don't have existing data
+    const hasExistingData = earningAssets.length > 0;
+    getEarningAssets(!hasExistingData);
+    getInactiveTokens(!hasExistingData);
     loadNetworksAndTokens().catch(() => {});
-  }, [userAddress]);
+  }, [userAddress, earningAssets.length]);
 
   return (
     <div className="h-screen bg-gray-50 overflow-hidden">
@@ -148,7 +149,7 @@ const DepositsPage = () => {
               </div>
               {/* My Deposits (Earning Assets) */}
               <AssetsList 
-                loading={loading} 
+                loading={loadingEarningAssets || loadingInactiveTokens} 
                 tokens={nonPoolTokens} 
                 inActiveTokens={inactiveTokens} 
                 isDashboard={false}
@@ -161,7 +162,7 @@ const DepositsPage = () => {
               <CardTitle>Available Assets</CardTitle>
             </CardHeader>
             <CardContent>
-              <AssetsGrid loading={loading} assets={sortedEarningAssets} />
+              <AssetsGrid loading={loadingEarningAssets} assets={sortedEarningAssets} />
             </CardContent>
           </Card>
         </main>

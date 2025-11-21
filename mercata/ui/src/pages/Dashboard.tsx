@@ -24,7 +24,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { userAddress } = useUser();
-  const { earningAssets, getEarningAssets, inactiveTokens, getInactiveTokens, loading } = useTokenContext();
+  const { earningAssets, getEarningAssets, inactiveTokens, getInactiveTokens, loadingEarningAssets, loadingInactiveTokens } = useTokenContext();
   const { loans, refreshLoans } = useLendingContext();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
@@ -64,27 +64,13 @@ const Dashboard = () => {
     totalCDPDebt
   });
 
-  // Add visibility states to prevent flashing
-  const [isComponentMounted, setIsComponentMounted] = useState(false);
-  const [isDataInitialized, setIsDataInitialized] = useState(false);
-
   useEffect(() => {
     document.title = "Dashboard | STRATO Mercata";
     
-    // Set mounted state immediately to prevent flash
-    setIsComponentMounted(true);
-    
-    // Remove the timeout to prevent loading flash
-    getEarningAssets();
-    getInactiveTokens();
+    // Show loading on initial load only
+    getEarningAssets(true);
+    getInactiveTokens(true);
     refreshLoans();
-
-    // Mark data as initialized after a brief delay to ensure proper rendering
-    const initTimer = setTimeout(() => {
-      setIsDataInitialized(true);
-    }, 100);
-
-    return () => clearTimeout(initTimer);
   }, [userAddress]);
 
   useEffect(() => {
@@ -116,21 +102,16 @@ const Dashboard = () => {
         description: `Successfully claimed ${pendingRewards} CATA tokens!`,
       });
 
-      // Refresh data after successful claim
+      // Refresh data after successful claim (silent refresh)
       await Promise.all([
-        getEarningAssets(),
-        getInactiveTokens(),
+        getEarningAssets(false),
+        getInactiveTokens(false),
         refetchPendingRewards(),
       ]);
     } finally {
       setIsClaiming(false);
     }
   };
-
-  // Don't render anything until component is properly mounted
-  if (!isComponentMounted) {
-    return null;
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -181,35 +162,30 @@ const Dashboard = () => {
             />
           </div>
 
-          {/* Only render lower sections after data initialization to prevent flash */}
-          {isDataInitialized && (
-            <>
-              <div className="mb-8">
-                <AssetsList 
-                  loading={loading} 
-                  tokens={nonPoolTokens} 
-                  inActiveTokens={inactiveTokens} 
-                />
-              </div>
+          <div className="mb-8">
+            <AssetsList 
+              loading={loadingEarningAssets || loadingInactiveTokens} 
+              tokens={nonPoolTokens} 
+              inActiveTokens={inactiveTokens} 
+            />
+          </div>
 
-              <div className="mb-8">
-                <BorrowingSection 
-                  loanData={loans}
-                />
-              </div>
+          <div className="mb-8">
+            <BorrowingSection 
+              loanData={loans}
+            />
+          </div>
 
-              <div className="mb-8">
-                  <MyPoolParticipationSection 
-                      poolTokens={poolTokens}
-                      loading={loading}
-                    />
-              </div>
+          <div className="mb-8">
+            <MyPoolParticipationSection 
+              poolTokens={poolTokens}
+              loading={loadingEarningAssets || loadingInactiveTokens}
+            />
+          </div>
 
-              <div className="mb-8">
-                <DashboardFAQ />
-              </div>
-            </>
-          )}
+          <div className="mb-8">
+            <DashboardFAQ />
+          </div>
         </main>
       </div>
     </div>

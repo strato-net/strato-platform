@@ -116,6 +116,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
     chainId: expectedChainId || undefined,
     query: {
       enabled: isConnected && !!address && !!expectedChainId && isNativeToken,
+      refetchInterval: 15000,
     },
   });
 
@@ -136,6 +137,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
         !!expectedChainId &&
         !!selectedToken &&
         !isNativeToken,
+      refetchInterval: 15000,
     },
   });
 
@@ -612,6 +614,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
             onChange={handleAmountChange}
             decimals={parseInt(selectedToken?.externalDecimals || "18")}
             className="mt-2"
+            disabled={isLoading}
           />
         )}
       </div>

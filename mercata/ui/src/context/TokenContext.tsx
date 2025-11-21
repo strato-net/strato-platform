@@ -4,6 +4,7 @@ import {
   useState,
   useCallback,
   useEffect,
+  useRef,
   ReactNode,
 } from 'react';
 import { api } from '@/lib/axios';
@@ -19,11 +20,13 @@ type TokenContextType = {
   error: string | null;
   getAllTokens: (query?: Record<string, string>) => Promise<void>;
   getActiveTokens: () => Promise<void>;
-  getInactiveTokens: () => Promise<void>;
+  getInactiveTokens: (showLoading?: boolean) => Promise<void>;
   getToken: (address: string) => Promise<Token | null>;
   getUserTokensWithBalance: () => Promise<Token[]>;
   getTransferableTokens: () => Promise<Token[]>;
-  getEarningAssets: () => Promise<void>;
+  getEarningAssets: (showLoading?: boolean) => Promise<void>;
+  loadingEarningAssets: boolean;
+  loadingInactiveTokens: boolean;
   createToken: (token: CreateTokenPayload) => Promise<void>;
   transferToken: (payload: { address: string; to: string; value: string }) => Promise<void>;
   approveToken: (payload: { address: string; spender: string; value: string }) => Promise<void>;
@@ -39,7 +42,15 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
   const [inactiveTokens, setInactiveTokens] = useState<TokenType[]>([]);
   const [earningAssets, setEarningAssets] = useState<EarningAsset[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingEarningAssets, setLoadingEarningAssets] = useState(false);
+  const [loadingInactiveTokens, setLoadingInactiveTokens] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // ========== REFS ==========
+  const earningAssetsIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const earningAssetsAbortControllerRef = useRef<AbortController | null>(null);
+  const inactiveTokensIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const inactiveTokensAbortControllerRef = useRef<AbortController | null>(null);
 
   const getAllTokens = useCallback(async (query: Record<string, string> = {}) => {
     setLoading(true);
@@ -63,14 +74,37 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  const getInactiveTokens = useCallback(async () => {
-    setLoading(true);
+  const getInactiveTokens = useCallback(async (showLoading: boolean = false) => {
+    if (inactiveTokensAbortControllerRef.current) {
+      inactiveTokensAbortControllerRef.current.abort();
+    }
+
+    inactiveTokensAbortControllerRef.current = new AbortController();
+
+    if (showLoading) {
+      setLoadingInactiveTokens(true);
+    }
+
     try {
-      const res = await api.get<{ tokens: TokenType[]; totalCount: number }>(`/tokens/v2`, { params: { status: 'neq.2' } });
-      setInactiveTokens(res.data?.tokens || []);
-    } catch (err) {
+      const res = await api.get<{ tokens: TokenType[]; totalCount: number }>(
+        `/tokens/v2`,
+        { 
+          params: { status: 'neq.2' },
+          signal: inactiveTokensAbortControllerRef.current.signal
+        }
+      );
+      
+      if (!inactiveTokensAbortControllerRef.current.signal.aborted) {
+        setInactiveTokens(res.data?.tokens || []);
+      }
+    } catch (err: any) {
+      if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') {
+        return;
+      }
     } finally {
-      setLoading(false);
+      if (showLoading && !inactiveTokensAbortControllerRef.current?.signal.aborted) {
+        setLoadingInactiveTokens(false);
+      }
     }
   }, []);
 
@@ -110,14 +144,34 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  const getEarningAssets = useCallback(async () => {
-    setLoading(true);
+  const getEarningAssets = useCallback(async (showLoading: boolean = false) => {
+    if (earningAssetsAbortControllerRef.current) {
+      earningAssetsAbortControllerRef.current.abort();
+    }
+
+    earningAssetsAbortControllerRef.current = new AbortController();
+
+    if (showLoading) {
+      setLoadingEarningAssets(true);
+    }
+
     try {
-      const res = await api.get<EarningAsset[]>(`/tokens/v2/earning-assets`);
-      setEarningAssets(res.data || []);
-    } catch (err) {
+      const res = await api.get<EarningAsset[]>(
+        `/tokens/v2/earning-assets`,
+        { signal: earningAssetsAbortControllerRef.current.signal }
+      );
+      
+      if (!earningAssetsAbortControllerRef.current.signal.aborted) {
+        setEarningAssets(res.data || []);
+      }
+    } catch (err: any) {
+      if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') {
+        return;
+      }
     } finally {
-      setLoading(false);
+      if (showLoading && !earningAssetsAbortControllerRef.current?.signal.aborted) {
+        setLoadingEarningAssets(false);
+      }
     }
   }, []);
 
@@ -188,9 +242,44 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [getAllTokens]);
 
+  // ========== POLLING EFFECTS ==========
+  // Earning assets polling (15s interval)
   useEffect(() => {
-    getAllTokens();
-  }, [getAllTokens]);
+    getEarningAssets(true);
+
+    earningAssetsIntervalRef.current = setInterval(() => {
+      getEarningAssets(false);
+    }, 15000);
+
+    return () => {
+      if (earningAssetsIntervalRef.current) {
+        clearInterval(earningAssetsIntervalRef.current);
+        earningAssetsIntervalRef.current = null;
+      }
+      if (earningAssetsAbortControllerRef.current) {
+        earningAssetsAbortControllerRef.current.abort();
+      }
+    };
+  }, [getEarningAssets]);
+
+  // Inactive tokens polling (15s interval)
+  useEffect(() => {
+    getInactiveTokens(true);
+
+    inactiveTokensIntervalRef.current = setInterval(() => {
+      getInactiveTokens(false);
+    }, 15000);
+
+    return () => {
+      if (inactiveTokensIntervalRef.current) {
+        clearInterval(inactiveTokensIntervalRef.current);
+        inactiveTokensIntervalRef.current = null;
+      }
+      if (inactiveTokensAbortControllerRef.current) {
+        inactiveTokensAbortControllerRef.current.abort();
+      }
+    };
+  }, [getInactiveTokens]);
 
   return (
     <TokenContext.Provider
@@ -213,6 +302,8 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
         approveToken,
         transferFromToken,
         setTokenStatus,
+        loadingEarningAssets,
+        loadingInactiveTokens,
       }}
     >
       {children}
