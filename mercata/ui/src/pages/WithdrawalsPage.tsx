@@ -1,43 +1,35 @@
-import { useEffect, useState } from 'react';
-import DashboardHeader from '../components/dashboard/DashboardHeader';
-import DashboardSidebar from '../components/dashboard/DashboardSidebar';
-import MobileSidebar from '../components/dashboard/MobileSidebar';
-import { 
-  Card, 
-  CardContent,  
-  CardHeader, 
-  CardTitle 
-} from "@/components/ui/card";
-import { Tabs as AntdTabs } from 'antd';
-import BridgeOut from '@/components/bridge/BridgeOut';
-import WithdrawTransactionDetails from '@/components/dashboard/WithdrawTransactionDetails';
-import { useSearchParams } from 'react-router-dom';
-import { useBridgeContext } from '@/context/BridgeContext';
-import { Loader2 } from 'lucide-react';
+import { useEffect, useState } from "react";
+import DashboardHeader from "../components/dashboard/DashboardHeader";
+import DashboardSidebar from "../components/dashboard/DashboardSidebar";
+import MobileSidebar from "../components/dashboard/MobileSidebar";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs as AntdTabs } from "antd";
+import BridgeOut from "@/components/bridge/BridgeOut";
+import WithdrawTransactionDetails from "@/components/dashboard/WithdrawTransactionDetails";
+import { useSearchParams } from "react-router-dom";
+import { useBridgeContext } from "@/context/BridgeContext";
+import { Loader2 } from "lucide-react";
+import { formatBalance } from "@/utils/numberUtils";
 
 const WithdrawalsPage = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'from-savings' | 'bridge-out'>('from-savings');
+  const [activeTab, setActiveTab] = useState<"from-savings" | "bridge-out">(
+    "from-savings"
+  );
   const [searchParams] = useSearchParams();
-  const { loadNetworksAndTokens } = useBridgeContext();
-
-  const [loadingWithdrawalMetrics] = useState(false);
-  const [pendingWithdrawalsCount] = useState<number>(3);
-  const [totalWithdrawn30d] = useState<string>("12,450.50");
-  const [availableToWithdraw] = useState<string>("8,234.75");
+  const { loadNetworksAndTokens, withdrawalSummary, loadingWithdrawalSummary } =
+    useBridgeContext();
 
   useEffect(() => {
-    const tabParam = searchParams.get('tab');
-    if (tabParam === 'bridge-out') {
-      setActiveTab('bridge-out');
+    const tabParam = searchParams.get("tab");
+    if (tabParam === "bridge-out") {
+      setActiveTab("bridge-out");
     }
   }, [searchParams]);
 
   useEffect(() => {
     loadNetworksAndTokens().catch(() => {});
   }, [loadNetworksAndTokens]);
-
-  const pendingWithdrawals = pendingWithdrawalsCount.toString();
 
   return (
     <div className="h-screen bg-gray-50 overflow-hidden">
@@ -54,13 +46,19 @@ const WithdrawalsPage = () => {
 
       <DashboardSidebar />
 
-      <MobileSidebar 
-        isOpen={isMobileSidebarOpen} 
-        onClose={() => setIsMobileSidebarOpen(false)} 
+      <MobileSidebar
+        isOpen={isMobileSidebarOpen}
+        onClose={() => setIsMobileSidebarOpen(false)}
       />
 
-      <div className="h-screen flex flex-col transition-all duration-300 md:pl-64" style={{ paddingLeft: 'var(--sidebar-width, 0rem)' }}>
-        <DashboardHeader title="Withdrawals" onMenuClick={() => setIsMobileSidebarOpen(true)} />
+      <div
+        className="h-screen flex flex-col transition-all duration-300 md:pl-64"
+        style={{ paddingLeft: "var(--sidebar-width, 0rem)" }}
+      >
+        <DashboardHeader
+          title="Withdrawals"
+          onMenuClick={() => setIsMobileSidebarOpen(true)}
+        />
 
         <main className="flex-1 p-6 overflow-y-auto">
           <div className="mb-8 flex flex-col lg:flex-row gap-6 items-start">
@@ -75,23 +73,27 @@ const WithdrawalsPage = () => {
                       activeKey={activeTab}
                       items={[
                         {
-                          key: 'from-savings',
-                          label: 'From Savings',
+                          key: "from-savings",
+                          label: "From Savings",
                         },
                         {
-                          key: 'bridge-out',
-                          label: 'Bridge Out',
+                          key: "bridge-out",
+                          label: "Bridge Out",
                         },
                       ]}
-                      onChange={(value) => setActiveTab(value as 'from-savings' | 'bridge-out')}
+                      onChange={(value) =>
+                        setActiveTab(value as "from-savings" | "bridge-out")
+                      }
                       className="custom-tabs"
-                      style={{
-                        '--ant-primary-color': '#3b82f6',
-                        '--ant-primary-color-hover': '#2563eb',
-                      } as React.CSSProperties}
+                      style={
+                        {
+                          "--ant-primary-color": "#3b82f6",
+                          "--ant-primary-color-hover": "#2563eb",
+                        } as React.CSSProperties
+                      }
                     />
                     <div className="bg-white rounded-xl p-4 shadow-sm mt-4">
-                      <BridgeOut isConvert={activeTab === 'from-savings'} />
+                      <BridgeOut isConvert={activeTab === "from-savings"} />
                     </div>
                   </div>
                 </CardContent>
@@ -105,27 +107,53 @@ const WithdrawalsPage = () => {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Total Withdrawn (30d)</span>
-                    {loadingWithdrawalMetrics ? (
+                    <span className="text-sm text-gray-600">
+                      Total Withdrawn (30d)
+                    </span>
+                    {loadingWithdrawalSummary ? (
                       <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
                     ) : (
-                      <span className="text-sm font-semibold">${totalWithdrawn30d}</span>
+                      <span className="text-sm font-semibold">
+                        {formatBalance(
+                          withdrawalSummary?.totalWithdrawn30d || "0",
+                          undefined,
+                          18,
+                          2,
+                          2,
+                          true
+                        )}
+                      </span>
                     )}
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Pending Withdrawals</span>
-                    {loadingWithdrawalMetrics ? (
+                    <span className="text-sm text-gray-600">
+                      Pending Withdrawals
+                    </span>
+                    {loadingWithdrawalSummary ? (
                       <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
                     ) : (
-                      <span className="text-sm font-semibold">{pendingWithdrawals}</span>
+                      <span className="text-sm font-semibold">
+                        {withdrawalSummary?.pendingWithdrawals || 0}
+                      </span>
                     )}
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Available to Withdraw</span>
-                    {loadingWithdrawalMetrics ? (
+                    <span className="text-sm text-gray-600">
+                      Available to Withdraw
+                    </span>
+                    {loadingWithdrawalSummary ? (
                       <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
                     ) : (
-                      <span className="text-sm font-semibold text-green-600">${parseFloat(availableToWithdraw.replace(/,/g, '')).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span className="text-sm font-semibold text-green-600">
+                        {formatBalance(
+                          withdrawalSummary?.availableToWithdraw || "0",
+                          undefined,
+                          18,
+                          2,
+                          2,
+                          true
+                        )}
+                      </span>
                     )}
                   </div>
                 </CardContent>
@@ -162,4 +190,3 @@ const WithdrawalsPage = () => {
 };
 
 export default WithdrawalsPage;
-

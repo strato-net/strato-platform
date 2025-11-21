@@ -15,11 +15,12 @@ import {
   NetworkSummary,
   BridgeContextType,
 } from "@/lib/bridge/types";
-import { NetworkConfig, BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, WithdrawalRequestResponse } from "@mercata/shared-types";
+import { NetworkConfig, BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, WithdrawalRequestResponse, WithdrawalSummaryResponse } from "@mercata/shared-types";
 
 const BridgeContext = createContext<BridgeContextType | undefined>(undefined);
 
 export const BridgeProvider = ({ children }: { children: ReactNode }) => {
+  // ========== STATE ==========
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [availableNetworks, setAvailableNetworks] = useState<NetworkSummary[]>(
@@ -30,7 +31,14 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
   const [selectedToken, setSelectedToken] = useState<BridgeToken | null>(null);
   const [networksLoaded, setNetworksLoaded] = useState(false);
   const [targetTransactionTab, setTargetTransactionTab] = useState<BridgeTransactionTab | null>(null);
+  const [withdrawalSummary, setWithdrawalSummary] = useState<WithdrawalSummaryResponse | null>(null);
+  const [loadingWithdrawalSummary, setLoadingWithdrawalSummary] = useState(false);
 
+  // ========== REFS ==========
+  const withdrawalSummaryIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const withdrawalSummaryAbortControllerRef = useRef<AbortController | null>(null);
+
+  // ========== NETWORK & TOKEN FUNCTIONS ==========
   const fetchTokensForChain = useCallback(
     async (chainId: string) => {
       try {
@@ -46,7 +54,6 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         }
       } catch (e) {
         setBridgeableTokens([]);
-        setError("Failed to load tokens for selected network");
       }
     },
     [selectedToken],
@@ -78,8 +85,6 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         setSelectedNetwork(defaultName);
         await fetchTokensForChain(networks[0].chainId);
       }
-    } catch (e) {
-      setError("Failed to load networks");
     } finally {
       setLoading(false);
     }
@@ -98,53 +103,28 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
     [availableNetworks, fetchTokensForChain],
   );
 
-  const requestWithdrawal = useCallback(
-    async (params: WithdrawalRequestParams): Promise<BridgeResponse> => {
-      setLoading(true);
-      try {
-        const { data } = await api.post<WithdrawalRequestResponse>(`/bridge/requestWithdrawal`, params);
-        return { success: true, data };
-      } catch (e) {
-        setError("Withdrawal request failed");
-        throw e;
-      } finally {
-        setLoading(false);
-      }
-    },
-    [],
-  );
-
-  // Internal balance fetching function used by useBalance hook
+  // ========== BALANCE FUNCTIONS ==========
   const fetchBalance = useCallback(
     async (tokenAddress: string, signal?: AbortSignal): Promise<BalanceResponse> => {
-      try {
-        const addr = tokenAddress.startsWith("0x")
-          ? tokenAddress.slice(2)
-          : tokenAddress;
-        const { data } = await api.get(`/tokens/balance?address=eq.${addr}`, {
-          signal,
-        });
+      const addr = tokenAddress.startsWith("0x")
+        ? tokenAddress.slice(2)
+        : tokenAddress;
+      const { data } = await api.get(`/tokens/balance?address=eq.${addr}`, {
+        signal,
+      });
+      
+      if (Array.isArray(data) && data[0]) {
+        const tokenData = data[0];
+        const balance = tokenData.balance ? String(tokenData.balance) : "0";
         
-        if (Array.isArray(data) && data[0]) {
-          const tokenData = data[0];
-          const balance = tokenData.balance ? String(tokenData.balance) : "0";
-          
-          return { balance };
-        }
-        
-        return { balance: "0" };
-      } catch (e: any) {
-        if (e.name === 'AbortError' || e.code === 'ERR_CANCELED') {
-          throw e;
-        }
-        setError("Failed to fetch balance");
-        throw e;
+        return { balance };
       }
+      
+      return { balance: "0" };
     },
     [],
   );
 
-  // Custom useBalance hook similar to wagmi's useBalance
   const useBalance = useCallback((tokenAddress: string | null) => {
     const [data, setData] = useState<{ 
       balance: string; 
@@ -222,6 +202,55 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [fetchBalance]);
 
+  // ========== WITHDRAWAL FUNCTIONS ==========
+  const fetchWithdrawalSummary = useCallback(
+    async (showLoading: boolean = false) => {
+      if (withdrawalSummaryAbortControllerRef.current) {
+        withdrawalSummaryAbortControllerRef.current.abort();
+      }
+
+      withdrawalSummaryAbortControllerRef.current = new AbortController();
+
+      if (showLoading) {
+        setLoadingWithdrawalSummary(true);
+      }
+
+      try {
+        const { data } = await api.get<WithdrawalSummaryResponse>(
+          '/bridge/withdrawalSummary',
+          { signal: withdrawalSummaryAbortControllerRef.current.signal }
+        );
+        
+        if (!withdrawalSummaryAbortControllerRef.current.signal.aborted) {
+          setWithdrawalSummary(data);
+        }
+      } catch (err: any) {
+        if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') {
+          return;
+        }
+      } finally {
+        if (showLoading && !withdrawalSummaryAbortControllerRef.current?.signal.aborted) {
+          setLoadingWithdrawalSummary(false);
+        }
+      }
+    },
+    []
+  );
+
+  const requestWithdrawal = useCallback(
+    async (params: WithdrawalRequestParams): Promise<BridgeResponse> => {
+      setLoading(true);
+      try {
+        const { data } = await api.post<WithdrawalRequestResponse>(`/bridge/requestWithdrawal`, params);
+        return { success: true, data };
+      } finally {
+        setLoading(false);
+      }
+    },
+    [],
+  );
+
+  // ========== TRANSACTION FUNCTIONS ==========
   const fetchDepositTransactions = useCallback(
     async (rawParams: Record<string, string | undefined> = {}, context?: string): Promise<BridgeTransactionResponse> => {
       setLoading(true);
@@ -290,7 +319,29 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
     []
   );
 
+  // ========== POLLING EFFECTS ==========
+  // Withdrawal summary polling (15s interval)
+  useEffect(() => {
+    fetchWithdrawalSummary(true);
 
+    withdrawalSummaryIntervalRef.current = setInterval(() => {
+      fetchWithdrawalSummary(false);
+    }, 15000);
+
+    return () => {
+      if (withdrawalSummaryIntervalRef.current) {
+        clearInterval(withdrawalSummaryIntervalRef.current);
+        withdrawalSummaryIntervalRef.current = null;
+      }
+      if (withdrawalSummaryAbortControllerRef.current) {
+        withdrawalSummaryAbortControllerRef.current.abort();
+      }
+    };
+  }, [fetchWithdrawalSummary]);
+
+  // Note: Balance polling is handled inside the useBalance hook (15s interval per token)
+
+  // ========== PROVIDER ==========
   return (
     <BridgeContext.Provider
       value={{
@@ -309,6 +360,9 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         loadNetworksAndTokens,
         fetchDepositTransactions,
         fetchWithdrawTransactions,
+        withdrawalSummary,
+        loadingWithdrawalSummary,
+        fetchWithdrawalSummary,
       }}
     >
       {children}

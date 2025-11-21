@@ -1,4 +1,4 @@
-import { BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, WithdrawalRequestResponse } from "@mercata/shared-types";
+import { BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, WithdrawalRequestResponse, WithdrawalSummaryResponse } from "@mercata/shared-types";
 
 export interface BalanceResponse {
   balance: string;
@@ -43,6 +43,10 @@ export type BridgeContextType = {
   // Bridge transaction functions
   fetchDepositTransactions: (rawParams?: Record<string, string | undefined>, context?: string) => Promise<BridgeTransactionResponse>;
   fetchWithdrawTransactions: (rawParams?: Record<string, string | undefined>, context?: string) => Promise<BridgeTransactionResponse>;
+  // Withdrawal summary
+  withdrawalSummary: WithdrawalSummaryResponse | null;
+  loadingWithdrawalSummary: boolean;
+  fetchWithdrawalSummary: (showLoading?: boolean) => Promise<void>;
 };
 
 export interface ContractValidationResult {

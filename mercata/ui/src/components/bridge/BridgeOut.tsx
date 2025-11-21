@@ -48,6 +48,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isConvert = false }) => {
     setSelectedNetwork,
     selectedToken,
     setSelectedToken,
+    fetchWithdrawalSummary,
   } = useBridgeContext();
 
   // State
@@ -260,10 +261,11 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isConvert = false }) => {
 
       setAmount("");
 
-      if (userAddress) {
-        await fetchUsdstBalance(userAddress);
-      }
-      await refetchBalance();
+      await Promise.all([
+        userAddress ? fetchUsdstBalance(userAddress) : Promise.resolve(),
+        refetchBalance(),
+        fetchWithdrawalSummary(false),
+      ]);
     } finally {
       setIsLoading(false);
     }

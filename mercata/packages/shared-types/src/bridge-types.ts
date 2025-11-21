@@ -103,3 +103,12 @@ export interface WithdrawalRequestResponse {
   status: string;
   hash: string;
 }
+
+/**
+ * Response from withdrawal summary endpoint
+ */
+export interface WithdrawalSummaryResponse {
+  totalWithdrawn30d: string;      // Total withdrawn in last 30 days in wei (string format)
+  pendingWithdrawals: number;      // Count of pending withdrawals
+  availableToWithdraw: string;     // Available balance to withdraw in wei (string format)
+}

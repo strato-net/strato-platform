@@ -185,4 +185,32 @@ router.get("/networkConfigs", authHandler.authorizeRequest(false), BridgeControl
  */
 router.get("/transactions/:type", authHandler.authorizeRequest(), BridgeController.getTransactions);
 
+/**
+ * @openapi
+ * /bridge/withdrawalSummary:
+ *   get:
+ *     summary: Get withdrawal summary statistics for the authenticated user
+ *     tags: [Bridge]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Withdrawal summary statistics
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 totalWithdrawn30d:
+ *                   type: string
+ *                   description: Total withdrawn in last 30 days in wei (string format)
+ *                 pendingWithdrawals:
+ *                   type: number
+ *                   description: Count of pending withdrawals
+ *                 availableToWithdraw:
+ *                   type: string
+ *                   description: Available balance to withdraw in wei (string format)
+ */
+router.get("/withdrawalSummary", authHandler.authorizeRequest(), BridgeController.getWithdrawalSummary);
+
 export default router;

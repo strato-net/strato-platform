@@ -3,11 +3,12 @@ import {
   requestWithdrawal, 
   getBridgeableTokens,
   getNetworkConfigs,
-  getBridgeTransactions
+  getBridgeTransactions,
+  getWithdrawalSummary
 } from "../services/bridge.service";
 import { validateRequestWithdrawal, validateTransactionType } from "../validators/bridge.validators";
 import { validateRawParams } from "../validators/common.validators";
-import { NetworkConfig, BridgeToken, BridgeTransactionResponse, WithdrawalRequestParams, WithdrawalRequestResponse } from "@mercata/shared-types";
+import { NetworkConfig, BridgeToken, BridgeTransactionResponse, WithdrawalRequestParams, WithdrawalRequestResponse, WithdrawalSummaryResponse } from "@mercata/shared-types";
 import { isUserAdmin } from "../services/user.service";
 
 class BridgeController {
@@ -85,6 +86,20 @@ class BridgeController {
       const addressToUse = (context === 'admin' && isAdmin) ? undefined : userAddress;
       
       const result: BridgeTransactionResponse = await getBridgeTransactions(accessToken, validatedType, addressToUse, queryParams);
+      res.json(result);
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
+  static async getWithdrawalSummary(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress } = req;
+      const result: WithdrawalSummaryResponse = await getWithdrawalSummary(accessToken, userAddress as string);
       res.json(result);
     } catch (error: any) {
       next(error);

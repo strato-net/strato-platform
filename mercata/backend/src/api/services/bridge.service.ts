@@ -11,9 +11,11 @@ import {
   enrichAssetsWithTokenData,
   QUERY_CONFIGS 
 } from "../helpers/bridge.helper";
-import { NetworkConfig, BridgeToken, BridgeTransactionResponse, WithdrawalRequestParams, WithdrawalRequestResponse } from "@mercata/shared-types";
+import { NetworkConfig, BridgeToken, BridgeTransactionResponse, WithdrawalRequestParams, WithdrawalRequestResponse, WithdrawalSummaryResponse } from "@mercata/shared-types";
+import { getCompletePriceMap } from "../helpers/oracle.helper";
+import { toUTCTime } from "../helpers/cirrusHelpers";
 
-const { MercataBridge, Token, mercataBridge, USDST } = constants;
+const { MercataBridge, Token, mercataBridge, USDST, DECIMALS } = constants;
 
 export const requestWithdrawal = async (
   accessToken: string,
@@ -142,5 +144,76 @@ export const getBridgeAssets = async (accessToken: string) => {
       stratoTokenSymbol: tokenMap.get(asset.AssetInfo.stratoToken)?.symbol || ""
     }
   ]));
+};
+
+export const getWithdrawalSummary = async (
+  accessToken: string,
+  userAddress: string
+): Promise<WithdrawalSummaryResponse> => {
+  const { data: assets } = await cirrus.get(accessToken, `/${MercataBridge}-assets`, {
+    params: {
+      select: "value->>stratoToken",
+      "value->>enabled": "eq.true",
+      address: `eq.${mercataBridge}`
+    }
+  });
+
+  const stratoTokens = [...new Set((assets || []).map((a: any) => a.stratoToken).filter(Boolean))];
+  const thirtyDaysAgoUTC = toUTCTime(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
+
+  const [balances, prices, pending, completed] = await Promise.all([
+    stratoTokens.length > 0
+      ? cirrus.get(accessToken, `/${Token}-_balances`, {
+          params: {
+            select: "address,balance:value::text",
+            key: `eq.${userAddress}`,
+            address: `in.(${stratoTokens.join(",")})`
+          }
+        })
+      : Promise.resolve({ data: [] }),
+    getCompletePriceMap(accessToken),
+    cirrus.get(accessToken, `/${MercataBridge}-withdrawals`, {
+      params: {
+        select: "count()",
+        address: `eq.${mercataBridge}`,
+        "value->>stratoSender": `eq.${userAddress}`,
+        "value->>bridgeStatus": "in.(1,2)"
+      }
+    }),
+    cirrus.get(accessToken, `/${MercataBridge}-withdrawals`, {
+      params: {
+        select: "value->>stratoToken,value->>stratoTokenAmount",
+        address: `eq.${mercataBridge}`,
+        "value->>stratoSender": `eq.${userAddress}`,
+        "value->>bridgeStatus": "eq.3",
+        block_timestamp: `gte.${thirtyDaysAgoUTC}`
+      }
+    })
+  ]);
+
+  let availableUSD = 0n;
+  for (const b of balances.data || []) {
+    const balance = BigInt(b.balance || "0");
+    const price = BigInt(prices.get(b.address) || "0");
+    if (balance > 0n && price > 0n) {
+      availableUSD += (balance * price) / DECIMALS;
+    }
+  }
+
+  let withdrawnUSD = 0n;
+  for (const w of completed.data || []) {
+    if (!w.stratoToken || !w.stratoTokenAmount) continue;
+    const amount = BigInt(w.stratoTokenAmount || "0");
+    const price = BigInt(prices.get(w.stratoToken) || "0");
+    if (amount > 0n && price > 0n) {
+      withdrawnUSD += (amount * price) / DECIMALS;
+    }
+  }
+  
+  return {
+    totalWithdrawn30d: withdrawnUSD.toString(),
+    pendingWithdrawals: pending.data?.[0]?.count || 0,
+    availableToWithdraw: availableUSD.toString()
+  };
 };
 
