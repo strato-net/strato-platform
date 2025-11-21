@@ -1,14 +1,23 @@
 import { Request, Response, NextFunction } from "express";
 import { 
-  requestWithdrawal, 
+  requestWithdrawal,
+  requestAutoSave,
   getBridgeableTokens,
   getNetworkConfigs,
   getBridgeTransactions,
   getWithdrawalSummary
 } from "../services/bridge.service";
-import { validateRequestWithdrawal, validateTransactionType } from "../validators/bridge.validators";
+import { validateRequestWithdrawal, validateAutoSave, validateTransactionType } from "../validators/bridge.validators";
 import { validateRawParams } from "../validators/common.validators";
-import { NetworkConfig, BridgeToken, BridgeTransactionResponse, WithdrawalRequestParams, WithdrawalRequestResponse, WithdrawalSummaryResponse } from "@mercata/shared-types";
+import {
+  NetworkConfig,
+  BridgeToken,
+  BridgeTransactionResponse,
+  WithdrawalRequestParams,
+  AutoSaveRequestParams,
+  TransactionResponse,
+  WithdrawalSummaryResponse
+} from "@mercata/shared-types";
 import { isUserAdmin } from "../services/user.service";
 
 class BridgeController {
@@ -21,8 +30,28 @@ class BridgeController {
       const { accessToken, body, address: userAddress } = req;
       validateRequestWithdrawal(body);
       
-      const result: WithdrawalRequestResponse = await requestWithdrawal(accessToken, body as WithdrawalRequestParams, userAddress as string);
+      const result: TransactionResponse = await requestWithdrawal(accessToken, body as WithdrawalRequestParams, userAddress as string);
 
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
+  static async requestAutoSave(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, body, address: userAddress } = req;
+      validateAutoSave(body);
+   
+      const result: TransactionResponse = await requestAutoSave(accessToken, body as AutoSaveRequestParams, userAddress as string);
+   
       res.json({
         success: true,
         data: result,

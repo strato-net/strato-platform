@@ -11,7 +11,7 @@ import {
   enrichAssetsWithTokenData,
   QUERY_CONFIGS 
 } from "../helpers/bridge.helper";
-import { NetworkConfig, BridgeToken, BridgeTransactionResponse, WithdrawalRequestParams, WithdrawalRequestResponse, WithdrawalSummaryResponse } from "@mercata/shared-types";
+import { NetworkConfig, BridgeToken, BridgeTransactionResponse, WithdrawalRequestParams, AutoSaveRequestParams, WithdrawalSummaryResponse, TransactionResponse } from "@mercata/shared-types";
 import { getCompletePriceMap } from "../helpers/oracle.helper";
 import { toUTCTime } from "../helpers/cirrusHelpers";
 
@@ -27,7 +27,7 @@ export const requestWithdrawal = async (
     stratoTokenAmount,
   }: WithdrawalRequestParams,
   userAddress: string
-): Promise<WithdrawalRequestResponse> => {
+): Promise<TransactionResponse> => {
   const tx = await buildFunctionTx(
     [
       {
@@ -48,6 +48,30 @@ export const requestWithdrawal = async (
         },
       },
     ],
+    userAddress,
+    accessToken
+  );
+
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, tx)
+  );
+};
+
+export const requestAutoSave = async (
+  accessToken: string,
+  {
+    externalChainId,
+    externalTxHash,
+  }: AutoSaveRequestParams,
+  userAddress: string
+) : Promise<TransactionResponse> => {
+  const tx = await buildFunctionTx(
+    {
+      contractName: extractContractName(MercataBridge),
+      contractAddress: constants.mercataBridge,
+      method: "requestAutoSave",
+      args: { externalChainId, externalTxHash },
+    },
     userAddress,
     accessToken
   );

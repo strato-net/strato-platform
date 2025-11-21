@@ -11,6 +11,7 @@ import "../../abstract/ERC20/IERC20.sol";
 
 contract record LiquidityPool is Ownable  {
     event Deposited(address indexed user, uint amount, uint mTokenMinted);
+    event DepositedOnBehalfOf(address indexed depositor, address indexed recipient, uint amount, uint mTokenMinted);
     event Withdrawn(address indexed user, uint amount, uint mTokenBurned);
     event Borrowed(address indexed user, uint amount);
     event Repaid(address indexed user, uint amount);
@@ -65,6 +66,22 @@ contract record LiquidityPool is Ownable  {
         mToken.mint(user, mintAmount);
 
         emit Deposited(user, amount, mintAmount);
+    }
+
+    function depositOnBehalfOf(address recipient, uint amount, uint mintAmount, address depositor) external onlyLendingPool {
+        require(recipient != address(0) && amount > 0 && mintAmount > 0 && depositor != address(0), "Invalid deposit");
+        require(address(mToken) != address(0), "mToken not set");
+
+        address asset = _getAsset();
+
+        // Pull funds from the depositor into the pool
+        require(IERC20(asset).transferFrom(depositor, address(this), amount), "Transfer failed");
+
+        // Mint calculated amount of mTokens to the recipient
+        mToken.mint(recipient, mintAmount);
+
+        emit DepositedOnBehalfOf(depositor, recipient, amount, mintAmount);
+        emit Deposited(recipient, amount, mintAmount); // Recipient gets credit for the deposit
     }
 
     /**

@@ -61,6 +61,48 @@ router.post("/requestWithdrawal", authHandler.authorizeRequest(), BridgeControll
 
 /**
  * @openapi
+ * /bridge/requestAutoSave:
+ *   post:
+ *     summary: Request auto save
+ *     tags: [Bridge]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - externalChainId
+ *               - externalTxHash
+ *             properties:
+ *               externalChainId:
+ *                 type: string
+ *                 description: External chain identifier (numeric string)
+ *               externalTxHash:
+ *                 type: string
+ *                 description: External transaction hash
+ *     responses:
+ *       200:
+ *         description: Auto save request submitted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     status:
+ *                       type: string
+ *                     hash:
+ *                       type: string
+ */
+router.post("/requestAutoSave", authHandler.authorizeRequest(), BridgeController.requestAutoSave);
+
+/**
+ * @openapi
  * /bridge/bridgeableTokens/{chainId}:
  *   get:
  *     summary: List tokens that can withdraw to a chain

@@ -1,3 +1,5 @@
+import {TransactionResponse} from "./common-types";
+
 // ============================================================================
 // NETWORK CONFIG TYPES
 // ============================================================================
@@ -97,11 +99,12 @@ export interface WithdrawalRequestParams {
 }
 
 /**
- * Response from withdrawal request
+ * Parameters for requesting automatic supply of liquidity
+ * to the lending pool upon deposit completion
  */
-export interface WithdrawalRequestResponse {
-  status: string;
-  hash: string;
+export interface AutoSaveRequestParams {
+  externalChainId: string;
+  externalTxHash: string;
 }
 
 /**

@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, ChevronDown } from "lucide-react";
 import PercentageButtons from "@/components/ui/PercentageButtons";
 import { useAccount, useBalance, useChainId, useSignTypedData, useSwitchChain, useWriteContract } from "wagmi";
 import { createPublicClient, http } from "viem";
@@ -22,9 +22,7 @@ import { useUserTokens } from "@/context/UserTokensContext";
 import { useLendingContext } from "@/context/LendingContext";
 import { safeParseUnits, formatBalance, ensureHexPrefix } from "@/utils/numberUtils";
 import BridgeWalletStatus from "@/components/bridge/BridgeWalletStatus";
-import { formatUnits } from "ethers";
-import { api } from "@/lib/axios";
-import { usdstAddress } from "@/lib/constants";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 const DECIMAL_PATTERN = /^\d*\.?\d*$/;
 
@@ -46,6 +44,7 @@ const MintWidget: React.FC = () => {
     setSelectedNetwork,
     selectedToken,
     setSelectedToken,
+    requestAutoSave,
     loadNetworksAndTokens,
   } = useBridgeContext();
 
@@ -67,7 +66,8 @@ const MintWidget: React.FC = () => {
   const [amount, setAmount] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{ amount?: string; network?: string }>({});
-  const [autoDeposit, setAutoDeposit] = useState<boolean>(false);
+  const [autoDeposit, setAutoDeposit] = useState<boolean>(true);
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState<boolean>(false);
   const [minDepositInfo, setMinDepositInfo] = useState<{ 
     amount: string; 
     amountWei: bigint; 
@@ -343,48 +343,15 @@ const MintWidget: React.FC = () => {
       // Kick a quick balance refresh for immediate UI update
       await fetchUsdstBalance(userAddress);
 
-      // Auto-deposit: poll for USDST balance increase and deposit (TODO this is a really hacky way to do this)
+      // After mint transaction sent, request auto save if box is checked
       if (autoDeposit) {
-        const beforeWei = BigInt(usdstBalance || "0");
-        await fetchUsdstBalance(userAddress)
-        const targetIncreaseWei = safeParseUnits(amount, 18);
-        const start = Date.now();
-        const timeoutMs = 8 * 60 * 1000; // 8 minutes
-        let deposited = false;
-
-        while (Date.now() - start < timeoutMs) {
-          await new Promise(r => setTimeout(r, 4000));
-          await fetchUsdstBalance(userAddress);
-          try {
-            // Get fresh balance directly from API instead of using React state
-            const nowRes = await api.get(`/tokens/balance?address=eq.${usdstAddress}`);
-            const nowBalanceFromAPI = nowRes?.data?.[0]?.balance || "0";
-            const nowWei = BigInt(nowBalanceFromAPI);
-
-            if (nowWei - beforeWei == targetIncreaseWei) {
-              // Deposit the minted amount
-              const amtDec = safeParseUnits(amount, 18).toString();
-              // Note that we will not stake for rewards when autoDeposit
-              await depositLiquidity({ amount: amtDec, stakeMToken: false });
-              await refreshLiquidity();
-              // Also update the React state
-              await fetchUsdstBalance(userAddress);
-              toast({ title: "Auto-deposit complete", description: `Supplied ${amtDec} USDST to lending pool` });
-              deposited = true;
-              break;
-            }
-          } catch (balanceErr) {
-            console.error("Error checking balance:", balanceErr);
-          }
-        }
-        if (!deposited) {
-          toast({ title: "Auto-deposit pending", description: "We'll deposit after USDST arrives. If it takes too long, deposit from Lending section.", variant: "default" });
-        }
+        await requestAutoSave({
+          externalChainId: selectedNetworkConfig.chainId,
+          externalTxHash: txHash,
+        });
       }
     } catch (err: any) {
-      console.error("Error minting:", err);
-      const msg = err?.message || "Transaction failed";
-      toast({ title: "Mint failed", description: msg, variant: "destructive" });
+      // Error toast handled by injected hook
     } finally {
       setIsLoading(false);
       inFlightRef.current = false;
@@ -482,29 +449,59 @@ const MintWidget: React.FC = () => {
         />
       </div>
 
-      {/* <label className="flex items-center gap-2 text-sm text-gray-700">
-        <input type="checkbox" className="accent-blue-600" checked={autoDeposit} onChange={e => setAutoDeposit(e.target.checked)} />
-        Automatically deposit minted USDST into lending pool
-      </label> */}
-
       <div className="rounded-xl border bg-gray-50 p-4 space-y-3">
-        {autoDeposit && (
-          <div className="flex items-center justify-between text-gray-600 text-sm">
-            <span>Current APY</span>
-            <span className="font-medium">{apr ? `${apr}%` : "N/A"}</span>
-          </div>
-        )}
         <div className="flex items-center justify-between text-gray-600 text-sm">
           <span>USDST {autoDeposit ? "Supplied" : "Balance"}</span>
           <span className="font-medium">{autoDeposit ? formattedSuppliedBalance : formattedUsdstBalance || "0"} → {afterBalance}</span>
         </div>
         <div className="flex items-center justify-between text-gray-600 text-sm">
           <span>Outcome</span>
-          <span className="font-medium">{amount || "0.00"} USDST deposited {autoDeposit ? "and lent" : ""}</span>
+          <span className="font-medium">{amount || "0.00"} USDST deposited</span>
+        </div>
+        <div className="flex items-center justify-between text-gray-600 text-sm">
+          <span>Current Saving Rate</span>
+          <span className="font-medium text-green-600">{apr ? `${apr}%` : "N/A"}</span>
         </div>
       </div>
 
+      <label className="flex items-center gap-2 text-sm text-gray-700">
+        <input type="checkbox" className="accent-blue-600" checked={autoDeposit} onChange={e => setAutoDeposit(e.target.checked)} />
+        Earn saving rate by offering USDST for lending
+      </label>
 
+      <Collapsible open={showAdvancedOptions} onOpenChange={setShowAdvancedOptions}>
+        <CollapsibleTrigger className="flex items-center justify-between w-full text-sm text-gray-600 hover:text-gray-900 transition-colors">
+          <span>See Advanced Options</span>
+          <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showAdvancedOptions ? 'rotate-180' : ''}`} />
+        </CollapsibleTrigger>
+        <CollapsibleContent className="mt-4">
+          <div className="flex items-center gap-4">
+            <div className="flex-1 space-y-1.5">
+              <Label>From Network</Label>
+              <Select
+                value={selectedNetwork || ""}
+                onValueChange={(v) => {
+                  setSelectedNetwork(v);
+                  setSelectedToken(null);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select network" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableNetworks.map(n => (
+                    <SelectItem key={n.chainId} value={n.chainName}>{n.chainName}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex-1 space-y-1.5">
+              <Label>To Network</Label>
+              <Input value="STRATO" disabled className="bg-gray-50" />
+            </div>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
 
       <div className="flex justify-end">
         <Button
@@ -512,7 +509,7 @@ const MintWidget: React.FC = () => {
           disabled={isLoading || !selectedToken || !amount || !isConnected || !isCorrectNetwork}
           className="bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
         >
-          {isLoading ? "Processing..." : "Get USDST"}
+          {isLoading ? "Processing..." : "Deposit + Get USDST"}
         </Button>
       </div>
 

@@ -58,7 +58,8 @@ const DepositsPage = () => {
   });
   const [searchParams] = useSearchParams();
 
-  const initialTab = searchParams.get('tab') === 'convert' ? 'usdc' : undefined;
+  const initialTabParam = searchParams.get('tab');
+  const initialTab = initialTabParam === 'bridge-in' ? 'bridge-in' : 'easy-saving';
 
   // Add visibility state to prevent flashing
   const [isComponentMounted, setIsComponentMounted] = useState(false);
@@ -119,7 +120,10 @@ const DepositsPage = () => {
         <main className="flex-1 p-6 overflow-y-auto">
           <div className="mb-8 flex flex-col lg:flex-row gap-6 items-start">
             <div className="w-full lg:w-[40%] lg:min-w-[400px] lg:max-w-[600px] lg:sticky lg:top-0">
-              {/* Asset Summary */}
+              <ExchangeCart onVaultActionSuccess={handleVaultActionSuccess} initialTab={initialTab} />
+            </div>
+            <div className="flex-1 min-w-0 max-w-full">
+              {/* Net Balance moved to right column */}
               <div className="mb-6">
                 <AssetSummary 
                   title="Net Balance" 
@@ -128,10 +132,7 @@ const DepositsPage = () => {
                   color="bg-blue-500"
                 />
               </div>
-              <ExchangeCart onVaultActionSuccess={handleVaultActionSuccess} initialTab={initialTab} />
-            </div>
-            <div className="flex-1 min-w-0 max-w-full">
-              {/* Render AssetsList when data is loaded */}
+              {/* My Deposits (Earning Assets) */}
               <AssetsList 
                 loading={loading} 
                 tokens={nonPoolTokens} 
