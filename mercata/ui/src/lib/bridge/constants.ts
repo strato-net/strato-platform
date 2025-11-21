@@ -22,6 +22,19 @@ export const BRIDGE_MODE_LABELS = {
   },
 } as const;
 
+export const BRIDGE_IN_MODE_LABELS = {
+  convert: {
+    title: "Convert to USDST",
+    description: "Convert stablecoins to USDST",
+    amountLabel: "Amount",
+  },
+  bridge: {
+    title: "Bridge In Your Tokens",
+    description: "Bridge your tokens from external networks to STRATO",
+    amountLabel: "Amount",
+  },
+} as const;
+
 // Contract ABIs
 export const ERC20_ABI = [
   {

@@ -14,42 +14,56 @@ interface NetworkSelectorProps {
   selectedNetwork: string | null;
   availableNetworks: NetworkSummary[];
   onNetworkChange: (networkName: string) => void;
+  direction?: "in" | "out";
+  disabled?: boolean;
 }
 
 const NetworkSelector: React.FC<NetworkSelectorProps> = ({
   selectedNetwork,
   availableNetworks,
   onNetworkChange,
+  direction = "out",
+  disabled = false,
 }) => {
+  const isBridgeIn = direction === "in";
+
+  const NetworkSelect = ({ id }: { id: string }) => (
+    <Select value={selectedNetwork || ""} onValueChange={onNetworkChange} disabled={disabled}>
+      <SelectTrigger id={id}>
+        <SelectValue placeholder="Select network" />
+      </SelectTrigger>
+      <SelectContent>
+        {availableNetworks.map((n) => (
+          <SelectItem key={n.chainId} value={n.chainName}>
+            {n.chainName}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+
+  const StratoInput = ({ id }: { id: string }) => (
+    <Input id={id} value="STRATO" disabled className="bg-gray-50" />
+  );
+
   return (
     <div className="flex items-center gap-4">
       <div className="flex-1 space-y-1.5">
-        <Label htmlFor="from-chain">From Network</Label>
-        <Input
-          id="from-chain"
-          value="STRATO"
-          disabled
-          className="bg-gray-50"
-        />
+        <Label htmlFor="from-network">From Network</Label>
+        {isBridgeIn ? (
+          <NetworkSelect id="from-network" />
+        ) : (
+          <StratoInput id="from-network" />
+        )}
       </div>
 
       <div className="flex-1 space-y-1.5">
         <Label htmlFor="to-network">To Network</Label>
-        <Select
-          value={selectedNetwork || ""}
-          onValueChange={onNetworkChange}
-        >
-          <SelectTrigger id="to-network">
-            <SelectValue placeholder="Select network" />
-          </SelectTrigger>
-          <SelectContent>
-            {availableNetworks.map((n) => (
-              <SelectItem key={n.chainId} value={n.chainName}>
-                {n.chainName}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {isBridgeIn ? (
+          <StratoInput id="to-network" />
+        ) : (
+          <NetworkSelect id="to-network" />
+        )}
       </div>
     </div>
   );

@@ -265,7 +265,7 @@ const AssetDetail = () => {
               <div className="text-center py-12">
                 <h2 className="text-2xl font-bold mb-4">Asset Not Found</h2>
                 <p className="text-gray-600 mb-6">The asset you are looking for does not exist or has been removed.</p>
-                <Link to="/dashboard/deposits">
+                <Link to="/deposits">
                   <Button>Back to Deposits</Button>
                 </Link>
               </div>
@@ -292,7 +292,7 @@ const AssetDetail = () => {
 
         <main className="p-6">
           <div className="mb-6">
-            <Link to="/dashboard/deposits" className="inline-flex items-center text-blue-600 hover:text-blue-800">
+            <Link to="/deposits" className="inline-flex items-center text-blue-600 hover:text-blue-800">
               <ChevronLeft size={16} className="mr-1" /> Back to Deposits
             </Link>
           </div>

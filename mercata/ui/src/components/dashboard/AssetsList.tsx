@@ -46,7 +46,7 @@ const AssetsList = ({
             >
               <Plus size={16} />
               <a
-                href="/dashboard/deposits"
+                href="/deposits"
                 className="text-sm text-white flex items-center justify-end"
               >
                 Add Deposits
@@ -124,7 +124,7 @@ const AssetsList = ({
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Link
-                                    to={`/dashboard/deposits/${asset?.address || ''}`}
+                                    to={`/deposits/${asset?.address || ''}`}
                                     className="font-medium text-blue-600 truncate hover:text-blue-800 underline transition-colors"
                                   >
                                     {asset?._name || ""}
@@ -290,7 +290,7 @@ const AssetsList = ({
                                 <Tooltip>
                                   <TooltipTrigger asChild>
                                     <Link
-                                      to={`/dashboard/deposits/${asset?.address || ''}`}
+                                      to={`/deposits/${asset?.address || ''}`}
                                       className="font-medium text-blue-600 truncate hover:text-blue-800 underline transition-colors"
                                     >
                                       {asset?._name || ""}

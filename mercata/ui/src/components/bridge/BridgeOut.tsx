@@ -288,16 +288,38 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isConvert = false }) => {
         selectedNetwork={selectedNetwork}
         availableNetworks={availableNetworks}
         onNetworkChange={setSelectedNetwork}
+        disabled={isLoading}
       />
 
       <TokenSelector
         selectedToken={selectedToken}
         tokens={currentTokens}
         onTokenChange={setSelectedToken}
+        disabled={isLoading}
       />
 
       <div className="space-y-1.5">
-        <Label htmlFor="amount">{modeLabels.amountLabel}</Label>
+        <div className="flex justify-between items-center">
+          <Label htmlFor="amount">{modeLabels.amountLabel}</Label>
+          {!maxAmount && isBalanceLoading ? (
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+              <p className="text-sm text-gray-500">Fetching balance...</p>
+            </div>
+          ) : (
+            maxAmount && (
+              <p className="text-sm text-gray-500">
+                Max: {formatBalance(
+                  maxAmount,
+                  undefined,
+                  DECIMAL,
+                  2,
+                  DECIMAL
+                )}
+              </p>
+            )
+          )}
+        </div>
         <Input
           id="amount"
           type="text"
@@ -309,7 +331,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isConvert = false }) => {
           }`}
           value={amount}
           onChange={(e) => handleAmountChange(e.target.value)}
-          disabled={!isConnected}
+          disabled={!isConnected || isLoading}
         />
         {amountError && <p className="text-sm text-red-500">{amountError}</p>}
         {feeError && <p className="text-sm text-yellow-600">{feeError}</p>}
@@ -322,32 +344,6 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isConvert = false }) => {
             className="mt-2"
           />
         )}
-
-        <div className="flex items-center gap-2 mt-1">
-          {!maxAmount && isBalanceLoading ? (
-            <div className="flex items-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-              <p className="text-sm text-gray-500">Fetching balance...</p>
-            </div>
-          ) : (
-            maxAmount && (
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <p className="text-sm text-gray-500">
-                    Max:{" "}
-                    {formatBalance(
-                      maxAmount,
-                      selectedToken?.stratoTokenSymbol,
-                      DECIMAL,
-                      2,
-                      DECIMAL
-                    )}
-                  </p>
-                </div>
-              </div>
-            )
-          )}
-        </div>
       </div>
 
       <TransactionSummary
@@ -359,15 +355,13 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isConvert = false }) => {
         formatBalanceDisplay={formatBalanceDisplay}
       />
 
-      <div className="flex justify-end gap-4">
-        <Button
-          onClick={showConfirmModal}
-          disabled={isButtonDisabled}
-          className="bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
-        >
-          {isLoading ? "Processing..." : "Withdraw"}
-        </Button>
-      </div>
+      <Button
+        onClick={showConfirmModal}
+        disabled={isButtonDisabled}
+        className="w-full bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
+      >
+        {isLoading ? "Processing..." : "Withdraw"}
+      </Button>
 
       <BridgeConfirmationModal
         open={isModalOpen}

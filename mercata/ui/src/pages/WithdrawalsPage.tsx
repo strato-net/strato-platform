@@ -164,7 +164,7 @@ const WithdrawalsPage = () => {
                   <CardTitle>Important Notes</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ul className="space-y-2 text-sm text-gray-600 list-disc list-inside">
+                  <ul className="space-y-2 text-sm text-gray-600 list-disc pl-5">
                     <li>Minimum withdrawal: $10</li>
                     <li>Withdrawals are processed within 1-3 business days</li>
                     <li>Network fees vary based on blockchain congestion</li>

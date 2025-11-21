@@ -35,6 +35,7 @@ import { coinbaseWallet, metaMaskWallet, walletConnectWallet } from "@rainbow-me
 import AdminRoute from "./components/AdminRoute";
 import DashboardWrapper from "./components/layouts/DashboardWrapper";
 import { WithdrawalsProviders } from "./components/layouts/WithdrawalsProviders";
+import { DepositsProviders } from "./components/layouts/DepositsProviders";
 import { LendingProvider } from "./context/LendingContext";
 import { CDPProvider } from "./context/CDPContext";
 import { TokenProvider } from "./context/TokenContext";
@@ -149,17 +150,17 @@ const App = () => {
                                   }
                                 />
                                 <Route
-                                  path="/dashboard/deposits"
+                                  path="/deposits"
                                   element={
+                                    <DepositsProviders>
                                     <ProtectedRoute>
-                                      <DashboardWrapper>
                                         <DepositsPage />
-                                      </DashboardWrapper>
                                     </ProtectedRoute>
+                                    </DepositsProviders>
                                   }
                                 />
                                 <Route
-                                  path="/dashboard/deposits/:id"
+                                  path="/deposits/:id"
                                   element={
                                     <ProtectedRoute>
                                       <DashboardWrapper>

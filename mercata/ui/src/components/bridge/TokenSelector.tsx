@@ -13,12 +13,14 @@ interface TokenSelectorProps {
   selectedToken: BridgeToken | null;
   tokens: BridgeToken[];
   onTokenChange: (token: BridgeToken | null) => void;
+  disabled?: boolean;
 }
 
 const TokenSelector: React.FC<TokenSelectorProps> = ({
   selectedToken,
   tokens,
   onTokenChange,
+  disabled = false,
 }) => {
   return (
     <div className="space-y-1.5">
@@ -30,7 +32,7 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
             tokens.find((t) => t.externalSymbol === v) || null;
           onTokenChange(token);
         }}
-        disabled={!tokens.length}
+        disabled={!tokens.length || disabled}
       >
         <SelectTrigger id="from-token">
           <SelectValue placeholder="Select asset">
