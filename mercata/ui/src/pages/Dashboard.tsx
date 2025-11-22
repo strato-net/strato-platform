@@ -10,7 +10,7 @@ import { Wallet, Coins, Shield, Banknote, Loader2 } from "lucide-react";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
 import { usePendingRewards } from "@/hooks/usePendingRewards";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams, useNavigate, useLocation } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useNetBalance } from "@/hooks/useNetBalance";
 import MyPoolParticipationSection from "@/components/dashboard/MyPoolParticipationSection";
@@ -24,14 +24,15 @@ import { api } from "@/lib/axios";
 const Dashboard = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const { userAddress } = useUser();
-  const { earningAssets, getEarningAssets, inactiveTokens, getInactiveTokens, getBalanceHistory, balanceHistory, loading } = useTokenContext();
+  const { earningAssets, getEarningAssets, inactiveTokens, getInactiveTokens, getBalanceHistory, balanceHistory, loadingEarningAssets, loadingInactiveTokens } = useTokenContext();
   const { loans, refreshLoans } = useLendingContext();
+  const { totalCDPDebt, refreshVaults } = useCDP();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [selectedTimeRange, setSelectedTimeRange] = useState<string>('7d');
+  const [selectedTimeRange, setSelectedTimeRange] = useState<string>('1d');
 
-  const { totalCDPDebt } = useCDP();
   const { pendingRewards, refetch: refetchPendingRewards } = usePendingRewards(rewardsEnabled, 30000);
   const [isClaiming, setIsClaiming] = useState(false);
 
@@ -67,29 +68,21 @@ const Dashboard = () => {
     totalCDPDebt
   });
 
-  // Add visibility states to prevent flashing
-  const [isComponentMounted, setIsComponentMounted] = useState(false);
-  const [isDataInitialized, setIsDataInitialized] = useState(false);
-
   useEffect(() => {
     document.title = "Dashboard | STRATO Mercata";
     
-    // Set mounted state immediately to prevent flash
-    setIsComponentMounted(true);
+    const hasExistingEarningAssets = earningAssets.length > 0;
+    const hasExistingInactiveTokens = inactiveTokens.length > 0;
     
-    // Remove the timeout to prevent loading flash
-    getEarningAssets();
-    getInactiveTokens();
+    getEarningAssets(!hasExistingEarningAssets);
+    getInactiveTokens(!hasExistingInactiveTokens);
     refreshLoans();
-    getBalanceHistory(selectedTimeRange, '');
+    refreshVaults();
+  }, [location.pathname, userAddress, getEarningAssets, getInactiveTokens, refreshLoans, refreshVaults]);
 
-    // Mark data as initialized after a brief delay to ensure proper rendering
-    const initTimer = setTimeout(() => {
-      setIsDataInitialized(true);
-    }, 100);
-
-    return () => clearTimeout(initTimer);
-  }, [userAddress, selectedTimeRange]);
+  useEffect(() => {
+    getBalanceHistory(selectedTimeRange);
+  }, [getBalanceHistory, selectedTimeRange]);
 
   useEffect(() => {
     if (!searchParams) return;
@@ -120,21 +113,16 @@ const Dashboard = () => {
         description: `Successfully claimed ${pendingRewards} CATA tokens!`,
       });
 
-      // Refresh data after successful claim
+      // Refresh data after successful claim (silent refresh)
       await Promise.all([
-        getEarningAssets(),
-        getInactiveTokens(),
+        getEarningAssets(false),
+        getInactiveTokens(false),
         refetchPendingRewards(),
       ]);
     } finally {
       setIsClaiming(false);
     }
   };
-
-  // Don't render anything until component is properly mounted
-  if (!isComponentMounted) {
-    return null;
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -186,63 +174,56 @@ const Dashboard = () => {
           </div>
 
           {/* Portfolio Value Chart */}
-          {isDataInitialized && (
-            <div className="mb-8">
-              {balanceHistory && balanceHistory.length > 0 ? (
-                <PortfolioValueChart 
-                  key={selectedTimeRange}
-                  data={balanceHistory.map(item => ({
-                    timestamp: item.timestamp || 0,
-                    netBalance: typeof item.netBalance === 'string' ? parseFloat(item.netBalance) : (item.netBalance || 0)
-                  }))}
-                  onTimeRangeChange={(duration) => {
-                    setSelectedTimeRange(duration);
-                    getBalanceHistory(duration, '');
-                  }}
-                  selectedTimeRange={selectedTimeRange}
-                />
-              ) : loading ? (
-                <Card className="mb-6">
-                  <CardContent className="flex items-center justify-center h-80">
-                    <div className="flex items-center gap-2">
-                      <Loader2 className="animate-spin text-gray-500" size={20} />
-                      <p className="text-gray-500">Loading chart data...</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              ) : null}
-            </div>
-          )}
+          <div className="mb-8">
+            {balanceHistory && balanceHistory.length > 0 ? (
+              <PortfolioValueChart 
+                key={selectedTimeRange}
+                data={balanceHistory.map(item => ({
+                  timestamp: item.timestamp || 0,
+                  netBalance: typeof item.netBalance === 'string' ? parseFloat(item.netBalance) : (item.netBalance || 0)
+                }))}
+                onTimeRangeChange={(duration) => {
+                  setSelectedTimeRange(duration);
+                  getBalanceHistory(duration, '');
+                }}
+                selectedTimeRange={selectedTimeRange}
+              />
+            ) : (loadingEarningAssets || loadingInactiveTokens) ? (
+              <Card className="mb-6">
+                <CardContent className="flex items-center justify-center h-80">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="animate-spin text-gray-500" size={20} />
+                    <p className="text-gray-500">Loading chart data...</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : null}
+          </div>
 
-          {/* Only render lower sections after data initialization to prevent flash */}
-          {isDataInitialized && (
-            <>
-              <div className="mb-8">
-                <AssetsList 
-                  loading={loading} 
-                  tokens={nonPoolTokens} 
-                  inActiveTokens={inactiveTokens} 
-                />
-              </div>
+          <div className="mb-8">
+            <AssetsList 
+              loading={loadingEarningAssets || loadingInactiveTokens} 
+              tokens={nonPoolTokens} 
+              inActiveTokens={inactiveTokens} 
+            />
+          </div>
 
-              <div className="mb-8">
-                <BorrowingSection 
-                  loanData={loans}
-                />
-              </div>
+          <div className="mb-8">
+            <BorrowingSection 
+              loanData={loans}
+            />
+          </div>
 
-              <div className="mb-8">
-                  <MyPoolParticipationSection 
-                      poolTokens={poolTokens}
-                      loading={loading}
-                    />
-              </div>
+          <div className="mb-8">
+            <MyPoolParticipationSection 
+              poolTokens={poolTokens}
+              loading={loadingEarningAssets || loadingInactiveTokens}
+            />
+          </div>
 
-              <div className="mb-8">
-                <DashboardFAQ />
-              </div>
-            </>
-          )}
+          <div className="mb-8">
+            <DashboardFAQ />
+          </div>
         </main>
       </div>
     </div>

@@ -1,3 +1,6 @@
+// Export all common types
+export * from './common-types';
+
 // Export all swap-related types
 export * from './swap-types';
 
@@ -13,5 +16,5 @@ export * from './event-types';
 // Export all token-related types
 export * from './token-types';
 
-// Export all event-related types
-export * from './rewards';
+// Export all rewards-related types
+export * from './rewards-types';

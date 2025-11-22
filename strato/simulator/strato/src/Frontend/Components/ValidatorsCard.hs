@@ -68,4 +68,4 @@ statusText :: TS.ValidatorStatus -> T.Text
 statusText status = case status of
   TS.ValidatorActive -> "Active"
   TS.ValidatorInactive -> "Inactive"
-  TS.ValidatorSlashed -> "Slashed" 
+  TS.ValidatorSlashed -> "Slashed"

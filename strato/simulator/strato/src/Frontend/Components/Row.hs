@@ -85,7 +85,7 @@ rowPropsAttrs RowProps{..} = M.fromList
                        ])
   , ("style", _rpStyle)
   ]
-  where prefix x = "row-" <> maybe "" (<> "-") _rpPrefixClass <> x 
+  where prefix x = "row-" <> maybe "" (<> "-") _rpPrefixClass <> x
 
 row' :: MonadWidget t m => Dynamic t RowProps -> m a -> m (Element EventResult (DomBuilderSpace m) t, a)
 row' rowPropsDyn inner =

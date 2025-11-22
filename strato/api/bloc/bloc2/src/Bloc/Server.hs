@@ -28,7 +28,7 @@ import Data.Swagger
 import Servant
 import Servant.Swagger
 
-type MonadBlocAPI m = 
+type MonadBlocAPI m =
   ( MonadCoreAPI m,
     HasBlocEnv m,
     Mod.Accessible (Maybe SyncStatus) m,

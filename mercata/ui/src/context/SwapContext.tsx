@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from 'react';
 import { Pool, SwapHistoryEntry, SetPoolRatesParams, SwapToken, SwapContextType } from '@/interface';
 import {api} from '@/lib/axios';
+import { useUser } from '@/context/UserContext';
 
 // ============================================================================
 // TYPES
@@ -11,6 +12,8 @@ import {api} from '@/lib/axios';
 const SwapContext = createContext<SwapContextType | undefined>(undefined);
 
 export const SwapProvider = ({ children }: { children: ReactNode }) => {
+  const { isLoggedIn } = useUser();
+  
   // ============================================================================
   // STATE
   // ============================================================================
@@ -318,9 +321,11 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
   // INITIALIZATION
   // ============================================================================
   useEffect(() => {
+    if (!isLoggedIn) return;
+    
     fetchSwappableTokens();
     fetchPools();
-  }, [fetchSwappableTokens, fetchPools]);
+  }, [fetchSwappableTokens, fetchPools, isLoggedIn]);
 
   // ============================================================================
   // PROVIDER

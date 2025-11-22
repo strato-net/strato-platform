@@ -33,7 +33,7 @@ apiIndexerMainLoop :: ( MonadLogger m,
                         (Keccak256 `A.Alters` API OutputBlock) m
                       ) =>
                       m ()
-apiIndexerMainLoop = 
+apiIndexerMainLoop =
   consume "apiIndexer" (snd kafkaClientIds) targetTopicName $ \() idxEvents -> do
     indexAPI idxEvents
     return ()

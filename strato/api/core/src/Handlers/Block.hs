@@ -182,7 +182,7 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable BlocksFilterParams [B
                       fmap (\v -> bdRef E.^. BlockDataRefId E.==. E.val (toBlockDataRefId v)) qbBlockId,
                       fmap (\v -> bdRef E.^. BlockDataRefHash E.==. E.val v) qbHash
                     ]
-            
+
             unless (null criteria) $
               E.where_ (foldl1 (E.&&.) criteria)
 

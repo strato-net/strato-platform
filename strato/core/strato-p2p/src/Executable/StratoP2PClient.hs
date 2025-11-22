@@ -85,10 +85,10 @@ runPeer peer sSource = do
   $logInfoS "runPeer" . T.pack . C.blue $ "============================"
   $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "Attempting to connect to " ++ C.yellow (format (pPeerHost peer) ++ ":" ++ show (pPeerTcpPort peer))
   $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "my pubkey is: " ++ format myPublic
-  $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "server pubkey is: " ++ format otherPubKey 
+  $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "server pubkey is: " ++ format otherPubKey
   withActivePeer peer $
     runClientConnection (pPeerHost peer) (TCPPort . fromIntegral $ pPeerTcpPort peer) sSource $ \c -> do
-      attempt :: (Maybe SomeException) <- 
+      attempt :: (Maybe SomeException) <-
         withCertifiedPeer peer $
           runEthClientConduit
             peer {pPeerPubkey = Just otherPubKey}
@@ -120,7 +120,7 @@ runEthClientConduit peer pSource pSink seqSrc peerStr = do
     Nothing                   -> pure $ Just $ toException $ HandshakeException "handshake timed out"
     Just (_, (outCtx, inCtx)) -> do
       ret <-
-        fmap (either Just (const Nothing)) . try $ 
+        fmap (either Just (const Nothing)) . try $
         [
           labelPeerThread peerStr "Peer Source" Nothing $
           pSource
@@ -196,14 +196,14 @@ stratoP2PClient runner = runner $ \_ -> labelTheThread "strato P2P Client main l
         $logInfoS "stratoP2PClient/handleRunPeerResult" $ T.pack $ "Connection ended: " ++ show (e :: SomeException)
         recordException thePeer e
         case e of
-          e' | Just (ErrorCall x) <- fromException e' -> do 
-            disableException thePeer x Nothing False 
+          e' | Just (ErrorCall x) <- fromException e' -> do
+            disableException thePeer x Nothing False
             error x
-          e' | Just (HandshakeException _) <- fromException e' -> do 
-            disableException thePeer "HandshakeException" Nothing False 
+          e' | Just (HandshakeException _) <- fromException e' -> do
+            disableException thePeer "HandshakeException" Nothing False
           e' | Just WrongGenesisBlock <- fromException e' -> do
             disableException thePeer "WrongGenesisBlock" Nothing True
-            case pPeerPubkey thePeer of 
+            case pPeerPubkey thePeer of
               Just pubkey -> do
                 _ <- setPeerBondingState (pPeerHost thePeer) pubkey 3 -- 3 indicates wrong genesis block/networkID
                 return ()
@@ -214,7 +214,7 @@ stratoP2PClient runner = runner $ \_ -> labelTheThread "strato P2P Client main l
             disableException thePeer "EventBeforeHandshake" Nothing False
           e' | Just NetworkIDMismatch <- fromException e' -> do
             disableException thePeer "NetworkIDMismatch" Nothing True
-            case pPeerPubkey thePeer of 
+            case pPeerPubkey thePeer of
               Just pubkey -> do
                 _ <- setPeerBondingState (pPeerHost thePeer) pubkey 3 -- 3 indicates wrong genesis block/networkID
                 return ()
@@ -234,15 +234,15 @@ stratoP2PClient runner = runner $ \_ -> labelTheThread "strato P2P Client main l
           _ -> return ()
       Right _ -> return ()
 
-  -- where 
+  -- where
     disableException :: MonadP2P m => PPeer -> String -> Maybe NominalDiffTime -> Bool -> m ()
     disableException p exception disableBy disableUDP = do
       disErr <- storeDisableException p (T.pack exception)
       whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
-      _ <- case disableBy of 
+      _ <- case disableBy of
         Just secs -> logAndLengthenPeerDisableBy secs p
         Nothing -> logAndLengthenPeerDisableBy (24 * 60 * 60) p
-      when disableUDP $ do 
+      when disableUDP $ do
         udpErr <- disableUDPPeerForSeconds p 86400
         whenLeft udpErr $ \theUDPErr -> do
           $logErrorLS "stratoP2PClient/handleRunPeerResult" theUDPErr

@@ -66,10 +66,10 @@ const PercentageButtons: React.FC<PercentageButtonsProps> = ({
       {percentageValues.map(({ percent, percentValue }) => {
         const is100Percent = percent === 1;
         const isZeroAmount = maxValueBigInt <= 0n;
-        const isSmallAmount = disabled && maxValueBigInt > 0n; // Only when explicitly disabled due to small amount
+        const isSmallAmount = disabled && maxValueBigInt > 0n && !isZeroAmount; // Only when explicitly disabled due to small amount
         
-        // Disable all buttons if no amount available, but allow 100% for small amounts
-        const shouldDisable = isZeroAmount || (isSmallAmount && !is100Percent);
+        // Disable all buttons if no amount available, disabled (loading), or small amount (except 100%)
+        const shouldDisable = isZeroAmount || disabled || (isSmallAmount && !is100Percent);
         
         // Only consider active if not disabled
         const isActive = !shouldDisable && valueBigInt === percentValue;

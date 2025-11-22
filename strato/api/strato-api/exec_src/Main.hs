@@ -157,7 +157,7 @@ hoistCoreServer blocEnv urlMap = hoistServer (Proxy :: Proxy FullAPI) convertErr
   where
     convertErrors :: VaultM (ReaderT UrlMap (ReaderT BlocEnv (CirrusM (SQLM (LoggingT IO))))) a -> Handler a
     convertErrors x = Handler $ do
-      y <- liftIO 
+      y <- liftIO
         . try
         . runLoggingT
         . runSQLM

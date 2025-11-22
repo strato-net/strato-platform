@@ -156,8 +156,8 @@ instance {-# OVERLAPPING #-} MonadIO m => RunsServer (FilesystemT m) where
 instance {-# OVERLAPPING #-} MonadIO m => A.Replaceable SockAddr B.ByteString (FilesystemT m) where
   replace _ addr packet = do
     sock' <- asks _filesystemPeerUDPSocket
-    liftIO $ catch 
-      (void $ NB.sendTo sock' packet addr) 
+    liftIO $ catch
+      (void $ NB.sendTo sock' packet addr)
       (\(err :: IOError) -> runLoggingT . $logErrorS "NB.sendTo" . T.pack $ "Could not send data to " <> show addr <> "; got error: " <> show err)
 
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Awaitable UDPPacket (FilesystemT m) where
@@ -395,7 +395,7 @@ instance {-# OVERLAPPING #-} MonadIO m => A.Replaceable Integer (Canonical Block
 --     hashes :: [Keccak256] <- catMaybes <$> traverse (lookupLDB $ _canonicalDB . _filesystemDBs) [(max 0 (i-n))..i]
 --     obs <- A.lookupMany (A.Proxy @OutputBlock) hashes
 --     pure . map (outputBlockToBlock . snd) . sortOn (Down . fst) $ M.toList obs
--- 
+--
 -- instance {-# OVERLAPPING #-} MonadIO m => GetLastTransactions (FilesystemT m) where
 --   getLastTransactions _ n = do
 --     BestBlock _ i <- Mod.get (Mod.Proxy @BestBlock)

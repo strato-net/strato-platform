@@ -22,7 +22,7 @@ module Blockchain.Stream.Action (
 
   ActionData(..),
   actionDataStorageDiffs,
-  
+
   DataDiff(..),
   Delegatecall(..),
 

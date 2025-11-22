@@ -158,7 +158,7 @@ data InEvent
   | PreprepareResponse PreprepareDecision
   | ForcedConfigChange ForcedConfigChange
   | ValidatorBehaviorChange ForcedValidatorChange
-  | ValidatorChange Validator Bool 
+  | ValidatorChange Validator Bool
   deriving (Eq, Show)
 
 instance Format InEvent where

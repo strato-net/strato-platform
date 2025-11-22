@@ -307,8 +307,8 @@ lookupContractFunction x cName fName = do
           case filter (\(Using n _ _) -> n == cName) . concat . M.elems $ ctract ^. usings of
             [] -> [Internal, Private]
             _ -> []
-      
-  where 
+
+  where
     constructGetterType :: SourceAnnotation Text -> SVMType.Type -> SSS Type'
     constructGetterType y (SVMType.Array t _) = constructGetterType y t >>= \case
       Function (Product args y') rets ctx w j f ->
@@ -367,7 +367,7 @@ apply' funcArgTypes funcValTypes overloads args argNames funcArgNames functionAr
                      (Static a@(SVMType.Array _ _) x) -> flip Static x $ loop lengthOfArgs a
                      _ -> funcValTypes
       funcValTypes' = case (functionArrayGetter, funcArgTypes, funcValTypes) of
-                        (True, (Product ([(Static (SVMType.Int _ _) _), (Static (SVMType.Variadic) _)]) _), (Static (SVMType.Array _ _) _)) -> arrayLayer  
+                        (True, (Product ([(Static (SVMType.Int _ _) _), (Static (SVMType.Variadic) _)]) _), (Static (SVMType.Array _ _) _)) -> arrayLayer
                         _ -> funcValTypes
   case (p, funcValTypes') of
     (Bottom es, Bottom ess) -> pure $ Bottom (es <> ess)
@@ -376,7 +376,7 @@ apply' funcArgTypes funcValTypes overloads args argNames funcArgNames functionAr
       (x : xs) -> apply' (functionArgType x) (functionReturnType x) xs args argNames (functionArgNames x) functionArrayGetter
     _ -> pure $ funcValTypes'
   where
-    loop count (SVMType.Array t _) = 
+    loop count (SVMType.Array t _) =
       if count == 0
         then t
         else loop (count - 1) t
@@ -710,7 +710,7 @@ typecheckStatic (SVMType.Mapping d1 k1 v1) (SVMType.Mapping d2 k2 v2) = do
     (Just a, Just b) | a /= b -> Left "Mismatched dynamicity between mapping values"
     _ -> Right $ SVMType.Mapping (d1 <|> d2) k v
 typecheckStatic (SVMType.UserDefined alias1 a) (SVMType.UserDefined alias2 b) =
-  if alias1 == alias2 
+  if alias1 == alias2
     then typecheckStatic a b
     else
       Left $
@@ -968,7 +968,7 @@ contractHelper ::
   Type'
 contractHelper test cc c =
   let constr = maybe M.empty (M.singleton "constructor") $ _constructor c
-      funcsAndConstr = constr <> _functions c 
+      funcsAndConstr = constr <> _functions c
       varTypes' = reduceType' (_contractContext c) $ varDeclHelper test cc c <$> M.elems (_storageDefs c)
       constTypes' = reduceType' (_contractContext c) $ constDeclHelper test cc c <$> M.elems (_constants c)
       constTypes'' = reduceType' (_contractContext c) $ constDeclHelper test cc c <$> M.elems (_flConstants cc)
@@ -1293,7 +1293,7 @@ statementsHelperM args ss = do
                   (pure $ topType' x)
                   (NE.toList rs)
             Just r -> r
-      pure $ reduceType' x $ ret : ts'   
+      pure $ reduceType' x $ ret : ts'
 
 statementsHelper ::
   (M.Map SolidString (Annotated VarDefEntryF)) ->
@@ -1357,13 +1357,13 @@ intArgs x =
            decimalType' x,
            Product [stringType' x, intType' x] x
          ]
-    
+
 decimalArgs :: SourceAnnotation Text -> Type'
 decimalArgs x =
   Sum $
     intType' x
       :| [ stringType' x,
-           decimalType' x 
+           decimalType' x
          ]
 
 stringArgs :: SourceAnnotation Text -> Type'

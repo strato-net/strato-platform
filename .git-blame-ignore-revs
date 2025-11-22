@@ -1,0 +1,17 @@
+# .git-blame-ignore-revs
+#
+# This file contains a list of commits that should be ignored by git blame.
+# To use this file, run: git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# Each commit should have a comment explaining why it's being ignored.
+
+# f292b0475ecdc2a28d289abeb3d73f80f16c09c9
+# "strato: remastered" - Massive code reformatting across entire strato codebase (Sep 18, 2023)
+# This commit touched 500+ files with formatting changes, making git blame less useful
+# when trying to find the original author of meaningful code changes.
+f292b0475ecdc2a28d289abeb3d73f80f16c09c9
+
+# 0985d31d18fc4c666195c943487d485a684cb439
+# "Delete trailing whitespaces from Haskell files in strato" (Nov 19, 2025)
+# This commit removed trailing whitespaces from Haskell files across the codebase.
+0985d31d18fc4c666195c943487d485a684cb439

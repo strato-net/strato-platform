@@ -14,7 +14,7 @@ import Data.Text.Encoding
 import GHC.Generics (Generic)
 
 sci2Int :: Scientific -> Integer
-sci2Int n = round (toRealFloat n :: Double) 
+sci2Int n = round (toRealFloat n :: Double)
 
 data BitcoinBlockSummary = BitcoinBlockSummary
   { blockHeight :: Integer
