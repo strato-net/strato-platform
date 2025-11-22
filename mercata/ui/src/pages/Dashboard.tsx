@@ -14,6 +14,8 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useNetBalance } from "@/hooks/useNetBalance";
 import MyPoolParticipationSection from "@/components/dashboard/MyPoolParticipationSection";
+import PortfolioValueChart from "@/components/dashboard/PortfolioValueChart";
+import { Card, CardContent } from "@/components/ui/card";
 import { useLendingContext } from "@/context/LendingContext";
 import { useCDP } from "@/context/CDPContext";
 import { cataAddress, rewardsEnabled } from "@/lib/constants";
@@ -24,9 +26,10 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { userAddress } = useUser();
-  const { earningAssets, getEarningAssets, inactiveTokens, getInactiveTokens, loading } = useTokenContext();
+  const { earningAssets, getEarningAssets, inactiveTokens, getInactiveTokens, getBalanceHistory, balanceHistory, loading } = useTokenContext();
   const { loans, refreshLoans } = useLendingContext();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [selectedTimeRange, setSelectedTimeRange] = useState<string>('7d');
 
   const { totalCDPDebt } = useCDP();
   const { pendingRewards, refetch: refetchPendingRewards } = usePendingRewards(rewardsEnabled, 30000);
@@ -78,6 +81,7 @@ const Dashboard = () => {
     getEarningAssets();
     getInactiveTokens();
     refreshLoans();
+    getBalanceHistory(selectedTimeRange, '');
 
     // Mark data as initialized after a brief delay to ensure proper rendering
     const initTimer = setTimeout(() => {
@@ -85,7 +89,7 @@ const Dashboard = () => {
     }, 100);
 
     return () => clearTimeout(initTimer);
-  }, [userAddress]);
+  }, [userAddress, selectedTimeRange]);
 
   useEffect(() => {
     if (!searchParams) return;
@@ -180,6 +184,35 @@ const Dashboard = () => {
               color="bg-orange-500"
             />
           </div>
+
+          {/* Portfolio Value Chart */}
+          {isDataInitialized && (
+            <div className="mb-8">
+              {balanceHistory && balanceHistory.length > 0 ? (
+                <PortfolioValueChart 
+                  key={selectedTimeRange}
+                  data={balanceHistory.map(item => ({
+                    timestamp: item.timestamp || 0,
+                    netBalance: typeof item.netBalance === 'string' ? parseFloat(item.netBalance) : (item.netBalance || 0)
+                  }))}
+                  onTimeRangeChange={(duration) => {
+                    setSelectedTimeRange(duration);
+                    getBalanceHistory(duration, '');
+                  }}
+                  selectedTimeRange={selectedTimeRange}
+                />
+              ) : loading ? (
+                <Card className="mb-6">
+                  <CardContent className="flex items-center justify-center h-80">
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="animate-spin text-gray-500" size={20} />
+                      <p className="text-gray-500">Loading chart data...</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : null}
+            </div>
+          )}
 
           {/* Only render lower sections after data initialization to prevent flash */}
           {isDataInitialized && (
