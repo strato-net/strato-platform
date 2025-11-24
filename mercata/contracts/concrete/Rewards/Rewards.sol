@@ -237,6 +237,7 @@ contract record Rewards is Ownable {
         address user,
         uint256 amount
     ) external {
+        require(activities[activityId].activityType == ActivityType.Position, "Only for Position activities");
         _handleActivity(activityId, user, amount, true);
     }
 
@@ -251,7 +252,23 @@ contract record Rewards is Ownable {
         address user,
         uint256 amount
     ) external {
+        require(activities[activityId].activityType == ActivityType.Position, "Only for Position activities");
         _handleActivity(activityId, user, amount, false);
+    }
+
+    /**
+     * @dev Record a one-time action occurrence for a user
+     * @param activityId The one-time activity that occurred
+     * @param user The user who performed the action
+     * @param amount The amount/value of the action
+     */
+    function occurred(
+        uint256 activityId,
+        address user,
+        uint256 amount
+    ) external {
+        require(activities[activityId].activityType == ActivityType.OneTime, "Only for OneTime activities");
+        _handleActivity(activityId, user, amount, true);
     }
 
     // ═════════════════════════════════════════════════════════════════════════

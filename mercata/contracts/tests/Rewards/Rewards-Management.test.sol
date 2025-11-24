@@ -247,6 +247,68 @@ contract Describe_Rewards_Management is Authorizable {
     }
 
     // ═════════════════════════════════════════════════════════════════════════
+    // ACTIVITY TYPE VALIDATION
+    // ═════════════════════════════════════════════════════════════════════════
+
+    function it_should_prevent_deposit_on_onetime_activity() {
+        // given - add a OneTime activity
+        uint256 activityId = 1;
+        rewards.addActivity(activityId, "Swap Activity", ActivityType.OneTime, 100, address(this));
+
+        // when/then - try to deposit on OneTime activity
+        bool reverted = false;
+        try rewards.deposit(activityId, address(user1), 100) {
+            reverted = false;
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Deposit should fail on OneTime activity");
+    }
+
+    function it_should_prevent_withdraw_on_onetime_activity() {
+        // given - add a OneTime activity
+        uint256 activityId = 1;
+        rewards.addActivity(activityId, "Swap Activity", ActivityType.OneTime, 100, address(this));
+
+        // when/then - try to withdraw on OneTime activity
+        bool reverted = false;
+        try rewards.withdraw(activityId, address(user1), 100) {
+            reverted = false;
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Withdraw should fail on OneTime activity");
+    }
+
+    function it_should_prevent_occurred_on_position_activity() {
+        // given - add a Position activity
+        uint256 activityId = 1;
+        rewards.addActivity(activityId, "Liquidity Pool", ActivityType.Position, 100, address(this));
+
+        // when/then - try to call occurred on Position activity
+        bool reverted = false;
+        try rewards.occurred(activityId, address(user1), 100) {
+            reverted = false;
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Occurred should fail on Position activity");
+    }
+
+    function it_should_allow_occurred_on_onetime_activity() {
+        // given - add a OneTime activity
+        uint256 activityId = 1;
+        rewards.addActivity(activityId, "Swap Activity", ActivityType.OneTime, 100, address(this));
+
+        // when - call occurred
+        rewards.occurred(activityId, address(user1), 100);
+
+        // then - check user stake increased
+        (uint256 stake, uint256 rewardDebt) = rewards.userInfo(activityId, address(user1));
+        require(stake == 100, "User stake should be 100");
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
     // OWNERSHIP & AUTHORIZATION
     // ═════════════════════════════════════════════════════════════════════════
 
