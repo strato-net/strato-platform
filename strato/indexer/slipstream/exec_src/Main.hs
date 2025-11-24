@@ -14,6 +14,7 @@ import Blockchain.Slipstream.Data.CirrusTables
 import Blockchain.Slipstream.MessageConsumer
 import Blockchain.Slipstream.Options
 import Blockchain.Slipstream.OutputData
+import Blockchain.Slipstream.SQL (cirrusConnStr)
 import Control.Concurrent
 import Control.Monad
 import Control.Monad.Composable.Kafka

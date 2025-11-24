@@ -9,7 +9,7 @@ import {
 } from 'react';
 import { api } from '@/lib/axios';
 import { Token, CreateTokenPayload } from '@/interface';
-import { Token as TokenType, EarningAsset } from '@mercata/shared-types';
+import { Token as TokenType, EarningAsset, NetBalanceSnapshot } from '@mercata/shared-types';
 import { usdstAddress } from '@/lib/constants';
 import { useUser } from '@/context/UserContext';
 
@@ -18,6 +18,7 @@ type TokenContextType = {
   activeTokens: Token[];
   inactiveTokens: TokenType[];
   earningAssets: EarningAsset[];
+  balanceHistory: NetBalanceSnapshot[];
   loading: boolean;
   error: string | null;
   getAllTokens: (query?: Record<string, string>) => Promise<void>;
@@ -27,6 +28,7 @@ type TokenContextType = {
   getUserTokensWithBalance: () => Promise<Token[]>;
   getTransferableTokens: () => Promise<Token[]>;
   getEarningAssets: (showLoading?: boolean) => Promise<void>;
+  getBalanceHistory: (duration?: string, end?: string) => Promise<void>;
   loadingEarningAssets: boolean;
   loadingInactiveTokens: boolean;
   createToken: (token: CreateTokenPayload) => Promise<void>;
@@ -49,6 +51,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
   const [activeTokens, setActiveTokens] = useState<Token[]>([]);
   const [inactiveTokens, setInactiveTokens] = useState<TokenType[]>([]);
   const [earningAssets, setEarningAssets] = useState<EarningAsset[]>([]);
+  const [balanceHistory, setBalanceHistory] = useState<NetBalanceSnapshot[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingEarningAssets, setLoadingEarningAssets] = useState(false);
   const [loadingInactiveTokens, setLoadingInactiveTokens] = useState(false);
@@ -222,6 +225,18 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  const getBalanceHistory = useCallback(async (duration: string = '1d', end: string) => {
+    setLoading(true);
+    try {
+      const query = `?duration=${duration}${end ? `&end=${end}` : ''}`;
+      const res = await api.get<NetBalanceSnapshot[]>(`/tokens/v2/balance-history${query}`);
+      setBalanceHistory(res.data || []);
+    } catch (err) {
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const createToken = useCallback(async (token: CreateTokenPayload) => {
     setLoading(true);
     try {
@@ -329,6 +344,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
         activeTokens,
         inactiveTokens,
         earningAssets,
+        balanceHistory,
         loading,
         error,
         getAllTokens,
@@ -338,6 +354,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
         getUserTokensWithBalance,
         getTransferableTokens,
         getEarningAssets,
+        getBalanceHistory,
         createToken,
         transferToken,
         approveToken,

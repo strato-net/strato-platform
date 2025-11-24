@@ -212,11 +212,12 @@ instance {-# OVERLAPPING #-} (MonadUnliftIO m, MonadLogger m) => (FilesystemT m)
       )
 
 sqlTypeSQLite :: SqlType -> T.Text
-sqlTypeSQLite SqlBool    = "bool"
-sqlTypeSQLite SqlDecimal = "decimal"
-sqlTypeSQLite SqlText    = "text"
-sqlTypeSQLite SqlJsonb   = "jsonb"
-sqlTypeSQLite SqlSerial  = ""
+sqlTypeSQLite SqlBool      = "bool"
+sqlTypeSQLite SqlDecimal   = "decimal"
+sqlTypeSQLite SqlText      = "text"
+sqlTypeSQLite SqlJsonb     = "jsonb"
+sqlTypeSQLite SqlTimestamp = "text"
+sqlTypeSQLite SqlSerial    = ""
 
 slipstreamQuerySQLite :: SlipstreamQuery -> Maybe T.Text
 slipstreamQuerySQLite (CreateTable tableName cols pk mTC) = Just $ T.concat

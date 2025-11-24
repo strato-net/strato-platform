@@ -14,6 +14,8 @@ import { useSearchParams, useNavigate, useLocation } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useNetBalance } from "@/hooks/useNetBalance";
 import MyPoolParticipationSection from "@/components/dashboard/MyPoolParticipationSection";
+import PortfolioValueChart from "@/components/dashboard/PortfolioValueChart";
+import { Card, CardContent } from "@/components/ui/card";
 import { useLendingContext } from "@/context/LendingContext";
 import { useCDP } from "@/context/CDPContext";
 import { cataAddress, rewardsEnabled } from "@/lib/constants";
@@ -25,10 +27,12 @@ const Dashboard = () => {
   const location = useLocation();
   const { toast } = useToast();
   const { userAddress } = useUser();
-  const { earningAssets, getEarningAssets, inactiveTokens, getInactiveTokens, loadingEarningAssets, loadingInactiveTokens } = useTokenContext();
+  const { earningAssets, getEarningAssets, inactiveTokens, getInactiveTokens, getBalanceHistory, balanceHistory, loadingEarningAssets, loadingInactiveTokens } = useTokenContext();
   const { loans, refreshLoans } = useLendingContext();
   const { totalCDPDebt, refreshVaults } = useCDP();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [selectedTimeRange, setSelectedTimeRange] = useState<string>('1d');
+
   const { pendingRewards, refetch: refetchPendingRewards } = usePendingRewards(rewardsEnabled, 30000);
   const [isClaiming, setIsClaiming] = useState(false);
 
@@ -75,6 +79,10 @@ const Dashboard = () => {
     refreshLoans();
     refreshVaults();
   }, [location.pathname, userAddress, getEarningAssets, getInactiveTokens, refreshLoans, refreshVaults]);
+
+  useEffect(() => {
+    getBalanceHistory(selectedTimeRange);
+  }, [getBalanceHistory, selectedTimeRange]);
 
   useEffect(() => {
     if (!searchParams) return;
@@ -165,30 +173,57 @@ const Dashboard = () => {
             />
           </div>
 
-              <div className="mb-8">
-                <AssetsList 
+          {/* Portfolio Value Chart */}
+          <div className="mb-8">
+            {balanceHistory && balanceHistory.length > 0 ? (
+              <PortfolioValueChart 
+                key={selectedTimeRange}
+                data={balanceHistory.map(item => ({
+                  timestamp: item.timestamp || 0,
+                  netBalance: typeof item.netBalance === 'string' ? parseFloat(item.netBalance) : (item.netBalance || 0)
+                }))}
+                onTimeRangeChange={(duration) => {
+                  setSelectedTimeRange(duration);
+                  getBalanceHistory(duration, '');
+                }}
+                selectedTimeRange={selectedTimeRange}
+              />
+            ) : (loadingEarningAssets || loadingInactiveTokens) ? (
+              <Card className="mb-6">
+                <CardContent className="flex items-center justify-center h-80">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="animate-spin text-gray-500" size={20} />
+                    <p className="text-gray-500">Loading chart data...</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : null}
+          </div>
+
+          <div className="mb-8">
+            <AssetsList 
               loading={loadingEarningAssets || loadingInactiveTokens} 
-                  tokens={nonPoolTokens} 
-                  inActiveTokens={inactiveTokens} 
-                />
-              </div>
+              tokens={nonPoolTokens} 
+              inActiveTokens={inactiveTokens} 
+            />
+          </div>
 
-              <div className="mb-8">
-                <BorrowingSection 
-                  loanData={loans}
-                />
-              </div>
+          <div className="mb-8">
+            <BorrowingSection 
+              loanData={loans}
+            />
+          </div>
 
-              <div className="mb-8">
-                  <MyPoolParticipationSection 
-                      poolTokens={poolTokens}
+          <div className="mb-8">
+            <MyPoolParticipationSection 
+              poolTokens={poolTokens}
               loading={loadingEarningAssets || loadingInactiveTokens}
-                    />
-              </div>
+            />
+          </div>
 
-              <div className="mb-8">
-                <DashboardFAQ />
-              </div>
+          <div className="mb-8">
+            <DashboardFAQ />
+          </div>
         </main>
       </div>
     </div>
