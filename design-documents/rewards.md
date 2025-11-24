@@ -126,15 +126,15 @@ interface IRewardsController {
     function handleAction(
         uint256 activityId,
         address user,
-        uint256 userNewStake,
-        uint256 totalNewStake
+        uint256 userNewStake
     ) external;
 }
 ```
 
 - `activityId` — identifies which activity this state change refers to.
-- `userNewStake` — user’s new effective stake after the action.
-- `totalNewStake` — total effective stake for the activity after the action.
+- `userNewStake` — user's new effective stake after the action.
+
+**Security Note:** `totalStake` is tracked internally by the RewardsController. The controller calculates it as `totalStake = totalStake + userNewStake - userOldStake`, ensuring pools cannot manipulate the total and dilute rewards. This maintains the invariant that `totalStake` always equals the sum of all user stakes.
 
 Each pool stores:
 
@@ -150,10 +150,9 @@ On LP deposit / withdrawal:
 ```solidity
 function _afterLiquidityChange(address user) internal {
     uint256 userStake = _getUserEffectiveStake(user);    // e.g. LP balance or USD value
-    uint256 totalStake = _getTotalEffectiveStake();      // total LP / TVL
 
     if (address(rewardsController) != address(0)) {
-        rewardsController.handleAction(activityId, user, userStake, totalStake);
+        rewardsController.handleAction(activityId, user, userStake);
     }
 }
 ```
@@ -175,15 +174,14 @@ Inside RewardsController:
 function handleAction(
     uint256 activityId,
     address user,
-    uint256 userNewStake,
-    uint256 totalNewStake
+    uint256 userNewStake
 ) external {
     Activity storage a = activities[activityId];
 
-    // 1) Update global index
-    _updateActivityIndex(a, totalNewStake);
+    // 1) Update global index using CURRENT totalStake (before user update)
+    _updateActivityIndex(activityId, a.totalStake);
 
-    // 2) Settle user’s pending rewards
+    // 2) Settle user's pending rewards
     uint256 oldStake = userStake[activityId][user];
     uint256 oldDebt  = userRewardDebt[activityId][user];
 
@@ -198,8 +196,8 @@ function handleAction(
     userStake[activityId][user]      = userNewStake;
     userRewardDebt[activityId][user] = (userNewStake * a.accRewardPerStake) / 1e18;
 
-    // 4) Update total stake
-    a.totalStake = totalNewStake;
+    // 4) Update total stake internally (secure calculation)
+    a.totalStake = a.totalStake + userNewStake - oldStake;
 }
 ```
 
@@ -264,12 +262,14 @@ Even if you speak about “epochs” in product docs, **on-chain we only change 
 - Only whitelisted pools/tokens should be allowed to call `handleAction` for their activities (e.g. via `allowedCallers[activityId] = poolAddress`).
 - Arithmetic uses checked math and proper scaling (`1e18` for indices).
 - EmissionRates should be bounded to avoid overflow / excessive emission.
+- **TotalStake integrity**: The controller tracks `totalStake` internally, preventing pools from manipulating totals to dilute rewards. The invariant `totalStake = sum(userStake[i])` is maintained by the controller.
 
 Key invariants:
 
 - For each activity:
   ```text
   totalRewardsEmitted ≈ ∫ emissionRate dt
+  totalStake[activityId] = Σ_all_users userStake[activityId][user]
   ```
 - For each user, across time:
   ```text
