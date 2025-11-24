@@ -26,6 +26,7 @@ struct Activity {
     uint256 lastUpdateTime;      // Last timestamp when the index was updated
     uint256 totalStake;          // Sum of all users' effective stakes for this activity
     address allowedCaller;       // Address of pool/contract allowed to call handleAction for this activity
+    bool isPaused;                 // Whether this activity is paused (paused activities cannot track rewards)
 }
 
 /**
@@ -54,6 +55,7 @@ contract record Rewards is Ownable {
     event ActivityAdded(uint256 indexed activityId, string name, uint256 emissionRate, address allowedCaller);
     event EmissionRateUpdated(uint256 indexed activityId, uint256 oldRate, uint256 newRate);
     event AllowedCallerUpdated(uint256 indexed activityId, address oldCaller, address newCaller);
+    event ActivityPauseToggled(uint256 indexed activityId, bool isPaused);
     event RewardsClaimed(address indexed user, uint256 amount);
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -135,7 +137,8 @@ contract record Rewards is Ownable {
             accRewardPerStake: 0,
             lastUpdateTime: block.timestamp,
             totalStake: 0,
-            allowedCaller: allowedCaller
+            allowedCaller: allowedCaller,
+            isPaused: false
         });
 
         activityIds.push(activityId);
@@ -179,6 +182,19 @@ contract record Rewards is Ownable {
         activity.allowedCaller = newAllowedCaller;
 
         emit AllowedCallerUpdated(activityId, oldCaller, newAllowedCaller);
+    }
+
+    /**
+     * @dev Toggle pause state for an activity
+     * @param activityId The activity to toggle
+     * @param isPaused true to pause, false to unpause
+     * @dev When paused, _handleActivity will revert, preventing reward tracking
+     * @dev Users can still claim existing accrued rewards while paused
+     */
+    function togglePause(uint256 activityId, bool isPaused) external onlyOwner {
+        Activity storage activity = activities[activityId];
+        activity.isPaused = isPaused;
+        emit ActivityPauseToggled(activityId, isPaused);
     }
 
     /**
@@ -289,6 +305,9 @@ contract record Rewards is Ownable {
         bool isIncrease
     ) internal {
         Activity storage activity = activities[activityId];
+
+        // Check if activity is paused
+        require(!activity.isPaused, "Activity is paused");
 
         // Access control: only allowed caller can update this activity
         require(msg.sender == activity.allowedCaller, "Caller not allowed");
