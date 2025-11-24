@@ -4,6 +4,7 @@ import "../Tokens/Token.sol";
 import "../Tokens/TokenFactory.sol";
 import "../Admin/FeeCollector.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
+import "../../abstract/ERC20/utils/Rewardable.sol";
 
 /**
  * @title Pool
@@ -25,7 +26,7 @@ import "../../abstract/ERC20/access/Ownable.sol";
  * @author Mercata Protocol
  * @version 1.0.0
  */
-contract record Pool is Ownable {
+contract record Pool is Ownable, Rewardable {
     
     // ============ EVENTS ============
     
@@ -347,12 +348,13 @@ contract record Pool is Ownable {
     /// @dev The user must approve input tokens for transfer before calling this function
     /// @dev Fees are automatically deducted and distributed between protocol and LP providers
     /// @dev Reentrancy protection is applied to prevent attacks
+    /// @dev Rewards are tracked if rewards contract and activity ID are configured
     function swap(
         bool isAToB,
         uint256 amountIn,
         uint256 minAmountOut,
         uint256 deadline
-    ) external nonReentrant returns (uint256 amountOut) {
+    ) external nonReentrant rewardable(0, msg.sender, amountIn) returns (uint256 amountOut) {
         require(amountIn > 0 && minAmountOut > 0, "Invalid input");
         require(block.timestamp <= deadline, "EXPIRED");
 
@@ -422,6 +424,19 @@ contract record Pool is Ownable {
     /// @dev When enabled, zap swaps follow the same fee structure as regular swaps
     function setZapSwapFeesEnabled(bool enabled) external onlyOwner {
         zapSwapFeesEnabled = enabled;
+    }
+
+    /// @notice Set the Rewards contract address and swap activity ID (factory only)
+    /// @param rewardsAddr The address of the Rewards contract (address(0) to disable rewards)
+    /// @param activityId The activity ID for swap rewards (0 = disable rewards)
+    /// @dev This function can only be called by the PoolFactory contract
+    /// @dev The activity must be registered in the Rewards contract with this pool as the allowed caller
+    function setRewards(address rewardsAddr, uint256 activityId) external onlyPoolFactory {
+        if (rewardsAddr != address(0)) {
+            _setRewards(rewardsAddr);
+        }
+        // If rewardsAddr is address(0), leave rewards as-is (can be set to zero via direct assignment if needed)
+        swapActivityId = activityId;
     }
 
     // ===========================================================
