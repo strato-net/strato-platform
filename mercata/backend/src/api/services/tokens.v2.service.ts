@@ -121,7 +121,6 @@ interface HistoryElement {
 function updatePortfolioInfo(portfolioInfo: any, newInfo: HistoryElement): any {
   switch (newInfo.collection_name) {
     case '_balances': {
-      console.log(`_balances ${newInfo.valid_from}: ${newInfo.address}`)
       const currentBalance = portfolioInfo.balances[newInfo.address] || 0;
       const newValue = newInfo.value || 0;
       return { ...portfolioInfo,
@@ -139,14 +138,12 @@ function updatePortfolioInfo(portfolioInfo: any, newInfo: HistoryElement): any {
       };
     }
     case 'vaults': {
-      console.log(`vaults ${newInfo.valid_from}: ${newInfo.key['key2']}`)
       const scaledDebt = parseInt(newInfo.value.scaledDebt) || 0;
       return { ...portfolioInfo, 
         userLoan: portfolioInfo.userLoan + scaledDebt
       };
     }
     case 'userCollaterals': {
-      console.log(`userCollaterals ${newInfo.valid_from}: ${newInfo.key['key2']}`)
       const token = newInfo.key['key2'] || '';
       const currentBalance = portfolioInfo.balances[token] || 0;
       const newValue = newInfo.value || 0;
@@ -228,14 +225,11 @@ export const getBalanceHistory = async (
       const tokenPrice = snapshot.portfolioInfo.prices[token] || 0;
       const tokenBalance = snapshot.portfolioInfo.balances[token] || 0;
       if (tokenPrice === 0 || tokenBalance === 0) {
-        console.log(`balance ${snapshot.timestamp} ${token}: ${tokenPrice} ${tokenBalance}`)
         continue;
       }
       const tokenValue = (tokenPrice / 1000000000) * (tokenBalance / 1000000000);
-      console.log(`balance ${snapshot.timestamp} ${token}: ${tokenPrice} ${tokenBalance} ${tokenValue}`)
       netBalance += tokenValue;
     }
-    console.log(`user loan ${snapshot.timestamp}: ${snapshot.portfolioInfo.userLoan}`)
     netBalance -= snapshot.portfolioInfo.userLoan || 0;
     return { timestamp: snapshot.timestamp, netBalance: netBalance / 1e18 }
   });

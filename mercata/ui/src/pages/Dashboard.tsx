@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import MobileSidebar from "../components/dashboard/MobileSidebar";
@@ -15,11 +15,14 @@ import { useToast } from "@/hooks/use-toast";
 import { useNetBalance } from "@/hooks/useNetBalance";
 import MyPoolParticipationSection from "@/components/dashboard/MyPoolParticipationSection";
 import PortfolioValueChart from "@/components/dashboard/PortfolioValueChart";
-import { Card, CardContent } from "@/components/ui/card";
 import { useLendingContext } from "@/context/LendingContext";
 import { useCDP } from "@/context/CDPContext";
 import { cataAddress, rewardsEnabled } from "@/lib/constants";
 import { api } from "@/lib/axios";
+import { NetBalanceSnapshot } from "@mercata/shared-types";
+
+const TIME_RANGES = ["1d", "7d", "1m", "3m", "6m", "1y", "all"] as const;
+type TimeRange = typeof TIME_RANGES[number];
 
 const Dashboard = () => {
   const [searchParams] = useSearchParams();
@@ -27,12 +30,16 @@ const Dashboard = () => {
   const location = useLocation();
   const { toast } = useToast();
   const { userAddress } = useUser();
-  const { earningAssets, getEarningAssets, inactiveTokens, getInactiveTokens, getBalanceHistory, balanceHistory, loadingEarningAssets, loadingInactiveTokens } = useTokenContext();
+  const { earningAssets, getEarningAssets, inactiveTokens, getInactiveTokens, getBalanceHistory, loadingEarningAssets, loadingInactiveTokens } = useTokenContext();
   const { loans, refreshLoans } = useLendingContext();
   const { totalCDPDebt, refreshVaults } = useCDP();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [selectedTimeRange, setSelectedTimeRange] = useState<string>('1d');
+  const [selectedTimeRange, setSelectedTimeRange] = useState<TimeRange>('1d');
   const [isLoadingBalanceHistory, setIsLoadingBalanceHistory] = useState(false);
+  const [balanceHistoryCache, setBalanceHistoryCache] = useState<Record<string, NetBalanceSnapshot[]>>({});
+  const [displayedBalanceHistory, setDisplayedBalanceHistory] = useState<NetBalanceSnapshot[]>([]);
+  const balanceHistoryCacheRef = useRef<Record<string, NetBalanceSnapshot[]>>({});
+  const hasPrefetchedRef = useRef(false);
 
   const { pendingRewards, refetch: refetchPendingRewards } = usePendingRewards(rewardsEnabled, 30000);
   const [isClaiming, setIsClaiming] = useState(false);
@@ -81,25 +88,68 @@ const Dashboard = () => {
     refreshVaults();
   }, [location.pathname, userAddress, getEarningAssets, getInactiveTokens, refreshLoans, refreshVaults]);
 
+  const setCacheForRange = useCallback((duration: TimeRange, data: NetBalanceSnapshot[]) => {
+    setBalanceHistoryCache(prev => {
+      const updated = { ...prev, [duration]: data };
+      balanceHistoryCacheRef.current = updated;
+      return updated;
+    });
+  }, []);
+
+  const prefetchOtherRanges = useCallback((primaryRange: TimeRange) => {
+    if (hasPrefetchedRef.current) return;
+    hasPrefetchedRef.current = true;
+    const rangesToPrefetch = TIME_RANGES.filter(range => range !== primaryRange);
+    rangesToPrefetch.forEach(range => {
+      (async () => {
+        if (balanceHistoryCacheRef.current[range]) return;
+        try {
+          const data = await getBalanceHistory(range, '');
+          setCacheForRange(range as TimeRange, data);
+        } catch (err) {
+          // ignore background errors
+        }
+      })();
+    });
+  }, [getBalanceHistory, setCacheForRange]);
+
   useEffect(() => {
     let isMounted = true;
-    const fetchBalanceHistory = async () => {
+
+    const loadRange = async () => {
+      const cached = balanceHistoryCacheRef.current[selectedTimeRange];
+      if (cached && cached.length > 0) {
+        setDisplayedBalanceHistory(cached);
+        setIsLoadingBalanceHistory(false);
+        prefetchOtherRanges(selectedTimeRange);
+        return;
+      }
+
       setIsLoadingBalanceHistory(true);
+      let shouldPrefetch = false;
       try {
-        await getBalanceHistory(selectedTimeRange, '');
+        const data = await getBalanceHistory(selectedTimeRange, '');
+        if (!isMounted) return;
+        setCacheForRange(selectedTimeRange, data);
+        setDisplayedBalanceHistory(data);
+        shouldPrefetch = true;
       } catch (err) {
-        // Error handling is done in context
       } finally {
         if (isMounted) {
           setIsLoadingBalanceHistory(false);
+          if (shouldPrefetch) {
+            prefetchOtherRanges(selectedTimeRange);
+          }
         }
       }
     };
-    fetchBalanceHistory();
+
+    loadRange();
+
     return () => {
       isMounted = false;
     };
-  }, [getBalanceHistory, selectedTimeRange]);
+  }, [selectedTimeRange, getBalanceHistory, prefetchOtherRanges, setCacheForRange]);
 
   useEffect(() => {
     if (!searchParams) return;
@@ -192,27 +242,17 @@ const Dashboard = () => {
 
           {/* Portfolio Value Chart */}
           <div className="mb-8">
-            {isLoadingBalanceHistory ? (
-              <Card className="mb-6">
-                <CardContent className="flex items-center justify-center h-80">
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="animate-spin text-gray-500" size={20} />
-                    <p className="text-gray-500">Loading chart data...</p>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : balanceHistory && balanceHistory.length > 0 ? (
-              <PortfolioValueChart 
-                data={balanceHistory.map(item => ({
-                  timestamp: item.timestamp || 0,
-                  netBalance: typeof item.netBalance === 'string' ? parseFloat(item.netBalance) : (item.netBalance || 0)
-                }))}
-                onTimeRangeChange={(duration) => {
-                  setSelectedTimeRange(duration);
-                }}
-                selectedTimeRange={selectedTimeRange}
-              />
-            ) : null}
+            <PortfolioValueChart 
+              data={(displayedBalanceHistory || []).map(item => ({
+                timestamp: item.timestamp || 0,
+                netBalance: typeof item.netBalance === 'string' ? parseFloat(item.netBalance) : (item.netBalance || 0)
+              }))}
+              onTimeRangeChange={(duration) => {
+                setSelectedTimeRange(duration as TimeRange);
+              }}
+              selectedTimeRange={selectedTimeRange}
+              isLoading={isLoadingBalanceHistory}
+            />
           </div>
 
           <div className="mb-8">
