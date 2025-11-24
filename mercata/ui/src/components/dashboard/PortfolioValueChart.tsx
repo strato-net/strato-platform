@@ -11,6 +11,7 @@ import {
 } from "recharts";
 import { format } from 'date-fns';
 import { TrendingUp, TrendingDown } from 'lucide-react';
+import { useMemo } from 'react';
 
 type PortfolioDataPoint = {
   timestamp: number;
@@ -84,26 +85,53 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
     );
   }
 
-  // Calculate time range to determine formatting
-  const timeRangeHours = calculateTimeRangeHours(data);
-  const isTimeRange = timeRangeHours <= 24;
+  // Memoize chart data transformations to prevent unnecessary recalculations
+  const chartData = useMemo(() => {
+    // Calculate time range to determine formatting
+    const timeRangeHours = calculateTimeRangeHours(data);
+    const isTimeRange = timeRangeHours <= 24;
 
-  // Transform data for chart (normalize to display values)
-  // Handle both string and number netBalance values
-  const chartData = data
-    .sort((a, b) => a.timestamp - b.timestamp) // Ensure chronological order
-    .map(point => {
-      const netBalance = typeof point.netBalance === 'string' 
-        ? parseFloat(point.netBalance) 
-        : point.netBalance;
-      return {
-        timestamp: point.timestamp,
-        date: formatDate(point.timestamp, isTimeRange),
-        value: netBalance, // Convert to readable format
-        raw: netBalance
-      };
-    })
-    .filter(point => !isNaN(point.value) && point.value >= 0); // Filter invalid data points
+    // Transform data for chart (normalize to display values)
+    // Handle both string and number netBalance values
+    return data
+      .sort((a, b) => a.timestamp - b.timestamp) // Ensure chronological order
+      .map(point => {
+        const netBalance = typeof point.netBalance === 'string' 
+          ? parseFloat(point.netBalance) 
+          : point.netBalance;
+        return {
+          timestamp: point.timestamp,
+          date: formatDate(point.timestamp, isTimeRange),
+          value: netBalance, // Convert to readable format
+          raw: netBalance
+        };
+      })
+      .filter(point => !isNaN(point.value) && point.value >= 0); // Filter invalid data points
+  }, [data]);
+
+  // Memoize calculated values
+  const { currentValue, change, yAxisDomain } = useMemo(() => {
+    if (chartData.length === 0) {
+      return { currentValue: 0, change: { value: 0, isPositive: true }, yAxisDomain: [0, 100] };
+    }
+
+    const currentValue = chartData[chartData.length - 1]?.value || 0;
+    const change = calculateChange(data);
+    
+    // Calculate domain with padding
+    const values = chartData.map(d => d.value);
+    const minValue = Math.min(...values);
+    const maxValue = Math.max(...values);
+    const range = maxValue - minValue;
+    const padding = range > 0 ? range * 0.1 : maxValue * 0.05; // Fallback if all values are the same
+    
+    const yAxisDomain = [
+      Math.max(0, minValue - padding),
+      maxValue + padding
+    ];
+
+    return { currentValue, change, yAxisDomain };
+  }, [chartData, data]);
 
   // Check if we have valid data after filtering
   if (chartData.length === 0) {
@@ -115,21 +143,6 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
       </Card>
     );
   }
-
-  const currentValue = chartData[chartData.length - 1]?.value || 0;
-  const change = calculateChange(data);
-  
-  // Calculate domain with padding
-  const values = chartData.map(d => d.value);
-  const minValue = Math.min(...values);
-  const maxValue = Math.max(...values);
-  const range = maxValue - minValue;
-  const padding = range > 0 ? range * 0.1 : maxValue * 0.05; // Fallback if all values are the same
-  
-  const yAxisDomain = [
-    Math.max(0, minValue - padding),
-    maxValue + padding
-  ];
 
   // Determine color based on trend - stock chart style (green for gains, red for losses)
   const lineColor = change.isPositive ? '#10b981' : '#ef4444'; // green-500 or red-500
