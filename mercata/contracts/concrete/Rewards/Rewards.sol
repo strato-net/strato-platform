@@ -43,6 +43,7 @@ contract record Rewards is Ownable {
     // ═════════════════════════════════════════════════════════════════════════
 
     event ActivityIndexUpdated(uint256 indexed activityId, uint256 accRewardPerStake, uint256 totalStake);
+    event ActivityAdded(uint256 indexed activityId, uint256 emissionRate, address allowedCaller);
 
     // ═════════════════════════════════════════════════════════════════════════
     // CONSTANTS
@@ -95,6 +96,32 @@ contract record Rewards is Ownable {
         }
     }
 
+    /**
+     * @dev Register a new activity for reward distribution
+     * @param activityId Unique identifier for the activity
+     * @param emissionRate CATA tokens emitted per second for this activity
+     * @param allowedCaller Address of pool/contract allowed to call handleAction
+     */
+    function addActivity(
+        uint256 activityId,
+        uint256 emissionRate,
+        address allowedCaller
+    ) external onlyOwner {
+        require(activities[activityId].lastUpdateTime == 0, "Activity already exists");
+        require(allowedCaller != address(0), "Invalid caller address");
+
+        activities[activityId] = Activity({
+            emissionRate: emissionRate,
+            accRewardPerStake: 0,
+            lastUpdateTime: block.timestamp,
+            totalStake: 0,
+            allowedCaller: allowedCaller
+        });
+
+        activityIds.push(activityId);
+
+        emit ActivityAdded(activityId, emissionRate, allowedCaller);
+    }
     // ═════════════════════════════════════════════════════════════════════════
     // INTERNAL FUNCTIONS
     // ═════════════════════════════════════════════════════════════════════════
