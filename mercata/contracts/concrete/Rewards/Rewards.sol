@@ -44,7 +44,7 @@ contract record Rewards is Ownable {
     // ═════════════════════════════════════════════════════════════════════════
 
     event ActivityIndexUpdated(uint256 indexed activityId, uint256 accRewardPerStake, uint256 totalStake);
-    event ActivityAdded(uint256 indexed activityId, uint256 emissionRate, address allowedCaller);
+    event UserStakeUpdated(uint256 indexed activityId, address indexed user, uint256 oldStake, uint256 newStake, uint256 pendingRewards);
     event ActivityAdded(uint256 indexed activityId, string name, uint256 emissionRate, address allowedCaller);
     event EmissionRateUpdated(uint256 indexed activityId, uint256 oldRate, uint256 newRate);
 
@@ -147,9 +147,92 @@ contract record Rewards is Ownable {
 
         emit EmissionRateUpdated(activityId, oldRate, newEmissionRate);
     }
+
+    /**
+     * @dev Deposit/increase stake for a user in an activity
+     * @param activityId The activity to deposit into
+     * @param user The user whose stake is increasing
+     * @param amount The amount to deposit
+     */
+    function deposit(
+        uint256 activityId,
+        address user,
+        uint256 amount
+    ) external {
+        _handleActivity(activityId, user, amount, true);
+    }
+
+    /**
+     * @dev Withdraw/decrease stake for a user in an activity
+     * @param activityId The activity to withdraw from
+     * @param user The user whose stake is decreasing
+     * @param amount The amount to withdraw
+     */
+    function withdraw(
+        uint256 activityId,
+        address user,
+        uint256 amount
+    ) external {
+        _handleActivity(activityId, user, amount, false);
+    }
+
     // ═════════════════════════════════════════════════════════════════════════
     // INTERNAL FUNCTIONS
     // ═════════════════════════════════════════════════════════════════════════
+
+    /**
+     * @dev Internal function to handle stake changes
+     * @param activityId The activity being updated
+     * @param user The user whose stake is changing
+     * @param amount The amount of stake change
+     * @param isIncrease True for deposit/increase, false for withdraw/decrease
+     */
+    function _handleActivity(
+        uint256 activityId,
+        address user,
+        uint256 amount,
+        bool isIncrease
+    ) internal {
+        Activity storage activity = activities[activityId];
+
+        // Access control: only allowed caller can update this activity
+        require(msg.sender == activity.allowedCaller, "Caller not allowed");
+
+        // 1) Update global index using current totalStake (before user update)
+        _updateActivityIndex(activityId);
+
+        // 2) Settle user's pending rewards
+        UserInfo storage userState = userInfo[activityId][user];
+        uint256 oldStake = userState.stake;
+        uint256 pendingRewards = 0;
+
+        if (oldStake > 0) {
+            uint256 accumulated = (oldStake * activity.accRewardPerStake) / PRECISION_MULTIPLIER;
+            pendingRewards = accumulated - userState.rewardDebt;
+
+            if (pendingRewards > 0) {
+                unclaimedRewards[user] += pendingRewards;
+            }
+        }
+
+        // 3) Calculate new stake from delta
+        uint256 newStake;
+        if (isIncrease) {
+            newStake = oldStake + amount;
+        } else {
+            require(oldStake >= amount, "Insufficient stake");
+            newStake = oldStake - amount;
+        }
+
+        // 4) Update user stake and debt
+        userState.stake = newStake;
+        userState.rewardDebt = (newStake * activity.accRewardPerStake) / PRECISION_MULTIPLIER;
+
+        // 5) Update total stake internally (secure calculation)
+        activity.totalStake = activity.totalStake + newStake - oldStake;
+
+        emit UserStakeUpdated(activityId, user, oldStake, newStake, pendingRewards);
+    }
 
     /**
      * @dev Updates the global reward index for an activity
