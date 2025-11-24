@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Clock, CheckCircle2, AlertCircle } from "lucide-react";
 import { Table, Select, Space, Card } from "antd";
 import { FrownOutlined, CopyOutlined } from "@ant-design/icons";
+import RefreshButton from "@/components/common/RefreshButton";
 import { useBridgeContext } from "@/context/BridgeContext";
 import { formatDate, getChainName, BRIDGE_STATUS_OPTIONS, handleCopyToClipboard, getExplorerUrl } from "@/lib/bridge/utils";
 import { renderTruncatedAddressWithCopy } from "@/lib/bridge/components";
@@ -17,6 +18,9 @@ const DepositTransactionDetails = ({ mintUSDST = false, context }: { mintUSDST?:
   const [depositStatus, setDepositStatus] = useState<number | null>(null);
   const [selectedChainId, setSelectedChainId] = useState<number | null>(null);
   const [transactions, setTransactions] = useState<DepositTransaction[]>([]);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const prevRefreshTrigger = useRef(refreshTrigger);
   const DEPOSIT_STATUS_OPTIONS = BRIDGE_STATUS_OPTIONS.filter((o) => o.value !== 4);
 
   const {
@@ -28,6 +32,10 @@ const DepositTransactionDetails = ({ mintUSDST = false, context }: { mintUSDST?:
   useEffect(() => {
     const loadTransactions = async () => {
       try {
+        if (refreshTrigger !== prevRefreshTrigger.current) {
+          setIsRefreshing(true);
+          prevRefreshTrigger.current = refreshTrigger;
+        }
         const params: Record<string, string> = {
           limit: ITEMS_PER_PAGE.toString(),
           offset: ((currentPage - 1) * ITEMS_PER_PAGE).toString(),
@@ -51,11 +59,15 @@ const DepositTransactionDetails = ({ mintUSDST = false, context }: { mintUSDST?:
         console.error("Error loading transactions:", error);
         setTransactions([]);
         setTotalCount(0);
+      } finally {
+        setIsRefreshing(false);
       }
     };
 
     loadTransactions();
-  }, [currentPage, depositStatus, selectedChainId, fetchDepositTransactions, context]);
+  }, [currentPage, depositStatus, selectedChainId, fetchDepositTransactions, context, refreshTrigger]);
+
+  const handleRefresh = () => setRefreshTrigger(prev => prev + 1);
 
   
 
@@ -184,38 +196,41 @@ const DepositTransactionDetails = ({ mintUSDST = false, context }: { mintUSDST?:
   return (
     <div className="space-y-4">
       <Card className="bg-white/80 rounded-xl shadow-sm border border-gray-200">
-        <Space size="large">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Status Filter
-            </label>
-            <Select
-              value={depositStatus}
-              onChange={(v) => {
-                setDepositStatus(v);
-                setCurrentPage(1);
-              }}
-              style={{ width: 150 }}
-              options={DEPOSIT_STATUS_OPTIONS}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Chain Filter
-            </label>
-            <Select
-              value={selectedChainId}
-              onChange={(v) => {
-                setSelectedChainId(v);
-                setCurrentPage(1);
-              }}
-              style={{ width: 150 }}
-              options={[
-                { value: null, label: "All Chains" },
-                ...availableNetworks.map((n) => ({ value: parseInt(n.chainId), label: n.chainName }))
-              ]}
-            />
-          </div>
+        <Space size="large" className="w-full justify-between">
+          <Space size="large">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Status Filter
+              </label>
+              <Select
+                value={depositStatus}
+                onChange={(v) => {
+                  setDepositStatus(v);
+                  setCurrentPage(1);
+                }}
+                style={{ width: 150 }}
+                options={DEPOSIT_STATUS_OPTIONS}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Chain Filter
+              </label>
+              <Select
+                value={selectedChainId}
+                onChange={(v) => {
+                  setSelectedChainId(v);
+                  setCurrentPage(1);
+                }}
+                style={{ width: 150 }}
+                options={[
+                  { value: null, label: "All Chains" },
+                  ...availableNetworks.map((n) => ({ value: parseInt(n.chainId), label: n.chainName }))
+                ]}
+              />
+            </div>
+          </Space>
+          <RefreshButton onRefresh={handleRefresh} loading={isRefreshing} />
         </Space>
       </Card>
       
