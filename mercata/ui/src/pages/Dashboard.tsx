@@ -32,6 +32,7 @@ const Dashboard = () => {
   const { totalCDPDebt, refreshVaults } = useCDP();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [selectedTimeRange, setSelectedTimeRange] = useState<string>('1d');
+  const [isLoadingBalanceHistory, setIsLoadingBalanceHistory] = useState(false);
 
   const { pendingRewards, refetch: refetchPendingRewards } = usePendingRewards(rewardsEnabled, 30000);
   const [isClaiming, setIsClaiming] = useState(false);
@@ -81,7 +82,23 @@ const Dashboard = () => {
   }, [location.pathname, userAddress, getEarningAssets, getInactiveTokens, refreshLoans, refreshVaults]);
 
   useEffect(() => {
-    getBalanceHistory(selectedTimeRange);
+    let isMounted = true;
+    const fetchBalanceHistory = async () => {
+      setIsLoadingBalanceHistory(true);
+      try {
+        await getBalanceHistory(selectedTimeRange, '');
+      } catch (err) {
+        // Error handling is done in context
+      } finally {
+        if (isMounted) {
+          setIsLoadingBalanceHistory(false);
+        }
+      }
+    };
+    fetchBalanceHistory();
+    return () => {
+      isMounted = false;
+    };
   }, [getBalanceHistory, selectedTimeRange]);
 
   useEffect(() => {
@@ -175,20 +192,7 @@ const Dashboard = () => {
 
           {/* Portfolio Value Chart */}
           <div className="mb-8">
-            {balanceHistory && balanceHistory.length > 0 ? (
-              <PortfolioValueChart 
-                key={selectedTimeRange}
-                data={balanceHistory.map(item => ({
-                  timestamp: item.timestamp || 0,
-                  netBalance: typeof item.netBalance === 'string' ? parseFloat(item.netBalance) : (item.netBalance || 0)
-                }))}
-                onTimeRangeChange={(duration) => {
-                  setSelectedTimeRange(duration);
-                  getBalanceHistory(duration, '');
-                }}
-                selectedTimeRange={selectedTimeRange}
-              />
-            ) : (loadingEarningAssets || loadingInactiveTokens) ? (
+            {isLoadingBalanceHistory ? (
               <Card className="mb-6">
                 <CardContent className="flex items-center justify-center h-80">
                   <div className="flex items-center gap-2">
@@ -197,6 +201,17 @@ const Dashboard = () => {
                   </div>
                 </CardContent>
               </Card>
+            ) : balanceHistory && balanceHistory.length > 0 ? (
+              <PortfolioValueChart 
+                data={balanceHistory.map(item => ({
+                  timestamp: item.timestamp || 0,
+                  netBalance: typeof item.netBalance === 'string' ? parseFloat(item.netBalance) : (item.netBalance || 0)
+                }))}
+                onTimeRangeChange={(duration) => {
+                  setSelectedTimeRange(duration);
+                }}
+                selectedTimeRange={selectedTimeRange}
+              />
             ) : null}
           </div>
 
