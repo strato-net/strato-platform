@@ -61,6 +61,9 @@ contract record Rewards is Ownable {
     // Mapping of activityId to Activity struct
     mapping(uint256 => Activity) public record activities;
 
+    // Array of all activity IDs for enumeration
+    uint256[] public activityIds;
+
     // User info per activity: activityId => user => UserInfo
     mapping(uint256 => mapping(address => UserInfo)) public record userInfo;
 
@@ -80,15 +83,27 @@ contract record Rewards is Ownable {
     }
 
     // ═════════════════════════════════════════════════════════════════════════
+    // PUBLIC FUNCTIONS
+    // ═════════════════════════════════════════════════════════════════════════
+
+    /**
+     * @dev Mass update reward indices for all activities
+     */
+    function massUpdateActivitiesIndices() public {
+        for (uint256 i = 0; i < activityIds.length; i++) {
+            _updateActivityIndex(activityIds[i]);
+        }
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
     // INTERNAL FUNCTIONS
     // ═════════════════════════════════════════════════════════════════════════
 
     /**
      * @dev Updates the global reward index for an activity
      * @param activityId The activity to update
-     * @param currentTotalStake The current total stake for this activity
      */
-    function _updateActivityIndex(uint256 activityId, uint256 currentTotalStake) internal {
+    function _updateActivityIndex(uint256 activityId) internal {
         Activity storage activity = activities[activityId];
 
         // If no time has passed, nothing to update
@@ -97,7 +112,7 @@ contract record Rewards is Ownable {
         }
 
         // If there's no stake, just update the timestamp
-        if (currentTotalStake == 0) {
+        if (activity.totalStake == 0) {
             activity.lastUpdateTime = block.timestamp;
             return;
         }
@@ -109,10 +124,10 @@ contract record Rewards is Ownable {
         uint256 reward = activity.emissionRate * dt;
 
         // Update the cumulative index
-        activity.accRewardPerStake += (reward * PRECISION_MULTIPLIER) / currentTotalStake;
+        activity.accRewardPerStake += (reward * PRECISION_MULTIPLIER) / activity.totalStake;
         activity.lastUpdateTime = block.timestamp;
 
-        emit ActivityIndexUpdated(activityId, activity.accRewardPerStake, currentTotalStake);
+        emit ActivityIndexUpdated(activityId, activity.accRewardPerStake, activity.totalStake);
     }
 
 }
