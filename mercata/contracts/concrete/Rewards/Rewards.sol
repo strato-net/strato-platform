@@ -14,6 +14,7 @@ struct UserInfo {
 }
 
 struct Activity {
+    string name;                 // Human-readable name for this activity
     uint256 emissionRate;        // CATA tokens emitted per second for this activity
     uint256 accRewardPerStake;   // Accumulated reward per 1 unit of stake (scaled by 1e18)
     uint256 lastUpdateTime;      // Last timestamp when the index was updated
@@ -44,6 +45,7 @@ contract record Rewards is Ownable {
 
     event ActivityIndexUpdated(uint256 indexed activityId, uint256 accRewardPerStake, uint256 totalStake);
     event ActivityAdded(uint256 indexed activityId, uint256 emissionRate, address allowedCaller);
+    event ActivityAdded(uint256 indexed activityId, string name, uint256 emissionRate, address allowedCaller);
     event EmissionRateUpdated(uint256 indexed activityId, uint256 oldRate, uint256 newRate);
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -100,18 +102,22 @@ contract record Rewards is Ownable {
     /**
      * @dev Register a new activity for reward distribution
      * @param activityId Unique identifier for the activity
+     * @param name Human-readable name for the activity
      * @param emissionRate CATA tokens emitted per second for this activity
      * @param allowedCaller Address of pool/contract allowed to call handleAction
      */
     function addActivity(
         uint256 activityId,
+        string name,
         uint256 emissionRate,
         address allowedCaller
     ) external onlyOwner {
         require(activities[activityId].lastUpdateTime == 0, "Activity already exists");
         require(allowedCaller != address(0), "Invalid caller address");
+        require(bytes(name).length > 0, "Name cannot be empty");
 
         activities[activityId] = Activity({
+            name: name,
             emissionRate: emissionRate,
             accRewardPerStake: 0,
             lastUpdateTime: block.timestamp,
@@ -121,7 +127,7 @@ contract record Rewards is Ownable {
 
         activityIds.push(activityId);
 
-        emit ActivityAdded(activityId, emissionRate, allowedCaller);
+        emit ActivityAdded(activityId, name, emissionRate, allowedCaller);
     }
 
     /**
