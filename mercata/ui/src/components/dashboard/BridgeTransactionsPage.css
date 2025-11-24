@@ -32,6 +32,48 @@
   justify-content: space-between !important;
 }
 
+/* Mobile: Allow tabs to scroll horizontally */
+@media (max-width: 640px) {
+  .custom-tabs .ant-tabs-nav {
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: thin !important;
+  }
+  
+  .custom-tabs .ant-tabs-nav::-webkit-scrollbar {
+    height: 4px !important;
+  }
+  
+  .custom-tabs .ant-tabs-nav::-webkit-scrollbar-track {
+    background: transparent !important;
+  }
+  
+  .custom-tabs .ant-tabs-nav::-webkit-scrollbar-thumb {
+    background: #cbd5e1 !important;
+    border-radius: 2px !important;
+  }
+  
+  .custom-tabs .ant-tabs-nav-wrap {
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  
+  .custom-tabs .ant-tabs-nav-list {
+    width: auto !important;
+    min-width: 100% !important;
+    justify-content: flex-start !important;
+    flex-wrap: nowrap !important;
+  }
+  
+  .custom-tabs .ant-tabs-tab {
+    flex: 0 0 auto !important;
+    min-width: fit-content !important;
+    white-space: nowrap !important;
+  }
+}
+
 /* For deposit tabs (2 items) */
 .custom-tabs .ant-tabs-nav-list[style*="grid-template-columns"] {
   display: flex !important;

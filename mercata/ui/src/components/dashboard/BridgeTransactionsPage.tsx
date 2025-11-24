@@ -45,11 +45,11 @@ const BridgeTransactionsPage = ({ isAdmin = false }: { isAdmin?: boolean }) => {
 
   return (
     <>
-      <div className="container mx-auto max-w-full py-2 px-0">
+      <div className="container mx-auto max-w-full py-0 px-0 md:py-8 md:px-4">
         <div className="w-full overflow-x-hidden">
           <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl shadow-lg p-4">
             <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-[18px] md:mb-6">
                 <div className="flex items-center gap-2">
                   <ArrowLeftRight className="h-6 w-6 text-blue-600" />
                   <h1 className="text-2xl font-semibold text-gray-900">Bridge Transactions</h1>
