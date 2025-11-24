@@ -44,6 +44,7 @@ contract record Rewards is Ownable {
 
     event ActivityIndexUpdated(uint256 indexed activityId, uint256 accRewardPerStake, uint256 totalStake);
     event ActivityAdded(uint256 indexed activityId, uint256 emissionRate, address allowedCaller);
+    event EmissionRateUpdated(uint256 indexed activityId, uint256 oldRate, uint256 newRate);
 
     // ═════════════════════════════════════════════════════════════════════════
     // CONSTANTS
@@ -121,6 +122,24 @@ contract record Rewards is Ownable {
         activityIds.push(activityId);
 
         emit ActivityAdded(activityId, emissionRate, allowedCaller);
+    }
+
+    /**
+     * @dev Update the emission rate for an existing activity
+     * @param activityId The activity to update
+     * @param newEmissionRate The new emission rate (CATA per second)
+     */
+    function setEmissionRate(uint256 activityId, uint256 newEmissionRate) external onlyOwner {
+        Activity storage activity = activities[activityId];
+        require(activity.lastUpdateTime > 0, "Activity does not exist");
+
+        // Update index with old emission rate first
+        _updateActivityIndex(activityId);
+
+        uint256 oldRate = activity.emissionRate;
+        activity.emissionRate = newEmissionRate;
+
+        emit EmissionRateUpdated(activityId, oldRate, newEmissionRate);
     }
     // ═════════════════════════════════════════════════════════════════════════
     // INTERNAL FUNCTIONS
