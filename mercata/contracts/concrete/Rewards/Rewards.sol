@@ -47,6 +47,7 @@ contract record Rewards is Ownable {
     event UserStakeUpdated(uint256 indexed activityId, address indexed user, uint256 oldStake, uint256 newStake, uint256 pendingRewards);
     event ActivityAdded(uint256 indexed activityId, string name, uint256 emissionRate, address allowedCaller);
     event EmissionRateUpdated(uint256 indexed activityId, uint256 oldRate, uint256 newRate);
+    event AllowedCallerUpdated(uint256 indexed activityId, address oldCaller, address newCaller);
     event RewardsClaimed(address indexed user, uint256 amount);
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -156,6 +157,22 @@ contract record Rewards is Ownable {
         totalRewardsEmission = totalRewardsEmission + newEmissionRate - oldRate;
 
         emit EmissionRateUpdated(activityId, oldRate, newEmissionRate);
+    }
+
+    /**
+     * @dev Update the allowed caller for an existing activity
+     * @param activityId The activity to update
+     * @param newAllowedCaller The new address allowed to call deposit/withdraw
+     */
+    function setAllowedCaller(uint256 activityId, address newAllowedCaller) external onlyOwner {
+        Activity storage activity = activities[activityId];
+        require(activity.lastUpdateTime > 0, "Activity does not exist");
+        require(newAllowedCaller != address(0), "Invalid caller address");
+
+        address oldCaller = activity.allowedCaller;
+        activity.allowedCaller = newAllowedCaller;
+
+        emit AllowedCallerUpdated(activityId, oldCaller, newAllowedCaller);
     }
 
     /**
