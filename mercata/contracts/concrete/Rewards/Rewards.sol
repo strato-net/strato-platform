@@ -68,6 +68,9 @@ contract record Rewards is Ownable {
     // Array of all activity IDs for enumeration
     uint256[] public activityIds;
 
+    // Total emission rate across all activities (CATA per second)
+    uint256 public totalRewardsEmission;
+
     // User info per activity: activityId => user => UserInfo
     mapping(uint256 => mapping(address => UserInfo)) public record userInfo;
 
@@ -127,6 +130,9 @@ contract record Rewards is Ownable {
 
         activityIds.push(activityId);
 
+        // Update total emission rate
+        totalRewardsEmission += emissionRate;
+
         emit ActivityAdded(activityId, name, emissionRate, allowedCaller);
     }
 
@@ -144,6 +150,9 @@ contract record Rewards is Ownable {
 
         uint256 oldRate = activity.emissionRate;
         activity.emissionRate = newEmissionRate;
+
+        // Update total emission rate
+        totalRewardsEmission = totalRewardsEmission + newEmissionRate - oldRate;
 
         emit EmissionRateUpdated(activityId, oldRate, newEmissionRate);
     }
