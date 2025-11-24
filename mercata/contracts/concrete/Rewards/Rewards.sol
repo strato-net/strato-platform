@@ -47,6 +47,7 @@ contract record Rewards is Ownable {
     event UserStakeUpdated(uint256 indexed activityId, address indexed user, uint256 oldStake, uint256 newStake, uint256 pendingRewards);
     event ActivityAdded(uint256 indexed activityId, string name, uint256 emissionRate, address allowedCaller);
     event EmissionRateUpdated(uint256 indexed activityId, uint256 oldRate, uint256 newRate);
+    event RewardsClaimed(address indexed user, uint256 amount);
 
     // ═════════════════════════════════════════════════════════════════════════
     // CONSTANTS
@@ -158,6 +159,51 @@ contract record Rewards is Ownable {
     }
 
     /**
+     * @dev Claim accumulated rewards for the caller
+     * @param activityIds Array of activity IDs to settle rewards from
+     */
+    function claimRewards(uint256[] calldata activityIds) external {
+        address user = msg.sender;
+
+        // Update indices and settle pending rewards for all specified activities
+        for (uint256 i = 0; i < activityIds.length; i++) {
+            _settlePendingRewards(activityIds[i], user);
+        }
+
+        // Get total accumulated rewards
+        uint256 totalRewards = unclaimedRewards[user];
+        require(totalRewards > 0, "No rewards to claim");
+
+        // Reset unclaimed rewards and transfer CATA tokens
+        unclaimedRewards[user] = 0;
+        rewardToken.transfer(user, totalRewards);
+
+        emit RewardsClaimed(user, totalRewards);
+    }
+
+    /**
+     * @dev Claim accumulated rewards from all activities for the caller
+     */
+    function claimAllRewards() external {
+        address user = msg.sender;
+
+        // Update indices and settle pending rewards for all activities
+        for (uint256 i = 0; i < activityIds.length; i++) {
+            _settlePendingRewards(activityIds[i], user);
+        }
+
+        // Get total accumulated rewards
+        uint256 totalRewards = unclaimedRewards[user];
+        require(totalRewards > 0, "No rewards to claim");
+
+        // Reset unclaimed rewards and transfer CATA tokens
+        unclaimedRewards[user] = 0;
+        rewardToken.transfer(user, totalRewards);
+
+        emit RewardsClaimed(user, totalRewards);
+    }
+
+    /**
      * @dev Deposit/increase stake for a user in an activity
      * @param activityId The activity to deposit into
      * @param user The user whose stake is increasing
@@ -241,6 +287,32 @@ contract record Rewards is Ownable {
         activity.totalStake = activity.totalStake + newStake - oldStake;
 
         emit UserStakeUpdated(activityId, user, oldStake, newStake, pendingRewards);
+    }
+
+    /**
+     * @dev Settle pending rewards for a user without changing their stake
+     * @param activityId The activity to settle rewards for
+     * @param user The user to settle rewards for
+     */
+    function _settlePendingRewards(uint256 activityId, address user) internal {
+        // Update the activity index first
+        _updateActivityIndex(activityId);
+
+        Activity storage activity = activities[activityId];
+        UserInfo storage userState = userInfo[activityId][user];
+        uint256 userStake = userState.stake;
+
+        if (userStake > 0) {
+            uint256 accumulated = (userStake * activity.accRewardPerStake) / PRECISION_MULTIPLIER;
+            uint256 pending = accumulated - userState.rewardDebt;
+
+            if (pending > 0) {
+                unclaimedRewards[user] += pending;
+            }
+
+            // Update reward debt to current accumulated value (without changing stake)
+            userState.rewardDebt = accumulated;
+        }
     }
 
     /**
