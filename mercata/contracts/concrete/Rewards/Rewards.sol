@@ -8,6 +8,11 @@ import "../Tokens/Token.sol";
 // DATA STRUCTURES
 // ═════════════════════════════════════════════════════════════════════════
 
+enum ActivityType {
+    Position,  // e.g providing liquidity
+    OneTime    // e.g swaps, borrows
+}
+
 struct RewardsUserInfo {
     uint256 stake;       // User's effective stake in this activity
     uint256 rewardDebt;  // Reward debt for accounting
@@ -15,6 +20,7 @@ struct RewardsUserInfo {
 
 struct Activity {
     string name;                 // Human-readable name for this activity
+    ActivityType activityType;   // Type of activity (Position or OneTime)
     uint256 emissionRate;        // CATA tokens emitted per second for this activity
     uint256 accRewardPerStake;   // Accumulated reward per 1 unit of stake (scaled by 1e18)
     uint256 lastUpdateTime;      // Last timestamp when the index was updated
@@ -108,12 +114,14 @@ contract record Rewards is Ownable {
      * @dev Register a new activity for reward distribution
      * @param activityId Unique identifier for the activity
      * @param name Human-readable name for the activity
+     * @param activityType Type of activity (Position or OneTime)
      * @param emissionRate CATA tokens emitted per second for this activity
      * @param allowedCaller Address of pool/contract allowed to call handleAction
      */
     function addActivity(
         uint256 activityId,
         string name,
+        ActivityType activityType,
         uint256 emissionRate,
         address allowedCaller
     ) external onlyOwner {
@@ -122,6 +130,7 @@ contract record Rewards is Ownable {
 
         activities[activityId] = Activity({
             name: name,
+            activityType: activityType,
             emissionRate: emissionRate,
             accRewardPerStake: 0,
             lastUpdateTime: block.timestamp,

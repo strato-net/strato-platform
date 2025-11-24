@@ -71,13 +71,14 @@ contract Describe_Rewards_Management is Authorizable {
         address allowedCaller = address(user1);
 
         // when
-        rewards.addActivity(activityId, name, emissionRate, allowedCaller);
+        rewards.addActivity(activityId, name, ActivityType.Position, emissionRate, allowedCaller);
 
         // then
-        (string memory activityName, uint256 rate, uint256 accReward, uint256 lastUpdate, uint256 totalStake, address caller) =
+        (string memory activityName, ActivityType activityType, uint256 rate, uint256 accReward, uint256 lastUpdate, uint256 totalStake, address caller) =
             rewards.activities(activityId);
 
         require(keccak256(bytes(activityName)) == keccak256(bytes(name)), "Activity name should match");
+        require(activityType == ActivityType.Position, "Activity type should match");
         require(rate == emissionRate, "Emission rate should match");
         require(accReward == 0, "Initial accRewardPerStake should be 0");
         require(lastUpdate == block.timestamp, "lastUpdateTime should be set to block.timestamp");
@@ -96,7 +97,7 @@ contract Describe_Rewards_Management is Authorizable {
 
         // when/then
         bool reverted = false;
-        try rewards.addActivity(activityId, name, emissionRate, allowedCaller) {
+        try rewards.addActivity(activityId, name, ActivityType.Position, emissionRate, allowedCaller) {
             reverted = false;
         } catch {
             reverted = true;
@@ -113,7 +114,7 @@ contract Describe_Rewards_Management is Authorizable {
 
         // when/then
         bool reverted = false;
-        try rewards.addActivity(activityId, name, emissionRate, allowedCaller) {
+        try rewards.addActivity(activityId, name, ActivityType.Position, emissionRate, allowedCaller) {
             reverted = false;
         } catch {
             reverted = true;
@@ -133,13 +134,13 @@ contract Describe_Rewards_Management is Authorizable {
         uint256 emission3 = 300;
 
         // when
-        rewards.addActivity(activity1, "Activity 1", emission1, address(user1));
+        rewards.addActivity(activity1, "Activity 1", ActivityType.Position, emission1, address(user1));
         require(rewards.totalRewardsEmission() == emission1, "Total emission after 1st activity");
 
-        rewards.addActivity(activity2, "Activity 2", emission2, address(user1));
+        rewards.addActivity(activity2, "Activity 2", ActivityType.Position, emission2, address(user1));
         require(rewards.totalRewardsEmission() == emission1 + emission2, "Total emission after 2nd activity");
 
-        rewards.addActivity(activity3, "Activity 3", emission3, address(user1));
+        rewards.addActivity(activity3, "Activity 3", ActivityType.Position, emission3, address(user1));
         require(rewards.totalRewardsEmission() == emission1 + emission2 + emission3, "Total emission after 3rd activity");
     }
 
@@ -153,14 +154,14 @@ contract Describe_Rewards_Management is Authorizable {
         uint256 initialEmission = 100;
         uint256 newEmission = 200;
 
-        rewards.addActivity(activityId, "Activity 1", initialEmission, address(user1));
+        rewards.addActivity(activityId, "Activity 1", ActivityType.Position, initialEmission, address(user1));
         require(rewards.totalRewardsEmission() == initialEmission, "Initial total emission");
 
         // when
         rewards.setEmissionRate(activityId, newEmission);
 
         // then
-        (string memory name, uint256 rate, uint256 accReward, uint256 lastUpdate, uint256 totalStake, address caller) =
+        (string memory name, ActivityType activityType, uint256 rate, uint256 accReward, uint256 lastUpdate, uint256 totalStake, address caller) =
             rewards.activities(activityId);
         require(rate == newEmission, "Emission rate should be updated");
         require(rewards.totalRewardsEmission() == newEmission, "Total emission should be updated");
@@ -173,9 +174,9 @@ contract Describe_Rewards_Management is Authorizable {
         uint256 activity1 = 1;
         uint256 activity2 = 2;
         uint256 activity3 = 3;
-        rewards.addActivity(activity1, "Activity 1", 100, address(user1));
-        rewards.addActivity(activity2, "Activity 2", 200, address(user1));
-        rewards.addActivity(activity3, "Activity 3", 300, address(user1));
+        rewards.addActivity(activity1, "Activity 1", ActivityType.Position, 100, address(user1));
+        rewards.addActivity(activity2, "Activity 2", ActivityType.Position, 200, address(user1));
+        rewards.addActivity(activity3, "Activity 3", ActivityType.Position, 300, address(user1));
 
         require(rewards.totalRewardsEmission() == 600, "Initial total emission");
 
@@ -195,13 +196,13 @@ contract Describe_Rewards_Management is Authorizable {
     function it_should_allow_setting_emission_rate_to_zero() {
         // given
         uint256 activityId = 1;
-        rewards.addActivity(activityId, "Activity 1", 100, address(user1));
+        rewards.addActivity(activityId, "Activity 1", ActivityType.Position, 100, address(user1));
 
         // when
         rewards.setEmissionRate(activityId, 0);
 
         // then
-        (string memory name, uint256 rate, uint256 accReward, uint256 lastUpdate, uint256 totalStake, address caller) =
+        (string memory name, ActivityType activityType, uint256 rate, uint256 accReward, uint256 lastUpdate, uint256 totalStake, address caller) =
             rewards.activities(activityId);
         require(rate == 0, "Emission rate should be 0");
         require(rewards.totalRewardsEmission() == 0, "Total emission should be 0");
@@ -217,13 +218,13 @@ contract Describe_Rewards_Management is Authorizable {
         address initialCaller = address(user1);
         address newCaller = address(user2);
 
-        rewards.addActivity(activityId, "Activity 1", 100, initialCaller);
+        rewards.addActivity(activityId, "Activity 1", ActivityType.Position, 100, initialCaller);
 
         // when
         rewards.setAllowedCaller(activityId, newCaller);
 
         // then
-        (string memory name, uint256 rate, uint256 accReward, uint256 lastUpdate, uint256 totalStake, address caller) =
+        (string memory name, ActivityType activityType, uint256 rate, uint256 accReward, uint256 lastUpdate, uint256 totalStake, address caller) =
             rewards.activities(activityId);
         require(caller == newCaller, "Allowed caller should be updated");
     }
@@ -233,7 +234,7 @@ contract Describe_Rewards_Management is Authorizable {
     function it_should_prevent_setting_allowed_caller_to_zero_address() {
         // given
         uint256 activityId = 1;
-        rewards.addActivity(activityId, "Activity 1", 100, address(user1));
+        rewards.addActivity(activityId, "Activity 1", ActivityType.Position, 100, address(user1));
 
         // when/then
         bool reverted = false;
@@ -255,8 +256,8 @@ contract Describe_Rewards_Management is Authorizable {
 
         // when - user1 tries to add activity
         bool reverted = false;
-        try TestUtils.callAs(user1, address(rewards), "addActivity(uint256, string, uint256, address)",
-            activityId, "Activity 1", 100, address(user1)) {
+        try TestUtils.callAs(user1, address(rewards), "addActivity(uint256, string, uint8, uint256, address)",
+            activityId, "Activity 1", uint8(ActivityType.Position), 100, address(user1)) {
             reverted = false;
         } catch {
             reverted = true;
@@ -269,7 +270,7 @@ contract Describe_Rewards_Management is Authorizable {
     function it_should_prevent_non_owner_from_updating_emission_rate() {
         // given
         uint256 activityId = 1;
-        rewards.addActivity(activityId, "Activity 1", 100, address(user1));
+        rewards.addActivity(activityId, "Activity 1", ActivityType.Position, 100, address(user1));
 
         // when - user1 tries to update emission rate
         bool reverted = false;
@@ -287,7 +288,7 @@ contract Describe_Rewards_Management is Authorizable {
     function it_should_prevent_non_owner_from_updating_allowed_caller() {
         // given
         uint256 activityId = 1;
-        rewards.addActivity(activityId, "Activity 1", 100, address(user1));
+        rewards.addActivity(activityId, "Activity 1", ActivityType.Position, 100, address(user1));
 
         // when - user1 tries to update allowed caller
         bool reverted = false;
