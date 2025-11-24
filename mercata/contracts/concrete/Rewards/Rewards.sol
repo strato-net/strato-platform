@@ -8,7 +8,7 @@ import "../Tokens/Token.sol";
 // DATA STRUCTURES
 // ═════════════════════════════════════════════════════════════════════════
 
-struct UserInfo {
+struct RewardsUserInfo {
     uint256 stake;       // User's effective stake in this activity
     uint256 rewardDebt;  // Reward debt for accounting
 }
@@ -73,8 +73,8 @@ contract record Rewards is Ownable {
     // Total emission rate across all activities (CATA per second)
     uint256 public totalRewardsEmission;
 
-    // User info per activity: activityId => user => UserInfo
-    mapping(uint256 => mapping(address => UserInfo)) public record userInfo;
+    // User info per activity: activityId => user => RewardsUserInfo
+    mapping(uint256 => mapping(address => RewardsUserInfo)) public record userInfo;
 
     // Total unclaimed rewards per user
     mapping(address => uint256) public record unclaimedRewards;
@@ -117,7 +117,6 @@ contract record Rewards is Ownable {
         uint256 emissionRate,
         address allowedCaller
     ) external onlyOwner {
-        require(activities[activityId].lastUpdateTime == 0, "Activity already exists");
         require(allowedCaller != address(0), "Invalid caller address");
         require(bytes(name).length > 0, "Name cannot be empty");
 
@@ -145,7 +144,6 @@ contract record Rewards is Ownable {
      */
     function setEmissionRate(uint256 activityId, uint256 newEmissionRate) external onlyOwner {
         Activity storage activity = activities[activityId];
-        require(activity.lastUpdateTime > 0, "Activity does not exist");
 
         // Update index with old emission rate first
         _updateActivityIndex(activityId);
@@ -166,7 +164,6 @@ contract record Rewards is Ownable {
      */
     function setAllowedCaller(uint256 activityId, address newAllowedCaller) external onlyOwner {
         Activity storage activity = activities[activityId];
-        require(activity.lastUpdateTime > 0, "Activity does not exist");
         require(newAllowedCaller != address(0), "Invalid caller address");
 
         address oldCaller = activity.allowedCaller;
@@ -274,7 +271,7 @@ contract record Rewards is Ownable {
         _updateActivityIndex(activityId);
 
         // 2) Settle user's pending rewards
-        UserInfo storage userState = userInfo[activityId][user];
+        RewardsUserInfo storage userState = userInfo[activityId][user];
         uint256 oldStake = userState.stake;
         uint256 pendingRewards = 0;
 
@@ -316,7 +313,7 @@ contract record Rewards is Ownable {
         _updateActivityIndex(activityId);
 
         Activity storage activity = activities[activityId];
-        UserInfo storage userState = userInfo[activityId][user];
+        RewardsUserInfo storage userState = userInfo[activityId][user];
         uint256 userStake = userState.stake;
 
         if (userStake > 0) {
