@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 import "../../../concrete/Rewards/Rewards.sol";
+import "../access/Ownable.sol";
 
 /**
  * @dev Contract module which allows children to implement reward tracking
@@ -12,16 +13,15 @@ import "../../../concrete/Rewards/Rewards.sol";
  * Note that the Rewards contract must be initialized with the appropriate
  * activity and the contract must be set as the allowed caller for that activity.
  */
-abstract contract Rewardable {
+abstract contract Rewardable is Ownable {
     /// @notice The Rewards contract address (can be zero if rewards are disabled)
     Rewards public rewards;
 
     /**
-     * @dev Set the Rewards contract address
-     * @param rewardsAddr The address of the Rewards contract
+     * @dev Set the Rewards contract address (admin only)
+     * @param rewardsAddr The address of the Rewards contract (address(0) to disable rewards)
      */
-    function _setRewards(address rewardsAddr) internal {
-        require(rewardsAddr != address(0), "Invalid rewards address");
+    function setRewards(address rewardsAddr) public onlyOwner {
         rewards = Rewards(rewardsAddr);
     }
 

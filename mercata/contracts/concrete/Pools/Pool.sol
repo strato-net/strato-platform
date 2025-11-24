@@ -426,19 +426,6 @@ contract record Pool is Ownable, Rewardable {
         zapSwapFeesEnabled = enabled;
     }
 
-    /// @notice Set the Rewards contract address and swap activity ID (factory only)
-    /// @param rewardsAddr The address of the Rewards contract (address(0) to disable rewards)
-    /// @param activityId The activity ID for swap rewards (0 = disable rewards)
-    /// @dev This function can only be called by the PoolFactory contract
-    /// @dev The activity must be registered in the Rewards contract with this pool as the allowed caller
-    function setRewards(address rewardsAddr, uint256 activityId) external onlyPoolFactory {
-        if (rewardsAddr != address(0)) {
-            _setRewards(rewardsAddr);
-        }
-        // If rewardsAddr is address(0), leave rewards as-is (can be set to zero via direct assignment if needed)
-        swapActivityId = activityId;
-    }
-
     // ===========================================================
     // ============ ZAP-IN (SINGLE TOKEN LIQUIDITY) ============
     // ===========================================================
