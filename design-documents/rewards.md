@@ -1,314 +1,142 @@
-This is a design document to implement brand new Rewards contract.
-The contract will replaces existing RewardsChef.
-It will be called Rewards.sol
+# Rewards System - Technical Implementation Guide
 
+## Overview
 
-# RewardsController — Aave-Style Incentives Design
+The Rewards system is a global incentives controller that distributes CATA token rewards to users based on their participation in various protocol activities. The system uses an Aave-style cumulative index pattern to achieve O(1) gas efficiency for all operations.
 
-## 1. Introduction & Goals
+**Key Implementation File:** `mercata/contracts/concrete/Rewards/Rewards.sol`
 
-This document defines the design of the **RewardsController** contract, a central incentives engine responsible for distributing CATA rewards across protocol activities.
+### Core Principles
 
-### Primary goals
+1. **No Asset Custody**: The contract never holds user assets (LP tokens, collateral, etc.) - only CATA rewards and accounting state
+2. **O(1) Operations**: All user interactions are constant time - no loops over users or time periods
+3. **Global Index Pattern**: Uses cumulative reward-per-stake indices for efficient calculation
+4. **Activity-Based**: Each reward stream is an "activity" with independent tracking
+5. **Pre-Funded Model**: Contract must be funded with CATA tokens before users can claim
 
-- **No user staking**: Users do not move LP tokens or any position tokens into the rewards contract.
-- **No asset custody**: The rewards contract holds **no user funds**, only accounting state.
-- **Global incentives controller**: One contract tracks rewards for all incentivized activities.
-- **Simple integration**: Pools / tokens call a single hook on user balance changes.
-- **Gas efficiency**: O(1) accounting updates per user action, no loops over users or epochs.
-- **Scalability**: Support many markets and users without storage/loop blowups.
-- **Auditability**: Simple, well-known pattern (similar to Aave’s Incentives Controller).
-- **Leadership clarity**: Easy to explain: _“We track points for balances over time, and users claim CATA.”_
+## Activity Types
 
-## 2. High-Level Overview
+The system supports two types of activities (see `Rewards.sol:11-14`):
 
-The RewardsController:
+### Position Activities (`ActivityType.Position`)
+- **Use Case**: Ongoing positions where users can increase/decrease participation
+- **Examples**: Liquidity provision, lending supply, borrowing
+- **API**: `deposit(activityId, user, amount)` and `withdraw(activityId, user, amount)`
+- **Behavior**: User stake can go up or down based on position changes
 
-- Tracks a set of **rewarded activities** (e.g. “SwapPool-1 LP”, “LendingPool-USDST Supply”, “Borrow-USDST”, “SafetyModule”).
-- Each activity has:
-  - A **reward emission rate** (CATA per second).
-  - A **global cumulative index** (`accRewardPerStake`) that tracks how much reward has accrued per 1 unit of “effective stake”.
-- Protocol modules (pools, token contracts) **call the controller** whenever a user’s effective stake changes.
-- The controller updates:
-  - The **activity index** (global, lazy-updated).
-  - The **user’s accrued rewards** (`unclaimedRewards[user]`).
-- Users call `claimRewards(...)` to pull CATA from the rewards treasury.
+### OneTime Activities (`ActivityType.OneTime`)
+- **Use Case**: Discrete actions where participation only increases
+- **Examples**: Swap volume tracking, one-time milestones
+- **API**: `occurred(activityId, user, amount)`
+- **Behavior**: User stake only increases (never decreases)
 
-There is **no staking**, **no LP transfer**, and **no need to track per-epoch state**.
+The contract enforces these restrictions at the function level (see `Rewards.sol:240`, `Rewards.sol:255`, `Rewards.sol:270`).
 
-## 3. Core Concepts
+## Architecture
 
-### 3.1 Activity
+### Data Structures
 
-An **Activity** is an abstract source of reward:
-
-- Each activity corresponds to a single reward “stream”:
-  examples:
-  - SwapPool-USDST/ETHST LP
-  - LendingPool-USDST supply
-  - LendingPool-USDST borrow
-  - SafetyModule stake
-  - (Optionally) “Swap volume synthetic stake”
-
-Each activity is identified by `activityId` (`uint256` or `bytes32`).
-
-### 3.2 Effective Stake
-
-For each activity, the pool defines a notion of **effective stake** per user:
-
-- For LP activities → effective stake may be LP token balance or USD-equivalent TVL.
-- For lending supply → amount of mTokens (or normalized principal).
-- For borrowing → amount of debt tokens (can be scaled debt).
-- For safety module → amount staked.
-- For swaps (if included) → could be implemented as:
-  - “sticky stake” (cumulative volume),
-  - or some other simple scheme chosen by the pool.
-
-**Key point:**
-The RewardsController is **agnostic** to the meaning of “stake” — it only sees numbers.
-Integrating the correct business logic happens in the calling pool/token contract.
-
-## 4. Rewards Model
-
-### 4.1 Emission Configuration
-
-Each activity has:
-
-- `emissionRate` — CATA emitted per second to that activity.
-- Optionally, a schedule (time-based change of emission rates). For Phase 0, this can be:
-  - a single constant emission rate, or
-  - a piecewise schedule maintained by admin (changing `emissionRate` at certain timestamps).
-
-We **do not** store per-epoch weights or do epoch loops.
-Epochs, if used, are just **time windows for updating `emissionRate`**, not first-class data structures.
-
-### 4.2 Global Index
-
-Per activity `A`:
-
-- `accRewardPerStake[A]` — cumulative reward per 1 unit of stake (scaled by `1e18`).
-- `lastUpdateTime[A]` — last timestamp when this index was updated.
-- `totalStake[A]` — sum of all users’ effective stakes for this activity.
-
-When reward-relevant time passes, we update:
-
-```text
-dt = now - lastUpdateTime[A]
-if dt > 0 and totalStake[A] > 0:
-    accRewardPerStake[A] += (emissionRate[A] * dt * 1e18) / totalStake[A]
-lastUpdateTime[A] = now
+**Activity** (`Rewards.sol:21-29`)
 ```
-
-This function is called lazily whenever an activity is touched (e.g. on user deposit, withdraw, borrow, repay, or claim).
-
-### 4.3 User State
-
-Per `(activity A, user U)`:
-
-- `userStake[A][U]` — user’s current effective stake in activity A.
-- `userRewardDebt[A][U]` — accounting variable:
-  ```text
-  userRewardDebt = userStake * accRewardPerStake
-  ```
-
-Global per user:
-
-- `unclaimedRewards[U]` — sum of all CATA accrued across all activities, not yet claimed.
-
-## 5. Pool Integration (Rewards Listener Pattern)
-
-Each pool or token responsible for an activity integrates with the RewardsController via a simple hook.
-
-### 5.1 Interface
-
-```solidity
-interface IRewardsController {
-    function handleAction(
-        uint256 activityId,
-        address user,
-        uint256 userNewStake
-    ) external;
+struct Activity {
+    string name;                 // Human-readable identifier
+    ActivityType activityType;   // Position or OneTime
+    uint256 emissionRate;        // CATA tokens per second for this activity
+    uint256 accRewardPerStake;   // Cumulative reward index (scaled by 1e18)
+    uint256 lastUpdateTime;      // Last time index was updated
+    uint256 totalStake;          // Sum of all user stakes (tracked internally)
+    address allowedCaller;       // Only this address can call deposit/withdraw/occurred
 }
 ```
 
-- `activityId` — identifies which activity this state change refers to.
-- `userNewStake` — user's new effective stake after the action.
-
-**Security Note:** `totalStake` is tracked internally by the RewardsController. The controller calculates it as `totalStake = totalStake + userNewStake - userOldStake`, ensuring pools cannot manipulate the total and dilute rewards. This maintains the invariant that `totalStake` always equals the sum of all user stakes.
-
-Each pool stores:
-
-```solidity
-IRewardsController public rewardsController;
-uint256 public activityId; // per pool/activity
+**RewardsUserInfo** (`Rewards.sol:16-19`)
 ```
-
-### 5.2 Example: SwapPool LP
-
-On LP deposit / withdrawal:
-
-```solidity
-function _afterLiquidityChange(address user) internal {
-    uint256 userStake = _getUserEffectiveStake(user);    // e.g. LP balance or USD value
-
-    if (address(rewardsController) != address(0)) {
-        rewardsController.handleAction(activityId, user, userStake);
-    }
+struct RewardsUserInfo {
+    uint256 stake;       // User's effective stake in this activity
+    uint256 rewardDebt;  // Accounting variable for reward calculation
 }
 ```
 
-Same pattern applies to:
+### State Variables
 
-- Lending supply tokens
-- Debt tokens
-- Safety module positions
-- Any other position-like activity
+- `activities[activityId]` - Activity data by ID
+- `userInfo[activityId][user]` - Per-user state for each activity
+- `unclaimedRewards[user]` - Accumulated claimable rewards across all activities
+- `totalRewardsEmission` - Sum of emission rates across all activities
+- `activityIds[]` - Array of all activity IDs for enumeration
 
-For swaps (if modeled as sticky stake), the pool would internally maintain a synthetic stake based on cumulative volume, and call `handleAction` when it changes.
+## Reward Calculation Logic
 
-## 6. handleAction: Core Accounting Logic
+### The Global Index Pattern
 
-Inside RewardsController:
+The system uses a cumulative index to track how much reward has accrued per unit of stake over time. This is the key to O(1) efficiency.
 
-```solidity
-function handleAction(
-    uint256 activityId,
-    address user,
-    uint256 userNewStake
-) external {
-    Activity storage a = activities[activityId];
-
-    // 1) Update global index using CURRENT totalStake (before user update)
-    _updateActivityIndex(activityId, a.totalStake);
-
-    // 2) Settle user's pending rewards
-    uint256 oldStake = userStake[activityId][user];
-    uint256 oldDebt  = userRewardDebt[activityId][user];
-
-    uint256 accumulated = (oldStake * a.accRewardPerStake) / 1e18;
-    uint256 pending     = accumulated - oldDebt;
-
-    if (pending > 0) {
-        unclaimedRewards[user] += pending;
-    }
-
-    // 3) Update user stake and debt
-    userStake[activityId][user]      = userNewStake;
-    userRewardDebt[activityId][user] = (userNewStake * a.accRewardPerStake) / 1e18;
-
-    // 4) Update total stake internally (secure calculation)
-    a.totalStake = a.totalStake + userNewStake - oldStake;
-}
+**Index Update** (see `_updateActivityIndex()` at `Rewards.sol:345-370`):
+```
+Time elapsed: dt = now - lastUpdateTime
+Rewards generated: reward = emissionRate * dt
+Index increment: accRewardPerStake += (reward * 1e18) / totalStake
 ```
 
-Properties:
-
-- O(1) operations per call.
-- No loops over users.
-- No per-epoch structures.
-- Rewards are always proportional to stake × time.
-
-## 7. Claiming Rewards
-
-Users call:
-
-```solidity
-function claimRewards(address user, uint256[] calldata activityIds) external;
+**User Pending Rewards** (calculated in `_handleActivity()` and `_settlePendingRewards()`):
+```
+accumulated = (userStake * accRewardPerStake) / 1e18
+pending = accumulated - rewardDebt
 ```
 
-Implementation:
+The `rewardDebt` tracks what the user has already been credited, so the difference gives new rewards since last update.
 
-1. For each `activityId` in the list:
-   - Call `_updateActivityIndex(activity)` (using current `totalStake`).
-   - Settle pending rewards exactly as in `handleAction`, but without changing `userStake`:
-     ```text
-     accumulated = userStake * accRewardPerStake
-     pending     = accumulated - userRewardDebt
-     ```
-   - Add `pending` to `unclaimedRewards[user]`.
-   - Update `userRewardDebt = userStake * accRewardPerStake`.
+### How Rewards Accrue
 
-2. Sum all pending amounts across activities.
+1. **Index Update**: When any user interacts with an activity, the global index is updated first using the **current** totalStake (before the user's change is applied)
 
-3. Transfer `amount` of CATA from a funding source:
-   - either from the contract’s CATA balance (pre-funded by treasury), or
-   - via minting, if CATA is mintable and controller is minter.
+2. **Settle User Rewards**: Calculate pending rewards using the freshly updated index and add to `unclaimedRewards[user]`
 
-4. Set `unclaimedRewards[user] = 0` (or subtract amount if you allow partial claims).
+3. **Update User State**:
+   - Update user's stake based on the action
+   - Set `rewardDebt = (newStake * accRewardPerStake) / 1e18`
 
-No epochs, no loops over historical periods, just index updates.
+4. **Update Total Stake**: `totalStake = totalStake + newStake - oldStake`
 
-## 8. Administration
+This ensures:
+- Users get credit for rewards accrued before their action
+- The new stake is properly initialized for future accrual
+- Total stake stays consistent (sum of all user stakes)
 
-Admin (e.g. governance) can:
+See `_handleActivity()` implementation at `Rewards.sol:268-313`.
 
-- Add a new activity:
-  - `addActivity(activityId, initialEmissionRate)`
-- Update emission rate:
-  - `setEmissionRate(activityId, newRate)`
-- Update rewardsController address in pools (via their existing admin mechanisms).
-- Fund the RewardsController with CATA from treasury, if using pre-funded model.
+### For Users
 
-Optionally:
+Users interact with activities through pools, then claim rewards:
 
-- Maintain an off-chain schedule (e.g. weekly changes to emission rates),
-  and apply `setEmissionRate` on schedule.
+```solidity
+// Claim from specific activities
+uint256[] memory activityIds = [1, 2, 3];
+rewards.claimRewards(activityIds);
 
-Even if you speak about “epochs” in product docs, **on-chain we only change `emissionRate`**, not store epoch state.
+// Or claim from all activities
+rewards.claimAllRewards();
+```
 
-## 9. Security & Invariants
+Claiming:
+1. Updates indices for specified activities
+2. Settles pending rewards (without changing stakes)
+3. Transfers all `unclaimedRewards[user]` to the user
+4. Resets `unclaimedRewards[user]` to 0
 
-- RewardsController never holds user LP tokens, mTokens, or collateral — only CATA (if pre-funded).
-- Only whitelisted pools/tokens should be allowed to call `handleAction` for their activities (e.g. via `allowedCallers[activityId] = poolAddress`).
-- Arithmetic uses checked math and proper scaling (`1e18` for indices).
-- EmissionRates should be bounded to avoid overflow / excessive emission.
-- **TotalStake integrity**: The controller tracks `totalStake` internally, preventing pools from manipulating totals to dilute rewards. The invariant `totalStake = sum(userStake[i])` is maintained by the controller.
+See `claimRewards()` at `Rewards.sol:188-205` and `claimAllRewards()` at `Rewards.sol:210-227`.
 
-Key invariants:
+## Administration
 
-- For each activity:
-  ```text
-  totalRewardsEmitted ≈ ∫ emissionRate dt
-  totalStake[activityId] = Σ_all_users userStake[activityId][user]
-  ```
-- For each user, across time:
-  ```text
-  totalRewardsClaimed + unclaimedRewards
-       = Σ_over_activities ∫ userStake(t)/totalStake(t) * emissionRate(t) dt
-  ```
+**Owner Functions** (all require `onlyOwner`):
 
-## 10. Properties (Leadership Summary)
+- `addActivity()` - Register new activity (see `Rewards.sol:121-147`)
+- `setEmissionRate()` - Update emission rate for an activity (see `Rewards.sol:154-167`)
+- `setAllowedCaller()` - Change the allowed caller for an activity (see `Rewards.sol:174-182`)
 
-This design satisfies the leadership constraints:
+**Emission Rate Updates**: When updating emission rates, the contract:
+1. Updates the activity index first (with old rate)
+2. Changes the emission rate
+3. Updates `totalRewardsEmission` accordingly
 
-- **No staking**
-  Users never move LP or position tokens into the rewards contract. All assets stay in pools.
-
-- **No LP token transfers in RewardsController**
-  Pools/tokens own balances; RewardsController sees only numbers (stakes).
-
-- **No event-type per-epoch weight tracking**
-  All rewards are computed via `stake × time` using a global cumulative index.
-
-- **No epoch loops**
-  Epochs, if used, only define emission rate changes. There is no per-epoch user state.
-
-- **Clean global incentives controller model**
-  One central contract, per-activity indices, pools call `handleAction` on state changes.
-
-- **Simple pool integration**
-  Each pool adds:
-  - a `rewardsController` address
-  - a small internal hook calling `handleAction` with new stakes.
-
-- **Very gas-efficient**
-  O(1) operations per state change, no loops over users or epochs.
-
-- **Auditor-friendly**
-  Pattern is directly inspired by Aave’s Incentives Controller, which is well known and battle tested.
-
-- **Scalable**
-  Works with many pools and users; state grows linearly with `(activities × active users)` without any per-epoch explosion.
-
-- **Easy to explain**
-  “Pools tell the Rewards contract how much each user has. The Rewards contract tracks how long and how much they’ve had. Users can claim their share of emissions at any time.”
+This ensures a clean transition between emission rates without retroactive changes.
