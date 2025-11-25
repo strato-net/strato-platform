@@ -17,6 +17,10 @@
 {-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
+{-# OPTIONS_GHC -fno-warn-unused-imports #-}
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
+{-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
+
 module Blockchain.Slipstream.Processor
   ( processTheMessages,
     parseActions,
@@ -28,15 +32,21 @@ import BlockApps.Logging
 import qualified BlockApps.SolidVMStorageDecoder as SolidVM
 import BlockApps.Solidity.Value
 import Blockchain.Data.TransactionResult
+import Blockchain.DB.SQLDB
 import Blockchain.Slipstream.Data.Action
+import Blockchain.Slipstream.Data.CirrusTables
 import qualified Blockchain.Slipstream.Events as E
 import Blockchain.Slipstream.OutputData
 import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Stream.Action as Action
 import qualified Blockchain.Stream.VMEvent as VME
 import Conduit
 import Control.Lens ((^.))
-import Control.Monad (forM, forM_, unless, when)
+import Control.Monad (forM, forM_, unless, when, void)
+import Control.Monad.Composable.SQL
+import Control.Monad.Trans.Reader
+import qualified Data.Aeson as JSON
 import Data.Either (lefts, rights)
 import Data.Foldable (toList)
 import Data.Function
@@ -46,10 +56,17 @@ import Data.Maybe
 import Data.Source
 import Data.Text (Text)
 import qualified Data.Text as T
-import SolidVM.Model.CodeCollection hiding (contractName)
+--import Database.Persist
+import Database.Persist.Postgresql
+import Database.Esqueleto.PostgreSQL.JSON
+import qualified Database.Persist.Postgresql as SQL
+import SolidVM.Model.CodeCollection hiding (contractName, Storage)
+import SolidVM.Model.Storable hiding (toList)
 import qualified SolidVM.Model.Type as SVMType
 import Text.Tools (boringBox, multilineLog)
 import Prelude hiding (lookup)
+import Blockchain.Slipstream.SolidityValue
+import           Blockchain.Slipstream.PostgresqlTypedShim
 
 data BatchedInserts = BatchedInserts
   { indexInsert :: E.ProcessedContract
@@ -65,7 +82,7 @@ splitActions :: [AggregateAction] -> [(Address, [AggregateAction])]
 splitActions = partitionWith actionAddress
 
 processedContract ::
-  Map.Map Text Value ->
+  Map.Map StoragePath BasicValue ->
   AggregateAction ->
   E.ProcessedContract
 processedContract state AggregateAction {..} =
@@ -82,8 +99,8 @@ rowToInsert ::
   E.ProcessedContract
 rowToInsert row =
   let newState = case actionStorage row of
-        Action.SolidVMDiff mp -> SolidVM.decodeCacheValues mp
-   in processedContract (Map.fromList $ newState) row
+        Action.SolidVMDiff mp -> mp
+   in processedContract newState row
 
 
 rowToCollections :: AggregateAction -> Map.Map Text Value
@@ -106,7 +123,7 @@ processedContractToProcessedCollectionRows state row =
           ) $ extractValues value
         ) $ Map.toList state
       processRecord (n, t, ks, v) = processedCollectionRow n t row ks v
-   in processRecord <$> recordVMs  
+   in processRecord <$> recordVMs
 
 processedCollectionRow :: Text -> Text -> AggregateAction -> [Value] -> Value ->  ProcessedCollectionRow
 processedCollectionRow collection ttype AggregateAction {..} ks v =
@@ -120,7 +137,7 @@ processedCollectionRow collection ttype AggregateAction {..} ks v =
       blockTimestamp = actionBlockTimestamp,
       blockNumber = actionBlockNumber,
       collectionDataKeys = ks,
-      collectionDataValue = v 
+      collectionDataValue = v
     }
 
 parseActions :: [VME.VMEvent] -> [(Address, [AggregateAction])]
@@ -141,7 +158,7 @@ parseEvents = concatMap parseEvent
           eventBlockTimestamp = Action._blockTimestamp a,
           eventBlockNumber = Action._blockNumber a,
           eventTxSender = Action._transactionSender a,
-          eventEvent = e, 
+          eventEvent = e,
           eventIndex = idx
         }
 
@@ -156,11 +173,13 @@ getCollectionsFromContract = mapMaybe (uncurry filterAndExtract) . Map.toList . 
 
 processTheMessages ::
   ( MonadIO m
+  , HasSQL m
   , MonadLogger m
   ) =>
+  PGConnection ->
   [VME.VMEvent] ->
   ConduitM i (Either TransactionResult [SlipstreamQuery]) m [AggregateEvent]
-processTheMessages messages = do
+processTheMessages conn messages = do
   case length messages of
     0 -> return ()
     1 -> $logInfoS "processTheMessages" "1 message has arrived"
@@ -176,7 +195,7 @@ processTheMessages messages = do
         [Action._delegatecalls a | VME.NewAction a <- messages]
       transactionResults = [tr | VME.NewTransactionResult tr <- messages]
 
-  fkeys <- mapOutput Right . outputDataDedup . fmap concat . forM creates $ \(cc, cr) -> do
+  fkeys <- mapOutput Right . outputData . fmap concat . forM creates $ \(cc, cr) -> do
     $logInfoS "processTheMessages" $ "CodeCollection Added"
     multilineLog "processTheMessages/contracts" $ boringBox $ map show (Map.keys $ cc ^. contracts)
 
@@ -201,9 +220,9 @@ processTheMessages messages = do
           $logWarnS "processTheMessages" $ "Failed to get inherited contracts for " <> T.pack (_contractName c) <> ": " <> T.pack (show err)
           pure []
         Right inheritedContracts -> pure $ map (T.pack . _contractName) inheritedContracts
-      indexFkeys <- createIndexTable c cc nameParts inherited
-      collectionFkeys <- catMaybes <$> traverse (createCollectionTable nameParts c cc inherited) collectionNamesAndTypes
-      eventFkeys <- createExpandEventTables c cc nameParts inherited
+      indexFkeys <- createIndexTable conn c cc nameParts inherited
+      collectionFkeys <- catMaybes <$> traverse (createCollectionTable conn nameParts c cc inherited) collectionNamesAndTypes
+      eventFkeys <- createExpandEventTables conn c cc nameParts inherited
       pure $ indexFkeys ++ collectionFkeys ++ eventFkeys
 
   inserts <- fmap concat $ do
@@ -224,31 +243,45 @@ processTheMessages messages = do
   let insertsByCodeHash = rights inserts
 
   forM_ (rights inserts) $ $logDebugLS "processTheMessages/toInsert"
-  
-  mapOutput Right . outputDataDedup $ do
-    forM_ insertsByCodeHash $ \ins -> do
-      insertIndexTable $ indexInsert ins
-      unless (null $ collectionInserts ins) $
-        insertCollectionTable $ collectionInserts ins
 
-    forM_ delegatecalls insertDelegatecall
+  mapOutput Right . outputData $ do
+    forM_ insertsByCodeHash $ \ins -> do
+--      lift $ insertIndexTable2 $ insertToStorage $ indexInsert ins
+      insertIndexTable conn $ indexInsert ins
+      unless (null $ collectionInserts ins) $
+        insertCollectionTable conn $ collectionInserts ins
+
+    forM_ delegatecalls $ insertDelegatecall conn
 
   let processedEventArrays = concatMap aggEventToCollectionRows events'
 
   when (not (null events')) $ do
-    mapOutput Right . outputData $ pipeInsertGlobalEventTable events'
+    mapOutput Right . outputData $ pipeInsertGlobalEventTable conn events'
     unless (null processedEventArrays) $
-      mapOutput Right . outputData $ insertCollectionTable processedEventArrays
+      mapOutput Right . outputData $ insertCollectionTable conn processedEventArrays
 
   when (not $ null fkeys) $ do
     $logDebugLS "processTheMessages" $ T.pack $ "Updating PostgREST schema cache for " ++ show (length fkeys) ++ " foreign keys"
-    mapOutput Right . outputDataDedup $ createFkeyFunctions fkeys
-    mapOutput Right . outputData $ notifyPostgREST
+    mapOutput Right . outputData $ createFkeyFunctions conn fkeys
+    mapOutput Right . outputData $ notifyPostgREST conn
 
   $logInfoS "processTheMessages" . T.pack $
     "Inserting " ++ show (length transactionResults) ++ " transaction results"
 
-  yieldMany $ Left <$> transactionResults
+  forM_ transactionResults $ \txr -> do
+    void . lift $ putTransactionResult txr
 
   return events'
+{-
+insertToStorage :: E.ProcessedContract -> Storage
+insertToStorage E.ProcessedContract{..} = Storage address blockHash (show blockTimestamp) blockNumber
+                                          (JSONB $ JSON.toJSON contractData)
 
+insertIndexTable2 :: (HasSQLDB m, PersistEntityBackend Storage ~ SqlBackend) =>
+                     Storage -> m ()
+insertIndexTable2 record = do
+--  putTransactionResult processedContract'
+  sqlQuery $ SQL.insertMany [record]
+--  sqlQuery $ insertMany [processedContract']
+  return ()
+-}

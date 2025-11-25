@@ -189,21 +189,6 @@ function newnode {
   if [ -n "${gasLimit}" ]; then
       gasFlag="--gasLimit=${gasLimit}"
   fi
-  if [ -n "${idServerUrl}" ]; then
-      idServer="--identityServerUrl=${idServerUrl}"
-  fi
-  if [ -n "${userRegistryAddress}" ]; then
-      urFlag="--userRegistryAddress=${userRegistryAddress}"
-  fi
-  if [ -n "${userRegistryCodeHash}" ]; then
-      ucFlag="--userRegistryCodeHash=${userRegistryCodeHash}"
-  fi
-  if [ -n "${useBuiltinUserRegistry}" ]; then
-      ubFlag="--useBuiltinUserRegistry=${useBuiltinUserRegistry}"
-  fi
-  if [ -n "${useWalletsByDefault}" ]; then
-      udFlag="--useWalletsByDefault=${useWalletsByDefault}"
-  fi
   if [ -n "${FILE_SERVER_URL}" ]; then
       fsFlag="--fileServerUrl=${FILE_SERVER_URL}"
   fi
@@ -252,11 +237,6 @@ function newnode {
     "${networkFlag}" \
     "${txsFlag}" \
     "${gasFlag}" \
-    "${idServer}" \
-    "${urFlag}" \
-    "${ucFlag}" \
-    "${ubFlag}" \
-    "${udFlag}" \
     "${fsFlag}" \
     "${nsFlag}" \
     "${iFlag}" +RTS -N1 >> logs/strato-api 2>&1

@@ -13,7 +13,7 @@ services:
       - LENDING_REGISTRY=${LENDING_REGISTRY}
       - TOKEN_FACTORY=${TOKEN_FACTORY}
       - ADMIN_REGISTRY=${ADMIN_REGISTRY}
-      - BRIDGE_API_BASE_URL=${BRIDGE_API_BASE_URL}
+      - MERCATA_BRIDGE=${MERCATA_BRIDGE}
       - WAGMI_PROJECT_ID=${WAGMI_PROJECT_ID}
     restart: unless-stopped
     logging:
@@ -26,6 +26,9 @@ services:
       - backend
     build: ./ui
     image: mercata-ui:latest
+    environment:
+      - LUCKY_ORANGE_SITE_ID=${LUCKY_ORANGE_SITE_ID}
+      - GOOGLE_ANALYTICS_ID=${GOOGLE_ANALYTICS_ID}
     restart: unless-stopped
     logging:
       driver: "json-file"

@@ -34,7 +34,7 @@ insertMercataGovernanceContract owner validators admins gi =
     { addressInfo = initialAccounts ++ [govLogicAcct, govStorageAcct],
       codeInfo = initialCode ++ [CodeInfo governanceSrc (Just "MercataGovernance")],
       delegatecalls = M.union (delegatecalls gi) . M.fromList . map (fmap S.singleton) $
-        [ (govStorageAddr, Delegatecall govStorageAddr govLogicAddr "BlockApps" "Mercata" "MercataGovernance")
+        [ (govStorageAddr, Delegatecall govStorageAddr govLogicAddr (Just "BlockApps") "MercataGovernance")
         ]
     }
   where

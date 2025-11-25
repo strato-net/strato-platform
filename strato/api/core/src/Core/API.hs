@@ -38,7 +38,6 @@ import           Blockchain.Strato.Model.Options
 import           Blockchain.Strato.Model.Secp256k1
 import           Control.Monad.Change.Alter
 import           Control.Monad.Change.Modify       (Accessible, Outputs)
-import           Control.Monad.Composable.Identity
 import           Data.Source.Map
 import           Handlers.AccountInfo              hiding (API, server)
 import qualified Handlers.AccountInfo              as Account
@@ -46,7 +45,6 @@ import           Handlers.BlkLast                  hiding (API, server)
 import qualified Handlers.BlkLast                  as BlkLast
 import           Handlers.Block                    hiding (API, server)
 import qualified Handlers.Block                    as Block
-import qualified Handlers.IdentityServerCallback   as Identity
 import           Handlers.Metadata                 hiding (API, server)
 import qualified Handlers.Metadata                 as Metadata
 import qualified Handlers.Peers                    as Peers
@@ -71,7 +69,6 @@ type CoreAPI =
            :<|> Account.CodeAPI
            :<|> BlkLast.API
            :<|> Block.API
-           :<|> Identity.API
            :<|> Metadata.API
            :<|> Peers.API
            :<|> QueuedTransactions.API
@@ -87,7 +84,6 @@ type MonadCoreAPI m =
     MonadLogger m,
     HasPeerDB m,
     Accessible Metadata.UrlMap m,
-    Accessible IdentityData m,
     Accessible [RawTransaction] m,
     Accessible Stats.TransactionCount m,
     Accessible V.PublicKey m,
@@ -109,7 +105,6 @@ coreApiServer =
     :<|> Account.codeServer
     :<|> BlkLast.server
     :<|> Block.server
-    :<|> Identity.server
     :<|> Metadata.server
     :<|> Peers.server
     :<|> QueuedTransactions.server

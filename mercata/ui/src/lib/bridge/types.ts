@@ -44,8 +44,8 @@ export type BridgeContextType = {
   setSelectedMintToken: (token: BridgeToken | null) => void;
   loadNetworksAndTokens: () => Promise<void>;
   // Bridge transaction functions
-  fetchDepositTransactions: (rawParams?: Record<string, string | undefined>) => Promise<BridgeTransactionResponse>;
-  fetchWithdrawTransactions: (rawParams?: Record<string, string | undefined>) => Promise<BridgeTransactionResponse>;
+  fetchDepositTransactions: (rawParams?: Record<string, string | undefined>, context?: string) => Promise<BridgeTransactionResponse>;
+  fetchWithdrawTransactions: (rawParams?: Record<string, string | undefined>, context?: string) => Promise<BridgeTransactionResponse>;
   fetchRedeemableTokens: (chainId: string) => void;
 };
 

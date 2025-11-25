@@ -443,11 +443,17 @@ router.get("/config/:asset", authHandler.authorizeRequest(true), CDPController.g
  * @openapi
  * /cdp/assets:
  *   get:
- *     summary: List supported collateral assets
+ *     summary: List collateral assets (optionally filter by support status)
  *     tags: [CDP]
+ *     parameters:
+ *       - in: query
+ *         name: supported
+ *         schema:
+ *           type: boolean
+ *         description: If true, returns only supported assets (isSupported === true). If false or omitted, returns all assets (including unsupported). Defaults to false (returns all).
  *     responses:
  *       200:
- *         description: Supported asset configurations
+ *         description: Asset configurations. Returns all assets by default, or only supported assets if 'supported=true' query parameter is provided.
  *         content:
  *           application/json:
  *             schema:
@@ -456,7 +462,7 @@ router.get("/config/:asset", authHandler.authorizeRequest(true), CDPController.g
  *                 type: object
  *                 additionalProperties: true
  */
-router.get("/assets", authHandler.authorizeRequest(true), CDPController.getSupportedAssets);
+router.get("/assets", authHandler.authorizeRequest(true), CDPController.getAssets);
 
 /**
  * @openapi
@@ -576,6 +582,37 @@ router.post("/admin/set-collateral-config", authHandler.authorizeRequest(true), 
  *               additionalProperties: true
  */
 router.post("/admin/set-asset-paused", authHandler.authorizeRequest(true), CDPController.setAssetPaused);
+
+/**
+ * @openapi
+ * /cdp/admin/set-asset-supported:
+ *   post:
+ *     summary: Toggle support for a collateral asset (admin)
+ *     tags: [CDP]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - asset
+ *               - supported
+ *             properties:
+ *               asset:
+ *                 type: string
+ *               supported:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: Support toggle transaction result
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               additionalProperties: true
+ */
+router.post("/admin/set-asset-supported", authHandler.authorizeRequest(true), CDPController.setAssetSupported);
 
 /**
  * @openapi
@@ -765,5 +802,63 @@ router.post("/bad-debt/top-up-junior-note", authHandler.authorizeRequest(), CDPC
  *               additionalProperties: true
  */
 router.post("/bad-debt/claim-junior-note", authHandler.authorizeRequest(), CDPController.claimJuniorNote);
+
+/**
+ * @openapi
+ * /cdp/stats:
+ *   get:
+ *     summary: Get aggregated CDP statistics by asset
+ *     tags: [CDP]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: CDP statistics aggregated by asset
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 totalCollateralValueUSD:
+ *                   type: string
+ *                   description: Total collateral value across all CDPs in USD
+ *                 totalDebtUSD:
+ *                   type: string
+ *                   description: Total debt across all CDPs in USD
+ *                 globalCollateralizationRatio:
+ *                   type: number
+ *                   description: Global collateralization ratio as percentage (collateral / debt * 100)
+ *                 assets:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       asset:
+ *                         type: string
+ *                         description: Asset contract address
+ *                       symbol:
+ *                         type: string
+ *                         description: Asset symbol (e.g., WBTC, ETHST)
+ *                       totalCollateral:
+ *                         type: string
+ *                         description: Total collateral amount (raw integer string)
+ *                       totalScaledDebt:
+ *                         type: string
+ *                         description: Total scaled debt amount
+ *                       totalDebtUSD:
+ *                         type: string
+ *                         description: Total debt in USD for this asset
+ *                       collateralValueUSD:
+ *                         type: string
+ *                         description: Total collateral value in USD for this asset
+ *                       collateralizationRatio:
+ *                         type: number
+ *                         description: Collateralization ratio as percentage (collateral / debt * 100)
+ *                       numberOfVaults:
+ *                         type: integer
+ *                         description: Number of vaults for this asset
+ */
+router.get("/stats", authHandler.authorizeRequest(), CDPController.getCDPStats);
+
 
 export default router;

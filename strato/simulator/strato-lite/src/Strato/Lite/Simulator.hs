@@ -49,7 +49,7 @@ import Data.Maybe (isJust)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Traversable (for)
-import Executable.StratoP2PClient 
+import Executable.StratoP2PClient
 import Executable.StratoP2PServer (runEthServerConduit)
 import Strato.Lite.Base
 import Strato.Lite.Base.Simulator
@@ -152,13 +152,13 @@ createSimulatorConnectionWithModifications server'' client'' modifyServerMsgs mo
             30303
           )
   let rServer = runEthServerConduit
-                  clientPPeer             
-                  (sourceTQueue clientToServerTQueue) 
-                  (sinkTQueue serverToClientTQueue)   
+                  clientPPeer
+                  (sourceTQueue clientToServerTQueue)
+                  (sinkTQueue serverToClientTQueue)
                   (sourceTMChan serverSeqSource .| (awaitForever $ yield . modifyServerMsgs))
                   (T.unpack $ "Me: " <> _corePeerName server' <> ", Them: " <> _corePeerName client')
-  let rClient = runEthClientConduit         
-                  serverPPeer   
+  let rClient = runEthClientConduit
+                  serverPPeer
                   (sourceTQueue serverToClientTQueue)
                   (sinkTQueue clientToServerTQueue)
                   (sourceTMChan clientSeqSource .| (awaitForever $ yield . modifyClientMsgs))
@@ -196,8 +196,8 @@ createGermophobicSimulatorConnection server'' client'' = do
             30303
           )
   let rServer = pure Nothing -- server is germophobic; will not conduct handshake
-  let rClient = runEthClientConduit         
-                  (serverPPeer $ fst server'')   
+  let rClient = runEthClientConduit
+                  (serverPPeer $ fst server'')
                   (sourceTQueue serverToClientTQueue)
                   (sinkTQueue clientToServerTQueue)
                   (sourceTMChan clientSeqSource)

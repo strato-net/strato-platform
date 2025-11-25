@@ -6,6 +6,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 module Blockchain.Init.Generator (
+  createGenesisInfo,
   mkAll
   ) where
 
@@ -46,7 +47,7 @@ import UnliftIO.Directory
 
 createGenesisInfo :: MonadIO m => String -> m ()
 createGenesisInfo network = do
-  let genesisInfo = 
+  let genesisInfo =
         case network of
           "upquark" -> HELIUM.genesisBlockTemplate config
             where config = HELIUM.HeliumGenesisBlockConfig
@@ -80,7 +81,7 @@ createGenesisInfo network = do
   liftIO $ putStrLn $ "Done. Output genesis block info was written"
 
 createCommandsFile :: IO ()
-createCommandsFile = 
+createCommandsFile =
   writeFile "commands.txt" [r|ethereum-discover +RTS -T -RTS
 
 strato-p2p --averageTxsPerBlock=40 --connectionTimeout=3600 --debugFail=true --maxConn=1000 --maxReturnedHeaders=500 --networkID=-1 --sqlPeers=true --minLogLevel=LevelInfo --network=helium +RTS -T -RTS

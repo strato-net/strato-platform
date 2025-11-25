@@ -36,21 +36,21 @@ barGraph config = do
       height = 200 :: Double
       width = 300 :: Double
       barWidth = 25 :: Double
-  
+
   elAttr "div" (Map.singleton "class" "bar-graph") $ do
     -- Graph title
     el "h3" $ text (bgLabel config)
-    
+
     -- Graph container
     elSvgAttr "svg" (Map.fromList
       [ ("width", T.pack $ show width)
       , ("height", T.pack $ show height)
       , ("id", bgIdentifier config)
       ]) $ do
-      
+
       -- Draw bars
       sequence_ $ zipWith (drawBar height width barWidth maxValue) [0..] (bgData config)
-      
+
       -- Add units if specified
       case bgUnits config of
         Just units -> do
@@ -76,7 +76,7 @@ drawBar totalHeight _ barWidth maxValue index val = do
         then 0
         else (val / maxValue) * totalHeight
       y = totalHeight - barHeight
-  
+
   elSvgAttr "rect" (Map.fromList
     [ ("x", T.pack $ show x)
     , ("y", T.pack $ show y)
@@ -84,10 +84,10 @@ drawBar totalHeight _ barWidth maxValue index val = do
     , ("height", T.pack $ show barHeight)
     , ("class", "bar")
     ]) $ return ()
-  
+
   -- Add value label
   elSvgAttr "text" (Map.fromList
     [ ("x", T.pack $ show (x + barWidth/2))
     , ("y", T.pack $ show (y - 5))
     , ("class", "value")
-    ]) $ text (T.pack $ show val) 
+    ]) $ text (T.pack $ show val)

@@ -271,7 +271,7 @@ instance Binary WrappedDecimal where
     put (WrappedDecimal (Decimal places mantissa)) = do
         put places
         put mantissa
-    
+
     get = do
         places <- get
         mantissa <- get

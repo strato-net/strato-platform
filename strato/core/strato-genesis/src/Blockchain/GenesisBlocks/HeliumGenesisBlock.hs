@@ -410,7 +410,7 @@ wbtc = BridgeAssetInfo
   0x29f2d40b0605204364af54ec677bd022da425d03
   0
   0x7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9
-  
+
 
 paxg :: BridgeAssetInfo
 paxg = BridgeAssetInfo
@@ -557,36 +557,36 @@ genesisBlockTemplate HeliumGenesisBlockConfig{..} =
              , safetyModuleEvents
              ],
         delegatecalls = M.fromList . map (fmap S.singleton) $
-          ((\t -> (GA.root t, Delegatecall (GA.root t) tokenImplAddress "BlockApps" "Mercata" "Token")) <$> GA.assets)
-          ++ [ (rateStrategyAddress, Delegatecall rateStrategyAddress rateStrategyImplAddress "BlockApps" "Mercata" "RateStrategy")
-             , (priceOracleAddress, Delegatecall priceOracleAddress priceOracleImplAddress "BlockApps" "Mercata" "PriceOracle")
-             , (collateralVaultAddress, Delegatecall collateralVaultAddress collateralVaultImplAddress "BlockApps" "Mercata" "CollateralVault")
-             , (liquidityPoolAddress, Delegatecall liquidityPoolAddress liquidityPoolImplAddress "BlockApps" "Mercata" "LiquidityPool")
-             , (lendingPoolAddress, Delegatecall lendingPoolAddress lendingPoolImplAddress "BlockApps" "Mercata" "LendingPool")
-             , (poolConfiguratorAddress, Delegatecall poolConfiguratorAddress poolConfiguratorImplAddress "BlockApps" "Mercata" "PoolConfigurator")
-             , (lendingRegistryAddress, Delegatecall lendingRegistryAddress lendingRegistryImplAddress "BlockApps" "Mercata" "LendingRegistry")
-             , (mercataBridgeAddress, Delegatecall mercataBridgeAddress mercataBridgeImplAddress "BlockApps" "Mercata" "MercataBridge")
-             , (poolFactoryAddress, Delegatecall poolFactoryAddress poolFactoryImplAddress "BlockApps" "Mercata" "PoolFactory")
-             , (tokenFactoryAddress, Delegatecall tokenFactoryAddress tokenFactoryImplAddress "BlockApps" "Mercata" "TokenFactory")
-             , (adminRegistryAddress, Delegatecall adminRegistryAddress adminRegistryImplAddress "BlockApps" "Mercata" "AdminRegistry")
-             , (feeCollectorAddress, Delegatecall feeCollectorAddress feeCollectorImplAddress "BlockApps" "Mercata" "FeeCollector")
-             , (voucherAddress, Delegatecall voucherAddress voucherImplAddress "BlockApps" "Mercata" "Voucher")
-             , (mTokenAddress, Delegatecall mTokenAddress tokenImplAddress "BlockApps" "Mercata" "Token")
-             , (cdpEngineAddress, Delegatecall cdpEngineAddress cdpEngineImplAddress "BlockApps" "Mercata" "CDPEngine")
-             , (cdpRegistryAddress, Delegatecall cdpRegistryAddress cdpRegistryImplAddress "BlockApps" "Mercata" "CDPRegistry")
-             , (cdpVaultAddress, Delegatecall cdpVaultAddress cdpVaultImplAddress "BlockApps" "Mercata" "CDPVault")
-             , (cdpReserveAddress, Delegatecall cdpReserveAddress cdpReserveImplAddress "BlockApps" "Mercata" "CDPReserve")
-             , (safetyModuleAddress, Delegatecall safetyModuleAddress safetyModuleImplAddress "BlockApps" "Mercata" "SafetyModule")
-             , (rewardsChefAddress, Delegatecall rewardsChefAddress rewardsChefImplAddress "BlockApps" "Mercata" "RewardsChef")
-             , (sUsdstAddress, Delegatecall sUsdstAddress tokenImplAddress "BlockApps" "Mercata" "Token")
-             , (ethstPoolAddress, Delegatecall ethstPoolAddress poolImplAddress "BlockApps" "Mercata" "Pool")
-             , (ethstLpTokenAddress, Delegatecall ethstLpTokenAddress tokenImplAddress "BlockApps" "Mercata" "Token")
-             , (wbtcstPoolAddress, Delegatecall wbtcstPoolAddress poolImplAddress "BlockApps" "Mercata" "Pool")
-             , (wbtcstLpTokenAddress, Delegatecall wbtcstLpTokenAddress tokenImplAddress "BlockApps" "Mercata" "Token")
-             , (goldstPoolAddress, Delegatecall goldstPoolAddress poolImplAddress "BlockApps" "Mercata" "Pool")
-             , (goldstLpTokenAddress, Delegatecall goldstLpTokenAddress tokenImplAddress "BlockApps" "Mercata" "Token")
-             , (silvstPoolAddress, Delegatecall silvstPoolAddress poolImplAddress "BlockApps" "Mercata" "Pool")
-             , (silvstLpTokenAddress, Delegatecall silvstLpTokenAddress tokenImplAddress "BlockApps" "Mercata" "Token")
+          ((\t -> (GA.root t, Delegatecall (GA.root t) tokenImplAddress (Just "BlockApps") "Token")) <$> GA.assets)
+          ++ [ (rateStrategyAddress, Delegatecall rateStrategyAddress rateStrategyImplAddress (Just "BlockApps") "RateStrategy")
+             , (priceOracleAddress, Delegatecall priceOracleAddress priceOracleImplAddress (Just "BlockApps") "PriceOracle")
+             , (collateralVaultAddress, Delegatecall collateralVaultAddress collateralVaultImplAddress (Just "BlockApps") "CollateralVault")
+             , (liquidityPoolAddress, Delegatecall liquidityPoolAddress liquidityPoolImplAddress (Just "BlockApps") "LiquidityPool")
+             , (lendingPoolAddress, Delegatecall lendingPoolAddress lendingPoolImplAddress (Just "BlockApps") "LendingPool")
+             , (poolConfiguratorAddress, Delegatecall poolConfiguratorAddress poolConfiguratorImplAddress (Just "BlockApps") "PoolConfigurator")
+             , (lendingRegistryAddress, Delegatecall lendingRegistryAddress lendingRegistryImplAddress (Just "BlockApps") "LendingRegistry")
+             , (mercataBridgeAddress, Delegatecall mercataBridgeAddress mercataBridgeImplAddress (Just "BlockApps") "MercataBridge")
+             , (poolFactoryAddress, Delegatecall poolFactoryAddress poolFactoryImplAddress (Just "BlockApps") "PoolFactory")
+             , (tokenFactoryAddress, Delegatecall tokenFactoryAddress tokenFactoryImplAddress (Just "BlockApps") "TokenFactory")
+             , (adminRegistryAddress, Delegatecall adminRegistryAddress adminRegistryImplAddress (Just "BlockApps") "AdminRegistry")
+             , (feeCollectorAddress, Delegatecall feeCollectorAddress feeCollectorImplAddress (Just "BlockApps") "FeeCollector")
+             , (voucherAddress, Delegatecall voucherAddress voucherImplAddress (Just "BlockApps") "Voucher")
+             , (mTokenAddress, Delegatecall mTokenAddress tokenImplAddress (Just "BlockApps") "Token")
+             , (cdpEngineAddress, Delegatecall cdpEngineAddress cdpEngineImplAddress (Just "BlockApps") "CDPEngine")
+             , (cdpRegistryAddress, Delegatecall cdpRegistryAddress cdpRegistryImplAddress (Just "BlockApps") "CDPRegistry")
+             , (cdpVaultAddress, Delegatecall cdpVaultAddress cdpVaultImplAddress (Just "BlockApps") "CDPVault")
+             , (cdpReserveAddress, Delegatecall cdpReserveAddress cdpReserveImplAddress (Just "BlockApps") "CDPReserve")
+             , (safetyModuleAddress, Delegatecall safetyModuleAddress safetyModuleImplAddress (Just "BlockApps") "SafetyModule")
+             , (rewardsChefAddress, Delegatecall rewardsChefAddress rewardsChefImplAddress (Just "BlockApps") "RewardsChef")
+             , (sUsdstAddress, Delegatecall sUsdstAddress tokenImplAddress (Just "BlockApps") "Token")
+             , (ethstPoolAddress, Delegatecall ethstPoolAddress poolImplAddress (Just "BlockApps") "Pool")
+             , (ethstLpTokenAddress, Delegatecall ethstLpTokenAddress tokenImplAddress (Just "BlockApps") "Token")
+             , (wbtcstPoolAddress, Delegatecall wbtcstPoolAddress poolImplAddress (Just "BlockApps") "Pool")
+             , (wbtcstLpTokenAddress, Delegatecall wbtcstLpTokenAddress tokenImplAddress (Just "BlockApps") "Token")
+             , (goldstPoolAddress, Delegatecall goldstPoolAddress poolImplAddress (Just "BlockApps") "Pool")
+             , (goldstLpTokenAddress, Delegatecall goldstLpTokenAddress tokenImplAddress (Just "BlockApps") "Token")
+             , (silvstPoolAddress, Delegatecall silvstPoolAddress poolImplAddress (Just "BlockApps") "Pool")
+             , (silvstLpTokenAddress, Delegatecall silvstLpTokenAddress tokenImplAddress (Just "BlockApps") "Token")
              ]
         }
 

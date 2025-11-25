@@ -31,7 +31,7 @@ services:
       - LENDING_REGISTRY=${LENDING_REGISTRY}
       - TOKEN_FACTORY=${TOKEN_FACTORY}
       - ADMIN_REGISTRY=${ADMIN_REGISTRY}
-      - BRIDGE_API_BASE_URL=${BRIDGE_API_BASE_URL}
+      - MERCATA_BRIDGE=${MERCATA_BRIDGE}
       - WAGMI_PROJECT_ID=${WAGMI_PROJECT_ID}
     restart: unless-stopped
     logging:
@@ -44,6 +44,9 @@ services:
       - mercata-backend
     build: ./mercata/ui
     image: ${MERCATAUI_IMAGE:-<REPO_URL>mercata-ui:<VERSION>}
+    environment:
+      - LUCKY_ORANGE_SITE_ID=${LUCKY_ORANGE_SITE_ID}
+      - GOOGLE_ANALYTICS_ID=${GOOGLE_ANALYTICS_ID}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -128,7 +131,6 @@ services:
     - FULL_DEBUG_LOG=${FULL_DEBUG_LOG:-false}
     - gasLimit=${gasLimit}
     - generateKey=${generateKey:-true}
-    # - idServerUrl=${idServerUrl}
     - INSTRUMENTATION=${INSTRUMENTATION:-false}
     - kafkaHost=kafka
     - kafkaPort=9092
@@ -173,11 +175,7 @@ services:
     - svmDev=${svmDev}
     - test_mode_bypass_blockstanbul=${test_mode_bypass_blockstanbul:-false} \
     - txSizeLimit=${txSizeLimit}
-    - userRegistryAddress=${userRegistryAddress}
-    - userRegistryCodeHash=${userRegistryCodeHash}
-    - useBuiltinUserRegistry=${useBuiltinUserRegistry}
     - useCustomGenesis=${useCustomGenesis}
-    - useWalletsByDefault=${useWalletsByDefault}
     - VAULT_URL=${VAULT_URL}
     - VAULT_PROXY_DEBUG=${VAULT_PROXY_DEBUG}
     - VM_DEBUGGER=${VM_DEBUGGER}
@@ -292,7 +290,7 @@ services:
         max-size: "100m"
         max-file: "3"
   zookeeper:
-    image: zookeeper:3.4.14
+    image: zookeeper:3.9.3
     restart: unless-stopped
     volumes:
       - zookeeperdata:/data

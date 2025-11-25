@@ -20,7 +20,7 @@ module Blockchain.Sequencer (
   ) where
 
 import BlockApps.Logging
-import Blockchain.Blockstanbul 
+import Blockchain.Blockstanbul
 import Blockchain.Data.BlockHeader
 import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Data.TransactionDef as TD
@@ -127,7 +127,7 @@ unseqEventHandler events = do
       record t k num = do
         liftIO $ withLabel eventsplitMetrics t (flip unsafeAddCounter . fromIntegral $ num)
         $logInfoS "splitEvents" . T.pack $ printf "Running %d %s" num k
-        
+
   let blocks = [b | IEBlock b <- events]
 
   when (not $ null blocks) $ record "inevent_type_block" "IngestBlocks" (length blocks)
@@ -283,7 +283,7 @@ transformFullTransactions pairs = do
             P.incCounter seqTxsUnwitnessed
             return $ Just (ts, otx)
 
-            
+
   let txs = catMaybes mOtxs
   lift . logF $ "Sending " ++ show (length txs) ++ " public transactions to P2P and the VM"
   yield . Right $ map pairToVmTx txs

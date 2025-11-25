@@ -33,10 +33,6 @@ packages:
 - highway/client
 - highway/server
 
-- identity-provider/api
-#- identity-provider/server
-- identity-provider/client
-
 - indexer/slipstream
 - indexer/strato-index
 
@@ -49,7 +45,6 @@ packages:
 - libs/composable-monads/kafka-monad
 - libs/composable-monads/redis-monad
 - libs/composable-monads/sql-monad
-- libs/composable-monads/identity-monad
 - libs/composable-monads/notification-monad
 - libs/composable-monads/vault-monad
 - libs/ethereum-rlp
@@ -75,7 +70,6 @@ packages:
 - tools/convoke
 - tools/debugger-tools
 - tools/process-monitor
-#- tools/x509-tools
 
 - vault/api
 - vault/client
@@ -125,6 +119,7 @@ extra-deps:
 - git: https://github.com/sdiehl/elliptic-curve
   commit: 445e196a550e36e0f25bd4d9d6a38676b4cf2be8
 
+#- gi-gtk-3.0.44                                                                                                    #macos
 #- gi-javascriptcore-4.0.29@sha256:7bb28449655efa0774e530969ad594ee0caa36b4772d900e31ffca4a7dab260b,905             #macos
 #- gi-javascriptcore4-4.0.29@sha256:3ea53cdb3d7bb2b36916ca47a66ede923a5579e6d2c62bfc15585fc5f529d0b2,4031           #macos
 #- gi-webkit2-4.0.32@sha256:42356461f28f9ea09fdbbbf166ba3d63638d109b65922610a7a4d89dc6bcc1d1,12728                  #macos

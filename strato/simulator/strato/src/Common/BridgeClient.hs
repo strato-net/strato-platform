@@ -100,7 +100,7 @@ encodeText = T.decodeUtf8 . BL.toStrict . encode
 fetchBridgeState :: IO Double
 fetchBridgeState = do
   mgr <- newManager defaultManagerSettings -- tlsManagerSettings
-  result <- runClientM (getContractsState (ContractName "BitcoinBrige") 0x1234567890 Nothing Nothing Nothing Nothing False) (mkClientEnv mgr blocBaseUrl)
+  result <- runClientM (getContractsState (ContractName "BitcoinBrige") 0x1234567890 Nothing Nothing Nothing False) (mkClientEnv mgr blocBaseUrl)
   case result of
     Left e -> throwIO e
     Right stateMap -> pure $ case M.lookup "balances" stateMap of

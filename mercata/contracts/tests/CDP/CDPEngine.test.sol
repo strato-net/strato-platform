@@ -721,6 +721,232 @@ contract Describe_CDPEngine is Authorizable {
         require(!cdpEngine.globalPaused(), "Engine should be unpaused");
     }
 
+    // // ============ SUPPORTED ASSET TOGGLE TESTS ============
+
+    function it_cdp_engine_can_toggle_supported_asset_and_block_deposit_and_mint() {
+        // Initial deposit should work while supported
+        uint256 initialDeposit = 500e18;
+        require(
+            ERC20(collateralTokenAddress).approve(address(cdpVault), initialDeposit),
+            "Initial collateral approval failed"
+        );
+        cdpEngine.deposit(collateralTokenAddress, initialDeposit);
+
+        // Disable support for the asset
+        cdpEngine.setSupportedAsset(collateralTokenAddress, false);
+
+        // Deposit should revert when unsupported
+        bool depositReverted = false;
+        try {
+            cdpEngine.deposit(collateralTokenAddress, 1e18);
+        } catch {
+            depositReverted = true;
+        }
+        require(depositReverted, "Deposit should be blocked when asset unsupported");
+
+        // Mint should revert when unsupported
+        bool mintReverted = false;
+        try {
+            cdpEngine.mint(collateralTokenAddress, 1e18);
+        } catch {
+            mintReverted = true;
+        }
+        require(mintReverted, "Mint should be blocked when asset unsupported");
+
+        // Re-enable support and verify deposit works again
+        cdpEngine.setSupportedAsset(collateralTokenAddress, true);
+        require(
+            ERC20(collateralTokenAddress).approve(address(cdpVault), 1e18),
+            "Re-enable: collateral approval failed"
+        );
+        cdpEngine.deposit(collateralTokenAddress, 1e18);
+    }
+
+    function it_cdp_engine_toggle_supported_asset_blocks_withdraw_and_repay_until_reenabled() {
+        // Setup: deposit and mint while supported
+        uint256 depositAmount = 1000e18;
+        uint256 mintAmount = 100e18;
+        require(
+            ERC20(collateralTokenAddress).approve(address(cdpVault), depositAmount),
+            "Collateral approval failed"
+        );
+        cdpEngine.deposit(collateralTokenAddress, depositAmount);
+        cdpEngine.mint(collateralTokenAddress, mintAmount);
+
+        // Disable support for the asset
+        cdpEngine.setSupportedAsset(collateralTokenAddress, false);
+
+        // Withdraw should revert when unsupported
+        bool withdrawReverted = false;
+        try {
+            cdpEngine.withdraw(collateralTokenAddress, 1e18);
+        } catch {
+            withdrawReverted = true;
+        }
+        require(withdrawReverted, "Withdraw should be blocked when asset unsupported");
+
+        // Repay should revert when unsupported
+        require(
+            ERC20(usdstAddress).approve(address(cdpEngine), 1e18),
+            "USDST approval failed"
+        );
+        bool repayReverted = false;
+        try {
+            cdpEngine.repay(collateralTokenAddress, 1e18);
+        } catch {
+            repayReverted = true;
+        }
+        require(repayReverted, "Repay should be blocked when asset unsupported");
+
+        // Re-enable support; operations should succeed again
+        cdpEngine.setSupportedAsset(collateralTokenAddress, true);
+        require(
+            ERC20(usdstAddress).approve(address(cdpEngine), 1e18),
+            "USDST re-approval failed"
+        );
+        cdpEngine.repay(collateralTokenAddress, 1e18);
+        cdpEngine.withdraw(collateralTokenAddress, 1e18);
+    }
+
+    function it_cdp_engine_blocks_mintMax_when_unsupported_and_allows_after_reenable() {
+        // Setup: deposit while supported
+        uint256 depositAmount = 2000e18;
+        require(
+            ERC20(collateralTokenAddress).approve(address(cdpVault), depositAmount),
+            "Collateral approval failed"
+        );
+        cdpEngine.deposit(collateralTokenAddress, depositAmount);
+
+        // Disable support
+        cdpEngine.setSupportedAsset(collateralTokenAddress, false);
+
+        // mintMax should revert when unsupported
+        bool mintMaxReverted = false;
+        try {
+            cdpEngine.mintMax(collateralTokenAddress);
+        } catch {
+            mintMaxReverted = true;
+        }
+        require(mintMaxReverted, "mintMax should be blocked when asset unsupported");
+
+        // Re-enable and verify mintMax works
+        cdpEngine.setSupportedAsset(collateralTokenAddress, true);
+        uint256 minted = cdpEngine.mintMax(collateralTokenAddress);
+        require(minted > 0, "mintMax should succeed when re-enabled");
+    }
+
+    function it_cdp_engine_blocks_withdrawMax_when_unsupported_and_allows_after_reenable() {
+        // Setup: deposit while supported (no debt)
+        uint256 depositAmount = 1000e18;
+        require(
+            ERC20(collateralTokenAddress).approve(address(cdpVault), depositAmount),
+            "Collateral approval failed"
+        );
+        cdpEngine.deposit(collateralTokenAddress, depositAmount);
+
+        // Disable support
+        cdpEngine.setSupportedAsset(collateralTokenAddress, false);
+
+        // withdrawMax should revert when unsupported
+        bool withdrawMaxReverted = false;
+        try {
+            cdpEngine.withdrawMax(collateralTokenAddress);
+        } catch {
+            withdrawMaxReverted = true;
+        }
+        require(withdrawMaxReverted, "withdrawMax should be blocked when asset unsupported");
+
+        // Re-enable and verify withdrawMax returns full deposit (no debt case)
+        cdpEngine.setSupportedAsset(collateralTokenAddress, true);
+        uint256 withdrawn = cdpEngine.withdrawMax(collateralTokenAddress);
+        require(withdrawn == depositAmount, "withdrawMax should withdraw all when re-enabled and no debt");
+    }
+
+    function it_cdp_engine_blocks_repayAll_when_unsupported_and_allows_after_reenable() {
+        // Setup: deposit and mint while supported
+        uint256 depositAmount = 2000e18;
+        uint256 mintAmount = 1000e18;
+        require(
+            ERC20(collateralTokenAddress).approve(address(cdpVault), depositAmount),
+            "Collateral approval failed"
+        );
+        cdpEngine.deposit(collateralTokenAddress, depositAmount);
+        cdpEngine.mint(collateralTokenAddress, mintAmount);
+
+        // Disable support
+        cdpEngine.setSupportedAsset(collateralTokenAddress, false);
+
+        // repayAll should revert when unsupported
+        bool repayAllReverted = false;
+        try {
+            cdpEngine.repayAll(collateralTokenAddress);
+        } catch {
+            repayAllReverted = true;
+        }
+        require(repayAllReverted, "repayAll should be blocked when asset unsupported");
+
+        // Re-enable and verify repayAll works
+        cdpEngine.setSupportedAsset(collateralTokenAddress, true);
+        require(
+            ERC20(usdstAddress).approve(address(cdpEngine), mintAmount + 100e18),
+            "USDST approval failed"
+        );
+        cdpEngine.repayAll(collateralTokenAddress);
+        (, uint256 sdAfter) = cdpEngine.vaults(address(this), collateralTokenAddress);
+        require(sdAfter == 0, "Debt should be fully repaid after re-enable");
+    }
+
+    function it_cdp_engine_blocks_liquidate_when_unsupported_and_allows_after_reenable() {
+        // Setup: UserB creates a position
+        uint256 depositAmount = 2000e18; // $10,000 at $5
+        uint256 mintAmount = 6000e18;    // 166% CR initially
+        userB.do(collateralTokenAddress, "approve", address(cdpVault), depositAmount);
+        userB.do(address(cdpEngine), "deposit", collateralTokenAddress, depositAmount);
+        userB.do(address(cdpEngine), "mint", collateralTokenAddress, mintAmount);
+
+        // Make the position unsafe
+        uint256 currentPrice = priceOracle.getAssetPrice(collateralTokenAddress);
+        uint256 newPrice = (currentPrice * 3) / 10; // drop to $1.5 (70% drop)
+        priceOracle.setAssetPrice(collateralTokenAddress, newPrice);
+
+        // Disable support
+        cdpEngine.setSupportedAsset(collateralTokenAddress, false);
+
+        // Liquidation should revert when unsupported
+        bool liquidationReverted = false;
+        try {
+            userA.do(address(cdpEngine), "liquidate", collateralTokenAddress, address(userB), 1000e18);
+        } catch {
+            liquidationReverted = true;
+        }
+        require(liquidationReverted, "Liquidate should be blocked when asset unsupported");
+
+        // Re-enable and verify liquidation proceeds
+        cdpEngine.setSupportedAsset(collateralTokenAddress, true);
+        ( , uint256 debtBefore) = cdpEngine.vaults(address(userB), collateralTokenAddress);
+        userA.do(address(cdpEngine), "liquidate", collateralTokenAddress, address(userB), 1000e18);
+        ( , uint256 debtAfter) = cdpEngine.vaults(address(userB), collateralTokenAddress);
+        require(debtAfter < debtBefore, "Debt should decrease after liquidation when re-enabled");
+    }
+
+    function it_cdp_engine_setSupportedAsset_is_onlyOwner() {
+        // Non-owner attempt should revert
+        bool reverted = false;
+        try {
+            userA.do(address(cdpEngine), "setSupportedAsset", collateralTokenAddress, false);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Non-owner should not be able to setSupportedAsset");
+
+        // Owner can call successfully
+        cdpEngine.setSupportedAsset(collateralTokenAddress, false);
+        require(!cdpEngine.isSupportedAsset(collateralTokenAddress), "Owner call should succeed");
+        // Re-enable for cleanliness
+        cdpEngine.setSupportedAsset(collateralTokenAddress, true);
+        require(cdpEngine.isSupportedAsset(collateralTokenAddress), "Asset should be re-enabled");
+    }
+
     // ============ LIQUIDATION TESTS ============
 
     function it_cdp_engine_can_liquidate_unhealthy_position() {

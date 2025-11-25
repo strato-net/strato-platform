@@ -93,8 +93,8 @@ type GetSwapPoolByAddress = Capture "address" Text :> Get '[JSON] Value
 type GetAllSwapPools = Get '[JSON] Value
 type PostSwapPool = ReqBody '[JSON] Value :> Post '[JSON] Value
 type PostSwapPoolAddLiquidity = "addLiquidity" :> ReqBody '[JSON] Value :> Post '[JSON] Value
-type PostSwapPoolRemoveLiquidity = "removeLiquidity" :> ReqBody '[JSON] Value :> Post '[JSON] Value 
-type PostSwapPoolSwap = "swap" :> ReqBody '[JSON] Value :> Post '[JSON] Value 
+type PostSwapPoolRemoveLiquidity = "removeLiquidity" :> ReqBody '[JSON] Value :> Post '[JSON] Value
+type PostSwapPoolSwap = "swap" :> ReqBody '[JSON] Value :> Post '[JSON] Value
 
 type LendingAPI = GetLendingPool
              :<|> GetLendingPoolDepositableTokens

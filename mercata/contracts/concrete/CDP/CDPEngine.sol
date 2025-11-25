@@ -693,6 +693,15 @@ contract record CDPEngine is Ownable {
         emit PausedGlobal(isPaused);
     }
 
+    /** Owner-only: toggle support for a collateral asset (pseudo-remove/add) */
+    /// @param asset The asset to toggle support for.
+    /// @param supported Whether the asset should be supported.
+    /// @dev WARNING: This function can result in financial loss if there are open positions for the asset.
+    function setSupportedAsset(address asset, bool supported) external onlyOwner {
+        require(asset != address(0), "CDPEngine: invalid asset");
+        isSupportedAsset[asset] = supported;
+    }
+
     /**
      * @dev Fixed-point exponentiation (Maker-style), rounding half up.
      * @param x Base in RAY

@@ -17,7 +17,7 @@ contract record SafetyModule is Ownable {
     event Staked(address indexed user, uint assetsIn, uint sharesOut);
     event UnstakeCooldown(address indexed user, uint start, uint end);
     event Redeemed(address indexed user, uint sharesIn, uint assetsOut);
-    event RewardNotified(uint amount);
+    event RewardNotified(address indexed sender, uint amount);
     event ShortfallCovered(uint amount);
     event ParamsUpdated(uint cooldown, uint window, uint maxSlashBps);
     event TokensUpdated(address _asset, address _sToken);
@@ -256,7 +256,26 @@ contract record SafetyModule is Ownable {
         require(delta > 0, "SM:no delta");
         _managedAssets += delta;
 
-        emit RewardNotified(delta);
+        emit RewardNotified(msg.sender, delta);
+    }
+
+    /// @notice Record tokens already transferred by LendingPool during reserve sweep
+    /// @dev Only callable by LendingPool. Validates exact amount arrived by checking delta.
+    /// @param expectedAmount The amount LendingPool intended to transfer
+    /// @param balanceBefore The SafetyModule balance before the transfer
+    function recordTransfer(uint256 expectedAmount, uint256 balanceBefore) external {
+        require(msg.sender == address(lendingPool), "SM: only LendingPool");
+        require(expectedAmount > 0, "SM: zero amount");
+        
+        uint256 balanceAfter = IERC20(asset).balanceOf(address(this));
+        uint256 actualReceived = balanceAfter - balanceBefore;
+        
+        // Validate THIS transaction's delta matches expected
+        require(actualReceived == expectedAmount, "SM: unexpected balance change");
+        
+        _managedAssets += actualReceived;
+        
+        emit RewardNotified(msg.sender, actualReceived);
     }
 
     /// @notice Slash vault to cover protocol shortfall.

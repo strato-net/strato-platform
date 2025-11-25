@@ -23,6 +23,7 @@ import AssetDetail from "./pages/AssetDetail";
 import Pools from "./pages/Pools";
 import ActivityFeed from "./pages/ActivityFeed";
 import NotFound from "./pages/NotFound";
+import MercataStats from "./pages/MercataStats";
 
 // Import dashboard components
 
@@ -224,6 +225,17 @@ const App = () => {
                                     <ProtectedRoute>
                                       <DashboardWrapper>
                                         <BridgeTransactionsPage />
+                                      </DashboardWrapper>
+                                    </ProtectedRoute>
+                                  }
+                                />
+
+                                <Route
+                                  path="/dashboard/stats"
+                                  element={
+                                    <ProtectedRoute>
+                                      <DashboardWrapper>
+                                        <MercataStats />
                                       </DashboardWrapper>
                                     </ProtectedRoute>
                                   }

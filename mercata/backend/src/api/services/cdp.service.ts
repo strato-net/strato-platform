@@ -234,6 +234,40 @@ const isTokenActive = async (
   );
 };
 
+// Helper function to get only active tokens (status === 2) with their info
+const getActiveTokens = async (
+  accessToken: string,
+  tokenAddresses: string[]
+): Promise<Record<string, { symbol: string; decimals: number }>> => {
+  if (tokenAddresses.length === 0) {
+    return {};
+  }
+
+  // Fetch all tokens in parallel
+  const tokenResults = await Promise.all(
+    tokenAddresses.map(async (address) => {
+      const { data } = await cirrus.get(accessToken, `/${Token}`, {
+        params: {
+          address: "eq." + address,
+          select: "_symbol,customDecimals,status",
+        }
+      });
+      return { address, token: data?.[0] };
+    })
+  );
+
+  // Filter for only active tokens (status = '2') and build the map
+  return tokenResults.reduce((map, { address, token }) => {
+    if (token && token.status === '2') {
+      map[address] = {
+        symbol: token._symbol || "UNKNOWN",
+        decimals: token.customDecimals || 18,
+      };
+    }
+    return map;
+  }, {} as Record<string, { symbol: string; decimals: number }>);
+};
+
 
 
 interface VaultData {
@@ -1029,6 +1063,16 @@ export const getAssetConfig = async (
   const config = configEntry.CollateralConfig;
   const tokenInfo = await getTokenInfo(accessToken, asset);
   
+  // Check isSupportedAsset mapping - if asset is not in the mapping, it's disabled (false)
+  // The Cirrus query returns entries with 'key' field (asset address) and 'value' field (boolean)
+  const supportedAssetEntry = registry.cdpEngine.isSupportedAsset?.find(
+    (entry: any) => {
+      const entryKey = entry.key || entry.asset;
+      return entryKey?.toLowerCase() === asset.toLowerCase();
+    }
+  );
+  const isSupported = supportedAssetEntry?.value === true;
+  
   return {
     asset,
     symbol: tokenInfo.symbol,
@@ -1041,39 +1085,102 @@ export const getAssetConfig = async (
     debtCeiling: config.debtCeiling,
     unitScale: config.unitScale,
     isPaused: config.isPaused,
-    isSupported: true,
+    isSupported,
   };
 };
 
+// Get all collateral assets (regardless of support status) - used by admin
+export const getAllCollateralAssets = async (
+  accessToken: string,
+): Promise<AssetConfig[]> => {
+  const [{ data: [registryData] }, { data: symbols }] = await Promise.all([
+    cirrus.get(accessToken, `/${CDPRegistry}`, {
+      params: {
+        select: `cdpEngine:cdpEngine_fkey(collateralConfigs:${CDPEngine}-collateralConfigs(asset:key,CollateralConfig:value),isSupportedAsset:${CDPEngine}-isSupportedAsset!inner(asset:key,value))`,
+        address: `eq.${cdpRegistry}`,
+      },
+    }),
+    cirrus.get(accessToken, `/${Token}`, {
+      params: {
+        select: "address,_symbol",
+        "status": "eq.2",
+      },
+    }),
+  ]);
+
+  const supportedMap = new Map(registryData.cdpEngine.isSupportedAsset.map((a: any) => [a.asset, a.value]));
+  const symbolMap = new Map(symbols.map((s: any) => [s.address, s._symbol]));
+
+  return registryData.cdpEngine.collateralConfigs
+    .filter((config: any) => symbolMap.has(config.asset))
+    .map((config: any) => {
+      const cfg = config.CollateralConfig;
+      return {
+        asset: config.asset,
+        symbol: symbolMap.get(config.asset),
+        liquidationRatio: Number(cfg.liquidationRatio) / Number(WAD) * 100,
+        minCR: Number(cfg.minCR) / Number(WAD) * 100,
+        liquidationPenaltyBps: parseInt(cfg.liquidationPenaltyBps),
+        closeFactorBps: parseInt(cfg.closeFactorBps),
+        stabilityFeeRate: convertStabilityFeeRateToAnnualPercentage(cfg.stabilityFeeRate),
+        debtFloor: cfg.debtFloor,
+        debtCeiling: cfg.debtCeiling,
+        unitScale: cfg.unitScale,
+        isPaused: cfg.isPaused,
+        isSupported: supportedMap.get(config.asset),
+      };
+    });
+};
+
+// Get only supported collateral assets (isSupported === true) - used by user-facing components
 export const getSupportedAssets = async (
   accessToken: string,
-  userAddress: string
 ): Promise<AssetConfig[]> => {
-  const registry = await getCDPRegistry(accessToken, userAddress, {}, "getSupportedAssets");
-  
-  if (!registry?.cdpEngine) {
-    throw new Error("CDP Engine not found");
-  }
-
-  const configEntries = registry.cdpEngine.collateralConfigs || [];
-  if (configEntries.length === 0) return [];
-
-  // Check each asset individually and filter to only active tokens
-  const activeConfigPromises = configEntries.map(async (entry: any) => {
-    const isActive = await isTokenActive(accessToken, entry.asset);
-    return isActive ? entry : null;
-  });
-  
-  const activeConfigEntries = (await Promise.all(activeConfigPromises))
-    .filter((entry: any) => entry !== null);
-
-  // Build asset configs for active tokens
-  const configPromises = activeConfigEntries.map(async (entry: any) => 
-    getAssetConfig(accessToken, userAddress, entry.asset)
+  const { data: [registryData] } = await cirrus.get(
+    accessToken,
+    `/${CDPRegistry}`,
+    {
+      params: {
+        select: `cdpEngine:cdpEngine_fkey(collateralConfigs:${CDPEngine}-collateralConfigs(asset:key,CollateralConfig:value),isSupportedAsset:${CDPEngine}-isSupportedAsset!inner(asset:key,value))`,
+        "cdpEngine.isSupportedAsset.value": "eq.true",
+        address: `eq.${cdpRegistry}`,
+      },
+    }
   );
-  
-  const configs = await Promise.all(configPromises);
-  return configs.filter((config: AssetConfig | null): config is AssetConfig => config !== null);
+
+  const supportedAssetAddresses = registryData.cdpEngine.isSupportedAsset.map(
+    (asset: any) => asset.asset
+  );
+
+  const { data: symbols } = await cirrus.get(accessToken, `/${Token}`, {
+    params: {
+      select: "address,_symbol",
+      "status": "eq.2",
+      address: `in.(${supportedAssetAddresses.join(",")})`,
+    },
+  });
+
+  const symbolMap = new Map(symbols.map((s: any) => [s.address, s._symbol]));
+
+  return registryData.cdpEngine.collateralConfigs
+    .filter((config: any) => symbolMap.has(config.asset))
+    .map((config: any) => {
+      const cfg = config.CollateralConfig;
+      return {
+        asset: config.asset,
+        symbol: symbolMap.get(config.asset),
+        liquidationRatio: Number(cfg.liquidationRatio) / Number(WAD) * 100,
+        minCR: Number(cfg.minCR) / Number(WAD) * 100,
+        liquidationPenaltyBps: parseInt(cfg.liquidationPenaltyBps),
+        closeFactorBps: parseInt(cfg.closeFactorBps),
+        stabilityFeeRate: convertStabilityFeeRateToAnnualPercentage(cfg.stabilityFeeRate),
+        debtFloor: cfg.debtFloor,
+        debtCeiling: cfg.debtCeiling,
+        unitScale: cfg.unitScale,
+        isPaused: cfg.isPaused,
+        isSupported: true,
+      };
+    });
 };
 
 export const getMaxLiquidatable = async (
@@ -1262,6 +1369,33 @@ export const setGlobalPaused = async (
   );
 };
 
+export const setAssetSupported = async (
+  accessToken: string,
+  userAddress: string,
+  body: { asset: string; supported: boolean }
+): Promise<{ status: string; hash: string }> => {
+  const registry = await getCDPRegistry(accessToken, userAddress, {}, "setAssetSupported");
+  
+  if (!registry?.cdpEngine) {
+    throw new Error("CDP Engine not found");
+  }
+
+  const tx: FunctionInput = {
+    contractName: extractContractName(CDPEngine),
+    contractAddress: registry.cdpEngine.address,
+    method: "setSupportedAsset",
+    args: {
+      asset: body.asset,
+      supported: body.supported,
+    },
+  };
+
+  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
+  );
+};
+
 export const getGlobalPaused = async (
   accessToken: string,
   userAddress: string
@@ -1279,8 +1413,8 @@ export const getAllCollateralConfigs = async (
   accessToken: string,
   userAddress: string
 ): Promise<AssetConfig[]> => {
-  // This is the same as getSupportedAssets but with a different name for clarity
-  return getSupportedAssets(accessToken, userAddress);
+  // Return all collateral assets (regardless of support status) for admin view
+  return getAllCollateralAssets(accessToken);
 };
 
 export const getBadDebt = async (
@@ -1686,6 +1820,199 @@ export const topUpJuniorNote = async (
       error: error.response?.data || error.message
     });
     throw new Error("Failed to top up junior note");
+  }
+};
+
+// CDP Stats interface for aggregated data
+interface CDPStatsData {
+  asset: string;
+  symbol: string;
+  totalCollateral: string;
+  totalScaledDebt: string;
+  totalDebtUSD: string;
+  collateralValueUSD: string;
+  collateralizationRatio: number;
+  numberOfVaults: number;
+}
+
+interface CDPStatsResponse {
+  totalCollateralValueUSD: string;
+  totalDebtUSD: string;
+  globalCollateralizationRatio: number;
+  assets: CDPStatsData[];
+}
+
+/**
+ * Get aggregated CDP statistics by asset
+ * Fetches all vaults from CDPEngine and aggregates collateral and debt by asset
+ */
+export const getCDPStats = async (
+  accessToken: string,
+  userAddress: string
+): Promise<CDPStatsResponse> => {
+  try {
+    // Get registry to find CDPEngine address
+    const registry = await getCDPRegistry(accessToken, userAddress, {}, "getCDPStats");
+    
+    if (!registry?.cdpEngine) {
+      throw new Error("CDP Engine not found");
+    }
+    const cdpEngineAddress = registry.cdpEngine.address;
+
+    // Fetch all vaults from CDPEngine
+    const { data: vaults } = await cirrus.get(
+      accessToken,
+      `/${CDPEngine}-vaults`,
+      {
+        params: {
+          select: "user:key,asset:key2,Vault:value",
+          address: `eq.${cdpEngineAddress}`
+        }
+      }
+    );
+
+    if (!vaults || vaults.length === 0) {
+      return {
+        totalCollateralValueUSD: "0",
+        totalDebtUSD: "0",
+        globalCollateralizationRatio: 0,
+        assets: []
+      };
+    }
+
+    // Get all unique assets
+    const uniqueAssets = [...new Set(vaults.map((v: any) => v.asset))] as string[];
+    // Get token info, prices, and configs for all assets in parallel
+    const [tokenInfoMap, priceMap, configMap, globalStateMap] = await Promise.all([
+      // Get only active tokens (status = '2')
+      getActiveTokens(accessToken, uniqueAssets),
+
+      // Get prices from registry
+      Promise.resolve(
+        registry.priceOracle?.prices?.reduce((map: Record<string, string>, p: any) => {
+          map[p.asset] = p.value || "0";
+          return map;
+        }, {}) || {}
+      ),
+
+      // Get configs from registry
+      Promise.resolve(
+        registry.cdpEngine.collateralConfigs?.reduce((map: Record<string, any>, c: any) => {
+          map[c.asset] = c.CollateralConfig;
+          return map;
+        }, {}) || {}
+      ),
+
+      // Get global states from registry
+      Promise.resolve(
+        registry.cdpEngine.collateralGlobalStates?.reduce((map: Record<string, any>, s: any) => {
+          map[s.asset] = s.CollateralGlobalState;
+          return map;
+        }, {}) || {}
+      )
+    ]);
+    // Aggregate vaults by asset
+    const assetStats: Record<string, {
+      collateral: bigint;
+      scaledDebt: bigint;
+      vaultCount: number;
+    }> = {};
+
+    vaults.forEach((vault: any) => {
+      const asset = vault.asset.toLowerCase();
+      const vaultData = vault.Vault || {};
+      
+      // Skip inactive tokens (not in tokenInfoMap means status !== '2')
+      if (!tokenInfoMap[asset]) {
+        return;
+      }
+      
+      if (!assetStats[asset]) {
+        assetStats[asset] = {
+          collateral: 0n,
+          scaledDebt: 0n,
+          vaultCount: 0
+        };
+      }
+
+      assetStats[asset].collateral += BigInt(vaultData.collateral || "0");
+      assetStats[asset].scaledDebt += BigInt(vaultData.scaledDebt || "0");
+      assetStats[asset].vaultCount += 1;
+    });
+
+    // Calculate stats for each asset
+    let totalCollateralValueUSD = 0n;
+    let totalDebtUSD = 0n;
+
+    const assetsData: CDPStatsData[] = await Promise.all(
+      Object.entries(assetStats).map(async ([assetAddress, stats]) => {
+        const tokenInfo = tokenInfoMap[assetAddress];
+        const price = BigInt(priceMap[assetAddress.toLowerCase()] || "0");
+        const config = configMap[assetAddress.toLowerCase()];
+        const globalState = globalStateMap[assetAddress.toLowerCase()];
+
+        // Calculate current debt using rate accumulator
+        const currentRateAccumulator = BigInt(globalState?.rateAccumulator || RAY.toString());
+        const currentDebtUSD = (stats.scaledDebt * currentRateAccumulator) / RAY;
+
+        // Calculate collateral value in USD
+        const unitScale = BigInt(config?.unitScale || WAD.toString());
+        const collateralValueUSD = (stats.collateral * price) / unitScale;
+
+        totalCollateralValueUSD += collateralValueUSD;
+        totalDebtUSD += currentDebtUSD;
+
+        // Calculate collateralization ratio as percentage
+        let collateralizationRatio = 0;
+        if (currentDebtUSD > 0n) {
+          // CR = (collateralValue / debt) * 100
+          collateralizationRatio = Number((collateralValueUSD * WAD) / currentDebtUSD) / Number(WAD) * 100;
+        } else if (collateralValueUSD > 0n) {
+          // If there's collateral but no debt, CR is effectively infinite
+          collateralizationRatio = Number.MAX_SAFE_INTEGER;
+        }
+
+        return {
+          asset: assetAddress,
+          symbol: tokenInfo?.symbol || "UNKNOWN",
+          totalCollateral: stats.collateral.toString(),
+          totalScaledDebt: stats.scaledDebt.toString(),
+          totalDebtUSD: currentDebtUSD.toString(),
+          collateralValueUSD: collateralValueUSD.toString(),
+          collateralizationRatio,
+          numberOfVaults: stats.vaultCount
+        };
+      })
+    );
+
+    // Sort assets by collateral value USD (descending)
+    assetsData.sort((a, b) => {
+      const aValue = BigInt(a.collateralValueUSD);
+      const bValue = BigInt(b.collateralValueUSD);
+      if (aValue > bValue) return -1;
+      if (aValue < bValue) return 1;
+      return 0;
+    });
+
+    // Calculate global collateralization ratio
+    let globalCollateralizationRatio = 0;
+    if (totalDebtUSD > 0n) {
+      globalCollateralizationRatio = Number((totalCollateralValueUSD * WAD) / totalDebtUSD) / Number(WAD) * 100;
+    } else if (totalCollateralValueUSD > 0n) {
+      globalCollateralizationRatio = Number.MAX_SAFE_INTEGER;
+    }
+
+    return {
+      totalCollateralValueUSD: totalCollateralValueUSD.toString(),
+      totalDebtUSD: totalDebtUSD.toString(),
+      globalCollateralizationRatio,
+      assets: assetsData
+    };
+  } catch (error: any) {
+    console.error("Error fetching CDP stats:", {
+      error: error.response?.data || error.message
+    });
+    throw new Error("Failed to fetch CDP statistics");
   }
 };
 
