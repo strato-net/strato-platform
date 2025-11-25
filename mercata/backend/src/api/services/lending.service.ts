@@ -64,12 +64,18 @@ export const getExchangeRateFromCirrus = async (
     const latestEvent = events[0];
     const exchangeRate = latestEvent?.newRate || oneToOne;
 
-    return exchangeRate;
+    return getMTokenExchangeRate(latestEvent).toString();
   } catch (error) {
     console.error(`Error fetching exchange rate from Cirrus for lending pool: `, error);
     return oneToOne;
   }
 };
+
+export const getMTokenExchangeRate = (
+  event: any
+): bigint => {
+  return event?.newRate || (10n ** 18n);
+}
 
 
 /**
