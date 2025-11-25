@@ -112,5 +112,24 @@ router.get("/net-balance-history", authHandler.authorizeRequest(), TokensV2Contr
  */
 router.get("/borrowing-history", authHandler.authorizeRequest(), TokensV2Controller.getBorrowingHistory);
 
+/**
+ * @openapi
+ * /tokens/v2/pool-price-history:
+ *   get:
+ *     summary: Get pool price history for a given pool (v2)
+ *     tags: [Tokens]
+ *     responses:
+ *       200:
+ *         description: Pool price history
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 additionalProperties: true
+ */
+router.get("/pool-price-history/:poolAddress", authHandler.authorizeRequest(), TokensV2Controller.getPoolPriceHistory);
+
 export default router;
 

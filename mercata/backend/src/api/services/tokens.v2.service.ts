@@ -481,3 +481,36 @@ export const getBorrowingHistory = async (
   );
   return balanceHistory.map(({timestamp, data}) => ({timestamp, balance: data.balance}));
 };
+
+export const getPoolPriceHistory = async (
+  accessToken: string,
+  userAddress: string,
+  poolAddress: string,
+  historyParams: HistoryParams,
+): Promise<BalanceSnapshot[]> => {
+  const storageFilters = [
+    `address.eq.${poolAddress}`
+  ]
+
+  const reducer = (data: any, h: StorageHistoryElement): any => {
+    const tokenABalance = parseFloat(h.data.tokenABalance) || 0;
+    const tokenBBalance = parseFloat(h.data.tokenBBalance) || 0;
+    if (tokenABalance === 0) {
+      return { balance: 0.0 };
+    }
+    return { balance: tokenBBalance / tokenABalance };
+  }
+
+  const balanceHistory = await getHistory(
+    accessToken,
+    historyParams,
+    [`address.eq.${poolAddress}`],
+    [],
+    [],
+    { price: 0.0 },
+    reducer,
+    ((s,_) => s),
+    ((s,_) => s)
+  );
+  return balanceHistory.map(({timestamp, data}) => ({timestamp, balance: data.balance}));
+};

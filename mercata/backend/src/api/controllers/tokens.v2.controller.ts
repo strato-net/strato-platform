@@ -5,6 +5,7 @@ import {
   getBorrowingHistory,
   getEarningAssets,
   getNetBalanceHistory,
+  getPoolPriceHistory,
   getTokens
 } from "../services/tokens.v2.service";
 import { validateQueryParams } from "../validators/tokens.validator";
@@ -97,6 +98,25 @@ class TokensV2Controller {
       const historyParams = getHistoryParams(`${query?.duration || '1d'}`, query.end ? `${query.end}` : undefined);
 
       const result = await getBorrowingHistory(accessToken, userAddress, historyParams);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getPoolPriceHistory(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, params, query, address: userAddress } = req;
+
+      const { poolAddress } = params;
+
+      const historyParams = getHistoryParams(`${query?.duration || '1d'}`, query.end ? `${query.end}` : undefined);
+
+      const result = await getPoolPriceHistory(accessToken, userAddress, poolAddress, historyParams);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
