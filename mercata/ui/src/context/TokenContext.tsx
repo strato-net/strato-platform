@@ -28,7 +28,7 @@ type TokenContextType = {
   getUserTokensWithBalance: () => Promise<Token[]>;
   getTransferableTokens: () => Promise<Token[]>;
   getEarningAssets: (showLoading?: boolean) => Promise<void>;
-  getBalanceHistory: (duration?: string, end?: string) => Promise<void>;
+  getBalanceHistory: (duration?: string, end?: string) => Promise<NetBalanceSnapshot[]>;
   loadingEarningAssets: boolean;
   loadingInactiveTokens: boolean;
   createToken: (token: CreateTokenPayload) => Promise<void>;
@@ -225,13 +225,16 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  const getBalanceHistory = useCallback(async (duration: string = '1d', end: string) => {
+  const getBalanceHistory = useCallback(async (duration: string = '1d', end?: string): Promise<NetBalanceSnapshot[]> => {
     setLoading(true);
     try {
       const query = `?duration=${duration}${end ? `&end=${end}` : ''}`;
       const res = await api.get<NetBalanceSnapshot[]>(`/tokens/v2/balance-history${query}`);
-      setBalanceHistory(res.data || []);
+      const data = res.data || [];
+      setBalanceHistory(data);
+      return data;
     } catch (err) {
+      return [];
     } finally {
       setLoading(false);
     }
