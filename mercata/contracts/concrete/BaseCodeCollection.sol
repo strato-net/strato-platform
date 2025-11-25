@@ -20,6 +20,7 @@ import "./Pools/PoolFactory.sol";
 
 //Rewards
 import "./Rewards/RewardsChef.sol";
+import "./Rewards/Rewards.sol";
 
 //Lending
 import "Lending/CollateralVault.sol";
@@ -63,6 +64,7 @@ contract record Mercata is Authorizable {
     CDPReserve public cdpReserve;
     SafetyModule public safetyModule;
     RewardsChef public rewardsChef;
+    Rewards public rewards;
 
     constructor() public {
         // The owner of the implementation contract is ignored in favor of the proxy owner
@@ -147,6 +149,11 @@ contract record Mercata is Authorizable {
         address rewardsChefImpl = address(new RewardsChef(implOwnerIgnored));
         rewardsChef = RewardsChef(address(new Proxy(rewardsChefImpl, this)));
         Ownable(rewardsChef).transferOwnership(address(adminRegistry));
+
+        // Create Rewards (without initialization - to be initialized in tests)
+        address rewardsImpl = address(new Rewards(implOwnerIgnored));
+        rewards = Rewards(address(new Proxy(rewardsImpl, this)));
+        Ownable(rewards).transferOwnership(address(adminRegistry));
 
         // Deploy CDP registry, vault, and engine
         address cdpRegistryImpl = address(new CDPRegistry(implOwnerIgnored));
