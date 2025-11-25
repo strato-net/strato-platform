@@ -85,6 +85,9 @@ contract record Rewards is Ownable {
     // Total unclaimed rewards per user
     mapping(address => uint256) public record unclaimedRewards;
 
+    // Last block number when _handleActivity was called
+    uint256 public lastBlockHandled;
+
     // ═════════════════════════════════════════════════════════════════════════
     // CONSTRUCTOR
     // ═════════════════════════════════════════════════════════════════════════
@@ -345,6 +348,9 @@ contract record Rewards is Ownable {
         // Access control: only allowed caller can update this activity
         require(msg.sender == activity.allowedCaller, "Caller not allowed");
 
+        // Track last block handled
+        lastBlockHandled = block.number;
+
         // 1) Update global index using current totalStake (before user update)
         _updateActivityIndex(activityId);
 
@@ -399,6 +405,9 @@ contract record Rewards is Ownable {
 
         // Access control: only allowed caller can update this activity
         require(msg.sender == activity.allowedCaller, "Caller not allowed");
+
+        // Track last block handled
+        lastBlockHandled = block.number;
 
         // 1) Update global index ONCE for the entire batch
         _updateActivityIndex(activityId);
