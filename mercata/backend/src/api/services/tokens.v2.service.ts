@@ -1,9 +1,9 @@
 import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
 import { getCompletePriceMap } from "../helpers/oracle.helper";
-import { Token, EarningAsset, NetBalanceSnapshot } from "@mercata/shared-types";
+import { Token, EarningAsset, BalanceSnapshot, NetBalanceSnapshot } from "@mercata/shared-types";
 import { buildTokenSelectFields } from "../../config/tokensConstants";
-import { getHistory, HistoryParams, MappingHistoryElement, StorageHistoryElement } from "../helpers/history.helper";
+import { getHistory, HistoryParams, HistorySnapshot, MappingHistoryElement, StorageHistoryElement } from "../helpers/history.helper";
 import { calculateLPTokenPrice } from "../helpers/swapping.helper";
 
 const { Token, CollateralVault, CDPEngine, DECIMALS } = constants;
@@ -297,6 +297,60 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
 }
 
 export const getBalanceHistory = async (
+  accessToken: string,
+  userAddress: string,
+  tokenAddress: string,
+  historyParams: HistoryParams,
+): Promise<BalanceSnapshot[]> => {
+
+  const mappingFilters = [
+    `path.like.*${userAddress}*`,
+  ]
+
+  const mappingCollectionNames = [
+    '_balances',
+    'userCollaterals',
+  ]
+
+  const reducer = (snapshot: HistorySnapshot, h: MappingHistoryElement): HistorySnapshot => {
+    switch (h.collection_name) {
+      case '_balances': {
+        const currentBalance = snapshot.data.balance || 0;
+        const newValue = parseFloat(h.value) || h.value || 0;
+        return { ...snapshot, 
+          data: { ...snapshot.data,
+            balance: currentBalance + newValue
+          }
+        };
+      } 
+      case 'userCollaterals': {
+        const currentBalance = snapshot.data.balance || 0;
+        const newValue = parseFloat(h.value) || h.value || 0;
+        return { ...snapshot, 
+          data: { ...snapshot.data,
+            balance: currentBalance + newValue
+          }
+        };
+      }
+    }
+    return snapshot;
+  }
+
+  const balanceHistory = await getHistory(
+    accessToken,
+    historyParams,
+    [],
+    [`and(path.like.*${userAddress}*,address.eq.${tokenAddress})`],
+    ['_balances', 'userCollaterals'],
+    { balance: 0 },
+    ((s,_) => s),
+    reducer,
+    ((s,_) => s)
+  );
+  return balanceHistory.map(({timestamp, data}) => ({timestamp, balance: data.balance}));
+};
+
+export const getNetBalanceHistory = async (
   accessToken: string,
   userAddress: string,
   historyParams: HistoryParams,

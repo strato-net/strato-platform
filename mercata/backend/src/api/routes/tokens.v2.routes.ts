@@ -59,6 +59,25 @@ router.get("/earning-assets", authHandler.authorizeRequest(), TokensV2Controller
  * @openapi
  * /tokens/v2/balance-history:
  *   get:
+ *     summary: Get token balance history for the signed-in user (v2)
+ *     tags: [Tokens]
+ *     responses:
+ *       200:
+ *         description: Net balance history
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 additionalProperties: true
+ */
+router.get("/balance-history/:tokenAddress", authHandler.authorizeRequest(), TokensV2Controller.getBalanceHistory);
+
+/**
+ * @openapi
+ * /tokens/v2/net-balance-history:
+ *   get:
  *     summary: Get net balance history for the signed-in user (v2)
  *     tags: [Tokens]
  *     responses:
@@ -72,7 +91,7 @@ router.get("/earning-assets", authHandler.authorizeRequest(), TokensV2Controller
  *                 type: object
  *                 additionalProperties: true
  */
-router.get("/balance-history", authHandler.authorizeRequest(), TokensV2Controller.getBalanceHistory);
+router.get("/net-balance-history", authHandler.authorizeRequest(), TokensV2Controller.getNetBalanceHistory);
 
 export default router;
 

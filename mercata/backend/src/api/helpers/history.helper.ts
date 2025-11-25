@@ -23,6 +23,11 @@ export interface HistoryParams {
   numTicks: number;
 }
 
+export interface HistorySnapshot {
+  timestamp: number;
+  data: any;
+}
+
 export const getHistoryParams = (duration?: string, end?: string): HistoryParams => {
   const endTimestamp = end ? Date.parse(end) : Date.now();
   switch (duration) {
@@ -96,8 +101,8 @@ export const getHistory = async (
   initialSnapshotData: any,
   storageReducer: (data: any, element: StorageHistoryElement) => any,
   mappingReducer: (data: any, element: MappingHistoryElement) => any,
-  snapshotFn: (snapshot: {timestamp: number, data: any}, index: number) => {timestamp: number, data: any}
-): Promise<{timestamp: number, data: any}[]> => {
+  snapshotFn: (snapshot: HistorySnapshot, index: number) => HistorySnapshot
+): Promise<HistorySnapshot[]> => {
   const endTimestamp = params.endTimestamp;
   const interval = params.interval;
   const numTicks = params.numTicks;

@@ -9,8 +9,8 @@ import {
 } from 'react';
 import { api } from '@/lib/axios';
 import { Token, CreateTokenPayload } from '@/interface';
-import { Token as TokenType, EarningAsset, NetBalanceSnapshot } from '@mercata/shared-types';
-import { usdstAddress } from '@/lib/constants';
+import { Token as TokenType, EarningAsset, BalanceSnapshot, NetBalanceSnapshot } from '@mercata/shared-types';
+import { cataAddress, usdstAddress } from '@/lib/constants';
 import { useUser } from '@/context/UserContext';
 
 type TokenContextType = {
@@ -19,6 +19,7 @@ type TokenContextType = {
   inactiveTokens: TokenType[];
   earningAssets: EarningAsset[];
   balanceHistory: NetBalanceSnapshot[];
+  cataBalanceHistory: BalanceSnapshot[];
   loading: boolean;
   error: string | null;
   getAllTokens: (query?: Record<string, string>) => Promise<void>;
@@ -52,6 +53,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
   const [inactiveTokens, setInactiveTokens] = useState<TokenType[]>([]);
   const [earningAssets, setEarningAssets] = useState<EarningAsset[]>([]);
   const [balanceHistory, setBalanceHistory] = useState<NetBalanceSnapshot[]>([]);
+  const [cataBalanceHistory, setCataBalanceHistory] = useState<BalanceSnapshot[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingEarningAssets, setLoadingEarningAssets] = useState(false);
   const [loadingInactiveTokens, setLoadingInactiveTokens] = useState(false);
@@ -225,11 +227,26 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  const getCataBalanceHistory = useCallback(async (duration: string = '1d', end?: string): Promise<BalanceSnapshot[]> => {
+    setLoading(true);
+    try {
+      const query = `?duration=${duration}${end ? `&end=${end}` : ''}`;
+      const res = await api.get<BalanceSnapshot[]>(`/tokens/v2/balance-history/${cataAddress}${query}`);
+      const data = res.data || [];
+      setCataBalanceHistory(data);
+      return data;
+    } catch (err) {
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const getBalanceHistory = useCallback(async (duration: string = '1d', end?: string): Promise<NetBalanceSnapshot[]> => {
     setLoading(true);
     try {
       const query = `?duration=${duration}${end ? `&end=${end}` : ''}`;
-      const res = await api.get<NetBalanceSnapshot[]>(`/tokens/v2/balance-history${query}`);
+      const res = await api.get<NetBalanceSnapshot[]>(`/tokens/v2/net-balance-history${query}`);
       const data = res.data || [];
       setBalanceHistory(data);
       return data;
