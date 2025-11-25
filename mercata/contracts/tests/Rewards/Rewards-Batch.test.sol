@@ -51,10 +51,10 @@ contract Describe_Rewards_Batch is Authorizable {
         rewards.initialize(tokenAddress);
 
         // Add Position activity for batchDeposit/batchWithdraw tests
-        rewards.addActivity(liquidityActivityId, "Liquidity Pool", ActivityType.Position, liquidityEmissionRate, address(this));
+        rewards.addActivity(liquidityActivityId, "Liquidity Pool", ActivityType.Position, liquidityEmissionRate, address(this), address(this));
 
         // Add OneTime activity for batchOccurred tests
-        rewards.addActivity(swapActivityId, "Swap Activity", ActivityType.OneTime, swapEmissionRate, address(this));
+        rewards.addActivity(swapActivityId, "Swap Activity", ActivityType.OneTime, swapEmissionRate, address(this), address(this));
 
         uint256 fundingAmount = 1000000 * 1e18;
         rewardToken.mint(address(rewards), fundingAmount);
@@ -89,7 +89,7 @@ contract Describe_Rewards_Batch is Authorizable {
         require(stake3 == 300 * 1e18, "User3 stake should be 300");
 
         // Check total stake
-        (, , , , , uint256 totalStake, ) = rewards.activities(liquidityActivityId);
+        (, , , , , uint256 totalStake, , ) = rewards.activities(liquidityActivityId);
         require(totalStake == 600 * 1e18, "Total stake should be 600");
     }
 
@@ -192,7 +192,7 @@ contract Describe_Rewards_Batch is Authorizable {
         require(stake2 == 400 * 1e18, "User2 stake should be 400 after withdrawal");
 
         // Check total stake
-        (, , , , , uint256 totalStake, ) = rewards.activities(liquidityActivityId);
+        (, , , , , uint256 totalStake, , ) = rewards.activities(liquidityActivityId);
         require(totalStake == 1000 * 1e18, "Total stake should be 1000");
     }
 

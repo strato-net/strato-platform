@@ -25,7 +25,8 @@ struct Activity {
     uint256 accRewardPerStake;   // Accumulated reward per 1 unit of stake (scaled by 1e18)
     uint256 lastUpdateTime;      // Last timestamp when the index was updated
     uint256 totalStake;          // Sum of all users' effective stakes for this activity
-    address allowedCaller;       // Address of pool/contract allowed to call handleAction for this activity
+    address allowedCaller;       // Address allowed to call deposit/withdraw/occurred for this activity
+    address sourceContract;      // Address of the contract this activity tracks (for external service mapping)
 }
 
 /**
@@ -51,7 +52,7 @@ contract record Rewards is Ownable {
 
     event ActivityIndexUpdated(uint256 indexed activityId, uint256 accRewardPerStake, uint256 totalStake);
     event UserStakeUpdated(uint256 indexed activityId, address indexed user, uint256 oldStake, uint256 newStake, uint256 pendingRewards);
-    event ActivityAdded(uint256 indexed activityId, string name, uint256 emissionRate, address allowedCaller);
+    event ActivityAdded(uint256 indexed activityId, string name, uint256 emissionRate, address allowedCaller, address sourceContract);
     event EmissionRateUpdated(uint256 indexed activityId, uint256 oldRate, uint256 newRate);
     event AllowedCallerUpdated(uint256 indexed activityId, address oldCaller, address newCaller);
     event RewardsClaimed(address indexed user, uint256 amount);
@@ -119,16 +120,19 @@ contract record Rewards is Ownable {
      * @param name Human-readable name for the activity
      * @param activityType Type of activity (Position or OneTime)
      * @param emissionRate CATA tokens emitted per second for this activity
-     * @param allowedCaller Address of pool/contract allowed to call handleAction
+     * @param allowedCaller Address allowed to call deposit/withdraw/occurred
+     * @param sourceContract Address of the contract this activity tracks (for external service mapping)
      */
     function addActivity(
         uint256 activityId,
         string name,
         ActivityType activityType,
         uint256 emissionRate,
-        address allowedCaller
+        address allowedCaller,
+        address sourceContract
     ) external onlyOwner {
         require(allowedCaller != address(0), "Invalid caller address");
+        require(sourceContract != address(0), "Invalid source contract address");
         require(bytes(name).length > 0, "Name cannot be empty");
 
         activities[activityId] = Activity({
@@ -138,7 +142,8 @@ contract record Rewards is Ownable {
             accRewardPerStake: 0,
             lastUpdateTime: block.timestamp,
             totalStake: 0,
-            allowedCaller: allowedCaller
+            allowedCaller: allowedCaller,
+            sourceContract: sourceContract
         });
 
         activityIds.push(activityId);
@@ -146,7 +151,7 @@ contract record Rewards is Ownable {
         // Update total emission rate
         totalRewardsEmission += emissionRate;
 
-        emit ActivityAdded(activityId, name, emissionRate, allowedCaller);
+        emit ActivityAdded(activityId, name, emissionRate, allowedCaller, sourceContract);
     }
 
     /**
