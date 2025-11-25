@@ -40,10 +40,14 @@ pipeline {
             sh "sudo ./strato --pull"
             sh "sudo ./strato --wipe"
             sh "sudo ./strato-run.sh"
-            script {
-              lib.waitLocalNodeIsSynced()
-            }
           }
+        }
+      }
+    }
+    stage('Wait for Sync') {
+      steps {
+        script {
+          lib.waitLocalNodeIsSynced()
         }
       }
     }
@@ -53,7 +57,7 @@ pipeline {
     always {
       dir ('strato-getting-started') {
         sh 'rm -rf strato_logs*'
-        sh './fetchlogs'
+        sh 'sudo ./fetchlogs'
         sh 'sudo chmod 777 strato_logs.zip'
         archiveArtifacts artifacts: 'strato_logs.zip', fingerprint: true, allowEmptyArchive: true
         sh 'sudo rm -rf strato_logs.zip'
