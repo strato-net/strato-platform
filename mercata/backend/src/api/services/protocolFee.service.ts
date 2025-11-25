@@ -6,6 +6,7 @@ import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
 import { getCDPRegistry } from "./cdp.service";
 import { getPool } from "./lending.service";
+import { getPrice } from "./oracle.service";
 import * as config from "../../config/config";
 
 const {
@@ -470,12 +471,39 @@ export const getSwapProtocolRevenue = async (
     
     const timeCutoffs = getTimeCutoffs();
     
-    // Transform events to common format
-    const transformedEvents = tokenTransferEvents.map((event: any) => ({
-      value: BigInt(event.attributes?.value || "0"),
-      timestamp: parseTimestamp(event.block_timestamp),
-      asset: event.address.toLowerCase() // The token that emitted the Transfer event
-    }));
+    // Get unique token addresses from events
+    const uniqueTokenAddresses: string[] = [...new Set<string>(tokenTransferEvents.map((event: any) => event.address.toLowerCase()))];
+    
+    // Fetch prices for all tokens in parallel
+    const priceMap = new Map<string, bigint>();
+    await Promise.all(
+      uniqueTokenAddresses.map(async (tokenAddress: string) => {
+        try {
+          const priceData = await getPrice(accessToken, tokenAddress) as { asset: string; price: string };
+          priceMap.set(tokenAddress, BigInt(priceData.price));
+        } catch (error) {
+          console.warn(`Price not found for token ${tokenAddress}, using 0`);
+          priceMap.set(tokenAddress, 0n);
+        }
+      })
+    );
+    
+    // Transform events to common format, multiplying value by price
+    // value is in token units (18 decimals), price is in 18 decimals
+    // result = value * price / 1e18 (to avoid double scaling)
+    const DECIMALS = 10n ** 18n;
+    const transformedEvents = tokenTransferEvents.map((event: any) => {
+      const tokenAddress = event.address.toLowerCase();
+      const rawValue = BigInt(event.attributes?.value || "0");
+      const price = priceMap.get(tokenAddress) || 0n;
+      const valueInUsd = (rawValue * price) / DECIMALS;
+      
+      return {
+        value: valueInUsd,
+        timestamp: parseTimestamp(event.block_timestamp),
+        asset: tokenAddress // The token that emitted the Transfer event
+      };
+    });
     
     const periodRevenue = categorizeRevenueByPeriod(transformedEvents, timeCutoffs);
     
