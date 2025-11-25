@@ -1,12 +1,8 @@
 import { config } from "../config";
 import { logInfo, logError } from "../utils/logger";
 import {
-  getPoolDepositedEvents,
-  getPoolWithdrawnEvents,
-  getLiquidityPoolDepositedEvents,
-  getLiquidityPoolWithdrawnEvents,
-  getLendingPoolBorrowedEvents,
-  getLendingPoolRepaidEvents,
+  getEventsBatch,
+  getRewardsActivities,
 } from "../services/cirrusService";
 import {
   depositBatch,
@@ -15,25 +11,45 @@ import {
 } from "../services/rewardsService";
 import { blockTrackingService } from "../services/blockTrackingService";
 import { checkBalances } from "../utils/balanceCheck";
-import { ProtocolEvent, RewardsAction, EventMapping, NonEmptyArray } from "../types";
+import { ProtocolEvent, RewardsAction, EventMapping, NonEmptyArray, ActivityInfo } from "../types";
 
-const EVENT_MAPPINGS: EventMapping[] = [
-  { contractName: "Pool", eventName: "Deposited", activityId: 1, actionType: "deposit" },
-  { contractName: "Pool", eventName: "Withdrawn", activityId: 1, actionType: "withdraw" },
-  { contractName: "LiquidityPool", eventName: "Deposited", activityId: 2, actionType: "deposit" },
-  { contractName: "LiquidityPool", eventName: "Withdrawn", activityId: 2, actionType: "withdraw" },
-  { contractName: "LendingPool", eventName: "Borrowed", activityId: 3, actionType: "occurred" },
-  { contractName: "LendingPool", eventName: "Repaid", activityId: 4, actionType: "occurred" },
-];
+let eventMappings: EventMapping[] = [];
+let activitiesCache: Map<string, ActivityInfo> = new Map();
 
-const getEventFetcher = (contractName: string, eventName: string) => {
-  if (contractName === "Pool" && eventName === "Deposited") return getPoolDepositedEvents;
-  if (contractName === "Pool" && eventName === "Withdrawn") return getPoolWithdrawnEvents;
-  if (contractName === "LiquidityPool" && eventName === "Deposited") return getLiquidityPoolDepositedEvents;
-  if (contractName === "LiquidityPool" && eventName === "Withdrawn") return getLiquidityPoolWithdrawnEvents;
-  if (contractName === "LendingPool" && eventName === "Borrowed") return getLendingPoolBorrowedEvents;
-  if (contractName === "LendingPool" && eventName === "Repaid") return getLendingPoolRepaidEvents;
-  return null;
+const parseEventName = (activityName: string): string | null => {
+  const parts = activityName.split("-");
+  if (parts.length < 2) {
+    return null;
+  }
+  return parts[parts.length - 1];
+};
+
+const buildEventMappings = (activities: Map<string, ActivityInfo>): EventMapping[] => {
+  const mappings: EventMapping[] = [];
+
+  for (const [activityName, activity] of activities.entries()) {
+    const eventName = parseEventName(activityName);
+    if (!eventName) {
+      logInfo("RewardsPolling", `Could not parse event name from activity: ${activityName}, skipping`);
+      continue;
+    }
+
+    let actionType: "deposit" | "withdraw" | "occurred";
+    if (activity.activityType === "OneTime") {
+      actionType = "occurred";
+    } else {
+      actionType = eventName === "Deposited" ? "deposit" : "withdraw";
+    }
+
+    mappings.push({
+      contractAddress: activity.allowedCaller,
+      eventName,
+      activityId: activity.activityId,
+      actionType,
+    });
+  }
+
+  return mappings;
 };
 
 const mapEventToAction = (event: ProtocolEvent, mapping: EventMapping): RewardsAction => {
@@ -73,35 +89,73 @@ const processEvents = async (): Promise<void> => {
   try {
     await checkBalances();
 
+    if (eventMappings.length === 0) {
+      logInfo("RewardsPolling", "No event mappings available, reloading activities...");
+      await loadActivities();
+      if (eventMappings.length === 0) {
+        logError("RewardsPolling", new Error("No event mappings found after reload"), {
+          operation: "processEvents",
+        });
+        return;
+      }
+    }
+
     const allActions: RewardsAction[] = [];
     const blockUpdates = new Map<string, number>();
 
-    for (const mapping of EVENT_MAPPINGS) {
-      const key = `${mapping.contractName}-${mapping.eventName}`;
-      const lastBlock = await blockTrackingService.getLastProcessedBlock(key);
-      const fetcher = getEventFetcher(mapping.contractName, mapping.eventName);
+    const contractAddresses = [...new Set(eventMappings.map(m => m.contractAddress))];
+    const eventNames = [...new Set(eventMappings.map(m => m.eventName))];
+    
+    const lastBlocks = await Promise.all(
+      eventMappings.map(async (m) => {
+        const key = `${m.contractAddress}-${m.eventName}`;
+        return await blockTrackingService.getLastProcessedBlock(key);
+      })
+    );
+    
+    const minLastBlock = lastBlocks.length > 0 ? Math.min(...lastBlocks) : 0;
 
-      if (!fetcher) {
-        logError("RewardsPolling", new Error(`No fetcher for ${key}`), {
-          contractName: mapping.contractName,
-          eventName: mapping.eventName,
-        });
+    const allEvents = await getEventsBatch(
+      contractAddresses,
+      eventNames,
+      minLastBlock,
+    );
+
+    const eventMappingByKey = new Map<string, EventMapping>();
+    for (const mapping of eventMappings) {
+      const key = `${mapping.contractAddress}-${mapping.eventName}`;
+      eventMappingByKey.set(key, mapping);
+    }
+
+    const eventsByKey = new Map<string, ProtocolEvent[]>();
+    for (const event of allEvents) {
+      const key = `${event.contractAddress}-${event.eventName}`;
+      if (!eventsByKey.has(key)) {
+        eventsByKey.set(key, []);
+      }
+      eventsByKey.get(key)!.push(event);
+    }
+
+    for (const [key, events] of eventsByKey.entries()) {
+      const mapping = eventMappingByKey.get(key);
+      if (!mapping) {
         continue;
       }
 
-      const events = await fetcher(lastBlock);
+      const lastBlock = await blockTrackingService.getLastProcessedBlock(key);
+      const filteredEvents = events.filter(e => (e.blockNumber || 0) > lastBlock);
 
-      if (events.length > 0) {
-        const actions = events.map((event) => mapEventToAction(event, mapping));
+      if (filteredEvents.length > 0) {
+        const actions = filteredEvents.map((event) => mapEventToAction(event, mapping));
         allActions.push(...actions);
 
         const maxBlock = Math.max(
-          ...events.map((e) => e.blockNumber || 0),
+          ...filteredEvents.map((e) => e.blockNumber || 0),
           lastBlock,
         );
         blockUpdates.set(key, maxBlock);
 
-        logInfo("RewardsPolling", `Found ${events.length} ${key} events`, {
+        logInfo("RewardsPolling", `Found ${filteredEvents.length} events for ${key}`, {
           lastBlock,
           maxBlock,
         });
@@ -155,11 +209,31 @@ export const startRewardsPolling = (): void => {
   logInfo("RewardsPolling", `Started rewards polling with interval ${pollingInterval}ms`);
 };
 
+const loadActivities = async (): Promise<void> => {
+  try {
+    activitiesCache = await getRewardsActivities();
+    eventMappings = buildEventMappings(activitiesCache);
+
+    logInfo("RewardsPolling", `Loaded ${activitiesCache.size} activities, built ${eventMappings.length} event mappings`);
+    
+    for (const mapping of eventMappings) {
+      logInfo("RewardsPolling", `Mapped ${mapping.contractAddress}-${mapping.eventName} to activityId ${mapping.activityId} (${mapping.actionType})`);
+    }
+  } catch (error) {
+    logError("RewardsPolling", error as Error, {
+      operation: "loadActivities",
+    });
+    throw error;
+  }
+};
+
 export const initializeRewardsPolling = async () => {
   logInfo("RewardsPolling", "Initializing rewards polling...");
 
-  for (const mapping of EVENT_MAPPINGS) {
-    const key = `${mapping.contractName}-${mapping.eventName}`;
+  await loadActivities();
+
+  for (const mapping of eventMappings) {
+    const key = `${mapping.contractAddress}-${mapping.eventName}`;
     const lastBlock = await blockTrackingService.getLastProcessedBlock(key);
     if (lastBlock > 0) {
       logInfo("RewardsPolling", `Loaded last processed block for ${key}: ${lastBlock}`);

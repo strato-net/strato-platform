@@ -57,7 +57,7 @@ export interface ApiClient {
 }
 
 export interface ProtocolEvent {
-  contractName: string;
+  contractAddress: string;
   eventName: string;
   user: string;
   amount: string;
@@ -73,10 +73,30 @@ export interface RewardsAction {
   actionType: "deposit" | "withdraw" | "occurred";
 }
 
+export interface ActivityInfo {
+  activityId: number;
+  name: string;
+  activityType: "Position" | "OneTime";
+  emissionRate: string;
+  allowedCaller: string;
+}
+
 export interface EventMapping {
-  contractName: string;
+  contractAddress: string;
   eventName: string;
   activityId: number;
   actionType: "deposit" | "withdraw" | "occurred";
+}
+
+export interface CirrusEvent {
+  id: number;
+  address: string;
+  block_hash: string;
+  block_timestamp: string;
+  block_number: string;
+  transaction_sender: string;
+  event_index: number;
+  event_name: string;
+  attributes: Record<string, any>;
 }
 
