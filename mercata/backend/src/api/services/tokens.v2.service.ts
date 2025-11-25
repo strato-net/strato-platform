@@ -1,7 +1,7 @@
 import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
 import { getCompletePriceMap } from "../helpers/oracle.helper";
-import { Token, EarningAsset, BalanceSnapshot, NetBalanceSnapshot } from "@mercata/shared-types";
+import { Token, EarningAsset, BalanceSnapshot } from "@mercata/shared-types";
 import { buildTokenSelectFields } from "../../config/tokensConstants";
 import { getHistory, HistoryParams, HistorySnapshot, MappingHistoryElement, StorageHistoryElement } from "../helpers/history.helper";
 import { calculateLPTokenPrice } from "../helpers/swapping.helper";
@@ -292,7 +292,7 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
     const tokenValue = (tokenPrice / 1000000000) * (tokenBalance / 1000000000);
     netBalance += tokenValue;
   }
-  netBalance -= netLoan + (snapshot.data.userLoan?.scaledDebt || 0);
+  netBalance -= netLoan + ((snapshot.data.userLoan?.scaledDebt || 0) / 1e27);
   return { timestamp: snapshot.timestamp, data: {netBalance: netBalance / 1e18 }};
 }
 
@@ -340,7 +340,7 @@ export const getNetBalanceHistory = async (
   accessToken: string,
   userAddress: string,
   historyParams: HistoryParams,
-): Promise<NetBalanceSnapshot[]> => {
+): Promise<BalanceSnapshot[]> => {
 
   const storageFilters = [
     'data->>lpToken.neq.""',
@@ -379,7 +379,7 @@ export const getNetBalanceHistory = async (
     updatePortfolioInfoMapping,
     processBalanceSnapshot
   );
-  return balanceHistory.map(({timestamp, data}) => ({timestamp, netBalance: data.netBalance}));
+  return balanceHistory.map(({timestamp, data}) => ({timestamp, balance: data.netBalance}));
 };
 
 export const getBorrowingHistory = async (
@@ -437,11 +437,9 @@ export const getBorrowingHistory = async (
       case 'userLoan': {
         const scaledDebt = parseFloat(h.value.scaledDebt) || 0;
         const lastUpdated = parseInt(h.value.lastUpdated) || 0;
-        const now = Date.now();
-        const dt = now - lastUpdated;
-        const ert = Math.exp(0.05 * dt / (60*60*24*365));
         return { ...data, 
-          userLoan: data.balance + ((scaledDebt * ert) / 1e18)
+          userLoan: data.userLoan + scaledDebt,
+          lastUpdated: lastUpdated
         };
       }
     }
@@ -461,7 +459,7 @@ export const getBorrowingHistory = async (
       let netLoan = 0;
       for (const tokenAddr in s.data.tokens) {
         const token = s.data.tokens[tokenAddr];
-        const stabilityFeeRate = token.stabilityFeeRate;
+        const stabilityFeeRate = token.stabilityFeeRate || BigInt('1000000000627937192293877252');
         const lastAccrual = token.lastAccrual || 0;
         const rateAccumulator = token.rateAccumulator || BigInt(1e27);
         const scaledDebt = token.scaledDebt || 0;
@@ -472,7 +470,12 @@ export const getBorrowingHistory = async (
         const rateAccErt = Number(rateAccumulator) * ert / 1e27;
         netLoan += Number(scaledDebt) * rateAccErt / 1e18;
       }
-      netLoan += s.data.userLoan;
+      console.log(`DFW: ${netLoan} ${s.data.userLoan}`)
+      const userLoan = s.data.userLoan || 0;
+      const lastUpdated = s.data.lastUpdated || 0;
+      const dt = s.timestamp - (1000*lastUpdated);
+      const ert = Math.exp(0.05 * dt / (1000*60*60*24*365));
+      netLoan += (userLoan * ert)/1e18;
       return { ...s, data: { balance: netLoan }};
     })
   );

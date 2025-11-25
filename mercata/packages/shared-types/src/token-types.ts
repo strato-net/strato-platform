@@ -24,8 +24,3 @@ export interface BalanceSnapshot {
   timestamp: number;
   balance: number;
 }
-
-export interface NetBalanceSnapshot {
-  timestamp: number;
-  netBalance: number;
-}

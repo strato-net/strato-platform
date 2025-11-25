@@ -9,7 +9,7 @@ import {
 } from 'react';
 import { api } from '@/lib/axios';
 import { Token, CreateTokenPayload } from '@/interface';
-import { Token as TokenType, EarningAsset, BalanceSnapshot, NetBalanceSnapshot } from '@mercata/shared-types';
+import { Token as TokenType, EarningAsset, BalanceSnapshot } from '@mercata/shared-types';
 import { cataAddress, usdstAddress } from '@/lib/constants';
 import { useUser } from '@/context/UserContext';
 
@@ -18,7 +18,7 @@ type TokenContextType = {
   activeTokens: Token[];
   inactiveTokens: TokenType[];
   earningAssets: EarningAsset[];
-  balanceHistory: NetBalanceSnapshot[];
+  balanceHistory: BalanceSnapshot[];
   cataBalanceHistory: BalanceSnapshot[];
   borrowingHistory: BalanceSnapshot[];
   loading: boolean;
@@ -30,7 +30,7 @@ type TokenContextType = {
   getUserTokensWithBalance: () => Promise<Token[]>;
   getTransferableTokens: () => Promise<Token[]>;
   getEarningAssets: (showLoading?: boolean) => Promise<void>;
-  getBalanceHistory: (duration?: string, end?: string) => Promise<NetBalanceSnapshot[]>;
+  getBalanceHistory: (duration?: string, end?: string) => Promise<BalanceSnapshot[]>;
   getCataBalanceHistory: (duration?: string, end?: string) => Promise<BalanceSnapshot[]>;
   getBorrowingHistory: (duration?: string, end?: string) => Promise<BalanceSnapshot[]>;
   loadingEarningAssets: boolean;
@@ -55,7 +55,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
   const [activeTokens, setActiveTokens] = useState<Token[]>([]);
   const [inactiveTokens, setInactiveTokens] = useState<TokenType[]>([]);
   const [earningAssets, setEarningAssets] = useState<EarningAsset[]>([]);
-  const [balanceHistory, setBalanceHistory] = useState<NetBalanceSnapshot[]>([]);
+  const [balanceHistory, setBalanceHistory] = useState<BalanceSnapshot[]>([]);
   const [cataBalanceHistory, setCataBalanceHistory] = useState<BalanceSnapshot[]>([]);
   const [borrowingHistory, setBorrowingHistory] = useState<BalanceSnapshot[]>([]);
   const [loading, setLoading] = useState(false);
@@ -246,11 +246,11 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  const getBalanceHistory = useCallback(async (duration: string = '1d', end?: string): Promise<NetBalanceSnapshot[]> => {
+  const getBalanceHistory = useCallback(async (duration: string = '1d', end?: string): Promise<BalanceSnapshot[]> => {
     setLoading(true);
     try {
       const query = `?duration=${duration}${end ? `&end=${end}` : ''}`;
-      const res = await api.get<NetBalanceSnapshot[]>(`/tokens/v2/net-balance-history${query}`);
+      const res = await api.get<BalanceSnapshot[]>(`/tokens/v2/net-balance-history${query}`);
       const data = res.data || [];
       setBalanceHistory(data);
       return data;

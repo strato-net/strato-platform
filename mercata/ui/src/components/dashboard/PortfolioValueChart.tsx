@@ -15,7 +15,7 @@ import { useMemo } from 'react';
 
 type PortfolioDataPoint = {
   timestamp: number;
-  netBalance: number;
+  balance: number;
 };
 
 type TabType = 'netBalance' | 'rewards' | 'borrowed';
@@ -55,8 +55,7 @@ const calculateTimeRangeHours = (data: PortfolioDataPoint[]): number => {
 
 // Format balance value
 const formatBalance = (value: number): string => {
-  // Convert from wei-like units (e22) to readable format
-  const dollars = value / 1e22;
+  const dollars = value;
   if (dollars >= 1000) {
     return `$${(dollars / 1000).toFixed(1)}k`;
   }
@@ -64,11 +63,11 @@ const formatBalance = (value: number): string => {
 };
 
 // Calculate percentage change
-const calculateChange = (data: PortfolioDataPoint[], isNormalized: boolean = true): { value: number; isPositive: boolean } => {
+const calculateChange = (data: PortfolioDataPoint[]): { value: number; isPositive: boolean } => {
   if (data.length < 2) return { value: 0, isPositive: true };
   
-  const first = isNormalized ? data[0].netBalance / 1e22 : data[0].netBalance;
-  const last = isNormalized ? data[data.length - 1].netBalance / 1e22 : data[data.length - 1].netBalance;
+  const first = data[0].balance;
+  const last = data[data.length - 1].balance;
   if (first === 0) return { value: 0, isPositive: true };
   const change = ((last - first) / first) * 100;
   
@@ -101,7 +100,6 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
   };
 
   const colors = getColorScheme(tabType);
-  const isNormalized = tabType === 'netBalance';
   // Memoize chart data transformations to prevent unnecessary recalculations
   const chartData = useMemo(() => {
     if (!data || data.length === 0) {
@@ -114,20 +112,20 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
     return [...data]
       .sort((a, b) => a.timestamp - b.timestamp)
       .map(point => {
-        const netBalance = typeof point.netBalance === 'string' 
-          ? parseFloat(point.netBalance) 
-          : point.netBalance;
+        const balance = typeof point.balance === 'string' 
+          ? parseFloat(point.balance) 
+          : point.balance;
         // Normalize value for netBalance tab, keep raw for others
-        const value = isNormalized ? netBalance / 1e22 : netBalance;
+        const value = balance;
         return {
           timestamp: point.timestamp,
           date: formatDate(point.timestamp, isTimeRange),
           value,
-          raw: netBalance
+          raw: balance
         };
       })
       .filter(point => !isNaN(point.value) && point.value >= 0);
-  }, [data, isNormalized]);
+  }, [data]);
 
   const hasData = chartData.length > 0;
 
@@ -138,7 +136,7 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
     }
 
     const currentValue = propCurrentValue !== undefined ? propCurrentValue : (chartData[chartData.length - 1]?.value || 0);
-    const change = calculateChange(data, isNormalized);
+    const change = calculateChange(data);
     
     const values = chartData.map(d => d.value);
     const minValue = Math.min(...values);
@@ -152,7 +150,7 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
     ];
 
     return { currentValue, change, yAxisDomain };
-  }, [chartData, data, hasData, isNormalized, propCurrentValue]);
+  }, [chartData, data, hasData, propCurrentValue]);
 
   // Determine color based on trend and tab type
   const lineColor = change.isPositive ? colors.positive : colors.negative;
@@ -185,7 +183,7 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
               )}
             </div>
             <div className={`flex items-center gap-1 text-sm ${change.isPositive ? (tabType === 'rewards' ? 'text-purple-500' : tabType === 'borrowed' ? 'text-red-500' : 'text-green-500') : (tabType === 'borrowed' ? 'text-green-500' : 'text-red-500')}`}>
-              {change.isPositive ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
+              {change.isPositive ? <TrendingUp size={16} color={getColorScheme(tabType).positive} /> : <TrendingDown size={16} color={getColorScheme(tabType).negative}/>}
               <span>{hasData ? `${change.value.toFixed(2)}%` : '—'}</span>
             </div>
           </div>

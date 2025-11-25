@@ -19,7 +19,7 @@ import { useLendingContext } from "@/context/LendingContext";
 import { useCDP } from "@/context/CDPContext";
 import { cataAddress, rewardsEnabled } from "@/lib/constants";
 import { api } from "@/lib/axios";
-import { NetBalanceSnapshot, BalanceSnapshot } from "@mercata/shared-types";
+import { BalanceSnapshot } from "@mercata/shared-types";
 
 const TIME_RANGES = ["1d", "7d", "1m", "3m", "6m", "1y", "all"] as const;
 type TimeRange = typeof TIME_RANGES[number];
@@ -51,16 +51,16 @@ const Dashboard = () => {
   const [isLoadingBalanceHistory, setIsLoadingBalanceHistory] = useState(false);
   
   // Caches for different tabs
-  const [balanceHistoryCache, setBalanceHistoryCache] = useState<Record<string, NetBalanceSnapshot[]>>({});
+  const [balanceHistoryCache, setBalanceHistoryCache] = useState<Record<string, BalanceSnapshot[]>>({});
   const [cataBalanceHistoryCache, setCataBalanceHistoryCache] = useState<Record<string, BalanceSnapshot[]>>({});
   const [borrowedHistoryCache, setBorrowedHistoryCache] = useState<Record<string, BalanceSnapshot[]>>({});
   
   // Displayed data for current tab
-  const [displayedBalanceHistory, setDisplayedBalanceHistory] = useState<NetBalanceSnapshot[]>([]);
+  const [displayedBalanceHistory, setDisplayedBalanceHistory] = useState<BalanceSnapshot[]>([]);
   const [displayedCataBalanceHistory, setDisplayedCataBalanceHistory] = useState<BalanceSnapshot[]>([]);
   const [displayedBorrowedHistory, setDisplayedBorrowedHistory] = useState<BalanceSnapshot[]>([]);
   
-  const balanceHistoryCacheRef = useRef<Record<string, NetBalanceSnapshot[]>>({});
+  const balanceHistoryCacheRef = useRef<Record<string, BalanceSnapshot[]>>({});
   const cataBalanceHistoryCacheRef = useRef<Record<string, BalanceSnapshot[]>>({});
   const borrowedHistoryCacheRef = useRef<Record<string, BalanceSnapshot[]>>({});
   const hasPrefetchedRef = useRef<Record<TabType, boolean>>({ netBalance: false, rewards: false, borrowed: false });
@@ -112,7 +112,7 @@ const Dashboard = () => {
     refreshVaults();
   }, [location.pathname, userAddress, getEarningAssets, getInactiveTokens, refreshLoans, refreshVaults]);
 
-  const setCacheForRange = useCallback((duration: TimeRange, data: NetBalanceSnapshot[], tab: TabType = 'netBalance') => {
+  const setCacheForRange = useCallback((duration: TimeRange, data: BalanceSnapshot[], tab: TabType = 'netBalance') => {
     if (tab === 'netBalance') {
       setBalanceHistoryCache(prev => {
         const updated = { ...prev, [duration]: data };
@@ -353,10 +353,7 @@ const Dashboard = () => {
           <div className="mb-8">
             {activeTab === 'netBalance' && (
               <PortfolioValueChart 
-                data={(displayedBalanceHistory || []).map(item => ({
-                  timestamp: item.timestamp || 0,
-                  netBalance: typeof item.netBalance === 'string' ? parseFloat(item.netBalance) : (item.netBalance || 0)
-                }))}
+                data={(displayedBalanceHistory || [])}
                 onTimeRangeChange={(duration) => {
                   setSelectedTimeRange(duration as TimeRange);
                 }}
@@ -370,10 +367,7 @@ const Dashboard = () => {
             )}
             {activeTab === 'rewards' && (
               <PortfolioValueChart 
-                data={(displayedCataBalanceHistory || []).map(item => ({
-                  timestamp: item.timestamp || 0,
-                  netBalance: typeof item.balance === 'string' ? parseFloat(item.balance) : (item.balance || 0)
-                }))}
+                data={(displayedCataBalanceHistory || [])}
                 onTimeRangeChange={(duration) => {
                   setSelectedTimeRange(duration as TimeRange);
                 }}
@@ -387,10 +381,7 @@ const Dashboard = () => {
             )}
             {activeTab === 'borrowed' && (
               <PortfolioValueChart 
-                data={(displayedBorrowedHistory || []).map(item => ({
-                  timestamp: item.timestamp || 0,
-                  netBalance: typeof item.balance === 'string' ? parseFloat(item.balance) : (item.balance || 0)
-                }))}
+                data={(displayedBorrowedHistory || [])}
                 onTimeRangeChange={(duration) => {
                   setSelectedTimeRange(duration as TimeRange);
                 }}
