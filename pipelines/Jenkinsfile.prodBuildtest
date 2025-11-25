@@ -66,18 +66,17 @@ pipeline {
         message: "Release ${env.RELEASE_VERSION} Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
       )
       
-// TODO: uncomment after testing
-//      script {
-//        def VERSION = sh(
-//            returnStdout: true,
-//            script: "grep -oP \"#strato-version:\\\\K[^#]*\" strato-getting-started/docker-compose.yml"
-//        ).trim()
-//        slackSend(
-//            channel: '#engineering',
-//            color: 'good',
-//            message: "Mainnet buildtest.mercata.blockapps.net was redeployed with STRATO v.${VERSION}"
-//        )
-//      }
+      script {
+        def VERSION = sh(
+            returnStdout: true,
+            script: "grep -oP \"#strato-version:\\\\K[^#]*\" strato-getting-started/docker-compose.yml"
+        ).trim()
+        slackSend(
+            channel: '#engineering',
+            color: 'good',
+            message: "Mainnet buildtest.mercata.blockapps.net was redeployed with STRATO v.${VERSION}"
+        )
+      }
     }
 
     failure {
