@@ -3,8 +3,8 @@ import { constants } from "../../config/constants";
 import { getCompletePriceMap } from "../helpers/oracle.helper";
 import { Token, EarningAsset, NetBalanceSnapshot } from "@mercata/shared-types";
 import { buildTokenSelectFields } from "../../config/tokensConstants";
+import { getHistory, HistoryParams, MappingHistoryElement, StorageHistoryElement } from "../helpers/history.helper";
 import { calculateLPTokenPrice } from "../helpers/swapping.helper";
-import { start } from "repl";
 
 const { Token, CollateralVault, CDPEngine, DECIMALS } = constants;
 
@@ -109,23 +109,6 @@ export const getEarningAssets = async (
     };
   });
 };
-
-interface StorageHistoryElement {
-  address: string;
-  data: any;
-  valid_from: string;
-  valid_to: string;
-}
-
-interface MappingHistoryElement {
-  address: string;
-  collection_name: string;
-  key: any;
-  path: string;
-  value: any;
-  valid_from: string;
-  valid_to: string;
-}
 
 function updatePortfolioInfoStorage(portfolioInfo: any, newInfo: StorageHistoryElement): any {
   if (newInfo.data._symbol) {
@@ -257,168 +240,104 @@ function updatePortfolioInfoMapping(portfolioInfo: any, newInfo: MappingHistoryE
   return portfolioInfo;
 }
 
+function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index: number): {timestamp: number, data: any} {
+  let netBalance: number = 0;
+  let netLoan: number = 0;
+  for (const tokenAddr in snapshot.data.tokens) {
+    const token = snapshot.data.tokens[tokenAddr] || {};
+    let tokenPrice = token?.price || 0;
+    const tokenBalance = token?.balance || 0;
+    if (token?.scaledDebt) {
+      const rateAccumulator = Number(BigInt(token?.rateAccumulator) / 1000000000000000000n) / 1000000000;
+      const loanAmt = (token?.scaledDebt || 0) * rateAccumulator;
+      netLoan += loanAmt;
+    }
+    if (tokenBalance === 0) continue;
+    if (tokenPrice === 0) {
+      const totalSupply = token?.supply || '0';
+      if (totalSupply === '0') continue;
+      const pool = token?.pool;
+      const managedAssets = token?.managedAssets;
+      if (pool) { // LP token
+        tokenPrice = calculateLPTokenPrice(
+          pool.tokenABalance,
+          pool.tokenBBalance,
+          snapshot.data.tokens[pool.tokenA]?.price || '0',
+          snapshot.data.tokens[pool.tokenB]?.price || '0',
+          totalSupply
+        );
+      } else if (managedAssets) { // sUSDST
+        tokenPrice = Number((managedAssets * BigInt(1e18)) / BigInt(totalSupply));
+      } else { // mUSDST
+        const borrowIndex = BigInt(token?.borrowIndex) || 0n;
+        const borrowableAsset = token?.borrowableAsset || '';
+        const reservesAccrued = BigInt(token?.reservesAccrued) || 0n;
+        const totalScaledDebt = BigInt(token?.totalScaledDebt) || 0n;
+        const cash = BigInt(snapshot.data.tokens[token?.borrowableAsset || '']?.liquidityPoolBalance) || 0n;
+        const debt = (totalScaledDebt * borrowIndex) / BigInt(1e27);
+        const badDebt = token?.badDebt || 0n;
+        let underlying = cash + debt + badDebt;
+        if (reservesAccrued < underlying) {
+            underlying -= reservesAccrued;
+        } else {
+            underlying = cash;
+        }
+        if (underlying == 0) {
+          tokenPrice = 1e18;
+        } else {
+          tokenPrice = Number((underlying * BigInt(1e18)) / BigInt(totalSupply));
+        }
+      }
+    }
+    const tokenValue = (tokenPrice / 1000000000) * (tokenBalance / 1000000000);
+    netBalance += tokenValue;
+  }
+  netBalance -= netLoan + (snapshot.data.userLoan?.scaledDebt || 0);
+  return { timestamp: snapshot.timestamp, data: {netBalance: netBalance / 1e18 }};
+}
+
 export const getBalanceHistory = async (
   accessToken: string,
   userAddress: string,
-  endTimestamp: number,
-  interval: number,
-  numTicks: number,
+  historyParams: HistoryParams,
 ): Promise<NetBalanceSnapshot[]> => {
-  const startTimestamp = endTimestamp - (interval * numTicks);
-  const startTime = (new Date(startTimestamp)).toISOString();
-  const endTime = (new Date(endTimestamp)).toISOString();
-  const [storageRes, mappingRes] = await Promise.all([
-    await cirrus.get(accessToken, "/history@storage", {
-      params: {
-        or: `(data->>lpToken.neq.'',data->>_symbol.like.*-LP,data->>_symbol.in.(MUSDST,SUSDST),data->>sToken.gt.0,and(data->>mToken.gt.0,data->>borrowIndex.gt.0))`,
-        valid_from: `lte.${endTime}`,
-        valid_to: `gte.${startTime}`,
-        select: 'address,data,valid_from,valid_to'
-      },
-    }),
-    await cirrus.get(accessToken, "/history@mapping", {
-      params: {
-        or: `(path.like.*${userAddress}*,path.like.prices[*,path.like.collateralConfigs[*,path.like.collateralGlobalStates[*,and(address.eq.937efa7e3a77e20bbdbd7c0d32b6514f368c1010,path.eq._balances[0000000000000000000000000000000000001004]))`,
-        valid_from: `lte.${endTime}`,
-        valid_to: `gte.${startTime}`,
-        collection_name: `in.(${['_balances', 'collateralConfigs', 'collateralGlobalStates', 'prices', 'userCollaterals', 'userLoan', 'vaults'].join(',')})`,
-        select: 'address,collection_name,key,path,value,valid_from,valid_to'
-      },
-    })
-  ]);
 
-  const storageHistory = storageRes.data as StorageHistoryElement[];
-  const mappingHistory = mappingRes.data as MappingHistoryElement[];
-  const snapshots: {timestamp: number, portfolioInfo: any}[] = (new Array(numTicks + 1)).fill({}).map((_, i) => { return {
-    timestamp: endTimestamp - (interval * (numTicks - i)),
-    portfolioInfo: { tokens: {}, userLoan: {} }
-  }; });
+  const storageFilters = [
+    'data->>lpToken.neq.""',
+    'data->>_symbol.like.*-LP',
+    'data->>_symbol.in.(MUSDST,SUSDST)',
+    'data->>sToken.gt.0',
+    'and(data->>mToken.gt.0,data->>borrowIndex.gt.0)'
+  ]
 
-  storageHistory.forEach((h) => {
-    const validFrom = Date.parse(h.valid_from + 'Z');
-    const validTo = h.valid_to === 'infinity' ? Number.MAX_SAFE_INTEGER : Date.parse(h.valid_to + 'Z');
-    if (validFrom <= startTimestamp && validTo >= endTimestamp) {
-      for (let i = 0; i < snapshots.length; i++) {
-        snapshots[i].portfolioInfo = updatePortfolioInfoStorage(snapshots[i].portfolioInfo, h);
-      }
-    } else if (validFrom <= startTimestamp) {
-      for (let i = 0; i < snapshots.length; i++) {
-        if (snapshots[i].timestamp <= validTo) {
-          snapshots[i].portfolioInfo = updatePortfolioInfoStorage(snapshots[i].portfolioInfo, h);
-        } else {
-          break;
-        }
-      }
-    } else if (validTo >= endTimestamp) {
-      for (let i = snapshots.length - 1; i >= 0; i--) {
-        if (snapshots[i].timestamp >= validFrom) {
-          snapshots[i].portfolioInfo = updatePortfolioInfoStorage(snapshots[i].portfolioInfo, h);
-        } else {
-          break;
-        }
-      }
-    } else {
-      for (let i = 0; i < snapshots.length; i++) {
-        if (snapshots[i].timestamp >= validFrom && snapshots[i].timestamp <= validTo) {
-          snapshots[i].portfolioInfo = updatePortfolioInfoStorage(snapshots[i].portfolioInfo, h);
-        }
-        if (snapshots[i].timestamp > validTo) {
-          break;
-        }
-      }
-    }
-  });
+  const mappingFilters = [
+    `path.like.*${userAddress}*`,
+    'path.like.prices[*',
+    'path.like.collateralConfigs[*',
+    'path.like.collateralGlobalStates[*',
+    'and(address.eq.937efa7e3a77e20bbdbd7c0d32b6514f368c1010,path.eq._balances[0000000000000000000000000000000000001004])'
+  ]
 
-  mappingHistory.forEach((h) => {
-    const validFrom = Date.parse(h.valid_from + 'Z');
-    const validTo = h.valid_to === 'infinity' ? Number.MAX_SAFE_INTEGER : Date.parse(h.valid_to + 'Z');
-    if (validFrom <= startTimestamp && validTo >= endTimestamp) {
-      for (let i = 0; i < snapshots.length; i++) {
-        snapshots[i].portfolioInfo = updatePortfolioInfoMapping(snapshots[i].portfolioInfo, h);
-      }
-    } else if (validFrom <= startTimestamp) {
-      for (let i = 0; i < snapshots.length; i++) {
-        if (snapshots[i].timestamp <= validTo) {
-          snapshots[i].portfolioInfo = updatePortfolioInfoMapping(snapshots[i].portfolioInfo, h);
-        } else {
-          break;
-        }
-      }
-    } else if (validTo >= endTimestamp) {
-      for (let i = snapshots.length - 1; i >= 0; i--) {
-        if (snapshots[i].timestamp >= validFrom) {
-          snapshots[i].portfolioInfo = updatePortfolioInfoMapping(snapshots[i].portfolioInfo, h);
-        } else {
-          break;
-        }
-      }
-    } else {
-      for (let i = 0; i < snapshots.length; i++) {
-        if (snapshots[i].timestamp >= validFrom && snapshots[i].timestamp <= validTo) {
-          snapshots[i].portfolioInfo = updatePortfolioInfoMapping(snapshots[i].portfolioInfo, h);
-        }
-        if (snapshots[i].timestamp > validTo) {
-          break;
-        }
-      }
-    }
-  });
+  const mappingCollectionNames = [
+    '_balances',
+    'collateralConfigs',
+    'collateralGlobalStates',
+    'prices',
+    'userCollaterals',
+    'userLoan',
+    'vaults'
+  ]
 
-  const balanceHistory = snapshots.map((snapshot, i) => {
-    let netBalance: number = 0;
-    let netLoan: number = 0;
-    for (const tokenAddr in snapshot.portfolioInfo.tokens) {
-      const token = snapshot.portfolioInfo.tokens[tokenAddr] || {};
-      let tokenPrice = token?.price || 0;
-      const tokenBalance = token?.balance || 0;
-      if (token?.scaledDebt) {
-        const rateAccumulator = Number(BigInt(token?.rateAccumulator) / 1000000000000000000n) / 1000000000;
-        const loanAmt = (token?.scaledDebt || 0) * rateAccumulator;
-        netLoan += loanAmt;
-      }
-      if (tokenBalance === 0) continue;
-      if (tokenPrice === 0) {
-        const totalSupply = token?.supply || '0';
-        if (totalSupply === '0') continue;
-        const pool = token?.pool;
-        const managedAssets = token?.managedAssets;
-        if (pool) { // LP token
-          tokenPrice = calculateLPTokenPrice(
-            pool.tokenABalance,
-            pool.tokenBBalance,
-            snapshot.portfolioInfo.tokens[pool.tokenA]?.price || '0',
-            snapshot.portfolioInfo.tokens[pool.tokenB]?.price || '0',
-            totalSupply
-          );
-        } else if (managedAssets) { // sUSDST
-          tokenPrice = Number((managedAssets * BigInt(1e18)) / BigInt(totalSupply));
-        } else { // mUSDST
-          const borrowIndex = BigInt(token?.borrowIndex) || 0n;
-          const borrowableAsset = token?.borrowableAsset || '';
-          const reservesAccrued = BigInt(token?.reservesAccrued) || 0n;
-          const totalScaledDebt = BigInt(token?.totalScaledDebt) || 0n;
-          const cash = BigInt(snapshot.portfolioInfo.tokens[token?.borrowableAsset || '']?.liquidityPoolBalance) || 0n;
-          const debt = (totalScaledDebt * borrowIndex) / BigInt(1e27);
-          const badDebt = token?.badDebt || 0n;
-          let underlying = cash + debt + badDebt;
-          if (reservesAccrued < underlying) {
-              underlying -= reservesAccrued;
-          } else {
-              underlying = cash;
-          }
-          if (underlying == 0) {
-            tokenPrice = 1e18;
-          } else {
-            tokenPrice = Number((underlying * BigInt(1e18)) / BigInt(totalSupply));
-          }
-        }
-      }
-      const tokenValue = (tokenPrice / 1000000000) * (tokenBalance / 1000000000);
-      netBalance += tokenValue;
-    }
-    netBalance -= netLoan + (snapshot.portfolioInfo.userLoan?.scaledDebt || 0);
-    return { timestamp: snapshot.timestamp, netBalance: netBalance / 1e18 };
-  });
-
-  return balanceHistory;
+  const balanceHistory = await getHistory(
+    accessToken,
+    historyParams,
+    storageFilters,
+    mappingFilters,
+    mappingCollectionNames,
+    { tokens: {}, userLoan: {} },
+    updatePortfolioInfoStorage,
+    updatePortfolioInfoMapping,
+    processBalanceSnapshot
+  );
+  return balanceHistory.map(({timestamp, data}) => ({timestamp, netBalance: data.netBalance}));
 };
