@@ -93,5 +93,24 @@ router.get("/balance-history/:tokenAddress", authHandler.authorizeRequest(), Tok
  */
 router.get("/net-balance-history", authHandler.authorizeRequest(), TokensV2Controller.getNetBalanceHistory);
 
+/**
+ * @openapi
+ * /tokens/v2/borrowing-history:
+ *   get:
+ *     summary: Get borrowing history for the signed-in user (v2)
+ *     tags: [Tokens]
+ *     responses:
+ *       200:
+ *         description: Borrowing history
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 additionalProperties: true
+ */
+router.get("/borrowing-history", authHandler.authorizeRequest(), TokensV2Controller.getBorrowingHistory);
+
 export default router;
 

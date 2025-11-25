@@ -302,38 +302,24 @@ export const getBalanceHistory = async (
   tokenAddress: string,
   historyParams: HistoryParams,
 ): Promise<BalanceSnapshot[]> => {
-
-  const mappingFilters = [
-    `path.like.*${userAddress}*`,
-  ]
-
-  const mappingCollectionNames = [
-    '_balances',
-    'userCollaterals',
-  ]
-
-  const reducer = (snapshot: HistorySnapshot, h: MappingHistoryElement): HistorySnapshot => {
+  const reducer = (data: any, h: MappingHistoryElement): HistorySnapshot => {
     switch (h.collection_name) {
       case '_balances': {
-        const currentBalance = snapshot.data.balance || 0;
+        const currentBalance = data.balance || 0;
         const newValue = parseFloat(h.value) || h.value || 0;
-        return { ...snapshot, 
-          data: { ...snapshot.data,
-            balance: currentBalance + newValue
-          }
+        return { ...data,
+          balance: currentBalance + (newValue / 1e18)
         };
-      } 
+      }
       case 'userCollaterals': {
-        const currentBalance = snapshot.data.balance || 0;
+        const currentBalance = data.balance || 0;
         const newValue = parseFloat(h.value) || h.value || 0;
-        return { ...snapshot, 
-          data: { ...snapshot.data,
-            balance: currentBalance + newValue
-          }
+        return { ...data,
+          balance: currentBalance + (newValue / 1e18)
         };
       }
     }
-    return snapshot;
+    return data;
   }
 
   const balanceHistory = await getHistory(
@@ -394,4 +380,101 @@ export const getNetBalanceHistory = async (
     processBalanceSnapshot
   );
   return balanceHistory.map(({timestamp, data}) => ({timestamp, netBalance: data.netBalance}));
+};
+
+export const getBorrowingHistory = async (
+  accessToken: string,
+  userAddress: string,
+  historyParams: HistoryParams,
+): Promise<BalanceSnapshot[]> => {
+  const mappingFilters = [
+    `path.like.*${userAddress}*`,
+    'path.like.collateralConfigs[*',
+    'path.like.collateralGlobalStates[*',
+  ]
+
+  const mappingCollectionNames = [
+    'collateralConfigs',
+    'collateralGlobalStates',
+    'userLoan',
+    'vaults'
+  ]
+
+  const reducer = (data: any, h: MappingHistoryElement): HistorySnapshot => {
+    switch (h.collection_name) {
+      case 'collateralConfigs': {
+        const stabilityFeeRate = BigInt(h.value.stabilityFeeRate || '1000000000627937192293877252');
+        return { ...data, 
+          tokens: { ...data.tokens,
+            [h.key.key || '']: { ...data.tokens[h.key.key || ''],
+              stabilityFeeRate: stabilityFeeRate
+            }
+          }
+        };
+      }
+      case 'collateralGlobalStates': {
+        const rateAccumulator = BigInt(h.value.rateAccumulator || BigInt(1e27));
+        const lastAccrual = parseFloat(h.value.lastAccrual) || 0;
+        return { ...data, 
+          tokens: { ...data.tokens,
+            [h.key.key || '']: { ...data.tokens[h.key.key || ''],
+              rateAccumulator: rateAccumulator,
+              lastAccrual: lastAccrual
+            }
+          }
+        };
+      }
+      case 'vaults': {
+        const scaledDebt = parseFloat(h.value.scaledDebt) || 0;
+        return { ...data, 
+          tokens: { ...data.tokens,
+            [h.key.key2 || '']: { ...data.tokens[h.key.key2],
+              scaledDebt: BigInt(scaledDebt)
+            }
+          }
+        };
+      }
+      case 'userLoan': {
+        const scaledDebt = parseFloat(h.value.scaledDebt) || 0;
+        const lastUpdated = parseInt(h.value.lastUpdated) || 0;
+        const now = Date.now();
+        const dt = now - lastUpdated;
+        const ert = Math.exp(0.05 * dt / (60*60*24*365));
+        return { ...data, 
+          userLoan: data.balance + ((scaledDebt * ert) / 1e18)
+        };
+      }
+    }
+    return data;
+  }
+
+  const balanceHistory = await getHistory(
+    accessToken,
+    historyParams,
+    [],
+    mappingFilters,
+    mappingCollectionNames,
+    { tokens: {}, userLoan: 0 },
+    ((s,_) => s),
+    reducer,
+    ((s,_) => {
+      let netLoan = 0;
+      for (const tokenAddr in s.data.tokens) {
+        const token = s.data.tokens[tokenAddr];
+        const stabilityFeeRate = token.stabilityFeeRate;
+        const lastAccrual = token.lastAccrual || 0;
+        const rateAccumulator = token.rateAccumulator || BigInt(1e27);
+        const scaledDebt = token.scaledDebt || 0;
+        const minusRAY = BigInt(stabilityFeeRate) - BigInt(1e27);
+        const interestRate = Math.round(200 * Number(minusRAY / 1000n) / 627937192293877.252) / 10000;
+        const dt = s.timestamp - (1000 * lastAccrual);
+        const ert = Math.exp(interestRate * dt / (1000*60*60*24*365));
+        const rateAccErt = Number(rateAccumulator) * ert / 1e27;
+        netLoan += Number(scaledDebt) * rateAccErt / 1e18;
+      }
+      netLoan += s.data.userLoan;
+      return { ...s, data: { balance: netLoan }};
+    })
+  );
+  return balanceHistory.map(({timestamp, data}) => ({timestamp, balance: data.balance}));
 };

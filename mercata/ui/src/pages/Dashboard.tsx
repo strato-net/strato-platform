@@ -19,10 +19,12 @@ import { useLendingContext } from "@/context/LendingContext";
 import { useCDP } from "@/context/CDPContext";
 import { cataAddress, rewardsEnabled } from "@/lib/constants";
 import { api } from "@/lib/axios";
-import { NetBalanceSnapshot } from "@mercata/shared-types";
+import { NetBalanceSnapshot, BalanceSnapshot } from "@mercata/shared-types";
 
 const TIME_RANGES = ["1d", "7d", "1m", "3m", "6m", "1y", "all"] as const;
 type TimeRange = typeof TIME_RANGES[number];
+
+type TabType = 'netBalance' | 'rewards' | 'borrowed';
 
 const Dashboard = () => {
   const [searchParams] = useSearchParams();
@@ -30,16 +32,38 @@ const Dashboard = () => {
   const location = useLocation();
   const { toast } = useToast();
   const { userAddress } = useUser();
-  const { earningAssets, getEarningAssets, inactiveTokens, getInactiveTokens, getBalanceHistory, loadingEarningAssets, loadingInactiveTokens } = useTokenContext();
+  const {
+    earningAssets,
+    getEarningAssets,
+    inactiveTokens,
+    getInactiveTokens,
+    getBalanceHistory,
+    getCataBalanceHistory,
+    getBorrowingHistory,
+    loadingEarningAssets,
+    loadingInactiveTokens
+  } = useTokenContext();
+  const [activeTab, setActiveTab] = useState<TabType>('netBalance');
   const { loans, refreshLoans } = useLendingContext();
   const { totalCDPDebt, refreshVaults } = useCDP();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [selectedTimeRange, setSelectedTimeRange] = useState<TimeRange>('1d');
   const [isLoadingBalanceHistory, setIsLoadingBalanceHistory] = useState(false);
+  
+  // Caches for different tabs
   const [balanceHistoryCache, setBalanceHistoryCache] = useState<Record<string, NetBalanceSnapshot[]>>({});
+  const [cataBalanceHistoryCache, setCataBalanceHistoryCache] = useState<Record<string, BalanceSnapshot[]>>({});
+  const [borrowedHistoryCache, setBorrowedHistoryCache] = useState<Record<string, BalanceSnapshot[]>>({});
+  
+  // Displayed data for current tab
   const [displayedBalanceHistory, setDisplayedBalanceHistory] = useState<NetBalanceSnapshot[]>([]);
+  const [displayedCataBalanceHistory, setDisplayedCataBalanceHistory] = useState<BalanceSnapshot[]>([]);
+  const [displayedBorrowedHistory, setDisplayedBorrowedHistory] = useState<BalanceSnapshot[]>([]);
+  
   const balanceHistoryCacheRef = useRef<Record<string, NetBalanceSnapshot[]>>({});
-  const hasPrefetchedRef = useRef(false);
+  const cataBalanceHistoryCacheRef = useRef<Record<string, BalanceSnapshot[]>>({});
+  const borrowedHistoryCacheRef = useRef<Record<string, BalanceSnapshot[]>>({});
+  const hasPrefetchedRef = useRef<Record<TabType, boolean>>({ netBalance: false, rewards: false, borrowed: false });
 
   const { pendingRewards, refetch: refetchPendingRewards } = usePendingRewards(rewardsEnabled, 30000);
   const [isClaiming, setIsClaiming] = useState(false);
@@ -88,59 +112,138 @@ const Dashboard = () => {
     refreshVaults();
   }, [location.pathname, userAddress, getEarningAssets, getInactiveTokens, refreshLoans, refreshVaults]);
 
-  const setCacheForRange = useCallback((duration: TimeRange, data: NetBalanceSnapshot[]) => {
-    setBalanceHistoryCache(prev => {
-      const updated = { ...prev, [duration]: data };
-      balanceHistoryCacheRef.current = updated;
-      return updated;
-    });
+  const setCacheForRange = useCallback((duration: TimeRange, data: NetBalanceSnapshot[], tab: TabType = 'netBalance') => {
+    if (tab === 'netBalance') {
+      setBalanceHistoryCache(prev => {
+        const updated = { ...prev, [duration]: data };
+        balanceHistoryCacheRef.current = updated;
+        return updated;
+      });
+    } else if (tab === 'rewards') {
+      const cataData = data as unknown as BalanceSnapshot[];
+      setCataBalanceHistoryCache(prev => {
+        const updated = { ...prev, [duration]: cataData };
+        cataBalanceHistoryCacheRef.current = updated;
+        return updated;
+      });
+    }
   }, []);
 
-  const prefetchOtherRanges = useCallback((primaryRange: TimeRange) => {
-    if (hasPrefetchedRef.current) return;
-    hasPrefetchedRef.current = true;
+  const prefetchOtherRanges = useCallback((primaryRange: TimeRange, tab: TabType) => {
+    if (hasPrefetchedRef.current[tab]) return;
+    hasPrefetchedRef.current[tab] = true;
     const rangesToPrefetch = TIME_RANGES.filter(range => range !== primaryRange);
+    
     rangesToPrefetch.forEach(range => {
       (async () => {
-        if (balanceHistoryCacheRef.current[range]) return;
         try {
-          const data = await getBalanceHistory(range, '');
-          setCacheForRange(range as TimeRange, data);
+          if (tab === 'netBalance') {
+            if (balanceHistoryCacheRef.current[range]) return;
+            const data = await getBalanceHistory(range, '');
+            setCacheForRange(range as TimeRange, data, 'netBalance');
+          } else if (tab === 'rewards') {
+            if (cataBalanceHistoryCacheRef.current[range]) return;
+            const data = await getCataBalanceHistory(range, '');
+            setCataBalanceHistoryCache(prev => {
+              const updated = { ...prev, [range]: data };
+              cataBalanceHistoryCacheRef.current = updated;
+              return updated;
+            });
+          } else if (tab === 'borrowed') {
+            if (borrowedHistoryCacheRef.current[range]) return;
+            const data = await getBorrowingHistory(range, '');
+            setBorrowedHistoryCache(prev => {
+              const updated = { ...prev, [range]: data };
+              borrowedHistoryCacheRef.current = updated;
+              return updated;
+            });
+          }
         } catch (err) {
           // ignore background errors
         }
       })();
     });
-  }, [getBalanceHistory, setCacheForRange]);
+  }, [getBalanceHistory, getCataBalanceHistory, getBorrowingHistory, setCacheForRange]);
 
   useEffect(() => {
     let isMounted = true;
 
     const loadRange = async () => {
-      const cached = balanceHistoryCacheRef.current[selectedTimeRange];
-      if (cached && cached.length > 0) {
-        setDisplayedBalanceHistory(cached);
-        setIsLoadingBalanceHistory(false);
-        prefetchOtherRanges(selectedTimeRange);
-        return;
-      }
-
-      setIsLoadingBalanceHistory(true);
-      let shouldPrefetch = false;
-      try {
-        const data = await getBalanceHistory(selectedTimeRange, '');
-        if (!isMounted) return;
-        setCacheForRange(selectedTimeRange, data);
-        setDisplayedBalanceHistory(data);
-        shouldPrefetch = true;
-      } catch (err) {
-      } finally {
-        if (isMounted) {
+      if (activeTab === 'netBalance') {
+        const cached = balanceHistoryCacheRef.current[selectedTimeRange];
+        if (cached && cached.length > 0) {
+          setDisplayedBalanceHistory(cached);
           setIsLoadingBalanceHistory(false);
-          if (shouldPrefetch) {
-            prefetchOtherRanges(selectedTimeRange);
+          prefetchOtherRanges(selectedTimeRange, 'netBalance');
+          return;
+        }
+
+        setIsLoadingBalanceHistory(true);
+        let shouldPrefetch = false;
+        try {
+          const data = await getBalanceHistory(selectedTimeRange, '');
+          if (!isMounted) return;
+          setCacheForRange(selectedTimeRange, data, 'netBalance');
+          setDisplayedBalanceHistory(data);
+          shouldPrefetch = true;
+        } catch (err) {
+        } finally {
+          if (isMounted) {
+            setIsLoadingBalanceHistory(false);
+            if (shouldPrefetch) {
+              prefetchOtherRanges(selectedTimeRange, 'netBalance');
+            }
           }
         }
+      } else if (activeTab === 'rewards') {
+        const cached = cataBalanceHistoryCacheRef.current[selectedTimeRange];
+        if (cached && cached.length > 0) {
+          setDisplayedCataBalanceHistory(cached);
+          setIsLoadingBalanceHistory(false);
+          prefetchOtherRanges(selectedTimeRange, 'rewards');
+          return;
+        }
+
+        setIsLoadingBalanceHistory(true);
+        let shouldPrefetch = false;
+        try {
+          const data = await getCataBalanceHistory(selectedTimeRange, '');
+          if (!isMounted) return;
+          setCataBalanceHistoryCache(prev => {
+            const updated = { ...prev, [selectedTimeRange]: data };
+            cataBalanceHistoryCacheRef.current = updated;
+            return updated;
+          });
+          setDisplayedCataBalanceHistory(data);
+          shouldPrefetch = true;
+        } catch (err) {
+        } finally {
+          if (isMounted) {
+            setIsLoadingBalanceHistory(false);
+            if (shouldPrefetch) {
+              prefetchOtherRanges(selectedTimeRange, 'rewards');
+            }
+          }
+        }
+      } else if (activeTab === 'borrowed') {
+        const cached = borrowedHistoryCacheRef.current[selectedTimeRange];
+        if (cached && cached.length > 0) {
+          setDisplayedBorrowedHistory(cached);
+          setIsLoadingBalanceHistory(false);
+          prefetchOtherRanges(selectedTimeRange, 'borrowed');
+          return;
+        }
+
+        setIsLoadingBalanceHistory(true);
+        const data = await getBorrowingHistory(selectedTimeRange, '');
+        setBorrowedHistoryCache(prev => {
+          const updated = { ...prev, [selectedTimeRange]: data };
+          borrowedHistoryCacheRef.current = updated;
+          return updated;
+        });
+        setDisplayedBorrowedHistory(data);
+        setIsLoadingBalanceHistory(false);
+        prefetchOtherRanges(selectedTimeRange, 'borrowed');
       }
     };
 
@@ -149,7 +252,7 @@ const Dashboard = () => {
     return () => {
       isMounted = false;
     };
-  }, [selectedTimeRange, getBalanceHistory, prefetchOtherRanges, setCacheForRange]);
+  }, [selectedTimeRange, activeTab, getBalanceHistory, getCataBalanceHistory, getBorrowingHistory, prefetchOtherRanges, setCacheForRange]);
 
   useEffect(() => {
     if (!searchParams) return;
@@ -212,6 +315,8 @@ const Dashboard = () => {
               value={`$${totalBalance.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`}
               icon={<Wallet className="text-white" size={18} />}
               color="bg-blue-500"
+              onClick={() => setActiveTab('netBalance')}
+              isActive={activeTab === 'netBalance'}
             />
 
             <AssetSummary
@@ -219,6 +324,8 @@ const Dashboard = () => {
               value={`${cataBalance.toLocaleString("en-US", { maximumFractionDigits: 2 })} CATA Points`}
               icon={<Coins className="text-white" size={18} />}
               color="bg-purple-500"
+              onClick={() => setActiveTab('rewards')}
+              isActive={activeTab === 'rewards'}
             />
 
             {rewardsEnabled && (
@@ -237,22 +344,64 @@ const Dashboard = () => {
               value={`${totalBorrowed.toFixed(2)} USDST`}
               icon={<Shield className="text-white" size={18} />}
               color="bg-orange-500"
+              onClick={() => setActiveTab('borrowed')}
+              isActive={activeTab === 'borrowed'}
             />
           </div>
 
           {/* Portfolio Value Chart */}
           <div className="mb-8">
-            <PortfolioValueChart 
-              data={(displayedBalanceHistory || []).map(item => ({
-                timestamp: item.timestamp || 0,
-                netBalance: typeof item.netBalance === 'string' ? parseFloat(item.netBalance) : (item.netBalance || 0)
-              }))}
-              onTimeRangeChange={(duration) => {
-                setSelectedTimeRange(duration as TimeRange);
-              }}
-              selectedTimeRange={selectedTimeRange}
-              isLoading={isLoadingBalanceHistory}
-            />
+            {activeTab === 'netBalance' && (
+              <PortfolioValueChart 
+                data={(displayedBalanceHistory || []).map(item => ({
+                  timestamp: item.timestamp || 0,
+                  netBalance: typeof item.netBalance === 'string' ? parseFloat(item.netBalance) : (item.netBalance || 0)
+                }))}
+                onTimeRangeChange={(duration) => {
+                  setSelectedTimeRange(duration as TimeRange);
+                }}
+                selectedTimeRange={selectedTimeRange}
+                isLoading={isLoadingBalanceHistory}
+                tabType="netBalance"
+                title="Portfolio Value"
+                subtitle="Net balance over time"
+                currentValue={totalBalance}
+              />
+            )}
+            {activeTab === 'rewards' && (
+              <PortfolioValueChart 
+                data={(displayedCataBalanceHistory || []).map(item => ({
+                  timestamp: item.timestamp || 0,
+                  netBalance: typeof item.balance === 'string' ? parseFloat(item.balance) : (item.balance || 0)
+                }))}
+                onTimeRangeChange={(duration) => {
+                  setSelectedTimeRange(duration as TimeRange);
+                }}
+                selectedTimeRange={selectedTimeRange}
+                isLoading={isLoadingBalanceHistory}
+                tabType="rewards"
+                title="Rewards"
+                subtitle="CATA balance over time"
+                currentValue={cataBalance}
+              />
+            )}
+            {activeTab === 'borrowed' && (
+              <PortfolioValueChart 
+                data={(displayedBorrowedHistory || []).map(item => ({
+                  timestamp: item.timestamp || 0,
+                  netBalance: typeof item.balance === 'string' ? parseFloat(item.balance) : (item.balance || 0)
+                }))}
+                onTimeRangeChange={(duration) => {
+                  setSelectedTimeRange(duration as TimeRange);
+                }}
+                selectedTimeRange={selectedTimeRange}
+                isLoading={isLoadingBalanceHistory}
+                tabType="borrowed"
+                title="Borrowed"
+                subtitle="Total borrowed over time"
+                currentValue={totalBorrowed}
+              />
+            )}
           </div>
 
           <div className="mb-8">

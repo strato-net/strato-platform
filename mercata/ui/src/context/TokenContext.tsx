@@ -20,6 +20,7 @@ type TokenContextType = {
   earningAssets: EarningAsset[];
   balanceHistory: NetBalanceSnapshot[];
   cataBalanceHistory: BalanceSnapshot[];
+  borrowingHistory: BalanceSnapshot[];
   loading: boolean;
   error: string | null;
   getAllTokens: (query?: Record<string, string>) => Promise<void>;
@@ -30,6 +31,8 @@ type TokenContextType = {
   getTransferableTokens: () => Promise<Token[]>;
   getEarningAssets: (showLoading?: boolean) => Promise<void>;
   getBalanceHistory: (duration?: string, end?: string) => Promise<NetBalanceSnapshot[]>;
+  getCataBalanceHistory: (duration?: string, end?: string) => Promise<BalanceSnapshot[]>;
+  getBorrowingHistory: (duration?: string, end?: string) => Promise<BalanceSnapshot[]>;
   loadingEarningAssets: boolean;
   loadingInactiveTokens: boolean;
   createToken: (token: CreateTokenPayload) => Promise<void>;
@@ -54,6 +57,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
   const [earningAssets, setEarningAssets] = useState<EarningAsset[]>([]);
   const [balanceHistory, setBalanceHistory] = useState<NetBalanceSnapshot[]>([]);
   const [cataBalanceHistory, setCataBalanceHistory] = useState<BalanceSnapshot[]>([]);
+  const [borrowingHistory, setBorrowingHistory] = useState<BalanceSnapshot[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingEarningAssets, setLoadingEarningAssets] = useState(false);
   const [loadingInactiveTokens, setLoadingInactiveTokens] = useState(false);
@@ -257,6 +261,21 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  const getBorrowingHistory = useCallback(async (duration: string = '1d', end?: string): Promise<BalanceSnapshot[]> => {
+    setLoading(true);
+    try {
+      const query = `?duration=${duration}${end ? `&end=${end}` : ''}`;
+      const res = await api.get<BalanceSnapshot[]>(`/tokens/v2/borrowing-history${query}`);
+      const data = res.data || [];
+      setBorrowingHistory(data);
+      return data;
+    } catch (err) {
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const createToken = useCallback(async (token: CreateTokenPayload) => {
     setLoading(true);
     try {
@@ -365,6 +384,8 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
         inactiveTokens,
         earningAssets,
         balanceHistory,
+        cataBalanceHistory,
+        borrowingHistory,
         loading,
         error,
         getAllTokens,
@@ -375,6 +396,8 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
         getTransferableTokens,
         getEarningAssets,
         getBalanceHistory,
+        getCataBalanceHistory,
+        getBorrowingHistory,
         createToken,
         transferToken,
         approveToken,

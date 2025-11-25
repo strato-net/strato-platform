@@ -12,6 +12,7 @@ interface AssetSummaryProps {
   color: string;
   tooltip?: string;
   onClick?: () => void;
+  isActive?: boolean;
 }
 
 const AssetSummary = ({
@@ -21,9 +22,15 @@ const AssetSummary = ({
   color,
   tooltip,
   onClick,
+  isActive = false,
 }: AssetSummaryProps) => {
   return (
-    <div className="bg-white rounded-xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition-shadow w-full h-full flex flex-col justify-center">
+    <div 
+      className={`bg-white rounded-xl border p-5 shadow-sm transition-all w-full h-full flex flex-col justify-center ${
+        isActive ? 'border-blue-500 border-2 shadow-md' : 'border-gray-100 hover:shadow-md'
+      } ${onClick ? 'cursor-pointer' : ''}`}
+      onClick={onClick}
+    >
       <div className="flex justify-between items-start">
         <div>
           <div className="flex items-center gap-1">
@@ -43,10 +50,7 @@ const AssetSummary = ({
         </div>
 
         <div
-          className={`w-10 h-10 rounded-full flex items-center justify-center ${color} ${
-            onClick ? "cursor-pointer hover:opacity-80 transition-opacity" : ""
-          }`}
-          onClick={onClick}
+          className={`w-10 h-10 rounded-full flex items-center justify-center ${color} transition-opacity`}
         >
           {icon}
         </div>

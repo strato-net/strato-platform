@@ -18,11 +18,17 @@ type PortfolioDataPoint = {
   netBalance: number;
 };
 
+type TabType = 'netBalance' | 'rewards' | 'borrowed';
+
 interface PortfolioValueChartProps {
   data: PortfolioDataPoint[];
   onTimeRangeChange?: (duration: string) => void;
   selectedTimeRange?: string;
   isLoading?: boolean;
+  tabType?: TabType;
+  title?: string;
+  subtitle?: string;
+  currentValue?: number;
 }
 
 // Convert timestamp to date or time string for display based on range
@@ -58,11 +64,12 @@ const formatBalance = (value: number): string => {
 };
 
 // Calculate percentage change
-const calculateChange = (data: PortfolioDataPoint[]): { value: number; isPositive: boolean } => {
+const calculateChange = (data: PortfolioDataPoint[], isNormalized: boolean = true): { value: number; isPositive: boolean } => {
   if (data.length < 2) return { value: 0, isPositive: true };
   
-  const first = data[0].netBalance / 1e22;
-  const last = data[data.length - 1].netBalance / 1e22;
+  const first = isNormalized ? data[0].netBalance / 1e22 : data[0].netBalance;
+  const last = isNormalized ? data[data.length - 1].netBalance / 1e22 : data[data.length - 1].netBalance;
+  if (first === 0) return { value: 0, isPositive: true };
   const change = ((last - first) / first) * 100;
   
   return {
@@ -75,8 +82,26 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
   data, 
   onTimeRangeChange,
   selectedTimeRange = '7d',
-  isLoading = false
+  isLoading = false,
+  tabType = 'netBalance',
+  title = 'Portfolio Value',
+  subtitle = 'Net balance over time',
+  currentValue: propCurrentValue
 }) => {
+  // Determine color scheme based on tab type
+  const getColorScheme = (tab: TabType): { line: string; positive: string; negative: string } => {
+    switch (tab) {
+      case 'rewards':
+        return { line: '#a855f7', positive: '#a855f7', negative: '#ef4444' }; // purple-500
+      case 'borrowed':
+        return { line: '#f97316', positive: '#f97316', negative: '#f97316' }; // orange-500
+      default:
+        return { line: '#3b82f6', positive: '#22c55e', negative: '#ef4444' }; // blue-500
+    }
+  };
+
+  const colors = getColorScheme(tabType);
+  const isNormalized = tabType === 'netBalance';
   // Memoize chart data transformations to prevent unnecessary recalculations
   const chartData = useMemo(() => {
     if (!data || data.length === 0) {
@@ -92,26 +117,28 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
         const netBalance = typeof point.netBalance === 'string' 
           ? parseFloat(point.netBalance) 
           : point.netBalance;
+        // Normalize value for netBalance tab, keep raw for others
+        const value = isNormalized ? netBalance / 1e22 : netBalance;
         return {
           timestamp: point.timestamp,
           date: formatDate(point.timestamp, isTimeRange),
-          value: netBalance,
+          value,
           raw: netBalance
         };
       })
       .filter(point => !isNaN(point.value) && point.value >= 0);
-  }, [data]);
+  }, [data, isNormalized]);
 
   const hasData = chartData.length > 0;
 
   // Memoize calculated values
   const { currentValue, change, yAxisDomain } = useMemo(() => {
     if (!hasData) {
-      return { currentValue: 0, change: { value: 0, isPositive: true }, yAxisDomain: [0, 100] };
+      return { currentValue: propCurrentValue || 0, change: { value: 0, isPositive: true }, yAxisDomain: [0, 100] };
     }
 
-    const currentValue = chartData[chartData.length - 1]?.value || 0;
-    const change = calculateChange(data);
+    const currentValue = propCurrentValue !== undefined ? propCurrentValue : (chartData[chartData.length - 1]?.value || 0);
+    const change = calculateChange(data, isNormalized);
     
     const values = chartData.map(d => d.value);
     const minValue = Math.min(...values);
@@ -125,27 +152,39 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
     ];
 
     return { currentValue, change, yAxisDomain };
-  }, [chartData, data, hasData]);
+  }, [chartData, data, hasData, isNormalized, propCurrentValue]);
 
-  // Determine color based on trend - stock chart style (green for gains, red for losses)
-  const lineColor = change.isPositive ? '#10b981' : '#ef4444'; // green-500 or red-500
+  // Determine color based on trend and tab type
+  const lineColor = change.isPositive ? colors.positive : colors.negative;
 
   return (
     <Card className="mb-6">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-2xl font-bold">Portfolio Value</h3>
-            <p className="text-sm text-gray-600 mt-1">Net balance over time</p>
+            <h3 className="text-2xl font-bold">{title}</h3>
+            <p className="text-sm text-gray-600 mt-1">{subtitle}</p>
           </div>
           <div className="text-right">
             <div className="text-2xl font-bold">
-              {hasData ? `$${currentValue.toLocaleString('en-US', { 
-                minimumFractionDigits: 2, 
-                maximumFractionDigits: 2 
-              })}` : '—'}
+              {tabType === 'rewards' ? (
+                `${currentValue.toLocaleString('en-US', { 
+                  minimumFractionDigits: 2, 
+                  maximumFractionDigits: 2 
+                })} CATA Points`
+              ) : tabType === 'borrowed' ? (
+                `${currentValue.toLocaleString('en-US', { 
+                  minimumFractionDigits: 2, 
+                  maximumFractionDigits: 2 
+                })} USDST`
+              ) : (
+                `$${currentValue.toLocaleString('en-US', { 
+                  minimumFractionDigits: 2, 
+                  maximumFractionDigits: 2 
+                })}`
+              )}
             </div>
-            <div className={`flex items-center gap-1 text-sm ${change.isPositive ? 'text-green-500' : 'text-red-500'}`}>
+            <div className={`flex items-center gap-1 text-sm ${change.isPositive ? (tabType === 'rewards' ? 'text-purple-500' : tabType === 'borrowed' ? 'text-red-500' : 'text-green-500') : (tabType === 'borrowed' ? 'text-green-500' : 'text-red-500')}`}>
               {change.isPositive ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
               <span>{hasData ? `${change.value.toFixed(2)}%` : '—'}</span>
             </div>
@@ -157,14 +196,14 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
           {hasData ? (
             <>
               <ChartContainer
-                config={{
-                  value: {
-                    theme: {
-                      light: lineColor,
-                      dark: lineColor,
-                    }
-                  },
-                }}
+            config={{
+              value: {
+                theme: {
+                  light: colors.line,
+                  dark: colors.line,
+                }
+              },
+            }}
                 className="w-full h-full"
               >
                 <ResponsiveContainer width="100%" height="100%">
@@ -188,9 +227,17 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
                       axisLine={false}
                       tickLine={false}
                       tick={{ fontSize: 11, fill: '#6b7280' }}
-                      domain={yAxisDomain}
-                      width={60}
-                      tickFormatter={(value) => `$${(value / 1000).toFixed(1)}k`}
+                  domain={yAxisDomain}
+                  width={60}
+                  tickFormatter={(value) => {
+                    if (tabType === 'rewards') {
+                      return `${(value / 1000).toFixed(1)}k`;
+                    } else if (tabType === 'borrowed') {
+                      return `${(value / 1000).toFixed(1)}k`;
+                    } else {
+                      return `$${(value / 1000).toFixed(1)}k`;
+                    }
+                  }}
                     />
                     <ChartTooltip
                       content={({ active, payload }) => {
@@ -203,10 +250,22 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
                               {formatFullDate(dataPoint.timestamp)}
                             </p>
                             <p className="text-sm font-semibold">
-                              ${dataPoint.value.toLocaleString('en-US', { 
-                                minimumFractionDigits: 2, 
-                                maximumFractionDigits: 2 
-                              })}
+                              {tabType === 'rewards' ? (
+                                `${dataPoint.value.toLocaleString('en-US', { 
+                                  minimumFractionDigits: 2, 
+                                  maximumFractionDigits: 2 
+                                })} CATA Points`
+                              ) : tabType === 'borrowed' ? (
+                                `${dataPoint.value.toLocaleString('en-US', { 
+                                  minimumFractionDigits: 2, 
+                                  maximumFractionDigits: 2 
+                                })} USDST`
+                              ) : (
+                                `$${dataPoint.value.toLocaleString('en-US', { 
+                                  minimumFractionDigits: 2, 
+                                  maximumFractionDigits: 2 
+                                })}`
+                              )}
                             </p>
                           </div>
                         );
