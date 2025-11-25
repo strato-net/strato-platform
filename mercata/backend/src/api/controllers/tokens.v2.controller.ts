@@ -87,6 +87,13 @@ class TokensV2Controller {
           numTicks = 366; // 12 months
           break;
         }
+        case 'all': {
+          const genesisTimestamp = Date.parse('2025-10-30T00:00:00Z');
+          const dt = endTimestamp - genesisTimestamp;
+          interval = Number(dt/360);
+          numTicks = 360;
+          break;
+        }
       }
 
       const result = await getBalanceHistory(accessToken, userAddress, endTimestamp, interval, numTicks);

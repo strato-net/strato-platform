@@ -149,11 +149,11 @@ function updatePortfolioInfoStorage(portfolioInfo: any, newInfo: StorageHistoryE
     return { ...portfolioInfo,
       tokens: { ...portfolioInfo.tokens,
         [newInfo.data.mToken]: { ...portfolioInfo.tokens[newInfo.data.mToken],
-          borrowIndex: BigInt(newInfo.data.borrowIndex) || 0n,
+          borrowIndex: BigInt(newInfo.data.borrowIndex || '') || 0n,
           borrowableAsset: newInfo.data.borrowableAsset,
-          reservesAccrued: BigInt(newInfo.data.reservesAccrued) || 0n,
-          totalScaledDebt: BigInt(newInfo.data.totalScaledDebt) || 0n,
-          badDebt: BigInt(newInfo.data.badDebt) || 0n
+          reservesAccrued: BigInt(newInfo.data.reservesAccrued || '') || 0n,
+          totalScaledDebt: BigInt(newInfo.data.totalScaledDebt || '') || 0n,
+          badDebt: BigInt(newInfo.data.badDebt || '') || 0n
         }
       }
     };
