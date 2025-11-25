@@ -242,10 +242,12 @@ export const getCDPProtocolRevenue = async (
     const timeCutoffs = getTimeCutoffs();
     
     // Transform events to common format
+    // Note: CDP fees are always paid in USDST, so we use the USDST address
+    // rather than the collateral asset from the event
     const transformedEvents = feesRoutedEvents.map((event: any) => ({
       value: BigInt(event.toCollector || "0"),
       timestamp: parseTimestamp(event.block_timestamp),
-      asset: event.asset.toLowerCase()
+      asset: constants.USDST.toLowerCase()
     }));
     
     const periodRevenue = categorizeRevenueByPeriod(transformedEvents, timeCutoffs);
