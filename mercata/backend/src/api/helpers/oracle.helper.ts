@@ -50,16 +50,22 @@ const addSTokenPrice = async (
   const managedAssets = BigInt(smRes.data?.[0]?._managedAssets ?? "0");
   const totalShares   = BigInt(stRes.data?.[0]?._totalSupply ?? "0");
 
+  const exchangeRate = calculateSTokenPrice(
+    managedAssets,
+    totalShares
+  );
+
+  priceMap.set(sToken.address, exchangeRate.toString());
+}
+
+export const calculateSTokenPrice = (managedAssets: bigint, totalShares: bigint): bigint => {
   // If no shares exist, define price = 1e18 (initial exchange rate)
   if (totalShares === 0n) {
-    priceMap.set(sToken.address, DECIMALS.toString());
-    return;
+    return DECIMALS;
   }
 
   // exchangeRate = (managedAssets / totalShares) * 1e18
-  const exchangeRate = (managedAssets * DECIMALS) / totalShares;
-
-  priceMap.set(sToken.address, exchangeRate.toString());
+  return (managedAssets * DECIMALS) / totalShares;
 };
 
 const addLPTokenPrices = async (
