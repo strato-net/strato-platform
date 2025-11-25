@@ -197,10 +197,13 @@ pipeline {
                     version=$(grep -oP "#strato-version:\\K[^#]*" docker-compose.yml)
                     AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} AWS_DEFAULT_REGION="us-east-1"
                     aws s3 cp docker-compose.yml s3://blockapps-build-artifacts/${version}/
+                    aws s3 cp docker-compose.allDocker.yml s3://blockapps-build-artifacts/${version}/
                     aws s3 cp docker-compose.vault.yml s3://blockapps-build-artifacts/${version}/
                     aws s3 cp docker-compose.highway.yml s3://blockapps-build-artifacts/${version}/
                     aws s3 cp docker-compose.ecr.yml s3://blockapps-build-artifacts/${version}/
+                    aws s3 cp docker-compose.allDocker.ecr.yml s3://blockapps-build-artifacts/${version}/
                     aws s3 cp docker-compose.vault.ecr.yml s3://blockapps-build-artifacts/${version}/
+                    aws s3 cp docker-compose.highway.ecr.yml s3://blockapps-build-artifacts/${version}/
                   '''
                 }
               }
