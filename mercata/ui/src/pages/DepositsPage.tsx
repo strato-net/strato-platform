@@ -12,7 +12,7 @@ import {
 import { Tabs as AntdTabs } from "antd";
 import AssetSummary from '@/components/dashboard/AssetSummary';
 import AssetsGrid from '@/components/dashboard/AssetsGrid';
-import { Wallet, ExternalLink } from 'lucide-react';
+import { Wallet, ArrowRight } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { useTokenContext } from '@/context/TokenContext';
 import { useLendingContext } from '@/context/LendingContext';
@@ -102,7 +102,7 @@ const DepositsPage = () => {
                       onClick={() => setTargetTransactionTab('DepositRecorded')}
                       className="flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors"
                     >
-                      <ExternalLink size={16} />
+                      <ArrowRight size={16} />
                       View Transactions
                     </Link>
                   </div>

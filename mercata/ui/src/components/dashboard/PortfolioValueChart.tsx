@@ -10,7 +10,7 @@ import {
   ReferenceLine,
 } from "recharts";
 import { format } from 'date-fns';
-import { TrendingUp, TrendingDown } from 'lucide-react';
+import { TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
 import { useMemo } from 'react';
 
 type PortfolioDataPoint = {
@@ -22,6 +22,7 @@ interface PortfolioValueChartProps {
   data: PortfolioDataPoint[];
   onTimeRangeChange?: (duration: string) => void;
   selectedTimeRange?: string;
+  isLoading?: boolean;
 }
 
 // Convert timestamp to date or time string for display based on range
@@ -73,28 +74,20 @@ const calculateChange = (data: PortfolioDataPoint[]): { value: number; isPositiv
 const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({ 
   data, 
   onTimeRangeChange,
-  selectedTimeRange = '7d'
+  selectedTimeRange = '7d',
+  isLoading = false
 }) => {
-  if (data.length === 0) {
-    return (
-      <Card className="mb-6">
-        <CardContent className="flex items-center justify-center h-80">
-          <p className="text-gray-500">No portfolio data available</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
   // Memoize chart data transformations to prevent unnecessary recalculations
   const chartData = useMemo(() => {
-    // Calculate time range to determine formatting
+    if (!data || data.length === 0) {
+      return [];
+    }
+
     const timeRangeHours = calculateTimeRangeHours(data);
     const isTimeRange = timeRangeHours <= 24;
 
-    // Transform data for chart (normalize to display values)
-    // Handle both string and number netBalance values
-    return data
-      .sort((a, b) => a.timestamp - b.timestamp) // Ensure chronological order
+    return [...data]
+      .sort((a, b) => a.timestamp - b.timestamp)
       .map(point => {
         const netBalance = typeof point.netBalance === 'string' 
           ? parseFloat(point.netBalance) 
@@ -102,28 +95,29 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
         return {
           timestamp: point.timestamp,
           date: formatDate(point.timestamp, isTimeRange),
-          value: netBalance, // Convert to readable format
+          value: netBalance,
           raw: netBalance
         };
       })
-      .filter(point => !isNaN(point.value) && point.value >= 0); // Filter invalid data points
+      .filter(point => !isNaN(point.value) && point.value >= 0);
   }, [data]);
+
+  const hasData = chartData.length > 0;
 
   // Memoize calculated values
   const { currentValue, change, yAxisDomain } = useMemo(() => {
-    if (chartData.length === 0) {
+    if (!hasData) {
       return { currentValue: 0, change: { value: 0, isPositive: true }, yAxisDomain: [0, 100] };
     }
 
     const currentValue = chartData[chartData.length - 1]?.value || 0;
     const change = calculateChange(data);
     
-    // Calculate domain with padding
     const values = chartData.map(d => d.value);
     const minValue = Math.min(...values);
     const maxValue = Math.max(...values);
     const range = maxValue - minValue;
-    const padding = range > 0 ? range * 0.1 : maxValue * 0.05; // Fallback if all values are the same
+    const padding = range > 0 ? range * 0.1 : maxValue * 0.05;
     
     const yAxisDomain = [
       Math.max(0, minValue - padding),
@@ -131,18 +125,7 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
     ];
 
     return { currentValue, change, yAxisDomain };
-  }, [chartData, data]);
-
-  // Check if we have valid data after filtering
-  if (chartData.length === 0) {
-    return (
-      <Card className="mb-6">
-        <CardContent className="flex items-center justify-center h-80">
-          <p className="text-gray-500">No valid portfolio data available</p>
-        </CardContent>
-      </Card>
-    );
-  }
+  }, [chartData, data, hasData]);
 
   // Determine color based on trend - stock chart style (green for gains, red for losses)
   const lineColor = change.isPositive ? '#10b981' : '#ef4444'; // green-500 or red-500
@@ -157,97 +140,118 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
           </div>
           <div className="text-right">
             <div className="text-2xl font-bold">
-              ${currentValue.toLocaleString('en-US', { 
+              {hasData ? `$${currentValue.toLocaleString('en-US', { 
                 minimumFractionDigits: 2, 
                 maximumFractionDigits: 2 
-              })}
+              })}` : '—'}
             </div>
             <div className={`flex items-center gap-1 text-sm ${change.isPositive ? 'text-green-500' : 'text-red-500'}`}>
-              {change.isPositive ? (
-                <TrendingUp size={16} />
-              ) : (
-                <TrendingDown size={16} />
-              )}
-              <span>{change.value.toFixed(2)}%</span>
+              {change.isPositive ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
+              <span>{hasData ? `${change.value.toFixed(2)}%` : '—'}</span>
             </div>
           </div>
         </div>
       </CardHeader>
       <CardContent className="overflow-hidden">
-        <div className="w-full h-80">
-          <ChartContainer
-            config={{
-              value: {
-                theme: {
-                  light: lineColor,
-                  dark: lineColor,
-                }
-              },
-            }}
-            className="w-full h-full"
-          >
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart
-                data={chartData}
-                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+        <div className="relative w-full h-80">
+          {hasData ? (
+            <>
+              <ChartContainer
+                config={{
+                  value: {
+                    theme: {
+                      light: lineColor,
+                      dark: lineColor,
+                    }
+                  },
+                }}
+                className="w-full h-full"
               >
-                <CartesianGrid 
-                  strokeDasharray="3 3" 
-                  vertical={false}
-                  stroke="#e5e7eb"
-                />
-                <XAxis
-                  dataKey="date"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={false}
-                  interval="preserveStartEnd"
-                />
-                <YAxis
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 11, fill: '#6b7280' }}
-                  domain={yAxisDomain}
-                  width={60}
-                  tickFormatter={(value) => `$${(value / 1000).toFixed(1)}k`}
-                />
-                <ChartTooltip
-                  content={({ active, payload, label }) => {
-                    if (!active || !payload || !payload.length) return null;
-                    
-                    const data = payload[0].payload as typeof chartData[0];
-                    return (
-                      <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3">
-                        <p className="text-xs text-gray-500 mb-1">
-                          {formatFullDate(data.timestamp)}
-                        </p>
-                        <p className="text-sm font-semibold">
-                          ${data.value.toLocaleString('en-US', { 
-                            minimumFractionDigits: 2, 
-                            maximumFractionDigits: 2 
-                          })}
-                        </p>
-                      </div>
-                    );
-                  }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="value"
-                  stroke={lineColor}
-                  strokeWidth={2}
-                  dot={false}
-                  activeDot={{ r: 6, fill: lineColor }}
-                />
-                <ReferenceLine 
-                  y={currentValue} 
-                  stroke={lineColor}
-                  strokeDasharray="2 2"
-                  strokeOpacity={0.3}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </ChartContainer>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={chartData}
+                    margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                  >
+                    <CartesianGrid 
+                      strokeDasharray="3 3" 
+                      vertical={false}
+                      stroke="#e5e7eb"
+                    />
+                    <XAxis
+                      dataKey="date"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={false}
+                      interval="preserveStartEnd"
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 11, fill: '#6b7280' }}
+                      domain={yAxisDomain}
+                      width={60}
+                      tickFormatter={(value) => `$${(value / 1000).toFixed(1)}k`}
+                    />
+                    <ChartTooltip
+                      content={({ active, payload }) => {
+                        if (!active || !payload || !payload.length) return null;
+                        
+                        const dataPoint = payload[0].payload as typeof chartData[0];
+                        return (
+                          <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3">
+                            <p className="text-xs text-gray-500 mb-1">
+                              {formatFullDate(dataPoint.timestamp)}
+                            </p>
+                            <p className="text-sm font-semibold">
+                              ${dataPoint.value.toLocaleString('en-US', { 
+                                minimumFractionDigits: 2, 
+                                maximumFractionDigits: 2 
+                              })}
+                            </p>
+                          </div>
+                        );
+                      }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="value"
+                      stroke={lineColor}
+                      strokeWidth={2}
+                      dot={false}
+                      activeDot={{ r: 6, fill: lineColor }}
+                      animationDuration={350}
+                      animationEasing="ease-out"
+                    />
+                    <ReferenceLine 
+                      y={currentValue} 
+                      stroke={lineColor}
+                      strokeDasharray="2 2"
+                      strokeOpacity={0.3}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+              {isLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-white/60 backdrop-blur-sm">
+                  <div className="flex items-center gap-2 text-gray-600 text-sm">
+                    <Loader2 className="animate-spin" size={18} />
+                    <span>Updating chart...</span>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="flex h-full items-center justify-center text-gray-500 bg-gray-50 rounded-md">
+              {isLoading ? (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="animate-spin" size={18} />
+                  <span>Loading chart data...</span>
+                </div>
+              ) : (
+                <span>No portfolio data available</span>
+              )}
+            </div>
+          )}
         </div>
         
         {/* Time Range Selector */}
