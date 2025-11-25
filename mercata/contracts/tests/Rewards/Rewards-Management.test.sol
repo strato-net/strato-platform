@@ -304,7 +304,7 @@ contract Describe_Rewards_Management is Authorizable {
         rewards.occurred(activityId, address(user1), 100);
 
         // then - check user stake increased
-        (uint256 stake, uint256 rewardDebt) = rewards.userInfo(activityId, address(user1));
+        (uint256 stake, uint256 userIndex) = rewards.userInfo(activityId, address(user1));
         require(stake == 100, "User stake should be 100");
     }
 

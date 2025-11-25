@@ -15,7 +15,7 @@ enum ActivityType {
 
 struct RewardsUserInfo {
     uint256 stake;       // User's effective stake in this activity
-    uint256 rewardDebt;  // Reward debt for accounting
+    uint256 userIndex;   // Snapshot of accRewardPerStake at last update (Aave-style)
 }
 
 struct Activity {
@@ -296,14 +296,15 @@ contract record Rewards is Ownable {
         // 1) Update global index using current totalStake (before user update)
         _updateActivityIndex(activityId);
 
-        // 2) Settle user's pending rewards
+        // 2) Settle user's pending rewards using index delta (Aave-style)
         RewardsUserInfo storage userState = userInfo[activityId][user];
         uint256 oldStake = userState.stake;
         uint256 pendingRewards = 0;
 
         if (oldStake > 0) {
-            uint256 accumulated = (oldStake * activity.accRewardPerStake) / PRECISION_MULTIPLIER;
-            pendingRewards = accumulated - userState.rewardDebt;
+            // Calculate rewards using index delta: stake × (currentIndex - userIndex)
+            uint256 indexDelta = activity.accRewardPerStake - userState.userIndex;
+            pendingRewards = (oldStake * indexDelta) / PRECISION_MULTIPLIER;
 
             if (pendingRewards > 0) {
                 unclaimedRewards[user] += pendingRewards;
@@ -319,9 +320,9 @@ contract record Rewards is Ownable {
             newStake = oldStake - amount;
         }
 
-        // 4) Update user stake and debt
+        // 4) Update user stake and index snapshot
         userState.stake = newStake;
-        userState.rewardDebt = (newStake * activity.accRewardPerStake) / PRECISION_MULTIPLIER;
+        userState.userIndex = activity.accRewardPerStake;
 
         // 5) Update total stake internally (secure calculation)
         activity.totalStake = activity.totalStake + newStake - oldStake;
@@ -343,15 +344,16 @@ contract record Rewards is Ownable {
         uint256 userStake = userState.stake;
 
         if (userStake > 0) {
-            uint256 accumulated = (userStake * activity.accRewardPerStake) / PRECISION_MULTIPLIER;
-            uint256 pending = accumulated - userState.rewardDebt;
+            // Calculate rewards using index delta: stake × (currentIndex - userIndex)
+            uint256 indexDelta = activity.accRewardPerStake - userState.userIndex;
+            uint256 pending = (userStake * indexDelta) / PRECISION_MULTIPLIER;
 
             if (pending > 0) {
                 unclaimedRewards[user] += pending;
             }
 
-            // Update reward debt to current accumulated value (without changing stake)
-            userState.rewardDebt = accumulated;
+            // Update user index to current (without changing stake)
+            userState.userIndex = activity.accRewardPerStake;
         }
     }
 
