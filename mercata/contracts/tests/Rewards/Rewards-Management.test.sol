@@ -40,16 +40,8 @@ contract Describe_Rewards_Management is Authorizable {
         require(tokenAddress != address(0), "Token address is 0");
         rewardToken = Token(tokenAddress);
 
-        // Use Rewards from Mercata
-        rewards = m.rewards();
-
-        // Whitelist test contract to transfer ownership via adminRegistry voting
-        m.adminRegistry().castVoteOnIssue(address(rewards), "transferOwnership", address(this));
-
-        // Transfer ownership to test contract (now whitelisted)
-        Ownable(address(rewards)).transferOwnership(address(this));
-
-        // Initialize Rewards contract (now that we own it)
+        // Create Rewards contract directly (test contract is owner)
+        rewards = new Rewards(address(this));
         rewards.initialize(tokenAddress);
     }
 
