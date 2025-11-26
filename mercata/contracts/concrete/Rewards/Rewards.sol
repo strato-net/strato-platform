@@ -107,7 +107,7 @@ contract record Rewards is Ownable {
     // ═══════════════════════════════════════════════════════════════════════
 
     // Current block number being processed (for idempotency)
-    uint256 public currentBlock;
+    uint256 public currentBlockHandled;
 
     // Mapping of event hashes processed in the current block
     mapping(uint256 => bool) public processedHashes;
@@ -356,20 +356,20 @@ contract record Rewards is Ownable {
         // IDEMPOTENCY CHECK
         // ═══════════════════════════════════════════════════════════════════════
 
-        // If blockNumber < currentBlock, this is an old event - silently ignore
-        if (action.blockNumber < currentBlock) {
+        // If blockNumber < currentBlockHandled, this is an old event - silently ignore
+        if (action.blockNumber < currentBlockHandled) {
             return;
         }
 
-        // If blockNumber > currentBlock, we've moved to a new block
-        if (action.blockNumber > currentBlock) {
+        // If blockNumber > currentBlockHandled, we've moved to a new block
+        if (action.blockNumber > currentBlockHandled) {
             // Clear the processed hashes from the previous block
             _clearProcessedHashes();
             // Update to the new block
-            currentBlock = action.blockNumber;
+            currentBlockHandled = action.blockNumber;
         }
 
-        // blockNumber == currentBlock at this point
+        // blockNumber == currentBlockHandled at this point
         // Check if we've already processed this event hash
         if (processedHashes[action.eventHash]) {
             // Already processed - silently ignore (idempotency)

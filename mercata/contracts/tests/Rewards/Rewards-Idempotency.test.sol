@@ -89,7 +89,7 @@ contract Describe_Rewards_Idempotency is Authorizable {
         require(stake == depositAmount, "Old block event should be ignored - stake should be 1000, not 2000");
 
         // then - currentBlock should still be 200
-        require(rewards.currentBlock() == newerBlock, "currentBlock should remain at 200");
+        require(rewards.currentBlockHandled() == newerBlock, "currentBlock should remain at 200");
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -114,7 +114,7 @@ contract Describe_Rewards_Idempotency is Authorizable {
         require(stake == depositAmount * 2, "Same hash in different blocks should both be processed");
 
         // then - currentBlock should be 101
-        require(rewards.currentBlock() == block101, "currentBlock should be 101");
+        require(rewards.currentBlockHandled() == block101, "currentBlock should be 101");
     }
 
     // ═════════════════════════════════════════════════════════════════════════
