@@ -289,6 +289,16 @@ contract record Rewards is Ownable {
         _handleAction(Action(activityId, user, amount, ActionType.Occurred));
     }
 
+    /**
+     * @dev Process multiple actions in a single call
+     * @param actions Array of actions to process
+     */
+    function batchHandleAction(Action[] calldata actions) external {
+        for (uint256 i = 0; i < actions.length; i++) {
+            _handleAction(actions[i]);
+        }
+    }
+
     // ═════════════════════════════════════════════════════════════════════════
     // INTERNAL FUNCTIONS
     // ═════════════════════════════════════════════════════════════════════════
