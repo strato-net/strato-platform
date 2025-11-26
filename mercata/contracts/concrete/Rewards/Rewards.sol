@@ -13,9 +13,22 @@ enum ActivityType {
     OneTime    // e.g swaps, borrows
 }
 
+enum ActionType {
+    Deposit,   // Increase stake (Position activities only)
+    Withdraw,  // Decrease stake (Position activities only)
+    Occurred   // One-time action (OneTime activities only)
+}
+
+struct Action {
+    uint256 activityId;  // The activity being updated
+    address user;        // The user whose stake is changing
+    uint256 amount;      // The amount of stake change
+    ActionType actionType; // The type of action
+}
+
 struct RewardsUserInfo {
     uint256 stake;       // User's effective stake in this activity
-    uint256 rewardDebt;  // Reward debt for accounting
+    uint256 userIndex;   // Snapshot of accRewardPerStake at last update (Aave-style)
 }
 
 struct Activity {
@@ -25,7 +38,8 @@ struct Activity {
     uint256 accRewardPerStake;   // Accumulated reward per 1 unit of stake (scaled by 1e18)
     uint256 lastUpdateTime;      // Last timestamp when the index was updated
     uint256 totalStake;          // Sum of all users' effective stakes for this activity
-    address allowedCaller;       // Address of pool/contract allowed to call handleAction for this activity
+    address allowedCaller;       // Address allowed to call deposit/withdraw/occurred for this activity
+    address sourceContract;      // Address of the contract this activity tracks (for external service mapping)
 }
 
 /**
@@ -51,9 +65,10 @@ contract record Rewards is Ownable {
 
     event ActivityIndexUpdated(uint256 indexed activityId, uint256 accRewardPerStake, uint256 totalStake);
     event UserStakeUpdated(uint256 indexed activityId, address indexed user, uint256 oldStake, uint256 newStake, uint256 pendingRewards);
-    event ActivityAdded(uint256 indexed activityId, string name, uint256 emissionRate, address allowedCaller);
+    event ActivityAdded(uint256 indexed activityId, string name, uint256 emissionRate, address allowedCaller, address sourceContract);
     event EmissionRateUpdated(uint256 indexed activityId, uint256 oldRate, uint256 newRate);
     event AllowedCallerUpdated(uint256 indexed activityId, address oldCaller, address newCaller);
+    event SourceContractUpdated(uint256 indexed activityId, address oldSourceContract, address newSourceContract);
     event RewardsClaimed(address indexed user, uint256 amount);
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -84,6 +99,9 @@ contract record Rewards is Ownable {
 
     // Total unclaimed rewards per user
     mapping(address => uint256) public record unclaimedRewards;
+
+    // Last block number when _handleAction was called
+    uint256 public lastBlockHandled;
 
     // ═════════════════════════════════════════════════════════════════════════
     // CONSTRUCTOR
@@ -116,16 +134,20 @@ contract record Rewards is Ownable {
      * @param name Human-readable name for the activity
      * @param activityType Type of activity (Position or OneTime)
      * @param emissionRate CATA tokens emitted per second for this activity
-     * @param allowedCaller Address of pool/contract allowed to call handleAction
+     * @param allowedCaller Address allowed to call deposit/withdraw/occurred
+     * @param sourceContract Address of the contract this activity tracks (for external service mapping)
      */
     function addActivity(
         uint256 activityId,
         string name,
         ActivityType activityType,
         uint256 emissionRate,
-        address allowedCaller
+        address allowedCaller,
+        address sourceContract
     ) external onlyOwner {
+        require(activities[activityId].allowedCaller == address(0), "Activity already exists");
         require(allowedCaller != address(0), "Invalid caller address");
+        require(sourceContract != address(0), "Invalid source contract address");
         require(bytes(name).length > 0, "Name cannot be empty");
 
         activities[activityId] = Activity({
@@ -135,7 +157,8 @@ contract record Rewards is Ownable {
             accRewardPerStake: 0,
             lastUpdateTime: block.timestamp,
             totalStake: 0,
-            allowedCaller: allowedCaller
+            allowedCaller: allowedCaller,
+            sourceContract: sourceContract
         });
 
         activityIds.push(activityId);
@@ -143,7 +166,7 @@ contract record Rewards is Ownable {
         // Update total emission rate
         totalRewardsEmission += emissionRate;
 
-        emit ActivityAdded(activityId, name, emissionRate, allowedCaller);
+        emit ActivityAdded(activityId, name, emissionRate, allowedCaller, sourceContract);
     }
 
     /**
@@ -153,6 +176,7 @@ contract record Rewards is Ownable {
      */
     function setEmissionRate(uint256 activityId, uint256 newEmissionRate) external onlyOwner {
         Activity storage activity = activities[activityId];
+        require(activity.allowedCaller != address(0), "Activity does not exist");
 
         // Update index with old emission rate first
         _updateActivityIndex(activityId);
@@ -173,12 +197,29 @@ contract record Rewards is Ownable {
      */
     function setAllowedCaller(uint256 activityId, address newAllowedCaller) external onlyOwner {
         Activity storage activity = activities[activityId];
+        require(activity.allowedCaller != address(0), "Activity does not exist");
         require(newAllowedCaller != address(0), "Invalid caller address");
 
         address oldCaller = activity.allowedCaller;
         activity.allowedCaller = newAllowedCaller;
 
         emit AllowedCallerUpdated(activityId, oldCaller, newAllowedCaller);
+    }
+
+    /**
+     * @dev Update the source contract for an existing activity
+     * @param activityId The activity to update
+     * @param newSourceContract The new source contract address
+     */
+    function setSourceContract(uint256 activityId, address newSourceContract) external onlyOwner {
+        Activity storage activity = activities[activityId];
+        require(activity.allowedCaller != address(0), "Activity does not exist");
+        require(newSourceContract != address(0), "Invalid source contract address");
+
+        address oldSourceContract = activity.sourceContract;
+        activity.sourceContract = newSourceContract;
+
+        emit SourceContractUpdated(activityId, oldSourceContract, newSourceContract);
     }
 
     /**
@@ -237,8 +278,7 @@ contract record Rewards is Ownable {
         address user,
         uint256 amount
     ) external {
-        require(activities[activityId].activityType == ActivityType.Position, "Only for Position activities");
-        _handleActivity(activityId, user, amount, true);
+        _handleAction(Action(activityId, user, amount, ActionType.Deposit));
     }
 
     /**
@@ -252,8 +292,7 @@ contract record Rewards is Ownable {
         address user,
         uint256 amount
     ) external {
-        require(activities[activityId].activityType == ActivityType.Position, "Only for Position activities");
-        _handleActivity(activityId, user, amount, false);
+        _handleAction(Action(activityId, user, amount, ActionType.Withdraw));
     }
 
     /**
@@ -267,8 +306,17 @@ contract record Rewards is Ownable {
         address user,
         uint256 amount
     ) external {
-        require(activities[activityId].activityType == ActivityType.OneTime, "Only for OneTime activities");
-        _handleActivity(activityId, user, amount, true);
+        _handleAction(Action(activityId, user, amount, ActionType.Occurred));
+    }
+
+    /**
+     * @dev Process multiple actions in a single call
+     * @param actions Array of actions to process
+     */
+    function batchHandleAction(Action[] calldata actions) external {
+        for (uint256 i = 0; i < actions.length; i++) {
+            _handleAction(actions[i]);
+        }
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -277,56 +325,62 @@ contract record Rewards is Ownable {
 
     /**
      * @dev Internal function to handle stake changes
-     * @param activityId The activity being updated
-     * @param user The user whose stake is changing
-     * @param amount The amount of stake change
-     * @param isIncrease True for deposit/increase, false for withdraw/decrease
+     * @param action The action to process
      */
-    function _handleActivity(
-        uint256 activityId,
-        address user,
-        uint256 amount,
-        bool isIncrease
-    ) internal {
-        Activity storage activity = activities[activityId];
+    function _handleAction(Action action) internal {
+        Activity storage activity = activities[action.activityId];
+
+        // Validate action type against activity type
+        if (action.actionType == ActionType.Deposit || action.actionType == ActionType.Withdraw) {
+            require(activity.activityType == ActivityType.Position, "Only for Position activities");
+        } else {
+            require(activity.activityType == ActivityType.OneTime, "Only for OneTime activities");
+        }
+
+        // Determine if this is an increase or decrease
+        bool isIncrease = (action.actionType != ActionType.Withdraw);
 
         // Access control: only allowed caller can update this activity
         require(msg.sender == activity.allowedCaller, "Caller not allowed");
 
-        // 1) Update global index using current totalStake (before user update)
-        _updateActivityIndex(activityId);
+        // Track last block handled
+        lastBlockHandled = block.number;
 
-        // 2) Settle user's pending rewards
-        RewardsUserInfo storage userState = userInfo[activityId][user];
+        // 1) Update global index using current totalStake (before user update)
+        _updateActivityIndex(action.activityId);
+
+        // 2) Settle user's pending rewards using index delta (Aave-style)
+        RewardsUserInfo storage userState = userInfo[action.activityId][action.user];
         uint256 oldStake = userState.stake;
         uint256 pendingRewards = 0;
 
         if (oldStake > 0) {
-            uint256 accumulated = (oldStake * activity.accRewardPerStake) / PRECISION_MULTIPLIER;
-            pendingRewards = accumulated - userState.rewardDebt;
+            // Calculate rewards using index delta: stake × (currentIndex - userIndex)
+            uint256 indexDelta = activity.accRewardPerStake - userState.userIndex;
+            pendingRewards = (oldStake * indexDelta) / PRECISION_MULTIPLIER;
 
             if (pendingRewards > 0) {
-                unclaimedRewards[user] += pendingRewards;
+                unclaimedRewards[action.user] += pendingRewards;
             }
         }
 
         // 3) Calculate new stake from delta
         uint256 newStake;
         if (isIncrease) {
-            newStake = oldStake + amount;
+            newStake = oldStake + action.amount;
         } else {
-            require(oldStake >= amount, "Insufficient stake");
-            newStake = oldStake - amount;
+            require(oldStake >= action.amount, "Insufficient stake");
+            newStake = oldStake - action.amount;
         }
 
-        // 4) Update user stake and debt
+        // 4) Update user stake and index snapshot
         userState.stake = newStake;
-        userState.rewardDebt = (newStake * activity.accRewardPerStake) / PRECISION_MULTIPLIER;
+        userState.userIndex = activity.accRewardPerStake;
 
         // 5) Update total stake internally (secure calculation)
         activity.totalStake = activity.totalStake + newStake - oldStake;
 
-        emit UserStakeUpdated(activityId, user, oldStake, newStake, pendingRewards);
+        emit UserStakeUpdated(action.activityId, action.user, oldStake, newStake, pendingRewards);
     }
 
     /**
@@ -343,15 +397,16 @@ contract record Rewards is Ownable {
         uint256 userStake = userState.stake;
 
         if (userStake > 0) {
-            uint256 accumulated = (userStake * activity.accRewardPerStake) / PRECISION_MULTIPLIER;
-            uint256 pending = accumulated - userState.rewardDebt;
+            // Calculate rewards using index delta: stake × (currentIndex - userIndex)
+            uint256 indexDelta = activity.accRewardPerStake - userState.userIndex;
+            uint256 pending = (userStake * indexDelta) / PRECISION_MULTIPLIER;
 
             if (pending > 0) {
                 unclaimedRewards[user] += pending;
             }
 
-            // Update reward debt to current accumulated value (without changing stake)
-            userState.rewardDebt = accumulated;
+            // Update user index to current (without changing stake)
+            userState.userIndex = activity.accRewardPerStake;
         }
     }
 
