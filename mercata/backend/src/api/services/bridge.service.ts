@@ -1,6 +1,6 @@
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
-import { strato, cirrus } from "../../utils/mercataApiHelper";
+import { strato, cirrus, bridge } from "../../utils/mercataApiHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import { extractContractName, ensureHexPrefix } from "../../utils/utils";
 import { getTokenMetadata } from "../helpers/cirrusHelpers";
@@ -65,20 +65,15 @@ export const requestAutoSave = async (
   }: AutoSaveRequestParams,
   userAddress: string
 ) : Promise<TransactionResponse> => {
-  const tx = await buildFunctionTx(
-    {
-      contractName: extractContractName(MercataBridge),
-      contractAddress: constants.mercataBridge,
-      method: "requestAutoSave",
-      args: { externalChainId, externalTxHash },
-    },
-    userAddress,
-    accessToken
-  );
+  const params: AutoSaveRequestParams = {
+    externalChainId,
+    externalTxHash,
+  };
 
-  return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, tx)
-  );
+  // Bridge service handles transaction execution and polling internally,
+  // so we just call it directly and return the result
+  const response = await bridge.post<TransactionResponse>(accessToken, `/request-autosave`, params);
+  return response.data;
 };
 
 export const getBridgeTransactions = async (

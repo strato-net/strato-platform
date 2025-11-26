@@ -589,7 +589,8 @@ contract record MercataBridge is Ownable {
         }
     }
 
-    function requestAutoSave(uint externalChainId, string externalTxHash) external {
+    function requestAutoSave(address user, uint externalChainId, string externalTxHash) external onlyOwner {
+        require(user != address(0), "MB: invalid user");
         require(externalChainId > 0, "MB: invalid external chain id");
         require(chains[externalChainId].enabled, "MB: chain not enabled");
         require(externalTxHash.length > 0, "MB: invalid external tx hash");
@@ -597,9 +598,9 @@ contract record MercataBridge is Ownable {
         string normalizedTxHash = externalTxHash.normalizeHex();
 
         require(deposits[externalChainId][normalizedTxHash].bridgeStatus != BridgeStatus.COMPLETED, "MB: Already completed");
-        autoSaveRequested[msg.sender][externalChainId][normalizedTxHash] = true;
+        autoSaveRequested[user][externalChainId][normalizedTxHash] = true;
 
-        emit AutoSaveRequested(msg.sender, externalChainId, normalizedTxHash);
+        emit AutoSaveRequested(user, externalChainId, normalizedTxHash);
     }
 
     /**
