@@ -21,7 +21,7 @@ class AuthHandler {
 
         // Make user address available to request handler
         res.locals.userAddress = userAddress;
-        next();
+        return next();
       } catch (error: any) {
         return res.status(401).json({
           error: "Failed to get user address from token",

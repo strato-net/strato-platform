@@ -56,15 +56,13 @@ export const eth = makeTokenClient(_eth);
 
 // Bridge client needs to be initialized after bridgeUrl is set
 let bridgeClient: ReturnType<typeof makeTokenClient> | null = null;
-const getBridgeClient = (() => {
-  return () => {
-    if (!bridgeClient) {
-      if (!bridgeUrl) throw new Error("Bridge URL not initialized.");
-      bridgeClient = makeTokenClient(createApiClient(`${bridgeUrl}`));
-    }
-    return bridgeClient;
-  };
-})();
+const getBridgeClient = () => {
+  if (!bridgeClient) {
+    if (!bridgeUrl) throw new Error("Bridge URL not initialized.");
+    bridgeClient = makeTokenClient(createApiClient(`${bridgeUrl}`));
+  }
+  return bridgeClient;
+};
 export const bridge = new Proxy({} as ReturnType<typeof makeTokenClient>, {
   get(_target, prop) {
     return getBridgeClient()[prop as keyof ReturnType<typeof makeTokenClient>];
