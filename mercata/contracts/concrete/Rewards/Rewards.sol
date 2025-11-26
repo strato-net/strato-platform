@@ -145,6 +145,7 @@ contract record Rewards is Ownable {
         address allowedCaller,
         address sourceContract
     ) external onlyOwner {
+        require(activities[activityId].allowedCaller == address(0), "Activity already exists");
         require(allowedCaller != address(0), "Invalid caller address");
         require(sourceContract != address(0), "Invalid source contract address");
         require(bytes(name).length > 0, "Name cannot be empty");
@@ -175,6 +176,7 @@ contract record Rewards is Ownable {
      */
     function setEmissionRate(uint256 activityId, uint256 newEmissionRate) external onlyOwner {
         Activity storage activity = activities[activityId];
+        require(activity.allowedCaller != address(0), "Activity does not exist");
 
         // Update index with old emission rate first
         _updateActivityIndex(activityId);
@@ -195,6 +197,7 @@ contract record Rewards is Ownable {
      */
     function setAllowedCaller(uint256 activityId, address newAllowedCaller) external onlyOwner {
         Activity storage activity = activities[activityId];
+        require(activity.allowedCaller != address(0), "Activity does not exist");
         require(newAllowedCaller != address(0), "Invalid caller address");
 
         address oldCaller = activity.allowedCaller;
@@ -210,6 +213,7 @@ contract record Rewards is Ownable {
      */
     function setSourceContract(uint256 activityId, address newSourceContract) external onlyOwner {
         Activity storage activity = activities[activityId];
+        require(activity.allowedCaller != address(0), "Activity does not exist");
         require(newSourceContract != address(0), "Invalid source contract address");
 
         address oldSourceContract = activity.sourceContract;

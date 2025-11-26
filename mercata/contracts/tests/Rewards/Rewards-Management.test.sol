@@ -126,7 +126,20 @@ contract Describe_Rewards_Management is Authorizable {
         require(reverted, "Adding activity with empty name should revert");
     }
 
-    // NOTE: Duplicate activity check removed - we can add same activityId multiple times (overwrites)
+    function it_should_prevent_adding_duplicate_activity() {
+        // given
+        uint256 activityId = 1;
+        rewards.addActivity(activityId, "Activity 1", ActivityType.Position, 100, address(user1), address(user1));
+
+        // when/then - try to add activity with same ID
+        bool reverted = false;
+        try rewards.addActivity(activityId, "Activity 2", ActivityType.Position, 200, address(user2), address(user2)) {
+            reverted = false;
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Adding duplicate activity should revert");
+    }
 
     function it_should_track_total_emission_when_adding_multiple_activities() {
         // given
@@ -171,7 +184,18 @@ contract Describe_Rewards_Management is Authorizable {
         require(rewards.totalRewardsEmission() == newEmission, "Total emission should be updated");
     }
 
-    // NOTE: No validation for nonexistent activity - updates will succeed on any activityId
+    function it_should_prevent_updating_emission_rate_on_nonexistent_activity() {
+        // given - no activity exists with id 999
+
+        // when/then
+        bool reverted = false;
+        try rewards.setEmissionRate(999, 200) {
+            reverted = false;
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Updating emission rate on nonexistent activity should revert");
+    }
 
     function it_should_maintain_correct_total_emission_when_updating_rates() {
         // given - add three activities
@@ -233,7 +257,18 @@ contract Describe_Rewards_Management is Authorizable {
         require(caller == newCaller, "Allowed caller should be updated");
     }
 
-    // NOTE: No validation for nonexistent activity - updates will succeed on any activityId
+    function it_should_prevent_updating_allowed_caller_on_nonexistent_activity() {
+        // given - no activity exists with id 999
+
+        // when/then
+        bool reverted = false;
+        try rewards.setAllowedCaller(999, address(user1)) {
+            reverted = false;
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Updating allowed caller on nonexistent activity should revert");
+    }
 
     function it_should_prevent_setting_allowed_caller_to_zero_address() {
         // given
