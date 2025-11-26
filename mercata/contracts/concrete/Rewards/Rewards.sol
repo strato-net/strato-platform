@@ -20,6 +20,7 @@ enum ActionType {
 }
 
 struct Action {
+    uint256 actionId;    // Unique identifier for idempotency (monotonically increasing)
     uint256 activityId;  // The activity being updated
     address user;        // The user whose stake is changing
     uint256 amount;      // The amount of stake change
@@ -102,6 +103,9 @@ contract record Rewards is Ownable {
 
     // Last block number when _handleAction was called
     uint256 public lastBlockHandled;
+
+    // Last handled action ID for idempotency (monotonically increasing)
+    uint256 public lastHandledActionId;
 
     // ═════════════════════════════════════════════════════════════════════════
     // CONSTRUCTOR
@@ -269,44 +273,50 @@ contract record Rewards is Ownable {
 
     /**
      * @dev Deposit/increase stake for a user in an activity
+     * @param actionId Unique identifier for idempotency
      * @param activityId The activity to deposit into
      * @param user The user whose stake is increasing
      * @param amount The amount to deposit
      */
     function deposit(
+        uint256 actionId,
         uint256 activityId,
         address user,
         uint256 amount
     ) external {
-        _handleAction(Action(activityId, user, amount, ActionType.Deposit));
+        _handleAction(Action(actionId, activityId, user, amount, ActionType.Deposit));
     }
 
     /**
      * @dev Withdraw/decrease stake for a user in an activity
+     * @param actionId Unique identifier for idempotency
      * @param activityId The activity to withdraw from
      * @param user The user whose stake is decreasing
      * @param amount The amount to withdraw
      */
     function withdraw(
+        uint256 actionId,
         uint256 activityId,
         address user,
         uint256 amount
     ) external {
-        _handleAction(Action(activityId, user, amount, ActionType.Withdraw));
+        _handleAction(Action(actionId, activityId, user, amount, ActionType.Withdraw));
     }
 
     /**
      * @dev Record a one-time action occurrence for a user
+     * @param actionId Unique identifier for idempotency
      * @param activityId The one-time activity that occurred
      * @param user The user who performed the action
      * @param amount The amount/value of the action
      */
     function occurred(
+        uint256 actionId,
         uint256 activityId,
         address user,
         uint256 amount
     ) external {
-        _handleAction(Action(activityId, user, amount, ActionType.Occurred));
+        _handleAction(Action(actionId, activityId, user, amount, ActionType.Occurred));
     }
 
     /**
@@ -328,6 +338,11 @@ contract record Rewards is Ownable {
      * @param action The action to process
      */
     function _handleAction(Action action) internal {
+        // Idempotency check: silently ignore actions already processed or out of order
+        if (action.actionId <= lastHandledActionId) {
+            return;
+        }
+
         Activity storage activity = activities[action.activityId];
 
         // Validate action type against activity type
@@ -342,6 +357,9 @@ contract record Rewards is Ownable {
 
         // Access control: only allowed caller can update this activity
         require(msg.sender == activity.allowedCaller, "Caller not allowed");
+
+        // Update idempotency tracker
+        lastHandledActionId = action.actionId;
 
         // Track last block handled
         lastBlockHandled = block.number;

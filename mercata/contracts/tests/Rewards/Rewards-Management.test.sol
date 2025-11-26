@@ -19,6 +19,9 @@ contract Describe_Rewards_Management is Authorizable {
     User user1;
     User user2;
 
+    // Action ID counter for idempotency
+    uint256 nextActionId = 1;
+
     function beforeAll() {
         bypassAuthorizations = true;
         // Create test users once
@@ -345,7 +348,7 @@ contract Describe_Rewards_Management is Authorizable {
 
         // when/then - try to deposit on OneTime activity
         bool reverted = false;
-        try rewards.deposit(activityId, address(user1), 100) {
+        try rewards.deposit(nextActionId++, activityId, address(user1), 100) {
             reverted = false;
         } catch {
             reverted = true;
@@ -360,7 +363,7 @@ contract Describe_Rewards_Management is Authorizable {
 
         // when/then - try to withdraw on OneTime activity
         bool reverted = false;
-        try rewards.withdraw(activityId, address(user1), 100) {
+        try rewards.withdraw(nextActionId++, activityId, address(user1), 100) {
             reverted = false;
         } catch {
             reverted = true;
@@ -375,7 +378,7 @@ contract Describe_Rewards_Management is Authorizable {
 
         // when/then - try to call occurred on Position activity
         bool reverted = false;
-        try rewards.occurred(activityId, address(user1), 100) {
+        try rewards.occurred(nextActionId++, activityId, address(user1), 100) {
             reverted = false;
         } catch {
             reverted = true;
@@ -389,7 +392,7 @@ contract Describe_Rewards_Management is Authorizable {
         rewards.addActivity(activityId, "Swap Activity", ActivityType.OneTime, 100, address(this), address(this));
 
         // when - call occurred
-        rewards.occurred(activityId, address(user1), 100);
+        rewards.occurred(nextActionId++, activityId, address(user1), 100);
 
         // then - check user stake increased
         (uint256 stake, uint256 userIndex) = rewards.userInfo(activityId, address(user1));
