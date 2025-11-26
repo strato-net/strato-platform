@@ -8,9 +8,10 @@ import { logInfo, logError } from "./utils/logger";
 import { validateBridgeConfig } from "./utils/configValidator";
 import { startMultiChainDepositPolling } from "./polling/alchemyPolling";
 import { initializeMercataPolling } from "./polling/mercataPolling";
-import { initOpenIdConfig, verifyAccessTokenSignature, getTokenFromHeader, createOrGetUserKey } from "./auth";
+import { initOpenIdConfig} from "./auth";
 import { healthMonitor } from "./utils/healthMonitor";
-import { requestAutoSave } from "./services/autosaveService";
+import AutoSaveController from "./controllers/autosave.controller";
+import AuthHandler from "./auth/tokenMiddleware";
 
 const app = express();
 const port = process.env.PORT || 3003;
@@ -34,55 +35,12 @@ app.use(
   },
 );
 
+// Exposed Routes
 app.get("/health", async (_, res) => {
   const errorFileExists = await healthMonitor.errorFileExists();
   res.status(errorFileExists ? 500 : 200).json({status: !errorFileExists, message: 'pong'})
 });
-
-app.post("/requestAutoSave", async (req, res, next) => {
-  try {
-    // Extract and validate token
-    const token = getTokenFromHeader(req);
-    if (!token) {
-      return res.status(401).json({ error: "Missing or invalid authorization header" });
-    }
-
-    // Verify token signature
-    try {
-      await verifyAccessTokenSignature(token);
-    } catch (error: any) {
-      return res.status(401).json({
-        error: "Invalid or expired access token",
-        message: error.message
-      });
-    }
-
-    // Get user address from token
-    let userAddress: string;
-    try {
-      userAddress = await createOrGetUserKey(token);
-    } catch (error: any) {
-      return res.status(401).json({
-        error: "Failed to get user address",
-        message: error.message
-      });
-    }
-
-    // Extract request parameters
-    const { externalChainId, externalTxHash } = req.body;
-    if (!externalChainId || !externalTxHash) {
-      return res.status(400).json({
-        error: "Missing required parameters: externalChainId and externalTxHash"
-      });
-    }
-
-    // Call the service
-    const result = await requestAutoSave({ userAddress, externalChainId, externalTxHash });
-    res.status(200).json(result);
-  } catch (error) {
-    next(error);
-  }
-});
+app.post("/request-autosave", AuthHandler.authorizeRequest(), AutoSaveController.requestAutoSave);
 
 app.listen(port, async () => {
   try {

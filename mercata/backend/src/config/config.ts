@@ -45,11 +45,8 @@ export const baseUrl = process.env.BASE_URL || "http://localhost";
 */
 import { eth } from "../utils/mercataApiHelper"; // after nodeUrl is defined
 const defaultBridgeServiceFor: Record<string, string> = {
-  // Helium testnet
-  "114784819836269":"http://localhost:3003", //TODO testnet bridge service url
-
-  // Upquark mainnet
-  "33056204878082667":"TODO_mainnet_bridge_service_url"
+  "114784819836269":"https://bridge.testnet.stratomercata.com", // Helium testnet
+  "33056204878082667":"https://bridge.stratomercata.com",       // Upquark mainnet
 };
 export let bridgeUrl: string | undefined;
 export async function initBridgeConfig() {

@@ -72,7 +72,7 @@ export const requestAutoSave = async (
 
   // Bridge service handles transaction execution and polling internally,
   // so we just call it directly and return the result
-  const response = await bridge.post<TransactionResponse>(accessToken, `/requestAutoSave`, params);
+  const response = await bridge.post<TransactionResponse>(accessToken, `/request-autosave`, params);
   return response.data;
 };
 

@@ -112,6 +112,7 @@ contract Describe_MercataBridge is Authorizable {
         adminRegistry.addWhitelist(address(bridge), "finaliseWithdrawalBatch", address(relayer));
         adminRegistry.addWhitelist(address(bridge), "abortWithdrawal", address(relayer));
         adminRegistry.addWhitelist(address(bridge), "abortWithdrawalBatch", address(relayer));
+        adminRegistry.addWhitelist(address(bridge), "requestAutoSave", address(relayer));
 
         // Create test tokens through token factory with AdminRegistry as owner
         testToken = TestERC20(tokenFactory.createTokenWithInitialOwner("Test Token", "TEST", [], [], [], "TEST", 0, 18, address(adminRegistry)));
@@ -1538,7 +1539,8 @@ contract Describe_MercataBridge is Authorizable {
         // First initiate deposit
         relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x6666), amount, txHash, recipient);
 
-        User(recipient).do(address(bridge), "requestAutoSave", externalChainId, txHash);
+
+        relayer.do(address(bridge), "requestAutoSave", recipient, externalChainId, txHash);
 
         // Confirm the deposit with auto save
         relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash);
@@ -1559,7 +1561,7 @@ contract Describe_MercataBridge is Authorizable {
 
         // This is what we expect to actually happen;
         // autoSave request before the bridge service picks up the deposit
-        User(recipient).do(address(bridge), "requestAutoSave", externalChainId, txHash);
+        relayer.do(address(bridge), "requestAutoSave", recipient, externalChainId, txHash);
 
         // First initiate deposit
         relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x6666), amount, txHash, recipient);
@@ -1585,7 +1587,7 @@ contract Describe_MercataBridge is Authorizable {
         // First initiate deposit
         relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x6666), amount, txHash, recipient);
 
-        User(recipient).do(address(bridge), "requestAutoSave", externalChainId, txHash);
+        relayer.do(address(bridge), "requestAutoSave", recipient, externalChainId, txHash);
 
         // Confirm the deposit with auto save, which will fail due to disabled minting of mUSDST
         adminRegistry.castVoteOnIssue(address(adminRegistry), "removeWhitelist", address(mUSDST), "mint", address(mercata.liquidityPool()));

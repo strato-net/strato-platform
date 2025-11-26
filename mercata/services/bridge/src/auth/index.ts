@@ -285,11 +285,11 @@ export function getTokenFromHeader(req: Request): string | null {
 }
 
 /**
- * Try to get an existing STRATO key for a user token.
+ * Try to get the STRATO address for a user token.
  * @returns the address, or null if none exists yet.
- * @throws on non-400 failures.
+ * @throws on strato API failures or null address response.
  */
-async function getUserKey(token: string): Promise<string | null> {
+export async function getUserKey(token: string): Promise<string> {
   try {
     const response = await axios.get(
       `${config.api.nodeUrl}/strato/v2.3/key`,
@@ -302,60 +302,12 @@ async function getUserKey(token: string): Promise<string | null> {
         timeout: 60000,
       }
     );
-    return response.data.address ?? null;
-  } catch (err: any) {
-    // 400 means "no key yet" for that API endpoint
-    if (err.response?.status === 400) {
-      return null;
-    } else {
-      console.error("Error getting user key:", err);
-      throw new Error("Key retrieval failed");
+    if (!response.data.address) {
+      throw new Error("No address returned from STRATO API");
     }
+    return response.data.address;
+  } catch (err: any) {
+    console.error("Error getting user key:", err);
+    throw new Error("Address retrieval failed");
   }
-}
-
-/**
- * Create a STRATO key for a user token.
- * @returns the address, or null in case of an error
- * @throws on failures.
- */
-async function createUserKey(token: string): Promise<string | null> {
-  try {
-    const response = await axios.post(
-      `${config.api.nodeUrl}/strato/v2.3/key`,
-      undefined,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        timeout: 60000,
-      }
-    );
-    return response.data.address ?? null;
-  } catch (err) {
-    console.error("Error creating user key:", err);
-    return null;
-  }
-}
-
-/**
- * Fetches an existing STRATO key for a user token, or creates one if none exists.
- *
- * @param token - Bearer token for authorization
- * @returns the address string
- */
-export async function createOrGetUserKey(token: string): Promise<string> {
-  let address = await getUserKey(token);
-  if (!address) {
-    console.info("No key found for the user, creating a new one…");
-    address = await createUserKey(token);
-  }
-
-  if (!address) {
-    throw new Error("Key creation failed: no address returned after attempting to create a new key");
-  }
-
-  return address;
 }
