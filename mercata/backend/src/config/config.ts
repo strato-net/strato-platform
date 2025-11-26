@@ -1,4 +1,4 @@
-import { fetchOpenIdConfig } from "../utils/authHelper";
+import { fetchOpenIdConfig, getServiceToken } from "../utils/authHelper";
 import { JSONWebKeySet } from "jose";
 
 // Load local .env files when not in production
@@ -31,10 +31,40 @@ export async function initOpenIdConfig() {
   openIdTokenEndpoint = tokenEndpoint;
   openIdJwks = jwks;
 }
+
 export const clientId = process.env.OAUTH_CLIENT_ID;
 export const clientSecret = process.env.OAUTH_CLIENT_SECRET;
 export const nodeUrl = process.env.NODE_URL;
 export const baseUrl = process.env.BASE_URL || "http://localhost";
+
+/*
+   Bridge Service URL used for autosave requests;
+   First priority is environment variable BRIDGE_SERVICE_URL;
+   If this is unset, we use the default bridge service url hardcoded below for each network;
+   We determine the network id from the node metadata endpoint.
+*/
+import { eth } from "../utils/mercataApiHelper"; // after nodeUrl is defined
+const defaultBridgeServiceFor: Record<string, string> = {
+  // Helium testnet
+  "114784819836269":"http://localhost:3003", //TODO testnet bridge service url
+
+  // Upquark mainnet
+  "33056204878082667":"TODO_mainnet_bridge_service_url"
+};
+export let bridgeUrl: string | undefined;
+export async function initBridgeConfig() {
+  if (process.env.BRIDGE_SERVICE_URL) {
+    bridgeUrl = process.env.BRIDGE_SERVICE_URL;
+    return;
+  }
+
+  const accessToken = await getServiceToken();
+  const { data } = await eth.get(accessToken, `/metadata`);
+  const networkId: string = data.networkID;
+  bridgeUrl = defaultBridgeServiceFor[networkId];
+}
+
+// Smart contract addresses
 export const poolConfigurator = process.env.POOL_CONFIGURATOR || "0000000000000000000000000000000000001006";
 export const lendingRegistry = process.env.LENDING_REGISTRY || "0000000000000000000000000000000000001007";
 export const mercataBridge = process.env.MERCATA_BRIDGE || "0000000000000000000000000000000000001008";

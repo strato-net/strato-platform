@@ -1,5 +1,5 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from "axios";
-import { nodeUrl } from "../config/config";
+import { nodeUrl, bridgeUrl } from "../config/config";
 
 const createApiClient = (baseURL: string): AxiosInstance =>
   axios.create({
@@ -15,6 +15,7 @@ const _strato = createApiClient(`${nodeUrl}/strato/v2.3`);
 const _cirrus = createApiClient(`${nodeUrl}/cirrus/search`);
 const _bloc = createApiClient(`${nodeUrl}/bloc/v2.2`);
 const _eth = createApiClient(`${nodeUrl}/strato-api/eth/v1.2`);
+const _bridge = createApiClient(`${bridgeUrl}`);
 
 function makeTokenClient(client: AxiosInstance) {
   return {
@@ -53,3 +54,4 @@ export const strato = makeTokenClient(_strato);
 export const cirrus = makeTokenClient(_cirrus);
 export const bloc = makeTokenClient(_bloc);
 export const eth = makeTokenClient(_eth);
+export const bridge = makeTokenClient(_bridge);
