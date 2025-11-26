@@ -24,6 +24,8 @@ struct Action {
     address user;        // The user whose stake is changing
     uint256 amount;      // The amount of stake change
     ActionType actionType; // The type of action
+    uint256 blockNumber; // Block number this event originated from (for idempotency)
+    uint256 eventHash;   // Unique hash identifying this event (for idempotency)
 }
 
 struct RewardsUserInfo {
@@ -100,8 +102,18 @@ contract record Rewards is Ownable {
     // Total unclaimed rewards per user
     mapping(address => uint256) public record unclaimedRewards;
 
-    // Last block number when _handleAction was called
-    uint256 public lastBlockHandled;
+    // ═══════════════════════════════════════════════════════════════════════
+    // IDEMPOTENCY STATE
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // Current block number being processed (for idempotency)
+    uint256 public currentBlock;
+
+    // Mapping of event hashes processed in the current block
+    mapping(uint256 => bool) public processedHashes;
+
+    // Array of event hashes in current block (for clearing the mapping)
+    uint256[] public processedHashList;
 
     // ═════════════════════════════════════════════════════════════════════════
     // CONSTRUCTOR
@@ -272,13 +284,17 @@ contract record Rewards is Ownable {
      * @param activityId The activity to deposit into
      * @param user The user whose stake is increasing
      * @param amount The amount to deposit
+     * @param blockNumber The block number this event originated from (for idempotency)
+     * @param eventHash Unique hash identifying this event (for idempotency)
      */
     function deposit(
         uint256 activityId,
         address user,
-        uint256 amount
+        uint256 amount,
+        uint256 blockNumber,
+        uint256 eventHash
     ) external {
-        _handleAction(Action(activityId, user, amount, ActionType.Deposit));
+        _handleAction(Action(activityId, user, amount, ActionType.Deposit, blockNumber, eventHash));
     }
 
     /**
@@ -286,13 +302,17 @@ contract record Rewards is Ownable {
      * @param activityId The activity to withdraw from
      * @param user The user whose stake is decreasing
      * @param amount The amount to withdraw
+     * @param blockNumber The block number this event originated from (for idempotency)
+     * @param eventHash Unique hash identifying this event (for idempotency)
      */
     function withdraw(
         uint256 activityId,
         address user,
-        uint256 amount
+        uint256 amount,
+        uint256 blockNumber,
+        uint256 eventHash
     ) external {
-        _handleAction(Action(activityId, user, amount, ActionType.Withdraw));
+        _handleAction(Action(activityId, user, amount, ActionType.Withdraw, blockNumber, eventHash));
     }
 
     /**
@@ -300,18 +320,22 @@ contract record Rewards is Ownable {
      * @param activityId The one-time activity that occurred
      * @param user The user who performed the action
      * @param amount The amount/value of the action
+     * @param blockNumber The block number this event originated from (for idempotency)
+     * @param eventHash Unique hash identifying this event (for idempotency)
      */
     function occurred(
         uint256 activityId,
         address user,
-        uint256 amount
+        uint256 amount,
+        uint256 blockNumber,
+        uint256 eventHash
     ) external {
-        _handleAction(Action(activityId, user, amount, ActionType.Occurred));
+        _handleAction(Action(activityId, user, amount, ActionType.Occurred, blockNumber, eventHash));
     }
 
     /**
      * @dev Process multiple actions in a single call
-     * @param actions Array of actions to process
+     * @param actions Array of actions to process (each action includes blockNumber and eventHash)
      */
     function batchHandleAction(Action[] calldata actions) external {
         for (uint256 i = 0; i < actions.length; i++) {
@@ -324,10 +348,42 @@ contract record Rewards is Ownable {
     // ═════════════════════════════════════════════════════════════════════════
 
     /**
-     * @dev Internal function to handle stake changes
-     * @param action The action to process
+     * @dev Internal function to handle stake changes with idempotency
+     * @param action The action to process (includes blockNumber and eventHash for idempotency)
      */
     function _handleAction(Action action) internal {
+        // ═══════════════════════════════════════════════════════════════════════
+        // IDEMPOTENCY CHECK
+        // ═══════════════════════════════════════════════════════════════════════
+
+        // If blockNumber < currentBlock, this is an old event - silently ignore
+        if (action.blockNumber < currentBlock) {
+            return;
+        }
+
+        // If blockNumber > currentBlock, we've moved to a new block
+        if (action.blockNumber > currentBlock) {
+            // Clear the processed hashes from the previous block
+            _clearProcessedHashes();
+            // Update to the new block
+            currentBlock = action.blockNumber;
+        }
+
+        // blockNumber == currentBlock at this point
+        // Check if we've already processed this event hash
+        if (processedHashes[action.eventHash]) {
+            // Already processed - silently ignore (idempotency)
+            return;
+        }
+
+        // Mark this event hash as processed
+        processedHashes[action.eventHash] = true;
+        processedHashList.push(action.eventHash);
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // ACTION PROCESSING
+        // ═══════════════════════════════════════════════════════════════════════
+
         Activity storage activity = activities[action.activityId];
 
         // Validate action type against activity type
@@ -342,9 +398,6 @@ contract record Rewards is Ownable {
 
         // Access control: only allowed caller can update this activity
         require(msg.sender == activity.allowedCaller, "Caller not allowed");
-
-        // Track last block handled
-        lastBlockHandled = block.number;
 
         // 1) Update global index using current totalStake (before user update)
         _updateActivityIndex(action.activityId);
@@ -381,6 +434,18 @@ contract record Rewards is Ownable {
         activity.totalStake = activity.totalStake + newStake - oldStake;
 
         emit UserStakeUpdated(action.activityId, action.user, oldStake, newStake, pendingRewards);
+    }
+
+    /**
+     * @dev Clear all processed hashes when moving to a new block
+     * This keeps storage bounded to only the hashes of the current block
+     */
+    function _clearProcessedHashes() internal {
+        for (uint256 i = 0; i < processedHashList.length; i++) {
+            delete processedHashes[processedHashList[i]];
+        }
+        // Clear the array
+        processedHashList = [];
     }
 
     /**
