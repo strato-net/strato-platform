@@ -470,7 +470,6 @@ export const getBorrowingHistory = async (
         const rateAccErt = Number(rateAccumulator) * ert / 1e27;
         netLoan += Number(scaledDebt) * rateAccErt / 1e18;
       }
-      console.log(`DFW: ${netLoan} ${s.data.userLoan}`)
       const userLoan = s.data.userLoan || 0;
       const lastUpdated = s.data.lastUpdated || 0;
       const dt = s.timestamp - (1000*lastUpdated);
