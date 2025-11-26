@@ -24,6 +24,7 @@ import Pools from "./pages/Pools";
 import ActivityFeed from "./pages/ActivityFeed";
 import NotFound from "./pages/NotFound";
 import MercataStats from "./pages/MercataStats";
+import Rewards from "./pages/Rewards";
 
 // Import dashboard components
 
@@ -236,6 +237,17 @@ const App = () => {
                                     <ProtectedRoute>
                                       <DashboardWrapper>
                                         <MercataStats />
+                                      </DashboardWrapper>
+                                    </ProtectedRoute>
+                                  }
+                                />
+
+                                <Route
+                                  path="/dashboard/rewards"
+                                  element={
+                                    <ProtectedRoute>
+                                      <DashboardWrapper>
+                                        <Rewards />
                                       </DashboardWrapper>
                                     </ProtectedRoute>
                                   }
