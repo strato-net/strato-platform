@@ -59,15 +59,41 @@ const extractAmountFromAttributes = (attributes: Record<string, any>): string =>
          "0";
 };
 
+export const getLastBlockHandled = async (): Promise<number> => {
+  try {
+    const data = await cirrus.get(`/${MERCATA_PREFIX}-Rewards`, {
+      params: {
+        address: `eq.${config.rewards.address}`,
+        select: "lastBlockHandled",
+      },
+    });
+
+    if (!Array.isArray(data) || !data.length || !data[0]?.lastBlockHandled) {
+      logInfo("CirrusService", "No lastBlockHandled found, defaulting to 0");
+      return 0;
+    }
+
+    const lastBlock = Number(data[0].lastBlockHandled);
+    logInfo("CirrusService", `Read lastBlockHandled from Rewards contract: ${lastBlock}`);
+    return lastBlock;
+  } catch (error) {
+    logError("CirrusService", error as Error, {
+      operation: "getLastBlockHandled",
+    });
+    return 0;
+  }
+};
+
 export const getEventsBatch = async (
   contractAddresses: string[],
   eventNames: string[],
-  minBlockNumber: number,
 ): Promise<ProtocolEvent[]> => {
   try {
     if (contractAddresses.length === 0 || eventNames.length === 0) {
       return [];
     }
+
+    const minBlockNumber = await getLastBlockHandled();
 
     const addressFilter = contractAddresses.length === 1 
       ? `eq.${contractAddresses[0]}`
