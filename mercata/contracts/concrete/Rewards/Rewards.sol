@@ -86,7 +86,7 @@ contract record Rewards is Ownable {
     // Total unclaimed rewards per user
     mapping(address => uint256) public record unclaimedRewards;
 
-    // Last block number when _handleActivity was called
+    // Last block number when _handleAction was called
     uint256 public lastBlockHandled;
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -246,7 +246,7 @@ contract record Rewards is Ownable {
         uint256 amount
     ) external {
         require(activities[activityId].activityType == ActivityType.Position, "Only for Position activities");
-        _handleActivity(activityId, user, amount, true);
+        _handleAction(activityId, user, amount, true);
     }
 
     /**
@@ -261,7 +261,7 @@ contract record Rewards is Ownable {
         uint256 amount
     ) external {
         require(activities[activityId].activityType == ActivityType.Position, "Only for Position activities");
-        _handleActivity(activityId, user, amount, false);
+        _handleAction(activityId, user, amount, false);
     }
 
     /**
@@ -276,7 +276,7 @@ contract record Rewards is Ownable {
         uint256 amount
     ) external {
         require(activities[activityId].activityType == ActivityType.OneTime, "Only for OneTime activities");
-        _handleActivity(activityId, user, amount, true);
+        _handleAction(activityId, user, amount, true);
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -342,7 +342,7 @@ contract record Rewards is Ownable {
      * @param amount The amount of stake change
      * @param isIncrease True for deposit/increase, false for withdraw/decrease
      */
-    function _handleActivity(
+    function _handleAction(
         uint256 activityId,
         address user,
         uint256 amount,
