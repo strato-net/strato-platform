@@ -19,6 +19,13 @@ enum ActionType {
     Occurred   // One-time action (OneTime activities only)
 }
 
+struct Action {
+    uint256 activityId;  // The activity being updated
+    address user;        // The user whose stake is changing
+    uint256 amount;      // The amount of stake change
+    ActionType actionType; // The type of action
+}
+
 struct RewardsUserInfo {
     uint256 stake;       // User's effective stake in this activity
     uint256 userIndex;   // Snapshot of accRewardPerStake at last update (Aave-style)
@@ -251,7 +258,7 @@ contract record Rewards is Ownable {
         address user,
         uint256 amount
     ) external {
-        _handleAction(activityId, user, amount, ActionType.Deposit);
+        _handleAction(Action(activityId, user, amount, ActionType.Deposit));
     }
 
     /**
@@ -265,7 +272,7 @@ contract record Rewards is Ownable {
         address user,
         uint256 amount
     ) external {
-        _handleAction(activityId, user, amount, ActionType.Withdraw);
+        _handleAction(Action(activityId, user, amount, ActionType.Withdraw));
     }
 
     /**
@@ -279,7 +286,7 @@ contract record Rewards is Ownable {
         address user,
         uint256 amount
     ) external {
-        _handleAction(activityId, user, amount, ActionType.Occurred);
+        _handleAction(Action(activityId, user, amount, ActionType.Occurred));
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -288,28 +295,20 @@ contract record Rewards is Ownable {
 
     /**
      * @dev Internal function to handle stake changes
-     * @param activityId The activity being updated
-     * @param user The user whose stake is changing
-     * @param amount The amount of stake change
-     * @param actionType The type of action (Deposit, Withdraw, or Occurred)
+     * @param action The action to process
      */
-    function _handleAction(
-        uint256 activityId,
-        address user,
-        uint256 amount,
-        ActionType actionType
-    ) internal {
-        Activity storage activity = activities[activityId];
+    function _handleAction(Action action) internal {
+        Activity storage activity = activities[action.activityId];
 
         // Validate action type against activity type
-        if (actionType == ActionType.Deposit || actionType == ActionType.Withdraw) {
+        if (action.actionType == ActionType.Deposit || action.actionType == ActionType.Withdraw) {
             require(activity.activityType == ActivityType.Position, "Only for Position activities");
         } else {
             require(activity.activityType == ActivityType.OneTime, "Only for OneTime activities");
         }
 
         // Determine if this is an increase or decrease
-        bool isIncrease = (actionType != ActionType.Withdraw);
+        bool isIncrease = (action.actionType != ActionType.Withdraw);
 
         // Access control: only allowed caller can update this activity
         require(msg.sender == activity.allowedCaller, "Caller not allowed");
@@ -318,10 +317,10 @@ contract record Rewards is Ownable {
         lastBlockHandled = block.number;
 
         // 1) Update global index using current totalStake (before user update)
-        _updateActivityIndex(activityId);
+        _updateActivityIndex(action.activityId);
 
         // 2) Settle user's pending rewards using index delta (Aave-style)
-        RewardsUserInfo storage userState = userInfo[activityId][user];
+        RewardsUserInfo storage userState = userInfo[action.activityId][action.user];
         uint256 oldStake = userState.stake;
         uint256 pendingRewards = 0;
 
@@ -331,17 +330,17 @@ contract record Rewards is Ownable {
             pendingRewards = (oldStake * indexDelta) / PRECISION_MULTIPLIER;
 
             if (pendingRewards > 0) {
-                unclaimedRewards[user] += pendingRewards;
+                unclaimedRewards[action.user] += pendingRewards;
             }
         }
 
         // 3) Calculate new stake from delta
         uint256 newStake;
         if (isIncrease) {
-            newStake = oldStake + amount;
+            newStake = oldStake + action.amount;
         } else {
-            require(oldStake >= amount, "Insufficient stake");
-            newStake = oldStake - amount;
+            require(oldStake >= action.amount, "Insufficient stake");
+            newStake = oldStake - action.amount;
         }
 
         // 4) Update user stake and index snapshot
@@ -351,7 +350,7 @@ contract record Rewards is Ownable {
         // 5) Update total stake internally (secure calculation)
         activity.totalStake = activity.totalStake + newStake - oldStake;
 
-        emit UserStakeUpdated(activityId, user, oldStake, newStake, pendingRewards);
+        emit UserStakeUpdated(action.activityId, action.user, oldStake, newStake, pendingRewards);
     }
 
     /**
