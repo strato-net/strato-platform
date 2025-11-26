@@ -51,19 +51,20 @@ contract Describe_Rewards_Idempotency is Authorizable {
 
     // ═════════════════════════════════════════════════════════════════════════
     // IDEMPOTENCY: Duplicate events in same block are silently ignored
-    // Hash is calculated from keccak256(user, amount, activityId, actionType, blockNumber)
+    // Hash is calculated from keccak256(blockNumber, eventIndex)
     // ═════════════════════════════════════════════════════════════════════════
 
     function it_should_ignore_duplicate_event_in_same_block() {
-        // given - user1 deposits 1000 units in block 100
+        // given - user1 deposits 1000 units in block 100, eventIndex 0
         uint256 depositAmount = 1000 * 1e18;
         uint256 blockNum = 100;
-        rewards.deposit(liquidityActivityId, address(user1), depositAmount, blockNum);
+        uint256 eventIndex = 0;
+        rewards.deposit(liquidityActivityId, address(user1), depositAmount, blockNum, eventIndex);
 
-        // when - the same event is sent again (same user, amount, activityId, actionType, blockNumber)
+        // when - the same event is sent again (same blockNumber and eventIndex)
         // This simulates a duplicate event from the indexer
-        // Hash = keccak256(user, amount, activityId, actionType, blockNumber) - all same = duplicate
-        rewards.deposit(liquidityActivityId, address(user1), depositAmount, blockNum);
+        // Hash = keccak256(blockNumber, eventIndex) - same = duplicate
+        rewards.deposit(liquidityActivityId, address(user1), depositAmount, blockNum, eventIndex);
 
         // then - user's stake should only be 1000 (not 2000), proving the duplicate was ignored
         (uint256 stake, uint256 userIndex) = rewards.userInfo(liquidityActivityId, address(user1));
@@ -79,12 +80,11 @@ contract Describe_Rewards_Idempotency is Authorizable {
         uint256 depositAmount = 1000 * 1e18;
         uint256 newerBlock = 200;
         uint256 olderBlock = 100;
-        rewards.deposit(liquidityActivityId, address(user1), depositAmount, newerBlock);
+        rewards.deposit(liquidityActivityId, address(user1), depositAmount, newerBlock, 0);
 
         // when - an event from an older block (100) arrives late
         // This simulates out-of-order or replayed old events
-        // Use different amount to show it's not rejected due to hash match, but due to old block
-        rewards.deposit(liquidityActivityId, address(user1), 500 * 1e18, olderBlock);
+        rewards.deposit(liquidityActivityId, address(user1), 500 * 1e18, olderBlock, 0);
 
         // then - user's stake should still be 1000 (old block event ignored)
         (uint256 stake, uint256 userIndex) = rewards.userInfo(liquidityActivityId, address(user1));
@@ -96,21 +96,20 @@ contract Describe_Rewards_Idempotency is Authorizable {
 
     // ═════════════════════════════════════════════════════════════════════════
     // IDEMPOTENCY: Hash set is cleared when moving to a new block
-    // Since blockNumber is part of the hash, same user+amount in different blocks = different hash
     // ═════════════════════════════════════════════════════════════════════════
 
     function it_should_clear_hash_set_when_moving_to_new_block() {
-        // given - process event in block 100
+        // given - process event in block 100, eventIndex 0
         uint256 depositAmount = 500 * 1e18;
         uint256 block100 = 100;
         uint256 block101 = 101;
 
-        rewards.deposit(liquidityActivityId, address(user1), depositAmount, block100);
+        rewards.deposit(liquidityActivityId, address(user1), depositAmount, block100, 0);
 
-        // when - move to block 101 with same user and amount
+        // when - move to block 101 with same eventIndex (0)
         // Since blockNumber is part of the hash, this produces a different hash
         // Hash set is also cleared when moving to a new block
-        rewards.deposit(liquidityActivityId, address(user1), depositAmount, block101);
+        rewards.deposit(liquidityActivityId, address(user1), depositAmount, block101, 0);
 
         // then - user's stake should be 1000 (both deposits processed)
         (uint256 stake, uint256 userIndex) = rewards.userInfo(liquidityActivityId, address(user1));
@@ -121,25 +120,24 @@ contract Describe_Rewards_Idempotency is Authorizable {
     }
 
     // ═════════════════════════════════════════════════════════════════════════
-    // IDEMPOTENCY: Different hashes in same block are all processed
-    // Different amounts produce different hashes
+    // IDEMPOTENCY: Different eventIndex in same block are all processed
     // ═════════════════════════════════════════════════════════════════════════
 
     function it_should_process_different_hashes_in_same_block() {
-        // given - multiple events with different amounts (hence different hashes) in the same block
+        // given - multiple events with different eventIndex in the same block
         uint256 blockNum = 100;
+        uint256 depositAmount = 100 * 1e18;
 
-        // when - process 5 different events in the same block with different amounts
-        // Each has unique hash because amount differs
-        rewards.deposit(liquidityActivityId, address(user1), 100 * 1e18, blockNum);
-        rewards.deposit(liquidityActivityId, address(user1), 200 * 1e18, blockNum);
-        rewards.deposit(liquidityActivityId, address(user1), 300 * 1e18, blockNum);
-        rewards.deposit(liquidityActivityId, address(user1), 400 * 1e18, blockNum);
-        rewards.deposit(liquidityActivityId, address(user1), 500 * 1e18, blockNum);
+        // when - process 5 different events in the same block with different eventIndex
+        rewards.deposit(liquidityActivityId, address(user1), depositAmount, blockNum, 0);
+        rewards.deposit(liquidityActivityId, address(user1), depositAmount, blockNum, 1);
+        rewards.deposit(liquidityActivityId, address(user1), depositAmount, blockNum, 2);
+        rewards.deposit(liquidityActivityId, address(user1), depositAmount, blockNum, 3);
+        rewards.deposit(liquidityActivityId, address(user1), depositAmount, blockNum, 4);
 
-        // then - all 5 deposits should be processed (total 1500)
+        // then - all 5 deposits should be processed (total 500)
         (uint256 stake, uint256 userIndex) = rewards.userInfo(liquidityActivityId, address(user1));
-        require(stake == 1500 * 1e18, "All unique events in same block should be processed");
+        require(stake == 500 * 1e18, "All unique events in same block should be processed");
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -151,14 +149,13 @@ contract Describe_Rewards_Idempotency is Authorizable {
         uint256 depositAmount = 1000 * 1e18;
         uint256 withdrawAmount = 400 * 1e18;
         uint256 blockNum = 100;
-        rewards.deposit(liquidityActivityId, address(user1), depositAmount, blockNum);
+        rewards.deposit(liquidityActivityId, address(user1), depositAmount, blockNum, 0);
 
-        // when - withdraw 400 units
-        // Note: deposit and withdraw have different actionTypes, so different hashes even with same amount
-        rewards.withdraw(liquidityActivityId, address(user1), withdrawAmount, blockNum);
+        // when - withdraw 400 units with eventIndex 1
+        rewards.withdraw(liquidityActivityId, address(user1), withdrawAmount, blockNum, 1);
 
-        // when - duplicate withdraw event (same user, amount, activityId, actionType, blockNumber = same hash)
-        rewards.withdraw(liquidityActivityId, address(user1), withdrawAmount, blockNum);
+        // when - duplicate withdraw event (same blockNumber and eventIndex = same hash)
+        rewards.withdraw(liquidityActivityId, address(user1), withdrawAmount, blockNum, 1);
 
         // then - stake should be 600 (1000 - 400), not 200 (1000 - 400 - 400)
         (uint256 stake, uint256 userIndex) = rewards.userInfo(liquidityActivityId, address(user1));
@@ -171,21 +168,22 @@ contract Describe_Rewards_Idempotency is Authorizable {
 
     function it_should_handle_batch_actions_idempotently() {
         // given - prepare a batch of actions with some duplicates
-        // Same user + amount + activityId + actionType + blockNumber = same hash = duplicate
+        // Same blockNumber + eventIndex = same hash = duplicate
         uint256 blockNum = 100;
+        uint256 depositAmount = 100 * 1e18;
 
         Action[] memory actions = new Action[](4);
-        actions[0] = Action(liquidityActivityId, address(user1), 100 * 1e18, ActionType.Deposit, blockNum);
-        actions[1] = Action(liquidityActivityId, address(user1), 200 * 1e18, ActionType.Deposit, blockNum);
-        actions[2] = Action(liquidityActivityId, address(user1), 100 * 1e18, ActionType.Deposit, blockNum); // duplicate of actions[0]
-        actions[3] = Action(liquidityActivityId, address(user1), 300 * 1e18, ActionType.Deposit, blockNum);
+        actions[0] = Action(liquidityActivityId, address(user1), depositAmount, ActionType.Deposit, blockNum, 0);
+        actions[1] = Action(liquidityActivityId, address(user1), depositAmount, ActionType.Deposit, blockNum, 1);
+        actions[2] = Action(liquidityActivityId, address(user1), depositAmount, ActionType.Deposit, blockNum, 0); // duplicate of actions[0]
+        actions[3] = Action(liquidityActivityId, address(user1), depositAmount, ActionType.Deposit, blockNum, 2);
 
         // when - process batch
         rewards.batchHandleAction(actions);
 
-        // then - only 3 unique events should be processed (amounts 100, 200, 300)
+        // then - only 3 unique events should be processed (eventIndex 0, 1, 2)
         (uint256 stake, uint256 userIndex) = rewards.userInfo(liquidityActivityId, address(user1));
-        require(stake == 600 * 1e18, "Batch should ignore duplicate hashes");
+        require(stake == 300 * 1e18, "Batch should ignore duplicate hashes");
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -195,8 +193,9 @@ contract Describe_Rewards_Idempotency is Authorizable {
     function it_should_allow_owner_to_emergency_override() {
         // given - process some events in block 100
         uint256 blockNum = 100;
-        rewards.deposit(liquidityActivityId, address(user1), 100 * 1e18, blockNum);
-        rewards.deposit(liquidityActivityId, address(user1), 200 * 1e18, blockNum);
+        uint256 depositAmount = 100 * 1e18;
+        rewards.deposit(liquidityActivityId, address(user1), depositAmount, blockNum, 0);
+        rewards.deposit(liquidityActivityId, address(user1), depositAmount, blockNum, 1);
 
         require(rewards.currentBlockHandled() == 100, "currentBlockHandled should be 100");
 
@@ -206,18 +205,17 @@ contract Describe_Rewards_Idempotency is Authorizable {
         // then - currentBlockHandled should be 50
         require(rewards.currentBlockHandled() == 50, "currentBlockHandled should be reset to 50");
 
-        // then - old hashes should be cleared, so same hash can be reprocessed
-        // Deposit same amount as first deposit - would be duplicate if hash set wasn't cleared
-        rewards.deposit(liquidityActivityId, address(user1), 100 * 1e18, blockNum);
+        // then - old hashes should be cleared, so same blockNumber+eventIndex can be reprocessed
+        rewards.deposit(liquidityActivityId, address(user1), depositAmount, blockNum, 0);
 
-        // then - stake should be 400 (original 100 + 200 + new 100)
+        // then - stake should be 300 (original 100 + 100 + new 100)
         (uint256 stake, uint256 userIndex) = rewards.userInfo(liquidityActivityId, address(user1));
-        require(stake == 400 * 1e18, "Hash should be reprocessed after emergency override");
+        require(stake == 300 * 1e18, "Hash should be reprocessed after emergency override");
     }
 
     function it_should_prevent_non_owner_from_emergency_override() {
         // given - some state exists
-        rewards.deposit(liquidityActivityId, address(user1), 100 * 1e18, 100);
+        rewards.deposit(liquidityActivityId, address(user1), 100 * 1e18, 100, 0);
 
         // when - non-owner tries to call emergencyOverride
         bool reverted = false;

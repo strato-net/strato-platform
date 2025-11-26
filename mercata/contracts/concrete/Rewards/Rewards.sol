@@ -25,6 +25,7 @@ struct Action {
     uint256 amount;      // The amount of stake change
     ActionType actionType; // The type of action
     uint256 blockNumber; // Block number this event originated from (for idempotency)
+    uint256 eventIndex;  // Event index within the block (for idempotency)
 }
 
 struct RewardsUserInfo {
@@ -284,14 +285,16 @@ contract record Rewards is Ownable {
      * @param user The user whose stake is increasing
      * @param amount The amount to deposit
      * @param blockNumber The block number this event originated from (for idempotency)
+     * @param eventIndex The event index within the block (for idempotency)
      */
     function deposit(
         uint256 activityId,
         address user,
         uint256 amount,
-        uint256 blockNumber
+        uint256 blockNumber,
+        uint256 eventIndex
     ) external {
-        _handleAction(Action(activityId, user, amount, ActionType.Deposit, blockNumber));
+        _handleAction(Action(activityId, user, amount, ActionType.Deposit, blockNumber, eventIndex));
     }
 
     /**
@@ -300,14 +303,16 @@ contract record Rewards is Ownable {
      * @param user The user whose stake is decreasing
      * @param amount The amount to withdraw
      * @param blockNumber The block number this event originated from (for idempotency)
+     * @param eventIndex The event index within the block (for idempotency)
      */
     function withdraw(
         uint256 activityId,
         address user,
         uint256 amount,
-        uint256 blockNumber
+        uint256 blockNumber,
+        uint256 eventIndex
     ) external {
-        _handleAction(Action(activityId, user, amount, ActionType.Withdraw, blockNumber));
+        _handleAction(Action(activityId, user, amount, ActionType.Withdraw, blockNumber, eventIndex));
     }
 
     /**
@@ -316,14 +321,16 @@ contract record Rewards is Ownable {
      * @param user The user who performed the action
      * @param amount The amount/value of the action
      * @param blockNumber The block number this event originated from (for idempotency)
+     * @param eventIndex The event index within the block (for idempotency)
      */
     function occurred(
         uint256 activityId,
         address user,
         uint256 amount,
-        uint256 blockNumber
+        uint256 blockNumber,
+        uint256 eventIndex
     ) external {
-        _handleAction(Action(activityId, user, amount, ActionType.Occurred, blockNumber));
+        _handleAction(Action(activityId, user, amount, ActionType.Occurred, blockNumber, eventIndex));
     }
 
     /**
@@ -371,8 +378,8 @@ contract record Rewards is Ownable {
             currentBlockHandled = action.blockNumber;
         }
 
-        // Calculate event hash from action attributes
-        string eventHash = keccak256(action.user, action.amount, action.activityId, action.actionType, action.blockNumber);
+        // Calculate event hash from blockNumber and eventIndex (uniquely identifies event on chain)
+        string eventHash = keccak256(action.blockNumber, action.eventIndex);
 
         // blockNumber == currentBlockHandled at this point
         // Check if we've already processed this event hash
