@@ -280,58 +280,6 @@ contract record Rewards is Ownable {
     }
 
     // ═════════════════════════════════════════════════════════════════════════
-    // BATCH FUNCTIONS
-    // ═════════════════════════════════════════════════════════════════════════
-
-    /**
-     * @dev Batch deposit for multiple users in a single activity
-     * @param activityId The activity to deposit into
-     * @param users Array of user addresses
-     * @param amounts Array of deposit amounts (must match users length)
-     */
-    function batchDeposit(
-        uint256 activityId,
-        address[] calldata users,
-        uint256[] calldata amounts
-    ) external {
-        require(users.length == amounts.length, "Array length mismatch");
-        require(activities[activityId].activityType == ActivityType.Position, "Only for Position activities");
-        _batchHandleActivity(activityId, users, amounts, true);
-    }
-
-    /**
-     * @dev Batch withdraw for multiple users in a single activity
-     * @param activityId The activity to withdraw from
-     * @param users Array of user addresses
-     * @param amounts Array of withdrawal amounts (must match users length)
-     */
-    function batchWithdraw(
-        uint256 activityId,
-        address[] calldata users,
-        uint256[] calldata amounts
-    ) external {
-        require(users.length == amounts.length, "Array length mismatch");
-        require(activities[activityId].activityType == ActivityType.Position, "Only for Position activities");
-        _batchHandleActivity(activityId, users, amounts, false);
-    }
-
-    /**
-     * @dev Batch record one-time action occurrences for multiple users
-     * @param activityId The one-time activity that occurred
-     * @param users Array of user addresses
-     * @param amounts Array of action amounts (must match users length)
-     */
-    function batchOccurred(
-        uint256 activityId,
-        address[] calldata users,
-        uint256[] calldata amounts
-    ) external {
-        require(users.length == amounts.length, "Array length mismatch");
-        require(activities[activityId].activityType == ActivityType.OneTime, "Only for OneTime activities");
-        _batchHandleActivity(activityId, users, amounts, true);
-    }
-
-    // ═════════════════════════════════════════════════════════════════════════
     // INTERNAL FUNCTIONS
     // ═════════════════════════════════════════════════════════════════════════
 
@@ -391,69 +339,6 @@ contract record Rewards is Ownable {
         activity.totalStake = activity.totalStake + newStake - oldStake;
 
         emit UserStakeUpdated(activityId, user, oldStake, newStake, pendingRewards);
-    }
-
-    /**
-     * @dev Internal function to handle batch stake changes (optimized - updates index once)
-     * @param activityId The activity being updated
-     * @param users Array of user addresses
-     * @param amounts Array of stake change amounts
-     * @param isIncrease True for deposit/increase, false for withdraw/decrease
-     */
-    function _batchHandleActivity(
-        uint256 activityId,
-        address[] calldata users,
-        uint256[] calldata amounts,
-        bool isIncrease
-    ) internal {
-        Activity storage activity = activities[activityId];
-
-        // Access control: only allowed caller can update this activity
-        require(msg.sender == activity.allowedCaller, "Caller not allowed");
-
-        // Track last block handled
-        lastBlockHandled = block.number;
-
-        // 1) Update global index ONCE for the entire batch
-        _updateActivityIndex(activityId);
-
-        // 2) Process each user
-        for (uint256 i = 0; i < users.length; i++) {
-            address user = users[i];
-            uint256 amount = amounts[i];
-
-            RewardsUserInfo storage userState = userInfo[activityId][user];
-            uint256 oldStake = userState.stake;
-            uint256 pendingRewards = 0;
-
-            // Settle user's pending rewards using index delta
-            if (oldStake > 0) {
-                uint256 indexDelta = activity.accRewardPerStake - userState.userIndex;
-                pendingRewards = (oldStake * indexDelta) / PRECISION_MULTIPLIER;
-
-                if (pendingRewards > 0) {
-                    unclaimedRewards[user] += pendingRewards;
-                }
-            }
-
-            // Calculate new stake
-            uint256 newStake;
-            if (isIncrease) {
-                newStake = oldStake + amount;
-            } else {
-                require(oldStake >= amount, "Insufficient stake");
-                newStake = oldStake - amount;
-            }
-
-            // Update user stake and index snapshot
-            userState.stake = newStake;
-            userState.userIndex = activity.accRewardPerStake;
-
-            // Update total stake
-            activity.totalStake = activity.totalStake + newStake - oldStake;
-
-            emit UserStakeUpdated(activityId, user, oldStake, newStake, pendingRewards);
-        }
     }
 
     /**
