@@ -20,10 +20,12 @@ enum ActionType {
 }
 
 struct Action {
-    uint256 activityId;  // The activity being updated
-    address user;        // The user whose stake is changing
-    uint256 amount;      // The amount of stake change
+    uint256 activityId;   // The activity being updated
+    address user;         // The user whose stake is changing
+    uint256 amount;       // The amount of stake change
     ActionType actionType; // The type of action
+    uint256 blockNumber;  // Block number of the event (for idempotency)
+    uint256 eventHash;    // Unique identifier for the event (for idempotency)
 }
 
 struct RewardsUserInfo {
@@ -100,8 +102,12 @@ contract record Rewards is Ownable {
     // Total unclaimed rewards per user
     mapping(address => uint256) public record unclaimedRewards;
 
-    // Last block number when _handleAction was called
-    uint256 public lastBlockHandled;
+    // Current block being processed (for idempotency)
+    uint256 public currentBlock;
+
+    // Block number when each event hash was processed (for idempotency)
+    // A hash is considered processed for the current block only if processedHashBlock[hash] == currentBlock
+    mapping(uint256 => uint256) public processedHashBlock;
 
     // ═════════════════════════════════════════════════════════════════════════
     // CONSTRUCTOR
@@ -272,13 +278,17 @@ contract record Rewards is Ownable {
      * @param activityId The activity to deposit into
      * @param user The user whose stake is increasing
      * @param amount The amount to deposit
+     * @param blockNumber Block number of the event (for idempotency)
+     * @param eventHash Unique identifier for the event (for idempotency)
      */
     function deposit(
         uint256 activityId,
         address user,
-        uint256 amount
+        uint256 amount,
+        uint256 blockNumber,
+        uint256 eventHash
     ) external {
-        _handleAction(Action(activityId, user, amount, ActionType.Deposit));
+        _handleAction(Action(activityId, user, amount, ActionType.Deposit, blockNumber, eventHash));
     }
 
     /**
@@ -286,13 +296,17 @@ contract record Rewards is Ownable {
      * @param activityId The activity to withdraw from
      * @param user The user whose stake is decreasing
      * @param amount The amount to withdraw
+     * @param blockNumber Block number of the event (for idempotency)
+     * @param eventHash Unique identifier for the event (for idempotency)
      */
     function withdraw(
         uint256 activityId,
         address user,
-        uint256 amount
+        uint256 amount,
+        uint256 blockNumber,
+        uint256 eventHash
     ) external {
-        _handleAction(Action(activityId, user, amount, ActionType.Withdraw));
+        _handleAction(Action(activityId, user, amount, ActionType.Withdraw, blockNumber, eventHash));
     }
 
     /**
@@ -300,13 +314,17 @@ contract record Rewards is Ownable {
      * @param activityId The one-time activity that occurred
      * @param user The user who performed the action
      * @param amount The amount/value of the action
+     * @param blockNumber Block number of the event (for idempotency)
+     * @param eventHash Unique identifier for the event (for idempotency)
      */
     function occurred(
         uint256 activityId,
         address user,
-        uint256 amount
+        uint256 amount,
+        uint256 blockNumber,
+        uint256 eventHash
     ) external {
-        _handleAction(Action(activityId, user, amount, ActionType.Occurred));
+        _handleAction(Action(activityId, user, amount, ActionType.Occurred, blockNumber, eventHash));
     }
 
     /**
@@ -328,6 +346,30 @@ contract record Rewards is Ownable {
      * @param action The action to process
      */
     function _handleAction(Action action) internal {
+        // Idempotency check (only applies when currentBlock > 0, i.e., after first action)
+        if (currentBlock > 0) {
+            if (action.blockNumber < currentBlock) {
+                // Event is from an old block we've already moved past - ignore
+                return;
+            }
+
+            if (action.blockNumber == currentBlock) {
+                // Same block - check for duplicate hash
+                if (processedHashBlock[action.eventHash] == currentBlock) {
+                    // Already processed this event in this block - ignore
+                    return;
+                }
+            }
+        }
+
+        // Update currentBlock if moving to a new block
+        if (action.blockNumber > currentBlock) {
+            currentBlock = action.blockNumber;
+        }
+
+        // Mark this hash as processed for the current block
+        processedHashBlock[action.eventHash] = currentBlock;
+
         Activity storage activity = activities[action.activityId];
 
         // Validate action type against activity type
@@ -342,9 +384,6 @@ contract record Rewards is Ownable {
 
         // Access control: only allowed caller can update this activity
         require(msg.sender == activity.allowedCaller, "Caller not allowed");
-
-        // Track last block handled
-        lastBlockHandled = block.number;
 
         // 1) Update global index using current totalStake (before user update)
         _updateActivityIndex(action.activityId);

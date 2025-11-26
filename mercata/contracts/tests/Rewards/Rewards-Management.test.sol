@@ -345,7 +345,7 @@ contract Describe_Rewards_Management is Authorizable {
 
         // when/then - try to deposit on OneTime activity
         bool reverted = false;
-        try rewards.deposit(activityId, address(user1), 100) {
+        try rewards.deposit(activityId, address(user1), 100, block.number, 1) {
             reverted = false;
         } catch {
             reverted = true;
@@ -360,7 +360,7 @@ contract Describe_Rewards_Management is Authorizable {
 
         // when/then - try to withdraw on OneTime activity
         bool reverted = false;
-        try rewards.withdraw(activityId, address(user1), 100) {
+        try rewards.withdraw(activityId, address(user1), 100, block.number, 2) {
             reverted = false;
         } catch {
             reverted = true;
@@ -375,7 +375,7 @@ contract Describe_Rewards_Management is Authorizable {
 
         // when/then - try to call occurred on Position activity
         bool reverted = false;
-        try rewards.occurred(activityId, address(user1), 100) {
+        try rewards.occurred(activityId, address(user1), 100, block.number, 3) {
             reverted = false;
         } catch {
             reverted = true;
@@ -389,7 +389,7 @@ contract Describe_Rewards_Management is Authorizable {
         rewards.addActivity(activityId, "Swap Activity", ActivityType.OneTime, 100, address(this), address(this));
 
         // when - call occurred
-        rewards.occurred(activityId, address(user1), 100);
+        rewards.occurred(activityId, address(user1), 100, block.number, 4);
 
         // then - check user stake increased
         (uint256 stake, uint256 userIndex) = rewards.userInfo(activityId, address(user1));
