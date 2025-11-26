@@ -13,6 +13,12 @@ enum ActivityType {
     OneTime    // e.g swaps, borrows
 }
 
+enum ActionType {
+    Deposit,   // Increase stake (Position activities only)
+    Withdraw,  // Decrease stake (Position activities only)
+    Occurred   // One-time action (OneTime activities only)
+}
+
 struct RewardsUserInfo {
     uint256 stake;       // User's effective stake in this activity
     uint256 userIndex;   // Snapshot of accRewardPerStake at last update (Aave-style)
@@ -245,8 +251,7 @@ contract record Rewards is Ownable {
         address user,
         uint256 amount
     ) external {
-        require(activities[activityId].activityType == ActivityType.Position, "Only for Position activities");
-        _handleAction(activityId, user, amount, true);
+        _handleAction(activityId, user, amount, ActionType.Deposit);
     }
 
     /**
@@ -260,8 +265,7 @@ contract record Rewards is Ownable {
         address user,
         uint256 amount
     ) external {
-        require(activities[activityId].activityType == ActivityType.Position, "Only for Position activities");
-        _handleAction(activityId, user, amount, false);
+        _handleAction(activityId, user, amount, ActionType.Withdraw);
     }
 
     /**
@@ -275,8 +279,7 @@ contract record Rewards is Ownable {
         address user,
         uint256 amount
     ) external {
-        require(activities[activityId].activityType == ActivityType.OneTime, "Only for OneTime activities");
-        _handleAction(activityId, user, amount, true);
+        _handleAction(activityId, user, amount, ActionType.Occurred);
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -288,15 +291,25 @@ contract record Rewards is Ownable {
      * @param activityId The activity being updated
      * @param user The user whose stake is changing
      * @param amount The amount of stake change
-     * @param isIncrease True for deposit/increase, false for withdraw/decrease
+     * @param actionType The type of action (Deposit, Withdraw, or Occurred)
      */
     function _handleAction(
         uint256 activityId,
         address user,
         uint256 amount,
-        bool isIncrease
+        ActionType actionType
     ) internal {
         Activity storage activity = activities[activityId];
+
+        // Validate action type against activity type
+        if (actionType == ActionType.Deposit || actionType == ActionType.Withdraw) {
+            require(activity.activityType == ActivityType.Position, "Only for Position activities");
+        } else {
+            require(activity.activityType == ActivityType.OneTime, "Only for OneTime activities");
+        }
+
+        // Determine if this is an increase or decrease
+        bool isIncrease = (actionType != ActionType.Withdraw);
 
         // Access control: only allowed caller can update this activity
         require(msg.sender == activity.allowedCaller, "Caller not allowed");
