@@ -251,6 +251,55 @@ contract Describe_Rewards_Management is Authorizable {
     }
 
     // ═════════════════════════════════════════════════════════════════════════
+    // SOURCE CONTRACT UPDATES
+    // ═════════════════════════════════════════════════════════════════════════
+
+    function it_should_allow_updating_source_contract() {
+        // given
+        uint256 activityId = 1;
+        address initialSource = address(user1);
+        address newSource = address(user2);
+
+        rewards.addActivity(activityId, "Activity 1", ActivityType.Position, 100, address(user1), initialSource);
+
+        // when
+        rewards.setSourceContract(activityId, newSource);
+
+        // then
+        (string memory name, ActivityType activityType, uint256 rate, uint256 accReward, uint256 lastUpdate, uint256 totalStake, address caller, address source) =
+            rewards.activities(activityId);
+        require(source == newSource, "Source contract should be updated");
+    }
+
+    function it_should_prevent_updating_source_contract_on_nonexistent_activity() {
+        // given - no activity exists with id 999
+
+        // when/then
+        bool reverted = false;
+        try rewards.setSourceContract(999, address(user1)) {
+            reverted = false;
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Updating source contract on nonexistent activity should revert");
+    }
+
+    function it_should_prevent_setting_source_contract_to_zero_address() {
+        // given
+        uint256 activityId = 1;
+        rewards.addActivity(activityId, "Activity 1", ActivityType.Position, 100, address(user1), address(user1));
+
+        // when/then
+        bool reverted = false;
+        try rewards.setSourceContract(activityId, address(0)) {
+            reverted = false;
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Setting source contract to zero address should revert");
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
     // ACTIVITY TYPE VALIDATION
     // ═════════════════════════════════════════════════════════════════════════
 

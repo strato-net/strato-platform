@@ -68,6 +68,7 @@ contract record Rewards is Ownable {
     event ActivityAdded(uint256 indexed activityId, string name, uint256 emissionRate, address allowedCaller, address sourceContract);
     event EmissionRateUpdated(uint256 indexed activityId, uint256 oldRate, uint256 newRate);
     event AllowedCallerUpdated(uint256 indexed activityId, address oldCaller, address newCaller);
+    event SourceContractUpdated(uint256 indexed activityId, address oldSourceContract, address newSourceContract);
     event RewardsClaimed(address indexed user, uint256 amount);
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -200,6 +201,21 @@ contract record Rewards is Ownable {
         activity.allowedCaller = newAllowedCaller;
 
         emit AllowedCallerUpdated(activityId, oldCaller, newAllowedCaller);
+    }
+
+    /**
+     * @dev Update the source contract for an existing activity
+     * @param activityId The activity to update
+     * @param newSourceContract The new source contract address
+     */
+    function setSourceContract(uint256 activityId, address newSourceContract) external onlyOwner {
+        Activity storage activity = activities[activityId];
+        require(newSourceContract != address(0), "Invalid source contract address");
+
+        address oldSourceContract = activity.sourceContract;
+        activity.sourceContract = newSourceContract;
+
+        emit SourceContractUpdated(activityId, oldSourceContract, newSourceContract);
     }
 
     /**
