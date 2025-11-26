@@ -343,6 +343,15 @@ contract record Rewards is Ownable {
         }
     }
 
+    /**
+     * @dev Emergency function to reset idempotency state
+     * @param newBlockNumber The block number to set as currentBlockHandled
+     */
+    function emergencyOverride(uint256 newBlockNumber) external onlyOwner {
+        _clearProcessedHashes();
+        currentBlockHandled = newBlockNumber;
+    }
+
     // ═════════════════════════════════════════════════════════════════════════
     // INTERNAL FUNCTIONS
     // ═════════════════════════════════════════════════════════════════════════

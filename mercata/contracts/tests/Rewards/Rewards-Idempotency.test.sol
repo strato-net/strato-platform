@@ -183,4 +183,48 @@ contract Describe_Rewards_Idempotency is Authorizable {
         require(stake == depositAmount * 3, "Batch should ignore duplicate hashes");
     }
 
+    // ═════════════════════════════════════════════════════════════════════════
+    // IDEMPOTENCY: Emergency override resets state
+    // ═════════════════════════════════════════════════════════════════════════
+
+    function it_should_allow_owner_to_emergency_override() {
+        // given - process some events in block 100
+        uint256 depositAmount = 100 * 1e18;
+        uint256 blockNum = 100;
+        rewards.deposit(liquidityActivityId, address(user1), depositAmount, blockNum, 1);
+        rewards.deposit(liquidityActivityId, address(user1), depositAmount, blockNum, 2);
+
+        require(rewards.currentBlockHandled() == 100, "currentBlockHandled should be 100");
+
+        // when - owner calls emergencyOverride to reset to block 50
+        rewards.emergencyOverride(50);
+
+        // then - currentBlockHandled should be 50
+        require(rewards.currentBlockHandled() == 50, "currentBlockHandled should be reset to 50");
+
+        // then - old hashes should be cleared, so hash 1 can be reused
+        // (this would normally be ignored if we were still at block 100)
+        rewards.deposit(liquidityActivityId, address(user1), depositAmount, blockNum, 1);
+
+        // then - stake should be 300 (original 200 + new 100)
+        (uint256 stake, uint256 userIndex) = rewards.userInfo(liquidityActivityId, address(user1));
+        require(stake == depositAmount * 3, "Hash should be reprocessed after emergency override");
+    }
+
+    function it_should_prevent_non_owner_from_emergency_override() {
+        // given - some state exists
+        rewards.deposit(liquidityActivityId, address(user1), 100 * 1e18, 100, 1);
+
+        // when - non-owner tries to call emergencyOverride
+        bool reverted = false;
+        try TestUtils.callAs(user1, address(rewards), "emergencyOverride(uint256)", 50) {
+            reverted = false;
+        } catch {
+            reverted = true;
+        }
+
+        // then - should revert
+        require(reverted, "Non-owner should not be able to call emergencyOverride");
+    }
+
 }
