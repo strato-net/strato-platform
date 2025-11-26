@@ -14,13 +14,13 @@ const BridgeTransactionsPage = () => {
       <DashboardSidebar />
       <div className="flex flex-col transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 16rem)', height: '100vh' }}>
         <DashboardHeader title="Bridge Transactions" />
-        <div className="flex-1 p-8">
+        <div className="flex-1 p-0 md:p-8">
           <div className="relative">
             <Button
               variant="ghost"
               size="icon"
               onClick={() => navigate(-1)}
-              className="absolute -left-4 top-0 rounded-full hover:bg-gray-100 w-10 h-10 border border-gray-200 shadow-sm"
+              className="hidden md:flex absolute -left-4 top-0 rounded-full hover:bg-gray-100 w-10 h-10 border border-gray-200 shadow-sm"
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
