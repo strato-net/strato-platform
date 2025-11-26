@@ -19,9 +19,7 @@ contract Describe_Rewards_Management is Authorizable {
     User user1;
     User user2;
 
-    // For idempotency testing - simulate block numbers and unique event hashes
     uint256 testBlockNumber = 100;
-    uint256 nextEventHash = 1;
 
     function beforeAll() {
         bypassAuthorizations = true;
@@ -341,7 +339,7 @@ contract Describe_Rewards_Management is Authorizable {
 
         // when/then - try to deposit on OneTime activity
         bool reverted = false;
-        try rewards.deposit(activityId, address(user1), 100, testBlockNumber, nextEventHash++) {
+        try rewards.deposit(activityId, address(user1), 100, testBlockNumber) {
             reverted = false;
         } catch {
             reverted = true;
@@ -356,7 +354,7 @@ contract Describe_Rewards_Management is Authorizable {
 
         // when/then - try to withdraw on OneTime activity
         bool reverted = false;
-        try rewards.withdraw(activityId, address(user1), 100, testBlockNumber, nextEventHash++) {
+        try rewards.withdraw(activityId, address(user1), 100, testBlockNumber) {
             reverted = false;
         } catch {
             reverted = true;
@@ -371,7 +369,7 @@ contract Describe_Rewards_Management is Authorizable {
 
         // when/then - try to call occurred on Position activity
         bool reverted = false;
-        try rewards.occurred(activityId, address(user1), 100, testBlockNumber, nextEventHash++) {
+        try rewards.occurred(activityId, address(user1), 100, testBlockNumber) {
             reverted = false;
         } catch {
             reverted = true;
@@ -385,7 +383,7 @@ contract Describe_Rewards_Management is Authorizable {
         rewards.addActivity(activityId, "Swap Activity", ActivityType.OneTime, 100, address(this), address(this));
 
         // when - call occurred
-        rewards.occurred(activityId, address(user1), 100, testBlockNumber, nextEventHash++);
+        rewards.occurred(activityId, address(user1), 100, testBlockNumber);
 
         // then - check user stake increased
         (uint256 stake, uint256 userIndex) = rewards.userInfo(activityId, address(user1));
