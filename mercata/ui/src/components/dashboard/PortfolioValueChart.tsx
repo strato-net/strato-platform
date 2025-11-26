@@ -188,7 +188,7 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
                 })}`
               )}
             </div>
-            <div className={`flex items-center gap-1 text-sm ${change.isPositive ? (tabType === 'rewards' ? 'text-purple-500' : tabType === 'borrowed' ? 'text-red-500' : 'text-green-500') : (tabType === 'borrowed' ? 'text-green-500' : 'text-red-500')}`}>
+            <div className={`flex items-center gap-1 text-sm ${tabType === 'rewards' ? 'text-purple-500' : tabType === 'borrowed' ? 'text-orange-500' : change.isPositive ? 'text-green-500' : 'text-red-500'}`}>
               {change.isPositive ? <TrendingUp size={16} color={getColorScheme(tabType).positive} /> : <TrendingDown size={16} color={getColorScheme(tabType).negative}/>}
               <span>{hasData ? `${change.value.toFixed(2)}%` : '—'}</span>
             </div>
