@@ -53,15 +53,6 @@ const calculateTimeRangeHours = (data: PortfolioDataPoint[]): number => {
   return (last - first) / (1000 * 60 * 60); // Convert milliseconds to hours
 };
 
-// Format balance value
-const formatBalance = (value: number): string => {
-  const dollars = value;
-  if (dollars >= 1000) {
-    return `$${(dollars / 1000).toFixed(1)}k`;
-  }
-  return `$${dollars.toFixed(2)}`;
-};
-
 // Calculate percentage change
 const calculateChange = (data: PortfolioDataPoint[]): { value: number; isPositive: boolean } => {
   if (data.length < 2) return { value: 0, isPositive: true };
@@ -130,9 +121,14 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
   const hasData = chartData.length > 0;
 
   // Memoize calculated values
-  const { currentValue, change, yAxisDomain } = useMemo(() => {
+  const { currentValue, change, yAxisDomain, scale } = useMemo(() => {
     if (!hasData) {
-      return { currentValue: propCurrentValue || 0, change: { value: 0, isPositive: true }, yAxisDomain: [0, 100] };
+      return { 
+        currentValue: propCurrentValue || 0, 
+        change: { value: 0, isPositive: true }, 
+        yAxisDomain: [0, 100],
+        scale: { divisor: 1, suffix: '' }
+      };
     }
 
     const currentValue = propCurrentValue !== undefined ? propCurrentValue : (chartData[chartData.length - 1]?.value || 0);
@@ -149,7 +145,17 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
       maxValue + padding
     ];
 
-    return { currentValue, change, yAxisDomain };
+    const maxDomainValue = maxValue + padding;
+    let scale;
+    if (maxDomainValue >= 1000000) {
+      scale = { divisor: 1000000, suffix: 'M' };
+    } else if (maxDomainValue >= 1000) {
+      scale = { divisor: 1000, suffix: 'k' };
+    } else {
+      scale = { divisor: 1, suffix: '' };
+    }
+
+    return { currentValue, change, yAxisDomain, scale };
   }, [chartData, data, hasData, propCurrentValue]);
 
   // Determine color based on trend and tab type
@@ -207,7 +213,7 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart
                     data={chartData}
-                    margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                    margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
                   >
                     <CartesianGrid 
                       strokeDasharray="3 3" 
@@ -225,17 +231,20 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
                       axisLine={false}
                       tickLine={false}
                       tick={{ fontSize: 11, fill: '#6b7280' }}
-                  domain={yAxisDomain}
-                  width={60}
-                  tickFormatter={(value) => {
-                    if (tabType === 'rewards') {
-                      return `${(value / 1000).toFixed(1)}k`;
-                    } else if (tabType === 'borrowed') {
-                      return `${(value / 1000).toFixed(1)}k`;
-                    } else {
-                      return `$${(value / 1000).toFixed(1)}k`;
-                    }
-                  }}
+                      domain={yAxisDomain}
+                      width={80}
+                      tickFormatter={(value) => {
+                        const scaledValue = value / scale.divisor;
+                        const formatted = scaledValue >= 1 ? scaledValue.toFixed(1) : scaledValue.toFixed(2);
+                        
+                        if (tabType === 'rewards') {
+                          return `CATA ${formatted}${scale.suffix}`;
+                        } else if (tabType === 'borrowed') {
+                          return `USDST ${formatted}${scale.suffix}`;
+                        } else {
+                          return `$${formatted}${scale.suffix}`;
+                        }
+                      }}
                     />
                     <ChartTooltip
                       content={({ active, payload }) => {

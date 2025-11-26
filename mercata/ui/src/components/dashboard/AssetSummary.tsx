@@ -26,8 +26,8 @@ const AssetSummary = ({
 }: AssetSummaryProps) => {
   return (
     <div 
-      className={`bg-white rounded-xl border p-5 shadow-sm transition-all w-full h-full flex flex-col justify-center ${
-        isActive ? 'border-blue-500 border-2 shadow-md' : 'border-gray-100 hover:shadow-md'
+      className={`bg-white rounded-xl border-2 p-5 shadow-sm transition-all w-full h-full flex flex-col justify-center ${
+        isActive ? 'border-blue-500 shadow-md' : 'border-gray-100 hover:shadow-md'
       } ${onClick ? 'cursor-pointer' : ''}`}
       onClick={onClick}
     >

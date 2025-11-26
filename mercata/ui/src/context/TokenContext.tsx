@@ -45,6 +45,15 @@ type TokenContextType = {
   voucherBalance: string;
   loadingUsdstBalance: boolean;
   fetchUsdstBalance: (signal?: AbortSignal) => Promise<void>;
+  // Balance history caches
+  netBalanceHistoryCache: Record<string, BalanceSnapshot[]>;
+  rewardsHistoryCache: Record<string, BalanceSnapshot[]>;
+  borrowedHistoryCache: Record<string, BalanceSnapshot[]>;
+  loadingBalanceHistory: boolean;
+  setNetBalanceHistoryCache: (range: string, data: BalanceSnapshot[]) => void;
+  setRewardsHistoryCache: (range: string, data: BalanceSnapshot[]) => void;
+  setBorrowedHistoryCache: (range: string, data: BalanceSnapshot[]) => void;
+  setLoadingBalanceHistory: (loading: boolean) => void;
 };
 
 const TokenContext = createContext<TokenContextType | undefined>(undefined);
@@ -67,6 +76,12 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
   const [usdstBalance, setUsdstBalance] = useState("0");
   const [voucherBalance, setVoucherBalance] = useState("0");
   const [loadingUsdstBalance, setLoadingUsdstBalance] = useState(false);
+  
+  // Balance history caches
+  const [netBalanceHistoryCache, setNetBalanceHistoryCacheState] = useState<Record<string, BalanceSnapshot[]>>({});
+  const [rewardsHistoryCache, setRewardsHistoryCacheState] = useState<Record<string, BalanceSnapshot[]>>({});
+  const [borrowedHistoryCache, setBorrowedHistoryCacheState] = useState<Record<string, BalanceSnapshot[]>>({});
+  const [loadingBalanceHistory, setLoadingBalanceHistory] = useState(false);
 
   // ========== REFS ==========
   const earningAssetsIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -276,6 +291,18 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  const setNetBalanceHistoryCache = useCallback((range: string, data: BalanceSnapshot[]) => {
+    setNetBalanceHistoryCacheState(prev => ({ ...prev, [range]: data }));
+  }, []);
+
+  const setRewardsHistoryCache = useCallback((range: string, data: BalanceSnapshot[]) => {
+    setRewardsHistoryCacheState(prev => ({ ...prev, [range]: data }));
+  }, []);
+
+  const setBorrowedHistoryCache = useCallback((range: string, data: BalanceSnapshot[]) => {
+    setBorrowedHistoryCacheState(prev => ({ ...prev, [range]: data }));
+  }, []);
+
   const createToken = useCallback(async (token: CreateTokenPayload) => {
     setLoading(true);
     try {
@@ -409,6 +436,14 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
         voucherBalance,
         loadingUsdstBalance,
         fetchUsdstBalance,
+        netBalanceHistoryCache,
+        rewardsHistoryCache,
+        borrowedHistoryCache,
+        loadingBalanceHistory,
+        setNetBalanceHistoryCache,
+        setRewardsHistoryCache,
+        setBorrowedHistoryCache,
+        setLoadingBalanceHistory,
       }}
     >
       {children}
