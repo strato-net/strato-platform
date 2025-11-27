@@ -13,8 +13,6 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE DataKinds #-}
 
-{-# OPTIONS -fno-warn-deprecations #-}
-
 module Blockchain.Slipstream.OutputData (
   SlipstreamQuery(..),
   slipstreamQueryPostgres,
@@ -71,7 +69,7 @@ import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Stream.Action        (Delegatecall(..))
 import           Data.Text.Encoding              (decodeUtf8, decodeUtf8', encodeUtf8)
 import           Data.Time
-import qualified Database.Esqueleto              as E
+import qualified Database.Esqueleto.Experimental as E
 import           Database.Persist                (insert_)
 import           Database.Persist.Postgresql     (runSqlPool, SqlPersistT)
 import           Blockchain.Slipstream.PostgresqlTypedShim
@@ -722,9 +720,8 @@ insertDelegatecall conn (Delegatecall storageAddress codeAddress Nothing contrac
   lift $ performSQLQueries conn
     [
       E.insertSelect $ do
-        src <- E.from $ \c -> do
-          E.where_ (c E.^. ContractAddress E.==. E.val (StorageKey codeAddress))
-          return c
+        src <- E.from $ E.table @Contract
+        E.where_ (src E.^. ContractAddress E.==. E.val (StorageKey codeAddress))
           -- Build an Insertion MyTable by listing *non-id* fields in schema order:
         pure $ Contract
           E.<#  (E.val $ StorageKey storageAddress)
