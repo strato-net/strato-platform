@@ -177,41 +177,6 @@ contract record Rewards is Ownable {
     }
 
     /**
-     * @dev Internal function to register a new activity
-     */
-    function _addActivity(
-        uint256 activityId,
-        string name,
-        ActivityType activityType,
-        uint256 emissionRate,
-        address allowedCaller,
-        address sourceContract
-    ) internal {
-        require(activities[activityId].allowedCaller == address(0), "Activity already exists");
-        require(allowedCaller != address(0), "Invalid caller address");
-        require(sourceContract != address(0), "Invalid source contract address");
-        require(bytes(name).length > 0, "Name cannot be empty");
-
-        activities[activityId] = Activity({
-            name: name,
-            activityType: activityType,
-            emissionRate: emissionRate,
-            accRewardPerStake: 0,
-            lastUpdateTime: block.timestamp,
-            totalStake: 0,
-            allowedCaller: allowedCaller,
-            sourceContract: sourceContract
-        });
-
-        activityIds.push(activityId);
-
-        // Update total emission rate
-        totalRewardsEmission += emissionRate;
-
-        emit ActivityAdded(activityId, name, emissionRate, allowedCaller, sourceContract);
-    }
-
-    /**
      * @dev Update the emission rate for an existing activity
      * @param activityId The activity to update
      * @param newEmissionRate The new emission rate (CATA per second)
@@ -339,6 +304,41 @@ contract record Rewards is Ownable {
     // ═════════════════════════════════════════════════════════════════════════
     // INTERNAL FUNCTIONS
     // ═════════════════════════════════════════════════════════════════════════
+
+    /**
+     * @dev Internal function to register a new activity
+     */
+    function _addActivity(
+        uint256 activityId,
+        string name,
+        ActivityType activityType,
+        uint256 emissionRate,
+        address allowedCaller,
+        address sourceContract
+    ) internal {
+        require(activities[activityId].allowedCaller == address(0), "Activity already exists");
+        require(allowedCaller != address(0), "Invalid caller address");
+        require(sourceContract != address(0), "Invalid source contract address");
+        require(bytes(name).length > 0, "Name cannot be empty");
+
+        activities[activityId] = Activity({
+            name: name,
+            activityType: activityType,
+            emissionRate: emissionRate,
+            accRewardPerStake: 0,
+            lastUpdateTime: block.timestamp,
+            totalStake: 0,
+            allowedCaller: allowedCaller,
+            sourceContract: sourceContract
+        });
+
+        activityIds.push(activityId);
+
+        // Update total emission rate
+        totalRewardsEmission += emissionRate;
+
+        emit ActivityAdded(activityId, name, emissionRate, allowedCaller, sourceContract);
+    }
 
     /**
      * @dev Internal function to handle stake changes with idempotency
