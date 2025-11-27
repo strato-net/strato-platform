@@ -20,10 +20,17 @@ enum ActionType {
 }
 
 struct Action {
-    uint256 activityId;  // The activity being updated
-    address user;        // The user whose stake is changing
-    uint256 amount;      // The amount of stake change
-    ActionType actionType; // The type of action
+    address sourceContract; // The source contract this event originated from
+    string eventName;       // The event name that triggered this action
+    address user;           // The user whose stake is changing
+    uint256 amount;         // The amount of stake change
+    uint256 blockNumber;    // Block number this event originated from (for idempotency)
+    uint256 eventIndex;     // Event index within the block (for idempotency)
+}
+
+struct ActionableEvent {
+    string eventName;    // Name of the event that triggers this action
+    ActionType actionType; // The type of action to perform when this event occurs
 }
 
 struct RewardsUserInfo {
@@ -38,8 +45,8 @@ struct Activity {
     uint256 accRewardPerStake;   // Accumulated reward per 1 unit of stake (scaled by 1e18)
     uint256 lastUpdateTime;      // Last timestamp when the index was updated
     uint256 totalStake;          // Sum of all users' effective stakes for this activity
-    address allowedCaller;       // Address allowed to call deposit/withdraw/occurred for this activity
     address sourceContract;      // Address of the contract this activity tracks (for external service mapping)
+    ActionableEvent[] actionableEvents; // Events that can trigger actions for this activity
 }
 
 /**
@@ -65,9 +72,8 @@ contract record Rewards is Ownable {
 
     event ActivityIndexUpdated(uint256 indexed activityId, uint256 accRewardPerStake, uint256 totalStake);
     event UserStakeUpdated(uint256 indexed activityId, address indexed user, uint256 oldStake, uint256 newStake, uint256 pendingRewards);
-    event ActivityAdded(uint256 indexed activityId, string name, uint256 emissionRate, address allowedCaller, address sourceContract);
+    event ActivityAdded(uint256 indexed activityId, string name, uint256 emissionRate, address sourceContract);
     event EmissionRateUpdated(uint256 indexed activityId, uint256 oldRate, uint256 newRate);
-    event AllowedCallerUpdated(uint256 indexed activityId, address oldCaller, address newCaller);
     event SourceContractUpdated(uint256 indexed activityId, address oldSourceContract, address newSourceContract);
     event RewardsClaimed(address indexed user, uint256 amount);
 
@@ -94,14 +100,38 @@ contract record Rewards is Ownable {
     // Total emission rate across all activities (CATA per second)
     uint256 public totalRewardsEmission;
 
-    // User info per activity: activityId => user => RewardsUserInfo
-    mapping(uint256 => mapping(address => RewardsUserInfo)) public record userInfo;
+    // User info per activity: user => activityId => RewardsUserInfo
+    mapping(address => mapping(uint256 => RewardsUserInfo)) public record userInfo;
 
     // Total unclaimed rewards per user
     mapping(address => uint256) public record unclaimedRewards;
 
-    // Last block number when _handleAction was called
-    uint256 public lastBlockHandled;
+    // ═══════════════════════════════════════════════════════════════════════
+    // EVENT TO ACTIVITY MAPPING
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // Struct to store both activityId and actionType for an event
+    struct EventInfo {
+        uint256 activityId;  // 0 means not found
+        ActionType actionType;
+    }
+
+    // Mapping from sourceContract -> eventName -> EventInfo
+    // This enables O(1) lookup of activity and action type by source contract and event name
+    mapping(address => mapping(string => EventInfo)) public sourceEventInfo;
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // IDEMPOTENCY STATE
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // Current block number being processed (for idempotency)
+    uint256 public currentBlockHandled;
+
+    // Mapping of event hashes processed in the current block
+    mapping(string => bool) public processedHashes;
+
+    // Array of event hashes in current block (for clearing the mapping)
+    string[] public processedHashList;
 
     // ═════════════════════════════════════════════════════════════════════════
     // CONSTRUCTOR
@@ -129,44 +159,42 @@ contract record Rewards is Ownable {
     }
 
     /**
-     * @dev Register a new activity for reward distribution
+     * @dev Register a new Position activity for reward distribution
      * @param activityId Unique identifier for the activity
      * @param name Human-readable name for the activity
-     * @param activityType Type of activity (Position or OneTime)
      * @param emissionRate CATA tokens emitted per second for this activity
-     * @param allowedCaller Address allowed to call deposit/withdraw/occurred
-     * @param sourceContract Address of the contract this activity tracks (for external service mapping)
+     * @param sourceContract Address of the contract this activity tracks
+     * @param actionableEvents Array of events that can trigger actions (must have at least one)
      */
-    function addActivity(
+    function addPositionActivity(
         uint256 activityId,
         string name,
-        ActivityType activityType,
         uint256 emissionRate,
-        address allowedCaller,
-        address sourceContract
+        address sourceContract,
+        ActionableEvent[] actionableEvents
     ) external onlyOwner {
-        require(activities[activityId].allowedCaller == address(0), "Activity already exists");
-        require(allowedCaller != address(0), "Invalid caller address");
-        require(sourceContract != address(0), "Invalid source contract address");
-        require(bytes(name).length > 0, "Name cannot be empty");
+        require(actionableEvents.length > 0, "At least one actionable event required");
+        _addActivity(activityId, name, ActivityType.Position, emissionRate, sourceContract, actionableEvents);
+    }
 
-        activities[activityId] = Activity({
-            name: name,
-            activityType: activityType,
-            emissionRate: emissionRate,
-            accRewardPerStake: 0,
-            lastUpdateTime: block.timestamp,
-            totalStake: 0,
-            allowedCaller: allowedCaller,
-            sourceContract: sourceContract
-        });
-
-        activityIds.push(activityId);
-
-        // Update total emission rate
-        totalRewardsEmission += emissionRate;
-
-        emit ActivityAdded(activityId, name, emissionRate, allowedCaller, sourceContract);
+    /**
+     * @dev Register a new OneTime activity for reward distribution
+     * @param activityId Unique identifier for the activity
+     * @param name Human-readable name for the activity
+     * @param emissionRate CATA tokens emitted per second for this activity
+     * @param sourceContract Address of the contract this activity tracks
+     * @param eventName Name of the event that triggers this one-time action
+     */
+    function addOneTimeActivity(
+        uint256 activityId,
+        string name,
+        uint256 emissionRate,
+        address sourceContract,
+        string eventName
+    ) external onlyOwner {
+        ActionableEvent[] memory actionableEvents = new ActionableEvent[](1);
+        actionableEvents[0] = ActionableEvent(eventName, ActionType.Occurred);
+        _addActivity(activityId, name, ActivityType.OneTime, emissionRate, sourceContract, actionableEvents);
     }
 
     /**
@@ -176,7 +204,7 @@ contract record Rewards is Ownable {
      */
     function setEmissionRate(uint256 activityId, uint256 newEmissionRate) external onlyOwner {
         Activity storage activity = activities[activityId];
-        require(activity.allowedCaller != address(0), "Activity does not exist");
+        require(activity.sourceContract != address(0), "Activity does not exist");
 
         // Update index with old emission rate first
         _updateActivityIndex(activityId);
@@ -191,29 +219,13 @@ contract record Rewards is Ownable {
     }
 
     /**
-     * @dev Update the allowed caller for an existing activity
-     * @param activityId The activity to update
-     * @param newAllowedCaller The new address allowed to call deposit/withdraw
-     */
-    function setAllowedCaller(uint256 activityId, address newAllowedCaller) external onlyOwner {
-        Activity storage activity = activities[activityId];
-        require(activity.allowedCaller != address(0), "Activity does not exist");
-        require(newAllowedCaller != address(0), "Invalid caller address");
-
-        address oldCaller = activity.allowedCaller;
-        activity.allowedCaller = newAllowedCaller;
-
-        emit AllowedCallerUpdated(activityId, oldCaller, newAllowedCaller);
-    }
-
-    /**
      * @dev Update the source contract for an existing activity
      * @param activityId The activity to update
      * @param newSourceContract The new source contract address
      */
     function setSourceContract(uint256 activityId, address newSourceContract) external onlyOwner {
         Activity storage activity = activities[activityId];
-        require(activity.allowedCaller != address(0), "Activity does not exist");
+        require(activity.sourceContract != address(0), "Activity does not exist");
         require(newSourceContract != address(0), "Invalid source contract address");
 
         address oldSourceContract = activity.sourceContract;
@@ -268,55 +280,30 @@ contract record Rewards is Ownable {
     }
 
     /**
-     * @dev Deposit/increase stake for a user in an activity
-     * @param activityId The activity to deposit into
-     * @param user The user whose stake is increasing
-     * @param amount The amount to deposit
+     * @dev Process a single action
+     * @param action The action to process
      */
-    function deposit(
-        uint256 activityId,
-        address user,
-        uint256 amount
-    ) external {
-        _handleAction(Action(activityId, user, amount, ActionType.Deposit));
-    }
-
-    /**
-     * @dev Withdraw/decrease stake for a user in an activity
-     * @param activityId The activity to withdraw from
-     * @param user The user whose stake is decreasing
-     * @param amount The amount to withdraw
-     */
-    function withdraw(
-        uint256 activityId,
-        address user,
-        uint256 amount
-    ) external {
-        _handleAction(Action(activityId, user, amount, ActionType.Withdraw));
-    }
-
-    /**
-     * @dev Record a one-time action occurrence for a user
-     * @param activityId The one-time activity that occurred
-     * @param user The user who performed the action
-     * @param amount The amount/value of the action
-     */
-    function occurred(
-        uint256 activityId,
-        address user,
-        uint256 amount
-    ) external {
-        _handleAction(Action(activityId, user, amount, ActionType.Occurred));
+    function handleAction(Action calldata action) external onlyOwner {
+        _handleAction(action);
     }
 
     /**
      * @dev Process multiple actions in a single call
-     * @param actions Array of actions to process
+     * @param actions Array of actions to process (each action includes blockNumber for idempotency)
      */
-    function batchHandleAction(Action[] calldata actions) external {
+    function batchHandleAction(Action[] calldata actions) external onlyOwner {
         for (uint256 i = 0; i < actions.length; i++) {
             _handleAction(actions[i]);
         }
+    }
+
+    /**
+     * @dev Emergency function to reset idempotency state
+     * @param newBlockNumber The block number to set as currentBlockHandled
+     */
+    function emergencyOverride(uint256 newBlockNumber) external onlyOwner {
+        _clearProcessedHashes();
+        currentBlockHandled = newBlockNumber;
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -324,33 +311,114 @@ contract record Rewards is Ownable {
     // ═════════════════════════════════════════════════════════════════════════
 
     /**
-     * @dev Internal function to handle stake changes
-     * @param action The action to process
+     * @dev Internal function to register a new activity
+     */
+    function _addActivity(
+        uint256 activityId,
+        string name,
+        ActivityType activityType,
+        uint256 emissionRate,
+        address sourceContract,
+        ActionableEvent[] actionableEvents
+    ) internal {
+        require(activities[activityId].sourceContract == address(0), "Activity already exists");
+        require(sourceContract != address(0), "Invalid source contract address");
+        require(bytes(name).length > 0, "Name cannot be empty");
+
+        // Check for duplicate event names within the same sourceContract using the mapping
+        for (uint256 evtIdx = 0; evtIdx < actionableEvents.length; evtIdx++) {
+            require(
+                sourceEventInfo[sourceContract][actionableEvents[evtIdx].eventName].activityId == 0,
+                "Event name already exists for this source contract"
+            );
+        }
+
+        Activity storage activity = activities[activityId];
+        activity.name = name;
+        activity.activityType = activityType;
+        activity.emissionRate = emissionRate;
+        activity.accRewardPerStake = 0;
+        activity.lastUpdateTime = block.timestamp;
+        activity.totalStake = 0;
+        activity.sourceContract = sourceContract;
+
+        // Copy actionable events and register in mapping
+        for (uint256 i = 0; i < actionableEvents.length; i++) {
+            activity.actionableEvents.push(actionableEvents[i]);
+            sourceEventInfo[sourceContract][actionableEvents[i].eventName] = EventInfo(activityId, actionableEvents[i].actionType);
+        }
+
+        activityIds.push(activityId);
+
+        // Update total emission rate
+        totalRewardsEmission += emissionRate;
+
+        emit ActivityAdded(activityId, name, emissionRate, sourceContract);
+    }
+
+    /**
+     * @dev Internal function to handle stake changes with idempotency
+     * @param action The action to process (includes blockNumber for idempotency)
      */
     function _handleAction(Action action) internal {
-        Activity storage activity = activities[action.activityId];
+        // ═══════════════════════════════════════════════════════════════════════
+        // IDEMPOTENCY CHECK
+        // ═══════════════════════════════════════════════════════════════════════
+
+        // If blockNumber < currentBlockHandled, this is an old event - silently ignore
+        if (action.blockNumber < currentBlockHandled) {
+            return;
+        }
+
+        // If blockNumber > currentBlockHandled, we've moved to a new block
+        if (action.blockNumber > currentBlockHandled) {
+            // Clear the processed hashes from the previous block
+            _clearProcessedHashes();
+            // Update to the new block
+            currentBlockHandled = action.blockNumber;
+        }
+
+        // Calculate event hash from blockNumber and eventIndex (uniquely identifies event on chain)
+        string eventHash = keccak256(action.blockNumber, action.eventIndex);
+
+        // blockNumber == currentBlockHandled at this point
+        // Check if we've already processed this event hash
+        if (processedHashes[eventHash]) {
+            // Already processed - silently ignore (idempotency)
+            return;
+        }
+
+        // Mark this event hash as processed
+        processedHashes[eventHash] = true;
+        processedHashList.push(eventHash);
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // ACTION PROCESSING
+        // ═══════════════════════════════════════════════════════════════════════
+
+        // Look up activity and action type by sourceContract and eventName
+        EventInfo storage eventInfo = sourceEventInfo[action.sourceContract][action.eventName];
+        require(eventInfo.activityId != 0, "Activity not found for source/event");
+
+        uint256 activityId = eventInfo.activityId;
+        ActionType actionType = eventInfo.actionType;
+        Activity storage activity = activities[activityId];
 
         // Validate action type against activity type
-        if (action.actionType == ActionType.Deposit || action.actionType == ActionType.Withdraw) {
+        if (actionType == ActionType.Deposit || actionType == ActionType.Withdraw) {
             require(activity.activityType == ActivityType.Position, "Only for Position activities");
         } else {
             require(activity.activityType == ActivityType.OneTime, "Only for OneTime activities");
         }
 
         // Determine if this is an increase or decrease
-        bool isIncrease = (action.actionType != ActionType.Withdraw);
-
-        // Access control: only allowed caller can update this activity
-        require(msg.sender == activity.allowedCaller, "Caller not allowed");
-
-        // Track last block handled
-        lastBlockHandled = block.number;
+        bool isIncrease = (actionType != ActionType.Withdraw);
 
         // 1) Update global index using current totalStake (before user update)
-        _updateActivityIndex(action.activityId);
+        _updateActivityIndex(activityId);
 
         // 2) Settle user's pending rewards using index delta (Aave-style)
-        RewardsUserInfo storage userState = userInfo[action.activityId][action.user];
+        RewardsUserInfo storage userState = userInfo[action.user][activityId];
         uint256 oldStake = userState.stake;
         uint256 pendingRewards = 0;
 
@@ -380,7 +448,19 @@ contract record Rewards is Ownable {
         // 5) Update total stake internally (secure calculation)
         activity.totalStake = activity.totalStake + newStake - oldStake;
 
-        emit UserStakeUpdated(action.activityId, action.user, oldStake, newStake, pendingRewards);
+        emit UserStakeUpdated(activityId, action.user, oldStake, newStake, pendingRewards);
+    }
+
+    /**
+     * @dev Clear all processed hashes when moving to a new block
+     * This keeps storage bounded to only the hashes of the current block
+     */
+    function _clearProcessedHashes() internal {
+        for (uint256 i = 0; i < processedHashList.length; i++) {
+            delete processedHashes[processedHashList[i]];
+        }
+        // Clear the array
+        processedHashList = [];
     }
 
     /**
@@ -393,7 +473,7 @@ contract record Rewards is Ownable {
         _updateActivityIndex(activityId);
 
         Activity storage activity = activities[activityId];
-        RewardsUserInfo storage userState = userInfo[activityId][user];
+        RewardsUserInfo storage userState = userInfo[user][activityId];
         uint256 userStake = userState.stake;
 
         if (userStake > 0) {
