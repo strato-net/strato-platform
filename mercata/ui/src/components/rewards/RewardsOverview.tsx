@@ -9,6 +9,12 @@ interface RewardsOverviewProps {
   loading: boolean;
 }
 
+const truncateTokenAddress = (address: string, front: number = 6, back: number = 4) => {
+  if (!address) return "";
+  if (address.length <= front + back) return address;
+  return `${address.substring(0, front)}...${address.substring(address.length - back)}`;
+};
+
 export const RewardsOverview = ({ state, loading }: RewardsOverviewProps) => {
   if (loading) {
     return (
@@ -70,9 +76,9 @@ export const RewardsOverview = ({ state, loading }: RewardsOverviewProps) => {
             </div>
             <div className="flex-1">
               <p className="text-sm text-muted-foreground">Reward Token</p>
-              <p className="text-lg font-semibold">Points</p>
+              <p className="text-lg font-semibold">CATA</p>
               <p className="text-xs text-muted-foreground mt-1 font-mono">
-                {state.rewardToken.slice(0, 10)}...
+                {truncateTokenAddress(state.rewardToken)}
               </p>
             </div>
           </div>
