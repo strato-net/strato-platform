@@ -55,6 +55,28 @@ contract Describe_Rewards_Management is Authorizable {
         return events;
     }
 
+    // Helper functions to create unique events for testing multiple activities with same source
+    function _eventsA1() internal pure returns (ActionableEvent[] memory) {
+        ActionableEvent[] memory events = new ActionableEvent[](2);
+        events[0] = ActionableEvent("A1Deposit", ActionType.Deposit);
+        events[1] = ActionableEvent("A1Withdraw", ActionType.Withdraw);
+        return events;
+    }
+
+    function _eventsA2() internal pure returns (ActionableEvent[] memory) {
+        ActionableEvent[] memory events = new ActionableEvent[](2);
+        events[0] = ActionableEvent("A2Deposit", ActionType.Deposit);
+        events[1] = ActionableEvent("A2Withdraw", ActionType.Withdraw);
+        return events;
+    }
+
+    function _eventsA3() internal pure returns (ActionableEvent[] memory) {
+        ActionableEvent[] memory events = new ActionableEvent[](2);
+        events[0] = ActionableEvent("A3Deposit", ActionType.Deposit);
+        events[1] = ActionableEvent("A3Withdraw", ActionType.Withdraw);
+        return events;
+    }
+
     // ═════════════════════════════════════════════════════════════════════════
     // ACTIVITY MANAGEMENT
     // ═════════════════════════════════════════════════════════════════════════
@@ -147,7 +169,127 @@ contract Describe_Rewards_Management is Authorizable {
         require(reverted, "Adding position activity with empty events should revert");
     }
 
-    function it_should_prevent_adding_duplicate_activity() {
+    function it_should_prevent_adding_activity_with_duplicate_event_for_same_source() {
+        // given - Activity 1 with sourceContract 0xaa and events: Deposit, Withdraw
+        uint256 activityId1 = 1;
+        address sourceA = address(user1);
+        ActionableEvent[] memory events1 = new ActionableEvent[](2);
+        events1[0] = ActionableEvent("Deposit", ActionType.Deposit);
+        events1[1] = ActionableEvent("Withdraw", ActionType.Withdraw);
+        rewards.addPositionActivity(activityId1, "Activity 1", 100, address(this), sourceA, events1);
+
+        // when/then - try to add Activity 2 with same sourceContract and event "Deposit"
+        uint256 activityId2 = 2;
+        ActionableEvent[] memory events2 = new ActionableEvent[](1);
+        events2[0] = ActionableEvent("Deposit", ActionType.Deposit); // duplicate event name
+
+        bool reverted = false;
+        try rewards.addPositionActivity(activityId2, "Activity 2", 200, address(this), sourceA, events2) {
+            reverted = false;
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should prevent duplicate event name for same source contract");
+    }
+
+    function it_should_allow_same_event_name_for_different_source_contracts() {
+        // given - Activity 1 with sourceContract 0xaa and event: Withdraw
+        uint256 activityId1 = 1;
+        address sourceA = address(user1);
+        ActionableEvent[] memory events1 = new ActionableEvent[](1);
+        events1[0] = ActionableEvent("Withdraw", ActionType.Withdraw);
+        rewards.addPositionActivity(activityId1, "Activity 1", 100, address(this), sourceA, events1);
+
+        // when - add Activity 2 with different sourceContract 0xbb but same event "Withdraw"
+        uint256 activityId2 = 2;
+        address sourceB = address(user2);
+        ActionableEvent[] memory events2 = new ActionableEvent[](1);
+        events2[0] = ActionableEvent("Withdraw", ActionType.Withdraw); // same event name, different source
+
+        // then - should succeed
+        rewards.addPositionActivity(activityId2, "Activity 2", 200, address(this), sourceB, events2);
+
+        // verify both activities exist
+        (string memory name1, , , , , , , ) = rewards.activities(activityId1);
+        (string memory name2, , , , , , , ) = rewards.activities(activityId2);
+        require(keccak256(bytes(name1)) == keccak256(bytes("Activity 1")), "Activity 1 should exist");
+        require(keccak256(bytes(name2)) == keccak256(bytes("Activity 2")), "Activity 2 should exist");
+    }
+
+    function it_should_allow_non_overlapping_events_for_same_source() {
+        // given - Activity 1 with sourceContract 0xaa and event: Withdraw
+        uint256 activityId1 = 1;
+        address sourceA = address(user1);
+        ActionableEvent[] memory events1 = new ActionableEvent[](1);
+        events1[0] = ActionableEvent("Withdraw", ActionType.Withdraw);
+        rewards.addPositionActivity(activityId1, "Activity 1", 100, address(this), sourceA, events1);
+
+        // given - Activity 2 with same sourceContract 0xaa and event: Deposit
+        uint256 activityId2 = 2;
+        ActionableEvent[] memory events2 = new ActionableEvent[](1);
+        events2[0] = ActionableEvent("Deposit", ActionType.Deposit);
+        rewards.addPositionActivity(activityId2, "Activity 2", 200, address(this), sourceA, events2);
+
+        // when - try to add Activity 3 with same sourceContract but event: Borrow (non-overlapping)
+        uint256 activityId3 = 3;
+        ActionableEvent[] memory events3 = new ActionableEvent[](1);
+        events3[0] = ActionableEvent("Borrow", ActionType.Deposit);
+
+        // then - should succeed
+        rewards.addPositionActivity(activityId3, "Activity 3", 300, address(this), sourceA, events3);
+
+        // verify all three activities exist
+        (string memory name3, , , , , , , ) = rewards.activities(activityId3);
+        require(keccak256(bytes(name3)) == keccak256(bytes("Activity 3")), "Activity 3 should exist");
+    }
+
+    function it_should_prevent_duplicate_event_across_multiple_existing_activities() {
+        // given - Activity 1 with sourceContract 0xaa and event: Withdraw
+        uint256 activityId1 = 1;
+        address sourceA = address(user1);
+        ActionableEvent[] memory events1 = new ActionableEvent[](1);
+        events1[0] = ActionableEvent("Withdraw", ActionType.Withdraw);
+        rewards.addPositionActivity(activityId1, "Activity 1", 100, address(this), sourceA, events1);
+
+        // given - Activity 2 with same sourceContract 0xaa and event: Deposit
+        uint256 activityId2 = 2;
+        ActionableEvent[] memory events2 = new ActionableEvent[](1);
+        events2[0] = ActionableEvent("Deposit", ActionType.Deposit);
+        rewards.addPositionActivity(activityId2, "Activity 2", 200, address(this), sourceA, events2);
+
+        // when/then - try to add Activity 3 with same source and event "Deposit" (conflicts with Activity 2)
+        uint256 activityId3 = 3;
+        ActionableEvent[] memory events3 = new ActionableEvent[](1);
+        events3[0] = ActionableEvent("Deposit", ActionType.Deposit); // conflicts with Activity 2
+
+        bool reverted = false;
+        try rewards.addPositionActivity(activityId3, "Activity 3", 300, address(this), sourceA, events3) {
+            reverted = false;
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should prevent duplicate event name across multiple activities for same source");
+    }
+
+    function it_should_prevent_duplicate_event_for_onetime_activity() {
+        // given - OneTime activity with sourceContract 0xaa and event: Swap
+        uint256 activityId1 = 1;
+        address sourceA = address(user1);
+        rewards.addOneTimeActivity(activityId1, "Swap Activity", 100, address(this), sourceA, "Swap");
+
+        // when/then - try to add another OneTime activity with same source and event "Swap"
+        uint256 activityId2 = 2;
+
+        bool reverted = false;
+        try rewards.addOneTimeActivity(activityId2, "Another Swap", 200, address(this), sourceA, "Swap") {
+            reverted = false;
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should prevent duplicate event name for OneTime activities with same source");
+    }
+
+    function it_should_prevent_duplicate_activity() {
         // given
         uint256 activityId = 1;
         rewards.addPositionActivity(activityId, "Activity 1", 100, address(user1), address(user1), _defaultPositionEvents());
@@ -171,14 +313,14 @@ contract Describe_Rewards_Management is Authorizable {
         uint256 emission2 = 200;
         uint256 emission3 = 300;
 
-        // when
-        rewards.addPositionActivity(activity1, "Activity 1", emission1, address(user1), address(user1), _defaultPositionEvents());
+        // when - using unique events for same source contract
+        rewards.addPositionActivity(activity1, "Activity 1", emission1, address(user1), address(user1), _eventsA1());
         require(rewards.totalRewardsEmission() == emission1, "Total emission after 1st activity");
 
-        rewards.addPositionActivity(activity2, "Activity 2", emission2, address(user1), address(user1), _defaultPositionEvents());
+        rewards.addPositionActivity(activity2, "Activity 2", emission2, address(user1), address(user1), _eventsA2());
         require(rewards.totalRewardsEmission() == emission1 + emission2, "Total emission after 2nd activity");
 
-        rewards.addPositionActivity(activity3, "Activity 3", emission3, address(user1), address(user1), _defaultPositionEvents());
+        rewards.addPositionActivity(activity3, "Activity 3", emission3, address(user1), address(user1), _eventsA3());
         require(rewards.totalRewardsEmission() == emission1 + emission2 + emission3, "Total emission after 3rd activity");
     }
 
@@ -219,13 +361,13 @@ contract Describe_Rewards_Management is Authorizable {
     }
 
     function it_should_maintain_correct_total_emission_when_updating_rates() {
-        // given - add three activities
+        // given - add three activities with unique events for same source
         uint256 activity1 = 1;
         uint256 activity2 = 2;
         uint256 activity3 = 3;
-        rewards.addPositionActivity(activity1, "Activity 1", 100, address(user1), address(user1), _defaultPositionEvents());
-        rewards.addPositionActivity(activity2, "Activity 2", 200, address(user1), address(user1), _defaultPositionEvents());
-        rewards.addPositionActivity(activity3, "Activity 3", 300, address(user1), address(user1), _defaultPositionEvents());
+        rewards.addPositionActivity(activity1, "Activity 1", 100, address(user1), address(user1), _eventsA1());
+        rewards.addPositionActivity(activity2, "Activity 2", 200, address(user1), address(user1), _eventsA2());
+        rewards.addPositionActivity(activity3, "Activity 3", 300, address(user1), address(user1), _eventsA3());
 
         require(rewards.totalRewardsEmission() == 600, "Initial total emission");
 

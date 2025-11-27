@@ -109,6 +109,14 @@ contract record Rewards is Ownable {
     mapping(address => uint256) public record unclaimedRewards;
 
     // ═══════════════════════════════════════════════════════════════════════
+    // EVENT TO ACTIVITY MAPPING
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // Mapping from sourceContract -> eventName -> activityId (0 means not found)
+    // This enables O(1) lookup of activity by source contract and event name
+    mapping(address => mapping(string => uint256)) public sourceEventToActivityId;
+
+    // ═══════════════════════════════════════════════════════════════════════
     // IDEMPOTENCY STATE
     // ═══════════════════════════════════════════════════════════════════════
 
@@ -335,6 +343,14 @@ contract record Rewards is Ownable {
         require(sourceContract != address(0), "Invalid source contract address");
         require(bytes(name).length > 0, "Name cannot be empty");
 
+        // Check for duplicate event names within the same sourceContract using the mapping
+        for (uint256 evtIdx = 0; evtIdx < actionableEvents.length; evtIdx++) {
+            require(
+                sourceEventToActivityId[sourceContract][actionableEvents[evtIdx].eventName] == 0,
+                "Event name already exists for this source contract"
+            );
+        }
+
         Activity storage activity = activities[activityId];
         activity.name = name;
         activity.activityType = activityType;
@@ -345,9 +361,10 @@ contract record Rewards is Ownable {
         activity.allowedCaller = allowedCaller;
         activity.sourceContract = sourceContract;
 
-        // Copy actionable events
+        // Copy actionable events and register in mapping
         for (uint256 i = 0; i < actionableEvents.length; i++) {
             activity.actionableEvents.push(actionableEvents[i]);
+            sourceEventToActivityId[sourceContract][actionableEvents[i].eventName] = activityId;
         }
 
         activityIds.push(activityId);
