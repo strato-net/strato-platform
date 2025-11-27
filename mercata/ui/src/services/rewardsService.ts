@@ -1,7 +1,4 @@
 import { api } from "@/lib/axios";
-import { rewardsAddress } from "@/lib/constants";
-import { REWARDS_ABI } from "@/lib/rewards/constants";
-import { useWriteContract, useAccount } from "wagmi";
 import { formatUnits } from "viem";
 import { dummyRewardsState, dummyActivities, getDummyUserRewards } from "./rewardsDummyData";
 
@@ -161,5 +158,44 @@ export const formatEmissionRatePerWeek = (emissionRatePerSecond: string): string
   const secondsPerWeek = 604800n; // 7 * 24 * 60 * 60
   const perWeek = rateBig * secondsPerWeek;
   return formatUnits(perWeek, 18);
+};
+
+/**
+ * Claim all rewards for a user
+ * Backend will handle the contract interaction
+ * TODO: Implement backend endpoint
+ */
+export const claimAllRewards = async (userAddress: string): Promise<{ success: boolean; txHash?: string }> => {
+  // TODO: Replace with actual API call once backend is implemented
+  // const response = await api.post("/rewards/claim-all", { address: userAddress });
+  // return response.data;
+  
+  // Placeholder - will be replaced with backend call
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve({ success: true, txHash: "0x0000000000000000000000000000000000000000000000000000000000000000" });
+    }, 1000);
+  });
+};
+
+/**
+ * Claim rewards for specific activities
+ * Backend will handle the contract interaction
+ * TODO: Implement backend endpoint
+ */
+export const claimRewards = async (userAddress: string, activityIds: number[]): Promise<{ success: boolean; txHash?: string }> => {
+  // TODO: Replace with actual API call once backend is implemented
+  // const response = await api.post("/rewards/claim", { 
+  //   address: userAddress,
+  //   activityIds 
+  // });
+  // return response.data;
+  
+  // Placeholder - will be replaced with backend call
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve({ success: true, txHash: "0x0000000000000000000000000000000000000000000000000000000000000000" });
+    }, 1000);
+  });
 };
 

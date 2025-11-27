@@ -2,19 +2,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { UserRewardsData } from "@/services/rewardsService";
+import { UserRewardsData, claimAllRewards, claimRewards } from "@/services/rewardsService";
 import {
   calculatePendingRewards,
   calculateEstimatedRewardsPerDay,
   formatEmissionRatePerDay,
 } from "@/services/rewardsService";
-import { formatBalance, formatUnits, ensureHexPrefix } from "@/utils/numberUtils";
+import { formatBalance, calculateTokenValue } from "@/utils/numberUtils";
 import { Loader2, Coins, TrendingUp, Percent } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useWriteContract } from "wagmi";
-import { rewardsAddress } from "@/lib/constants";
-import { REWARDS_ABI } from "@/lib/rewards/constants";
 import { useState } from "react";
+import { useOracleContext } from "@/context/OracleContext";
+import { useUser } from "@/context/UserContext";
 
 interface UserRewardsSectionProps {
   userRewards: UserRewardsData | null;
@@ -28,61 +27,99 @@ export const UserRewardsSection = ({
   onClaimSuccess,
 }: UserRewardsSectionProps) => {
   const { toast } = useToast();
-  const { writeContractAsync, isPending } = useWriteContract();
+  const { userAddress } = useUser();
+  const { getPrice } = useOracleContext();
   const [claimingActivityIds, setClaimingActivityIds] = useState<number[]>([]);
+  const [isClaimingAll, setIsClaimingAll] = useState(false);
 
   const handleClaimAll = async () => {
-    try {
-      setClaimingActivityIds([]);
-      const contractAddress = ensureHexPrefix(rewardsAddress);
-      if (!contractAddress) {
-        throw new Error("Invalid rewards contract address");
-      }
-      const hash = await writeContractAsync({
-        address: contractAddress,
-        abi: REWARDS_ABI,
-        functionName: "claimAllRewards",
-      });
-
+    if (!userAddress) {
       toast({
-        title: "Claim Transaction Sent",
-        description: `Transaction hash: ${hash.slice(0, 10)}...`,
-      });
-
-      onClaimSuccess?.();
-    } catch (error: any) {
-      toast({
-        title: "Claim Failed",
-        description: error?.message || "Failed to claim rewards",
+        title: "User Not Logged In",
+        description: "Please log in to claim rewards",
         variant: "destructive",
       });
+      return;
+    }
+
+    if (!userRewards) {
+      toast({
+        title: "No Rewards",
+        description: "You don't have any rewards to claim",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsClaimingAll(true);
+      setClaimingActivityIds([]);
+      
+      const result = await claimAllRewards(userAddress);
+      
+      if (result.success) {
+        toast({
+          title: "Claim Successful",
+          description: result.txHash 
+            ? `Transaction hash: ${result.txHash.slice(0, 10)}...`
+            : "Rewards claimed successfully",
+        });
+        onClaimSuccess?.();
+      } else {
+        throw new Error("Claim failed");
+      }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to claim rewards";
+      toast({
+        title: "Claim Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsClaimingAll(false);
     }
   };
 
   const handleClaimActivity = async (activityIds: number[]) => {
+    if (!userAddress) {
+      toast({
+        title: "User Not Logged In",
+        description: "Please log in to claim rewards",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!userRewards) {
+      toast({
+        title: "No Rewards",
+        description: "You don't have any rewards to claim",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setClaimingActivityIds(activityIds);
-      const contractAddress = ensureHexPrefix(rewardsAddress);
-      if (!contractAddress) {
-        throw new Error("Invalid rewards contract address");
+      
+      const result = await claimRewards(userAddress, activityIds);
+      
+      if (result.success) {
+        toast({
+          title: "Claim Successful",
+          description: result.txHash 
+            ? `Transaction hash: ${result.txHash.slice(0, 10)}...`
+            : "Rewards claimed successfully",
+        });
+        onClaimSuccess?.();
+      } else {
+        throw new Error("Claim failed");
       }
-      const hash = await writeContractAsync({
-        address: contractAddress,
-        abi: REWARDS_ABI,
-        functionName: "claimRewards",
-        args: [activityIds],
-      });
-
-      toast({
-        title: "Claim Transaction Sent",
-        description: `Transaction hash: ${hash.slice(0, 10)}...`,
-      });
-
-      onClaimSuccess?.();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to claim rewards";
       toast({
         title: "Claim Failed",
-        description: error?.message || "Failed to claim rewards",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -116,7 +153,9 @@ export const UserRewardsSection = ({
           <CardDescription>Your rewards breakdown by activity</CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground text-center py-8">Connect your wallet to view rewards</p>
+          <p className="text-muted-foreground text-center py-8">
+            {userAddress ? "No rewards found for your address" : "Please log in to view your rewards"}
+          </p>
         </CardContent>
       </Card>
     );
@@ -124,6 +163,9 @@ export const UserRewardsSection = ({
 
   const unclaimedFormatted = formatBalance(userRewards.unclaimedRewards, "points", 18, 2, 6);
   const hasUnclaimed = BigInt(userRewards.unclaimedRewards) > 0n;
+  const hasAnyRewards = hasUnclaimed || userRewards.activities.some(
+    (a) => BigInt(a.userInfo.stake) > 0n
+  );
   const activitiesWithStake = userRewards.activities.filter(
     (a) => BigInt(a.userInfo.stake) > 0n
   );
@@ -161,14 +203,16 @@ export const UserRewardsSection = ({
             </div>
             <Button
               onClick={handleClaimAll}
-              disabled={!hasUnclaimed || isPending}
+              disabled={!hasUnclaimed || isClaimingAll || !userAddress}
               size="lg"
             >
-              {isPending ? (
+              {isClaimingAll ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Claiming...
                 </>
+              ) : !userAddress ? (
+                "Log In to Claim"
               ) : (
                 "Claim All"
               )}
@@ -190,8 +234,21 @@ export const UserRewardsSection = ({
         <div className="space-y-4">
           <h3 className="text-lg font-semibold">Your Activity Positions</h3>
           {activitiesWithStake.map(({ activity, userInfo }) => {
-            const stakeFormatted = formatBalance(userInfo.stake, "", 18, 2, 6);
-            const totalStakeFormatted = formatBalance(activity.totalStake, "", 18, 2, 6);
+            const priceWei = getPrice(activity.sourceContract);
+            const userTVLUSD = priceWei 
+              ? calculateTokenValue(userInfo.stake, priceWei)
+              : null;
+            const totalTVLUSD = priceWei 
+              ? calculateTokenValue(activity.totalStake, priceWei)
+              : null;
+            
+            const userTVLFormatted = userTVLUSD 
+              ? `$${parseFloat(userTVLUSD).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+              : `$${formatBalance(userInfo.stake, "", 18, 2, 6)}`;
+            const totalTVLFormatted = totalTVLUSD 
+              ? `$${parseFloat(totalTVLUSD).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+              : `$${formatBalance(activity.totalStake, "", 18, 2, 6)}`;
+            
             const share = BigInt(activity.totalStake) > 0n
               ? (BigInt(userInfo.stake) * 10000n) / BigInt(activity.totalStake) / 100n
               : 0n;
@@ -250,9 +307,9 @@ export const UserRewardsSection = ({
                     <div>
                       <div className="flex items-center space-x-2 mb-1">
                         <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                        <p className="text-sm text-muted-foreground">Your Stake</p>
+                        <p className="text-sm text-muted-foreground">Your TVL</p>
                       </div>
-                      <p className="text-lg font-semibold">{stakeFormatted}</p>
+                      <p className="text-lg font-semibold">{userTVLFormatted}</p>
                     </div>
 
                     <div>
@@ -262,7 +319,7 @@ export const UserRewardsSection = ({
                       </div>
                       <p className="text-lg font-semibold">{share.toString()}%</p>
                       <p className="text-xs text-muted-foreground">
-                        of {totalStakeFormatted} total
+                        of {totalTVLFormatted} total
                       </p>
                     </div>
 

@@ -3,9 +3,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Activity } from "@/services/rewardsService";
-import { formatBalance } from "@/utils/numberUtils";
+import { formatBalance, calculateTokenValue } from "@/utils/numberUtils";
 import { formatEmissionRatePerDay, formatEmissionRatePerWeek } from "@/services/rewardsService";
 import { formatDistanceToNow } from "date-fns";
+import { useOracleContext } from "@/context/OracleContext";
 
 interface ActivitiesTableProps {
   activities: Activity[];
@@ -14,6 +15,8 @@ interface ActivitiesTableProps {
 }
 
 export const ActivitiesTable = ({ activities, loading, onActivityClick }: ActivitiesTableProps) => {
+  const { getPrice } = useOracleContext();
+
   if (loading) {
     return (
       <Card>
@@ -61,7 +64,7 @@ export const ActivitiesTable = ({ activities, loading, onActivityClick }: Activi
                 <TableHead>Name</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Emission Rate</TableHead>
-                <TableHead>Total Stake</TableHead>
+                <TableHead>Total TVL</TableHead>
                 <TableHead>Last Update</TableHead>
               </TableRow>
             </TableHeader>
@@ -69,7 +72,13 @@ export const ActivitiesTable = ({ activities, loading, onActivityClick }: Activi
               {activities.map((activity) => {
                 const emissionPerDay = formatEmissionRatePerDay(activity.emissionRate);
                 const emissionPerWeek = formatEmissionRatePerWeek(activity.emissionRate);
-                const totalStakeFormatted = formatBalance(activity.totalStake, "", 18, 2, 6);
+                const priceWei = getPrice(activity.sourceContract);
+                const totalTVLUSD = priceWei 
+                  ? calculateTokenValue(activity.totalStake, priceWei)
+                  : null;
+                const totalStakeFormatted = totalTVLUSD 
+                  ? `$${parseFloat(totalTVLUSD).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                  : `$${formatBalance(activity.totalStake, "", 18, 2, 6)}`;
                 const lastUpdate = new Date(Number(activity.lastUpdateTime) * 1000);
                 const timeAgo = formatDistanceToNow(lastUpdate, { addSuffix: true });
 
