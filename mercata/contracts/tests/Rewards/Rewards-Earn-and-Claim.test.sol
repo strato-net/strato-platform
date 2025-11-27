@@ -52,16 +52,16 @@ contract Describe_Rewards_Earn_and_Claim is Authorizable {
         rewards = new Rewards(address(this));
         rewards.initialize(tokenAddress);
 
-        // Add activities - test contract is the allowed caller (simulating the pool)
+        // Add activities - test contract is the owner
         ActionableEvent[] memory liquidityEvents = new ActionableEvent[](2);
         liquidityEvents[0] = ActionableEvent("Deposit", ActionType.Deposit);
         liquidityEvents[1] = ActionableEvent("Withdraw", ActionType.Withdraw);
-        rewards.addPositionActivity(liquidityActivityId, "Lending Pool Liquidity", liquidityEmissionRate, address(this), address(this), liquidityEvents);
+        rewards.addPositionActivity(liquidityActivityId, "Lending Pool Liquidity", liquidityEmissionRate, address(this), liquidityEvents);
 
         ActionableEvent[] memory borrowEvents = new ActionableEvent[](2);
         borrowEvents[0] = ActionableEvent("Borrow", ActionType.Deposit);
         borrowEvents[1] = ActionableEvent("Repay", ActionType.Withdraw);
-        rewards.addPositionActivity(borrowActivityId, "Lending Pool Borrows", borrowEmissionRate, address(this), address(this), borrowEvents);
+        rewards.addPositionActivity(borrowActivityId, "Lending Pool Borrows", borrowEmissionRate, address(this), borrowEvents);
 
         // Fund the Rewards contract with CATA tokens
         uint256 fundingAmount = 1000000 * 1e18; // 1 million CATA

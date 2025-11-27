@@ -45,7 +45,6 @@ struct Activity {
     uint256 accRewardPerStake;   // Accumulated reward per 1 unit of stake (scaled by 1e18)
     uint256 lastUpdateTime;      // Last timestamp when the index was updated
     uint256 totalStake;          // Sum of all users' effective stakes for this activity
-    address allowedCaller;       // Address allowed to call handleAction for this activity
     address sourceContract;      // Address of the contract this activity tracks (for external service mapping)
     ActionableEvent[] actionableEvents; // Events that can trigger actions for this activity
 }
@@ -73,9 +72,8 @@ contract record Rewards is Ownable {
 
     event ActivityIndexUpdated(uint256 indexed activityId, uint256 accRewardPerStake, uint256 totalStake);
     event UserStakeUpdated(uint256 indexed activityId, address indexed user, uint256 oldStake, uint256 newStake, uint256 pendingRewards);
-    event ActivityAdded(uint256 indexed activityId, string name, uint256 emissionRate, address allowedCaller, address sourceContract);
+    event ActivityAdded(uint256 indexed activityId, string name, uint256 emissionRate, address sourceContract);
     event EmissionRateUpdated(uint256 indexed activityId, uint256 oldRate, uint256 newRate);
-    event AllowedCallerUpdated(uint256 indexed activityId, address oldCaller, address newCaller);
     event SourceContractUpdated(uint256 indexed activityId, address oldSourceContract, address newSourceContract);
     event RewardsClaimed(address indexed user, uint256 amount);
 
@@ -165,7 +163,6 @@ contract record Rewards is Ownable {
      * @param activityId Unique identifier for the activity
      * @param name Human-readable name for the activity
      * @param emissionRate CATA tokens emitted per second for this activity
-     * @param allowedCaller Address allowed to call handleAction for this activity
      * @param sourceContract Address of the contract this activity tracks
      * @param actionableEvents Array of events that can trigger actions (must have at least one)
      */
@@ -173,12 +170,11 @@ contract record Rewards is Ownable {
         uint256 activityId,
         string name,
         uint256 emissionRate,
-        address allowedCaller,
         address sourceContract,
         ActionableEvent[] actionableEvents
     ) external onlyOwner {
         require(actionableEvents.length > 0, "At least one actionable event required");
-        _addActivity(activityId, name, ActivityType.Position, emissionRate, allowedCaller, sourceContract, actionableEvents);
+        _addActivity(activityId, name, ActivityType.Position, emissionRate, sourceContract, actionableEvents);
     }
 
     /**
@@ -186,7 +182,6 @@ contract record Rewards is Ownable {
      * @param activityId Unique identifier for the activity
      * @param name Human-readable name for the activity
      * @param emissionRate CATA tokens emitted per second for this activity
-     * @param allowedCaller Address allowed to call handleAction for this activity
      * @param sourceContract Address of the contract this activity tracks
      * @param eventName Name of the event that triggers this one-time action
      */
@@ -194,13 +189,12 @@ contract record Rewards is Ownable {
         uint256 activityId,
         string name,
         uint256 emissionRate,
-        address allowedCaller,
         address sourceContract,
         string eventName
     ) external onlyOwner {
         ActionableEvent[] memory actionableEvents = new ActionableEvent[](1);
         actionableEvents[0] = ActionableEvent(eventName, ActionType.Occurred);
-        _addActivity(activityId, name, ActivityType.OneTime, emissionRate, allowedCaller, sourceContract, actionableEvents);
+        _addActivity(activityId, name, ActivityType.OneTime, emissionRate, sourceContract, actionableEvents);
     }
 
     /**
@@ -210,7 +204,7 @@ contract record Rewards is Ownable {
      */
     function setEmissionRate(uint256 activityId, uint256 newEmissionRate) external onlyOwner {
         Activity storage activity = activities[activityId];
-        require(activity.allowedCaller != address(0), "Activity does not exist");
+        require(activity.sourceContract != address(0), "Activity does not exist");
 
         // Update index with old emission rate first
         _updateActivityIndex(activityId);
@@ -225,29 +219,13 @@ contract record Rewards is Ownable {
     }
 
     /**
-     * @dev Update the allowed caller for an existing activity
-     * @param activityId The activity to update
-     * @param newAllowedCaller The new address allowed to call deposit/withdraw
-     */
-    function setAllowedCaller(uint256 activityId, address newAllowedCaller) external onlyOwner {
-        Activity storage activity = activities[activityId];
-        require(activity.allowedCaller != address(0), "Activity does not exist");
-        require(newAllowedCaller != address(0), "Invalid caller address");
-
-        address oldCaller = activity.allowedCaller;
-        activity.allowedCaller = newAllowedCaller;
-
-        emit AllowedCallerUpdated(activityId, oldCaller, newAllowedCaller);
-    }
-
-    /**
      * @dev Update the source contract for an existing activity
      * @param activityId The activity to update
      * @param newSourceContract The new source contract address
      */
     function setSourceContract(uint256 activityId, address newSourceContract) external onlyOwner {
         Activity storage activity = activities[activityId];
-        require(activity.allowedCaller != address(0), "Activity does not exist");
+        require(activity.sourceContract != address(0), "Activity does not exist");
         require(newSourceContract != address(0), "Invalid source contract address");
 
         address oldSourceContract = activity.sourceContract;
@@ -305,7 +283,7 @@ contract record Rewards is Ownable {
      * @dev Process a single action
      * @param action The action to process
      */
-    function handleAction(Action calldata action) external {
+    function handleAction(Action calldata action) external onlyOwner {
         _handleAction(action);
     }
 
@@ -313,7 +291,7 @@ contract record Rewards is Ownable {
      * @dev Process multiple actions in a single call
      * @param actions Array of actions to process (each action includes blockNumber for idempotency)
      */
-    function batchHandleAction(Action[] calldata actions) external {
+    function batchHandleAction(Action[] calldata actions) external onlyOwner {
         for (uint256 i = 0; i < actions.length; i++) {
             _handleAction(actions[i]);
         }
@@ -340,12 +318,10 @@ contract record Rewards is Ownable {
         string name,
         ActivityType activityType,
         uint256 emissionRate,
-        address allowedCaller,
         address sourceContract,
         ActionableEvent[] actionableEvents
     ) internal {
-        require(activities[activityId].allowedCaller == address(0), "Activity already exists");
-        require(allowedCaller != address(0), "Invalid caller address");
+        require(activities[activityId].sourceContract == address(0), "Activity already exists");
         require(sourceContract != address(0), "Invalid source contract address");
         require(bytes(name).length > 0, "Name cannot be empty");
 
@@ -364,7 +340,6 @@ contract record Rewards is Ownable {
         activity.accRewardPerStake = 0;
         activity.lastUpdateTime = block.timestamp;
         activity.totalStake = 0;
-        activity.allowedCaller = allowedCaller;
         activity.sourceContract = sourceContract;
 
         // Copy actionable events and register in mapping
@@ -378,7 +353,7 @@ contract record Rewards is Ownable {
         // Update total emission rate
         totalRewardsEmission += emissionRate;
 
-        emit ActivityAdded(activityId, name, emissionRate, allowedCaller, sourceContract);
+        emit ActivityAdded(activityId, name, emissionRate, sourceContract);
     }
 
     /**
@@ -438,9 +413,6 @@ contract record Rewards is Ownable {
 
         // Determine if this is an increase or decrease
         bool isIncrease = (actionType != ActionType.Withdraw);
-
-        // Access control: only allowed caller can update this activity
-        require(msg.sender == activity.allowedCaller, "Caller not allowed");
 
         // 1) Update global index using current totalStake (before user update)
         _updateActivityIndex(activityId);
