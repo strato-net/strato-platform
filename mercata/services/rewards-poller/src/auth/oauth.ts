@@ -1,6 +1,6 @@
-import axios from "axios";
 import simpleOauth2 from "simple-oauth2";
 import { fetch } from "../utils/api";
+import { logError } from "../utils/logger";
 
 interface OAuthConfig {
   clientId: string;
@@ -82,8 +82,8 @@ class OAuthUtil {
       try {
         result = await this.oauth2.getToken(tokenParams) as OAuthTokenResult;
       } catch (error: any) {
-        console.error(`[OAuth Debug] oauth2.getToken() failed:`, {
-          errorMessage: error?.message,
+        logError("OAuth", error as Error, {
+          operation: "oauth2.getToken",
           errorCode: error?.code,
           hasResponse: !!error?.response,
           statusCode: error?.response?.status,
@@ -109,8 +109,8 @@ class OAuthUtil {
         token: tokenData,
       };
     } catch (error: any) {
-      console.error(`[OAuth Debug] Final error handler triggered:`, {
-        errorMessage: error?.message,
+      logError("OAuth", error as Error, {
+        operation: "getAccessTokenByResourceOwnerCredential",
         errorName: error?.name,
         errorCode: error?.code,
         hasResponse: !!error?.response,
@@ -124,10 +124,15 @@ class OAuthUtil {
       
       if (error.response?.data) {
         const contentType = error.response.headers["content-type"] || "";
-        console.error(`[OAuth Debug] Processing HTTP response error - Content-Type: ${contentType}`);
+        logError("OAuth", new Error("Processing HTTP response error"), {
+          operation: "getAccessTokenByResourceOwnerCredential",
+          contentType
+        });
         
         if (!contentType.includes("application/json")) {
-          console.error(`[OAuth Debug] Non-JSON response detected!`);
+          logError("OAuth", new Error("Non-JSON response detected"), {
+            operation: "getAccessTokenByResourceOwnerCredential"
+          });
           throw new Error(
             `OAuth endpoint returned non-JSON content (${contentType}). Response: ${error.response.data.substring(0, 200)}...`,
           );

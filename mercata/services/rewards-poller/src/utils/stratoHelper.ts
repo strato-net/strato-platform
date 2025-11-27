@@ -95,10 +95,3 @@ export const execute = async (
   return result;
 };
 
-export default {
-  buildFunctionTx,
-  until,
-  postAndWaitForTx,
-  execute,
-};
-

@@ -53,11 +53,6 @@ export const retryWithBackoff = async <T>(
       }
 
       if (!isRetryableError(lastError)) {
-        logError(context, lastError, {
-          operation: "retryWithBackoff",
-          attempts: attempt,
-          nonRetryable: true,
-        });
         throw lastError;
       }
 

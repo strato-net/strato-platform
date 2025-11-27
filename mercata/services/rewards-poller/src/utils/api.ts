@@ -121,12 +121,3 @@ export const fetch = createClient("", {
   logPrefix: "Fetch",
 });
 
-export default {
-  extractErrorMessage,
-  createClient,
-  cirrus,
-  strato,
-  bloc,
-  fetch,
-};
-

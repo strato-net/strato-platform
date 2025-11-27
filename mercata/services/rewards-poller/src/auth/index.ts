@@ -1,6 +1,6 @@
 import OAuthUtil from "./oauth";
 import { config } from "../config";
-import { logError } from "../utils/logger";
+import { logError, logInfo } from "../utils/logger";
 import { strato } from "../utils/api";
 
 const validateConfig = () => {
@@ -46,12 +46,12 @@ let oauthInstance: any = null;
 
 export const initOpenIdConfig = async () => {
   if (oauthInitialized) {
-    console.log(`[Auth] OAuth already initialized, skipping`);
+    logInfo("Auth", "OAuth already initialized, skipping");
     return;
   }
 
   try {
-    console.log(`[Auth] Initializing OAuth with config:`, {
+    logInfo("Auth", "Initializing OAuth with config", {
       clientId: config.auth.clientId,
       hasClientSecret: !!config.auth.clientSecret,
       openIdDiscoveryUrl: config.auth.openIdDiscoveryUrl,
@@ -62,15 +62,14 @@ export const initOpenIdConfig = async () => {
     oauthInstance = await OAuthUtil.init(getOAuthConfig());
     oauthInitialized = true;
     
-    console.log(`[Auth] OAuth initialization completed successfully`);
+    logInfo("Auth", "OAuth initialization completed successfully");
   } catch (error) {
-    console.error(`[Auth] OAuth initialization failed:`, {
+    logError("Auth", error as Error, {
+      operation: "initOpenIdConfig",
       errorMessage: (error as Error)?.message,
       errorName: (error as Error)?.name,
       errorStack: (error as Error)?.stack
     });
-    
-    logError("Auth", error as Error, { operation: "initOpenIdConfig" });
     throw error;
   }
 };
@@ -116,7 +115,8 @@ export const getBAUserToken = async (): Promise<string> => {
     
     return token;
   } catch (error: any) {
-    console.error(`[Auth] getBAUserToken error:`, {
+    logError("Auth", error as Error, {
+      operation: "getBAUserToken",
       errorMessage: error?.message,
       errorName: error?.name,
       errorStack: error?.stack,

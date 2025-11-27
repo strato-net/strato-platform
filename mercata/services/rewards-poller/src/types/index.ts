@@ -57,46 +57,29 @@ export interface ApiClient {
 }
 
 export interface ProtocolEvent {
-  contractAddress: string;
-  eventName: string;
-  user: string;
+  address: string;
+  event_name: string;
+  block_number: number;
+  event_index: number;
+  transaction_sender: string;
   amount: string;
-  blockNumber?: number;
-  txHash?: string;
-  timestamp?: string;
 }
 
 export interface RewardsAction {
-  activityId: number;
+  sourceContract: string;
+  eventName: string;
   user: string;
   amount: string;
-  actionType: "deposit" | "withdraw" | "occurred";
-}
-
-export interface ActivityInfo {
-  activityId: number;
-  name: string;
-  activityType: "Position" | "OneTime";
-  emissionRate: string;
-  allowedCaller: string;
-}
-
-export interface EventMapping {
-  contractAddress: string;
-  eventName: string;
-  activityId: number;
-  actionType: "deposit" | "withdraw" | "occurred";
+  blockNumber: number;
+  eventIndex: number;
 }
 
 export interface CirrusEvent {
-  id: number;
   address: string;
-  block_hash: string;
-  block_timestamp: string;
   block_number: string;
-  transaction_sender: string;
   event_index: number;
   event_name: string;
+  transaction_sender: string;
   attributes: Record<string, any>;
 }
 

@@ -21,10 +21,11 @@ const config = {
   balance: {
     gasFeeUSDST: BigInt(process.env.GAS_FEE_USDST || '1') * BigInt(1e16),
     gasFeeVoucher: BigInt(process.env.GAS_FEE_VOUCHER || '100') * BigInt(1e16),
-    minTransactionsThreshold: BigInt(process.env.MIN_TRANSACTIONS_THRESHOLD || '200'),
+    minTransactionsThreshold: BigInt(process.env.MIN_TRANSACTIONS_THRESHOLD || '1'),
+    warningTransactionsThreshold: BigInt(process.env.WARNING_TRANSACTIONS_THRESHOLD || '50'),
   },
   retry: {
-    maxAttempts: Number(process.env.RETRY_MAX_ATTEMPTS) || 3,
+    maxAttempts: Number(process.env.RETRY_MAX_ATTEMPTS) || 2,
     initialDelay: Number(process.env.RETRY_INITIAL_DELAY) || 1000,
     maxDelay: Number(process.env.RETRY_MAX_DELAY) || 10000,
   },
