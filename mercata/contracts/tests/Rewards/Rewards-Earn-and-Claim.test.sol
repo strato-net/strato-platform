@@ -24,6 +24,9 @@ contract Describe_Rewards_Earn_and_Claim is Authorizable {
     uint256 liquidityEmissionRate = 900; // 900 CATA per second
     uint256 borrowEmissionRate = 100;    // 100 CATA per second
 
+    uint256 testBlockNumber = 100;
+    uint256 nextEventIndex = 0;
+
     function beforeAll() {
         bypassAuthorizations = true;
         // Create test users once
@@ -65,7 +68,7 @@ contract Describe_Rewards_Earn_and_Claim is Authorizable {
     function it_should_accrue_rewards_for_single_liquidity_provider() {
         // given - user1 deposits 1000 units of liquidity
         uint256 depositAmount = 1000 * 1e18;
-        rewards.deposit(liquidityActivityId, address(user1), depositAmount);
+        rewards.deposit(liquidityActivityId, address(user1), depositAmount, testBlockNumber, nextEventIndex++);
 
         // given - 100 seconds pass
         fastForward(100);
@@ -91,11 +94,11 @@ contract Describe_Rewards_Earn_and_Claim is Authorizable {
     function it_should_split_rewards_proportionally_between_two_users() {
         // given - user1 deposits 600 units
         uint256 user1Deposit = 600 * 1e18;
-        rewards.deposit(liquidityActivityId, address(user1), user1Deposit);
+        rewards.deposit(liquidityActivityId, address(user1), user1Deposit, testBlockNumber, nextEventIndex++);
 
         // given - user2 deposits 400 units
         uint256 user2Deposit = 400 * 1e18;
-        rewards.deposit(liquidityActivityId, address(user2), user2Deposit);
+        rewards.deposit(liquidityActivityId, address(user2), user2Deposit, testBlockNumber, nextEventIndex++);
 
         // given - 100 seconds pass
         fastForward(100);
@@ -129,11 +132,11 @@ contract Describe_Rewards_Earn_and_Claim is Authorizable {
     function it_should_accrue_rewards_from_multiple_activities() {
         // given - user1 deposits liquidity (activity 1)
         uint256 liquidityAmount = 1000 * 1e18;
-        rewards.deposit(liquidityActivityId, address(user1), liquidityAmount);
+        rewards.deposit(liquidityActivityId, address(user1), liquidityAmount, testBlockNumber, nextEventIndex++);
 
         // given - user1 borrows (activity 2)
         uint256 borrowAmount = 500 * 1e18;
-        rewards.deposit(borrowActivityId, address(user1), borrowAmount);
+        rewards.deposit(borrowActivityId, address(user1), borrowAmount, testBlockNumber, nextEventIndex++);
 
         // given - 100 seconds pass
         fastForward(100);
@@ -164,14 +167,14 @@ contract Describe_Rewards_Earn_and_Claim is Authorizable {
     function it_should_handle_partial_withdrawal_and_continue_accruing() {
         // given - user1 deposits 1000 units
         uint256 initialDeposit = 1000 * 1e18;
-        rewards.deposit(liquidityActivityId, address(user1), initialDeposit);
+        rewards.deposit(liquidityActivityId, address(user1), initialDeposit, testBlockNumber, nextEventIndex++);
 
         // given - 50 seconds pass
         fastForward(50);
 
         // when - user1 withdraws 400 units (leaving 600)
         uint256 withdrawAmount = 400 * 1e18;
-        rewards.withdraw(liquidityActivityId, address(user1), withdrawAmount);
+        rewards.withdraw(liquidityActivityId, address(user1), withdrawAmount, testBlockNumber, nextEventIndex++);
 
         // given - another 50 seconds pass
         fastForward(50);

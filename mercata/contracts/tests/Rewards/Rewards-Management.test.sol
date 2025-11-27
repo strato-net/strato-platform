@@ -19,6 +19,8 @@ contract Describe_Rewards_Management is Authorizable {
     User user1;
     User user2;
 
+    uint256 testBlockNumber = 100;
+
     function beforeAll() {
         bypassAuthorizations = true;
         // Create test users once
@@ -337,7 +339,7 @@ contract Describe_Rewards_Management is Authorizable {
 
         // when/then - try to deposit on OneTime activity
         bool reverted = false;
-        try rewards.deposit(activityId, address(user1), 100) {
+        try rewards.deposit(activityId, address(user1), 100, testBlockNumber, 0) {
             reverted = false;
         } catch {
             reverted = true;
@@ -352,7 +354,7 @@ contract Describe_Rewards_Management is Authorizable {
 
         // when/then - try to withdraw on OneTime activity
         bool reverted = false;
-        try rewards.withdraw(activityId, address(user1), 100) {
+        try rewards.withdraw(activityId, address(user1), 100, testBlockNumber, 0) {
             reverted = false;
         } catch {
             reverted = true;
@@ -367,7 +369,7 @@ contract Describe_Rewards_Management is Authorizable {
 
         // when/then - try to call occurred on Position activity
         bool reverted = false;
-        try rewards.occurred(activityId, address(user1), 100) {
+        try rewards.occurred(activityId, address(user1), 100, testBlockNumber, 0) {
             reverted = false;
         } catch {
             reverted = true;
@@ -381,7 +383,7 @@ contract Describe_Rewards_Management is Authorizable {
         rewards.addActivity(activityId, "Swap Activity", ActivityType.OneTime, 100, address(this), address(this));
 
         // when - call occurred
-        rewards.occurred(activityId, address(user1), 100);
+        rewards.occurred(activityId, address(user1), 100, testBlockNumber, 0);
 
         // then - check user stake increased
         (uint256 stake, uint256 userIndex) = rewards.userInfo(activityId, address(user1));
