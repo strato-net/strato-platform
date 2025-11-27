@@ -125,13 +125,14 @@ contract record Rewards is Ownable {
     // IDEMPOTENCY STATE
     // ═══════════════════════════════════════════════════════════════════════
 
-    // Current block number being processed (for idempotency)
+    // Last block number processed - exposed for off-chain service to know where to resume after crash
+    // This is NOT used in contract logic, only for external visibility
     uint256 public currentBlockHandled;
 
-    // Mapping of event hashes processed in the current block
+    // Mapping of all processed event hashes (persisted forever until retention cleanup)
     mapping(string => bool) public processedHashes;
 
-    // Array of event hashes in current block (for clearing the mapping)
+    // Array of all processed event hashes (for potential future retention cleanup)
     string[] public processedHashList;
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -451,29 +452,22 @@ contract record Rewards is Ownable {
     /**
      * @dev Internal function to handle stake changes with idempotency
      * @param action The action to process (includes blockNumber for idempotency)
+     *
+     * IMPORTANT: The off-chain service MUST send events in correct order:
+     * 1. All events from block N before any events from block N+1
+     * 2. Events within a block must be sent in eventIndex order
+     *
+     * This ordering is required because the rewards logic depends on it
+     * (e.g., a Deposit must be processed before a Withdraw for the same user).
      */
     function _handleAction(Action action) internal {
         // ═══════════════════════════════════════════════════════════════════════
         // IDEMPOTENCY CHECK
         // ═══════════════════════════════════════════════════════════════════════
 
-        // If blockNumber < currentBlockHandled, this is an old event - silently ignore
-        if (action.blockNumber < currentBlockHandled) {
-            return;
-        }
-
-        // If blockNumber > currentBlockHandled, we've moved to a new block
-        if (action.blockNumber > currentBlockHandled) {
-            // Clear the processed hashes from the previous block
-            _clearProcessedHashes();
-            // Update to the new block
-            currentBlockHandled = action.blockNumber;
-        }
-
         // Calculate event hash from blockNumber and eventIndex (uniquely identifies event on chain)
         string eventHash = keccak256(action.blockNumber, action.eventIndex);
 
-        // blockNumber == currentBlockHandled at this point
         // Check if we've already processed this event hash
         if (processedHashes[eventHash]) {
             // Already processed - silently ignore (idempotency)
@@ -483,6 +477,11 @@ contract record Rewards is Ownable {
         // Mark this event hash as processed
         processedHashes[eventHash] = true;
         processedHashList.push(eventHash);
+
+        // Update currentBlockHandled for off-chain service visibility (not used in logic)
+        if (action.blockNumber > currentBlockHandled) {
+            currentBlockHandled = action.blockNumber;
+        }
 
         // ═══════════════════════════════════════════════════════════════════════
         // ACTION PROCESSING

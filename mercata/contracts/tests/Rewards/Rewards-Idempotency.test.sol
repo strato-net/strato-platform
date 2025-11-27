@@ -75,33 +75,10 @@ contract Describe_Rewards_Idempotency is Authorizable {
     }
 
     // ═════════════════════════════════════════════════════════════════════════
-    // IDEMPOTENCY: Old block events are silently ignored
+    // IDEMPOTENCY: Same eventIndex in different blocks produces different hash
     // ═════════════════════════════════════════════════════════════════════════
 
-    function it_should_ignore_old_block_events() {
-        // given - process an event in block 200
-        uint256 depositAmount = 1000 * 1e18;
-        uint256 newerBlock = 200;
-        uint256 olderBlock = 100;
-        rewards.handleAction(Action(address(this), "Deposit", address(user1), depositAmount, newerBlock, 0));
-
-        // when - an event from an older block (100) arrives late
-        // This simulates out-of-order or replayed old events
-        rewards.handleAction(Action(address(this), "Deposit", address(user1), 500 * 1e18, olderBlock, 0));
-
-        // then - user's stake should still be 1000 (old block event ignored)
-        (uint256 stake, uint256 userIndex) = rewards.userInfo(address(user1), liquidityActivityId);
-        require(stake == depositAmount, "Old block event should be ignored - stake should be 1000, not 1500");
-
-        // then - currentBlock should still be 200
-        require(rewards.currentBlockHandled() == newerBlock, "currentBlock should remain at 200");
-    }
-
-    // ═════════════════════════════════════════════════════════════════════════
-    // IDEMPOTENCY: Hash set is cleared when moving to a new block
-    // ═════════════════════════════════════════════════════════════════════════
-
-    function it_should_clear_hash_set_when_moving_to_new_block() {
+    function it_should_process_same_event_index_in_different_blocks() {
         // given - process event in block 100, eventIndex 0
         uint256 depositAmount = 500 * 1e18;
         uint256 block100 = 100;
@@ -109,17 +86,17 @@ contract Describe_Rewards_Idempotency is Authorizable {
 
         rewards.handleAction(Action(address(this), "Deposit", address(user1), depositAmount, block100, 0));
 
-        // when - move to block 101 with same eventIndex (0)
+        // when - process event in block 101 with same eventIndex (0)
         // Since blockNumber is part of the hash, this produces a different hash
-        // Hash set is also cleared when moving to a new block
+        // hash(100, 0) != hash(101, 0)
         rewards.handleAction(Action(address(this), "Deposit", address(user1), depositAmount, block101, 0));
 
         // then - user's stake should be 1000 (both deposits processed)
         (uint256 stake, uint256 userIndex) = rewards.userInfo(address(user1), liquidityActivityId);
         require(stake == depositAmount * 2, "Events in different blocks should both be processed");
 
-        // then - currentBlock should be 101
-        require(rewards.currentBlockHandled() == block101, "currentBlock should be 101");
+        // then - currentBlockHandled should be 101 (highest block seen)
+        require(rewards.currentBlockHandled() == block101, "currentBlockHandled should be 101");
     }
 
     // ═════════════════════════════════════════════════════════════════════════
