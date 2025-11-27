@@ -100,8 +100,8 @@ contract record Rewards is Ownable {
     // Total emission rate across all activities (CATA per second)
     uint256 public totalRewardsEmission;
 
-    // User info per activity: activityId => user => RewardsUserInfo
-    mapping(uint256 => mapping(address => RewardsUserInfo)) public record userInfo;
+    // User info per activity: user => activityId => RewardsUserInfo
+    mapping(address => mapping(uint256 => RewardsUserInfo)) public record userInfo;
 
     // Total unclaimed rewards per user
     mapping(address => uint256) public record unclaimedRewards;
@@ -418,7 +418,7 @@ contract record Rewards is Ownable {
         _updateActivityIndex(activityId);
 
         // 2) Settle user's pending rewards using index delta (Aave-style)
-        RewardsUserInfo storage userState = userInfo[activityId][action.user];
+        RewardsUserInfo storage userState = userInfo[action.user][activityId];
         uint256 oldStake = userState.stake;
         uint256 pendingRewards = 0;
 
@@ -473,7 +473,7 @@ contract record Rewards is Ownable {
         _updateActivityIndex(activityId);
 
         Activity storage activity = activities[activityId];
-        RewardsUserInfo storage userState = userInfo[activityId][user];
+        RewardsUserInfo storage userState = userInfo[user][activityId];
         uint256 userStake = userState.stake;
 
         if (userStake > 0) {

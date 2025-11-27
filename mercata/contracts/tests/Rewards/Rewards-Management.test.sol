@@ -454,7 +454,7 @@ contract Describe_Rewards_Management is Authorizable {
         rewards.handleAction(Action(address(this), "Swap", address(user1), 100, testBlockNumber, 0));
 
         // then - check user stake increased
-        (uint256 stake, uint256 userIndex) = rewards.userInfo(activityId, address(user1));
+        (uint256 stake, uint256 userIndex) = rewards.userInfo(address(user1), activityId);
         require(stake == 100, "User stake should be 100");
     }
 
@@ -467,7 +467,7 @@ contract Describe_Rewards_Management is Authorizable {
         rewards.handleAction(Action(address(this), "Deposit", address(user1), 100, testBlockNumber, 0));
 
         // then - check user stake increased
-        (uint256 stake, uint256 userIndex) = rewards.userInfo(activityId, address(user1));
+        (uint256 stake, uint256 userIndex) = rewards.userInfo(address(user1), activityId);
         require(stake == 100, "User stake should be 100");
     }
 
@@ -483,7 +483,7 @@ contract Describe_Rewards_Management is Authorizable {
         rewards.handleAction(Action(address(this), "Withdraw", address(user1), 50, testBlockNumber, 1));
 
         // then - check user stake decreased
-        (uint256 stake, uint256 userIndex) = rewards.userInfo(activityId, address(user1));
+        (uint256 stake, uint256 userIndex) = rewards.userInfo(address(user1), activityId);
         require(stake == 50, "User stake should be 50 after withdrawal");
     }
 

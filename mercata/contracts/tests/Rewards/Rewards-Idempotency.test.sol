@@ -70,7 +70,7 @@ contract Describe_Rewards_Idempotency is Authorizable {
         rewards.handleAction(Action(address(this), "Deposit", address(user1), depositAmount, blockNum, eventIndex));
 
         // then - user's stake should only be 1000 (not 2000), proving the duplicate was ignored
-        (uint256 stake, uint256 userIndex) = rewards.userInfo(liquidityActivityId, address(user1));
+        (uint256 stake, uint256 userIndex) = rewards.userInfo(address(user1), liquidityActivityId);
         require(stake == depositAmount, "Duplicate event should be ignored - stake should be 1000, not 2000");
     }
 
@@ -90,7 +90,7 @@ contract Describe_Rewards_Idempotency is Authorizable {
         rewards.handleAction(Action(address(this), "Deposit", address(user1), 500 * 1e18, olderBlock, 0));
 
         // then - user's stake should still be 1000 (old block event ignored)
-        (uint256 stake, uint256 userIndex) = rewards.userInfo(liquidityActivityId, address(user1));
+        (uint256 stake, uint256 userIndex) = rewards.userInfo(address(user1), liquidityActivityId);
         require(stake == depositAmount, "Old block event should be ignored - stake should be 1000, not 1500");
 
         // then - currentBlock should still be 200
@@ -115,7 +115,7 @@ contract Describe_Rewards_Idempotency is Authorizable {
         rewards.handleAction(Action(address(this), "Deposit", address(user1), depositAmount, block101, 0));
 
         // then - user's stake should be 1000 (both deposits processed)
-        (uint256 stake, uint256 userIndex) = rewards.userInfo(liquidityActivityId, address(user1));
+        (uint256 stake, uint256 userIndex) = rewards.userInfo(address(user1), liquidityActivityId);
         require(stake == depositAmount * 2, "Events in different blocks should both be processed");
 
         // then - currentBlock should be 101
@@ -139,7 +139,7 @@ contract Describe_Rewards_Idempotency is Authorizable {
         rewards.handleAction(Action(address(this), "Deposit", address(user1), depositAmount, blockNum, 4));
 
         // then - all 5 deposits should be processed (total 500)
-        (uint256 stake, uint256 userIndex) = rewards.userInfo(liquidityActivityId, address(user1));
+        (uint256 stake, uint256 userIndex) = rewards.userInfo(address(user1), liquidityActivityId);
         require(stake == 500 * 1e18, "All unique events in same block should be processed");
     }
 
@@ -161,7 +161,7 @@ contract Describe_Rewards_Idempotency is Authorizable {
         rewards.handleAction(Action(address(this), "Withdraw", address(user1), withdrawAmount, blockNum, 1));
 
         // then - stake should be 600 (1000 - 400), not 200 (1000 - 400 - 400)
-        (uint256 stake, uint256 userIndex) = rewards.userInfo(liquidityActivityId, address(user1));
+        (uint256 stake, uint256 userIndex) = rewards.userInfo(address(user1), liquidityActivityId);
         require(stake == depositAmount - withdrawAmount, "Duplicate withdraw should be ignored");
     }
 
@@ -185,7 +185,7 @@ contract Describe_Rewards_Idempotency is Authorizable {
         rewards.batchHandleAction(actions);
 
         // then - only 3 unique events should be processed (eventIndex 0, 1, 2)
-        (uint256 stake, uint256 userIndex) = rewards.userInfo(liquidityActivityId, address(user1));
+        (uint256 stake, uint256 userIndex) = rewards.userInfo(address(user1), liquidityActivityId);
         require(stake == 300 * 1e18, "Batch should ignore duplicate hashes");
     }
 
@@ -212,7 +212,7 @@ contract Describe_Rewards_Idempotency is Authorizable {
         rewards.handleAction(Action(address(this), "Deposit", address(user1), depositAmount, blockNum, 0));
 
         // then - stake should be 300 (original 100 + 100 + new 100)
-        (uint256 stake, uint256 userIndex) = rewards.userInfo(liquidityActivityId, address(user1));
+        (uint256 stake, uint256 userIndex) = rewards.userInfo(address(user1), liquidityActivityId);
         require(stake == 300 * 1e18, "Hash should be reprocessed after emergency override");
     }
 
