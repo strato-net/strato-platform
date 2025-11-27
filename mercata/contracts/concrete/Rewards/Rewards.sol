@@ -28,6 +28,11 @@ struct Action {
     uint256 eventIndex;  // Event index within the block (for idempotency)
 }
 
+struct ActionableEvent {
+    string eventName;    // Name of the event that triggers this action
+    ActionType actionType; // The type of action to perform when this event occurs
+}
+
 struct RewardsUserInfo {
     uint256 stake;       // User's effective stake in this activity
     uint256 userIndex;   // Snapshot of accRewardPerStake at last update (Aave-style)
@@ -40,8 +45,9 @@ struct Activity {
     uint256 accRewardPerStake;   // Accumulated reward per 1 unit of stake (scaled by 1e18)
     uint256 lastUpdateTime;      // Last timestamp when the index was updated
     uint256 totalStake;          // Sum of all users' effective stakes for this activity
-    address allowedCaller;       // Address allowed to call deposit/withdraw/occurred for this activity
+    address allowedCaller;       // Address allowed to call handleAction for this activity
     address sourceContract;      // Address of the contract this activity tracks (for external service mapping)
+    ActionableEvent[] actionableEvents; // Events that can trigger actions for this activity
 }
 
 /**
@@ -147,15 +153,18 @@ contract record Rewards is Ownable {
      * @param emissionRate CATA tokens emitted per second for this activity
      * @param allowedCaller Address allowed to call handleAction for this activity
      * @param sourceContract Address of the contract this activity tracks
+     * @param actionableEvents Array of events that can trigger actions (must have at least one)
      */
     function addPositionActivity(
         uint256 activityId,
         string name,
         uint256 emissionRate,
         address allowedCaller,
-        address sourceContract
+        address sourceContract,
+        ActionableEvent[] actionableEvents
     ) external onlyOwner {
-        _addActivity(activityId, name, ActivityType.Position, emissionRate, allowedCaller, sourceContract);
+        require(actionableEvents.length > 0, "At least one actionable event required");
+        _addActivity(activityId, name, ActivityType.Position, emissionRate, allowedCaller, sourceContract, actionableEvents);
     }
 
     /**
@@ -165,15 +174,19 @@ contract record Rewards is Ownable {
      * @param emissionRate CATA tokens emitted per second for this activity
      * @param allowedCaller Address allowed to call handleAction for this activity
      * @param sourceContract Address of the contract this activity tracks
+     * @param eventName Name of the event that triggers this one-time action
      */
     function addOneTimeActivity(
         uint256 activityId,
         string name,
         uint256 emissionRate,
         address allowedCaller,
-        address sourceContract
+        address sourceContract,
+        string eventName
     ) external onlyOwner {
-        _addActivity(activityId, name, ActivityType.OneTime, emissionRate, allowedCaller, sourceContract);
+        ActionableEvent[] memory actionableEvents = new ActionableEvent[](1);
+        actionableEvents[0] = ActionableEvent(eventName, ActionType.Occurred);
+        _addActivity(activityId, name, ActivityType.OneTime, emissionRate, allowedCaller, sourceContract, actionableEvents);
     }
 
     /**
@@ -314,23 +327,28 @@ contract record Rewards is Ownable {
         ActivityType activityType,
         uint256 emissionRate,
         address allowedCaller,
-        address sourceContract
+        address sourceContract,
+        ActionableEvent[] actionableEvents
     ) internal {
         require(activities[activityId].allowedCaller == address(0), "Activity already exists");
         require(allowedCaller != address(0), "Invalid caller address");
         require(sourceContract != address(0), "Invalid source contract address");
         require(bytes(name).length > 0, "Name cannot be empty");
 
-        activities[activityId] = Activity({
-            name: name,
-            activityType: activityType,
-            emissionRate: emissionRate,
-            accRewardPerStake: 0,
-            lastUpdateTime: block.timestamp,
-            totalStake: 0,
-            allowedCaller: allowedCaller,
-            sourceContract: sourceContract
-        });
+        Activity storage activity = activities[activityId];
+        activity.name = name;
+        activity.activityType = activityType;
+        activity.emissionRate = emissionRate;
+        activity.accRewardPerStake = 0;
+        activity.lastUpdateTime = block.timestamp;
+        activity.totalStake = 0;
+        activity.allowedCaller = allowedCaller;
+        activity.sourceContract = sourceContract;
+
+        // Copy actionable events
+        for (uint256 i = 0; i < actionableEvents.length; i++) {
+            activity.actionableEvents.push(actionableEvents[i]);
+        }
 
         activityIds.push(activityId);
 
