@@ -43,7 +43,7 @@ contract Describe_Rewards_Idempotency is Authorizable {
         rewards = new Rewards(address(this));
         rewards.initialize(tokenAddress);
 
-        rewards.addActivity(liquidityActivityId, "Lending Pool Liquidity", ActivityType.Position, liquidityEmissionRate, address(this), address(this));
+        rewards.addPositionActivity(liquidityActivityId, "Lending Pool Liquidity", liquidityEmissionRate, address(this), address(this));
 
         uint256 fundingAmount = 1000000 * 1e18;
         rewardToken.mint(address(rewards), fundingAmount);

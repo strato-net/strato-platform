@@ -141,22 +141,52 @@ contract record Rewards is Ownable {
     }
 
     /**
-     * @dev Register a new activity for reward distribution
+     * @dev Register a new Position activity for reward distribution
      * @param activityId Unique identifier for the activity
      * @param name Human-readable name for the activity
-     * @param activityType Type of activity (Position or OneTime)
      * @param emissionRate CATA tokens emitted per second for this activity
-     * @param allowedCaller Address allowed to call deposit/withdraw/occurred
-     * @param sourceContract Address of the contract this activity tracks (for external service mapping)
+     * @param allowedCaller Address allowed to call handleAction for this activity
+     * @param sourceContract Address of the contract this activity tracks
      */
-    function addActivity(
+    function addPositionActivity(
+        uint256 activityId,
+        string name,
+        uint256 emissionRate,
+        address allowedCaller,
+        address sourceContract
+    ) external onlyOwner {
+        _addActivity(activityId, name, ActivityType.Position, emissionRate, allowedCaller, sourceContract);
+    }
+
+    /**
+     * @dev Register a new OneTime activity for reward distribution
+     * @param activityId Unique identifier for the activity
+     * @param name Human-readable name for the activity
+     * @param emissionRate CATA tokens emitted per second for this activity
+     * @param allowedCaller Address allowed to call handleAction for this activity
+     * @param sourceContract Address of the contract this activity tracks
+     */
+    function addOneTimeActivity(
+        uint256 activityId,
+        string name,
+        uint256 emissionRate,
+        address allowedCaller,
+        address sourceContract
+    ) external onlyOwner {
+        _addActivity(activityId, name, ActivityType.OneTime, emissionRate, allowedCaller, sourceContract);
+    }
+
+    /**
+     * @dev Internal function to register a new activity
+     */
+    function _addActivity(
         uint256 activityId,
         string name,
         ActivityType activityType,
         uint256 emissionRate,
         address allowedCaller,
         address sourceContract
-    ) external onlyOwner {
+    ) internal {
         require(activities[activityId].allowedCaller == address(0), "Activity already exists");
         require(allowedCaller != address(0), "Invalid caller address");
         require(sourceContract != address(0), "Invalid source contract address");
