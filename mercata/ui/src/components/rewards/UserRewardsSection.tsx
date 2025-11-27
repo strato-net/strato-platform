@@ -268,13 +268,13 @@ export const UserRewardsSection = ({
 
                     <div>
                       <p className="text-sm text-muted-foreground mb-1">Estimated Rewards/Day</p>
-                      <p className="text-lg font-semibold">{estimatedPerDayFormatted} points</p>
+                      <p className="text-lg font-semibold">{estimatedPerDayFormatted}</p>
                     </div>
 
                     <div>
                       <p className="text-sm text-muted-foreground mb-1">Pending Rewards</p>
                       <p className="text-lg font-semibold text-yellow-600 dark:text-yellow-400">
-                        {pendingFormatted} points
+                        {pendingFormatted}
                       </p>
                     </div>
                   </div>
