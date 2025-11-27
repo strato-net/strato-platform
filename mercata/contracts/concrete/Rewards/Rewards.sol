@@ -95,6 +95,9 @@ contract record Rewards is Ownable {
     // Array of all activity IDs for enumeration
     uint256[] public activityIds;
 
+    // Counter for generating unique activity IDs (starts at 1, 0 means "not found")
+    uint256 public nextActivityId = 1;
+
     // Total emission rate across all activities (CATA per second)
     uint256 public totalRewardsEmission;
 
@@ -158,41 +161,39 @@ contract record Rewards is Ownable {
 
     /**
      * @dev Register a new Position activity for reward distribution
-     * @param activityId Unique identifier for the activity
      * @param name Human-readable name for the activity
      * @param emissionRate CATA tokens emitted per second for this activity
      * @param sourceContract Address of the contract this activity tracks
      * @param actionableEvents Array of events that can trigger actions (must have at least one)
+     * @return activityId The auto-generated unique identifier for the activity
      */
     function addPositionActivity(
-        uint256 activityId,
         string name,
         uint256 emissionRate,
         address sourceContract,
         ActionableEvent[] actionableEvents
-    ) external onlyOwner {
+    ) external onlyOwner returns (uint256) {
         require(actionableEvents.length > 0, "At least one actionable event required");
-        _addActivity(activityId, name, ActivityType.Position, emissionRate, sourceContract, actionableEvents);
+        return _addActivity(name, ActivityType.Position, emissionRate, sourceContract, actionableEvents);
     }
 
     /**
      * @dev Register a new OneTime activity for reward distribution
-     * @param activityId Unique identifier for the activity
      * @param name Human-readable name for the activity
      * @param emissionRate CATA tokens emitted per second for this activity
      * @param sourceContract Address of the contract this activity tracks
      * @param eventName Name of the event that triggers this one-time action
+     * @return activityId The auto-generated unique identifier for the activity
      */
     function addOneTimeActivity(
-        uint256 activityId,
         string name,
         uint256 emissionRate,
         address sourceContract,
         string eventName
-    ) external onlyOwner {
+    ) external onlyOwner returns (uint256) {
         ActionableEvent[] memory actionableEvents = new ActionableEvent[](1);
         actionableEvents[0] = ActionableEvent(eventName, ActionType.Occurred);
-        _addActivity(activityId, name, ActivityType.OneTime, emissionRate, sourceContract, actionableEvents);
+        return _addActivity(name, ActivityType.OneTime, emissionRate, sourceContract, actionableEvents);
     }
 
     /**
@@ -398,16 +399,15 @@ contract record Rewards is Ownable {
 
     /**
      * @dev Internal function to register a new activity
+     * @return activityId The auto-generated unique identifier for the activity
      */
     function _addActivity(
-        uint256 activityId,
         string name,
         ActivityType activityType,
         uint256 emissionRate,
         address sourceContract,
         ActionableEvent[] actionableEvents
-    ) internal {
-        require(activities[activityId].sourceContract == address(0), "Activity already exists");
+    ) internal returns (uint256) {
         require(sourceContract != address(0), "Invalid source contract address");
         require(bytes(name).length > 0, "Name cannot be empty");
 
@@ -418,6 +418,10 @@ contract record Rewards is Ownable {
                 "Event name already exists for this source contract"
             );
         }
+
+        // Generate unique activity ID
+        uint256 activityId = nextActivityId;
+        nextActivityId++;
 
         Activity storage activity = activities[activityId];
         activity.name = name;
@@ -440,6 +444,8 @@ contract record Rewards is Ownable {
         totalRewardsEmission += emissionRate;
 
         emit ActivityAdded(activityId, name, emissionRate, sourceContract);
+
+        return activityId;
     }
 
     /**

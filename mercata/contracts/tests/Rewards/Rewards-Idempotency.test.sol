@@ -19,7 +19,7 @@ contract Describe_Rewards_Idempotency is Authorizable {
     User user1;
     User user2;
 
-    uint256 liquidityActivityId = 1;
+    uint256 liquidityActivityId;
     uint256 liquidityEmissionRate = 900;
 
     function beforeAll() {
@@ -46,7 +46,7 @@ contract Describe_Rewards_Idempotency is Authorizable {
         ActionableEvent[] memory events = new ActionableEvent[](2);
         events[0] = ActionableEvent("Deposit", ActionType.Deposit);
         events[1] = ActionableEvent("Withdraw", ActionType.Withdraw);
-        rewards.addPositionActivity(liquidityActivityId, "Lending Pool Liquidity", liquidityEmissionRate, address(this), events);
+        liquidityActivityId = rewards.addPositionActivity("Lending Pool Liquidity", liquidityEmissionRate, address(this), events);
 
         uint256 fundingAmount = 1000000 * 1e18;
         rewardToken.mint(address(rewards), fundingAmount);

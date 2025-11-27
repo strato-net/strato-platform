@@ -89,15 +89,15 @@ contract Describe_Rewards_Management is Authorizable {
 
     function it_should_allow_adding_new_activity() {
         // given
-        uint256 activityId = 1;
         string memory name = "SwapPool-USDST/ETHST";
         uint256 emissionRate = 100;
         address sourceContract = address(user1);
 
         // when
-        rewards.addPositionActivity(activityId, name, emissionRate, sourceContract, _defaultPositionEvents());
+        uint256 activityId = rewards.addPositionActivity(name, emissionRate, sourceContract, _defaultPositionEvents());
 
         // then
+        require(activityId == 1, "First activity ID should be 1");
         (string memory activityName, ActivityType activityType, uint256 rate, uint256 accReward, uint256 lastUpdate, uint256 totalStake, address source) =
             rewards.activities(activityId);
 
@@ -114,14 +114,13 @@ contract Describe_Rewards_Management is Authorizable {
 
     function it_should_prevent_adding_activity_with_empty_name() {
         // given
-        uint256 activityId = 1;
         string memory name = "";
         uint256 emissionRate = 100;
         address sourceContract = address(user1);
 
         // when/then
         bool reverted = false;
-        try rewards.addPositionActivity(activityId, name, emissionRate, sourceContract, _defaultPositionEvents()) {
+        try rewards.addPositionActivity(name, emissionRate, sourceContract, _defaultPositionEvents()) {
             reverted = false;
         } catch {
             reverted = true;
@@ -131,7 +130,6 @@ contract Describe_Rewards_Management is Authorizable {
 
     function it_should_prevent_adding_position_activity_with_empty_events() {
         // given
-        uint256 activityId = 1;
         string memory name = "SwapPool";
         uint256 emissionRate = 100;
         address sourceContract = address(user1);
@@ -139,7 +137,7 @@ contract Describe_Rewards_Management is Authorizable {
 
         // when/then
         bool reverted = false;
-        try rewards.addPositionActivity(activityId, name, emissionRate, sourceContract, emptyEvents) {
+        try rewards.addPositionActivity(name, emissionRate, sourceContract, emptyEvents) {
             reverted = false;
         } catch {
             reverted = true;
@@ -149,20 +147,18 @@ contract Describe_Rewards_Management is Authorizable {
 
     function it_should_prevent_adding_activity_with_duplicate_event_for_same_source() {
         // given - Activity 1 with sourceContract 0xaa and events: Deposit, Withdraw
-        uint256 activityId1 = 1;
         address sourceA = address(user1);
         ActionableEvent[] memory events1 = new ActionableEvent[](2);
         events1[0] = ActionableEvent("Deposit", ActionType.Deposit);
         events1[1] = ActionableEvent("Withdraw", ActionType.Withdraw);
-        rewards.addPositionActivity(activityId1, "Activity 1", 100, sourceA, events1);
+        rewards.addPositionActivity("Activity 1", 100, sourceA, events1);
 
         // when/then - try to add Activity 2 with same sourceContract and event "Deposit"
-        uint256 activityId2 = 2;
         ActionableEvent[] memory events2 = new ActionableEvent[](1);
         events2[0] = ActionableEvent("Deposit", ActionType.Deposit); // duplicate event name
 
         bool reverted = false;
-        try rewards.addPositionActivity(activityId2, "Activity 2", 200, sourceA, events2) {
+        try rewards.addPositionActivity("Activity 2", 200, sourceA, events2) {
             reverted = false;
         } catch {
             reverted = true;
@@ -172,20 +168,18 @@ contract Describe_Rewards_Management is Authorizable {
 
     function it_should_allow_same_event_name_for_different_source_contracts() {
         // given - Activity 1 with sourceContract 0xaa and event: Withdraw
-        uint256 activityId1 = 1;
         address sourceA = address(user1);
         ActionableEvent[] memory events1 = new ActionableEvent[](1);
         events1[0] = ActionableEvent("Withdraw", ActionType.Withdraw);
-        rewards.addPositionActivity(activityId1, "Activity 1", 100, sourceA, events1);
+        uint256 activityId1 = rewards.addPositionActivity("Activity 1", 100, sourceA, events1);
 
         // when - add Activity 2 with different sourceContract 0xbb but same event "Withdraw"
-        uint256 activityId2 = 2;
         address sourceB = address(user2);
         ActionableEvent[] memory events2 = new ActionableEvent[](1);
         events2[0] = ActionableEvent("Withdraw", ActionType.Withdraw); // same event name, different source
 
         // then - should succeed
-        rewards.addPositionActivity(activityId2, "Activity 2", 200, sourceB, events2);
+        uint256 activityId2 = rewards.addPositionActivity("Activity 2", 200, sourceB, events2);
 
         // verify both activities exist
         (string memory name1, , , , , , ) = rewards.activities(activityId1);
@@ -196,25 +190,22 @@ contract Describe_Rewards_Management is Authorizable {
 
     function it_should_allow_non_overlapping_events_for_same_source() {
         // given - Activity 1 with sourceContract 0xaa and event: Withdraw
-        uint256 activityId1 = 1;
         address sourceA = address(user1);
         ActionableEvent[] memory events1 = new ActionableEvent[](1);
         events1[0] = ActionableEvent("Withdraw", ActionType.Withdraw);
-        rewards.addPositionActivity(activityId1, "Activity 1", 100, sourceA, events1);
+        rewards.addPositionActivity("Activity 1", 100, sourceA, events1);
 
         // given - Activity 2 with same sourceContract 0xaa and event: Deposit
-        uint256 activityId2 = 2;
         ActionableEvent[] memory events2 = new ActionableEvent[](1);
         events2[0] = ActionableEvent("Deposit", ActionType.Deposit);
-        rewards.addPositionActivity(activityId2, "Activity 2", 200, sourceA, events2);
+        rewards.addPositionActivity("Activity 2", 200, sourceA, events2);
 
         // when - try to add Activity 3 with same sourceContract but event: Borrow (non-overlapping)
-        uint256 activityId3 = 3;
         ActionableEvent[] memory events3 = new ActionableEvent[](1);
         events3[0] = ActionableEvent("Borrow", ActionType.Deposit);
 
         // then - should succeed
-        rewards.addPositionActivity(activityId3, "Activity 3", 300, sourceA, events3);
+        uint256 activityId3 = rewards.addPositionActivity("Activity 3", 300, sourceA, events3);
 
         // verify all three activities exist
         (string memory name3, , , , , , ) = rewards.activities(activityId3);
@@ -223,25 +214,22 @@ contract Describe_Rewards_Management is Authorizable {
 
     function it_should_prevent_duplicate_event_across_multiple_existing_activities() {
         // given - Activity 1 with sourceContract 0xaa and event: Withdraw
-        uint256 activityId1 = 1;
         address sourceA = address(user1);
         ActionableEvent[] memory events1 = new ActionableEvent[](1);
         events1[0] = ActionableEvent("Withdraw", ActionType.Withdraw);
-        rewards.addPositionActivity(activityId1, "Activity 1", 100, sourceA, events1);
+        rewards.addPositionActivity("Activity 1", 100, sourceA, events1);
 
         // given - Activity 2 with same sourceContract 0xaa and event: Deposit
-        uint256 activityId2 = 2;
         ActionableEvent[] memory events2 = new ActionableEvent[](1);
         events2[0] = ActionableEvent("Deposit", ActionType.Deposit);
-        rewards.addPositionActivity(activityId2, "Activity 2", 200, sourceA, events2);
+        rewards.addPositionActivity("Activity 2", 200, sourceA, events2);
 
         // when/then - try to add Activity 3 with same source and event "Deposit" (conflicts with Activity 2)
-        uint256 activityId3 = 3;
         ActionableEvent[] memory events3 = new ActionableEvent[](1);
         events3[0] = ActionableEvent("Deposit", ActionType.Deposit); // conflicts with Activity 2
 
         bool reverted = false;
-        try rewards.addPositionActivity(activityId3, "Activity 3", 300, sourceA, events3) {
+        try rewards.addPositionActivity("Activity 3", 300, sourceA, events3) {
             reverted = false;
         } catch {
             reverted = true;
@@ -251,15 +239,12 @@ contract Describe_Rewards_Management is Authorizable {
 
     function it_should_prevent_duplicate_event_for_onetime_activity() {
         // given - OneTime activity with sourceContract 0xaa and event: Swap
-        uint256 activityId1 = 1;
         address sourceA = address(user1);
-        rewards.addOneTimeActivity(activityId1, "Swap Activity", 100, sourceA, "Swap");
+        rewards.addOneTimeActivity("Swap Activity", 100, sourceA, "Swap");
 
         // when/then - try to add another OneTime activity with same source and event "Swap"
-        uint256 activityId2 = 2;
-
         bool reverted = false;
-        try rewards.addOneTimeActivity(activityId2, "Another Swap", 200, sourceA, "Swap") {
+        try rewards.addOneTimeActivity("Another Swap", 200, sourceA, "Swap") {
             reverted = false;
         } catch {
             reverted = true;
@@ -267,38 +252,20 @@ contract Describe_Rewards_Management is Authorizable {
         require(reverted, "Should prevent duplicate event name for OneTime activities with same source");
     }
 
-    function it_should_prevent_duplicate_activity() {
-        // given
-        uint256 activityId = 1;
-        rewards.addPositionActivity(activityId, "Activity 1", 100, address(user1), _defaultPositionEvents());
-
-        // when/then - try to add activity with same ID
-        bool reverted = false;
-        try rewards.addPositionActivity(activityId, "Activity 2", 200, address(user2), _defaultPositionEvents()) {
-            reverted = false;
-        } catch {
-            reverted = true;
-        }
-        require(reverted, "Adding duplicate activity should revert");
-    }
-
     function it_should_track_total_emission_when_adding_multiple_activities() {
         // given
-        uint256 activity1 = 1;
-        uint256 activity2 = 2;
-        uint256 activity3 = 3;
         uint256 emission1 = 100;
         uint256 emission2 = 200;
         uint256 emission3 = 300;
 
         // when - using unique events for same source contract
-        rewards.addPositionActivity(activity1, "Activity 1", emission1, address(user1), _eventsA1());
+        rewards.addPositionActivity("Activity 1", emission1, address(user1), _eventsA1());
         require(rewards.totalRewardsEmission() == emission1, "Total emission after 1st activity");
 
-        rewards.addPositionActivity(activity2, "Activity 2", emission2, address(user1), _eventsA2());
+        rewards.addPositionActivity("Activity 2", emission2, address(user1), _eventsA2());
         require(rewards.totalRewardsEmission() == emission1 + emission2, "Total emission after 2nd activity");
 
-        rewards.addPositionActivity(activity3, "Activity 3", emission3, address(user1), _eventsA3());
+        rewards.addPositionActivity("Activity 3", emission3, address(user1), _eventsA3());
         require(rewards.totalRewardsEmission() == emission1 + emission2 + emission3, "Total emission after 3rd activity");
     }
 
@@ -308,11 +275,10 @@ contract Describe_Rewards_Management is Authorizable {
 
     function it_should_allow_updating_emission_rate() {
         // given
-        uint256 activityId = 1;
         uint256 initialEmission = 100;
         uint256 newEmission = 200;
 
-        rewards.addPositionActivity(activityId, "Activity 1", initialEmission, address(user1), _defaultPositionEvents());
+        uint256 activityId = rewards.addPositionActivity("Activity 1", initialEmission, address(user1), _defaultPositionEvents());
         require(rewards.totalRewardsEmission() == initialEmission, "Initial total emission");
 
         // when
@@ -340,12 +306,9 @@ contract Describe_Rewards_Management is Authorizable {
 
     function it_should_maintain_correct_total_emission_when_updating_rates() {
         // given - add three activities with unique events for same source
-        uint256 activity1 = 1;
-        uint256 activity2 = 2;
-        uint256 activity3 = 3;
-        rewards.addPositionActivity(activity1, "Activity 1", 100, address(user1), _eventsA1());
-        rewards.addPositionActivity(activity2, "Activity 2", 200, address(user1), _eventsA2());
-        rewards.addPositionActivity(activity3, "Activity 3", 300, address(user1), _eventsA3());
+        uint256 activity1 = rewards.addPositionActivity("Activity 1", 100, address(user1), _eventsA1());
+        uint256 activity2 = rewards.addPositionActivity("Activity 2", 200, address(user1), _eventsA2());
+        uint256 activity3 = rewards.addPositionActivity("Activity 3", 300, address(user1), _eventsA3());
 
         require(rewards.totalRewardsEmission() == 600, "Initial total emission");
 
@@ -364,8 +327,7 @@ contract Describe_Rewards_Management is Authorizable {
 
     function it_should_allow_setting_emission_rate_to_zero() {
         // given
-        uint256 activityId = 1;
-        rewards.addPositionActivity(activityId, "Activity 1", 100, address(user1), _defaultPositionEvents());
+        uint256 activityId = rewards.addPositionActivity("Activity 1", 100, address(user1), _defaultPositionEvents());
 
         // when
         rewards.setEmissionRate(activityId, 0);
@@ -383,11 +345,10 @@ contract Describe_Rewards_Management is Authorizable {
 
     function it_should_allow_updating_source_contract() {
         // given
-        uint256 activityId = 1;
         address initialSource = address(user1);
         address newSource = address(user2);
 
-        rewards.addPositionActivity(activityId, "Activity 1", 100, initialSource, _defaultPositionEvents());
+        uint256 activityId = rewards.addPositionActivity("Activity 1", 100, initialSource, _defaultPositionEvents());
 
         // when
         rewards.setSourceContract(activityId, newSource);
@@ -413,8 +374,7 @@ contract Describe_Rewards_Management is Authorizable {
 
     function it_should_prevent_setting_source_contract_to_zero_address() {
         // given
-        uint256 activityId = 1;
-        rewards.addPositionActivity(activityId, "Activity 1", 100, address(user1), _defaultPositionEvents());
+        uint256 activityId = rewards.addPositionActivity("Activity 1", 100, address(user1), _defaultPositionEvents());
 
         // when/then
         bool reverted = false;
@@ -432,8 +392,7 @@ contract Describe_Rewards_Management is Authorizable {
 
     function it_should_fail_on_unknown_event_for_source() {
         // given - add a OneTime activity with "Swap" event
-        uint256 activityId = 1;
-        rewards.addOneTimeActivity(activityId, "Swap Activity", 100, address(this), "Swap");
+        rewards.addOneTimeActivity("Swap Activity", 100, address(this), "Swap");
 
         // when/then - try to use an event name that doesn't exist for this source
         bool reverted = false;
@@ -447,8 +406,7 @@ contract Describe_Rewards_Management is Authorizable {
 
     function it_should_allow_valid_event_on_onetime_activity() {
         // given - add a OneTime activity with "Swap" event
-        uint256 activityId = 1;
-        rewards.addOneTimeActivity(activityId, "Swap Activity", 100, address(this), "Swap");
+        uint256 activityId = rewards.addOneTimeActivity("Swap Activity", 100, address(this), "Swap");
 
         // when - use the registered "Swap" event
         rewards.handleAction(Action(address(this), "Swap", address(user1), 100, testBlockNumber, 0));
@@ -460,8 +418,7 @@ contract Describe_Rewards_Management is Authorizable {
 
     function it_should_allow_deposit_on_position_activity() {
         // given - add a Position activity with Deposit/Withdraw events
-        uint256 activityId = 1;
-        rewards.addPositionActivity(activityId, "Liquidity Pool", 100, address(this), _defaultPositionEvents());
+        uint256 activityId = rewards.addPositionActivity("Liquidity Pool", 100, address(this), _defaultPositionEvents());
 
         // when - use the registered "Deposit" event
         rewards.handleAction(Action(address(this), "Deposit", address(user1), 100, testBlockNumber, 0));
@@ -473,8 +430,7 @@ contract Describe_Rewards_Management is Authorizable {
 
     function it_should_allow_withdraw_on_position_activity() {
         // given - add a Position activity with Deposit/Withdraw events
-        uint256 activityId = 1;
-        rewards.addPositionActivity(activityId, "Liquidity Pool", 100, address(this), _defaultPositionEvents());
+        uint256 activityId = rewards.addPositionActivity("Liquidity Pool", 100, address(this), _defaultPositionEvents());
 
         // given - first deposit
         rewards.handleAction(Action(address(this), "Deposit", address(user1), 100, testBlockNumber, 0));
@@ -493,8 +449,7 @@ contract Describe_Rewards_Management is Authorizable {
 
     function it_should_prevent_non_owner_from_updating_emission_rate() {
         // given
-        uint256 activityId = 1;
-        rewards.addPositionActivity(activityId, "Activity 1", 100, address(user1), _defaultPositionEvents());
+        uint256 activityId = rewards.addPositionActivity("Activity 1", 100, address(user1), _defaultPositionEvents());
 
         // when - user1 tries to update emission rate
         bool reverted = false;
@@ -511,8 +466,7 @@ contract Describe_Rewards_Management is Authorizable {
 
     function it_should_prevent_non_owner_from_calling_handleAction() {
         // given
-        uint256 activityId = 1;
-        rewards.addPositionActivity(activityId, "Activity 1", 100, address(user1), _defaultPositionEvents());
+        rewards.addPositionActivity("Activity 1", 100, address(user1), _defaultPositionEvents());
 
         // when - user1 (non-owner) tries to call handleAction
         bool reverted = false;
@@ -533,10 +487,9 @@ contract Describe_Rewards_Management is Authorizable {
 
     function it_should_change_position_activity_events_and_ignore_old_events() {
         // given - create activity with event "EventA"
-        uint256 activityId = 1;
         ActionableEvent[] memory eventsA = new ActionableEvent[](1);
         eventsA[0] = ActionableEvent("EventA", ActionType.Deposit);
-        rewards.addPositionActivity(activityId, "Test Activity", 100, address(this), eventsA);
+        uint256 activityId = rewards.addPositionActivity("Test Activity", 100, address(this), eventsA);
 
         // when - run action with EventA
         rewards.handleAction(Action(address(this), "EventA", address(user1), 100, testBlockNumber, 0));
@@ -590,8 +543,7 @@ contract Describe_Rewards_Management is Authorizable {
 
     function it_should_prevent_setting_events_on_onetime_activity() {
         // given - create a OneTime activity
-        uint256 activityId = 1;
-        rewards.addOneTimeActivity(activityId, "OneTime Activity", 100, address(this), "Swap");
+        uint256 activityId = rewards.addOneTimeActivity("OneTime Activity", 100, address(this), "Swap");
 
         // when/then - try to use setPositionActivityEvents on OneTime activity
         ActionableEvent[] memory events = new ActionableEvent[](1);
@@ -608,8 +560,7 @@ contract Describe_Rewards_Management is Authorizable {
 
     function it_should_prevent_setting_empty_events_on_position_activity() {
         // given - create a Position activity
-        uint256 activityId = 1;
-        rewards.addPositionActivity(activityId, "Test Activity", 100, address(this), _defaultPositionEvents());
+        uint256 activityId = rewards.addPositionActivity("Test Activity", 100, address(this), _defaultPositionEvents());
 
         // when/then - try to set empty events
         ActionableEvent[] memory emptyEvents = new ActionableEvent[](0);
@@ -625,11 +576,10 @@ contract Describe_Rewards_Management is Authorizable {
 
     function it_should_allow_keeping_same_event_when_updating_position_activity() {
         // given - create activity with EventA and EventB
-        uint256 activityId = 1;
         ActionableEvent[] memory initialEvents = new ActionableEvent[](2);
         initialEvents[0] = ActionableEvent("EventA", ActionType.Deposit);
         initialEvents[1] = ActionableEvent("EventB", ActionType.Withdraw);
-        rewards.addPositionActivity(activityId, "Test Activity", 100, address(this), initialEvents);
+        uint256 activityId = rewards.addPositionActivity("Test Activity", 100, address(this), initialEvents);
 
         // when - update to keep EventA but change EventB to EventC
         ActionableEvent[] memory newEvents = new ActionableEvent[](2);
@@ -650,8 +600,7 @@ contract Describe_Rewards_Management is Authorizable {
 
     function it_should_change_onetime_activity_event_and_ignore_old_event() {
         // given - create OneTime activity with event "EventA"
-        uint256 activityId = 1;
-        rewards.addOneTimeActivity(activityId, "Test OneTime", 100, address(this), "EventA");
+        uint256 activityId = rewards.addOneTimeActivity("Test OneTime", 100, address(this), "EventA");
 
         // when - run action with EventA
         rewards.handleAction(Action(address(this), "EventA", address(user1), 100, testBlockNumber, 0));
@@ -701,8 +650,7 @@ contract Describe_Rewards_Management is Authorizable {
 
     function it_should_prevent_setting_event_on_position_activity() {
         // given - create a Position activity
-        uint256 activityId = 1;
-        rewards.addPositionActivity(activityId, "Position Activity", 100, address(this), _defaultPositionEvents());
+        uint256 activityId = rewards.addPositionActivity("Position Activity", 100, address(this), _defaultPositionEvents());
 
         // when/then - try to use setOneTimeActivityEvent on Position activity
         bool reverted = false;
@@ -716,8 +664,7 @@ contract Describe_Rewards_Management is Authorizable {
 
     function it_should_prevent_setting_empty_event_name_on_onetime_activity() {
         // given - create a OneTime activity
-        uint256 activityId = 1;
-        rewards.addOneTimeActivity(activityId, "Test OneTime", 100, address(this), "Swap");
+        uint256 activityId = rewards.addOneTimeActivity("Test OneTime", 100, address(this), "Swap");
 
         // when/then - try to set empty event name
         bool reverted = false;
