@@ -278,7 +278,7 @@ export const UserRewardsSection = ({
                       <CardTitle className="text-lg">{activity.name}</CardTitle>
                       <CardDescription>
                         Activity #{activity.activityId} •{" "}
-                        <Badge variant={activity.activityType === 0 ? "default" : "secondary"}>
+                        <Badge variant="secondary">
                           {activity.activityType === 0 ? "Position" : "One-Time"}
                         </Badge>
                       </CardDescription>
