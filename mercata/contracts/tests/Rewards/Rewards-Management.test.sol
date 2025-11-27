@@ -501,62 +501,61 @@ contract Describe_Rewards_Management is Authorizable {
     // ACTIVITY TYPE VALIDATION
     // ═════════════════════════════════════════════════════════════════════════
 
-    function it_should_prevent_deposit_on_onetime_activity() {
-        // given - add a OneTime activity
+    function it_should_fail_on_unknown_event_for_source() {
+        // given - add a OneTime activity with "Swap" event
         uint256 activityId = 1;
         rewards.addOneTimeActivity(activityId, "Swap Activity", 100, address(this), address(this), "Swap");
 
-        // when/then - try to deposit on OneTime activity
+        // when/then - try to use an event name that doesn't exist for this source
         bool reverted = false;
-        try rewards.handleAction(Action(activityId, address(user1), 100, ActionType.Deposit, testBlockNumber, 0)) {
+        try rewards.handleAction(Action(address(this), "UnknownEvent", address(user1), 100, testBlockNumber, 0)) {
             reverted = false;
         } catch {
             reverted = true;
         }
-        require(reverted, "Deposit should fail on OneTime activity");
+        require(reverted, "Unknown event should fail");
     }
 
-    function it_should_prevent_withdraw_on_onetime_activity() {
-        // given - add a OneTime activity
+    function it_should_allow_valid_event_on_onetime_activity() {
+        // given - add a OneTime activity with "Swap" event
         uint256 activityId = 1;
         rewards.addOneTimeActivity(activityId, "Swap Activity", 100, address(this), address(this), "Swap");
 
-        // when/then - try to withdraw on OneTime activity
-        bool reverted = false;
-        try rewards.handleAction(Action(activityId, address(user1), 100, ActionType.Withdraw, testBlockNumber, 0)) {
-            reverted = false;
-        } catch {
-            reverted = true;
-        }
-        require(reverted, "Withdraw should fail on OneTime activity");
-    }
-
-    function it_should_prevent_occurred_on_position_activity() {
-        // given - add a Position activity
-        uint256 activityId = 1;
-        rewards.addPositionActivity(activityId, "Liquidity Pool", 100, address(this), address(this), _defaultPositionEvents());
-
-        // when/then - try to call occurred on Position activity
-        bool reverted = false;
-        try rewards.handleAction(Action(activityId, address(user1), 100, ActionType.Occurred, testBlockNumber, 0)) {
-            reverted = false;
-        } catch {
-            reverted = true;
-        }
-        require(reverted, "Occurred should fail on Position activity");
-    }
-
-    function it_should_allow_occurred_on_onetime_activity() {
-        // given - add a OneTime activity
-        uint256 activityId = 1;
-        rewards.addOneTimeActivity(activityId, "Swap Activity", 100, address(this), address(this), "Swap");
-
-        // when - call occurred
-        rewards.handleAction(Action(activityId, address(user1), 100, ActionType.Occurred, testBlockNumber, 0));
+        // when - use the registered "Swap" event
+        rewards.handleAction(Action(address(this), "Swap", address(user1), 100, testBlockNumber, 0));
 
         // then - check user stake increased
         (uint256 stake, uint256 userIndex) = rewards.userInfo(activityId, address(user1));
         require(stake == 100, "User stake should be 100");
+    }
+
+    function it_should_allow_deposit_on_position_activity() {
+        // given - add a Position activity with Deposit/Withdraw events
+        uint256 activityId = 1;
+        rewards.addPositionActivity(activityId, "Liquidity Pool", 100, address(this), address(this), _defaultPositionEvents());
+
+        // when - use the registered "Deposit" event
+        rewards.handleAction(Action(address(this), "Deposit", address(user1), 100, testBlockNumber, 0));
+
+        // then - check user stake increased
+        (uint256 stake, uint256 userIndex) = rewards.userInfo(activityId, address(user1));
+        require(stake == 100, "User stake should be 100");
+    }
+
+    function it_should_allow_withdraw_on_position_activity() {
+        // given - add a Position activity with Deposit/Withdraw events
+        uint256 activityId = 1;
+        rewards.addPositionActivity(activityId, "Liquidity Pool", 100, address(this), address(this), _defaultPositionEvents());
+
+        // given - first deposit
+        rewards.handleAction(Action(address(this), "Deposit", address(user1), 100, testBlockNumber, 0));
+
+        // when - use the registered "Withdraw" event
+        rewards.handleAction(Action(address(this), "Withdraw", address(user1), 50, testBlockNumber, 1));
+
+        // then - check user stake decreased
+        (uint256 stake, uint256 userIndex) = rewards.userInfo(activityId, address(user1));
+        require(stake == 50, "User stake should be 50 after withdrawal");
     }
 
     // ═════════════════════════════════════════════════════════════════════════

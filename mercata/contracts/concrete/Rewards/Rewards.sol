@@ -20,12 +20,12 @@ enum ActionType {
 }
 
 struct Action {
-    uint256 activityId;  // The activity being updated
-    address user;        // The user whose stake is changing
-    uint256 amount;      // The amount of stake change
-    ActionType actionType; // The type of action
-    uint256 blockNumber; // Block number this event originated from (for idempotency)
-    uint256 eventIndex;  // Event index within the block (for idempotency)
+    address sourceContract; // The source contract this event originated from
+    string eventName;       // The event name that triggered this action
+    address user;           // The user whose stake is changing
+    uint256 amount;         // The amount of stake change
+    uint256 blockNumber;    // Block number this event originated from (for idempotency)
+    uint256 eventIndex;     // Event index within the block (for idempotency)
 }
 
 struct ActionableEvent {
@@ -112,9 +112,15 @@ contract record Rewards is Ownable {
     // EVENT TO ACTIVITY MAPPING
     // ═══════════════════════════════════════════════════════════════════════
 
-    // Mapping from sourceContract -> eventName -> activityId (0 means not found)
-    // This enables O(1) lookup of activity by source contract and event name
-    mapping(address => mapping(string => uint256)) public sourceEventToActivityId;
+    // Struct to store both activityId and actionType for an event
+    struct EventInfo {
+        uint256 activityId;  // 0 means not found
+        ActionType actionType;
+    }
+
+    // Mapping from sourceContract -> eventName -> EventInfo
+    // This enables O(1) lookup of activity and action type by source contract and event name
+    mapping(address => mapping(string => EventInfo)) public sourceEventInfo;
 
     // ═══════════════════════════════════════════════════════════════════════
     // IDEMPOTENCY STATE
@@ -346,7 +352,7 @@ contract record Rewards is Ownable {
         // Check for duplicate event names within the same sourceContract using the mapping
         for (uint256 evtIdx = 0; evtIdx < actionableEvents.length; evtIdx++) {
             require(
-                sourceEventToActivityId[sourceContract][actionableEvents[evtIdx].eventName] == 0,
+                sourceEventInfo[sourceContract][actionableEvents[evtIdx].eventName].activityId == 0,
                 "Event name already exists for this source contract"
             );
         }
@@ -364,7 +370,7 @@ contract record Rewards is Ownable {
         // Copy actionable events and register in mapping
         for (uint256 i = 0; i < actionableEvents.length; i++) {
             activity.actionableEvents.push(actionableEvents[i]);
-            sourceEventToActivityId[sourceContract][actionableEvents[i].eventName] = activityId;
+            sourceEventInfo[sourceContract][actionableEvents[i].eventName] = EventInfo(activityId, actionableEvents[i].actionType);
         }
 
         activityIds.push(activityId);
@@ -415,26 +421,32 @@ contract record Rewards is Ownable {
         // ACTION PROCESSING
         // ═══════════════════════════════════════════════════════════════════════
 
-        Activity storage activity = activities[action.activityId];
+        // Look up activity and action type by sourceContract and eventName
+        EventInfo storage eventInfo = sourceEventInfo[action.sourceContract][action.eventName];
+        require(eventInfo.activityId != 0, "Activity not found for source/event");
+
+        uint256 activityId = eventInfo.activityId;
+        ActionType actionType = eventInfo.actionType;
+        Activity storage activity = activities[activityId];
 
         // Validate action type against activity type
-        if (action.actionType == ActionType.Deposit || action.actionType == ActionType.Withdraw) {
+        if (actionType == ActionType.Deposit || actionType == ActionType.Withdraw) {
             require(activity.activityType == ActivityType.Position, "Only for Position activities");
         } else {
             require(activity.activityType == ActivityType.OneTime, "Only for OneTime activities");
         }
 
         // Determine if this is an increase or decrease
-        bool isIncrease = (action.actionType != ActionType.Withdraw);
+        bool isIncrease = (actionType != ActionType.Withdraw);
 
         // Access control: only allowed caller can update this activity
         require(msg.sender == activity.allowedCaller, "Caller not allowed");
 
         // 1) Update global index using current totalStake (before user update)
-        _updateActivityIndex(action.activityId);
+        _updateActivityIndex(activityId);
 
         // 2) Settle user's pending rewards using index delta (Aave-style)
-        RewardsUserInfo storage userState = userInfo[action.activityId][action.user];
+        RewardsUserInfo storage userState = userInfo[activityId][action.user];
         uint256 oldStake = userState.stake;
         uint256 pendingRewards = 0;
 
@@ -464,7 +476,7 @@ contract record Rewards is Ownable {
         // 5) Update total stake internally (secure calculation)
         activity.totalStake = activity.totalStake + newStake - oldStake;
 
-        emit UserStakeUpdated(action.activityId, action.user, oldStake, newStake, pendingRewards);
+        emit UserStakeUpdated(activityId, action.user, oldStake, newStake, pendingRewards);
     }
 
     /**

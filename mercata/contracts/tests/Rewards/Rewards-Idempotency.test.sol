@@ -62,12 +62,12 @@ contract Describe_Rewards_Idempotency is Authorizable {
         uint256 depositAmount = 1000 * 1e18;
         uint256 blockNum = 100;
         uint256 eventIndex = 0;
-        rewards.handleAction(Action(liquidityActivityId, address(user1), depositAmount, ActionType.Deposit, blockNum, eventIndex));
+        rewards.handleAction(Action(address(this), "Deposit", address(user1), depositAmount, blockNum, eventIndex));
 
         // when - the same event is sent again (same blockNumber and eventIndex)
         // This simulates a duplicate event from the indexer
         // Hash = keccak256(blockNumber, eventIndex) - same = duplicate
-        rewards.handleAction(Action(liquidityActivityId, address(user1), depositAmount, ActionType.Deposit, blockNum, eventIndex));
+        rewards.handleAction(Action(address(this), "Deposit", address(user1), depositAmount, blockNum, eventIndex));
 
         // then - user's stake should only be 1000 (not 2000), proving the duplicate was ignored
         (uint256 stake, uint256 userIndex) = rewards.userInfo(liquidityActivityId, address(user1));
@@ -83,11 +83,11 @@ contract Describe_Rewards_Idempotency is Authorizable {
         uint256 depositAmount = 1000 * 1e18;
         uint256 newerBlock = 200;
         uint256 olderBlock = 100;
-        rewards.handleAction(Action(liquidityActivityId, address(user1), depositAmount, ActionType.Deposit, newerBlock, 0));
+        rewards.handleAction(Action(address(this), "Deposit", address(user1), depositAmount, newerBlock, 0));
 
         // when - an event from an older block (100) arrives late
         // This simulates out-of-order or replayed old events
-        rewards.handleAction(Action(liquidityActivityId, address(user1), 500 * 1e18, ActionType.Deposit, olderBlock, 0));
+        rewards.handleAction(Action(address(this), "Deposit", address(user1), 500 * 1e18, olderBlock, 0));
 
         // then - user's stake should still be 1000 (old block event ignored)
         (uint256 stake, uint256 userIndex) = rewards.userInfo(liquidityActivityId, address(user1));
@@ -107,12 +107,12 @@ contract Describe_Rewards_Idempotency is Authorizable {
         uint256 block100 = 100;
         uint256 block101 = 101;
 
-        rewards.handleAction(Action(liquidityActivityId, address(user1), depositAmount, ActionType.Deposit, block100, 0));
+        rewards.handleAction(Action(address(this), "Deposit", address(user1), depositAmount, block100, 0));
 
         // when - move to block 101 with same eventIndex (0)
         // Since blockNumber is part of the hash, this produces a different hash
         // Hash set is also cleared when moving to a new block
-        rewards.handleAction(Action(liquidityActivityId, address(user1), depositAmount, ActionType.Deposit, block101, 0));
+        rewards.handleAction(Action(address(this), "Deposit", address(user1), depositAmount, block101, 0));
 
         // then - user's stake should be 1000 (both deposits processed)
         (uint256 stake, uint256 userIndex) = rewards.userInfo(liquidityActivityId, address(user1));
@@ -132,11 +132,11 @@ contract Describe_Rewards_Idempotency is Authorizable {
         uint256 depositAmount = 100 * 1e18;
 
         // when - process 5 different events in the same block with different eventIndex
-        rewards.handleAction(Action(liquidityActivityId, address(user1), depositAmount, ActionType.Deposit, blockNum, 0));
-        rewards.handleAction(Action(liquidityActivityId, address(user1), depositAmount, ActionType.Deposit, blockNum, 1));
-        rewards.handleAction(Action(liquidityActivityId, address(user1), depositAmount, ActionType.Deposit, blockNum, 2));
-        rewards.handleAction(Action(liquidityActivityId, address(user1), depositAmount, ActionType.Deposit, blockNum, 3));
-        rewards.handleAction(Action(liquidityActivityId, address(user1), depositAmount, ActionType.Deposit, blockNum, 4));
+        rewards.handleAction(Action(address(this), "Deposit", address(user1), depositAmount, blockNum, 0));
+        rewards.handleAction(Action(address(this), "Deposit", address(user1), depositAmount, blockNum, 1));
+        rewards.handleAction(Action(address(this), "Deposit", address(user1), depositAmount, blockNum, 2));
+        rewards.handleAction(Action(address(this), "Deposit", address(user1), depositAmount, blockNum, 3));
+        rewards.handleAction(Action(address(this), "Deposit", address(user1), depositAmount, blockNum, 4));
 
         // then - all 5 deposits should be processed (total 500)
         (uint256 stake, uint256 userIndex) = rewards.userInfo(liquidityActivityId, address(user1));
@@ -152,13 +152,13 @@ contract Describe_Rewards_Idempotency is Authorizable {
         uint256 depositAmount = 1000 * 1e18;
         uint256 withdrawAmount = 400 * 1e18;
         uint256 blockNum = 100;
-        rewards.handleAction(Action(liquidityActivityId, address(user1), depositAmount, ActionType.Deposit, blockNum, 0));
+        rewards.handleAction(Action(address(this), "Deposit", address(user1), depositAmount, blockNum, 0));
 
         // when - withdraw 400 units with eventIndex 1
-        rewards.handleAction(Action(liquidityActivityId, address(user1), withdrawAmount, ActionType.Withdraw, blockNum, 1));
+        rewards.handleAction(Action(address(this), "Withdraw", address(user1), withdrawAmount, blockNum, 1));
 
         // when - duplicate withdraw event (same blockNumber and eventIndex = same hash)
-        rewards.handleAction(Action(liquidityActivityId, address(user1), withdrawAmount, ActionType.Withdraw, blockNum, 1));
+        rewards.handleAction(Action(address(this), "Withdraw", address(user1), withdrawAmount, blockNum, 1));
 
         // then - stake should be 600 (1000 - 400), not 200 (1000 - 400 - 400)
         (uint256 stake, uint256 userIndex) = rewards.userInfo(liquidityActivityId, address(user1));
@@ -176,10 +176,10 @@ contract Describe_Rewards_Idempotency is Authorizable {
         uint256 depositAmount = 100 * 1e18;
 
         Action[] memory actions = new Action[](4);
-        actions[0] = Action(liquidityActivityId, address(user1), depositAmount, ActionType.Deposit, blockNum, 0);
-        actions[1] = Action(liquidityActivityId, address(user1), depositAmount, ActionType.Deposit, blockNum, 1);
-        actions[2] = Action(liquidityActivityId, address(user1), depositAmount, ActionType.Deposit, blockNum, 0); // duplicate of actions[0]
-        actions[3] = Action(liquidityActivityId, address(user1), depositAmount, ActionType.Deposit, blockNum, 2);
+        actions[0] = Action(address(this), "Deposit", address(user1), depositAmount, blockNum, 0);
+        actions[1] = Action(address(this), "Deposit", address(user1), depositAmount, blockNum, 1);
+        actions[2] = Action(address(this), "Deposit", address(user1), depositAmount, blockNum, 0); // duplicate of actions[0]
+        actions[3] = Action(address(this), "Deposit", address(user1), depositAmount, blockNum, 2);
 
         // when - process batch
         rewards.batchHandleAction(actions);
@@ -197,8 +197,8 @@ contract Describe_Rewards_Idempotency is Authorizable {
         // given - process some events in block 100
         uint256 blockNum = 100;
         uint256 depositAmount = 100 * 1e18;
-        rewards.handleAction(Action(liquidityActivityId, address(user1), depositAmount, ActionType.Deposit, blockNum, 0));
-        rewards.handleAction(Action(liquidityActivityId, address(user1), depositAmount, ActionType.Deposit, blockNum, 1));
+        rewards.handleAction(Action(address(this), "Deposit", address(user1), depositAmount, blockNum, 0));
+        rewards.handleAction(Action(address(this), "Deposit", address(user1), depositAmount, blockNum, 1));
 
         require(rewards.currentBlockHandled() == 100, "currentBlockHandled should be 100");
 
@@ -209,7 +209,7 @@ contract Describe_Rewards_Idempotency is Authorizable {
         require(rewards.currentBlockHandled() == 50, "currentBlockHandled should be reset to 50");
 
         // then - old hashes should be cleared, so same blockNumber+eventIndex can be reprocessed
-        rewards.handleAction(Action(liquidityActivityId, address(user1), depositAmount, ActionType.Deposit, blockNum, 0));
+        rewards.handleAction(Action(address(this), "Deposit", address(user1), depositAmount, blockNum, 0));
 
         // then - stake should be 300 (original 100 + 100 + new 100)
         (uint256 stake, uint256 userIndex) = rewards.userInfo(liquidityActivityId, address(user1));
@@ -218,7 +218,7 @@ contract Describe_Rewards_Idempotency is Authorizable {
 
     function it_should_prevent_non_owner_from_emergency_override() {
         // given - some state exists
-        rewards.handleAction(Action(liquidityActivityId, address(user1), 100 * 1e18, ActionType.Deposit, 100, 0));
+        rewards.handleAction(Action(address(this), "Deposit", address(user1), 100 * 1e18, 100, 0));
 
         // when - non-owner tries to call emergencyOverride
         bool reverted = false;
