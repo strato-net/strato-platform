@@ -144,7 +144,7 @@ export const calculateEstimatedRewardsPerDay = (
 };
 
 /**
- * Format emission rate to CATA per day
+ * Format emission rate to points per day
  */
 export const formatEmissionRatePerDay = (emissionRatePerSecond: string): string => {
   const rateBig = BigInt(emissionRatePerSecond);
@@ -154,7 +154,7 @@ export const formatEmissionRatePerDay = (emissionRatePerSecond: string): string 
 };
 
 /**
- * Format emission rate to CATA per week
+ * Format emission rate to points per week
  */
 export const formatEmissionRatePerWeek = (emissionRatePerSecond: string): string => {
   const rateBig = BigInt(emissionRatePerSecond);

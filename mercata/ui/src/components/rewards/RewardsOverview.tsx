@@ -59,8 +59,8 @@ export const RewardsOverview = ({ state, loading }: RewardsOverviewProps) => {
             </div>
             <div className="flex-1">
               <p className="text-sm text-muted-foreground">Total Emission Rate</p>
-              <p className="text-2xl font-semibold">{emissionPerDay} CATA/day</p>
-              <p className="text-xs text-muted-foreground mt-1">{emissionPerWeek} CATA/week</p>
+              <p className="text-2xl font-semibold">{emissionPerDay} points/day</p>
+              <p className="text-xs text-muted-foreground mt-1">{emissionPerWeek} points/week</p>
             </div>
           </div>
 
@@ -70,7 +70,7 @@ export const RewardsOverview = ({ state, loading }: RewardsOverviewProps) => {
             </div>
             <div className="flex-1">
               <p className="text-sm text-muted-foreground">Reward Token</p>
-              <p className="text-lg font-semibold">CATA</p>
+              <p className="text-lg font-semibold">Points</p>
               <p className="text-xs text-muted-foreground mt-1 font-mono">
                 {state.rewardToken.slice(0, 10)}...
               </p>

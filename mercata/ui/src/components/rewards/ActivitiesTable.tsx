@@ -88,8 +88,8 @@ export const ActivitiesTable = ({ activities, loading, onActivityClick }: Activi
                     </TableCell>
                     <TableCell>
                       <div>
-                        <div className="font-medium">{emissionPerDay} CATA/day</div>
-                        <div className="text-xs text-muted-foreground">{emissionPerWeek} CATA/week</div>
+                        <div className="font-medium">{emissionPerDay} points/day</div>
+                        <div className="text-xs text-muted-foreground">{emissionPerWeek} points/week</div>
                       </div>
                     </TableCell>
                     <TableCell>{totalStakeFormatted}</TableCell>

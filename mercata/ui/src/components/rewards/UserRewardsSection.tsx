@@ -122,7 +122,7 @@ export const UserRewardsSection = ({
     );
   }
 
-  const unclaimedFormatted = formatBalance(userRewards.unclaimedRewards, "CATA", 18, 2, 6);
+  const unclaimedFormatted = formatBalance(userRewards.unclaimedRewards, "points", 18, 2, 6);
   const hasUnclaimed = BigInt(userRewards.unclaimedRewards) > 0n;
   const activitiesWithStake = userRewards.activities.filter(
     (a) => BigInt(a.userInfo.stake) > 0n
@@ -138,7 +138,7 @@ export const UserRewardsSection = ({
     );
     totalPending += BigInt(pending);
   });
-  const totalPendingFormatted = formatBalance(totalPending.toString(), "CATA", 18, 2, 6);
+  const totalPendingFormatted = formatBalance(totalPending.toString(), "points", 18, 2, 6);
 
   return (
     <div className="space-y-6">
@@ -201,14 +201,14 @@ export const UserRewardsSection = ({
               activity.accRewardPerStake,
               userInfo.userIndex
             );
-            const pendingFormatted = formatBalance(pending, "CATA", 18, 2, 6);
+            const pendingFormatted = formatBalance(pending, "points", 18, 2, 6);
 
             const estimatedPerDay = calculateEstimatedRewardsPerDay(
               userInfo.stake,
               activity.totalStake,
               activity.emissionRate
             );
-            const estimatedPerDayFormatted = formatBalance(estimatedPerDay, "CATA", 18, 2, 6);
+            const estimatedPerDayFormatted = formatBalance(estimatedPerDay, "points", 18, 2, 6);
 
             const isClaiming = claimingActivityIds.includes(activity.activityId);
             const hasPending = BigInt(pending) > 0n;
@@ -268,13 +268,13 @@ export const UserRewardsSection = ({
 
                     <div>
                       <p className="text-sm text-muted-foreground mb-1">Estimated Rewards/Day</p>
-                      <p className="text-lg font-semibold">{estimatedPerDayFormatted} CATA</p>
+                      <p className="text-lg font-semibold">{estimatedPerDayFormatted} points</p>
                     </div>
 
                     <div>
                       <p className="text-sm text-muted-foreground mb-1">Pending Rewards</p>
                       <p className="text-lg font-semibold text-yellow-600 dark:text-yellow-400">
-                        {pendingFormatted} CATA
+                        {pendingFormatted} points
                       </p>
                     </div>
                   </div>

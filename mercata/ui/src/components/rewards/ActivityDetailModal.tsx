@@ -81,11 +81,11 @@ export const ActivityDetailModal = ({
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <p className="text-muted-foreground">Per Day</p>
-                <p className="font-medium">{emissionPerDay} CATA/day</p>
+                <p className="font-medium">{emissionPerDay} points/day</p>
               </div>
               <div>
                 <p className="text-muted-foreground">Per Week</p>
-                <p className="font-medium">{emissionPerWeek} CATA/week</p>
+                <p className="font-medium">{emissionPerWeek} points/week</p>
               </div>
             </div>
           </div>
