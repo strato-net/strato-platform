@@ -1,6 +1,6 @@
 import { api } from "@/lib/axios";
 import { formatUnits } from "viem";
-import { dummyRewardsState, dummyActivities, getDummyUserRewards } from "./rewardsDummyData";
+import { dummyRewardsState, dummyActivities, getDummyUserRewards, getDummyLeaderboard } from "./rewardsDummyData";
 
 export interface Activity {
   activityId: number;
@@ -33,6 +33,12 @@ export interface UserRewardsData {
     userInfo: RewardsUserInfo;
     activity: Activity;
   }>;
+}
+
+export interface LeaderboardEntry {
+  address: string;
+  unclaimedRewards: string;
+  pendingRewards: string;
 }
 
 /**
@@ -196,6 +202,25 @@ export const claimRewards = async (userAddress: string, activityIds: number[]): 
     setTimeout(() => {
       resolve({ success: true, txHash: "0x0000000000000000000000000000000000000000000000000000000000000000" });
     }, 1000);
+  });
+};
+
+/**
+ * Fetch leaderboard of top reward earners
+ * TODO: Replace with actual API call once backend is implemented
+ */
+export const fetchLeaderboard = async (limit: number = 10): Promise<LeaderboardEntry[]> => {
+  // TODO: Replace with actual API call once backend is implemented
+  // const response = await api.get<LeaderboardEntry[]>("/rewards/leaderboard", {
+  //   params: { limit },
+  // });
+  // return response.data;
+  
+  // Return dummy data until backend is implemented
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(getDummyLeaderboard());
+    }, 300);
   });
 };
 

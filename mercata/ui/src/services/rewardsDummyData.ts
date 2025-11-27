@@ -1,4 +1,4 @@
-import { Activity, RewardsState, UserRewardsData } from "./rewardsService";
+import { Activity, RewardsState, UserRewardsData, LeaderboardEntry } from "./rewardsService";
 
 // Dummy data for Rewards contract (before deployment)
 export const dummyRewardsState: RewardsState = {
@@ -104,5 +104,61 @@ export const getDummyUserRewards = (userAddress: string): UserRewardsData => {
       },
     ],
   };
+};
+
+// Dummy leaderboard data
+export const getDummyLeaderboard = (): LeaderboardEntry[] => {
+  return [
+    {
+      address: "0x1234567890123456789012345678901234567890",
+      unclaimedRewards: "5000000000000000000", // 5 points
+      pendingRewards: "2500000000000000000", // 2.5 points
+    },
+    {
+      address: "0x2345678901234567890123456789012345678901",
+      unclaimedRewards: "4000000000000000000", // 4 points
+      pendingRewards: "3000000000000000000", // 3 points
+    },
+    {
+      address: "0x3456789012345678901234567890123456789012",
+      unclaimedRewards: "3500000000000000000", // 3.5 points
+      pendingRewards: "2000000000000000000", // 2 points
+    },
+    {
+      address: "0x4567890123456789012345678901234567890123",
+      unclaimedRewards: "3000000000000000000", // 3 points
+      pendingRewards: "2500000000000000000", // 2.5 points
+    },
+    {
+      address: "0x5678901234567890123456789012345678901234",
+      unclaimedRewards: "2500000000000000000", // 2.5 points
+      pendingRewards: "2000000000000000000", // 2 points
+    },
+    {
+      address: "0x6789012345678901234567890123456789012345",
+      unclaimedRewards: "2000000000000000000", // 2 points
+      pendingRewards: "1500000000000000000", // 1.5 points
+    },
+    {
+      address: "0x7890123456789012345678901234567890123456",
+      unclaimedRewards: "1800000000000000000", // 1.8 points
+      pendingRewards: "1200000000000000000", // 1.2 points
+    },
+    {
+      address: "0x8901234567890123456789012345678901234567",
+      unclaimedRewards: "1500000000000000000", // 1.5 points
+      pendingRewards: "1000000000000000000", // 1 point
+    },
+    {
+      address: "0x9012345678901234567890123456789012345678",
+      unclaimedRewards: "1200000000000000000", // 1.2 points
+      pendingRewards: "800000000000000000", // 0.8 points
+    },
+    {
+      address: "0xa012345678901234567890123456789012345678",
+      unclaimedRewards: "1000000000000000000", // 1 point
+      pendingRewards: "500000000000000000", // 0.5 points
+    },
+  ];
 };
 

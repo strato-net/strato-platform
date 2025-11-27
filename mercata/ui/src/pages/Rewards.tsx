@@ -6,21 +6,24 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RewardsOverview } from "@/components/rewards/RewardsOverview";
 import { ActivitiesTable } from "@/components/rewards/ActivitiesTable";
 import { UserRewardsSection } from "@/components/rewards/UserRewardsSection";
+import { RewardsLeaderboard } from "@/components/rewards/RewardsLeaderboard";
 import { ActivityDetailModal } from "@/components/rewards/ActivityDetailModal";
 import { useRewards } from "@/hooks/useRewards";
 import { useRewardsActivities } from "@/hooks/useRewardsActivities";
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
+import { useRewardsLeaderboard } from "@/hooks/useRewardsLeaderboard";
 import { Activity } from "@/services/rewardsService";
 
 const Rewards = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"activities" | "my-rewards">("activities");
+  const [activeTab, setActiveTab] = useState<"activities" | "my-rewards" | "leaderboard">("activities");
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
   const { state, loading: stateLoading, refetch: refetchState } = useRewards();
   const { activities, loading: activitiesLoading, refetch: refetchActivities } = useRewardsActivities();
   const { userRewards, loading: userRewardsLoading, refetch: refetchUserRewards } = useRewardsUserInfo();
+  const { entries: leaderboardEntries, loading: leaderboardLoading } = useRewardsLeaderboard(10);
 
   useEffect(() => {
     document.title = "Rewards | STRATO Mercata";
@@ -59,15 +62,16 @@ const Rewards = () => {
             <RewardsOverview state={state} loading={stateLoading} />
           </div>
 
-          {/* Tabs for Activities and My Rewards */}
+          {/* Tabs for Activities, My Rewards, and Leaderboard */}
           <Tabs
             value={activeTab}
-            onValueChange={(value) => setActiveTab(value as "activities" | "my-rewards")}
+            onValueChange={(value) => setActiveTab(value as "activities" | "my-rewards" | "leaderboard")}
             className="w-full"
           >
-            <TabsList className="grid w-full grid-cols-2 mb-6">
+            <TabsList className="grid w-full grid-cols-3 mb-6">
               <TabsTrigger value="activities">Activities</TabsTrigger>
               <TabsTrigger value="my-rewards">My Rewards</TabsTrigger>
+              <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
             </TabsList>
 
             <TabsContent value="activities">
@@ -83,6 +87,13 @@ const Rewards = () => {
                 userRewards={userRewards}
                 loading={userRewardsLoading}
                 onClaimSuccess={handleClaimSuccess}
+              />
+            </TabsContent>
+
+            <TabsContent value="leaderboard">
+              <RewardsLeaderboard
+                entries={leaderboardEntries}
+                loading={leaderboardLoading}
               />
             </TabsContent>
           </Tabs>
