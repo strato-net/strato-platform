@@ -39,6 +39,7 @@ export interface LeaderboardEntry {
   address: string;
   unclaimedRewards: string;
   pendingRewards: string;
+  emissionRate: string; // Points per second (in wei format, 18 decimals)
 }
 
 /**

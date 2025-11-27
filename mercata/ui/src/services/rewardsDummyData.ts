@@ -113,51 +113,61 @@ export const getDummyLeaderboard = (): LeaderboardEntry[] => {
       address: "0x1234567890123456789012345678901234567890",
       unclaimedRewards: "5000000000000000000", // 5 points
       pendingRewards: "2500000000000000000", // 2.5 points
+      emissionRate: "50000000000000000", // 0.05 points/sec (highest emission)
     },
     {
       address: "0x2345678901234567890123456789012345678901",
       unclaimedRewards: "4000000000000000000", // 4 points
       pendingRewards: "3000000000000000000", // 3 points
+      emissionRate: "45000000000000000", // 0.045 points/sec
     },
     {
       address: "0x3456789012345678901234567890123456789012",
       unclaimedRewards: "3500000000000000000", // 3.5 points
       pendingRewards: "2000000000000000000", // 2 points
+      emissionRate: "40000000000000000", // 0.04 points/sec
     },
     {
       address: "0x4567890123456789012345678901234567890123",
       unclaimedRewards: "3000000000000000000", // 3 points
       pendingRewards: "2500000000000000000", // 2.5 points
+      emissionRate: "35000000000000000", // 0.035 points/sec
     },
     {
       address: "0x5678901234567890123456789012345678901234",
       unclaimedRewards: "2500000000000000000", // 2.5 points
       pendingRewards: "2000000000000000000", // 2 points
+      emissionRate: "30000000000000000", // 0.03 points/sec
     },
     {
       address: "0x6789012345678901234567890123456789012345",
       unclaimedRewards: "2000000000000000000", // 2 points
       pendingRewards: "1500000000000000000", // 1.5 points
+      emissionRate: "25000000000000000", // 0.025 points/sec
     },
     {
       address: "0x7890123456789012345678901234567890123456",
       unclaimedRewards: "1800000000000000000", // 1.8 points
       pendingRewards: "1200000000000000000", // 1.2 points
+      emissionRate: "20000000000000000", // 0.02 points/sec
     },
     {
       address: "0x8901234567890123456789012345678901234567",
       unclaimedRewards: "1500000000000000000", // 1.5 points
       pendingRewards: "1000000000000000000", // 1 point
+      emissionRate: "15000000000000000", // 0.015 points/sec
     },
     {
       address: "0x9012345678901234567890123456789012345678",
       unclaimedRewards: "1200000000000000000", // 1.2 points
       pendingRewards: "800000000000000000", // 0.8 points
+      emissionRate: "10000000000000000", // 0.01 points/sec
     },
     {
       address: "0xa012345678901234567890123456789012345678",
       unclaimedRewards: "1000000000000000000", // 1 point
       pendingRewards: "500000000000000000", // 0.5 points
+      emissionRate: "5000000000000000", // 0.005 points/sec (lowest emission)
     },
   ];
 };
