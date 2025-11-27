@@ -54,15 +54,13 @@ struct Activity {
  *
  * This contract implements a global incentives controller that tracks rewards
  * for various protocol activities without requiring users to stake or transfer
- * their LP tokens. Pools and other protocol contracts call handleAction() when
- * user balances change, and the controller tracks accrued rewards using a
- * cumulative index pattern.
+ * their LP tokens.
  *
  * Key features:
  * - No asset custody - contract only tracks accounting state
  * - O(1) gas efficiency - no loops over users or epochs
  * - Global index pattern inspired by Aave's Incentives Controller
- * - Simple pool integration via handleAction() hook
+ * - Simple off-chain service integration via handleAction() hook
  */
 contract record Rewards is Ownable {
 
