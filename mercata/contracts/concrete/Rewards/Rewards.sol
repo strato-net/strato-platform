@@ -280,57 +280,11 @@ contract record Rewards is Ownable {
     }
 
     /**
-     * @dev Deposit/increase stake for a user in an activity
-     * @param activityId The activity to deposit into
-     * @param user The user whose stake is increasing
-     * @param amount The amount to deposit
-     * @param blockNumber The block number this event originated from (for idempotency)
-     * @param eventIndex The event index within the block (for idempotency)
+     * @dev Process a single action
+     * @param action The action to process
      */
-    function deposit(
-        uint256 activityId,
-        address user,
-        uint256 amount,
-        uint256 blockNumber,
-        uint256 eventIndex
-    ) external {
-        _handleAction(Action(activityId, user, amount, ActionType.Deposit, blockNumber, eventIndex));
-    }
-
-    /**
-     * @dev Withdraw/decrease stake for a user in an activity
-     * @param activityId The activity to withdraw from
-     * @param user The user whose stake is decreasing
-     * @param amount The amount to withdraw
-     * @param blockNumber The block number this event originated from (for idempotency)
-     * @param eventIndex The event index within the block (for idempotency)
-     */
-    function withdraw(
-        uint256 activityId,
-        address user,
-        uint256 amount,
-        uint256 blockNumber,
-        uint256 eventIndex
-    ) external {
-        _handleAction(Action(activityId, user, amount, ActionType.Withdraw, blockNumber, eventIndex));
-    }
-
-    /**
-     * @dev Record a one-time action occurrence for a user
-     * @param activityId The one-time activity that occurred
-     * @param user The user who performed the action
-     * @param amount The amount/value of the action
-     * @param blockNumber The block number this event originated from (for idempotency)
-     * @param eventIndex The event index within the block (for idempotency)
-     */
-    function occurred(
-        uint256 activityId,
-        address user,
-        uint256 amount,
-        uint256 blockNumber,
-        uint256 eventIndex
-    ) external {
-        _handleAction(Action(activityId, user, amount, ActionType.Occurred, blockNumber, eventIndex));
+    function handleAction(Action calldata action) external {
+        _handleAction(action);
     }
 
     /**
