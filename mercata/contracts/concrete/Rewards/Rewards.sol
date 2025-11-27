@@ -235,6 +235,94 @@ contract record Rewards is Ownable {
     }
 
     /**
+     * @dev Update the actionable events for an existing Position activity
+     * @param activityId The activity to update
+     * @param newActionableEvents The new array of actionable events
+     *
+     * WARNING: This function is NOT SAFE to call while the activity has existing stakes.
+     * Changing events mid-operation can cause:
+     * - Events from old configuration to be ignored
+     * - Inconsistent state between user stakes and event mappings
+     * Only use this function when the activity has zero total stake or during initial setup.
+     */
+    function setPositionActivityEvents(
+        uint256 activityId,
+        ActionableEvent[] newActionableEvents
+    ) external onlyOwner {
+        Activity storage activity = activities[activityId];
+        require(activity.sourceContract != address(0), "Activity does not exist");
+        require(activity.activityType == ActivityType.Position, "Only for Position activities");
+        require(newActionableEvents.length > 0, "At least one actionable event required");
+
+        address sourceContract = activity.sourceContract;
+
+        // Check for duplicate event names within the same sourceContract (excluding current activity's events)
+        for (uint256 evtIdx = 0; evtIdx < newActionableEvents.length; evtIdx++) {
+            EventInfo storage existingInfo = sourceEventInfo[sourceContract][newActionableEvents[evtIdx].eventName];
+            require(
+                existingInfo.activityId == 0 || existingInfo.activityId == activityId,
+                "Event name already exists for this source contract"
+            );
+        }
+
+        // Remove old event mappings (delete individual fields as SolidVM requires)
+        for (uint256 i = 0; i < activity.actionableEvents.length; i++) {
+            delete sourceEventInfo[sourceContract][activity.actionableEvents[i].eventName].activityId;
+            delete sourceEventInfo[sourceContract][activity.actionableEvents[i].eventName].actionType;
+        }
+
+        // Clear old actionable events array
+        activity.actionableEvents = [];
+
+        // Add new actionable events and register in mapping
+        for (uint256 j = 0; j < newActionableEvents.length; j++) {
+            activity.actionableEvents.push(newActionableEvents[j]);
+            sourceEventInfo[sourceContract][newActionableEvents[j].eventName] = EventInfo(activityId, newActionableEvents[j].actionType);
+        }
+    }
+
+    /**
+     * @dev Update the event name for an existing OneTime activity
+     * @param activityId The activity to update
+     * @param newEventName The new event name
+     *
+     * WARNING: This function is NOT SAFE to call while the activity has existing stakes.
+     * Changing the event name mid-operation can cause:
+     * - Events with the old name to be ignored
+     * - Inconsistent state between user stakes and event mappings
+     * Only use this function when the activity has zero total stake or during initial setup.
+     */
+    function setOneTimeActivityEvent(
+        uint256 activityId,
+        string newEventName
+    ) external onlyOwner {
+        Activity storage activity = activities[activityId];
+        require(activity.sourceContract != address(0), "Activity does not exist");
+        require(activity.activityType == ActivityType.OneTime, "Only for OneTime activities");
+        require(bytes(newEventName).length > 0, "Event name cannot be empty");
+
+        address sourceContract = activity.sourceContract;
+
+        // Check that new event name doesn't conflict with another activity
+        EventInfo storage existingInfo = sourceEventInfo[sourceContract][newEventName];
+        require(
+            existingInfo.activityId == 0 || existingInfo.activityId == activityId,
+            "Event name already exists for this source contract"
+        );
+
+        // Remove old event mapping (delete individual fields as SolidVM requires)
+        string oldEventName = activity.actionableEvents[0].eventName;
+        delete sourceEventInfo[sourceContract][oldEventName].activityId;
+        delete sourceEventInfo[sourceContract][oldEventName].actionType;
+
+        // Update the event name in actionableEvents array
+        activity.actionableEvents[0].eventName = newEventName;
+
+        // Register new event in mapping
+        sourceEventInfo[sourceContract][newEventName] = EventInfo(activityId, ActionType.Occurred);
+    }
+
+    /**
      * @dev Claim accumulated rewards for the caller
      * @param activityIds Array of activity IDs to settle rewards from
      */

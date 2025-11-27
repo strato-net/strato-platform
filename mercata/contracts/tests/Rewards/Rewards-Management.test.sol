@@ -527,4 +527,206 @@ contract Describe_Rewards_Management is Authorizable {
         require(reverted, "Non-owner should not be able to call handleAction");
     }
 
+    // ═════════════════════════════════════════════════════════════════════════
+    // SET POSITION ACTIVITY EVENTS
+    // ═════════════════════════════════════════════════════════════════════════
+
+    function it_should_change_position_activity_events_and_ignore_old_events() {
+        // given - create activity with event "EventA"
+        uint256 activityId = 1;
+        ActionableEvent[] memory eventsA = new ActionableEvent[](1);
+        eventsA[0] = ActionableEvent("EventA", ActionType.Deposit);
+        rewards.addPositionActivity(activityId, "Test Activity", 100, address(this), eventsA);
+
+        // when - run action with EventA
+        rewards.handleAction(Action(address(this), "EventA", address(user1), 100, testBlockNumber, 0));
+
+        // then - check state: user stake should be 100
+        (uint256 stake, ) = rewards.userInfo(address(user1), activityId);
+        require(stake == 100, "User stake should be 100 after EventA");
+
+        // when - modify activity to use EventB instead
+        ActionableEvent[] memory eventsB = new ActionableEvent[](1);
+        eventsB[0] = ActionableEvent("EventB", ActionType.Deposit);
+        rewards.setPositionActivityEvents(activityId, eventsB);
+
+        // when - try to run EventA again (should be ignored/fail)
+        bool reverted = false;
+        try rewards.handleAction(Action(address(this), "EventA", address(user1), 50, testBlockNumber, 1)) {
+            reverted = false;
+        } catch {
+            reverted = true;
+        }
+
+        // then - EventA should be rejected since it's no longer registered
+        require(reverted, "EventA should be rejected after changing to EventB");
+
+        // then - stake should remain unchanged at 100
+        (uint256 stakeAfter, ) = rewards.userInfo(address(user1), activityId);
+        require(stakeAfter == 100, "User stake should still be 100");
+
+        // when - run EventB (should work)
+        rewards.handleAction(Action(address(this), "EventB", address(user1), 50, testBlockNumber, 2));
+
+        // then - stake should be 150
+        (uint256 stakeFinal, ) = rewards.userInfo(address(user1), activityId);
+        require(stakeFinal == 150, "User stake should be 150 after EventB");
+    }
+
+    function it_should_prevent_setting_events_on_nonexistent_activity() {
+        // given - no activity exists with id 999
+        ActionableEvent[] memory events = new ActionableEvent[](1);
+        events[0] = ActionableEvent("Event", ActionType.Deposit);
+
+        // when/then
+        bool reverted = false;
+        try rewards.setPositionActivityEvents(999, events) {
+            reverted = false;
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Setting events on nonexistent activity should revert");
+    }
+
+    function it_should_prevent_setting_events_on_onetime_activity() {
+        // given - create a OneTime activity
+        uint256 activityId = 1;
+        rewards.addOneTimeActivity(activityId, "OneTime Activity", 100, address(this), "Swap");
+
+        // when/then - try to use setPositionActivityEvents on OneTime activity
+        ActionableEvent[] memory events = new ActionableEvent[](1);
+        events[0] = ActionableEvent("NewEvent", ActionType.Deposit);
+
+        bool reverted = false;
+        try rewards.setPositionActivityEvents(activityId, events) {
+            reverted = false;
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "setPositionActivityEvents should fail on OneTime activity");
+    }
+
+    function it_should_prevent_setting_empty_events_on_position_activity() {
+        // given - create a Position activity
+        uint256 activityId = 1;
+        rewards.addPositionActivity(activityId, "Test Activity", 100, address(this), _defaultPositionEvents());
+
+        // when/then - try to set empty events
+        ActionableEvent[] memory emptyEvents = new ActionableEvent[](0);
+
+        bool reverted = false;
+        try rewards.setPositionActivityEvents(activityId, emptyEvents) {
+            reverted = false;
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Setting empty events should revert");
+    }
+
+    function it_should_allow_keeping_same_event_when_updating_position_activity() {
+        // given - create activity with EventA and EventB
+        uint256 activityId = 1;
+        ActionableEvent[] memory initialEvents = new ActionableEvent[](2);
+        initialEvents[0] = ActionableEvent("EventA", ActionType.Deposit);
+        initialEvents[1] = ActionableEvent("EventB", ActionType.Withdraw);
+        rewards.addPositionActivity(activityId, "Test Activity", 100, address(this), initialEvents);
+
+        // when - update to keep EventA but change EventB to EventC
+        ActionableEvent[] memory newEvents = new ActionableEvent[](2);
+        newEvents[0] = ActionableEvent("EventA", ActionType.Deposit);  // keep same
+        newEvents[1] = ActionableEvent("EventC", ActionType.Withdraw); // change
+
+        rewards.setPositionActivityEvents(activityId, newEvents);
+
+        // then - EventA should still work
+        rewards.handleAction(Action(address(this), "EventA", address(user1), 100, testBlockNumber, 0));
+        (uint256 stake, ) = rewards.userInfo(address(user1), activityId);
+        require(stake == 100, "EventA should still work");
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // SET ONETIME ACTIVITY EVENT
+    // ═════════════════════════════════════════════════════════════════════════
+
+    function it_should_change_onetime_activity_event_and_ignore_old_event() {
+        // given - create OneTime activity with event "EventA"
+        uint256 activityId = 1;
+        rewards.addOneTimeActivity(activityId, "Test OneTime", 100, address(this), "EventA");
+
+        // when - run action with EventA
+        rewards.handleAction(Action(address(this), "EventA", address(user1), 100, testBlockNumber, 0));
+
+        // then - check state: user stake should be 100
+        (uint256 stake, ) = rewards.userInfo(address(user1), activityId);
+        require(stake == 100, "User stake should be 100 after EventA");
+
+        // when - modify activity to use EventB instead
+        rewards.setOneTimeActivityEvent(activityId, "EventB");
+
+        // when - try to run EventA again (should fail)
+        bool reverted = false;
+        try rewards.handleAction(Action(address(this), "EventA", address(user1), 50, testBlockNumber, 1)) {
+            reverted = false;
+        } catch {
+            reverted = true;
+        }
+
+        // then - EventA should be rejected since it's no longer registered
+        require(reverted, "EventA should be rejected after changing to EventB");
+
+        // then - stake should remain unchanged at 100
+        (uint256 stakeAfter, ) = rewards.userInfo(address(user1), activityId);
+        require(stakeAfter == 100, "User stake should still be 100");
+
+        // when - run EventB (should work)
+        rewards.handleAction(Action(address(this), "EventB", address(user1), 50, testBlockNumber, 2));
+
+        // then - stake should be 150
+        (uint256 stakeFinal, ) = rewards.userInfo(address(user1), activityId);
+        require(stakeFinal == 150, "User stake should be 150 after EventB");
+    }
+
+    function it_should_prevent_setting_event_on_nonexistent_onetime_activity() {
+        // given - no activity exists with id 999
+
+        // when/then
+        bool reverted = false;
+        try rewards.setOneTimeActivityEvent(999, "NewEvent") {
+            reverted = false;
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Setting event on nonexistent activity should revert");
+    }
+
+    function it_should_prevent_setting_event_on_position_activity() {
+        // given - create a Position activity
+        uint256 activityId = 1;
+        rewards.addPositionActivity(activityId, "Position Activity", 100, address(this), _defaultPositionEvents());
+
+        // when/then - try to use setOneTimeActivityEvent on Position activity
+        bool reverted = false;
+        try rewards.setOneTimeActivityEvent(activityId, "NewEvent") {
+            reverted = false;
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "setOneTimeActivityEvent should fail on Position activity");
+    }
+
+    function it_should_prevent_setting_empty_event_name_on_onetime_activity() {
+        // given - create a OneTime activity
+        uint256 activityId = 1;
+        rewards.addOneTimeActivity(activityId, "Test OneTime", 100, address(this), "Swap");
+
+        // when/then - try to set empty event name
+        bool reverted = false;
+        try rewards.setOneTimeActivityEvent(activityId, "") {
+            reverted = false;
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Setting empty event name should revert");
+    }
+
 }
