@@ -18,7 +18,8 @@ function printUsage() {
   console.error('Usage: node upgrade.js [options]');
   console.error('');
   console.error('Required arguments:');
-  console.error('  --proxy-address <address>    Address of the proxy contract to upgrade');
+  console.error('  --proxy-address <addresses>  Address(es) of the proxy contract(s) to upgrade');
+  console.error('                               Can be a single address or comma-separated list');
   console.error('  --contract-name <name>       Name of the implementation contract (e.g., PoolFactory)');
   console.error('  --contract-file <file>       Filename of the contract (e.g., Pools/PoolFactory.sol)');
   console.error('');
@@ -31,6 +32,7 @@ function printUsage() {
   console.error('');
   console.error('Example:');
   console.error('  node upgrade.js --proxy-address abc123 --contract-name PoolFactory --contract-file Pools/PoolFactory.sol');
+  console.error('  node upgrade.js --proxy-address abc123,def456,ghi789 --contract-name PoolFactory --contract-file Pools/PoolFactory.sol');
   console.error('  node upgrade.js --proxy-address abc123 --contract-name LendingPool --contract-file Lending/LendingPool.sol --constructor-args \'{"param":"value"}\'');
 }
 
@@ -164,7 +166,8 @@ async function main() {
     }
     
     // Get configuration from command-line arguments
-    const proxyAddress = args['proxy-address'];
+    const proxyAddressesStr = args['proxy-address'];
+    const proxyAddresses = proxyAddressesStr.split(',').map(addr => addr.trim()).filter(addr => addr.length > 0);
     const contractName = args['contract-name'];
     const contractFile = args['contract-file'];
     const constructorArgs = args['constructor-args'] ? JSON.parse(args['constructor-args']) : DEFAULT_CONSTRUCTOR_ARGS;
@@ -172,7 +175,7 @@ async function main() {
     const username = process.env.GLOBAL_ADMIN_NAME;
     const password = process.env.GLOBAL_ADMIN_PASSWORD;
     
-    console.log(`Proxy Address: ${proxyAddress}`);
+    console.log(`Proxy Addresses (${proxyAddresses.length}): ${proxyAddresses.join(', ')}`);
     console.log(`Contract Name: ${contractName}`);
     console.log(`Contract File: ${contractFile}`);
     console.log(`Constructor Args: ${JSON.stringify(constructorArgs)}`);
@@ -184,8 +187,12 @@ async function main() {
     const tokenObj = { token };
     console.log(`Authenticated as ${username}\n`);
 
-    // Verify that the proxy exists and the implementation contract name matches the new contract name
-    args['OVERRIDE-CHECKS'] || await verifyProxyAndImplementation(tokenObj, proxyAddress, contractName);
+    // Verify that each proxy exists and the implementation contract name matches the new contract name
+    if (!args['OVERRIDE-CHECKS']) {
+      for (const proxyAddress of proxyAddresses) {
+        await verifyProxyAndImplementation(tokenObj, proxyAddress, contractName);
+      }
+    }
     
     // Step 1: Deploy new implementation
     console.log(`Deploying new implementation: ${contractName}`);
@@ -256,47 +263,67 @@ async function main() {
     const implementation = await rest.createContract(tokenObj, contractArgs, deployOptions);
     console.log(`Implementation deployed at: ${implementation.address}\n`);
     
-    // Step 2: Upgrade the proxy
-    console.log(`Upgrading proxy at ${proxyAddress}...`);
-    console.log(`New implementation: ${implementation.address}`);
-    
-    const callArgs = {
-      contract: { address: proxyAddress, name: 'Proxy' },
-      method: 'setLogicContract',
-      args: { _logicContract: implementation.address },
-      txParams: {
-        gasPrice: config.gasPrice,
-        gasLimit: config.gasLimit,
-      },
-    };
-    
+    // Step 2: Upgrade all proxies to point to the same implementation
+    const upgradeResults = [];
     const callOptions = {
       config,
       cacheNonce: true,
     };
     
-    const upgradeResult = await rest.call(tokenObj, callArgs, callOptions);
+    for (let i = 0; i < proxyAddresses.length; i++) {
+      const proxyAddress = proxyAddresses[i];
+      console.log(`\nUpgrading proxy ${i + 1}/${proxyAddresses.length} at ${proxyAddress}...`);
+      console.log(`New implementation: ${implementation.address}`);
+      
+      const callArgs = {
+        contract: { address: proxyAddress, name: 'Proxy' },
+        method: 'setLogicContract',
+        args: { _logicContract: implementation.address },
+        txParams: {
+          gasPrice: config.gasPrice,
+          gasLimit: config.gasLimit,
+        },
+      };
+      
+      const upgradeResult = await rest.call(tokenObj, callArgs, callOptions);
+      upgradeResults.push({ proxyAddress, upgradeResult });
 
-    if (upgradeResult[0]) {
-        console.log('\n======  Upgrade  Pending  ======');
-        console.log("Proxy Uploaded and Upgrade Requested.")
-        console.log("Governance Vote Required.\nVote Issue ID: " + upgradeResult[0]);
-    }
-    else {
-        console.log('\n====== Upgrade Successful ======');
+      if (upgradeResult[0]) {
+        console.log(`Proxy ${proxyAddress}: Upgrade Pending - Governance Vote Required (Issue ID: ${upgradeResult[0]})`);
+      } else {
+        console.log(`Proxy ${proxyAddress}: Upgrade Successful`);
+      }
     }
 
-    console.log(`Proxy Address: ${proxyAddress}`);
-    console.log(`New Implementation: ${implementation.address}`);
+    console.log('\n====== Upgrade Summary ======');
+    const pendingUpgrades = upgradeResults.filter(r => r.upgradeResult[0]);
+    const successfulUpgrades = upgradeResults.filter(r => !r.upgradeResult[0]);
+    
+    if (successfulUpgrades.length > 0) {
+      console.log(`\nSuccessfully upgraded ${successfulUpgrades.length} proxy(ies):`);
+      successfulUpgrades.forEach(r => console.log(`  - ${r.proxyAddress}`));
+    }
+    
+    if (pendingUpgrades.length > 0) {
+      console.log(`\n${pendingUpgrades.length} upgrade(s) pending governance vote:`);
+      pendingUpgrades.forEach(r => console.log(`  - ${r.proxyAddress} (Issue ID: ${r.upgradeResult[0]})`));
+    }
+    
+    console.log(`\nNew Implementation: ${implementation.address}`);
     console.log('================================\n');
     
     // Save upgrade information
     const upgradeInfo = {
-      proxyAddress,
+      proxyAddresses,
       newImplementation: implementation.address,
       contractName,
       contractFile,
       upgradeTime: new Date().toISOString(),
+      results: upgradeResults.map(r => ({
+        proxyAddress: r.proxyAddress,
+        voteIssueId: r.upgradeResult[0] || null,
+        success: !r.upgradeResult[0],
+      })),
     };
     
     return upgradeInfo;
