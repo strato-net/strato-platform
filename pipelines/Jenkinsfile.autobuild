@@ -180,7 +180,6 @@ pipeline {
                     docker compose -f docker-compose.highway.push.ecr.yml push 2>&1
                     docker compose -f docker-compose.bridge.push.ecr.yml push 2>&1
                   '''
-                  archiveArtifacts artifacts: "bridge_image_tag, bridge_image_tag_ecr"
                   stash includes: 'bootstrap-docker/**', name: 'bootstrapDocker'
                   //stash includes: 'strato/indexer/slipstream/integrity_tests/**', name: 'slipstream_integrity_tests'
                 }
