@@ -30,7 +30,7 @@ EXTENSIONS=(
   # markdown
   # nix
   # sh
-  # sol
+  sol
   # tpl
   # ts
   # txt
