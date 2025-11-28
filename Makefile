@@ -84,25 +84,25 @@ mercata-ui:
 bridge:
 	@echo Now building bridge...
 	docker build -t ${REPO_URL}bridge:${VERSION} ./mercata/services/bridge
-	docker tag ${REPO_URL}bridge:${VERSION} ${REPO_AWS_ECR_URL_MERCATA}bridge:${VERSION}	
+	docker tag ${REPO_URL}bridge:${VERSION} ${REPO_AWS_ECR_URL}bridge:${VERSION}	
 #	# TODO: #dcpush - replace with proper docker compose push flow
 #	echo "${REPO_URL}bridge:${VERSION}" > bridge_image_tag
-#	echo "${REPO_AWS_ECR_URL_MERCATA}bridge:${VERSION}" > bridge_image_tag_ecr
+#	echo "${REPO_AWS_ECR_URL}bridge:${VERSION}" > bridge_image_tag_ecr
 
 bridge-nginx:
 	@echo Now building bridge-nginx...
 	docker build --add-host=openresty.org:3.125.51.27 -t ${REPO_URL}bridge-nginx:${VERSION} ./mercata/services/bridge/nginx
-	docker tag ${REPO_URL}bridge-nginx:${VERSION} ${REPO_AWS_ECR_URL_MERCATA}bridge-nginx:${VERSION}
+	docker tag ${REPO_URL}bridge-nginx:${VERSION} ${REPO_AWS_ECR_URL}bridge-nginx:${VERSION}
 
 oracle:
 	@echo Now building oracle... 
 	# TODO: Dockerize
 	@echo TODO: NO DOCKERFILE TO BUILD YET...
 	#docker build -t ${REPO_URL}oracle:${VERSION} ./mercata/services/oracle
-	#docker tag ${REPO_URL}oracle:${VERSION} ${REPO_AWS_ECR_URL_MERCATA}oracle:${VERSION}
+	#docker tag ${REPO_URL}oracle:${VERSION} ${REPO_AWS_ECR_URL}oracle:${VERSION}
 	# TODO: #dcpush - replace with proper docker compose push flow
 	#echo "${REPO_URL}oracle:${VERSION}" > oracle_image_tag
-	#echo "${REPO_AWS_ECR_URL_MERCATA}oracle:${VERSION}" > oracle_image_tag_ecr
+	#echo "${REPO_AWS_ECR_URL}oracle:${VERSION}" > oracle_image_tag_ecr
 
 eks:
 	@echo Now generating eks manifest files

@@ -1,5 +1,4 @@
 #bridge-version:<VERSION>
-version: "3"
 volumes:
   bridgedata:
     driver: local
