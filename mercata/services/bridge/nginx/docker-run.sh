@@ -30,7 +30,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ### Generate .lua script from templates according to configuration provided
   ########
   cp /tmp/openid.tpl.lua /tmp/openid.lua
-  sed -i "s/<OAUTH_DISCOVERY_URL_PLACEHOLDER>/$OPENID_DISCOVERY_URL/" /tmp/openid.lua
+  sed -i "s*<OAUTH_DISCOVERY_URL_PLACEHOLDER>*$OPENID_DISCOVERY_URL*" /tmp/openid.lua
   if [ "$ssl" = true ] ; then
     sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/yes/g' /tmp/openid.lua
     sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/https/g' /tmp/openid.lua
