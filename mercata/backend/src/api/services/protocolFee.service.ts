@@ -333,54 +333,85 @@ export const getLendingProtocolRevenue = async (
   accessToken: string,
 ): Promise<ProtocolRevenue> => {
   try {
-    // Get lending pool address from registry
-    const { lendingPool: lendingPoolAddress, liquidityPool: liquidityPoolAddress } = await getPool(accessToken, { 
-      select: "lendingPool,liquidityPool" 
+    // Get lending pool address and borrowableAsset from registry
+    const { 
+      lendingPool: lendingPoolAddress, 
+      liquidityPool: liquidityPoolAddress,
+      borrowableAsset: { borrowableAsset }
+    } = await getPool(accessToken, { 
+      select: "lendingPool,liquidityPool,borrowableAsset:lendingPool_fkey(borrowableAsset)" 
     });
     
-    if (!lendingPoolAddress || !liquidityPoolAddress) {
-      throw new Error("Lending pool address not found");
+    if (!lendingPoolAddress || !liquidityPoolAddress || !borrowableAsset) {
+      throw new Error("Lending pool address or borrowable asset not found");
     }
-    
-    // Get fee collector address from lending pool
-    const feeCollector = await getFeeCollector(accessToken, lendingPoolAddress);
-    
-    // Query all Transfer events where 'from' is the lending pool and 'to' is feeCollector
-    const { data: tokenTransferEvents } = await cirrus.get(accessToken, `/event`, {
-      params: {
-        event_name: `eq.Transfer`,
-        select: "address,attributes,block_timestamp",
-        "attributes->>from": `eq.${liquidityPoolAddress}`,
-        "attributes->>to": `eq.${feeCollector}`,
-        order: "block_timestamp.desc"
-      }
-    });
-    
-    if (!tokenTransferEvents || tokenTransferEvents.length === 0) {
-      return {
-        totalRevenue: "0",
-        revenueByPeriod: {
-          daily: { total: "0", byAsset: [] },
-          weekly: { total: "0", byAsset: [] },
-          monthly: { total: "0", byAsset: [] },
-          ytd: { total: "0", byAsset: [] },
-          allTime: { total: "0", byAsset: [] }
+
+    // Query events in parallel
+    const [{ data: indexAccruedEvents = [] }, { data: sweptEvents = [] }] = await Promise.all([
+      cirrus.get(accessToken, `/${LendingPool}-IndexAccrued`, {
+        params: {
+          address: `eq.${lendingPoolAddress}`,
+          select: "reservesAccruedAfter::text,block_timestamp",
+          order: "block_timestamp.asc"
         }
-      };
-    }
+      }).catch(() => ({ data: [] })),
+      cirrus.get(accessToken, `/${LendingPool}-ReservesSweptTreasury`, {
+        params: {
+          address: `eq.${lendingPoolAddress}`,
+          select: "amount::text,block_timestamp",
+          order: "block_timestamp.asc"
+        }
+      }).catch(() => ({ data: [] }))
+    ]);
     
     const timeCutoffs = getTimeCutoffs();
+    const borrowableAssetLower = borrowableAsset.toLowerCase();
     
-    // Transform events to common format
-    const transformedEvents = tokenTransferEvents.map((event: any) => ({
-      value: BigInt(event.attributes?.value || "0"),
-      timestamp: parseTimestamp(event.block_timestamp),
-      asset: event.address.toLowerCase() // The token that emitted the Transfer event
-    }));
+    // Helper: Get reservesAccruedAfter value at or before a timestamp
+    const getReservesAtTimestamp = (timestamp: number): bigint => {
+      for (let i = indexAccruedEvents.length - 1; i >= 0; i--) {
+        if (parseTimestamp(indexAccruedEvents[i].block_timestamp) <= timestamp) {
+          return BigInt(indexAccruedEvents[i].reservesAccruedAfter || "0");
+        }
+      }
+      return 0n;
+    };
     
-    const periodRevenue = categorizeRevenueByPeriod(transformedEvents, timeCutoffs);
+    // Helper: Calculate revenue for a time period (delta + swept events)
+    const calculatePeriodRevenue = (periodStart: number, periodEnd: number): bigint => {
+      const delta = getReservesAtTimestamp(periodEnd) - getReservesAtTimestamp(periodStart);
+      const sweptTotal = sweptEvents
+        .filter((e: any) => {
+          const t = parseTimestamp(e.block_timestamp);
+          return t >= periodStart && t <= periodEnd;
+        })
+        .reduce((sum: bigint, e: any) => sum + BigInt(e.amount || "0"), 0n);
+      return delta + sweptTotal;
+    };
     
-    // Build revenue data with token symbols
+    // Calculate revenue for all periods
+    const revenues = {
+      allTime: calculatePeriodRevenue(0, timeCutoffs.now),
+      daily: calculatePeriodRevenue(timeCutoffs.oneDayAgo, timeCutoffs.now),
+      weekly: calculatePeriodRevenue(timeCutoffs.oneWeekAgo, timeCutoffs.now),
+      monthly: calculatePeriodRevenue(timeCutoffs.oneMonthAgo, timeCutoffs.now),
+      ytd: calculatePeriodRevenue(timeCutoffs.ytdCutoff, timeCutoffs.now)
+    };
+    
+    // Build revenue by period structure
+    const periodRevenue: {
+      allTime: Record<string, bigint>;
+      daily: Record<string, bigint>;
+      weekly: Record<string, bigint>;
+      monthly: Record<string, bigint>;
+      ytd: Record<string, bigint>;
+    } = {
+      allTime: revenues.allTime > 0n ? { [borrowableAssetLower]: revenues.allTime } : {},
+      daily: revenues.daily > 0n ? { [borrowableAssetLower]: revenues.daily } : {},
+      weekly: revenues.weekly > 0n ? { [borrowableAssetLower]: revenues.weekly } : {},
+      monthly: revenues.monthly > 0n ? { [borrowableAssetLower]: revenues.monthly } : {},
+      ytd: revenues.ytd > 0n ? { [borrowableAssetLower]: revenues.ytd } : {}
+    };
     const tokenSymbolCache = new Map<string, string>();
     const [allTimeArray, dailyArray, weeklyArray, monthlyArray, ytdArray] = await Promise.all([
       buildRevenueArray(accessToken, periodRevenue.allTime, tokenSymbolCache),
