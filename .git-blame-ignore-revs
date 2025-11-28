@@ -15,3 +15,8 @@ f292b0475ecdc2a28d289abeb3d73f80f16c09c9
 # "Delete trailing whitespaces from Haskell files in strato" (Nov 19, 2025)
 # This commit removed trailing whitespaces from Haskell files across the codebase.
 0985d31d18fc4c666195c943487d485a684cb439
+
+# aaa4f824c90f0afa64aa1c3f7963ab9ce164ff24
+# "Delete trailing whitespace in all .sol (excluding genesis and legacy files)"
+# This commit removed trailing whitespaces from Solidity files across the codebase.
+aaa4f824c90f0afa64aa1c3f7963ab9ce164ff24
