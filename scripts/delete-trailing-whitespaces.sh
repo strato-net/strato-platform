@@ -32,7 +32,7 @@ EXTENSIONS=(
   # sh
   sol
   # tpl
-  # ts
+  ts
   # txt
   # xml
   # yaml
