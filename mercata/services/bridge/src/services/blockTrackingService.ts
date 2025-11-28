@@ -1,11 +1,13 @@
-import { promises as fs } from 'fs';
+import { promises as fs, mkdirSync } from 'fs';
 import path from 'path';
 import { logInfo, logError } from '../utils/logger';
 import { config } from '../config';
 import { execute } from '../utils/stratoHelper';
 
 const BLOCK_TRACKING_FILE = 'lastProcessedBlocks.json';
-const BLOCK_TRACKING_PATH = path.join(process.cwd(), BLOCK_TRACKING_FILE);
+const DATA_DIR = path.join(process.cwd(), 'data');
+mkdirSync(DATA_DIR, { recursive: true });
+const BLOCK_TRACKING_PATH = path.join(DATA_DIR, BLOCK_TRACKING_FILE);
 
 interface BlockTrackingData {
   [chainId: string]: number;

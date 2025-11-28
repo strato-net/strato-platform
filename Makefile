@@ -43,13 +43,13 @@ docker: build_all_docker docker-compose eks
 
 all_develop: build_develop docker-compose eks
 
-mercata: build_common apex nginx postgrest prometheus smd mercata-backend mercata-ui mercata-bridge mercata-oracle docker-compose
+mercata: build_common apex nginx postgrest prometheus smd mercata-backend mercata-ui bridge bridge-nginx oracle docker-compose
 
-build_all_docker: build_common_docker strato_docker apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui mercata-bridge mercata-oracle
+build_all_docker: build_common_docker strato_docker apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui bridge bridge-nginx oracle
 
-build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui mercata-bridge mercata-oracle
+build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui bridge bridge-nginx oracle
 
-.PHONY: all_develop apex build_all_docker build_buildbase build_common build_common_docker build_common_profiled build_develop docker-compose eks highway highway-nginx mercata mercata-backend mercata-bridge mercata-oracle mercata-ui nginx postgrest prometheus smd strato strato_docker vault-nginx vault-wrapper
+.PHONY: all_develop apex build_all_docker build_buildbase build_common build_common_docker build_common_profiled build_develop docker-compose eks highway highway-nginx mercata mercata-backend bridge bridge-nginx oracle mercata-ui nginx postgrest prometheus smd strato strato_docker vault-nginx vault-wrapper
 
 apex:
 	@echo Now building apex...
@@ -81,22 +81,27 @@ mercata-ui:
 	docker build -t ${REPO_URL}mercata-ui:${VERSION} -f ./mercata/ui/Dockerfile ./mercata
 	docker tag ${REPO_URL}mercata-ui:${VERSION} ${REPO_AWS_ECR_URL}mercata-ui:${VERSION}
 
-mercata-bridge:
-	@echo Now building mercata-bridge...
-	docker build -t ${REPO_URL}mercata-bridge:${VERSION} ./mercata/services/bridge
-	docker tag ${REPO_URL}mercata-bridge:${VERSION} ${REPO_AWS_ECR_URL_MERCATA}bridge:${VERSION}
-	# TODO: #dcpush - replace with proper docker compose push flow
-	echo "${REPO_URL}mercata-bridge:${VERSION}" > bridge_image_tag
-	echo "${REPO_AWS_ECR_URL_MERCATA}bridge:${VERSION}" > bridge_image_tag_ecr
+bridge:
+	@echo Now building bridge...
+	docker build -t ${REPO_URL}bridge:${VERSION} ./mercata/services/bridge
+	docker tag ${REPO_URL}bridge:${VERSION} ${REPO_AWS_ECR_URL_MERCATA}bridge:${VERSION}	
+#	# TODO: #dcpush - replace with proper docker compose push flow
+#	echo "${REPO_URL}bridge:${VERSION}" > bridge_image_tag
+#	echo "${REPO_AWS_ECR_URL_MERCATA}bridge:${VERSION}" > bridge_image_tag_ecr
 
-mercata-oracle:
-	@echo Now building mercata-oracle... 
+bridge-nginx:
+	@echo Now building bridge-nginx...
+	docker build --add-host=openresty.org:3.125.51.27 -t ${REPO_URL}bridge-nginx:${VERSION} ./mercata/services/bridge/nginx
+	docker tag ${REPO_URL}bridge-nginx:${VERSION} ${REPO_AWS_ECR_URL_MERCATA}bridge-nginx:${VERSION}
+
+oracle:
+	@echo Now building oracle... 
 	# TODO: Dockerize
 	@echo TODO: NO DOCKERFILE TO BUILD YET...
-	#docker build -t ${REPO_URL}mercata-oracle:${VERSION} ./mercata/services/oracle
-	#docker tag ${REPO_URL}mercata-oracle:${VERSION} ${REPO_AWS_ECR_URL_MERCATA}oracle:${VERSION}
+	#docker build -t ${REPO_URL}oracle:${VERSION} ./mercata/services/oracle
+	#docker tag ${REPO_URL}oracle:${VERSION} ${REPO_AWS_ECR_URL_MERCATA}oracle:${VERSION}
 	# TODO: #dcpush - replace with proper docker compose push flow
-	#echo "${REPO_URL}mercata-oracle:${VERSION}" > oracle_image_tag
+	#echo "${REPO_URL}oracle:${VERSION}" > oracle_image_tag
 	#echo "${REPO_AWS_ECR_URL_MERCATA}oracle:${VERSION}" > oracle_image_tag_ecr
 
 eks:
@@ -225,6 +230,8 @@ docker-compose:
 	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.vault.tpl.yml > docker-compose.vault.push.ecr.yml
 	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.highway.tpl.yml > docker-compose.highway.push.yml
 	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.highway.tpl.yml > docker-compose.highway.push.ecr.yml
+	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.bridge.tpl.yml > docker-compose.bridge.push.yml
+	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.bridge.tpl.yml > docker-compose.bridge.push.ecr.yml
 
 	@echo Creating the final docker-compose.yml...
 	awk '/build: ./{getline} 1' docker-compose.push.yml > docker-compose.yml
@@ -235,6 +242,8 @@ docker-compose:
 	awk '/build: ./{getline} 1' docker-compose.vault.push.ecr.yml > docker-compose.vault.ecr.yml
 	awk '/build: ./{getline} 1' docker-compose.highway.push.yml > docker-compose.highway.yml
 	awk '/build: ./{getline} 1' docker-compose.highway.push.ecr.yml > docker-compose.highway.ecr.yml
+	awk '/build: ./{getline} 1' docker-compose.bridge.push.yml > docker-compose.bridge.yml
+	awk '/build: ./{getline} 1' docker-compose.bridge.push.ecr.yml > docker-compose.bridge.ecr.yml
 
 docker-build:
 	cp -fr strato/extraFiles/* ${STRATODIR}
