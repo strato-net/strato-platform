@@ -79,7 +79,7 @@ library StringUtils {
     function substring(string s, uint start) internal pure returns (string) {
         return substring(s, start, s.length);
     }
-    
+
     function substring(string s, uint start, uint end) internal pure returns (string) {
         require(end > start, "substring: end index must be greater than starting index");
         bytes b = bytes(s);

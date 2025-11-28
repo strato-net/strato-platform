@@ -118,7 +118,7 @@ contract record CDPEngine is Ownable {
     event Paused(address indexed asset, bool isPaused);
     event PausedGlobal(bool isPaused);
     event JuniorParamsSet(uint premiumBps, uint sliceBps);
-    
+
     event VaultUpdated(
         address indexed user,
         address indexed asset,
@@ -127,7 +127,7 @@ contract record CDPEngine is Ownable {
     );
 
     event RegistryUpdated(address indexed oldRegistry, address indexed newRegistry);
-    
+
     // ───────────────────────── Registry Access Helpers ──────────────────────
     function _cdpVault() internal view returns (CDPVault) { return registry.cdpVault(); }
     function _cdpPriceOracle() internal view returns (PriceOracle) { return registry.priceOracle(); }
@@ -143,8 +143,8 @@ contract record CDPEngine is Ownable {
         _;
     }
 
-    modifier onlyKnownAsset(address asset) { 
-        require(isSupportedAsset[asset], "unsupported"); _; 
+    modifier onlyKnownAsset(address asset) {
+        require(isSupportedAsset[asset], "unsupported"); _;
     }
 
     modifier onlyActiveAsset(address asset) {
@@ -152,7 +152,7 @@ contract record CDPEngine is Ownable {
         require(_tokenFactory().isTokenActive(asset), "inactive");
         _;
     }
-    
+
     // ─────────────────────────────── Constructor ─────────────────────────────
     constructor(address initialOwner) Ownable(initialOwner) { }
 
@@ -308,7 +308,7 @@ contract record CDPEngine is Ownable {
         if (assetConfig.debtCeiling > 0) {
             uint assetDebtUSD = (assetState.totalScaledDebt * assetState.rateAccumulator) / RAY;
             require(assetDebtUSD + amountUSD <= assetConfig.debtCeiling, "CDPEngine: debt ceiling exceeded");
-        }       
+        }
         // Increase scaled debt (principal) using current index
         uint scaledAdd = (amountUSD * RAY + assetState.rateAccumulator - 1) / assetState.rateAccumulator;
         userVault.scaledDebt += scaledAdd;
@@ -487,7 +487,7 @@ contract record CDPEngine is Ownable {
         // Ensure repay + penalty can be paid fully in collateral:
         // repay <= collateralWei * 10000 / (10000 + penaltyBps)
         uint coverageCap = (collateralWei * 10000) / (10000 + config.liquidationPenaltyBps);
-        
+
         // Repay amount capped by all constraints
         bool capBinds = false;
         uint repay = debtToCover;
@@ -546,7 +546,7 @@ contract record CDPEngine is Ownable {
         emit LiquidationExecuted(
             borrower,
             collateralAsset,
-            owedForDelta,          
+            owedForDelta,
             penaltyWei,
             collateralToSeize,
             msg.sender,
@@ -610,11 +610,11 @@ contract record CDPEngine is Ownable {
         CollateralConfig storage config = collateralConfigs[asset];
         config.liquidationRatio = liquidationRatio;
         config.minCR = minCR;
-        config.liquidationPenaltyBps = liquidationPenaltyBps; 
-        config.closeFactorBps = closeFactorBps; 
-        config.stabilityFeeRate = stabilityFeeRate; 
-        config.debtFloor = debtFloor; 
-        config.debtCeiling = debtCeiling; 
+        config.liquidationPenaltyBps = liquidationPenaltyBps;
+        config.closeFactorBps = closeFactorBps;
+        config.stabilityFeeRate = stabilityFeeRate;
+        config.debtFloor = debtFloor;
+        config.debtCeiling = debtCeiling;
         config.unitScale = unitScale;
         config.isPaused = pause;
 
@@ -741,7 +741,7 @@ contract record CDPEngine is Ownable {
         CollateralGlobalState storage s = collateralGlobalStates[asset];
         Vault storage v = vaults[user][asset];
         uint debtUSD = (v.scaledDebt * s.rateAccumulator) / RAY;
-        if (debtUSD == 0) return (2**256 - 1); 
+        if (debtUSD == 0) return (2**256 - 1);
         (uint price, uint timestamp) = _cdpPriceOracle().getAssetPriceWithTimestamp(asset);
         require(price > 0, "invalid price");
         // require(block.timestamp - timestamp <= priceMaxAge, "CDPEngine: stale price");
@@ -903,7 +903,7 @@ contract record CDPEngine is Ownable {
             uint256 oldCap = note.capUSDST;
             uint256 oldEntry = note.entryIndex;
             uint256 newCap = oldCap + capUSDST;
-            
+
             // Blended entry = currentIndex - (oldCap/newCap) * (currentIndex - oldEntry)
             uint256 blendedEntry = juniorIndex;
             if (juniorIndex > oldEntry) {
@@ -911,11 +911,11 @@ contract record CDPEngine is Ownable {
                 uint256 adjustment = (oldCap * indexGrowth) / newCap;
                 blendedEntry = juniorIndex - adjustment;
             }
-            
+
             note.capUSDST = newCap;
             note.entryIndex = blendedEntry;
             totalJuniorOutstandingUSDST += capUSDST;
-            
+
             emit JuniorNoteCreated(msg.sender, newCap);
         }
     }
@@ -939,18 +939,18 @@ contract record CDPEngine is Ownable {
     /// @notice View function to show what's claimable for an owner
     function claimable(address owner) public view returns (uint256) {
         JuniorNote storage note = juniorNotes[owner];
-        
+
         // Calculate effective index including unaccounted reserve inflows
         uint256 effectiveIndex = juniorIndex == 0 ? 1e27 : juniorIndex;
         address reserveAddr = address(registry.cdpReserve());
         uint256 reserveBalance = _usdst().balanceOf(reserveAddr);
-        
+
         if (reserveBalance > prevReserveBalance && totalJuniorOutstandingUSDST > 0) {
             uint256 newInflows = reserveBalance - prevReserveBalance;
             uint256 indexBump = (newInflows * 1e27) / totalJuniorOutstandingUSDST;
             effectiveIndex += indexBump;
         }
-        
+
         return _entitlement(note, effectiveIndex);
     }
 

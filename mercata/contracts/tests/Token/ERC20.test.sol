@@ -365,12 +365,12 @@ contract Describe_ERC20 {
     function it_erc20_handles_multiple_transfers() {
         uint256 mintAmount = 10000e18;
         token.mintTokens(owner, mintAmount);
-        
+
         // Multiple transfers
         ERC20(token).transfer(address(user1), 1000e18);
         ERC20(token).transfer(address(user2), 2000e18);
         ERC20(token).transfer(address(user3), 1500e18);
-        
+
         require(ERC20(token).balanceOf(owner) == mintAmount - 4500e18, "Owner balance after multiple transfers");
         require(ERC20(token).balanceOf(address(user1)) == 1000e18, "User1 balance after transfer");
         require(ERC20(token).balanceOf(address(user2)) == 2000e18, "User2 balance after transfer");
@@ -381,11 +381,11 @@ contract Describe_ERC20 {
         uint256 amount1 = 1000e18;
         uint256 amount2 = 2000e18;
         uint256 amount3 = 3000e18;
-        
+
         ERC20(token).approve(address(user1), amount1);
         ERC20(token).approve(address(user2), amount2);
         ERC20(token).approve(address(user3), amount3);
-        
+
         require(ERC20(token).allowance(owner, address(user1)) == amount1, "User1 allowance");
         require(ERC20(token).allowance(owner, address(user2)) == amount2, "User2 allowance");
         require(ERC20(token).allowance(owner, address(user3)) == amount3, "User3 allowance");
@@ -398,7 +398,7 @@ contract Describe_ERC20 {
         uint256 mintAmount = 100e18;
         uint256 transferAmount = 200e18;
         token.mintTokens(owner, mintAmount);
-        
+
         bool reverted = false;
         try {
             ERC20(token).transfer(address(user1), transferAmount);
@@ -414,7 +414,7 @@ contract Describe_ERC20 {
         uint256 transferAmount = 200e18;
         token.mintTokens(owner, mintAmount);
         ERC20(token).approve(address(user1), approveAmount);
-        
+
         bool reverted = false;
         try {
             user1.do(address(token), "transferFrom", owner, address(user2), transferAmount);
@@ -427,7 +427,7 @@ contract Describe_ERC20 {
     function it_erc20_reverts_instead_of_returning_false_on_zero_address_transfer() {
         uint256 mintAmount = 1000e18;
         token.mintTokens(owner, mintAmount);
-        
+
         bool reverted = false;
         try {
             ERC20(token).transfer(zeroAddress, 100e18);
@@ -453,11 +453,11 @@ contract Describe_ERC20 {
         uint256 amount1 = 1000e18;
         uint256 amount2 = 2000e18;
         uint256 amount3 = 1500e18;
-        
+
         token.mintTokens(address(user1), amount1);
         token.mintTokens(address(user2), amount2);
         token.mintTokens(address(user3), amount3);
-        
+
         uint256 expectedSupply = amount1 + amount2 + amount3;
         require(ERC20(token).totalSupply() == expectedSupply, "Total supply should equal sum of all balances");
         require(ERC20(token).balanceOf(address(user1)) + ERC20(token).balanceOf(address(user2)) + ERC20(token).balanceOf(address(user3)) == expectedSupply, "Sum of balances should equal total supply");
@@ -468,7 +468,7 @@ contract Describe_ERC20 {
         uint256 burnAmount = 3000e18;
         token.mintTokens(owner, mintAmount);
         token.burnTokens(owner, burnAmount);
-        
+
         require(ERC20(token).totalSupply() == mintAmount - burnAmount, "Total supply should be reduced by burn amount");
         require(ERC20(token).balanceOf(owner) == mintAmount - burnAmount, "Owner balance should be reduced by burn amount");
     }
@@ -478,7 +478,7 @@ contract Describe_ERC20 {
         uint256 transferAmount = 5000e18;
         token.mintTokens(owner, mintAmount);
         ERC20(token).transfer(address(user1), transferAmount);
-        
+
         require(ERC20(token).totalSupply() == mintAmount, "Total supply should remain unchanged after transfers");
         require(ERC20(token).balanceOf(owner) + ERC20(token).balanceOf(address(user1)) == mintAmount, "Sum of balances should equal original total supply");
     }
@@ -490,18 +490,18 @@ contract Describe_ERC20 {
         uint256 approveAmount = 5000e18;
         uint256 transferAmount1 = 2000e18;
         uint256 transferAmount2 = 1500e18;
-        
+
         token.mintTokens(owner, mintAmount);
         ERC20(token).approve(address(user1), approveAmount);
-        
+
         // First transfer
         user1.do(address(token), "transferFrom", owner, address(user2), transferAmount1);
         require(ERC20(token).allowance(owner, address(user1)) == approveAmount - transferAmount1, "Allowance after first transfer");
-        
+
         // Second transfer
         user1.do(address(token), "transferFrom", owner, address(user3), transferAmount2);
         require(ERC20(token).allowance(owner, address(user1)) == approveAmount - transferAmount1 - transferAmount2, "Allowance after second transfer");
-        
+
         // Check final balances
         require(ERC20(token).balanceOf(owner) == mintAmount - transferAmount1 - transferAmount2, "Owner balance after transfers");
         require(ERC20(token).balanceOf(address(user2)) == transferAmount1, "User2 balance");
@@ -514,15 +514,15 @@ contract Describe_ERC20 {
         uint256 approveAmount2 = 4000e18;
         uint256 transferAmount1 = 2000e18;
         uint256 transferAmount2 = 2500e18;
-        
+
         token.mintTokens(owner, mintAmount);
         ERC20(token).approve(address(user1), approveAmount1);
         ERC20(token).approve(address(user2), approveAmount2);
-        
+
         // Both spenders transfer
         user1.do(address(token), "transferFrom", owner, address(user3), transferAmount1);
         user2.do(address(token), "transferFrom", owner, address(user3), transferAmount2);
-        
+
         require(ERC20(token).allowance(owner, address(user1)) == approveAmount1 - transferAmount1, "User1 allowance");
         require(ERC20(token).allowance(owner, address(user2)) == approveAmount2 - transferAmount2, "User2 allowance");
         require(ERC20(token).balanceOf(address(user3)) == transferAmount1 + transferAmount2, "User3 total balance");
@@ -533,10 +533,10 @@ contract Describe_ERC20 {
         uint256 initialApprove = 2000e18;
         uint256 updatedApprove = 5000e18;
         uint256 transferAmount = 3000e18;
-        
+
         token.mintTokens(owner, mintAmount);
         ERC20(token).approve(address(user1), initialApprove);
-        
+
         // Try to transfer more than initial approval - should fail
         bool reverted = false;
         try {
@@ -545,10 +545,10 @@ contract Describe_ERC20 {
             reverted = true;
         }
         require(reverted, "Should fail with insufficient allowance");
-        
+
         // Update approval
         ERC20(token).approve(address(user1), updatedApprove);
-        
+
         // Now transfer should succeed
         bool success = user1.do(address(token), "transferFrom", owner, address(user2), transferAmount);
         require(success, "Transfer should succeed after approval update");

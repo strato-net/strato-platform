@@ -16,9 +16,9 @@ import "../Proxy/Proxy.sol";
 
 /// @notice Token factory contract
 contract record TokenFactory is Ownable {
-    
+
     // ============ EVENTS ============
-    
+
     /// @notice Event emitted when a new token is created
     event TokenCreated(address token, address creator, string name, string symbol);
 
@@ -29,22 +29,22 @@ contract record TokenFactory is Ownable {
     event TokensRegistered(uint256 tokenCount);
 
     // ============ STATE VARIABLES ============
-    
+
     /// @notice Mapping of token addresses to factory token status
     mapping(address => bool) public isFactoryToken;
-    
+
     /// @notice Array of all token addresses
     address[] public record allTokens;
-    
+
     // ============ CONSTRUCTOR ============
-    
+
     /// @notice Constructor
     /// @param initialOwner The initial owner of the contract
     constructor(address initialOwner) Ownable(initialOwner) {
     }
 
     // ============ TOKEN MANAGEMENT ============
-    
+
     /// @notice Create a new token
     /// @param _name Token name
     /// @param _description Token description
@@ -103,12 +103,12 @@ contract record TokenFactory is Ownable {
             _initialOwner
         );
         newToken.transferOwnership(_initialOwner);
-        
+
         // Register the token
         address tokenAddress = address(newToken);
         isFactoryToken[tokenAddress] = true;
         allTokens.push(tokenAddress);
-        
+
         emit TokenCreated(tokenAddress, msg.sender, _name, _symbol);
         return tokenAddress;
     }

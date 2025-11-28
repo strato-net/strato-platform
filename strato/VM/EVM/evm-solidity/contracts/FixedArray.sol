@@ -8,4 +8,3 @@ contract FixedArray {
 
 
 }
-  

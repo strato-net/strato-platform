@@ -980,9 +980,9 @@ contract record LendingPool is Ownable, Pausable {
         // Pay SM directly from LiquidityPool and update its managed assets
         if (toSafety > 0 && address(safetyModule) != address(0)) {
             uint256 smBalBefore = IERC20(borrowableAsset).balanceOf(address(safetyModule));
-            
+
             LiquidityPool(_liquidityPool()).transferReserve(toSafety, address(safetyModule));
-            
+
             // Update SafetyModule's internal state by passing balanceBefore for validation
             safetyModule.recordTransfer(toSafety, smBalBefore);
         }

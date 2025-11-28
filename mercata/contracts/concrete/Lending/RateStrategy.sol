@@ -3,11 +3,11 @@
  * @notice Defines the interest rate calculation logic based on loan duration and static rates.
  * @dev Called by LendingPool to compute interest owed on active loans.
  */
- 
+
  contract record RateStrategy {
     constructor()  {
-    } 
-    
+    }
+
     function calculateInterest(uint principal, uint rate, uint lastUpdated) pure  returns (uint) {
         if (block.timestamp <= lastUpdated) return 0;
         uint durationSeconds = block.timestamp - lastUpdated;
