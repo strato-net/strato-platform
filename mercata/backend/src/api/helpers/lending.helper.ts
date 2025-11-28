@@ -92,7 +92,7 @@ export const calculateTotalCollateralValueForHealth = (
 
     const price = toBig(config.price);
     const liqThreshold = BigInt(config.liquidationThreshold);
-    
+
     if (price === 0n || liqThreshold === 0n) continue;
 
     // Calculate: (collateralAmount * price * liqThreshold) / (1e18 * 10000)
@@ -252,7 +252,7 @@ export const calculateCollateralMetrics = (
   // Calculate values in USD (18 decimals)
   const userBalanceValue = ((balance * price) / DECIMALS).toString();
   const collateralizedAmountValue = ((collateralized * price) / DECIMALS).toString();
-  
+
   // Calculate max borrowing power using LTV: (collateralizedAmount * price * ltv) / (1e18 * 10000)
   const maxBorrowingPower = ((collateralized * price * ltvBasisPoints) / (DECIMALS * 10000n)).toString();
 
@@ -300,7 +300,7 @@ export const calculateTotalUSDSTSupplied = (
 ): string => {
   const mTokenSupply = toBig(totalMTokenSupply);
   const rate = toBig(exchangeRate);
-  
+
   return ((mTokenSupply * rate) / DECIMALS).toString();
 };
 
@@ -339,13 +339,13 @@ export const calculateTotalCollateralValue = (
   borrowableAsset: string
 ): string => {
   let totalValue = 0n;
-  
+
   for (const config of assetConfigs) {
     if (config.asset === borrowableAsset) continue;
-    
+
     const price = prices.get(config.asset) || "0";
     if (price === "0" || !config.AssetConfig?.liquidationThreshold) continue;
-    
+
     // Sum all collateral for this asset across all users
     let totalAssetCollateral = 0n;
     for (const collateral of allCollaterals) {
@@ -353,16 +353,16 @@ export const calculateTotalCollateralValue = (
         totalAssetCollateral += toBig(collateral.amount);
       }
     }
-    
+
     if (totalAssetCollateral > 0n) {
       const collateralValue = (
-        totalAssetCollateral * 
+        totalAssetCollateral *
         toBig(price)
       ) / (DECIMALS);
       totalValue += collateralValue;
     }
   }
-  
+
   return totalValue.toString();
 };
 

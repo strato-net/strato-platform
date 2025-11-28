@@ -33,4 +33,4 @@ class EventsController {
   }
 }
 
-export default EventsController; 
+export default EventsController;

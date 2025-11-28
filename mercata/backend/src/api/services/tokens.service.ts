@@ -362,10 +362,10 @@ export const getTokenStats = async (
   try {
     // Get bridgeable tokens
     const bridgeAssets = await getBridgeAssets(accessToken);
-    
+
     // Create a set of allowed token addresses
     const allowedTokens = new Set<string>();
-    
+
     // Add all bridgeable token addresses
     for (const [_, assetInfo] of bridgeAssets) {
       if (assetInfo.stratoToken && assetInfo.enabled) {
@@ -392,13 +392,13 @@ export const getTokenStats = async (
     }
 
     const tokens = tokensResponse.data || [];
-    
+
     // Filter tokens to only include:
     // 1. Bridgeable tokens (already in allowedTokens set)
     // 2. USDST, GOLDST, SILVST by address
     const filteredTokens = tokens.filter((token: any) => {
       const address = token.address;
-      return allowedTokens.has(token.address) || 
+      return allowedTokens.has(token.address) ||
              address === '937efa7e3a77e20bbdbd7c0d32b6514f368c1010' || // USDST
              address === 'cdc93d30182125e05eec985b631c7c61b3f63ff0' || // GOLDST
              address === '2c59ef92d08efde71fe1a1cb5b45f4f6d48fcc94' // SILVST
@@ -416,19 +416,19 @@ export const getTokenStats = async (
           // We divide by 10^36 because both values have 18 decimals
           const marketCapWei = price * totalSupply;
           const marketCapUSD = marketCapWei / BigInt(10) ** BigInt(36);
-          
+
           // Convert to decimal string with 2 decimal places
           const wholePart = marketCapUSD.toString();
           const fractionalWei = marketCapWei % (BigInt(10) ** BigInt(36));
           const fractionalPart = (fractionalWei * BigInt(100) / (BigInt(10) ** BigInt(36))).toString().padStart(2, '0');
-          
+
           marketCap = `${wholePart}.${fractionalPart}`;
         }
       } catch (error) {
         console.error(`Error calculating market cap for ${token._symbol}:`, error);
         marketCap = "0.00";
       }
-      
+
       return {
         address: token.address,
         name: token._name,

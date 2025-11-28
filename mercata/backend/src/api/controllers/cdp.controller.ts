@@ -279,7 +279,7 @@ class CDPController {
       // Check for optional 'supported' query parameter
       // If true, return only supported assets. If false or omitted, return all assets.
       const supportedOnly = query.supported === 'true';
-      
+
       const assets = supportedOnly
         ? await getSupportedAssets(accessToken)
         : await getAllCollateralAssets(accessToken);
@@ -312,9 +312,9 @@ class CDPController {
   ): Promise<void> {
     try {
       const { accessToken, address: userAddress, body } = req;
-      
+
       validateSetCollateralConfigArgs(body);
-      
+
       const result = await setCollateralConfig(accessToken, userAddress as string, body);
       res.status(RestStatus.OK).json(result);
     } catch (error) {

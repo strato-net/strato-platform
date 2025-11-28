@@ -33,7 +33,7 @@ export const isUserAdmin = async (
   } catch (error) {
     return false;
   }
-}; 
+};
 
 export const getAdmin = async (
   accessToken: string
@@ -96,7 +96,7 @@ export const removeAdmin = async (
     const tx = await buildFunctionTx({
       contractName: extractContractName(AdminRegistry),
       contractAddress: adminRegistry,
-      method: "removeAdmin", 
+      method: "removeAdmin",
       args: {
         _admin: adminAddress,
       },
@@ -117,7 +117,7 @@ export const castVoteOnIssue = async (
   accessToken: string,
   userAddress: string,
   target: string,
-  func: string, 
+  func: string,
   args: any[],
 ): Promise<{ status: string; hash: string }> => {
   try {
@@ -126,7 +126,7 @@ export const castVoteOnIssue = async (
       _target: target,
       _args: args
     };
-    
+
     const tx = await buildFunctionTx({
       contractName: extractContractName(AdminRegistry),
       contractAddress: adminRegistry,
@@ -199,19 +199,19 @@ export const castVoteOnIssueById = async (
       },
     });
 
-    
+
 
     if (contractResponse.status !== 200 || !contractResponse.data || !Array.isArray(contractResponse.data) || contractResponse.data.length === 0) {
       throw new Error('Failed to fetch contract details for target address');
     }
     const contractName = contractResponse.data[0].contract_name;
-  
+
 
     // Get contract details to retrieve function parameter names
     const contractDetails = await getContractDetails(accessToken, target);
     const allFunctions = (contractDetails as any)?._functions || {};
     const functionInfo = allFunctions[func];
-    
+
     if (!functionInfo || !functionInfo._funcArgs) {
       throw new Error(`Function ${func} not found in contract ${contractName}`);
     }
@@ -219,7 +219,7 @@ export const castVoteOnIssueById = async (
     // Convert array args to object with parameter names
     const funcArgs = functionInfo._funcArgs as Array<[string, any]>;
     const argsObject: Record<string, any> = {};
-    
+
     if (Array.isArray(args)) {
       funcArgs.forEach(([paramName], index) => {
         if (index < args.length) {
@@ -288,8 +288,8 @@ export const getOpenIssues = async (
     const issuesMap = new Map();
     (issuesResponse?.data || []).forEach((issue: any) => {
       const existingIssue = issuesMap.get(issue.issueId);
-      if (!existingIssue || 
-          (issue.block_number && existingIssue.block_number && 
+      if (!existingIssue ||
+          (issue.block_number && existingIssue.block_number &&
            Number(issue.block_number) > Number(existingIssue.block_number))) {
         issuesMap.set(issue.issueId, issue);
       }

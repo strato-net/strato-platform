@@ -140,7 +140,7 @@ export function validateSetPoolRatesArgs(args: any) {
     swapFeeRate: Joi.number().min(0).max(10000).required(), // 0-100% with 2 decimals (10000 = 100%)
     lpSharePercent: Joi.number().min(0).max(10000).required(), // 0-100% with 2 decimals (10000 = 100%)
   });
-  
+
   const { error } = schema.validate(args);
   if (error) {
     throw new Error("Set Pool Rates Argument Validation Error: " + error.message);

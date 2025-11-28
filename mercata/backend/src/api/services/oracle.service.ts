@@ -30,8 +30,8 @@ export const getPrice = async (
   accessToken: string,
   asset?: string
 ) => {
-  const registry = await getPool(accessToken, { 
-    select: `priceOracle:priceOracle_fkey(address,prices:${PriceOracle}-prices(asset:key,price:value::text))` 
+  const registry = await getPool(accessToken, {
+    select: `priceOracle:priceOracle_fkey(address,prices:${PriceOracle}-prices(asset:key,price:value::text))`
   });
 
   const prices: { asset: string; price: string }[] = registry.priceOracle?.prices || [];
@@ -92,7 +92,7 @@ export const getPriceHistory = async (
     const registry = await getPool(accessToken, {
       select: "priceOracle",
     });
-    
+
     if (!registry.priceOracle) {
       throw new Error("Price oracle not found");
     }
@@ -226,7 +226,7 @@ export const getPriceHistory = async (
           blockTimestamp: new Date(currentHour)
         });
       }
-      
+
     }
 
 

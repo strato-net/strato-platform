@@ -34,7 +34,7 @@ export const constants = (() => {
   const RewardsChef = `${CONTRACT_PREFIX}RewardsChef`;
   const Voucher = `${CONTRACT_PREFIX}Voucher`;
   const Event = "event";
-    
+
   const tokenSelectFields = [
     "address",
     "_name",
@@ -52,7 +52,7 @@ export const constants = (() => {
 
   const tokenBalanceSelectFields = [
     "address",
-    "user:key", 
+    "user:key",
     "balance:value::text",
     `token:${Token}(address,_name,_symbol,_owner,_totalSupply::text,customDecimals,description,status,_paused,images:${Token}-images(value),attributes:${Token}-attributes(key,value))`
   ];
@@ -83,7 +83,7 @@ export const constants = (() => {
   const cdpRegistrySelectFields = [
     "address",
     "feeCollector",
-    "tokenFactory", 
+    "tokenFactory",
     "usdst",
     "cdpEngine:cdpEngine_fkey(" +
       "address," +
@@ -105,10 +105,10 @@ export const constants = (() => {
       `prices:${PriceOracle}-prices(asset:key,value::text)` +
     ")",
   ];
-  
+
   const priceHistorySelectFields = [
     "address",
-    "id", 
+    "id",
     "block_timestamp",
     "asset",
     "price::text",

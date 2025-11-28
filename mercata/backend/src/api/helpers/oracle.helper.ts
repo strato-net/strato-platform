@@ -15,14 +15,14 @@ const numberToString = (num: number | string): string => {
   if (typeof num === 'string') {
     return num;
   }
-  
+
   // For very large numbers, use toLocaleString with full precision
   // This avoids scientific notation
   if (Math.abs(num) >= 1e21) {
     // Use toLocaleString with specific options to avoid scientific notation
     return num.toLocaleString('fullwide', { useGrouping: false, maximumFractionDigits: 0 });
   }
-  
+
   // For smaller numbers, regular toString is fine
   return num.toString();
 };
@@ -43,10 +43,10 @@ export const createCompletePriceMap = async (
     const pools = await getPools(accessToken, undefined);
     for (const pool of pools) {
       if (!pool.lpToken?.address || !pool.lpToken?._totalSupply) continue;
-      
+
       const tokenAPrice = priceMap.get(pool.tokenA?.address) || 0;
       const tokenBPrice = priceMap.get(pool.tokenB?.address) || 0;
-      
+
       const lpTokenPrice = calculateLPTokenPrice(
         pool.tokenA.poolBalance || "0",
         pool.tokenB.poolBalance || "0",
@@ -54,7 +54,7 @@ export const createCompletePriceMap = async (
         tokenBPrice.toString(),
         pool.lpToken._totalSupply
       );
-      
+
       if (lpTokenPrice !== "0") {
         priceMap.set(pool.lpToken.address, lpTokenPrice.toString());
       }
@@ -69,17 +69,17 @@ export const createCompletePriceMap = async (
       select: "lendingPool:lendingPool_fkey(borrowableAsset,mToken),liquidityPool:liquidityPool_fkey(address)"
     });
     const { borrowableAsset, mToken } = lendingData.lendingPool || {};
-    
+
     if (borrowableAsset && mToken) {
       const borrowableAssetPrice = priceMap.get(borrowableAsset) || "0";
-      
+
       if (borrowableAssetPrice !== "0") {
         // Get exchange rate from Cirrus events instead of calculating manually
         const exchangeRate = await getExchangeRateFromCirrus(accessToken);
-        
+
         // mToken price = borrowable asset price * exchange rate
         const mTokenPrice = (BigInt(borrowableAssetPrice.toString()) * BigInt(exchangeRate)) / BigInt(10 ** 18);
-        
+
         priceMap.set(mToken, mTokenPrice.toString());
       }
     }
@@ -88,4 +88,4 @@ export const createCompletePriceMap = async (
   }
 
   return priceMap;
-}; 
+};

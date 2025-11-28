@@ -944,8 +944,8 @@ export const executeLiquidation = async (
   const approveValue = treatAsAll ? MAX_UINT256 : repayAmount.toString();
 
   const repayAmountAtomic = repayAmount.toString();
-  const minCollateralOutAtomic = options.minCollateralOut 
-    ? toBig(options.minCollateralOut).toString() 
+  const minCollateralOutAtomic = options.minCollateralOut
+    ? toBig(options.minCollateralOut).toString()
     : "0";
 
   const tx = await buildFunctionTx([
@@ -993,8 +993,8 @@ export const configureAsset = async (
   userAddress: string,
   body: Record<string, string | number>
 ) => {
-  if (!body.asset || body.ltv === undefined || body.liquidationThreshold === undefined || 
-      body.liquidationBonus === undefined || body.interestRate === undefined || 
+  if (!body.asset || body.ltv === undefined || body.liquidationThreshold === undefined ||
+      body.liquidationBonus === undefined || body.interestRate === undefined ||
       body.reserveFactor === undefined || body.perSecondFactorRAY === undefined) {
     throw new Error("Missing required parameters: asset, ltv, liquidationThreshold, liquidationBonus, interestRate, reserveFactor, perSecondFactorRAY");
   }
@@ -1012,7 +1012,7 @@ export const configureAsset = async (
   if (isNaN(interestRate) || interestRate < 0 || interestRate > 10000) throw new Error("Interest rate must be between 0 and 10000 basis points (0% to 100%)");
   if (isNaN(reserveFactor) || reserveFactor < 0 || reserveFactor > 5000) throw new Error("Reserve factor must be between 0 and 5000 basis points (0% to 50%)");
   if (ltv > liquidationThreshold) throw new Error("LTV cannot be higher than liquidation threshold");
-  
+
   // Validate perSecondFactorRAY
   if (!/^\d+$/.test(perSecondFactorRAY)) throw new Error("perSecondFactorRAY must be a valid integer string");
   const rayValue = BigInt(perSecondFactorRAY);

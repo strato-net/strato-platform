@@ -4,4 +4,4 @@ export { CirrusError } from './CirrusError';
 
 // You can add more error classes here as needed:
 // export { ValidationError } from './ValidationError';
-// export { AuthError } from './AuthError'; 
+// export { AuthError } from './AuthError';

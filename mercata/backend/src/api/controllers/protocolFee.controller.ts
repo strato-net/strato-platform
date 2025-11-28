@@ -17,12 +17,12 @@ class ProtocolFeeController {
   ): Promise<void> {
     try {
       const { accessToken, address: userAddress } = req;
-      
+
       const revenue = await protocolFeeService.getAggregatedProtocolRevenue(
         accessToken!,
         userAddress as string
       );
-      
+
       res.status(RestStatus.OK).json(revenue);
     } catch (error) {
       next(error);
@@ -41,14 +41,14 @@ class ProtocolFeeController {
       const { accessToken, address: userAddress } = req;
       const { protocol } = req.params;
       const { period } = req.query;
-      
+
       // Validate protocol
       if (!['cdp', 'lending', 'swap', 'gas'].includes(protocol)) {
-        res.status(RestStatus.BAD_REQUEST).json({ 
-          error: "Invalid protocol. Must be one of: cdp, lending, swap, gas" 
+        res.status(RestStatus.BAD_REQUEST).json({
+          error: "Invalid protocol. Must be one of: cdp, lending, swap, gas"
         });
       }
-      
+
       // If period is specified, get revenue for that period only
       if (period && ['daily', 'weekly', 'monthly', 'ytd', 'allTime'].includes(period as string)) {
         const periodRevenue = await protocolFeeService.getProtocolRevenueByPeriod(
@@ -59,13 +59,13 @@ class ProtocolFeeController {
         );
         res.status(RestStatus.OK).json(periodRevenue);
       }
-      
+
       // Otherwise get all revenue data for the protocol
       let revenue;
       switch (protocol) {
         case 'cdp':
           revenue = await protocolFeeService.getCDPProtocolRevenue(
-            accessToken!, 
+            accessToken!,
             userAddress as string
           );
           break;
@@ -79,7 +79,7 @@ class ProtocolFeeController {
           revenue = await protocolFeeService.getGasCostRevenue(accessToken!);
           break;
       }
-      
+
       res.status(RestStatus.OK).json(revenue);
     } catch (error) {
       next(error);
@@ -98,28 +98,28 @@ class ProtocolFeeController {
       const { accessToken, address: userAddress } = req;
       const { period } = req.params;
       const { protocol } = req.query;
-      
+
       // Validate period
       if (!['daily', 'weekly', 'monthly', 'ytd', 'allTime'].includes(period)) {
-        res.status(RestStatus.BAD_REQUEST).json({ 
-          error: "Invalid period. Must be one of: daily, weekly, monthly, ytd, allTime" 
+        res.status(RestStatus.BAD_REQUEST).json({
+          error: "Invalid period. Must be one of: daily, weekly, monthly, ytd, allTime"
         });
       }
-      
+
       // Validate protocol if specified
       if (protocol && !['cdp', 'lending', 'swap', 'gas'].includes(protocol as string)) {
-        res.status(RestStatus.BAD_REQUEST).json({ 
-          error: "Invalid protocol. Must be one of: cdp, lending, swap, gas" 
+        res.status(RestStatus.BAD_REQUEST).json({
+          error: "Invalid protocol. Must be one of: cdp, lending, swap, gas"
         });
       }
-      
+
       const periodRevenue = await protocolFeeService.getProtocolRevenueByPeriod(
         accessToken!,
         userAddress as string,
         period as any,
         protocol as any
       );
-      
+
       res.status(RestStatus.OK).json(periodRevenue);
     } catch (error) {
       next(error);

@@ -4,12 +4,12 @@ export class CirrusError extends Error {
   public code?: string;
   public hint?: string;
   public details?: any;
-  
+
   constructor(
-    message: string, 
-    status: number = 400, 
-    code?: string, 
-    hint?: string, 
+    message: string,
+    status: number = 400,
+    code?: string,
+    hint?: string,
     details?: any
   ) {
     super(message);
@@ -19,4 +19,4 @@ export class CirrusError extends Error {
     this.hint = hint;
     this.details = details;
   }
-} 
+}

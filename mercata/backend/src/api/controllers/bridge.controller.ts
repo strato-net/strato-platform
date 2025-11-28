@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
-import { 
-  requestWithdrawal, 
+import {
+  requestWithdrawal,
   getBridgeableTokens,
   getRedeemableTokens,
   getNetworkConfigs,
@@ -20,7 +20,7 @@ class BridgeController {
     try {
       const { accessToken, body, address: userAddress } = req;
       validateRequestWithdrawal(body);
-      
+
       const result: WithdrawalRequestResponse = await requestWithdrawal(accessToken, body as WithdrawalRequestParams, userAddress as string);
 
       res.json({
@@ -40,12 +40,12 @@ class BridgeController {
     try {
       const { accessToken } = req;
       const { chainId } = req.params;
-      
+
       if (!chainId) {
         res.status(400).json({ error: "chainId parameter is required" });
         return;
       }
-      
+
       const result: BridgeToken[] = await getBridgeableTokens(accessToken, chainId);
       res.json(result);
     } catch (error: any) {
@@ -61,12 +61,12 @@ class BridgeController {
     try {
       const { accessToken } = req;
       const { chainId } = req.params;
-      
+
       if (!chainId) {
         res.status(400).json({ error: "chainId parameter is required" });
         return;
       }
-      
+
       const result: BridgeToken[] = await getRedeemableTokens(accessToken, chainId);
       res.json(result);
     } catch (error: any) {
@@ -97,15 +97,15 @@ class BridgeController {
       const { accessToken, address: userAddress } = req;
       const { type } = req.params;
       const rawQueryParams = validateRawParams(req.query);
-      
+
       const { context, ...queryParams } = rawQueryParams;
-      
+
       const validatedType = validateTransactionType(type);
-      
+
       const isAdmin = await isUserAdmin(accessToken, userAddress);
-      
+
       const addressToUse = (context === 'admin' && isAdmin) ? undefined : userAddress;
-      
+
       const result: BridgeTransactionResponse = await getBridgeTransactions(accessToken, validatedType, addressToUse, queryParams);
       res.json(result);
     } catch (error: any) {

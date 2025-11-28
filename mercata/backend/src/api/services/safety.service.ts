@@ -75,7 +75,7 @@ export const getSafetyModuleInfo = async (
     // 2. sToken totalSupply (this is totalShares)
     // 3. User's sToken balance
     // 4. User's cooldown start time
-    
+
     let safetyModuleData: any[] = [];
     let sTokenTotalSupply: any[] = [];
     let userTokenBalance: any[] = [];
@@ -153,17 +153,17 @@ export const getSafetyModuleInfo = async (
 
     // Extract data from responses
     const safetyModule = safetyModuleData?.[0] || {};
-    
+
     // Get totalAssets from SafetyModule's _managedAssets state variable
     const totalAssets = safetyModule._managedAssets || "0";
-    
+
     // Get totalShares from sToken's total supply
     const totalShares = sTokenTotalSupply?.[0]?._totalSupply || "0";
-    
+
     // Get config values from SafetyModule contract
     const cooldownSeconds = safetyModule.COOLDOWN_SECONDS?.toString() || "259200"; // 3 days default
     const unstakeWindow = safetyModule.UNSTAKE_WINDOW?.toString() || "172800"; // 2 days default
-    
+
     // Get user-specific data (nested structure)
     const userShares = userTokenBalance?.[0]?.balance || "0";
     const cooldownStart = cooldownData?.[0]?.value || "0";
@@ -178,7 +178,7 @@ export const getSafetyModuleInfo = async (
       : "0";
 
     // Calculate exchange rate (assets per share)
-    const exchangeRate = totalShares !== "0" && BigInt(totalShares) > 0n 
+    const exchangeRate = totalShares !== "0" && BigInt(totalShares) > 0n
       ? (BigInt(totalAssets) * BigInt("1000000000000000000")) / BigInt(totalShares) // 18 decimals
       : BigInt("1000000000000000000"); // 1:1 ratio initially
 
@@ -454,12 +454,12 @@ export const redeemAllSafetyModule = async (
   userAddress: string
 ): Promise<{ status: string; hash: string }> => {
   const info = await getSafetyModuleInfo(accessToken, userAddress);
-  
+
   if (BigInt(info.userShares) === 0n) {
     throw new Error("No shares to redeem");
   }
 
-  return await redeemSafetyModule(accessToken, userAddress, { 
-    sharesAmount: info.userShares 
+  return await redeemSafetyModule(accessToken, userAddress, {
+    sharesAmount: info.userShares
   });
 };

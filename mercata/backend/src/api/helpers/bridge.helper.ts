@@ -30,7 +30,7 @@ export function buildQueryParams(
   const baseParams: Record<string, string> = {
     address: `eq.${constants.mercataBridge}`,
     ...Object.fromEntries(
-      Object.entries(rawParams).filter(([key, v]) => 
+      Object.entries(rawParams).filter(([key, v]) =>
         v !== undefined && !excludeFields.includes(key)
       )
     ),
@@ -48,7 +48,7 @@ export function enrichTransactionData(
   externalAssets: Map<string, any>,
   type: 'withdrawal' | 'deposit'
 ) {
-  return results.map((result: any) => {    
+  return results.map((result: any) => {
     const externalToken = type === 'withdrawal'
       ? result.WithdrawalInfo?.externalToken
       : result.DepositInfo?.externalToken;

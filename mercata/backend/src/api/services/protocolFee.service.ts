@@ -68,7 +68,7 @@ const getTimeCutoffs = () => {
   // Calculate YTD cutoff (January 1st of current year)
   const currentYear = new Date().getFullYear();
   const ytdCutoff = Math.floor(new Date(currentYear, 0, 1).getTime() / 1000);
-  
+
   return { now, oneDayAgo, oneWeekAgo, oneMonthAgo, ytdCutoff };
 };
 
@@ -122,21 +122,21 @@ const categorizeRevenueByPeriod = (
   ytd: Record<string, bigint>;
 } => {
   const { oneDayAgo, oneWeekAgo, oneMonthAgo, ytdCutoff } = timeCutoffs;
-  
+
   const allTime: Record<string, bigint> = {};
   const daily: Record<string, bigint> = {};
   const weekly: Record<string, bigint> = {};
   const monthly: Record<string, bigint> = {};
   const ytd: Record<string, bigint> = {};
-  
+
   events.forEach(({ value, timestamp, asset }) => {
     // Skip if value is 0
     if (value === 0n) return;
-    
+
     // Track all-time
     if (!allTime[asset]) allTime[asset] = 0n;
     allTime[asset] += value;
-    
+
     // Track by time period
     if (timestamp >= oneDayAgo) {
       if (!daily[asset]) daily[asset] = 0n;
@@ -155,7 +155,7 @@ const categorizeRevenueByPeriod = (
       ytd[asset] += value;
     }
   });
-  
+
   return { allTime, daily, weekly, monthly, ytd };
 };
 
@@ -177,14 +177,14 @@ const buildRevenueArray = async (
     });
     await Promise.all(tokenInfoPromises);
   }
-  
+
   // Build array with symbols
   const arr = Object.entries(revenueByAsset).map(([asset, revenue]) => ({
     asset,
     symbol: tokenSymbolCache.get(asset) || 'UNKNOWN',
     revenue: revenue.toString()
   }));
-  
+
   // Sort by revenue descending
   arr.sort((a, b) => {
     const revenueA = BigInt(a.revenue);
@@ -193,7 +193,7 @@ const buildRevenueArray = async (
     if (revenueA < revenueB) return 1;
     return 0;
   });
-  
+
   return arr;
 };
 
@@ -208,12 +208,12 @@ export const getCDPProtocolRevenue = async (
   try {
     // Get registry to find CDPEngine address
     const registry = await getCDPRegistry(accessToken, userAddress, {}, "getCDPProtocolRevenue");
-    
+
     if (!registry?.cdpEngine) {
       throw new Error("CDP Engine not found");
     }
     const cdpEngineAddress = registry.cdpEngine.address;
-    
+
     // Fetch all FeesRouted events from CDPEngine
     const { data: feesRoutedEvents } = await cirrus.get(
       accessToken,
@@ -240,7 +240,7 @@ export const getCDPProtocolRevenue = async (
     }
 
     const timeCutoffs = getTimeCutoffs();
-    
+
     // Transform events to common format
     // Note: CDP fees are always paid in USDST, so we use the USDST address
     // rather than the collateral asset from the event
@@ -249,9 +249,9 @@ export const getCDPProtocolRevenue = async (
       timestamp: parseTimestamp(event.block_timestamp),
       asset: constants.USDST.toLowerCase()
     }));
-    
+
     const periodRevenue = categorizeRevenueByPeriod(transformedEvents, timeCutoffs);
-    
+
     // Build revenue data with token symbols
     const tokenSymbolCache = new Map<string, string>();
     const [allTimeArray, dailyArray, weeklyArray, monthlyArray, ytdArray] = await Promise.all([
@@ -261,12 +261,12 @@ export const getCDPProtocolRevenue = async (
       buildRevenueArray(accessToken, periodRevenue.monthly, tokenSymbolCache),
       buildRevenueArray(accessToken, periodRevenue.ytd, tokenSymbolCache)
     ]);
-    
+
     // Calculate totals
     const calculateTotal = (revenueMap: Record<string, bigint>): string => {
       return Object.values(revenueMap).reduce((sum, val) => sum + val, 0n).toString();
     };
-    
+
     return {
       totalRevenue: calculateTotal(periodRevenue.allTime),
       revenueByPeriod: {
@@ -293,16 +293,16 @@ const getFeeCollector = async (
   lendingPoolAddress: string
 ): Promise<string> => {
   const { data: poolData } = await cirrus.get(accessToken, `/${LendingPool}`, {
-    params: { 
-      address: `eq.${lendingPoolAddress}`, 
-      select: "feeCollector" 
+    params: {
+      address: `eq.${lendingPoolAddress}`,
+      select: "feeCollector"
     }
   });
-  
+
   if (!poolData || poolData.length === 0 || !poolData[0].feeCollector) {
     throw new Error("Fee collector address not found in LendingPool");
   }
-  
+
   return poolData[0].feeCollector;
 };
 
@@ -313,16 +313,16 @@ const getSwapFeeCollector = async (
   accessToken: string
 ): Promise<string> => {
   const { data: factoryData } = await cirrus.get(accessToken, `/${PoolFactory}`, {
-    params: { 
-      address: `eq.${config.poolFactory}`, 
-      select: "feeCollector" 
+    params: {
+      address: `eq.${config.poolFactory}`,
+      select: "feeCollector"
     }
   });
-  
+
   if (!factoryData || factoryData.length === 0 || !factoryData[0].feeCollector) {
     throw new Error("Fee collector address not found in PoolFactory");
   }
-  
+
   return factoryData[0].feeCollector;
 };
 
@@ -334,17 +334,17 @@ export const getLendingProtocolRevenue = async (
 ): Promise<ProtocolRevenue> => {
   try {
     // Get lending pool address from registry
-    const { lendingPool: lendingPoolAddress, liquidityPool: liquidityPoolAddress } = await getPool(accessToken, { 
-      select: "lendingPool,liquidityPool" 
+    const { lendingPool: lendingPoolAddress, liquidityPool: liquidityPoolAddress } = await getPool(accessToken, {
+      select: "lendingPool,liquidityPool"
     });
-    
+
     if (!lendingPoolAddress || !liquidityPoolAddress) {
       throw new Error("Lending pool address not found");
     }
-    
+
     // Get fee collector address from lending pool
     const feeCollector = await getFeeCollector(accessToken, lendingPoolAddress);
-    
+
     // Query all Transfer events where 'from' is the lending pool and 'to' is feeCollector
     const { data: tokenTransferEvents } = await cirrus.get(accessToken, `/event`, {
       params: {
@@ -355,7 +355,7 @@ export const getLendingProtocolRevenue = async (
         order: "block_timestamp.desc"
       }
     });
-    
+
     if (!tokenTransferEvents || tokenTransferEvents.length === 0) {
       return {
         totalRevenue: "0",
@@ -368,18 +368,18 @@ export const getLendingProtocolRevenue = async (
         }
       };
     }
-    
+
     const timeCutoffs = getTimeCutoffs();
-    
+
     // Transform events to common format
     const transformedEvents = tokenTransferEvents.map((event: any) => ({
       value: BigInt(event.attributes?.value || "0"),
       timestamp: parseTimestamp(event.block_timestamp),
       asset: event.address.toLowerCase() // The token that emitted the Transfer event
     }));
-    
+
     const periodRevenue = categorizeRevenueByPeriod(transformedEvents, timeCutoffs);
-    
+
     // Build revenue data with token symbols
     const tokenSymbolCache = new Map<string, string>();
     const [allTimeArray, dailyArray, weeklyArray, monthlyArray, ytdArray] = await Promise.all([
@@ -389,12 +389,12 @@ export const getLendingProtocolRevenue = async (
       buildRevenueArray(accessToken, periodRevenue.monthly, tokenSymbolCache),
       buildRevenueArray(accessToken, periodRevenue.ytd, tokenSymbolCache)
     ]);
-    
+
     // Calculate totals
     const calculateTotal = (revenueMap: Record<string, bigint>): string => {
       return Object.values(revenueMap).reduce((sum, val) => sum + val, 0n).toString();
     };
-    
+
     return {
       totalRevenue: calculateTotal(periodRevenue.allTime),
       revenueByPeriod: {
@@ -422,7 +422,7 @@ export const getSwapProtocolRevenue = async (
   try {
     // Get fee collector address
     const feeCollector = await getSwapFeeCollector(accessToken);
-    
+
     // Get all pools from the factory's allPools array
     const { data: allPoolsData } = await cirrus.get(accessToken, `/${PoolFactory}-allPools`, {
       params: {
@@ -430,7 +430,7 @@ export const getSwapProtocolRevenue = async (
         select: "value"
       }
     });
-    
+
     if (!allPoolsData || allPoolsData.length === 0) {
       return {
         totalRevenue: "0",
@@ -443,10 +443,10 @@ export const getSwapProtocolRevenue = async (
         }
       };
     }
-    
+
     // Extract pool addresses from the allPools array
     const poolAddresses = allPoolsData.map((entry: any) => entry.value);
-    
+
     // Query all Transfer events where 'from' is any pool and 'to' is feeCollector
     const { data: tokenTransferEvents } = await cirrus.get(accessToken, `/event`, {
       params: {
@@ -457,7 +457,7 @@ export const getSwapProtocolRevenue = async (
         order: "block_timestamp.desc"
       }
     });
-    
+
     if (!tokenTransferEvents || tokenTransferEvents.length === 0) {
       return {
         totalRevenue: "0",
@@ -470,12 +470,12 @@ export const getSwapProtocolRevenue = async (
         }
       };
     }
-    
+
     const timeCutoffs = getTimeCutoffs();
-    
+
     // Get unique token addresses from events
     const uniqueTokenAddresses: string[] = [...new Set<string>(tokenTransferEvents.map((event: any) => event.address.toLowerCase()))];
-    
+
     // Fetch prices for all tokens in parallel
     const priceMap = new Map<string, bigint>();
     await Promise.all(
@@ -489,7 +489,7 @@ export const getSwapProtocolRevenue = async (
         }
       })
     );
-    
+
     // Transform events to common format, multiplying value by price
     // value is in token units (18 decimals), price is in 18 decimals
     // result = value * price / 1e18 (to avoid double scaling)
@@ -499,16 +499,16 @@ export const getSwapProtocolRevenue = async (
       const rawValue = BigInt(event.attributes?.value || "0");
       const price = priceMap.get(tokenAddress) || 0n;
       const valueInUsd = (rawValue * price) / DECIMALS;
-      
+
       return {
         value: valueInUsd,
         timestamp: parseTimestamp(event.block_timestamp),
         asset: tokenAddress // The token that emitted the Transfer event
       };
     });
-    
+
     const periodRevenue = categorizeRevenueByPeriod(transformedEvents, timeCutoffs);
-    
+
     // Build revenue data with token symbols
     const tokenSymbolCache = new Map<string, string>();
     const [allTimeArray, dailyArray, weeklyArray, monthlyArray, ytdArray] = await Promise.all([
@@ -518,12 +518,12 @@ export const getSwapProtocolRevenue = async (
       buildRevenueArray(accessToken, periodRevenue.monthly, tokenSymbolCache),
       buildRevenueArray(accessToken, periodRevenue.ytd, tokenSymbolCache)
     ]);
-    
+
     // Calculate totals
     const calculateTotal = (revenueMap: Record<string, bigint>): string => {
       return Object.values(revenueMap).reduce((sum, val) => sum + val, 0n).toString();
     };
-    
+
     return {
       totalRevenue: calculateTotal(periodRevenue.allTime),
       revenueByPeriod: {
@@ -551,7 +551,7 @@ export const getGasCostRevenue = async (
   try {
     // Get fee collector address (same as swap)
     const feeCollector = await getSwapFeeCollector(accessToken);
-    
+
     // Query all Transfer events where 'to' is feeCollector and 'from' is not a zero/system address
     const { data: tokenTransferEvents } = await cirrus.get(accessToken, `/event`, {
       params: {
@@ -572,18 +572,18 @@ export const getGasCostRevenue = async (
       }
     });
     const poolAddresses = allPoolsData ? allPoolsData.map((entry: any) => entry.value) : [];
-    
+
     // Get lending pool liquidityPool address to exclude (already counted in lending revenue)
-    const { lendingPool: lendingPoolAddress, liquidityPool: liquidityPoolAddress } = await getPool(accessToken, { 
-      select: "lendingPool,liquidityPool" 
+    const { lendingPool: lendingPoolAddress, liquidityPool: liquidityPoolAddress } = await getPool(accessToken, {
+      select: "lendingPool,liquidityPool"
     });
-    
+
     // Filter out transfers from pools and liquidity pool
     const excludedAddresses = new Set([...poolAddresses, liquidityPoolAddress].filter(Boolean));
-    const gasTransferEvents = tokenTransferEvents?.filter((event: any) => 
+    const gasTransferEvents = tokenTransferEvents?.filter((event: any) =>
       !excludedAddresses.has(event.attributes.from)
     ) || [];
-    
+
     if (!gasTransferEvents || gasTransferEvents.length === 0) {
       return {
         totalRevenue: "0",
@@ -598,7 +598,7 @@ export const getGasCostRevenue = async (
     }
     // Aggregate by token and time period
     const { oneDayAgo, oneWeekAgo, oneMonthAgo, ytdCutoff } = getTimeCutoffs();
-    
+
     const revenueByAsset: Record<string, {
       symbol: string;
       daily: bigint;
@@ -607,13 +607,13 @@ export const getGasCostRevenue = async (
       ytd: bigint;
       allTime: bigint;
     }> = {};
-    
+
     // Process each transfer event
     for (const event of gasTransferEvents) {
       const tokenAddress = event.address;
       const amount = BigInt(event.attributes.value || "0");
       const timestamp = parseTimestamp(event.block_timestamp);
-      
+
       // Initialize token entry if not exists
       if (!revenueByAsset[tokenAddress]) {
         const tokenInfo = await getTokenInfo(accessToken, tokenAddress);
@@ -626,7 +626,7 @@ export const getGasCostRevenue = async (
           allTime: 0n
         };
       }
-      
+
       // Add to appropriate time buckets
       revenueByAsset[tokenAddress].allTime += amount;
       if (timestamp >= ytdCutoff) revenueByAsset[tokenAddress].ytd += amount;
@@ -655,7 +655,7 @@ export const getGasCostRevenue = async (
     const calculateTotal = (items: RevenueByAsset[]): string => {
       return items.reduce((sum, item) => sum + BigInt(item.revenue), 0n).toString();
     };
-    
+
     const revenueByPeriod: RevenueByPeriod = {
       daily: {
         byAsset: formatRevenueByAsset('daily'),
@@ -678,7 +678,7 @@ export const getGasCostRevenue = async (
         total: "0"
       }
     };
-    
+
     // Set totals
     revenueByPeriod.daily.total = calculateTotal(revenueByPeriod.daily.byAsset);
     revenueByPeriod.weekly.total = calculateTotal(revenueByPeriod.weekly.byAsset);
@@ -712,11 +712,11 @@ export const getAggregatedProtocolRevenue = async (
       getSwapProtocolRevenue(accessToken),
       getGasCostRevenue(accessToken)
     ]);
-    
+
     // Helper to aggregate revenues across protocols
     const aggregateRevenues = (...revenues: RevenueByAsset[][]): RevenueByAsset[] => {
       const aggregated: Record<string, { symbol: string; revenue: bigint }> = {};
-      
+
       revenues.forEach(revenueArray => {
         revenueArray.forEach(({ asset, symbol, revenue }) => {
           if (!aggregated[asset]) {
@@ -725,7 +725,7 @@ export const getAggregatedProtocolRevenue = async (
           aggregated[asset].revenue += BigInt(revenue);
         });
       });
-      
+
       return Object.entries(aggregated)
         .map(([asset, { symbol, revenue }]) => ({
           asset,
@@ -740,7 +740,7 @@ export const getAggregatedProtocolRevenue = async (
           return 0;
         });
     };
-    
+
     // Aggregate totals
     const totalRevenue = (
       BigInt(cdpRevenue.totalRevenue) +
@@ -748,7 +748,7 @@ export const getAggregatedProtocolRevenue = async (
       BigInt(swapRevenue.totalRevenue) +
       BigInt(gasRevenue.totalRevenue)
     ).toString();
-    
+
     // Aggregate each time period
     const aggregated: RevenueByPeriod = {
       daily: {
@@ -822,7 +822,7 @@ export const getAggregatedProtocolRevenue = async (
         )
       }
     };
-    
+
     return {
       totalRevenue,
       byProtocol: {

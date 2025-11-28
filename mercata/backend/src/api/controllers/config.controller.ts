@@ -19,4 +19,4 @@ class ConfigController {
   }
 }
 
-export default ConfigController; 
+export default ConfigController;

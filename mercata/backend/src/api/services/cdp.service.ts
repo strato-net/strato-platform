@@ -72,7 +72,7 @@ export const getCDPRegistry = async (
     // User-specific query - only get vaults for this user
     selectQuery = [
       "address",
-      "feeCollector", 
+      "feeCollector",
       "tokenFactory",
       "usdst",
       "cdpReserve",
@@ -119,7 +119,7 @@ export const getCDPRegistry = async (
     // Validate required components - handle both direct address and object formats
     const engineAddress = registryData.cdpEngine?.address || registryData.cdpEngine;
     const vaultAddress = registryData.cdpVault?.address || registryData.cdpVault;
-    
+
     if (!engineAddress) {
       console.error(`❌ [${caller}] CDP Engine address missing from registry. Data structure:`, {
         hasEngineKey: 'cdpEngine' in registryData,
@@ -155,14 +155,14 @@ export const getUserVaults = async (
 ): Promise<any[]> => {
   try {
     const registry = await getCDPRegistry(accessToken, userAddress, {}, "getUserVaults");
-    
+
     if (!registry?.cdpEngine) {
       return [];
     }
 
     // Get the specific CDPEngine address from registry
     const cdpEngineAddress = registry.cdpEngine.address || registry.cdpEngine;
-    
+
     // Query vaults directly with user filter and specific CDPEngine address
     const { data: userVaults } = await cirrus.get(
       accessToken,
@@ -206,7 +206,7 @@ const getTokenInfo = async (
       select: "_symbol,customDecimals",
     }
   });
-  
+
   const token = data?.[0];
   return {
     symbol: token?._symbol || "UNKNOWN",
@@ -227,7 +227,7 @@ const isTokenActive = async (
   });
 
   const token = tokenData.data?.[0];
-  
+
   return (
     token?.status !== undefined &&
     Number(token.status) === 2
@@ -314,7 +314,7 @@ export const getVaults = async (
   userAddress: string
 ): Promise<VaultData[]> => {
   const registry = await getCDPRegistry(accessToken, userAddress, {}, "getVaults");
-  
+
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
   }
@@ -329,45 +329,45 @@ export const getVaults = async (
   const vaultPromises = userVaults.map(async (vaultEntry: any) => {
     const asset = vaultEntry.asset;
     const vault = vaultEntry.Vault;
-    
+
     // Get token info
     const tokenInfo = await getTokenInfo(accessToken, asset);
-    
+
     // Get asset config and global state
     const config = registry.cdpEngine.collateralConfigs?.find(
       (c: any) => c.asset.toLowerCase() === asset.toLowerCase()
     )?.CollateralConfig;
-    
+
     const globalState = registry.cdpEngine.collateralGlobalStates?.find(
       (s: any) => s.asset.toLowerCase() === asset.toLowerCase()
     )?.CollateralGlobalState;
-    
+
     // Get price
     const priceEntry = registry.priceOracle?.prices?.find(
       (p: any) => p.asset.toLowerCase() === asset.toLowerCase()
     );
     const price = BigInt(priceEntry?.value || "0");
-    
+
     // Only skip if missing essential data (config or vault), but allow missing globalState
     if (!config || !vault) {
       return null;
     }
-    
+
     // Use the current rate accumulator from the indexed data
     // This is already up-to-date as it's updated on every transaction
     // If no globalState, use default rate accumulator (RAY = 1e27, which means 1:1 scaling)
     const currentRateAccumulator = globalState?.rateAccumulator || RAY;
-    
+
     const scaledDebt = BigInt(vault.scaledDebt || "0");
     const currentDebt = (scaledDebt * BigInt(currentRateAccumulator)) / RAY;
-    
-    
+
+
     // Calculate collateral value
     const collateralAmount = BigInt(vault.collateral || "0");
     // Unit scale should now be 1e18 (fixed on-chain configuration)
     const collateralValueUSD = (collateralAmount * price) / BigInt(config.unitScale);
-    
-    
+
+
     // Calculate collateralization ratio
     let cr = 0;
     if (currentDebt > 0n) {
@@ -375,11 +375,11 @@ export const getVaults = async (
     } else if (collateralAmount > 0n) {
       cr = Number.MAX_SAFE_INTEGER; // Infinite CR when no debt
     }
-    
+
     const liquidationRatio = Number(config.liquidationRatio) / Number(WAD) * 100;
     const healthFactor = calculateHealthFactor(cr, liquidationRatio);
     const stabilityFeeRate = convertStabilityFeeRateToAnnualPercentage(config.stabilityFeeRate);
-    
+
     return {
       asset,
       symbol: tokenInfo.symbol,
@@ -409,7 +409,7 @@ export const getVault = async (
   asset: string
 ): Promise<VaultData | null> => {
   const registry = await getCDPRegistry(accessToken, userAddress, {}, "getVault");
-  
+
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
   }
@@ -419,7 +419,7 @@ export const getVault = async (
   const vaultEntry = userVaults.find(
     (v: any) => v.asset?.toLowerCase() === asset.toLowerCase()
   );
-  
+
   if (!vaultEntry) {
     return null;
   }
@@ -428,38 +428,38 @@ export const getVault = async (
 
   // Get token info
   const tokenInfo = await getTokenInfo(accessToken, asset);
-    
+
     // Get asset config and global state
     const config = registry.cdpEngine.collateralConfigs?.find(
       (c: any) => c.asset.toLowerCase() === asset.toLowerCase()
     )?.CollateralConfig;
-    
+
     const globalState = registry.cdpEngine.collateralGlobalStates?.find(
       (s: any) => s.asset.toLowerCase() === asset.toLowerCase()
     )?.CollateralGlobalState;
-    
+
     // Get price
     const priceEntry = registry.priceOracle?.prices?.find(
       (p: any) => p.asset.toLowerCase() === asset.toLowerCase()
     );
     const price = BigInt(priceEntry?.value || "0");
-    
+
     if (!config || !vault) {
       return null;
     }
-    
+
     // Use the current rate accumulator from the indexed data
     // This is already up-to-date as it's updated on every transaction
     const currentRateAccumulator = globalState?.rateAccumulator || RAY;
-    
+
     const scaledDebt = BigInt(vault.scaledDebt || "0");
     const currentDebt = (scaledDebt * BigInt(currentRateAccumulator)) / RAY;
-    
+
     // Calculate collateral value
     const collateralAmount = BigInt(vault.collateral || "0");
     // Unit scale should now be 1e18 (fixed on-chain configuration)
     const collateralValueUSD = (collateralAmount * price) / BigInt(config.unitScale);
-    
+
     // Calculate collateralization ratio
     let cr = 0;
     if (currentDebt > 0n) {
@@ -467,11 +467,11 @@ export const getVault = async (
     } else if (collateralAmount > 0n) {
       cr = Number.MAX_SAFE_INTEGER; // Infinite CR when no debt
     }
-    
+
     const liquidationRatio = Number(config.liquidationRatio) / Number(WAD) * 100;
     const healthFactor = calculateHealthFactor(cr, liquidationRatio);
     const stabilityFeeRate = convertStabilityFeeRateToAnnualPercentage(config.stabilityFeeRate);
-    
+
     return {
       asset,
       symbol: tokenInfo.symbol,
@@ -497,11 +497,11 @@ export const deposit = async (
   body: { asset: string; amount: string }
 ): Promise<{ status: string; hash: string }> => {
   const registry = await getCDPRegistry(accessToken, userAddress, {}, "deposit");
-  
+
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
   }
-  
+
   const amountWei = body.amount;
 
   const tx: FunctionInput[] = [
@@ -531,7 +531,7 @@ export const withdraw = async (
   body: { asset: string; amount: string }
 ): Promise<{ status: string; hash: string }> => {
   const registry = await getCDPRegistry(accessToken, userAddress, {}, "withdraw");
-  
+
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
   }
@@ -556,7 +556,7 @@ export const getMaxWithdraw = async (
   body: { asset: string }
 ): Promise<{ maxAmount: string }> => {
   const registry = await getCDPRegistry(accessToken, userAddress);
-  
+
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
   }
@@ -564,7 +564,7 @@ export const getMaxWithdraw = async (
   // Find the specific vault from registry data
   const allVaults = await getUserVaults(accessToken, userAddress);
   const vaultEntry = allVaults.find(
-    (v: any) => 
+    (v: any) =>
       v.asset?.toLowerCase() === body.asset.toLowerCase()
   );
 
@@ -581,7 +581,7 @@ export const getMaxWithdraw = async (
   const config = registry.cdpEngine.collateralConfigs?.find(
     (c: any) => c.asset.toLowerCase() === body.asset.toLowerCase()
   )?.CollateralConfig;
-  
+
   const globalState = registry.cdpEngine.collateralGlobalStates?.find(
     (s: any) => s.asset.toLowerCase() === body.asset.toLowerCase()
   )?.CollateralGlobalState;
@@ -613,7 +613,7 @@ export const getMaxWithdraw = async (
     }
 
     const price = BigInt(priceEntry.value || "0");
-    
+
     if (price <= 0n) {
       throw new Error("Invalid price");
     }
@@ -621,7 +621,7 @@ export const getMaxWithdraw = async (
     // Compute collateral required to keep CR >= minCR (NOT liquidationRatio)
     const minCR = BigInt(config.minCR || config.liquidationRatio);
     const unitScale = BigInt(config.unitScale);
-    
+
     const requiredCollateralValue = (debt * minCR) / WAD;
     const requiredCollateral = (requiredCollateralValue * unitScale) / price;
 
@@ -642,7 +642,7 @@ export const withdrawMax = async (
   body: { asset: string }
 ): Promise<{ status: string; hash: string }> => {
   const registry = await getCDPRegistry(accessToken, userAddress);
-  
+
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
   }
@@ -665,7 +665,7 @@ export const getMaxMint = async (
   body: { asset: string }
 ): Promise<{ maxAmount: string }> => {
   const registry = await getCDPRegistry(accessToken, userAddress);
-  
+
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
   }
@@ -673,7 +673,7 @@ export const getMaxMint = async (
   // Find the specific vault from registry data
   const allVaults = await getUserVaults(accessToken, userAddress);
   const vaultEntry = allVaults.find(
-    (v: any) => 
+    (v: any) =>
       v.asset?.toLowerCase() === body.asset.toLowerCase()
   );
 
@@ -690,7 +690,7 @@ export const getMaxMint = async (
   const config = registry.cdpEngine.collateralConfigs?.find(
     (c: any) => c.asset.toLowerCase() === body.asset.toLowerCase()
   )?.CollateralConfig;
-  
+
   const globalState = registry.cdpEngine.collateralGlobalStates?.find(
     (s: any) => s.asset.toLowerCase() === body.asset.toLowerCase()
   )?.CollateralGlobalState;
@@ -714,7 +714,7 @@ export const getMaxMint = async (
   }
 
   const price = BigInt(priceEntry.value || "0");
-  
+
   if (price <= 0n) {
     throw new Error("Invalid price");
   }
@@ -723,9 +723,9 @@ export const getMaxMint = async (
   const collateralAmount = BigInt(vault.collateral || "0");
   const minCR = BigInt(config.minCR || config.liquidationRatio);
   const unitScale = BigInt(config.unitScale);
-  
+
   const collateralValueUSD = (collateralAmount * price) / unitScale;
-  
+
   // Calculate max borrowable amount with minCR safety buffer (matches contract's mintMax behavior)
   const maxBorrowableUSD = (collateralValueUSD * WAD) / minCR;
 
@@ -744,7 +744,7 @@ export const getMaxMint = async (
   if (maxAmount > 0n && config.debtCeiling && BigInt(config.debtCeiling) > 0n) {
     const assetDebtUSD = (BigInt(globalState?.totalScaledDebt || "0") * currentRateAccumulator) / RAY;
     const debtCeiling = BigInt(config.debtCeiling);
-    
+
     if (assetDebtUSD + maxAmount > debtCeiling) {
       maxAmount = debtCeiling > assetDebtUSD ? debtCeiling - assetDebtUSD : 0n;
     }
@@ -754,7 +754,7 @@ export const getMaxMint = async (
   if (maxAmount > 0n && config.debtFloor && BigInt(config.debtFloor) > 0n) {
     const totalDebtAfter = currentDebt + maxAmount;
     const debtFloor = BigInt(config.debtFloor);
-    
+
     if (totalDebtAfter < debtFloor) {
       // If adding maxAmount would still be below floor, check if we can mint enough to reach floor
       if (currentDebt === 0n && maxAmount >= debtFloor) {
@@ -779,7 +779,7 @@ export const getAssetDebtInfo = async (
   body: { asset: string }
 ): Promise<{ currentTotalDebt: string; debtFloor: string; debtCeiling: string }> => {
   const registry = await getCDPRegistry(accessToken, userAddress);
-  
+
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
   }
@@ -788,7 +788,7 @@ export const getAssetDebtInfo = async (
   const config = registry.cdpEngine.collateralConfigs?.find(
     (c: any) => c.asset.toLowerCase() === body.asset.toLowerCase()
   )?.CollateralConfig;
-  
+
   const globalState = registry.cdpEngine.collateralGlobalStates?.find(
     (s: any) => s.asset.toLowerCase() === body.asset.toLowerCase()
   )?.CollateralGlobalState;
@@ -814,7 +814,7 @@ export const mint = async (
   body: { asset: string; amount: string }
 ): Promise<{ status: string; hash: string }> => {
   const registry = await getCDPRegistry(accessToken, userAddress, {}, "mint");
-  
+
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
   }
@@ -840,7 +840,7 @@ export const mintMax = async (
   body: { asset: string }
 ): Promise<{ status: string; hash: string }> => {
   const registry = await getCDPRegistry(accessToken, userAddress);
-  
+
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
   }
@@ -863,14 +863,14 @@ export const repay = async (
   body: { asset: string; amount: string }
 ): Promise<{ status: string; hash: string }> => {
   const registry = await getCDPRegistry(accessToken, userAddress);
-  
+
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
   }
 
   // Get USDST address from registry
   const usdstAddress = registry.usdst;
-  
+
   if (!usdstAddress) {
     throw new Error("USDST token not found in registry");
   }
@@ -905,14 +905,14 @@ export const repayAll = async (
   body: { asset: string }
 ): Promise<{ status: string; hash: string }> => {
   const registry = await getCDPRegistry(accessToken, userAddress);
-  
+
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
   }
 
   // Get USDST address from registry
   const usdstAddress = registry.usdst;
-  
+
   if (!usdstAddress) {
     throw new Error("USDST token not found in registry");
   }
@@ -946,14 +946,14 @@ export const liquidate = async (
   body: { collateralAsset: string; borrower: string; debtToCover: string }
 ): Promise<{ status: string; hash: string }> => {
   const registry = await getCDPRegistry(accessToken, userAddress);
-  
+
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
   }
 
   // Get USDST address from registry
   const usdstAddress = registry.usdst;
-  
+
   if (!usdstAddress) {
     throw new Error("USDST token not found in registry");
   }
@@ -991,7 +991,7 @@ export const getLiquidatable = async (
 ): Promise<VaultData[]> => {
   // Get registry info
   const registry = await getCDPRegistry(accessToken, userAddress);
-  
+
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
   }
@@ -1011,20 +1011,20 @@ export const getLiquidatable = async (
       }
     }
   ).catch(() => ({ data: [] })); // Graceful fallback
-  
+
   const vaultPromises = allVaultEntries.map(async (vaultEntry: any) => {
     const vaultOwner = vaultEntry.user;
     const asset = vaultEntry.asset;
     const vault = vaultEntry.Vault;
-    
+
     // Skip if no debt
     if (!vault?.scaledDebt || vault.scaledDebt === "0") {
       return null;
     }
-    
+
     // Get vault data
     const vaultData = await getVault(accessToken, vaultOwner, asset);
-    
+
     // Return only if liquidatable (health factor < 1.0)
     if (vaultData && vaultData.healthFactor < 1.0) {
       // Add the borrower address to the vault data for liquidation
@@ -1033,7 +1033,7 @@ export const getLiquidatable = async (
         borrower: vaultOwner
       };
     }
-    
+
     return null;
   });
 
@@ -1047,7 +1047,7 @@ export const getAssetConfig = async (
   asset: string
 ): Promise<AssetConfig | null> => {
   const registry = await getCDPRegistry(accessToken, userAddress);
-  
+
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
   }
@@ -1055,14 +1055,14 @@ export const getAssetConfig = async (
   const configEntry = registry.cdpEngine.collateralConfigs?.find(
     (c: any) => c.asset.toLowerCase() === asset.toLowerCase()
   );
-  
+
   if (!configEntry) {
     return null;
   }
-  
+
   const config = configEntry.CollateralConfig;
   const tokenInfo = await getTokenInfo(accessToken, asset);
-  
+
   // Check isSupportedAsset mapping - if asset is not in the mapping, it's disabled (false)
   // The Cirrus query returns entries with 'key' field (asset address) and 'value' field (boolean)
   const supportedAssetEntry = registry.cdpEngine.isSupportedAsset?.find(
@@ -1072,7 +1072,7 @@ export const getAssetConfig = async (
     }
   );
   const isSupported = supportedAssetEntry?.value === true;
-  
+
   return {
     asset,
     symbol: tokenInfo.symbol,
@@ -1188,9 +1188,9 @@ export const getMaxLiquidatable = async (
   userAddress: string,
   body: { collateralAsset: string; borrower: string }
 ): Promise<{ maxAmount: string }> => {
-  
+
   const registry = await getCDPRegistry(accessToken, userAddress);
-  
+
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
   }
@@ -1223,48 +1223,48 @@ export const getMaxLiquidatable = async (
   const rateAccumulator = BigInt(globalState.rateAccumulator);
   const scaledDebt = BigInt(vaultData.scaledDebt);
   const totalDebtUSD = (scaledDebt * rateAccumulator) / RAY;
-  
+
   // Apply close factor cap (Cap 2)
   const closeFactorBps = BigInt(config.closeFactorBps);
   const closeFactorCap = (totalDebtUSD * closeFactorBps) / 10000n;
-  
+
   // Calculate coverage cap (Cap 3) - ensures collateral can cover repay + penalty
   const priceEntry = registry.priceOracle?.prices?.find(
     (p: any) => p.asset.toLowerCase() === body.collateralAsset.toLowerCase()
   );
-  
+
   if (!priceEntry) {
     throw new Error("Price not found for collateral asset");
   }
-  
+
   const price = BigInt(priceEntry.value || "0");
   if (price <= 0n) {
     throw new Error("Invalid collateral price");
   }
-  
+
   const collateralAmount = BigInt(vaultData.collateralAmount);
   const unitScale = BigInt(config.unitScale);
   const liquidationPenaltyBps = BigInt(config.liquidationPenaltyBps);
-  
+
   const collateralUSD = (collateralAmount * price) / unitScale;
   const coverageCap = (collateralUSD * 10000n) / (10000n + liquidationPenaltyBps);
-  
+
   // Apply close factor and coverage caps
   const actualMaxLiquidatable = BigInt(Math.min(
-    Number(closeFactorCap), 
+    Number(closeFactorCap),
     Number(coverageCap)
   ));
-  
+
   // Add a small buffer to prevent dust issues when liquidating the maximum amount
   // This ensures we can liquidate slightly more than the pure mathematical result
   const bufferWei = 100000n; // 100k wei buffer
   const maxLiquidatableWithBuffer = actualMaxLiquidatable + bufferWei;
-  
+
   // Final safety: ensure we never exceed the total debt amount
-  const finalMaxLiquidatable = maxLiquidatableWithBuffer > totalDebtUSD 
-    ? totalDebtUSD 
+  const finalMaxLiquidatable = maxLiquidatableWithBuffer > totalDebtUSD
+    ? totalDebtUSD
     : maxLiquidatableWithBuffer;
-  
+
   return { maxAmount: finalMaxLiquidatable.toString() };
 };
 
@@ -1287,11 +1287,11 @@ export const setCollateralConfig = async (
   }
 ): Promise<{ status: string; hash: string }> => {
   const registry = await getCDPRegistry(accessToken, userAddress, {}, "setCollateralConfig");
-  
+
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
   }
-  
+
   const tx: FunctionInput = {
     contractName: extractContractName(CDPEngine),
     contractAddress: registry.cdpEngine.address,
@@ -1322,7 +1322,7 @@ export const setAssetPaused = async (
   body: { asset: string; isPaused: boolean }
 ): Promise<{ status: string; hash: string }> => {
   const registry = await getCDPRegistry(accessToken, userAddress, {}, "setAssetPaused");
-  
+
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
   }
@@ -1349,7 +1349,7 @@ export const setGlobalPaused = async (
   body: { isPaused: boolean }
 ): Promise<{ status: string; hash: string }> => {
   const registry = await getCDPRegistry(accessToken, userAddress, {}, "setGlobalPaused");
-  
+
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
   }
@@ -1375,7 +1375,7 @@ export const setAssetSupported = async (
   body: { asset: string; supported: boolean }
 ): Promise<{ status: string; hash: string }> => {
   const registry = await getCDPRegistry(accessToken, userAddress, {}, "setAssetSupported");
-  
+
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
   }
@@ -1401,7 +1401,7 @@ export const getGlobalPaused = async (
   userAddress: string
 ): Promise<{ isPaused: boolean }> => {
   const registry = await getCDPRegistry(accessToken, userAddress, {}, "getGlobalPaused");
-  
+
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
   }
@@ -1422,7 +1422,7 @@ export const getBadDebt = async (
   userAddress: string
 ): Promise<BadDebt[]> => {
   const registry = await getCDPRegistry(accessToken, userAddress);
-  
+
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
   }
@@ -1430,7 +1430,7 @@ export const getBadDebt = async (
   try {
     // Get the specific CDPEngine address from registry
     const cdpEngineAddress = registry.cdpEngine.address || registry.cdpEngine;
-    
+
     // Query the badDebt mapping from the CDP Engine contract
     // Use ::text to force Cirrus to return large numbers as strings instead of scientific notation
     const { data } = await cirrus.get(
@@ -1452,7 +1452,7 @@ export const getBadDebt = async (
 
     // Filter out zero bad debt entries
     const nonZeroBadDebtEntries = data.filter((entry: any) => entry.value && entry.value !== "0");
-    
+
     if (nonZeroBadDebtEntries.length === 0) {
       console.log('No non-zero bad debt entries found');
       return [];
@@ -1461,13 +1461,13 @@ export const getBadDebt = async (
 
     // Fetch token symbols for each asset with bad debt
     const badDebtEntries: BadDebt[] = [];
-    
+
     for (const entry of nonZeroBadDebtEntries) {
       const assetAddress = entry.key;
       const badDebtAmount = entry.value;
-      
+
       try {
-        
+
         // Query the token contract's symbol
         const symbolResponse = await cirrus.get(
           accessToken,
@@ -1495,7 +1495,7 @@ export const getBadDebt = async (
 
       } catch (error: any) {
         console.error(`Error fetching symbol for asset ${assetAddress}:`, error.message);
-        
+
         // Still include the entry without symbol
         badDebtEntries.push({
           asset: assetAddress,
@@ -1532,7 +1532,7 @@ export const getClaimableAmount = async (
   account: string
 ): Promise<string> => {
   const registry = await getCDPRegistry(accessToken, userAddress);
-  
+
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
   }
@@ -1540,7 +1540,7 @@ export const getClaimableAmount = async (
   const cdpEngineAddress = registry.cdpEngine.address || registry.cdpEngine;
   const reserveAddress = registry.cdpReserve;
   const usdstAddress = registry.usdst;
-  
+
   try {
     // Get all required data via Cirrus queries (gas-free)
     const [
@@ -1558,7 +1558,7 @@ export const getClaimableAmount = async (
           address: `eq.${cdpEngineAddress}`
         }
       }),
-      
+
       // 2. Get current junior index
       cirrus.get(accessToken, `/${CDPEngine}`, {
         params: {
@@ -1566,7 +1566,7 @@ export const getClaimableAmount = async (
           address: `eq.${cdpEngineAddress}`
         }
       }),
-      
+
       // 3. Get previous reserve balance
       cirrus.get(accessToken, `/${CDPEngine}`, {
         params: {
@@ -1574,7 +1574,7 @@ export const getClaimableAmount = async (
           address: `eq.${cdpEngineAddress}`
         }
       }),
-      
+
       // 4. Get total junior outstanding
       cirrus.get(accessToken, `/${CDPEngine}`, {
         params: {
@@ -1582,11 +1582,11 @@ export const getClaimableAmount = async (
           address: `eq.${cdpEngineAddress}`
         }
       }),
-      
+
       // 5. Get current reserve balance from USDST contract
       cirrus.get(accessToken, `/BlockApps-Token-_balances`, {
         params: {
-          select: "key,value::text", 
+          select: "key,value::text",
           key: `eq.${reserveAddress}`,
           address: `eq.${usdstAddress}`
         }
@@ -1647,7 +1647,7 @@ export const getJuniorNotes = async (
   account: string
 ): Promise<JuniorNote | null> => {
   const registry = await getCDPRegistry(accessToken, userAddress);
-  
+
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
   }
@@ -1655,7 +1655,7 @@ export const getJuniorNotes = async (
   try {
     // Get the specific CDPEngine address from registry
     const cdpEngineAddress = registry.cdpEngine.address || registry.cdpEngine;
-    
+
     // Query the juniorNotes mapping for the specific account
     const { data } = await cirrus.get(
       accessToken,
@@ -1706,7 +1706,7 @@ export const claimJuniorNote = async (
   userAddress: string
 ): Promise<{ status: string; hash: string }> => {
   const registry = await getCDPRegistry(accessToken, userAddress, {}, "claimJuniorNote");
-  
+
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
   }
@@ -1754,7 +1754,7 @@ export const topUpJuniorNote = async (
   body: { amountUSDST: string }
 ): Promise<{ status: string; hash: string; burnedUSDST?: string; capUSDST?: string }> => {
   const registry = await getCDPRegistry(accessToken, userAddress, {}, "topUpJuniorNote");
-  
+
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
   }
@@ -1770,7 +1770,7 @@ export const topUpJuniorNote = async (
   if (!badDebtData || badDebtData.length === 0) {
     throw new Error("No bad debt found to top up for");
   }
-  
+
   // Use the first asset with bad debt for the top-up
   const assetWithBadDebt = badDebtData.find(debt => parseFloat(debt.badDebt) > 0);
   if (!assetWithBadDebt) {
@@ -1853,7 +1853,7 @@ export const getCDPStats = async (
   try {
     // Get registry to find CDPEngine address
     const registry = await getCDPRegistry(accessToken, userAddress, {}, "getCDPStats");
-    
+
     if (!registry?.cdpEngine) {
       throw new Error("CDP Engine not found");
     }
@@ -1921,12 +1921,12 @@ export const getCDPStats = async (
     vaults.forEach((vault: any) => {
       const asset = vault.asset.toLowerCase();
       const vaultData = vault.Vault || {};
-      
+
       // Skip inactive tokens (not in tokenInfoMap means status !== '2')
       if (!tokenInfoMap[asset]) {
         return;
       }
-      
+
       if (!assetStats[asset]) {
         assetStats[asset] = {
           collateral: 0n,
@@ -2022,7 +2022,7 @@ export const openJuniorNote = async (
   body: { asset: string; amountUSDST: string }
 ): Promise<{ status: string; hash: string; burnedUSDST?: string; capUSDST?: string }> => {
   const registry = await getCDPRegistry(accessToken, userAddress, {}, "openJuniorNote");
-  
+
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
   }

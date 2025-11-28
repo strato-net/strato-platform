@@ -14,7 +14,7 @@ class UserController {
     try {
       const { address: userAddress, accessToken, userName } = req;
       const isAdmin = await isUserAdmin(accessToken, userAddress);
-      
+
       res.status(RestStatus.OK).json({ userAddress, isAdmin, userName });
       next();
     } catch (e) {
@@ -49,8 +49,8 @@ class UserController {
       validateUserAddress(userAddress);
 
       const result = await addAdmin(accessToken, actorAddress as string, userAddress);
-      res.status(RestStatus.CREATED).json({ 
-        message: "Admin added successfully", 
+      res.status(RestStatus.CREATED).json({
+        message: "Admin added successfully",
         userAddress,
         status: result.status,
         hash: result.hash
@@ -73,8 +73,8 @@ class UserController {
       validateUserAddress(userAddress);
 
       const result = await removeAdmin(accessToken, actorAddress as string, userAddress);
-      res.status(RestStatus.OK).json({ 
-        message: "Admin removed successfully", 
+      res.status(RestStatus.OK).json({
+        message: "Admin removed successfully",
         userAddress,
         status: result.status,
         hash: result.hash
@@ -94,10 +94,10 @@ class UserController {
       const { accessToken, address: actorAddress } = req;
       const { target, func, args } = req.body;
       validateAddressField(target);
-      
+
       const result = await castVoteOnIssue(accessToken, actorAddress as string, target, func, args);
-      res.status(RestStatus.OK).json({ 
-        message: "Vote cast successfully", 
+      res.status(RestStatus.OK).json({
+        message: "Vote cast successfully",
         target,
         func,
         args,
@@ -118,10 +118,10 @@ class UserController {
     try {
       const { accessToken, address: actorAddress } = req;
       const { issueId } = req.body;
-      
+
       const result = await castVoteOnIssueById(accessToken, actorAddress as string, issueId);
-      res.status(RestStatus.OK).json({ 
-        message: "Vote cast successfully", 
+      res.status(RestStatus.OK).json({
+        message: "Vote cast successfully",
         issueId,
         status: result.status,
         hash: result.hash,

@@ -43,7 +43,7 @@ export const postAndWaitForTx = async (
 ): Promise<{ status: string; hash: string }> => {
   try {
     const response = await stratoPostFn();
-    
+
     if (response.status !== 200) {
       throw new StratoError(`Strato error: ${response.statusText}`, 500);
     }
@@ -83,13 +83,13 @@ export const postAndWaitForTx = async (
     if (error instanceof StratoError) {
       throw error;
     }
-    
+
     // Check if this is an Axios error with response data
     if (error.response?.data && typeof error.response.data === 'string') {
       const extractedMessage = extractErrorMessage(error.response.data);
       throw new StratoError(extractedMessage, 400);
     }
-    
+
     // Re-throw the original error if it doesn't match the expected format
     throw error;
   }
@@ -128,6 +128,6 @@ export const executeTransaction = async (accessToken: string, tx: any): Promise<
   const { status, hash } = await postAndWaitForTx(accessToken, () =>
     bloc.post(accessToken, StratoPaths.transactionParallel, tx)
   );
-  
+
   return { status, hash };
 };

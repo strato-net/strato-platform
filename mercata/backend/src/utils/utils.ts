@@ -8,6 +8,6 @@ export function ensureHexPrefix(address: string): string {
   return address.startsWith('0x') ? address : `0x${address}`;
 }
 
-export const ensure = (ok: boolean, msg: string) => { 
-  if (!ok) throw new Error(msg); 
+export const ensure = (ok: boolean, msg: string) => {
+  if (!ok) throw new Error(msg);
 };

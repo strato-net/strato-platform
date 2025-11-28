@@ -15,7 +15,7 @@ class OracleController {
   ): Promise<void> {
     try {
       const { accessToken, query } = req;
-      const asset = typeof query.asset === "string" ? query.asset : undefined;  
+      const asset = typeof query.asset === "string" ? query.asset : undefined;
 
       const result = await getPrice(accessToken, asset);
       res.status(RestStatus.OK).json(result);

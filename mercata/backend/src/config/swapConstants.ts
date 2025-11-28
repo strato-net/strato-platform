@@ -38,7 +38,7 @@ export const SWAP_POOL_SELECT_FIELDS = [
   "address",
   "swapFeeRate",
   "lpSharePercent",
-  "aToBRatio::text", 
+  "aToBRatio::text",
   "bToARatio::text",
   `tokenA:tokenA_fkey(${SWAP_TOKEN_SELECT_FIELDS.join(',')})`,
   "tokenABalance::text",
@@ -56,7 +56,7 @@ export const SWAP_HISTORY_SELECT_FIELDS = [
   "block_timestamp",
   "sender",
   "tokenIn",
-  "tokenOut", 
+  "tokenOut",
   "amountIn::text",
   "amountOut::text",
   "pool:BlockApps-Pool(tokenA:tokenA_fkey(address,symbol:_symbol),tokenB:tokenB_fkey(address,symbol:_symbol))"

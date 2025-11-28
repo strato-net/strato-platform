@@ -7,7 +7,7 @@ export function validateDepositArgs(args: any) {
     asset: validateAddressField("asset"),
     amount: numericStringField("amount"),
   });
-  
+
   const { error } = schema.validate(args);
   if (error) {
     throw new Error("CDP Deposit Argument Validation Error: " + error.message);
@@ -19,7 +19,7 @@ export function validateWithdrawArgs(args: any) {
     asset: validateAddressField("asset"),
     amount: numericStringField("amount"),
   });
-  
+
   const { error } = schema.validate(args);
   if (error) {
     throw new Error("CDP Withdraw Argument Validation Error: " + error.message);
@@ -30,7 +30,7 @@ export function validateWithdrawMaxArgs(args: any) {
   const schema = Joi.object({
     asset: validateAddressField("asset"),
   });
-  
+
   const { error } = schema.validate(args);
   if (error) {
     throw new Error("CDP Withdraw Max Argument Validation Error: " + error.message);
@@ -42,7 +42,7 @@ export function validateMintArgs(args: any) {
     asset: validateAddressField("asset"),
     amount: numericStringField("amount"),
   });
-  
+
   const { error } = schema.validate(args);
   if (error) {
     throw new Error("CDP Mint Argument Validation Error: " + error.message);
@@ -53,7 +53,7 @@ export function validateMintMaxArgs(args: any) {
   const schema = Joi.object({
     asset: validateAddressField("asset"),
   });
-  
+
   const { error } = schema.validate(args);
   if (error) {
     throw new Error("CDP Mint Max Argument Validation Error: " + error.message);
@@ -65,7 +65,7 @@ export function validateRepayArgs(args: any) {
     asset: validateAddressField("asset"),
     amount: numericStringField("amount"),
   });
-  
+
   const { error } = schema.validate(args);
   if (error) {
     throw new Error("CDP Repay Argument Validation Error: " + error.message);
@@ -76,7 +76,7 @@ export function validateRepayAllArgs(args: any) {
   const schema = Joi.object({
     asset: validateAddressField("asset"),
   });
-  
+
   const { error } = schema.validate(args);
   if (error) {
     throw new Error("CDP Repay All Argument Validation Error: " + error.message);
@@ -89,7 +89,7 @@ export function validateLiquidateArgs(args: any) {
     borrower: validateAddressField("borrower"),
     debtToCover: numericStringField("debtToCover"),
   });
-  
+
   const { error } = schema.validate(args);
   if (error) {
     throw new Error("CDP Liquidate Argument Validation Error: " + error.message);
@@ -101,7 +101,7 @@ export function validateOpenJuniorNoteArgs(args: any) {
     asset: validateAddressField("asset"),
     amountUSDST: numericStringField("amountUSDST"),
   });
-  
+
   const { error } = schema.validate(args);
   if (error) {
     throw new Error("CDP Open Junior Note Argument Validation Error: " + error.message);
@@ -112,7 +112,7 @@ export function validateTopUpJuniorNoteArgs(args: any) {
   const schema = Joi.object({
     amountUSDST: numericStringField("amountUSDST"),
   });
-  
+
   const { error } = schema.validate(args);
   if (error) {
     throw new Error("CDP Top Up Junior Note Argument Validation Error: " + error.message);
@@ -123,7 +123,7 @@ export function validateTopUpJuniorNoteArgs(args: any) {
 export function validateSetCollateralConfigArgs(args: any) {
   const WAD = BigInt(10) ** BigInt(18);
   const RAY = BigInt(10) ** BigInt(27);
-  
+
   const schema = Joi.object({
     asset: validateAddressField("asset"),
     liquidationRatio: Joi.string().custom((value, helpers) => {
@@ -178,9 +178,9 @@ export function validateSetCollateralConfigArgs(args: any) {
     }),
     isPaused: Joi.boolean().required()
   });
-  
+
   const { error } = schema.validate(args);
   if (error) {
     throw new Error("CDP Set Collateral Config Argument Validation Error: " + error.message);
   }
-} 
+}

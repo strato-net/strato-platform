@@ -30,7 +30,7 @@ export function validateBorrowArgs(args: any) {
   const schema = Joi.object({
     amount: numericStringField("amount"),
   });
-  
+
   const { error } = schema.validate(args);
   if (error) {
     throw new Error("Borrow Argument Validation Error: " + error.message);
@@ -41,7 +41,7 @@ export function validateRepayArgs(args: any) {
   const schema = Joi.object({
     amount: numericStringField("amount"),
   });
-  
+
   const { error } = schema.validate(args);
   if (error) {
     throw new Error("Repay Argument Validation Error: " + error.message);
@@ -53,7 +53,7 @@ export function validateSupplyCollateralArgs(args: any) {
     asset: validateAddressField("asset"),
     amount: numericStringField("amount"),
   });
-  
+
   const { error } = schema.validate(args);
   if (error) {
     throw new Error("Supply Collateral Argument Validation Error: " + error.message);
@@ -65,7 +65,7 @@ export function validateWithdrawCollateralArgs(args: any) {
     asset: validateAddressField("asset"),
     amount: numericStringField("amount"),
   });
-  
+
   const { error } = schema.validate(args);
   if (error) {
     throw new Error("Withdraw Collateral Argument Validation Error: " + error.message);
@@ -109,7 +109,7 @@ export function validateConfigureAssetArgs(args: any) {
       'string.pattern.base': 'perSecondFactorRAY must be a valid integer string'
     }),
   });
-  
+
   const { error } = schema.validate(args);
   if (error) {
     throw new Error("Configure Asset Argument Validation Error: " + error.message);
@@ -120,7 +120,7 @@ export function validateSweepReservesArgs(args: any) {
   const schema = Joi.object({
     amount: numericStringField("amount"),
   });
-  
+
   const { error } = schema.validate(args);
   if (error) {
     throw new Error("Sweep Reserves Argument Validation Error: " + error.message);
@@ -132,7 +132,7 @@ export function validateSetDebtCeilingsArgs(args: any) {
     assetUnits: numericStringField("assetUnits", {allowZero: true}),
     usdValue: numericStringField("usdValue", {allowZero: true}),
   });
-  
+
   const { error } = schema.validate(args);
   if (error) {
     throw new Error("Set Debt Ceilings Argument Validation Error: " + error.message);
