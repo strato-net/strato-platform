@@ -184,7 +184,7 @@ contract Describe_MercataBridge is Authorizable {
             reverted = true;
         }
         require(reverted, "Should revert with zero token factory");
-        
+
         reverted = false;
         try {
             new MercataBridge(owner).initialize(address(tokenFactory), address(0));
