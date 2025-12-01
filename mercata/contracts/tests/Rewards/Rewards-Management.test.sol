@@ -98,8 +98,12 @@ contract Describe_Rewards_Management is Authorizable {
 
         // then
         require(activityId == 1, "First activity ID should be 1");
-        (string memory activityName, ActivityType activityType, uint256 rate, uint256 accReward, uint256 lastUpdate, uint256 totalStake, address source) =
+        // Get activity configuration
+        (string memory activityName, ActivityType activityType, uint256 rate, address source) =
             rewards.activities(activityId);
+        // Get activity state
+        (uint256 accReward, uint256 lastUpdate, uint256 totalStake) =
+            rewards.activityStates(activityId);
 
         require(keccak256(bytes(activityName)) == keccak256(bytes(name)), "Activity name should match");
         require(activityType == ActivityType.Position, "Activity type should match");
@@ -182,8 +186,8 @@ contract Describe_Rewards_Management is Authorizable {
         uint256 activityId2 = rewards.addPositionActivity("Activity 2", 200, sourceB, events2);
 
         // verify both activities exist
-        (string memory name1, , , , , , ) = rewards.activities(activityId1);
-        (string memory name2, , , , , , ) = rewards.activities(activityId2);
+        (string memory name1, , , ) = rewards.activities(activityId1);
+        (string memory name2, , , ) = rewards.activities(activityId2);
         require(keccak256(bytes(name1)) == keccak256(bytes("Activity 1")), "Activity 1 should exist");
         require(keccak256(bytes(name2)) == keccak256(bytes("Activity 2")), "Activity 2 should exist");
     }
@@ -208,7 +212,7 @@ contract Describe_Rewards_Management is Authorizable {
         uint256 activityId3 = rewards.addPositionActivity("Activity 3", 300, sourceA, events3);
 
         // verify all three activities exist
-        (string memory name3, , , , , , ) = rewards.activities(activityId3);
+        (string memory name3, , , ) = rewards.activities(activityId3);
         require(keccak256(bytes(name3)) == keccak256(bytes("Activity 3")), "Activity 3 should exist");
     }
 
@@ -285,7 +289,7 @@ contract Describe_Rewards_Management is Authorizable {
         rewards.setEmissionRate(activityId, newEmission);
 
         // then
-        (string memory name, ActivityType activityType, uint256 rate, uint256 accReward, uint256 lastUpdate, uint256 totalStake, address source) =
+        (string memory name, ActivityType activityType, uint256 rate, address source) =
             rewards.activities(activityId);
         require(rate == newEmission, "Emission rate should be updated");
         require(rewards.totalRewardsEmission() == newEmission, "Total emission should be updated");
@@ -333,7 +337,7 @@ contract Describe_Rewards_Management is Authorizable {
         rewards.setEmissionRate(activityId, 0);
 
         // then
-        (string memory name, ActivityType activityType, uint256 rate, uint256 accReward, uint256 lastUpdate, uint256 totalStake, address source) =
+        (string memory name, ActivityType activityType, uint256 rate, address source) =
             rewards.activities(activityId);
         require(rate == 0, "Emission rate should be 0");
         require(rewards.totalRewardsEmission() == 0, "Total emission should be 0");
@@ -354,7 +358,7 @@ contract Describe_Rewards_Management is Authorizable {
         rewards.setSourceContract(activityId, newSource);
 
         // then
-        (string memory name, ActivityType activityType, uint256 rate, uint256 accReward, uint256 lastUpdate, uint256 totalStake, address source) =
+        (string memory name, ActivityType activityType, uint256 rate, address source) =
             rewards.activities(activityId);
         require(source == newSource, "Source contract should be updated");
     }

@@ -38,15 +38,24 @@ struct RewardsUserInfo {
     uint256 userIndex;   // Snapshot of accRewardPerStake at last update (Aave-style)
 }
 
+/**
+ * @dev Activity configuration - set by governance
+ */
 struct Activity {
-    string name;                 // Human-readable name for this activity
+    string name;                 // Human-readable name for this activity (e.g., "GOLDST-USDST LP Staking")
     ActivityType activityType;   // Type of activity (Position or OneTime)
     uint256 emissionRate;        // CATA tokens emitted per second for this activity
+    address sourceContract;      // Address of the contract this activity tracks (for external service mapping)
+    ActionableEvent[] actionableEvents; // Events that can trigger actions for this activity
+}
+
+/**
+ * @dev Activity state - automatically updated by reward logic
+ */
+struct ActivityState {
     uint256 accRewardPerStake;   // Accumulated reward per 1 unit of stake (scaled by 1e18)
     uint256 lastUpdateTime;      // Last timestamp when the index was updated
     uint256 totalStake;          // Sum of all users' effective stakes for this activity
-    address sourceContract;      // Address of the contract this activity tracks (for external service mapping)
-    ActionableEvent[] actionableEvents; // Events that can trigger actions for this activity
 }
 
 /**
@@ -89,8 +98,11 @@ contract record Rewards is Ownable {
     // The CATA token (reward token)
     Token public rewardToken;
 
-    // Mapping of activityId to Activity struct
+    // Mapping of activityId to Activity struct (governance/configuration)
     mapping(uint256 => Activity) public record activities;
+
+    // Mapping of activityId to ActivityState struct (runtime state)
+    mapping(uint256 => ActivityState) public record activityStates;
 
     // Array of all activity IDs for enumeration
     uint256[] public activityIds;
@@ -423,14 +435,18 @@ contract record Rewards is Ownable {
         uint256 activityId = nextActivityId;
         nextActivityId++;
 
+        // Initialize activity configuration
         Activity storage activity = activities[activityId];
         activity.name = name;
         activity.activityType = activityType;
         activity.emissionRate = emissionRate;
-        activity.accRewardPerStake = 0;
-        activity.lastUpdateTime = block.timestamp;
-        activity.totalStake = 0;
         activity.sourceContract = sourceContract;
+
+        // Initialize activity state
+        ActivityState storage state = activityStates[activityId];
+        state.accRewardPerStake = 0;
+        state.lastUpdateTime = block.timestamp;
+        state.totalStake = 0;
 
         // Copy actionable events and register in mapping
         for (uint256 i = 0; i < actionableEvents.length; i++) {
@@ -495,6 +511,7 @@ contract record Rewards is Ownable {
         uint256 activityId = eventInfo.activityId;
         ActionType actionType = eventInfo.actionType;
         Activity storage activity = activities[activityId];
+        ActivityState storage state = activityStates[activityId];
 
         // Validate action type against activity type
         if (actionType == ActionType.Deposit || actionType == ActionType.Withdraw) {
@@ -516,7 +533,7 @@ contract record Rewards is Ownable {
 
         if (oldStake > 0) {
             // Calculate rewards using index delta: stake × (currentIndex - userIndex)
-            uint256 indexDelta = activity.accRewardPerStake - userState.userIndex;
+            uint256 indexDelta = state.accRewardPerStake - userState.userIndex;
             pendingRewards = (oldStake * indexDelta) / PRECISION_MULTIPLIER;
 
             if (pendingRewards > 0) {
@@ -535,10 +552,10 @@ contract record Rewards is Ownable {
 
         // 4) Update user stake and index snapshot
         userState.stake = newStake;
-        userState.userIndex = activity.accRewardPerStake;
+        userState.userIndex = state.accRewardPerStake;
 
         // 5) Update total stake internally (secure calculation)
-        activity.totalStake = activity.totalStake + newStake - oldStake;
+        state.totalStake = state.totalStake + newStake - oldStake;
 
         emit UserStakeUpdated(activityId, action.user, oldStake, newStake, pendingRewards);
     }
@@ -564,13 +581,13 @@ contract record Rewards is Ownable {
         // Update the activity index first
         _updateActivityIndex(activityId);
 
-        Activity storage activity = activities[activityId];
+        ActivityState storage state = activityStates[activityId];
         RewardsUserInfo storage userState = userInfo[user][activityId];
         uint256 userStake = userState.stake;
 
         if (userStake > 0) {
             // Calculate rewards using index delta: stake × (currentIndex - userIndex)
-            uint256 indexDelta = activity.accRewardPerStake - userState.userIndex;
+            uint256 indexDelta = state.accRewardPerStake - userState.userIndex;
             uint256 pending = (userStake * indexDelta) / PRECISION_MULTIPLIER;
 
             if (pending > 0) {
@@ -578,7 +595,7 @@ contract record Rewards is Ownable {
             }
 
             // Update user index to current (without changing stake)
-            userState.userIndex = activity.accRewardPerStake;
+            userState.userIndex = state.accRewardPerStake;
         }
     }
 
@@ -588,29 +605,30 @@ contract record Rewards is Ownable {
      */
     function _updateActivityIndex(uint256 activityId) internal {
         Activity storage activity = activities[activityId];
+        ActivityState storage state = activityStates[activityId];
 
         // If no time has passed, nothing to update
-        if (block.timestamp <= activity.lastUpdateTime) {
+        if (block.timestamp <= state.lastUpdateTime) {
             return;
         }
 
         // If there's no stake, just update the timestamp
-        if (activity.totalStake == 0) {
-            activity.lastUpdateTime = block.timestamp;
+        if (state.totalStake == 0) {
+            state.lastUpdateTime = block.timestamp;
             return;
         }
 
         // Calculate time elapsed
-        uint256 dt = block.timestamp - activity.lastUpdateTime;
+        uint256 dt = block.timestamp - state.lastUpdateTime;
 
         // Calculate rewards accrued during this period
         uint256 reward = activity.emissionRate * dt;
 
         // Update the cumulative index
-        activity.accRewardPerStake += (reward * PRECISION_MULTIPLIER) / activity.totalStake;
-        activity.lastUpdateTime = block.timestamp;
+        state.accRewardPerStake += (reward * PRECISION_MULTIPLIER) / state.totalStake;
+        state.lastUpdateTime = block.timestamp;
 
-        emit ActivityIndexUpdated(activityId, activity.accRewardPerStake, activity.totalStake);
+        emit ActivityIndexUpdated(activityId, state.accRewardPerStake, state.totalStake);
     }
 
 }
