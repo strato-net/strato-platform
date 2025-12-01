@@ -1,4 +1,5 @@
 export const ERROR_FILE_NAME = "rewards-poller-error.flag";
+export const BLOCK_TRACKING_FILE = "lastProcessedBlock.json";
 
 const config = {
   auth: {

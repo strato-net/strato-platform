@@ -4,6 +4,7 @@ import { logError, logInfo } from "../utils/logger";
 import { config } from "../config";
 import { readFileSync } from "fs";
 import { join } from "path";
+import { blockTrackingService } from "./blockTrackingService";
 
 const MERCATA_PREFIX = "BlockApps-Mercata";
 
@@ -67,20 +68,12 @@ export const getEventQueryParams = async (): Promise<{
   eventNames: string[];
   minBlockNumber: number;
 }> => {
-  const [activitiesData, blockData] = await Promise.all([
-    cirrus.get(`/${MERCATA_PREFIX}-Rewards-activities`, {
-      params: {
-        address: `eq.${config.rewards.address}`,
-        select: "value->>sourceContract,value->>actionableEvents",
-      },
-    }),
-    cirrus.get(`/${MERCATA_PREFIX}-Rewards`, {
-      params: {
-        address: `eq.${config.rewards.address}`,
-        select: "currentBlockHandled",
-      },
-    }),
-  ]);
+  const activitiesData = await cirrus.get(`/${MERCATA_PREFIX}-Rewards-activities`, {
+    params: {
+      address: `eq.${config.rewards.address}`,
+      select: "value->>sourceContract,value->>actionableEvents",
+    },
+  });
 
   const contractAddresses = new Set<string>();
   const eventNames = new Set<string>();
@@ -104,9 +97,15 @@ export const getEventQueryParams = async (): Promise<{
     }
   }
 
-  const minBlockNumber = Array.isArray(blockData) && blockData.length && blockData[0]?.currentBlockHandled
-    ? Number(blockData[0].currentBlockHandled)
-    : 0;
+  let minBlockNumber = 0;
+  try {
+    minBlockNumber = await blockTrackingService.getLastProcessedBlock();
+  } catch (error) {
+    logError("CirrusService", error as Error, {
+      operation: "getEventQueryParams",
+    });
+    minBlockNumber = 0;
+  }
 
   logInfo("CirrusService", `Loaded activities: ${contractAddresses.size} contracts, ${eventNames.size} event names, minBlock: ${minBlockNumber}`);
   

@@ -9,6 +9,7 @@ import {
 } from "../services/rewardsService";
 import { checkBalances } from "../utils/balanceCheck";
 import { RewardsAction, NonEmptyArray } from "../types";
+import { blockTrackingService } from "../services/blockTrackingService";
 
 const processEvents = async (): Promise<void> => {
   try {
@@ -43,6 +44,16 @@ const processEvents = async (): Promise<void> => {
     for (let i = 0; i < allActions.length; i += maxBatchSize) {
       const batch = allActions.slice(i, i + maxBatchSize) as NonEmptyArray<RewardsAction>;
       await batchHandleAction(batch);
+      
+      const maxBlockInBatch = Math.max(...batch.map(a => a.blockNumber));
+      try {
+        await blockTrackingService.updateLastProcessedBlock(maxBlockInBatch);
+      } catch (error) {
+        logError("RewardsPolling", error as Error, {
+          operation: "updateLastProcessedBlock",
+          blockNumber: maxBlockInBatch,
+        });
+      }
     }
 
     logInfo("RewardsPolling", `Processed ${allActions.length} actions`);
