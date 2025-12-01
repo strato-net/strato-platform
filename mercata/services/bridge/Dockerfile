@@ -25,7 +25,7 @@ WORKDIR /app
 
 COPY package*.json ./
 
-# Install build dependencies, run npm ci, then remove them in one layer.
+# Install build dependencies, run npm ci, then remove them in one layer
 RUN apk add --no-cache python3 make g++ \
     && npm ci --omit=dev \
     && apk del python3 make g++ \
