@@ -1,0 +1,93 @@
+pipeline {
+  agent {
+    label "mainnet-build1"
+  }
+  options { disableConcurrentBuilds() }
+  parameters {
+    string(name: 'STRATO_VERSION', description: 'The STRATO version tag, e.g.`15.0.3` or `15.0.3-274e8ad`. Can be found in the corresponding docker-compose.yml. Must be previously built by Jenkins, e.g. in the STRATO_autobuild')
+  }
+  stages {
+    stage('Prepare') {
+      steps {
+        script {
+          lib = load("${env.WORKSPACE}/pipelines/Jenkinsfile.library")
+        }
+      }
+    }
+
+    stage('Deploy to Mainnet') {
+      steps {
+        withCredentials([
+            usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
+        ]) {
+          sh "sudo docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000"
+        }
+        sh 'rm -rf strato-getting-started'
+        sh 'git clone https://github.com/blockapps/strato-getting-started'
+        dir("strato-getting-started") {
+          sh "cp ~/ssl/server.pem ssl/certs/"
+          sh "cp ~/ssl/server.key ssl/private/"
+          sh "aws s3 cp s3://blockapps-build-artifacts/${STRATO_VERSION}/docker-compose.allDocker.yml ./docker-compose.yml"
+          withCredentials([usernamePassword(credentialsId: 'mercata-mainnet-buildtest-client', passwordVariable: 'BUILDTEST_CLIENT_SECRET', usernameVariable: 'BUILDTEST_CLIENT_ID')]) {
+            writeFile file: "strato-run.sh", text: """#!/bin/bash
+                NODE_HOST=\$(</host) \\
+                  network='upquark' \\
+                  OAUTH_CLIENT_ID='$BUILDTEST_CLIENT_ID' \\
+                  OAUTH_CLIENT_SECRET='$BUILDTEST_CLIENT_SECRET' \\
+                  ssl='true' \\
+                  ./strato
+            """
+            sh "sudo ./strato --pull"
+            sh "sudo ./strato --wipe"
+            sh "sudo ./strato-run.sh"
+          }
+        }
+      }
+    }
+    stage('Wait for Sync') {
+      steps {
+        script {
+          lib.waitLocalNodeIsSynced()
+        }
+      }
+    }
+  }
+  
+  post {
+    always {
+      dir ('strato-getting-started') {
+        sh 'rm -rf strato_logs*'
+        sh 'sudo ./fetchlogs'
+        sh 'sudo chmod 777 strato_logs.zip'
+        archiveArtifacts artifacts: 'strato_logs.zip', fingerprint: true, allowEmptyArchive: true
+        sh 'sudo rm -rf strato_logs.zip'
+      }
+    }
+
+    success {
+      slackSend (
+        color: 'good',
+        message: "Release ${env.RELEASE_VERSION} Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+      )
+      
+      script {
+        def VERSION = sh(
+            returnStdout: true,
+            script: "grep -oP \"#strato-version:\\\\K[^#]*\" strato-getting-started/docker-compose.yml"
+        ).trim()
+        slackSend(
+            channel: '#engineering',
+            color: 'good',
+            message: "Mainnet buildtest.mercata.blockapps.net was redeployed with STRATO v.${VERSION}"
+        )
+      }
+    }
+
+    failure {
+      slackSend (
+        color: 'danger',
+        message: "Release ${env.RELEASE_VERSION} Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+      )
+    }
+  }
+}

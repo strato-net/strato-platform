@@ -72,6 +72,14 @@ export const useNetBalance = ({
     const totalDebt = lendingPoolDebt + cdpDebt;
     const netBalance = total - totalDebt;
 
+   
+    // Prevent flicker: Don't show negative balance if we're still loading assets
+    // If we have debt but no assets, we're likely in a loading state
+    if (netBalance < 0 && total === 0 && totalDebt > 0) {
+      // Skip update - keep previous state to avoid showing negative balance flash
+      return;
+    }
+    
     setResult({
       netBalance,
       cataBalance: cataTotal,

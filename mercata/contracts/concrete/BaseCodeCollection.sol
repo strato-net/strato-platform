@@ -67,7 +67,7 @@ contract record Mercata is Authorizable {
     constructor() public {
         // The owner of the implementation contract is ignored in favor of the proxy owner
         address implOwnerIgnored = address("deadbeef");
-        
+
         // Create AdminRegistry first
         address adminRegistryImpl = address(new AdminRegistry());
         adminRegistry = AdminRegistry(address(new Proxy(adminRegistryImpl, this)));

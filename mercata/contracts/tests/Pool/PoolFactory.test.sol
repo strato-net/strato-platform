@@ -36,12 +36,12 @@ contract Describe_PoolFactory is Authorizable {
         tokenCAddress = m.tokenFactory().createToken(
             "Token C", "Test Token C", emptyArray, emptyArray, emptyArray, "TKC", 10000000e18, 18
         );
-        
+
         // Activate tokens
         Token(tokenAAddress).setStatus(2); // ACTIVE
         Token(tokenBAddress).setStatus(2); // ACTIVE
         Token(tokenCAddress).setStatus(2); // ACTIVE
-        
+
         // Mint tokens to test contract
         Token(tokenAAddress).mint(address(this), 100000000e18);
         Token(tokenBAddress).mint(address(this), 100000000e18);
@@ -55,12 +55,12 @@ contract Describe_PoolFactory is Authorizable {
         // Verify tokens are active (required for pool creation)
         require(uint(Token(tokenAAddress).status()) == 2, "TokenA should be active");
         require(uint(Token(tokenBAddress).status()) == 2, "TokenB should be active");
-        
+
         // Verify factory has required components
         require(m.poolFactory().tokenFactory() != address(0), "Factory should have tokenFactory");
         require(m.poolFactory().adminRegistry() != address(0), "Factory should have adminRegistry");
         require(m.poolFactory().feeCollector() != address(0), "Factory should have feeCollector");
-        
+
         // Verify factory is ready for pool creation
         require(tokenAAddress != tokenBAddress, "Tokens should be different");
         require(tokenAAddress != address(0), "TokenA should not be zero");
@@ -73,7 +73,7 @@ contract Describe_PoolFactory is Authorizable {
         require(m.poolFactory().tokenFactory() != address(0), "Factory should have tokenFactory");
         require(m.poolFactory().adminRegistry() != address(0), "Factory should have adminRegistry");
         require(m.poolFactory().feeCollector() != address(0), "Factory should have feeCollector");
-        
+
         // Verify factory is ready to track pools
         require(tokenAAddress != address(0), "TokenA should not be zero");
         require(tokenBAddress != address(0), "TokenB should not be zero");
@@ -86,7 +86,7 @@ contract Describe_PoolFactory is Authorizable {
         require(m.poolFactory().tokenFactory() != address(0), "Factory should have tokenFactory");
         require(m.poolFactory().adminRegistry() != address(0), "Factory should have adminRegistry");
         require(m.poolFactory().feeCollector() != address(0), "Factory should have feeCollector");
-        
+
         // Verify tokens are different (prevents identical pool creation)
         require(tokenAAddress != tokenBAddress, "Tokens should be different");
         require(tokenAAddress != tokenCAddress, "TokenA should be different from TokenC");
@@ -116,11 +116,11 @@ contract Describe_PoolFactory is Authorizable {
         require(m.poolFactory().swapFeeRate() > 0, "swapFeeRate should be positive");
         require(m.poolFactory().lpSharePercent() > 0, "lpSharePercent should be positive");
         require(m.poolFactory().lpSharePercent() <= 10000, "lpSharePercent should not exceed 100%");
-        
+
         // Test pool registry (should return zero for non-existent pools)
         require(m.poolFactory().pools(tokenAAddress, tokenBAddress) == address(0), "Non-existent pool should return zero");
         require(m.poolFactory().pools(tokenBAddress, tokenAAddress) == address(0), "Non-existent pool should return zero");
-        
+
         // Test allPools array (should be empty initially)
         // Note: We can't test length directly due to SolidVM limitations
     }
@@ -152,7 +152,7 @@ contract Describe_PoolFactory is Authorizable {
         // Test setting fee parameters (owner only)
         uint256 newSwapFeeRate = 50; // 0.5%
         uint256 newLpSharePercent = 8000; // 80%
-        
+
         m.poolFactory().setFeeParameters(newSwapFeeRate, newLpSharePercent);
         require(m.poolFactory().swapFeeRate() == newSwapFeeRate, "swapFeeRate should be updated");
         require(m.poolFactory().lpSharePercent() == newLpSharePercent, "lpSharePercent should be updated");
@@ -164,11 +164,11 @@ contract Describe_PoolFactory is Authorizable {
         require(m.poolFactory().tokenFactory() != address(0), "Factory should have tokenFactory");
         require(m.poolFactory().adminRegistry() != address(0), "Factory should have adminRegistry");
         require(m.poolFactory().feeCollector() != address(0), "Factory should have feeCollector");
-        
+
         // Test fee parameter validation
         uint256 newSwapFeeRate = 25; // 0.25%
         uint256 newLpSharePercent = 7500; // 75%
-        
+
         require(newSwapFeeRate <= 1000, "Swap fee rate should not exceed 10%");
         require(newLpSharePercent <= 10000, "LP share percent should not exceed 100%");
         require(newLpSharePercent > 0, "LP share percent should be greater than 0");
@@ -182,7 +182,7 @@ contract Describe_PoolFactory is Authorizable {
         require(m.poolFactory().tokenFactory() != address(0), "Factory should have tokenFactory");
         require(m.poolFactory().adminRegistry() != address(0), "Factory should have adminRegistry");
         require(m.poolFactory().feeCollector() != address(0), "Factory should have feeCollector");
-        
+
         // Test syncPools function with empty array (should sync all pools)
         address[] memory emptyPools = new address[](0);
         // Note: We can't call syncPools without pools, but we can verify the function exists
@@ -195,7 +195,7 @@ contract Describe_PoolFactory is Authorizable {
         require(m.poolFactory().tokenFactory() != address(0), "Factory should have tokenFactory");
         require(m.poolFactory().adminRegistry() != address(0), "Factory should have adminRegistry");
         require(m.poolFactory().feeCollector() != address(0), "Factory should have feeCollector");
-        
+
         // Test skimPools function with empty array (should skim all pools)
         address[] memory emptyPools = new address[](0);
         // Note: We can't call skimPools without pools, but we can verify the function exists
@@ -209,12 +209,12 @@ contract Describe_PoolFactory is Authorizable {
         require(m.poolFactory().tokenFactory() != address(0), "Factory should have tokenFactory");
         require(m.poolFactory().adminRegistry() != address(0), "Factory should have adminRegistry");
         require(m.poolFactory().feeCollector() != address(0), "Factory should have feeCollector");
-        
+
         // Test syncPools function with empty array (should sync all pools)
         address[] memory emptyPools = new address[](0);
         // Note: We can't call syncPools without pools, but we can verify the function exists
         require(emptyPools.length == 0, "Empty array should have length 0");
-        
+
         // Verify tokens are ready for pool creation
         require(tokenAAddress != address(0), "TokenA should not be zero");
         require(tokenBAddress != address(0), "TokenB should not be zero");
@@ -227,13 +227,13 @@ contract Describe_PoolFactory is Authorizable {
         require(m.poolFactory().tokenFactory() != address(0), "Factory should have tokenFactory");
         require(m.poolFactory().adminRegistry() != address(0), "Factory should have adminRegistry");
         require(m.poolFactory().feeCollector() != address(0), "Factory should have feeCollector");
-        
+
         // Test skimPools function with empty array (should skim all pools)
         address[] memory emptyPools = new address[](0);
         // Note: We can't call skimPools without pools, but we can verify the function exists
         require(emptyPools.length == 0, "Empty array should have length 0");
         require(address(this) != address(0), "Recipient address should not be zero");
-        
+
         // Verify tokens are ready for pool creation
         require(tokenAAddress != address(0), "TokenA should not be zero");
         require(tokenBAddress != address(0), "TokenB should not be zero");
@@ -248,12 +248,12 @@ contract Describe_PoolFactory is Authorizable {
         require(m.poolFactory().tokenFactory() != address(0), "Factory should have tokenFactory");
         require(m.poolFactory().adminRegistry() != address(0), "Factory should have adminRegistry");
         require(m.poolFactory().feeCollector() != address(0), "Factory should have feeCollector");
-        
+
         // Test transfer validation
         address newFactory = address(0x999);
         require(newFactory != address(0), "New factory should not be zero");
         require(newFactory != address(m.poolFactory()), "New factory should be different from current");
-        
+
         // Note: We can't call transferPoolsToFactory without pools, but we can verify the function exists
     }
 
@@ -263,11 +263,11 @@ contract Describe_PoolFactory is Authorizable {
         require(m.poolFactory().tokenFactory() != address(0), "Factory should have tokenFactory");
         require(m.poolFactory().adminRegistry() != address(0), "Factory should have adminRegistry");
         require(m.poolFactory().feeCollector() != address(0), "Factory should have feeCollector");
-        
+
         // Test registration validation
         address[] memory poolAddresses = new address[](0);
         require(poolAddresses.length == 0, "Empty array should have length 0");
-        
+
         // Note: We can't call registerPoolsFromFactory without pools, but we can verify the function exists
     }
 
@@ -277,11 +277,11 @@ contract Describe_PoolFactory is Authorizable {
         // Test maximum fee parameters
         uint256 maxSwapFeeRate = 1000; // 10%
         uint256 maxLpSharePercent = 10000; // 100%
-        
+
         m.poolFactory().setFeeParameters(maxSwapFeeRate, maxLpSharePercent);
         require(m.poolFactory().swapFeeRate() == maxSwapFeeRate, "Should accept maximum swap fee rate");
         require(m.poolFactory().lpSharePercent() == maxLpSharePercent, "Should accept maximum LP share percent");
-        
+
         // Test minimum fee parameters (both must be > 0)
         uint256 minSwapFeeRate = 1; // 0.01%
         uint256 minLpSharePercent = 1; // 0.01%
@@ -296,12 +296,12 @@ contract Describe_PoolFactory is Authorizable {
         require(m.poolFactory().tokenFactory() != address(0), "Factory should have tokenFactory");
         require(m.poolFactory().adminRegistry() != address(0), "Factory should have adminRegistry");
         require(m.poolFactory().feeCollector() != address(0), "Factory should have feeCollector");
-        
+
         // Verify all tokens are different (required for multiple pools)
         require(tokenAAddress != tokenBAddress, "TokenA should be different from TokenB");
         require(tokenAAddress != tokenCAddress, "TokenA should be different from TokenC");
         require(tokenBAddress != tokenCAddress, "TokenB should be different from TokenC");
-        
+
         // Verify all tokens are active
         require(uint(Token(tokenAAddress).status()) == 2, "TokenA should be active");
         require(uint(Token(tokenBAddress).status()) == 2, "TokenB should be active");
@@ -314,13 +314,13 @@ contract Describe_PoolFactory is Authorizable {
         require(m.poolFactory().tokenFactory() != address(0), "Factory should have tokenFactory");
         require(m.poolFactory().adminRegistry() != address(0), "Factory should have adminRegistry");
         require(m.poolFactory().feeCollector() != address(0), "Factory should have feeCollector");
-        
+
         // Verify tokens are ready for pool operations
         require(tokenAAddress != address(0), "TokenA should not be zero");
         require(tokenBAddress != address(0), "TokenB should not be zero");
         require(uint(Token(tokenAAddress).status()) == 2, "TokenA should be active");
         require(uint(Token(tokenBAddress).status()) == 2, "TokenB should be active");
-        
+
         // Verify we have tokens for operations
         require(ERC20(tokenAAddress).balanceOf(address(this)) > 0, "Should have tokenA balance");
         require(ERC20(tokenBAddress).balanceOf(address(this)) > 0, "Should have tokenB balance");
@@ -338,12 +338,12 @@ contract Describe_PoolFactory is Authorizable {
         // Test that token active validation works
         require(uint(Token(tokenAAddress).status()) == 2, "TokenA should be active");
         require(uint(Token(tokenBAddress).status()) == 2, "TokenB should be active");
-        
+
         // Verify factory can validate active tokens
         require(m.poolFactory().tokenFactory() != address(0), "Factory should have tokenFactory");
         require(m.poolFactory().adminRegistry() != address(0), "Factory should have adminRegistry");
         require(m.poolFactory().feeCollector() != address(0), "Factory should have feeCollector");
-        
+
         // Verify tokens are ready for pool creation
         require(tokenAAddress != address(0), "TokenA should not be zero");
         require(tokenBAddress != address(0), "TokenB should not be zero");

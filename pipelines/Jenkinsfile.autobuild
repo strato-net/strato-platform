@@ -31,7 +31,7 @@ pipeline {
       steps {
         sh '''#!/bin/bash -le
           echo "Checking for trailing whitespaces..."
-          ./scripts/delete-trailing-whitespaces.sh --check
+          ./scripts/delete-trailing-whitespaces.sh --check --excludeDir legacy/pre-erc20-Jun2025 --excludeDir strato/core/strato-genesis .
         '''
       }
     }
