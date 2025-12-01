@@ -13,6 +13,8 @@ import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { SAFETY_STAKE_FEE, SAFETY_REDEEM_FEE, usdstAddress, safetyModuleAddress, rewardsEnabled } from "@/lib/constants";
 import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
+import { CompactRewardsDisplay } from "@/components/rewards/CompactRewardsDisplay";
+import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 
 const SafetyModuleSection = () => {
   const { userAddress } = useUser();
@@ -33,6 +35,7 @@ const SafetyModuleSection = () => {
   const [stakeSUSDST, setStakeSUSDST] = useState<boolean>(rewardsEnabled);
   const [includeStakedSUSDST, setIncludeStakedSUSDST] = useState<boolean>(false);
   const { toast } = useToast();
+  const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
 
   const refreshData = (signal?: AbortSignal) => {
@@ -225,6 +228,12 @@ const SafetyModuleSection = () => {
               <Shield className="h-5 w-5" />
               USDST Safety Module
             </CardTitle>
+            <CompactRewardsDisplay
+              userRewards={userRewards}
+              loading={rewardsLoading}
+              activityIds={[4]}
+              variant="button"
+            />
           </div>
         </CardHeader>
         <CardContent className="px-2 py-2 md:px-6 md:py-6">
@@ -291,6 +300,14 @@ const SafetyModuleSection = () => {
                   <div className="text-sm text-gray-500 mt-1">
                     Transaction Fee: {SAFETY_STAKE_FEE} USDST
                   </div>
+                  {/* Estimated Rewards */}
+                  <CompactRewardsDisplay
+                    userRewards={userRewards}
+                    loading={rewardsLoading}
+                    activityIds={[4]}
+                    variant="inline"
+                    inputAmount={stakeAmount}
+                  />
                   {/* Stake sUSDST Checkbox - only show if rewards are enabled */}
                   {rewardsEnabled && (
                     <div className="flex items-center space-x-2 mt-3">

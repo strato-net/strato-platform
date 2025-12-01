@@ -18,6 +18,8 @@ import BorrowForm from "@/components/borrow/BorrowForm";
 import RepayForm from "@/components/borrow/RepayForm";
 import CollateralManagementTable from "@/components/borrow/CollateralManagementTable";
 import { useBalancePolling } from "@/hooks/useSmartPolling";
+import { CompactRewardsDisplay } from '@/components/rewards/CompactRewardsDisplay';
+import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 
 const Borrow = () => {
   const { userAddress } = useUser();
@@ -32,6 +34,7 @@ const Borrow = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [repayLoading, setRepayLoading] = useState(false);
   const [eligibleCollateral, setEligibleCollateral] = useState<CollateralData[]>([]);
+  const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
   const { toast } = useToast();
   const {
@@ -239,7 +242,15 @@ const Borrow = () => {
             {/* Left Column - Borrow/Repay Tabbed Card */}
             <Card>
               <CardHeader>
-                <CardTitle>Borrow & Repay</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Borrow & Repay</CardTitle>
+                  <CompactRewardsDisplay
+                    userRewards={userRewards}
+                    loading={rewardsLoading}
+                    activityIds={[2]}
+                    variant="button"
+                  />
+                </div>
               </CardHeader>
               <CardContent>
                 <Tabs defaultValue="borrow" className="w-full">
@@ -257,6 +268,8 @@ const Borrow = () => {
                       collateralInfo={eligibleCollateral}
                       startPolling={startPolling}
                       stopPolling={stopPolling}
+                      userRewards={userRewards}
+                      rewardsLoading={rewardsLoading}
                     />
                   </TabsContent>
                   <TabsContent value="repay">
