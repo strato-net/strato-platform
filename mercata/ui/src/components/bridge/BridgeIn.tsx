@@ -89,7 +89,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
     loading: false
   });
   const [isTokenPermitted, setIsTokenPermitted] = useState(true);
-  const [autoDeposit, setAutoDeposit] = useState(isConvert); // Default autosave to true for convert mode; always false for bridge mode; also set in useEffect
+  const [autoDeposit, setAutoDeposit] = useState(isConvert);
 
   // Computed values
   const modeLabels = BRIDGE_IN_MODE_LABELS[isConvert ? "convert" : "bridge"];
