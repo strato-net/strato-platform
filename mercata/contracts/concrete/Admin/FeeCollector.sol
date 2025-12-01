@@ -31,4 +31,4 @@ contract record FeeCollector is Ownable {
         require(ERC20(token).transfer(to, amount), "FeeCollector: transfer failed");
         emit Withdrawn(token, to, amount);
     }
-} 
+}

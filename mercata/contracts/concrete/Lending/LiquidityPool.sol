@@ -81,7 +81,7 @@ contract record LiquidityPool is Ownable  {
         address asset = _getAsset();
         uint currentBalance = IERC20(asset).balanceOf(address(this));
         // Do not pay out protocol reserves: only cash minus reserves is withdrawable
-        uint reserves = LendingPool(registry.lendingPool()).reservesAccrued(); 
+        uint reserves = LendingPool(registry.lendingPool()).reservesAccrued();
         uint cashForLPs = currentBalance > reserves ? currentBalance - reserves : 0;
         require(underlyingAmount <= cashForLPs, "Insufficient liquidity (excl reserves)");
 
@@ -135,11 +135,11 @@ contract record LiquidityPool is Ownable  {
      */
     function transferReserve(uint reserveAmount, address feeCollector) external onlyLendingPool {
         require(reserveAmount > 0 && feeCollector != address(0), "Invalid reserve transfer");
-        
+
         address asset = _getAsset();
         uint currentBalance = IERC20(asset).balanceOf(address(this));
         require(currentBalance >= reserveAmount, "Insufficient liquidity to transfer to reserve");
-        
+
         // Transfer reserve to fee collector
         require(IERC20(asset).transfer(feeCollector, reserveAmount), "Reserve transfer failed");
     }
@@ -159,4 +159,4 @@ contract record LiquidityPool is Ownable  {
         require(_registry != address(0), "Invalid registry address");
         registry = LendingRegistry(_registry);
     }
-} 
+}

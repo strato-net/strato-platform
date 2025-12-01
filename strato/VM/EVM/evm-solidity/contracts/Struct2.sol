@@ -17,4 +17,3 @@ contract Struct2 {
   Pet I = Pet("walrus", "Paul", 64, false);
 
 }
-  
