@@ -185,7 +185,7 @@ data Delegatecall = Delegatecall
     _delegatecallOrganization :: Maybe Text,
     _delegatecallContractName :: Text
   }
-  deriving (Eq, Show, Read, Generic, NFData)
+  deriving (Eq, Ord, Show, Read, Generic, NFData)
 
 --makeLenses ''Delegatecall
 

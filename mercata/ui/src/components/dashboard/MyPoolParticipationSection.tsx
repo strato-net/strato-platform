@@ -1,46 +1,103 @@
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { formatBalance, calculateTokenValue } from "@/utils/numberUtils";
-import { formatUnits } from "ethers";
-import { useState } from "react";
+import { useMemo, useState, useCallback } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatBalance } from "@/utils/numberUtils";
+import { useLendingContext } from "@/context/LendingContext";
+import { useSwapContext } from "@/context/SwapContext";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import LPTokenDropdown from "./LPTokenDropdown";
-import { PoolParticipationProps } from "@/interface";
 
-export default function MyPoolParticipationSection({ 
-  liquidityInfo, 
-  loadingLiquidity, 
-  userPools, 
-  loadingUserPools,
-  shouldPreventFlash = false,
-  safetyInfo,
-  loadingSafety = false
+interface PoolParticipationProps {
+  poolTokens: any[];
+  loading?: boolean;
+}
+
+export default function MyPoolParticipationSection({
+  poolTokens,
+  loading = false,
 }: PoolParticipationProps) {
-  
-  const [expandedTokens, setExpandedTokens] = useState<Set<string>>(new Set());
+  const hasData = poolTokens.length > 0;
+  const shouldShowLoading = loading && !hasData;
 
-  // Helper variables for sUSDST calculations
-  const sUSDSTBalance = safetyInfo?.userShares && BigInt(safetyInfo.userShares) > 0n;
-  const sUsdstExchangeRate = safetyInfo?.exchangeRate ? parseFloat(formatUnits(safetyInfo.exchangeRate, 18)) : 1;
-  const sUsdstApy = safetyInfo?.exchangeRate ? `${((sUsdstExchangeRate - 1) * 100).toFixed(2)}%` : "N/A";
-  const sUsdstValue = safetyInfo?.exchangeRate ? `$${calculateTokenValue(safetyInfo.userShares, safetyInfo.exchangeRate)}` : "$0.00";
+  const { liquidityInfo, loadingLiquidity } = useLendingContext();
+  const { pools, poolsLoading } = useSwapContext();
 
-  const toggleTokenExpansion = (tokenAddress: string) => {
-    const newExpanded = new Set(expandedTokens);
-    if (newExpanded.has(tokenAddress)) {
-      newExpanded.delete(tokenAddress);
-    } else {
-      newExpanded.add(tokenAddress);
-    }
-    setExpandedTokens(newExpanded);
+  const [expandedTokens, setExpandedTokens] = useState<Record<string, boolean>>(
+    {}
+  );
+
+  const lpTokenPoolMap = useMemo(() => {
+    const map = new Map<string, any>();
+    pools?.forEach((pool: any) => {
+      const addr = pool.lpToken?.address;
+      if (addr) map.set(addr, pool);
+    });
+    return map;
+  }, [pools]);
+
+  const resolveTokenAPY = useCallback(
+    (token: any): string | null => {
+      if (liquidityInfo?.withdrawable?.address === token.address) {
+        return liquidityInfo.supplyAPY?.toFixed(2) || null;
+      }
+
+      if (token._symbol === "SUSDST") return null;
+
+      if (
+        token._symbol?.endsWith("-LP") ||
+        token.description === "Liquidity Provider Token"
+      ) {
+        return lpTokenPoolMap.get(token.address)?.apy || null;
+      }
+
+      return null;
+    },
+    [liquidityInfo, lpTokenPoolMap]
+  );
+
+  const rows = useMemo(
+    () =>
+      poolTokens.map((token) => {
+        const balance = BigInt(token.balance || "0");
+        const collateral = BigInt(token.collateralBalance || "0");
+        const total = balance + collateral;
+
+        const isLPToken =
+          token._symbol?.endsWith("-LP") ||
+          token.description === "Liquidity Provider Token";
+
+        const pool = isLPToken ? lpTokenPoolMap.get(token.address) : null;
+
+        const rawValue = token.value ? parseFloat(token.value) : 0;
+
+        return {
+          token,
+          formattedBalance:
+            total > 0n
+              ? formatBalance(
+                  total.toString(),
+                  undefined,
+                  token.customDecimals || 18,
+                  2,
+                  2
+                )
+              : "-",
+          apy: resolveTokenAPY(token),
+          value: rawValue > 0 ? `$${rawValue.toFixed(2)}` : "-",
+          isLPToken,
+          pool,
+        };
+      }),
+    [poolTokens, lpTokenPoolMap, resolveTokenAPY]
+  );
+
+  const anyLoading = poolsLoading || loadingLiquidity;
+
+  const toggleExpanded = (tokenAddress: string) => {
+    setExpandedTokens((prev) => ({
+      ...prev,
+      [tokenAddress]: !prev[tokenAddress],
+    }));
   };
-
-  // Don't show loading indicator immediately if shouldPreventFlash is true
-  const shouldShowLoading = (loadingLiquidity || loadingUserPools || loadingSafety) && !shouldPreventFlash;
 
   return (
     <Card className="rounded-2xl shadow-sm w-full mb-6">
@@ -61,98 +118,71 @@ export default function MyPoolParticipationSection({
 
         {shouldShowLoading ? (
           <div className="flex items-center justify-center gap-2">
-            <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
+            <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary" />
             <span className="text-sm text-gray-600">Loading...</span>
           </div>
+        ) : !hasData ? (
+          <div className="p-2 flex justify-center text-gray-500">
+            No pool tokens found
+          </div>
         ) : (
-          <>
-            {/* Lending Pool Row */}
-            {liquidityInfo?.withdrawable ? (
-              <div className="grid grid-cols-4 items-center bg-gray-50 px-4 py-3 rounded-md mb-2">
-                <div className="font-semibold text-gray-700">{liquidityInfo.withdrawable._name}</div>
-                <div className="text-center font-semibold text-gray-900">
-                  {liquidityInfo?.withdrawable?.userBalance
-                      ? formatBalance(liquidityInfo?.withdrawable?.userBalance,undefined,18,2,2)
-                      : "0.00"}
-                </div>
-                <div className="text-center font-semibold text-gray-900">
-                  {liquidityInfo?.supplyAPY ? `${liquidityInfo.supplyAPY}%` : "N/A"}
-                </div>
-                <div className="text-right font-medium text-gray-900">
-                  {liquidityInfo?.withdrawable?.withdrawValue
-                    ? `$${Number(formatUnits(liquidityInfo?.withdrawable?.withdrawValue, 18)).toFixed(2)}`
-                    : "$0.00"}
-                </div>
-              </div>
-            ) : null}
+          <div className="space-y-2">
+            {rows.map(
+              ({ token, formattedBalance, apy, value, isLPToken, pool }) => {
+                const isExpanded = !!expandedTokens[token.address];
+                const canExpand = isLPToken && pool && formattedBalance !== "-";
 
-            {/* SUSDST Row */}
-            {sUSDSTBalance && (
-              <div className="grid grid-cols-4 items-center bg-gray-50 px-4 py-3 rounded-md mb-2">
-                <div className="font-semibold text-gray-700">sUSDST</div>
-                <div className="text-center font-semibold text-gray-900">
-                  {formatBalance(safetyInfo.userShares, undefined, 18, 2, 2)}
-                </div>
-                <div className="text-center font-semibold text-gray-900">
-                  {sUsdstApy}
-                </div>
-                <div className="text-right font-medium text-gray-900">
-                  {sUsdstValue}
-                </div>
-              </div>
-            )}
-
-            {/* LP Token Rows */}
-            {userPools.length > 0 ? (
-              <div className="space-y-2">
-                {userPools.map((userPool, idx) => {
-                  const tokenAddress = userPool?.lpToken?.address || `token-${idx}`;
-                  const isExpanded = expandedTokens.has(tokenAddress);
-                  
-                  return (
-                    <div key={tokenAddress}>
-                      {/* Clickable LP Token Row */}
-                      <div 
-                        className="grid grid-cols-4 items-center bg-gray-50 px-4 py-3 rounded-md mb-2 cursor-pointer hover:bg-gray-100 transition-colors"
-                        onClick={() => toggleTokenExpansion(tokenAddress)}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-gray-700">{userPool.lpToken._name}</span>
-                          {isExpanded ? (
-                            <ChevronUp className="h-4 w-4 text-gray-500" />
+                return (
+                  <div key={token.address} className="space-y-0">
+                    <div
+                      className={`grid grid-cols-4 items-center bg-gray-50 px-4 py-3 rounded-md ${
+                        canExpand ? "cursor-pointer hover:bg-gray-100" : ""
+                      }`}
+                      onClick={() => canExpand && toggleExpanded(token.address)}
+                    >
+                      <div className="flex items-center gap-2 font-semibold text-gray-700">
+                        {token._name || token._symbol}
+                        {canExpand &&
+                          (isExpanded ? (
+                            <ChevronUp size={16} />
                           ) : (
-                            <ChevronDown className="h-4 w-4 text-gray-500" />
-                          )}
-                        </div>
-                        <div className="text-center font-semibold text-gray-900">
-                          {userPool?.lpToken?.balance
-                            ? formatBalance(userPool?.lpToken?.balance,undefined,18,2,2)
-                            : "0.00"}
-                        </div>
-                        <div className="text-center font-semibold text-gray-900">
-                          {userPool?.apy ? `${userPool.apy}%` : "N/A"}
-                        </div>
-                        <div className="text-right font-medium text-gray-900">
-                          {userPool?.lpToken?._totalSupply
-                            ? `$${calculateTokenValue(userPool?.lpToken?.balance, userPool?.lpToken?.price)}`
-                            : "$0.00"}
-                        </div>
+                            <ChevronDown size={16} />
+                          ))}
                       </div>
-                      
-                      {/* Dropdown with detailed breakdown */}
-                      <LPTokenDropdown
-                        lpToken={userPool}
-                        className="mb-2"
-                        isExpanded={isExpanded}
-                      />
+
+                      <div className="text-center font-semibold text-gray-900">
+                        {formattedBalance}
+                      </div>
+
+                      <div className="text-center font-semibold text-gray-900">
+                        {anyLoading ? (
+                          <div className="flex items-center justify-center">
+                            <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-primary" />
+                          </div>
+                        ) : apy ? (
+                          `${apy}%`
+                        ) : (
+                          "N/A"
+                        )}
+                      </div>
+
+                      <div className="text-right font-medium text-gray-900">
+                        {value}
+                      </div>
                     </div>
-                  );
-                })}
-              </div>
-            ) : !liquidityInfo?.withdrawable && Array.isArray(userPools) && userPools.length === 0 ? (
-              <div className="p-2 flex justify-center text-gray-500">No LP tokens found</div>
-            ) : null}
-          </>
+
+                    {canExpand && (
+                      <LPTokenDropdown
+                        lpToken={pool}
+                        isExpanded={isExpanded}
+                        className="px-4"
+                      />
+                    )}
+                  </div>
+                );
+              }
+            )}
+          </div>
         )}
       </CardContent>
     </Card>

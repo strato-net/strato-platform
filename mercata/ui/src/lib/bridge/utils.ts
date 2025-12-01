@@ -7,6 +7,23 @@ import { BridgeError } from "./types";
  * Normalizes errors from various sources into a consistent BridgeError format
  */
 export function normalizeError(error: any): BridgeError {
+  // Handle user rejections first (before other error processing)
+  const errorMessage = error?.message || error?.shortMessage || "";
+  const errorName = error?.name || "";
+  
+  if (
+    errorMessage.includes("User rejected") ||
+    errorMessage.includes("User denied") ||
+    errorMessage.includes("denied transaction") ||
+    errorName === "UserRejectedRequestError"
+  ) {
+    return {
+      code: "USER_REJECTED",
+      message: error.message || errorMessage,
+      userMessage: "Transaction cancelled. You can try again when ready.",
+    };
+  }
+
   // Handle viem errors
   if (error?.shortMessage) {
     return {
@@ -37,15 +54,6 @@ export function normalizeError(error: any): BridgeError {
       message: error.message,
       userMessage:
         "Insufficient funds for gas fees. Please add more ETH to your wallet.",
-    };
-  }
-
-  // Handle user rejections
-  if (error?.message?.includes("User rejected")) {
-    return {
-      code: "USER_REJECTED",
-      message: error.message,
-      userMessage: "Transaction cancelled by user",
     };
   }
 
@@ -171,7 +179,7 @@ export function getChainName(chainId: number | string): string {
  * Bridge status options for filter dropdowns
  */
 export const BRIDGE_STATUS_OPTIONS = [
-  { value: null, label: "All Statuses" },
+  { value: 0, label: "All Statuses" },
   { value: 1, label: "Initiated" },
   { value: 2, label: "Pending Review" },
   { value: 3, label: "Completed" },

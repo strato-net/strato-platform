@@ -21,6 +21,7 @@ export interface SwapContextState {
   swappableTokens: SwapToken[];
   pairableTokens: SwapToken[];
   userPools: Pool[];
+  pools: Pool[];
   
   // Loading states
   loading: boolean;
@@ -119,19 +120,6 @@ export interface SwapWidgetProps {
   onAssetChange: (asset: SwapToken, isFrom: boolean) => void;
   onSwap: (params: SwapParams) => Promise<void>;
   loading?: boolean;
-}
-
-/**
- * Props for pool participation components
- */
-export interface PoolParticipationProps {
-  liquidityInfo: any;
-  loadingLiquidity: any;
-  userPools: Pool[];
-  loadingUserPools: boolean;
-  shouldPreventFlash?: boolean;
-  safetyInfo?: SafetyModuleData | null;
-  loadingSafety?: boolean;
 }
 
 /**

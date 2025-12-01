@@ -1,4 +1,4 @@
-import { BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, WithdrawalRequestResponse } from "@mercata/shared-types";
+import { BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, AutoSaveRequestParams, TransactionResponse, WithdrawalSummaryResponse } from "@mercata/shared-types";
 
 export interface BalanceResponse {
   balance: string;
@@ -6,7 +6,7 @@ export interface BalanceResponse {
 
 export interface BridgeResponse {
   success: boolean;
-  data?: WithdrawalRequestResponse;
+  data?: TransactionResponse;
 }
 
 export type NetworkSummary = {
@@ -20,15 +20,14 @@ export type BridgeContextType = {
   loading: boolean;
   error: string | null;
   availableNetworks: NetworkSummary[];
-  bridgeableTokens: BridgeToken[];
-  redeemableTokens: BridgeToken[];
+  bridgeableTokens: BridgeToken[]; // All tokens for the selected network (filter by bridgeable flag)
   selectedNetwork: string | null;
   selectedToken: BridgeToken | null;
-  selectedMintToken: BridgeToken | null;
   // Navigation state for bridge transactions
   targetTransactionTab: BridgeTransactionTab | null;
   setTargetTransactionTab: (tab: BridgeTransactionTab | null) => void;
   requestWithdrawal: (params: WithdrawalRequestParams) => Promise<BridgeResponse>;
+  requestAutoSave: (params: AutoSaveRequestParams) => Promise<TransactionResponse>;
   useBalance: (tokenAddress: string | null) => {
     data: { 
       balance: string; 
@@ -41,12 +40,14 @@ export type BridgeContextType = {
   };
   setSelectedNetwork: (networkName: string) => void;
   setSelectedToken: (token: BridgeToken | null) => void;
-  setSelectedMintToken: (token: BridgeToken | null) => void;
   loadNetworksAndTokens: () => Promise<void>;
   // Bridge transaction functions
   fetchDepositTransactions: (rawParams?: Record<string, string | undefined>, context?: string) => Promise<BridgeTransactionResponse>;
   fetchWithdrawTransactions: (rawParams?: Record<string, string | undefined>, context?: string) => Promise<BridgeTransactionResponse>;
-  fetchRedeemableTokens: (chainId: string) => void;
+  // Withdrawal summary
+  withdrawalSummary: WithdrawalSummaryResponse | null;
+  loadingWithdrawalSummary: boolean;
+  fetchWithdrawalSummary: (showLoading?: boolean) => Promise<void>;
 };
 
 export interface ContractValidationResult {

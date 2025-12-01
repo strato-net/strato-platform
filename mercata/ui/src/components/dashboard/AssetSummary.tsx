@@ -1,5 +1,9 @@
 import { HelpCircle } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface AssetSummaryProps {
   title: string;
@@ -8,11 +12,25 @@ interface AssetSummaryProps {
   color: string;
   tooltip?: string;
   onClick?: () => void;
+  isActive?: boolean;
 }
 
-const AssetSummary = ({ title, value, icon, color, tooltip, onClick }: AssetSummaryProps) => {
+const AssetSummary = ({
+  title,
+  value,
+  icon,
+  color,
+  tooltip,
+  onClick,
+  isActive = false,
+}: AssetSummaryProps) => {
   return (
-    <div className="bg-white rounded-xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition-shadow">
+    <div 
+      className={`bg-white rounded-xl border-2 p-5 shadow-sm transition-all w-full h-full flex flex-col justify-center ${
+        isActive ? 'border-blue-500 shadow-md' : 'border-gray-100 hover:shadow-md'
+      } ${onClick ? 'cursor-pointer' : ''}`}
+      onClick={onClick}
+    >
       <div className="flex justify-between items-start">
         <div>
           <div className="flex items-center gap-1">
@@ -32,8 +50,7 @@ const AssetSummary = ({ title, value, icon, color, tooltip, onClick }: AssetSumm
         </div>
 
         <div
-          className={`w-10 h-10 rounded-full flex items-center justify-center ${color} ${onClick ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
-          onClick={onClick}
+          className={`w-10 h-10 rounded-full flex items-center justify-center ${color} transition-opacity`}
         >
           {icon}
         </div>
