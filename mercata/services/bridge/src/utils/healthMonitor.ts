@@ -1,8 +1,10 @@
-import { promises as fs } from 'fs';
+import { promises as fs, mkdirSync } from 'fs';
 import path from "path";
 import { ERROR_FILE_NAME } from "../config";
 
-const ERROR_FILE_PATH = path.join(process.cwd(), ERROR_FILE_NAME);
+const DATA_DIR = path.join(process.cwd(), 'data');
+mkdirSync(DATA_DIR, { recursive: true });
+const ERROR_FILE_PATH = path.join(DATA_DIR, ERROR_FILE_NAME);
 
 class HealthMonitor {
   
