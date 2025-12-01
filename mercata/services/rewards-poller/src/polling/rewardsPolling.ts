@@ -46,14 +46,7 @@ const processEvents = async (): Promise<void> => {
       await batchHandleAction(batch);
       
       const maxBlockInBatch = Math.max(...batch.map(a => a.blockNumber));
-      try {
-        await blockTrackingService.updateLastProcessedBlock(maxBlockInBatch);
-      } catch (error) {
-        logError("RewardsPolling", error as Error, {
-          operation: "updateLastProcessedBlock",
-          blockNumber: maxBlockInBatch,
-        });
-      }
+      await blockTrackingService.updateLastProcessedBlock(maxBlockInBatch);
     }
 
     logInfo("RewardsPolling", `Processed ${allActions.length} actions`);
@@ -69,10 +62,10 @@ export const startRewardsPolling = (): void => {
 
   const poll = async () => {
     await processEvents();
+    setTimeout(poll, pollingInterval);
   };
 
   void poll();
-  setInterval(poll, pollingInterval);
 
   logInfo("RewardsPolling", `Started rewards polling with interval ${pollingInterval}ms`);
 };
