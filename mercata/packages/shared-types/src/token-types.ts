@@ -20,7 +20,7 @@ export interface EarningAsset extends Token {
   value: string;
 }
 
-export interface NetBalanceSnapshot {
+export interface BalanceSnapshot {
   timestamp: number;
-  netBalance: number;
+  balance: number;
 }

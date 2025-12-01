@@ -54,15 +54,13 @@ struct Activity {
  *
  * This contract implements a global incentives controller that tracks rewards
  * for various protocol activities without requiring users to stake or transfer
- * their LP tokens. Pools and other protocol contracts call handleAction() when
- * user balances change, and the controller tracks accrued rewards using a
- * cumulative index pattern.
+ * their LP tokens.
  *
  * Key features:
  * - No asset custody - contract only tracks accounting state
  * - O(1) gas efficiency - no loops over users or epochs
  * - Global index pattern inspired by Aave's Incentives Controller
- * - Simple pool integration via handleAction() hook
+ * - Simple off-chain service integration via handleAction() hook
  */
 contract record Rewards is Ownable {
 
@@ -96,6 +94,9 @@ contract record Rewards is Ownable {
 
     // Array of all activity IDs for enumeration
     uint256[] public activityIds;
+
+    // Counter for generating unique activity IDs (starts at 1, 0 means "not found")
+    uint256 public nextActivityId = 1;
 
     // Total emission rate across all activities (CATA per second)
     uint256 public totalRewardsEmission;
@@ -160,41 +161,39 @@ contract record Rewards is Ownable {
 
     /**
      * @dev Register a new Position activity for reward distribution
-     * @param activityId Unique identifier for the activity
      * @param name Human-readable name for the activity
      * @param emissionRate CATA tokens emitted per second for this activity
      * @param sourceContract Address of the contract this activity tracks
      * @param actionableEvents Array of events that can trigger actions (must have at least one)
+     * @return activityId The auto-generated unique identifier for the activity
      */
     function addPositionActivity(
-        uint256 activityId,
         string name,
         uint256 emissionRate,
         address sourceContract,
         ActionableEvent[] actionableEvents
-    ) external onlyOwner {
+    ) external onlyOwner returns (uint256) {
         require(actionableEvents.length > 0, "At least one actionable event required");
-        _addActivity(activityId, name, ActivityType.Position, emissionRate, sourceContract, actionableEvents);
+        return _addActivity(name, ActivityType.Position, emissionRate, sourceContract, actionableEvents);
     }
 
     /**
      * @dev Register a new OneTime activity for reward distribution
-     * @param activityId Unique identifier for the activity
      * @param name Human-readable name for the activity
      * @param emissionRate CATA tokens emitted per second for this activity
      * @param sourceContract Address of the contract this activity tracks
      * @param eventName Name of the event that triggers this one-time action
+     * @return activityId The auto-generated unique identifier for the activity
      */
     function addOneTimeActivity(
-        uint256 activityId,
         string name,
         uint256 emissionRate,
         address sourceContract,
         string eventName
-    ) external onlyOwner {
+    ) external onlyOwner returns (uint256) {
         ActionableEvent[] memory actionableEvents = new ActionableEvent[](1);
         actionableEvents[0] = ActionableEvent(eventName, ActionType.Occurred);
-        _addActivity(activityId, name, ActivityType.OneTime, emissionRate, sourceContract, actionableEvents);
+        return _addActivity(name, ActivityType.OneTime, emissionRate, sourceContract, actionableEvents);
     }
 
     /**
@@ -232,6 +231,94 @@ contract record Rewards is Ownable {
         activity.sourceContract = newSourceContract;
 
         emit SourceContractUpdated(activityId, oldSourceContract, newSourceContract);
+    }
+
+    /**
+     * @dev Update the actionable events for an existing Position activity
+     * @param activityId The activity to update
+     * @param newActionableEvents The new array of actionable events
+     *
+     * WARNING: This function is NOT SAFE to call while the activity has existing stakes.
+     * Changing events mid-operation can cause:
+     * - Events from old configuration to be ignored
+     * - Inconsistent state between user stakes and event mappings
+     * Only use this function when the activity has zero total stake or during initial setup.
+     */
+    function setPositionActivityEvents(
+        uint256 activityId,
+        ActionableEvent[] newActionableEvents
+    ) external onlyOwner {
+        Activity storage activity = activities[activityId];
+        require(activity.sourceContract != address(0), "Activity does not exist");
+        require(activity.activityType == ActivityType.Position, "Only for Position activities");
+        require(newActionableEvents.length > 0, "At least one actionable event required");
+
+        address sourceContract = activity.sourceContract;
+
+        // Check for duplicate event names within the same sourceContract (excluding current activity's events)
+        for (uint256 evtIdx = 0; evtIdx < newActionableEvents.length; evtIdx++) {
+            EventInfo storage existingInfo = sourceEventInfo[sourceContract][newActionableEvents[evtIdx].eventName];
+            require(
+                existingInfo.activityId == 0 || existingInfo.activityId == activityId,
+                "Event name already exists for this source contract"
+            );
+        }
+
+        // Remove old event mappings (delete individual fields as SolidVM requires)
+        for (uint256 i = 0; i < activity.actionableEvents.length; i++) {
+            delete sourceEventInfo[sourceContract][activity.actionableEvents[i].eventName].activityId;
+            delete sourceEventInfo[sourceContract][activity.actionableEvents[i].eventName].actionType;
+        }
+
+        // Clear old actionable events array
+        activity.actionableEvents = [];
+
+        // Add new actionable events and register in mapping
+        for (uint256 j = 0; j < newActionableEvents.length; j++) {
+            activity.actionableEvents.push(newActionableEvents[j]);
+            sourceEventInfo[sourceContract][newActionableEvents[j].eventName] = EventInfo(activityId, newActionableEvents[j].actionType);
+        }
+    }
+
+    /**
+     * @dev Update the event name for an existing OneTime activity
+     * @param activityId The activity to update
+     * @param newEventName The new event name
+     *
+     * WARNING: This function is NOT SAFE to call while the activity has existing stakes.
+     * Changing the event name mid-operation can cause:
+     * - Events with the old name to be ignored
+     * - Inconsistent state between user stakes and event mappings
+     * Only use this function when the activity has zero total stake or during initial setup.
+     */
+    function setOneTimeActivityEvent(
+        uint256 activityId,
+        string newEventName
+    ) external onlyOwner {
+        Activity storage activity = activities[activityId];
+        require(activity.sourceContract != address(0), "Activity does not exist");
+        require(activity.activityType == ActivityType.OneTime, "Only for OneTime activities");
+        require(bytes(newEventName).length > 0, "Event name cannot be empty");
+
+        address sourceContract = activity.sourceContract;
+
+        // Check that new event name doesn't conflict with another activity
+        EventInfo storage existingInfo = sourceEventInfo[sourceContract][newEventName];
+        require(
+            existingInfo.activityId == 0 || existingInfo.activityId == activityId,
+            "Event name already exists for this source contract"
+        );
+
+        // Remove old event mapping (delete individual fields as SolidVM requires)
+        string oldEventName = activity.actionableEvents[0].eventName;
+        delete sourceEventInfo[sourceContract][oldEventName].activityId;
+        delete sourceEventInfo[sourceContract][oldEventName].actionType;
+
+        // Update the event name in actionableEvents array
+        activity.actionableEvents[0].eventName = newEventName;
+
+        // Register new event in mapping
+        sourceEventInfo[sourceContract][newEventName] = EventInfo(activityId, ActionType.Occurred);
     }
 
     /**
@@ -312,16 +399,15 @@ contract record Rewards is Ownable {
 
     /**
      * @dev Internal function to register a new activity
+     * @return activityId The auto-generated unique identifier for the activity
      */
     function _addActivity(
-        uint256 activityId,
         string name,
         ActivityType activityType,
         uint256 emissionRate,
         address sourceContract,
         ActionableEvent[] actionableEvents
-    ) internal {
-        require(activities[activityId].sourceContract == address(0), "Activity already exists");
+    ) internal returns (uint256) {
         require(sourceContract != address(0), "Invalid source contract address");
         require(bytes(name).length > 0, "Name cannot be empty");
 
@@ -332,6 +418,10 @@ contract record Rewards is Ownable {
                 "Event name already exists for this source contract"
             );
         }
+
+        // Generate unique activity ID
+        uint256 activityId = nextActivityId;
+        nextActivityId++;
 
         Activity storage activity = activities[activityId];
         activity.name = name;
@@ -354,6 +444,8 @@ contract record Rewards is Ownable {
         totalRewardsEmission += emissionRate;
 
         emit ActivityAdded(activityId, name, emissionRate, sourceContract);
+
+        return activityId;
     }
 
     /**

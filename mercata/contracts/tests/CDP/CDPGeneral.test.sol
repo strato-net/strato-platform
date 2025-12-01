@@ -64,7 +64,7 @@ contract Describe_CDPGeneral is Authorizable {
     // ========================================
     // GENERAL CDP SETUP
     // ========================================
-    
+
     function it_aa_can_deploy_Mercata() public {
         require(address(m) != address(0), "address is 0");
     }
@@ -82,7 +82,7 @@ contract Describe_CDPGeneral is Authorizable {
         CDPEngine engine = m.cdpEngine();
         CDPRegistry registry = m.cdpRegistry();
         AdminRegistry adminRegistry = m.adminRegistry();
-        
+
         // Create users for testing
         user1 = new User();
         user2 = new User();
@@ -90,36 +90,36 @@ contract Describe_CDPGeneral is Authorizable {
         require(address(user1) != address(0), "User1 not created");
         require(address(user2) != address(0), "User2 not created");
         require(address(user3) != address(0), "User3 not created");
-        
+
         // Create USDST token
         USDST = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
         require(address(USDST) != address(0), "Failed to create USDST token");
         Token(USDST).setStatus(2); // Activate USDST
         require(Token(USDST).status() == TokenStatus.ACTIVE, "USDST token not activated");
-        
+
         // Create ETHST token
         ETHST = m.tokenFactory().createToken("ETHST", "ETHST Token", [], [], [], "ETHST", 0, 18);
         require(address(ETHST) != address(0), "Failed to create ETHST token");
         Token(ETHST).setStatus(2); // Activate ETHST
         require(Token(ETHST).status() == TokenStatus.ACTIVE, "ETHST token not activated");
-        
+
         // Grant CDPEngine mint/burn rights on USDST
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(USDST), "mint", address(engine));
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(USDST), "burn", address(engine));
-        
+
         // Set TokenFactory in CDPRegistry
         registry.setTokenFactory(address(m.tokenFactory()));
-        
+
         // Set USDST token in the registry
         registry.setUSDST(address(USDST));
         require(address(registry.usdst()) == address(USDST), "USDST not set correctly in registry");
-        
+
         // Set initial ETHST price in oracle
         PriceOracle oracle = m.priceOracle();
         uint ethstPrice = 3000e18; // $3,000 with 18 decimals
         oracle.setAssetPrice(ETHST, ethstPrice);
         require(oracle.getAssetPrice(ETHST) == ethstPrice, "ETHST price not set correctly");
-        
+
         // Configure ETHST as collateral asset in CDPEngine
         engine.setCollateralAssetParams(
             ETHST,
@@ -133,7 +133,7 @@ contract Describe_CDPGeneral is Authorizable {
             1e18, // 1e18 unit scale (18 decimals)
             false // not paused
         );
-        
+
         log("✅ General CDP test environment setup complete");
     }
 
@@ -145,7 +145,7 @@ contract Describe_CDPGeneral is Authorizable {
         // Get users' current balances (they may have USDST from previous operations)
         uint user1InitialBalance = IERC20(USDST).balanceOf(address(user1));
         uint user2InitialBalance = IERC20(USDST).balanceOf(address(user2));
-        
+
         Token(USDST).mint(address(this), 1000e18);
         IERC20(USDST).transfer(address(user1), 1000e18);
         require(IERC20(USDST).balanceOf(address(user1)) == user1InitialBalance + 1000e18, "User1 should have additional 1000 USDST after receipt");
@@ -165,7 +165,7 @@ contract Describe_CDPGeneral is Authorizable {
     function it_ba_can_handle_zero_amounts() public {
         CDPEngine engine = m.cdpEngine();
         CDPVault vault = m.cdpVault();
-        
+
         // Test zero collateral deposit (should fail gracefully)
         user1.do(ETHST, "approve", address(vault), 0);
         try user1.do(address(engine), "deposit", ETHST, 0) {
@@ -173,14 +173,14 @@ contract Describe_CDPGeneral is Authorizable {
         } catch {
             log("✅ Zero collateral deposit correctly rejected");
         }
-        
+
         // Test zero USDST mint (should fail gracefully)
         try user1.do(address(engine), "mint", ETHST, 0) {
             log("⚠️  Zero mint accepted (may be intended behavior)");
         } catch {
             log("✅ Zero USDST mint correctly rejected");
         }
-        
+
         // Test zero liquidation (should fail gracefully)
         user2.do(USDST, "approve", address(engine), 0);
         try user2.do(address(engine), "liquidate", ETHST, address(user1), 0) {
@@ -188,7 +188,7 @@ contract Describe_CDPGeneral is Authorizable {
         } catch {
             log("✅ Zero liquidation correctly rejected");
         }
-        
+
         // Test zero junior note (should fail gracefully)
         user1.do(USDST, "approve", address(engine), 0);
         try user1.do(address(engine), "openJuniorNote", ETHST, 0) {
@@ -201,13 +201,13 @@ contract Describe_CDPGeneral is Authorizable {
     function it_bb_can_handle_max_values() public {
         CDPEngine engine = m.cdpEngine();
         PriceOracle oracle = m.priceOracle();
-        
+
         // Test max uint256 price
         uint maxPrice = 115792089237316195423570985008687907853269984665640564039457584007913129639935; // max uint256
         oracle.setAssetPrice(ETHST, maxPrice);
         require(oracle.getAssetPrice(ETHST) == maxPrice, "Max price not set correctly");
         log("✅ Max price value handled correctly");
-        
+
         // Test max uint256 amounts (should fail gracefully)
         uint maxAmount = 115792089237316195423570985008687907853269984665640564039457584007913129639935; // max uint256
         user1.do(USDST, "approve", address(engine), maxAmount);
@@ -216,7 +216,7 @@ contract Describe_CDPGeneral is Authorizable {
 
     function it_bc_can_handle_boundary_liquidation_ratios() public {
         CDPEngine engine = m.cdpEngine();
-        
+
         // Test minimum liquidation ratio (150% = 1.5e18)
         uint minLiquidationRatio = 1500000000000000000; // 150%
         engine.setCollateralAssetParams(
@@ -232,7 +232,7 @@ contract Describe_CDPGeneral is Authorizable {
             false
         );
         log("✅ Minimum liquidation ratio (150%) configured correctly");
-        
+
         // Test high liquidation ratio (300% = 3e18)
         uint highLiquidationRatio = 3000000000000000000; // 300%
         engine.setCollateralAssetParams(
@@ -257,14 +257,14 @@ contract Describe_CDPGeneral is Authorizable {
     function it_bd_can_prevent_unauthorized_access() public {
         CDPEngine engine = m.cdpEngine();
         PriceOracle oracle = m.priceOracle();
-        
+
         // Test that non-admin cannot set prices
         try oracle.setAssetPrice(ETHST, 1000e18) {
             log("⚠️  Non-admin was able to set prices (may be intended behavior)");
         } catch {
             log("✅ Non-admin correctly prevented from setting prices");
         }
-        
+
         // Test that non-admin cannot configure collateral
         try engine.setCollateralAssetParams(
             ETHST,
@@ -286,22 +286,22 @@ contract Describe_CDPGeneral is Authorizable {
 
     function it_be_can_prevent_reentrancy() public {
         CDPEngine engine = m.cdpEngine();
-        
+
         // Create a fresh user for this test to avoid conflicts
         User user4 = new User();
-        
+
         // Ensure ETHST price is set to reasonable value
         m.priceOracle().setAssetPrice(ETHST, 3000e18); // $3,000
-        
+
         // Give fresh user ETHST for testing
         Token(ETHST).mint(address(user4), 5e18);
-        
+
         // Test multiple rapid operations (reentrancy-like behavior)
         user4.do(ETHST, "approve", address(m.cdpVault()), 5e18);
         user4.do(address(engine), "deposit", ETHST, 1e18);
         // Safe mint: 1 ETHST * $3,000 / 1.5 = $2,000 max, use $1,500 to be safe
         user4.do(address(engine), "mint", ETHST, 1500e18);
-        
+
         // Rapid successive operations (these will fail due to insufficient collateral, which is expected)
         try user4.do(address(engine), "mint", ETHST, 500e18) {
             log("⚠️  Additional mint succeeded (may be intended behavior)");
@@ -313,7 +313,7 @@ contract Describe_CDPGeneral is Authorizable {
         } catch {
             log("✅ Additional mint correctly rejected (insufficient collateral)");
         }
-        
+
         log("✅ Rapid successive operations handled correctly (reentrancy protection)");
     }
 
@@ -324,26 +324,26 @@ contract Describe_CDPGeneral is Authorizable {
     function it_bf_can_handle_precision_calculations() public {
         CDPEngine engine = m.cdpEngine();
         PriceOracle oracle = m.priceOracle();
-        
+
         // Test precision with small amounts
         uint smallAmount = 1; // 1 wei
         oracle.setAssetPrice(ETHST, smallAmount);
         require(oracle.getAssetPrice(ETHST) == smallAmount, "Small price precision error");
         log("✅ Small amount precision handled correctly");
-        
+
         // Reset ETHST price to reasonable value for testing
         oracle.setAssetPrice(ETHST, 3000e18); // $3,000
-        
+
         // Give user1 more ETHST for large amount testing
         Token(ETHST).mint(address(user1), 1000e18);
         user1.do(ETHST, "approve", address(m.cdpVault()), 1000e18);
         user1.do(address(engine), "deposit", ETHST, 1000e18);
-        
+
         // Test precision with large amounts
         uint largeAmount = 1000000e18; // 1 million USDST
         user1.do(address(engine), "mint", ETHST, largeAmount);
         log("✅ Large amount precision handled correctly");
-        
+
         // Test collateralization ratio calculation precision
         uint cr = engine.collateralizationRatio(address(user1), ETHST);
         require(cr > 0, "Collateralization ratio should be positive");
@@ -352,10 +352,10 @@ contract Describe_CDPGeneral is Authorizable {
 
     function it_bg_can_prevent_overflow_underflow() public {
         CDPEngine engine = m.cdpEngine();
-        
+
         // Test operations that could cause overflow
         uint maxUint = 115792089237316195423570985008687907853269984665640564039457584007913129639935; // max uint256
-        
+
         // These should fail gracefully rather than overflow
         try user1.do(address(engine), "mint", ETHST, maxUint) {
             log("⚠️  Max mint amount accepted (may be intended behavior)");
@@ -370,7 +370,7 @@ contract Describe_CDPGeneral is Authorizable {
 
     function it_bh_can_handle_pause_unpause() public {
         CDPEngine engine = m.cdpEngine();
-        
+
         // Test pausing collateral asset
         engine.setCollateralAssetParams(
             ETHST,
@@ -385,14 +385,14 @@ contract Describe_CDPGeneral is Authorizable {
             true // Paused
         );
         log("✅ Collateral asset paused successfully");
-        
+
         // Test that operations are blocked when paused
         try user1.do(address(engine), "deposit", ETHST, 1e18) {
             require(false, "Deposit should be blocked when paused");
         } catch {
             log("✅ Deposit correctly blocked when paused");
         }
-        
+
         // Test unpausing
         engine.setCollateralAssetParams(
             ETHST,
@@ -411,7 +411,7 @@ contract Describe_CDPGeneral is Authorizable {
 
     function it_bi_can_handle_configuration_changes() public {
         CDPEngine engine = m.cdpEngine();
-        
+
         // Test changing liquidation ratio
         uint newLiquidationRatio = 2000000000000000000; // 200%
         engine.setCollateralAssetParams(
@@ -427,7 +427,7 @@ contract Describe_CDPGeneral is Authorizable {
             false
         );
         log("✅ Liquidation ratio changed successfully");
-        
+
         // Test changing liquidation penalty
         engine.setCollateralAssetParams(
             ETHST,
@@ -452,11 +452,11 @@ contract Describe_CDPGeneral is Authorizable {
         CDPEngine engine = m.cdpEngine();
         PriceOracle oracle = m.priceOracle();
         TokenFactory tokenFactory = m.tokenFactory();
-        
+
         // Create additional test asset
         address GOLDST = tokenFactory.createToken("GOLDST", "GOLDST Token", [], [], [], "GOLDST", 0, 18);
         Token(GOLDST).setStatus(2); // Activate
-        
+
         // Configure GOLDST as collateral
         engine.setCollateralAssetParams(
             GOLDST,
@@ -470,60 +470,60 @@ contract Describe_CDPGeneral is Authorizable {
             1e18,
             false
         );
-        
+
         // Set GOLDST price
         oracle.setAssetPrice(GOLDST, 2000e18); // $2,000
-        
+
         // Mint GOLDST to user
         Token(GOLDST).mint(address(user1), 10e18);
-        
+
         // Deposit GOLDST collateral
         user1.do(GOLDST, "approve", address(m.cdpVault()), 10e18);
         user1.do(address(engine), "deposit", GOLDST, 10e18);
-        
+
         // Mint USDST against GOLDST
         user1.do(address(engine), "mint", GOLDST, 10000e18);
-        
+
         log("✅ Multiple assets (ETHST + GOLDST) handled correctly");
     }
 
     function it_bk_can_handle_complex_scenarios() public {
         CDPEngine engine = m.cdpEngine();
         PriceOracle oracle = m.priceOracle();
-        
+
         // Create complex scenario with multiple users and positions
         User user6 = new User();
         User user7 = new User();
-        
+
         // Ensure ETHST price is set to reasonable value
         oracle.setAssetPrice(ETHST, 3000e18); // $3,000
-        
+
         // Give users ETHST and USDST
         Token(ETHST).mint(address(user6), 5e18);
         Token(USDST).mint(address(user6), 10000e18);
         Token(ETHST).mint(address(user7), 5e18);
         Token(USDST).mint(address(user7), 10000e18);
-        
+
         // User6 opens position - safe amount: 5 ETHST * $3,000 / 1.5 = $10,000 max mint
         user6.do(ETHST, "approve", address(m.cdpVault()), 5e18);
         user6.do(address(engine), "deposit", ETHST, 5e18);
         user6.do(address(engine), "mint", ETHST, 9000e18); // Safe amount under liquidation ratio
-        
+
         // User7 opens position - safe amount: 5 ETHST * $3,000 / 1.5 = $10,000 max mint
         user7.do(ETHST, "approve", address(m.cdpVault()), 5e18);
         user7.do(address(engine), "deposit", ETHST, 5e18);
         user7.do(address(engine), "mint", ETHST, 9000e18); // Safe amount under liquidation ratio
-        
+
         // Crash price
         oracle.setAssetPrice(ETHST, 100e18);
-        
+
         // Liquidate both positions (user2 liquidates user6 and user7)
         // Ensure user2 has enough USDST for liquidation
         Token(USDST).mint(address(user2), 20000e18);
         user2.do(USDST, "approve", address(engine), 20000e18);
         user2.do(address(engine), "liquidate", ETHST, address(user6), 9000e18);
         user2.do(address(engine), "liquidate", ETHST, address(user7), 9000e18);
-        
+
         log("✅ Complex multi-user scenario handled correctly");
     }
 
@@ -533,21 +533,21 @@ contract Describe_CDPGeneral is Authorizable {
 
     function it_bl_can_validate_input_parameters() public {
         CDPEngine engine = m.cdpEngine();
-        
+
         // Test invalid asset address
         try engine.deposit(address(0), 1e18) {
             require(false, "Should reject zero address asset");
         } catch {
             log("✅ Zero address asset correctly rejected");
         }
-        
+
         // Test invalid user address
         try engine.liquidate(ETHST, address(0), 1000e18) {
             require(false, "Should reject zero address user");
         } catch {
             log("✅ Zero address user correctly rejected");
         }
-        
+
         // Test invalid liquidation ratio (< 100%)
         try engine.setCollateralAssetParams(
             ETHST,
@@ -570,19 +570,19 @@ contract Describe_CDPGeneral is Authorizable {
     function it_bm_can_maintain_data_integrity() public {
         CDPEngine engine = m.cdpEngine();
         CDPVault vault = m.cdpVault();
-        
+
         // Test that vault balances match engine state
         uint vaultBalance = IERC20(ETHST).balanceOf(address(vault));
         (uint userVaultCollateral, uint _) = engine.vaults(address(user1), ETHST);
-        
+
         require(vaultBalance >= userVaultCollateral, "Vault balance mismatch");
         log("✅ Vault balance integrity maintained");
-        
+
         // Test that total supply matches minted amounts
         uint totalSupply = IERC20(USDST).totalSupply();
         require(totalSupply > 0, "Total supply should be positive");
         log("✅ Total supply integrity maintained");
-        
+
         // Test that bad debt tracking is accurate
         uint badDebt = engine.badDebtUSDST(ETHST);
         require(badDebt >= 0, "Bad debt should be non-negative");
@@ -596,10 +596,10 @@ contract Describe_CDPGeneral is Authorizable {
     function it_bn_can_handle_large_batch_operations() public {
         CDPEngine engine = m.cdpEngine();
         PriceOracle oracle = m.priceOracle();
-        
+
         // Ensure ETHST price is set to reasonable value
         oracle.setAssetPrice(ETHST, 3000e18); // $3,000
-        
+
         // Test multiple rapid deposits
         for (uint j = 0; j < 5; j++) {
             Token(ETHST).mint(address(user1), 1e18);
@@ -607,7 +607,7 @@ contract Describe_CDPGeneral is Authorizable {
             user1.do(address(engine), "deposit", ETHST, 1e18);
         }
         log("✅ Large batch operations handled efficiently");
-        
+
         // Test multiple rapid mints
         for (uint k = 0; k < 5; k++) {
             user1.do(address(engine), "mint", ETHST, 1000e18);
@@ -617,19 +617,19 @@ contract Describe_CDPGeneral is Authorizable {
 
     function it_bo_can_handle_gas_optimization() public {
         CDPEngine engine = m.cdpEngine();
-        
+
         // Test that operations complete within reasonable gas limits
         // (This is more of a monitoring test - actual gas measurement would need different tools)
-        
+
         // Test efficient state reads
         uint cr = engine.collateralizationRatio(address(user1), ETHST);
         uint badDebt = engine.badDebtUSDST(ETHST);
         uint juniorIndex = engine.juniorIndex();
-        
+
         require(cr > 0 || cr == 115792089237316195423570985008687907853269984665640564039457584007913129639935, "Collateralization ratio should be valid");
         require(badDebt >= 0, "Bad debt should be non-negative");
         require(juniorIndex >= 0, "Junior index should be non-negative");
-        
+
         log("✅ Gas-optimized state reads completed successfully");
     }
 
@@ -640,22 +640,22 @@ contract Describe_CDPGeneral is Authorizable {
     function it_bp_can_cleanup_test_state() public {
         CDPEngine engine = m.cdpEngine();
         CDPReserve reserve = m.cdpReserve();
-        
+
         // Final state verification
         uint finalBadDebt = engine.badDebtUSDST(ETHST);
         uint finalReserveBalance = IERC20(USDST).balanceOf(address(reserve));
         uint finalJuniorIndex = engine.juniorIndex();
-        
+
         log("📊 Final Test State:");
         log("   Bad Debt: " + string(finalBadDebt / 1e18) + " USDST");
         log("   Reserve Balance: " + string(finalReserveBalance / 1e18) + " USDST");
         log("   Junior Index: " + string(finalJuniorIndex));
-        
+
         // Verify system is in consistent state
         require(finalBadDebt >= 0, "Final bad debt should be non-negative");
         require(finalReserveBalance >= 0, "Final reserve balance should be non-negative");
         require(finalJuniorIndex >= 0, "Final junior index should be non-negative");
-        
+
         log("✅ Test state cleanup and verification completed");
     }
 

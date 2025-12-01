@@ -9,8 +9,8 @@ import {
 } from 'react';
 import { api } from '@/lib/axios';
 import { Token, CreateTokenPayload } from '@/interface';
-import { Token as TokenType, EarningAsset, NetBalanceSnapshot } from '@mercata/shared-types';
-import { usdstAddress } from '@/lib/constants';
+import { Token as TokenType, EarningAsset, BalanceSnapshot } from '@mercata/shared-types';
+import { cataAddress, usdstAddress } from '@/lib/constants';
 import { useUser } from '@/context/UserContext';
 
 type TokenContextType = {
@@ -18,7 +18,9 @@ type TokenContextType = {
   activeTokens: Token[];
   inactiveTokens: TokenType[];
   earningAssets: EarningAsset[];
-  balanceHistory: NetBalanceSnapshot[];
+  balanceHistory: BalanceSnapshot[];
+  cataBalanceHistory: BalanceSnapshot[];
+  borrowingHistory: BalanceSnapshot[];
   loading: boolean;
   error: string | null;
   getAllTokens: (query?: Record<string, string>) => Promise<void>;
@@ -28,7 +30,9 @@ type TokenContextType = {
   getUserTokensWithBalance: () => Promise<Token[]>;
   getTransferableTokens: () => Promise<Token[]>;
   getEarningAssets: (showLoading?: boolean) => Promise<void>;
-  getBalanceHistory: (duration?: string, end?: string) => Promise<void>;
+  getBalanceHistory: (duration?: string, end?: string) => Promise<BalanceSnapshot[]>;
+  getCataBalanceHistory: (duration?: string, end?: string) => Promise<BalanceSnapshot[]>;
+  getBorrowingHistory: (duration?: string, end?: string) => Promise<BalanceSnapshot[]>;
   loadingEarningAssets: boolean;
   loadingInactiveTokens: boolean;
   createToken: (token: CreateTokenPayload) => Promise<void>;
@@ -41,6 +45,15 @@ type TokenContextType = {
   voucherBalance: string;
   loadingUsdstBalance: boolean;
   fetchUsdstBalance: (signal?: AbortSignal) => Promise<void>;
+  // Balance history caches
+  netBalanceHistoryCache: Record<string, BalanceSnapshot[]>;
+  rewardsHistoryCache: Record<string, BalanceSnapshot[]>;
+  borrowedHistoryCache: Record<string, BalanceSnapshot[]>;
+  loadingBalanceHistory: boolean;
+  setNetBalanceHistoryCache: (range: string, data: BalanceSnapshot[]) => void;
+  setRewardsHistoryCache: (range: string, data: BalanceSnapshot[]) => void;
+  setBorrowedHistoryCache: (range: string, data: BalanceSnapshot[]) => void;
+  setLoadingBalanceHistory: (loading: boolean) => void;
 };
 
 const TokenContext = createContext<TokenContextType | undefined>(undefined);
@@ -51,7 +64,9 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
   const [activeTokens, setActiveTokens] = useState<Token[]>([]);
   const [inactiveTokens, setInactiveTokens] = useState<TokenType[]>([]);
   const [earningAssets, setEarningAssets] = useState<EarningAsset[]>([]);
-  const [balanceHistory, setBalanceHistory] = useState<NetBalanceSnapshot[]>([]);
+  const [balanceHistory, setBalanceHistory] = useState<BalanceSnapshot[]>([]);
+  const [cataBalanceHistory, setCataBalanceHistory] = useState<BalanceSnapshot[]>([]);
+  const [borrowingHistory, setBorrowingHistory] = useState<BalanceSnapshot[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingEarningAssets, setLoadingEarningAssets] = useState(false);
   const [loadingInactiveTokens, setLoadingInactiveTokens] = useState(false);
@@ -61,6 +76,12 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
   const [usdstBalance, setUsdstBalance] = useState("0");
   const [voucherBalance, setVoucherBalance] = useState("0");
   const [loadingUsdstBalance, setLoadingUsdstBalance] = useState(false);
+  
+  // Balance history caches
+  const [netBalanceHistoryCache, setNetBalanceHistoryCacheState] = useState<Record<string, BalanceSnapshot[]>>({});
+  const [rewardsHistoryCache, setRewardsHistoryCacheState] = useState<Record<string, BalanceSnapshot[]>>({});
+  const [borrowedHistoryCache, setBorrowedHistoryCacheState] = useState<Record<string, BalanceSnapshot[]>>({});
+  const [loadingBalanceHistory, setLoadingBalanceHistory] = useState(false);
 
   // ========== REFS ==========
   const earningAssetsIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -225,16 +246,61 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  const getBalanceHistory = useCallback(async (duration: string = '1d', end: string) => {
+  const getCataBalanceHistory = useCallback(async (duration: string = '1d', end?: string): Promise<BalanceSnapshot[]> => {
     setLoading(true);
     try {
       const query = `?duration=${duration}${end ? `&end=${end}` : ''}`;
-      const res = await api.get<NetBalanceSnapshot[]>(`/tokens/v2/balance-history${query}`);
-      setBalanceHistory(res.data || []);
+      const res = await api.get<BalanceSnapshot[]>(`/tokens/v2/balance-history/${cataAddress}${query}`);
+      const data = res.data || [];
+      setCataBalanceHistory(data);
+      return data;
     } catch (err) {
+      return [];
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  const getBalanceHistory = useCallback(async (duration: string = '1d', end?: string): Promise<BalanceSnapshot[]> => {
+    setLoading(true);
+    try {
+      const query = `?duration=${duration}${end ? `&end=${end}` : ''}`;
+      const res = await api.get<BalanceSnapshot[]>(`/tokens/v2/net-balance-history${query}`);
+      const data = res.data || [];
+      setBalanceHistory(data);
+      return data;
+    } catch (err) {
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const getBorrowingHistory = useCallback(async (duration: string = '1d', end?: string): Promise<BalanceSnapshot[]> => {
+    setLoading(true);
+    try {
+      const query = `?duration=${duration}${end ? `&end=${end}` : ''}`;
+      const res = await api.get<BalanceSnapshot[]>(`/tokens/v2/borrowing-history${query}`);
+      const data = res.data || [];
+      setBorrowingHistory(data);
+      return data;
+    } catch (err) {
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const setNetBalanceHistoryCache = useCallback((range: string, data: BalanceSnapshot[]) => {
+    setNetBalanceHistoryCacheState(prev => ({ ...prev, [range]: data }));
+  }, []);
+
+  const setRewardsHistoryCache = useCallback((range: string, data: BalanceSnapshot[]) => {
+    setRewardsHistoryCacheState(prev => ({ ...prev, [range]: data }));
+  }, []);
+
+  const setBorrowedHistoryCache = useCallback((range: string, data: BalanceSnapshot[]) => {
+    setBorrowedHistoryCacheState(prev => ({ ...prev, [range]: data }));
   }, []);
 
   const createToken = useCallback(async (token: CreateTokenPayload) => {
@@ -345,6 +411,8 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
         inactiveTokens,
         earningAssets,
         balanceHistory,
+        cataBalanceHistory,
+        borrowingHistory,
         loading,
         error,
         getAllTokens,
@@ -355,6 +423,8 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
         getTransferableTokens,
         getEarningAssets,
         getBalanceHistory,
+        getCataBalanceHistory,
+        getBorrowingHistory,
         createToken,
         transferToken,
         approveToken,
@@ -366,6 +436,14 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
         voucherBalance,
         loadingUsdstBalance,
         fetchUsdstBalance,
+        netBalanceHistoryCache,
+        rewardsHistoryCache,
+        borrowedHistoryCache,
+        loadingBalanceHistory,
+        setNetBalanceHistoryCache,
+        setRewardsHistoryCache,
+        setBorrowedHistoryCache,
+        setLoadingBalanceHistory,
       }}
     >
       {children}

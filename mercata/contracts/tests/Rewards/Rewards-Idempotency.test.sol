@@ -19,7 +19,7 @@ contract Describe_Rewards_Idempotency is Authorizable {
     User user1;
     User user2;
 
-    uint256 liquidityActivityId = 1;
+    uint256 liquidityActivityId;
     uint256 liquidityEmissionRate = 900;
 
     function beforeAll() {
@@ -46,7 +46,7 @@ contract Describe_Rewards_Idempotency is Authorizable {
         ActionableEvent[] memory events = new ActionableEvent[](2);
         events[0] = ActionableEvent("Deposit", ActionType.Deposit);
         events[1] = ActionableEvent("Withdraw", ActionType.Withdraw);
-        rewards.addPositionActivity(liquidityActivityId, "Lending Pool Liquidity", liquidityEmissionRate, address(this), events);
+        liquidityActivityId = rewards.addPositionActivity("Lending Pool Liquidity", liquidityEmissionRate, address(this), events);
 
         uint256 fundingAmount = 1000000 * 1e18;
         rewardToken.mint(address(rewards), fundingAmount);
@@ -230,6 +230,104 @@ contract Describe_Rewards_Idempotency is Authorizable {
 
         // then - should revert
         require(reverted, "Non-owner should not be able to call emergencyOverride");
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // IDEMPOTENCY: Full replay of off-chain service from first event
+    // Simulates a service restart that replays all historical events
+    // ═════════════════════════════════════════════════════════════════════════
+
+    function it_should_handle_full_replay_of_all_events_idempotently() {
+        // Setup: Create a second activity (OneTime) for this test
+        uint256 swapActivityId = rewards.addOneTimeActivity("Swap Rewards", 100, address(this), "Swap");
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // FIRST RUN: Process events across multiple blocks
+        // ═══════════════════════════════════════════════════════════════════════
+
+        // Block 100: user1 deposits 1000, user2 deposits 500
+        rewards.handleAction(Action(address(this), "Deposit", address(user1), 1000 * 1e18, 100, 0));
+        rewards.handleAction(Action(address(this), "Deposit", address(user2), 500 * 1e18, 100, 1));
+
+        // Block 101: user1 swaps 200, user2 deposits 300 more
+        rewards.handleAction(Action(address(this), "Swap", address(user1), 200 * 1e18, 101, 0));
+        rewards.handleAction(Action(address(this), "Deposit", address(user2), 300 * 1e18, 101, 1));
+
+        // Block 102: user1 withdraws 400, user2 swaps 150
+        rewards.handleAction(Action(address(this), "Withdraw", address(user1), 400 * 1e18, 102, 0));
+        rewards.handleAction(Action(address(this), "Swap", address(user2), 150 * 1e18, 102, 1));
+
+        // Block 103: user1 deposits 250
+        rewards.handleAction(Action(address(this), "Deposit", address(user1), 250 * 1e18, 103, 0));
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // CAPTURE STATE AFTER FIRST RUN
+        // ═══════════════════════════════════════════════════════════════════════
+
+        // Liquidity activity state
+        (uint256 user1LiquidityStake_before, ) = rewards.userInfo(address(user1), liquidityActivityId);
+        (uint256 user2LiquidityStake_before, ) = rewards.userInfo(address(user2), liquidityActivityId);
+
+        // Swap activity state
+        (uint256 user1SwapStake_before, ) = rewards.userInfo(address(user1), swapActivityId);
+        (uint256 user2SwapStake_before, ) = rewards.userInfo(address(user2), swapActivityId);
+
+        // Global state
+        uint256 currentBlock_before = rewards.currentBlockHandled();
+
+        // Verify expected state after first run:
+        // user1 liquidity: 1000 - 400 + 250 = 850
+        require(user1LiquidityStake_before == 850 * 1e18, "User1 liquidity stake should be 850");
+        // user2 liquidity: 500 + 300 = 800
+        require(user2LiquidityStake_before == 800 * 1e18, "User2 liquidity stake should be 800");
+        // user1 swap: 200
+        require(user1SwapStake_before == 200 * 1e18, "User1 swap stake should be 200");
+        // user2 swap: 150
+        require(user2SwapStake_before == 150 * 1e18, "User2 swap stake should be 150");
+        // Current block: 103
+        require(currentBlock_before == 103, "Current block should be 103");
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // SECOND RUN: Replay ALL events from the beginning (service restart)
+        // All events should be ignored as duplicates or old blocks
+        // ═══════════════════════════════════════════════════════════════════════
+
+        // Replay Block 100 events (should be ignored - old block)
+        rewards.handleAction(Action(address(this), "Deposit", address(user1), 1000 * 1e18, 100, 0));
+        rewards.handleAction(Action(address(this), "Deposit", address(user2), 500 * 1e18, 100, 1));
+
+        // Replay Block 101 events (should be ignored - old block)
+        rewards.handleAction(Action(address(this), "Swap", address(user1), 200 * 1e18, 101, 0));
+        rewards.handleAction(Action(address(this), "Deposit", address(user2), 300 * 1e18, 101, 1));
+
+        // Replay Block 102 events (should be ignored - old block)
+        rewards.handleAction(Action(address(this), "Withdraw", address(user1), 400 * 1e18, 102, 0));
+        rewards.handleAction(Action(address(this), "Swap", address(user2), 150 * 1e18, 102, 1));
+
+        // Replay Block 103 events (should be ignored - same block, duplicate hash)
+        rewards.handleAction(Action(address(this), "Deposit", address(user1), 250 * 1e18, 103, 0));
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // VERIFY STATE UNCHANGED AFTER REPLAY
+        // ═══════════════════════════════════════════════════════════════════════
+
+        // Liquidity activity state
+        (uint256 user1LiquidityStake_after, ) = rewards.userInfo(address(user1), liquidityActivityId);
+        (uint256 user2LiquidityStake_after, ) = rewards.userInfo(address(user2), liquidityActivityId);
+
+        // Swap activity state
+        (uint256 user1SwapStake_after, ) = rewards.userInfo(address(user1), swapActivityId);
+        (uint256 user2SwapStake_after, ) = rewards.userInfo(address(user2), swapActivityId);
+
+        // Global state
+        uint256 currentBlock_after = rewards.currentBlockHandled();
+
+        // Assert nothing changed
+        require(user1LiquidityStake_after == user1LiquidityStake_before, "User1 liquidity stake should be unchanged after replay");
+        require(user2LiquidityStake_after == user2LiquidityStake_before, "User2 liquidity stake should be unchanged after replay");
+        require(user1SwapStake_after == user1SwapStake_before, "User1 swap stake should be unchanged after replay");
+        require(user2SwapStake_after == user2SwapStake_before, "User2 swap stake should be unchanged after replay");
+        require(currentBlock_after == currentBlock_before, "Current block should be unchanged after replay");
     }
 
 }

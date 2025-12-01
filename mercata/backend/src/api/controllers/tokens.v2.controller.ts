@@ -1,8 +1,16 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
-import { getBalanceHistory, getEarningAssets, getTokens } from "../services/tokens.v2.service";
+import {
+  getBalanceHistory,
+  getBorrowingHistory,
+  getEarningAssets,
+  getNetBalanceHistory,
+  getPoolPriceHistory,
+  getTokens
+} from "../services/tokens.v2.service";
 import { validateQueryParams } from "../validators/tokens.validator";
 import { buildTokenSelectFields } from "../../config/tokensConstants";
+import { getHistoryParams } from "../helpers/history.helper";
 
 class TokensV2Controller {
   static async getUserTokens(
@@ -49,47 +57,66 @@ class TokensV2Controller {
     next: NextFunction
   ): Promise<void> {
     try {
+      const { accessToken, params, query, address: userAddress } = req;
+
+      const { tokenAddress } = params;
+
+      const historyParams = getHistoryParams(`${query?.duration || '1d'}`, query.end ? `${query.end}` : undefined);
+
+      const result = await getBalanceHistory(accessToken, userAddress, tokenAddress, historyParams);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getNetBalanceHistory(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
       const { accessToken, query, address: userAddress } = req;
 
-      const endTimestamp = query.end ? parseInt(`${query.end}`) : Date.now();
+      const historyParams = getHistoryParams(`${query?.duration || '1d'}`, query.end ? `${query.end}` : undefined);
 
-      const duration = query.duration || '1d';
-      let interval = 1000 * 5 * 60; // 5 minutes
-      let numTicks = 12 * 24; // 5 minutes * 288 = 24 hours
-      switch (duration) {
-        case '5d': {
-          interval = 1000 * 60 * 30; // 30 minutes
-          numTicks = 5 * 48;
-          break;
-        }
-        case '7d': {
-          interval = 1000 * 60 * 30; // 30 minutes
-          numTicks = 7 * 48;
-          break;
-        }
-        case '1m': {
-          interval = 1000 * 60 * 60 * 2; // 2 hours
-          numTicks = 372; // 1 month
-          break;
-        }
-        case '3m': {
-          interval = 1000 * 60 * 60 * 6; // 6 hours
-          numTicks = 368; // 3 months
-          break;
-        }
-        case '6m': {
-          interval = 1000 * 60 * 60 * 12; // 12 hours
-          numTicks = 366; // 6 months
-          break;
-        }
-        case '1y': {
-          interval = 1000 * 60 * 60 * 24; // 1 day
-          numTicks = 366; // 12 months
-          break;
-        }
-      }
+      const result = await getNetBalanceHistory(accessToken, userAddress, historyParams);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
 
-      const result = await getBalanceHistory(accessToken, userAddress, endTimestamp, interval, numTicks);
+  static async getBorrowingHistory(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, query, address: userAddress } = req;
+
+      const historyParams = getHistoryParams(`${query?.duration || '1d'}`, query.end ? `${query.end}` : undefined);
+
+      const result = await getBorrowingHistory(accessToken, userAddress, historyParams);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getPoolPriceHistory(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, params, query, address: userAddress } = req;
+
+      const { poolAddress } = params;
+
+      const historyParams = getHistoryParams(`${query?.duration || '1d'}`, query.end ? `${query.end}` : undefined);
+
+      const result = await getPoolPriceHistory(accessToken, userAddress, poolAddress, historyParams);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);

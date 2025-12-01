@@ -1,5 +1,5 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from "axios";
-import { nodeUrl } from "../config/config";
+import { nodeUrl, bridgeUrl } from "../config/config";
 
 const createApiClient = (baseURL: string): AxiosInstance =>
   axios.create({
@@ -53,3 +53,18 @@ export const strato = makeTokenClient(_strato);
 export const cirrus = makeTokenClient(_cirrus);
 export const bloc = makeTokenClient(_bloc);
 export const eth = makeTokenClient(_eth);
+
+// Bridge client needs to be initialized after bridgeUrl is set
+let bridgeClient: ReturnType<typeof makeTokenClient> | null = null;
+const getBridgeClient = () => {
+  if (!bridgeClient) {
+    if (!bridgeUrl) throw new Error("Bridge URL not initialized.");
+    bridgeClient = makeTokenClient(createApiClient(`${bridgeUrl}`));
+  }
+  return bridgeClient;
+};
+export const bridge = new Proxy({} as ReturnType<typeof makeTokenClient>, {
+  get(_target, prop) {
+    return getBridgeClient()[prop as keyof ReturnType<typeof makeTokenClient>];
+  },
+});

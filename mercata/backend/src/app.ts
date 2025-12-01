@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import routes from "./api/routes";
-import { initOpenIdConfig } from "./config/config";
+import { initOpenIdConfig, initBridgeConfig } from "./config/config";
 import { errorHandler, notFoundHandler } from "./api/middleware/errorHandler";
 
 const PORT = process.env.PORT || 3001;
@@ -21,6 +21,7 @@ app.use(errorHandler);
 (async () => {
   try {
     await initOpenIdConfig();
+    await initBridgeConfig();
     app.listen(PORT, () => {
       console.log(`Server running at http://localhost:${PORT}`);
     });

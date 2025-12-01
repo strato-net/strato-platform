@@ -19,8 +19,8 @@ contract Describe_Rewards_Earn_and_Claim is Authorizable {
     User user1;
     User user2;
 
-    uint256 liquidityActivityId = 1;
-    uint256 borrowActivityId = 2;
+    uint256 liquidityActivityId;
+    uint256 borrowActivityId;
     uint256 liquidityEmissionRate = 900; // 900 CATA per second
     uint256 borrowEmissionRate = 100;    // 100 CATA per second
 
@@ -56,12 +56,12 @@ contract Describe_Rewards_Earn_and_Claim is Authorizable {
         ActionableEvent[] memory liquidityEvents = new ActionableEvent[](2);
         liquidityEvents[0] = ActionableEvent("Deposit", ActionType.Deposit);
         liquidityEvents[1] = ActionableEvent("Withdraw", ActionType.Withdraw);
-        rewards.addPositionActivity(liquidityActivityId, "Lending Pool Liquidity", liquidityEmissionRate, address(this), liquidityEvents);
+        liquidityActivityId = rewards.addPositionActivity("Lending Pool Liquidity", liquidityEmissionRate, address(this), liquidityEvents);
 
         ActionableEvent[] memory borrowEvents = new ActionableEvent[](2);
         borrowEvents[0] = ActionableEvent("Borrow", ActionType.Deposit);
         borrowEvents[1] = ActionableEvent("Repay", ActionType.Withdraw);
-        rewards.addPositionActivity(borrowActivityId, "Lending Pool Borrows", borrowEmissionRate, address(this), borrowEvents);
+        borrowActivityId = rewards.addPositionActivity("Lending Pool Borrows", borrowEmissionRate, address(this), borrowEvents);
 
         // Fund the Rewards contract with CATA tokens
         uint256 fundingAmount = 1000000 * 1e18; // 1 million CATA
