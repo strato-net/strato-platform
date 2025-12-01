@@ -6,7 +6,7 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import { blockTrackingService } from "./blockTrackingService";
 
-const MERCATA_PREFIX = "BlockApps-Mercata";
+const MERCATA_PREFIX = "BlockApps-";
 
 interface AttributeMapping {
   [contractAddress: string]: {
@@ -68,7 +68,7 @@ export const getEventQueryParams = async (): Promise<{
   eventNames: string[];
   minBlockNumber: number;
 }> => {
-  const activitiesData = await cirrus.get(`/${MERCATA_PREFIX}-Rewards-activities`, {
+  const activitiesData = await cirrus.get(`/${MERCATA_PREFIX}Rewards-activities`, {
     params: {
       address: `eq.${config.rewards.address}`,
       select: "value->>sourceContract,value->>actionableEvents",

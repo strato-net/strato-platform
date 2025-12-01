@@ -54,6 +54,58 @@ cp .env.example .env
 - `PORT` - Service port (default: 3004)
 - `POLLING_INTERVAL` - Polling interval in milliseconds (default: 60000)
 
+### Optional Environment Variables
+
+#### Contract Addresses
+- `USDST_ADDRESS` - USDST token contract address (default: `937efa7e3a77e20bbdbd7c0d32b6514f368c1010`)
+
+#### Polling Configuration
+- `MAX_BATCH_SIZE` - Maximum number of actions per batch (default: `100`)
+
+#### Balance Configuration
+- `GAS_FEE_USDST` - Gas fee in USDST, multiplied by 1e16 (default: `1` = 0.01 USDST)
+- `GAS_FEE_VOUCHER` - Gas fee in Voucher, multiplied by 1e16 (default: `100` = 1 Voucher)
+- `MIN_TRANSACTIONS_THRESHOLD` - Minimum transactions that can be processed with current balance (default: `1`)
+- `WARNING_TRANSACTIONS_THRESHOLD` - Threshold for low balance warning (default: `50`)
+
+#### Retry Configuration
+- `RETRY_MAX_ATTEMPTS` - Maximum retry attempts (default: `2`)
+- `RETRY_INITIAL_DELAY` - Initial retry delay in milliseconds (default: `1000`)
+- `RETRY_MAX_DELAY` - Maximum retry delay in milliseconds (default: `10000`)
+
+### Example .env File
+
+```env
+# Authentication
+BA_USERNAME=your_username
+BA_PASSWORD=your_password
+CLIENT_SECRET=your_client_secret
+CLIENT_ID=your_client_id
+OPENID_DISCOVERY_URL=https://your-openid-provider/.well-known/openid-configuration
+
+# Contract Addresses
+REWARDS_CONTRACT_ADDRESS=0000000000000000000000000000000000000000
+USDST_ADDRESS=937efa7e3a77e20bbdbd7c0d32b6514f368c1010
+
+# API Configuration
+NODE_URL=https://your-strato-node-url
+
+# Polling Configuration
+POLLING_INTERVAL=60000
+MAX_BATCH_SIZE=100
+
+# Balance Configuration
+GAS_FEE_USDST=1
+GAS_FEE_VOUCHER=100
+MIN_TRANSACTIONS_THRESHOLD=1
+WARNING_TRANSACTIONS_THRESHOLD=50
+
+# Retry Configuration
+RETRY_MAX_ATTEMPTS=2
+RETRY_INITIAL_DELAY=1000
+RETRY_MAX_DELAY=10000
+```
+
 ## Event Mappings
 
 The service uses hardcoded event mappings to convert protocol events to Rewards contract calls:

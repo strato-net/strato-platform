@@ -13,6 +13,7 @@ import { blockTrackingService } from "../services/blockTrackingService";
 
 const processEvents = async (): Promise<void> => {
   try {
+    logInfo("RewardsPolling", "Starting polling cycle");
     await checkBalances();
 
     const { contractAddresses, eventNames, minBlockNumber } = await getEventQueryParams();
