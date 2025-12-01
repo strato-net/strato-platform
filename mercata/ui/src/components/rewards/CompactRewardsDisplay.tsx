@@ -125,12 +125,6 @@ export const CompactRewardsDisplay = ({
             </div>
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Pending</span>
-                <span className="font-medium text-yellow-600 dark:text-yellow-400">
-                  {totalPendingFormatted}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Est. per Day</span>
                 <span className="font-medium">{totalEstimatedPerDayFormatted}</span>
               </div>
