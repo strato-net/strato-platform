@@ -1359,6 +1359,11 @@ expToVar' (CC.ArrayExpression _ exps) = do
   vars <- for exps expToVar
   --  return $ Constant $ SArray (error "array type from array literal not known") $ V.fromList vars
   return $ Constant $ SArray $ V.fromList vars
+expToVar' (CC.ObjectLiteral _ fieldMap) = do
+  -- Convert each field expression to a Variable
+  varMap <- traverse expToVar fieldMap
+  -- Create an SStruct with empty name (the struct type name is not needed for field access)
+  return $ Constant $ SStruct "" varMap
 expToVar' (CC.Ternary _ condition expr1 expr2) = do
   c <- getBool =<< expToVar condition
   expToVar $ if c then expr1 else expr2
