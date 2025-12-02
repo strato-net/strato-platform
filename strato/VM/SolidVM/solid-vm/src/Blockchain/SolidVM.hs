@@ -459,7 +459,7 @@ call' from to' fnCalltype functionName valList = do
         let isForbidden = theFunction ^. CC.funcVisibility == Just CC.Private || theFunction ^. CC.funcVisibility == Just CC.Internal
         when (isExternal && isForbidden) $
           unknownFunction "logFunctionCall" (functionName, "asdf" :: String) -- contract ^. CC.contractName)
-        validateFunctionArguments theFunction valList >>= \case
+        validateFunctionArguments (contract ^. CC.structs) theFunction valList >>= \case
           Just (theFunction', valList') -> do
             mCallInfo <- getCurrentCallInfoIfExists
             let ro = case mCallInfo of
@@ -1529,15 +1529,15 @@ expToVar' (CC.FunctionCall _ e args) = do
               res <- case M.lookup funcName $ contract' ^. CC.functions of
                 Just func -> if (CC._funcIsFree func)
                   then do
-                    validateFunctionArguments func argVals >>= \case
+                    validateFunctionArguments (contract' ^. CC.structs) func argVals >>= \case
                       Just (mo, argVals') -> runTheCall address codeAddr contract' funcName hsh cc mo argVals' ro True
                       Nothing -> runTheCall address codeAddr contract' funcName hsh cc func argVals ro True
                   else do
-                    validateFunctionArguments func argVals >>= \case
+                    validateFunctionArguments (contract' ^. CC.structs) func argVals >>= \case
                       Just (mo, argVals') -> runTheCall address codeAddr contract' funcName hsh cc mo argVals' ro False
                       Nothing -> case M.lookup funcName $ cc ^. CC.flFuncs of
                         Just ff -> do
-                          validateFunctionArguments ff argVals >>= \case
+                          validateFunctionArguments (contract' ^. CC.structs) ff argVals >>= \case
                             Just (mo, argVals') -> runTheCall address codeAddr contract' funcName hsh cc mo argVals' ro True
                             Nothing -> runTheCall address codeAddr contract' funcName hsh cc func argVals ro False
                         Nothing -> runTheCall address codeAddr contract' funcName hsh cc func argVals ro False
@@ -2236,7 +2236,7 @@ runTheConstructors from to hsh cc contractName' argVals' = do
 
   argVals <- case contract' ^. CC.constructor of
     Nothing -> pure argVals'
-    Just theConstructor -> validateFunctionArguments theConstructor argVals' >>= \case
+    Just theConstructor -> validateFunctionArguments (contract' ^. CC.structs) theConstructor argVals' >>= \case
       Just (_, vals) -> pure vals
       Nothing -> invalidArguments "constructor arguments don't match" (contractName', argVals')
 
@@ -2350,7 +2350,7 @@ runTheCall address' codeAddr contract' funcName hsh cc theFunction argVals' ro f
       Nothing -> if name `elem` contract' ^. CC.parents then return Nothing else missingField "modifier not found" name
   let !theModifiers = catMaybes theModifiers'
 
-  argVals <- validateFunctionArguments theFunction argVals' >>= \case
+  argVals <- validateFunctionArguments (contract' ^. CC.structs) theFunction argVals' >>= \case
     Just (_, av) -> pure av
     Nothing -> typeError
       "the argument values do not match up with the function signature"
@@ -2987,8 +2987,8 @@ solidVMExceptionHandler catchBlockMap ex =
           return res
 
 -- checks if an argument list is valid for a given function signature
-validateFunctionArguments:: MonadSM m => CC.Func -> ValList -> m (Maybe (CC.Func, ValList))
-validateFunctionArguments func argVals = checkFunc $ func : CC._funcOverload func
+validateFunctionArguments:: MonadSM m => M.Map String [(String, CC.FieldType, a)] -> CC.Func -> ValList -> m (Maybe (CC.Func, ValList))
+validateFunctionArguments structDefs func argVals = checkFunc $ func : CC._funcOverload func
   where
     checkFunc [] = pure Nothing
     checkFunc (x:xs) = testMatch x >>= \case
@@ -3026,7 +3026,23 @@ validateFunctionArguments func argVals = checkFunc $ func : CC._funcOverload fun
         -- (SAddress a _, SVMType.String _) -> pure . Just . SString $ show a
         (SAddress a _, SVMType.Int _ _) -> pure . Just . SInteger . fromIntegral $ unAddress a
         (SEnumVal r x y, SVMType.UnknownLabel u) -> pure . bool Nothing (Just $ SEnumVal r x y) $ r == u
-        (SStruct r x, SVMType.UnknownLabel u) -> pure . bool Nothing (Just $ SStruct r x) $ r == u
+        -- Allow SStruct to match UnknownLabel if:
+        -- 1. The struct name matches the expected type, OR
+        -- 2. The struct name is empty (from ObjectLiteral) AND the field names match the struct definition
+        (SStruct r x, SVMType.UnknownLabel u) ->
+          if r == u then pure . Just $ SStruct r x
+          else if r == "" then do
+            -- Look up the struct definition to validate field names
+            case M.lookup u structDefs of
+              Nothing -> pure Nothing  -- Struct not found
+              Just structFields -> do
+                let expectedFieldNames = S.fromList $ map (\(fname, _, _) -> fname) structFields
+                    providedFieldNames = S.fromList $ M.keys x
+                -- Check if provided fields match expected fields
+                if expectedFieldNames == providedFieldNames
+                  then pure . Just $ SStruct u x
+                  else pure Nothing
+          else pure Nothing
         (SContract r x, SVMType.UnknownLabel u) -> pure . bool Nothing (Just $ SContract r x) $ r == u
         (SArray vs, SVMType.Array y ml) ->
           if (Just $ V.length vs) `SVMType.maybeEq` (fromIntegral <$> ml)
