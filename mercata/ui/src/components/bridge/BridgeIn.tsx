@@ -92,7 +92,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
   const [autoDeposit, setAutoDeposit] = useState(isConvert);
 
   // Computed values
-  const modeLabels = BRIDGE_IN_MODE_LABELS[isConvert ? "convert" : "bridge"];
+  const modeLabels = BRIDGE_IN_MODE_LABELS[isConvert ? "easy-savings" : "bridge"];
 
   const currentTokens = useMemo(() => {
     return bridgeableTokens.filter((token) =>
