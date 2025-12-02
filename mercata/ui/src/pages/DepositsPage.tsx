@@ -114,7 +114,7 @@ const DepositsPage = () => {
                     items={[
                       {
                         key: "convert",
-                        label: "Convert",
+                        label: "Easy Saving",
                       },
                       {
                         key: "bridge-in",
