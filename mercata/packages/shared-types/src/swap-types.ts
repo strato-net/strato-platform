@@ -88,14 +88,6 @@ export interface SwapHistoryResponse {
   totalCount: number;
 }
 
-/**
- * Generic transaction response
- */
-export interface TransactionResponse {
-  status: string;
-  hash: string;
-}
-
 // ============================================================================
 // POOL & TOKEN TYPES
 // ============================================================================

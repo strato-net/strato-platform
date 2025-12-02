@@ -9,6 +9,7 @@ import { ArrowDownUp, Check, ChevronDown, HelpCircle } from "lucide-react";
 import { Pool, SwapToken } from "@/interface";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
+import { useTokenContext } from "@/context/TokenContext";
 import { useLendingContext } from "@/context/LendingContext";
 import { useToast } from '@/hooks/use-toast';
 import { useSwapContext } from "@/context/SwapContext";
@@ -484,7 +485,8 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
     [pairableTokens, fromAsset?.address]
   );
   const { userAddress } = useUser();
-  const { usdstBalance, voucherBalance, fetchUsdstBalance, fetchTokens } = useUserTokens();
+  const { fetchTokens } = useUserTokens();
+  const { usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
   const { refreshLoans, refreshCollateral } = useLendingContext();
   const { toast } = useToast();
 
@@ -551,7 +553,6 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
     toAsset,
     getPoolByTokenPair,
     fetchUsdstBalance,
-    userAddress,
     interval: POLL_INTERVAL
   });
 
@@ -585,11 +586,11 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
 
   // Initial setup and user-dependent effects
   useEffect(() => {
-    if (userAddress) fetchUsdstBalance(userAddress);
+    fetchUsdstBalance();
     if (swappableTokens.length > 0) {
       initialTokenSetup();
     }
-  }, [userAddress, fetchUsdstBalance, swappableTokens.length]);
+  }, [fetchUsdstBalance, swappableTokens.length]);
 
   // Fetch pairable tokens when fromAsset changes
   useEffect(() => {
@@ -783,7 +784,7 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
       await refreshSwapHistory()
       // Refresh all contexts to ensure borrow page shows updated balances
       await Promise.all([
-        fetchUsdstBalance(userAddress),
+        fetchUsdstBalance(),
         fetchTokens(),           // Refresh UserTokensContext
         refreshLoans(),          // Refresh LendingContext
         refreshCollateral(),     // Refresh LendingContext

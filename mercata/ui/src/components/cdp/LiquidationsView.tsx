@@ -7,6 +7,7 @@ import { cdpService, VaultData, AssetConfig, TransactionResponse } from "@/servi
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
+import { useTokenContext } from "@/context/TokenContext";
 import { formatWeiToDecimalHP, formatNumber } from "@/utils/numberUtils";
 
 interface LiquidationsViewProps {
@@ -33,7 +34,8 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
   const [isGlobalPaused, setIsGlobalPaused] = useState<boolean>(false);
   const { toast } = useToast();
   const { userAddress } = useUser();
-  const { fetchTokens, fetchUsdstBalance, usdstBalance } = useUserTokens();
+  const { fetchTokens } = useUserTokens();
+  const { fetchUsdstBalance, usdstBalance } = useTokenContext();
 
   // Fetch liquidatable positions, asset configs, and USDST balance
   useEffect(() => {
@@ -50,12 +52,14 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
           console.error("Failed to fetch global pause status:", error);
           setIsGlobalPaused(false); // Default to not paused if we can't fetch
         }
-        
+
         // Fetch liquidatable vaults
         const liquidatable = await cdpService.getLiquidatable();
-        
+
         // Fetch asset configs for each unique asset
-        const uniqueAssets = [...new Set(liquidatable.map(vault => vault.asset))];
+        const uniqueAssets = [
+          ...new Set(liquidatable.map((vault) => vault.asset)),
+        ];
         const configPromises = uniqueAssets.map(async (asset) => {
           try {
             const config = await cdpService.getAssetConfig(asset);
@@ -65,7 +69,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
             return { asset, config: null };
           }
         });
-        
+
         const configResults = await Promise.all(configPromises);
         const configsMap: Record<string, AssetConfig> = {};
         configResults.forEach(({ asset, config }) => {
@@ -74,26 +78,28 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
           }
         });
         setAssetConfigs(configsMap);
-        
+
         // Filter out paused positions (global pause OR individual asset pause) and positions with 0 collateral
-        const filteredLiquidatable = liquidatable.filter(vault => {
+        const filteredLiquidatable = liquidatable.filter((vault) => {
           const assetConfig = configsMap[vault.asset];
           // Exclude if globally paused OR if this specific asset is paused
           const isPaused = globalPaused || (assetConfig?.isPaused ?? false);
           // Exclude if collateral amount is 0
-          const hasCollateral = vault.collateralAmount && vault.collateralAmount !== "0" && BigInt(vault.collateralAmount) > 0n;
+          const hasCollateral =
+            vault.collateralAmount &&
+            vault.collateralAmount !== "0" &&
+            BigInt(vault.collateralAmount) > 0n;
           return !isPaused && hasCollateral;
         });
         setLiquidatableVaults(filteredLiquidatable);
-        
+
         // Fetch USDST balance once for the entire component
-        if (userAddress) {
-          await fetchUsdstBalance(userAddress);
-          const availableUsdstWei = BigInt(usdstBalance || "0");
-          const availableUsdstDecimal = parseFloat(formatWeiToDecimalHP(availableUsdstWei.toString(), 18));
-          setAvailableUsdstBalance(availableUsdstDecimal);
-        }
-        
+        await fetchUsdstBalance();
+        const availableUsdstWei = BigInt(usdstBalance || "0");
+        const availableUsdstDecimal = parseFloat(
+          formatWeiToDecimalHP(availableUsdstWei.toString(), 18)
+        );
+        setAvailableUsdstBalance(availableUsdstDecimal);
       } catch (error) {
         console.error("Error fetching data:", error);
         toast({
@@ -329,15 +335,13 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
         setLiquidationAmounts(prev => ({ ...prev, [vaultKey]: "" }));
         
         // Refresh user token balances (they spent USDST and received collateral)
-        if (userAddress) {
           await fetchTokens(); // Refresh all token balances (including received collateral)
-          await fetchUsdstBalance(userAddress); // Refresh USDST balance (spent during liquidation)
+        await fetchUsdstBalance(); // Refresh USDST balance (spent during liquidation)
           
           // Update the global USDST balance after fetching
           const updatedUsdstWei = BigInt(usdstBalance || "0");
           const updatedUsdstDecimal = parseFloat(formatWeiToDecimalHP(updatedUsdstWei.toString(), 18));
           setAvailableUsdstBalance(updatedUsdstDecimal);
-        }
       }
     } catch (error) {
       console.error("Liquidation failed:", error);

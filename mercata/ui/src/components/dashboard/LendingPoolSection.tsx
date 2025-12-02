@@ -3,6 +3,7 @@ import { CircleArrowDown, CircleArrowUp, HelpCircle, PauseCircle } from "lucide-
 import { useLendingContext } from "@/context/LendingContext";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
+import { useTokenContext } from "@/context/TokenContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -18,7 +19,8 @@ import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 
 const LendingPoolSection = () => {
   const { userAddress } = useUser();
-  const { activeTokens: tokens, loading, fetchTokens, fetchUsdstBalance } = useUserTokens();
+  const { activeTokens: tokens, loading, fetchTokens } = useUserTokens();
+  const { fetchUsdstBalance } = useTokenContext();
   const {
     liquidityInfo,
     loadingLiquidity,
@@ -36,10 +38,9 @@ const LendingPoolSection = () => {
   const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
   const refreshLendingData = (signal?: AbortSignal) => {
-    if (!userAddress) return;
     fetchTokens(signal);
     refreshLiquidity(signal);
-    fetchUsdstBalance(userAddress);
+    fetchUsdstBalance();
   };
 
   const getMaxWithdrawableAmount = (): bigint => {
@@ -65,15 +66,14 @@ const LendingPoolSection = () => {
     }
   };
 
-  // 1. Fetch on userAddress change only, with abort controller
+  // 1. Fetch on mount, with abort controller
   useEffect(() => {
-    if (!userAddress) return;
     const abortController = new AbortController();
     refreshLendingData(abortController.signal);
     return () => {
       abortController.abort();
     };
-  }, [userAddress]);
+  }, []);
 
 
   const isDepositAmountValid = () => {

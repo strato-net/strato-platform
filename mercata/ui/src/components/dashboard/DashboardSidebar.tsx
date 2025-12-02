@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Wallet, Database, LogOut, ArrowLeft, ArrowRight, Book, ArrowRightLeft, Send, Shield, Activity, BarChart3, Coins } from 'lucide-react';
+import { LayoutDashboard, Wallet, ArrowLeft, ArrowRight, Book, ArrowRightLeft, Send, Shield, Activity, BarChart3, Coins ,Droplets, Download} from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import MERCATALOGO from '@/assets/mercata.png';
 import MERCATAICON from '@/assets/icon.png';
@@ -41,9 +41,10 @@ const DashboardSidebar = () => {
     { icon: <Send size={20} />, label: 'Transfer', path: '/dashboard/transfer' },
     { icon: <Book size={20} />, label: 'Borrow', path: '/dashboard/borrow' },
     { icon: <ArrowRightLeft size={20} />, label: 'Swap', path: '/dashboard/swap' },
-    { icon: <Database size={20} />, label: 'Pools', path: '/dashboard/pools' },
+    { icon: <Droplets size={20} />, label: 'Advanced', path: '/dashboard/advanced' },
     { icon: <Coins size={20} />, label: 'Rewards', path: '/dashboard/rewards' },
     { icon: <BarChart3 size={20} />, label: 'Mercata Stats', path: '/dashboard/stats' },
+    { icon: <Download size={20} />, label: 'Withdrawals', path: '/dashboard/withdrawals' },
     { icon: <Activity size={20} />, label: 'Activity Feed', path: '/dashboard/activity' },
     { icon: <Shield size={20} />, label: 'Admin', path: '/dashboard/admin' },
   ];

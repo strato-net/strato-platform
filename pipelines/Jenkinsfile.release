@@ -288,7 +288,7 @@ pipeline {
       )
 
       slackSend (
-        channel: '#the-core',
+        channel: '#engineering',
         color: 'good',
         message: "STRATO ${env.RELEASE_VERSION} is released"
       )

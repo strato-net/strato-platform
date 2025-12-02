@@ -5,29 +5,29 @@ import "../../abstract/ERC20/access/Ownable.sol";
  * @notice Provides asset price feeds used for loan value and collateral validation.
  * @dev Asset prices are set manually for now; can be upgraded to use external oracles.
  */
- 
+
  contract record PriceOracle is Ownable {
     // Asset price storage (price in 8-decimal format: 1e8 = $1.00)
     mapping(address => uint256) public record prices;
     mapping(address => uint256) public record lastUpdated;
-    
+
     // Events
     event PriceUpdated(address indexed asset, uint256 price, uint256 timestamp);
     event BatchPricesUpdated(address[] assets, uint256[] priceValues, uint256 timestamp);
-    
+
     constructor(address _owner) Ownable(_owner) {}
-    
+
     /**
      * @dev Internal helper to set price for a single asset with validation
      */
     function _setAssetPrice(address asset, uint256 price) internal {
         require(asset != address(0), "Invalid asset address");
         require(price > 0, "Price must be greater than 0");
-        
+
         prices[asset] = price;
         lastUpdated[asset] = block.timestamp;
     }
-    
+
     /**
      * @dev Set price for a single asset
      */
@@ -35,21 +35,21 @@ import "../../abstract/ERC20/access/Ownable.sol";
         _setAssetPrice(asset, price);
         emit PriceUpdated(asset, price, block.timestamp);
     }
-    
+
     /**
      * @dev Set prices for multiple assets in batch (main function for oracle service)
      */
     function setAssetPrices(address[] calldata assets, uint256[] calldata priceValues) external onlyOwner {
         require(assets.length == priceValues.length, "Arrays length mismatch");
         require(assets.length > 0, "Empty arrays");
-        
+
         for (uint256 i = 0; i < assets.length; i++) {
             _setAssetPrice(assets[i], priceValues[i]);
         }
-        
+
         emit BatchPricesUpdated(assets, priceValues, block.timestamp);
     }
-    
+
     /**
      * @dev Get price for an asset
      */
@@ -59,7 +59,7 @@ import "../../abstract/ERC20/access/Ownable.sol";
         require(price > 0, "Price not available");
         return price;
     }
-    
+
     /**
      * @dev Get price with timestamp for an asset
      */
@@ -70,7 +70,7 @@ import "../../abstract/ERC20/access/Ownable.sol";
         timestamp = lastUpdated[asset];
         return (price, timestamp);
     }
-    
+
     /**
      * @dev Check if price is fresh (updated within specified time)
      */
