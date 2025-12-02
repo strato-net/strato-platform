@@ -860,5 +860,47 @@ router.post("/bad-debt/claim-junior-note", authHandler.authorizeRequest(), CDPCo
  */
 router.get("/stats", authHandler.authorizeRequest(), CDPController.getCDPStats);
 
+/**
+ * @openapi
+ * /cdp/daily-interest:
+ *   get:
+ *     summary: Get total daily interest accrued across all CDP assets
+ *     tags: [CDP]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Daily interest accrued per asset and total
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 totalDailyInterestUSD:
+ *                   type: string
+ *                   description: Total daily interest accrued across all assets in USD (18 decimals)
+ *                 assets:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       asset:
+ *                         type: string
+ *                         description: Asset contract address
+ *                       symbol:
+ *                         type: string
+ *                         description: Asset symbol (e.g., WBTC, ETHST)
+ *                       totalDebtUSD:
+ *                         type: string
+ *                         description: Total debt in USD for this asset (18 decimals)
+ *                       dailyInterestUSD:
+ *                         type: string
+ *                         description: Daily interest accrued for this asset in USD (18 decimals)
+ *                       annualRatePercent:
+ *                         type: number
+ *                         description: Annual stability fee rate as percentage
+ */
+router.get("/daily-interest", authHandler.authorizeRequest(true), CDPController.getDailyInterestAccrued);
+
 
 export default router;

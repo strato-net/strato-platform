@@ -2016,6 +2016,82 @@ export const getCDPStats = async (
   }
 };
 
+interface DailyInterestData {
+  asset: string;
+  symbol: string;
+  totalDebtUSD: string;
+  dailyInterestUSD: string;
+  annualRatePercent: number;
+}
+
+interface DailyInterestResponse {
+  totalDailyInterestUSD: string;
+  assets: DailyInterestData[];
+}
+
+export const getDailyInterestAccrued = async (
+  accessToken: string,
+  userAddress: string
+): Promise<DailyInterestResponse> => {
+  const registry = await getCDPRegistry(accessToken, userAddress, {}, "getDailyInterestAccrued");
+  
+  if (!registry?.cdpEngine) {
+    throw new Error("CDP Engine not found");
+  }
+
+  const collateralConfigs = registry.cdpEngine.collateralConfigs || [];
+  const globalStates = registry.cdpEngine.collateralGlobalStates || [];
+
+
+  // Build a map of global states by asset
+  const globalStateMap = new Map(
+    globalStates.map((s: any) => [s.asset.toLowerCase(), s.CollateralGlobalState])
+  );
+  let totalDailyInterestUSD = 0n;
+  const assetsData: DailyInterestData[] = [];
+
+  for (const configEntry of collateralConfigs) {
+    const asset = configEntry.asset;
+    const config = configEntry.CollateralConfig;
+    const globalState = globalStateMap.get(asset.toLowerCase());
+
+    if (!config || !globalState) continue;
+
+    // Get token info for symbol
+    const tokenInfo = await getTokenInfo(accessToken, asset);
+
+    // Calculate actual debt: totalScaledDebt * rateAccumulator / RAY
+    const totalScaledDebt = BigInt((globalState as any).totalScaledDebt || "0");
+    const rateAccumulator = BigInt((globalState as any).rateAccumulator || RAY.toString());
+    const actualDebtUSD = (totalScaledDebt * rateAccumulator) / RAY;
+
+    // Get annual rate as percentage (already converted)
+    const annualRatePercent = convertStabilityFeeRateToAnnualPercentage(config.stabilityFeeRate);
+
+    // Daily interest = actualDebt * (annualRate / 100) / 365
+    // Using WAD precision: (actualDebt * annualRate * WAD / 100) / 365 / WAD
+    const annualRateWad = BigInt(Math.floor(annualRatePercent * Number(WAD) / 100));
+    const dailyInterestUSD = (actualDebtUSD * annualRateWad) / (365n * WAD);
+
+    totalDailyInterestUSD += dailyInterestUSD;
+
+    if (actualDebtUSD > 0n) {
+      assetsData.push({
+        asset,
+        symbol: tokenInfo.symbol,
+        totalDebtUSD: actualDebtUSD.toString(),
+        dailyInterestUSD: dailyInterestUSD.toString(),
+        annualRatePercent
+      });
+    }
+  }
+
+  return {
+    totalDailyInterestUSD: totalDailyInterestUSD.toString(),
+    assets: assetsData
+  };
+};
+
 export const openJuniorNote = async (
   accessToken: string,
   userAddress: string,
