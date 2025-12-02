@@ -36,7 +36,7 @@ const config = {
       price: 1,
     },
     polling: {
-      defaultTimeout: 60_000,
+      defaultTimeout: 600_000,
       defaultInterval: 5_000,
     },
     tx: {
