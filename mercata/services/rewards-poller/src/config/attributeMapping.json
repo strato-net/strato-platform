@@ -1,8 +1,26 @@
 {
-  "0000000000000000000000000000000000001005": {
+  "0000000000000000000000000000000000001004": {
+    "Deposited": {
+      "amount": "mTokenMinted"
+    },
+    "Withdrawn": {
+      "amount": "mTokenBurned"
+    },
     "Borrowed": {
       "amount": "amount"
     }
+  },
+  "0000000000000000000000000000000000001015": {
+    "Staked": {
+      "amount": "sharesOut"
+    },
+    "Redeemed": {
+      "amount": "sharesIn"
+    }
+  },
+  "0000000000000000000000000000000000001011": {
+    "USDSTMinted": {
+      "amount": "amountUSD"
+    }
   }
 }
-
