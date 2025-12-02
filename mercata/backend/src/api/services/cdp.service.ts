@@ -2016,24 +2016,32 @@ export const getCDPStats = async (
   }
 };
 
-interface DailyInterestData {
+interface InterestData {
   asset: string;
   symbol: string;
   totalDebtUSD: string;
-  dailyInterestUSD: string;
   annualRatePercent: number;
+  dailyInterestUSD: string;
+  weeklyInterestUSD: string;
+  monthlyInterestUSD: string;
+  ytdInterestUSD: string;
+  allTimeInterestUSD: string;
 }
 
-interface DailyInterestResponse {
+interface InterestResponse {
   totalDailyInterestUSD: string;
-  assets: DailyInterestData[];
+  totalWeeklyInterestUSD: string;
+  totalMonthlyInterestUSD: string;
+  totalYtdInterestUSD: string;
+  totalAllTimeInterestUSD: string;
+  assets: InterestData[];
 }
 
-export const getDailyInterestAccrued = async (
+export const getInterestAccrued = async (
   accessToken: string,
   userAddress: string
-): Promise<DailyInterestResponse> => {
-  const registry = await getCDPRegistry(accessToken, userAddress, {}, "getDailyInterestAccrued");
+): Promise<InterestResponse> => {
+  const registry = await getCDPRegistry(accessToken, userAddress, {}, "getInterestAccrued");
   
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
@@ -2042,13 +2050,23 @@ export const getDailyInterestAccrued = async (
   const collateralConfigs = registry.cdpEngine.collateralConfigs || [];
   const globalStates = registry.cdpEngine.collateralGlobalStates || [];
 
-
   // Build a map of global states by asset
   const globalStateMap = new Map(
     globalStates.map((s: any) => [s.asset.toLowerCase(), s.CollateralGlobalState])
   );
+
   let totalDailyInterestUSD = 0n;
-  const assetsData: DailyInterestData[] = [];
+  let totalWeeklyInterestUSD = 0n;
+  let totalMonthlyInterestUSD = 0n;
+  let totalYtdInterestUSD = 0n;
+  let totalAllTimeInterestUSD = 0n;
+
+  const assetsData: InterestData[] = [];
+
+  // Calculate days elapsed for YTD
+  const now = new Date();
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
+  const daysElapsedYTD = Math.floor((now.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
   for (const configEntry of collateralConfigs) {
     const asset = configEntry.asset;
@@ -2068,26 +2086,54 @@ export const getDailyInterestAccrued = async (
     // Get annual rate as percentage (already converted)
     const annualRatePercent = convertStabilityFeeRateToAnnualPercentage(config.stabilityFeeRate);
 
-    // Daily interest = actualDebt * (annualRate / 100) / 365
-    // Using WAD precision: (actualDebt * annualRate * WAD / 100) / 365 / WAD
+    // Using WAD precision for interest calculations
     const annualRateWad = BigInt(Math.floor(annualRatePercent * Number(WAD) / 100));
+
+    // Daily interest = actualDebt * (annualRate / 100) / 365
     const dailyInterestUSD = (actualDebtUSD * annualRateWad) / (365n * WAD);
 
+    // Weekly interest = daily * 7
+    const weeklyInterestUSD = dailyInterestUSD * 7n;
+
+    // Monthly interest = daily * 30
+    const monthlyInterestUSD = dailyInterestUSD * 30n;
+
+    // YTD interest = daily * days elapsed this year
+    const ytdInterestUSD = dailyInterestUSD * BigInt(daysElapsedYTD);
+
+    // All-time interest = total accumulated interest (rateAccumulator - RAY) * totalScaledDebt / RAY
+    // This represents the cumulative interest that has accrued since inception
+    const allTimeInterestUSD = totalScaledDebt > 0n 
+      ? (totalScaledDebt * (rateAccumulator - RAY)) / RAY
+      : 0n;
+
     totalDailyInterestUSD += dailyInterestUSD;
+    totalWeeklyInterestUSD += weeklyInterestUSD;
+    totalMonthlyInterestUSD += monthlyInterestUSD;
+    totalYtdInterestUSD += ytdInterestUSD;
+    totalAllTimeInterestUSD += allTimeInterestUSD;
 
     if (actualDebtUSD > 0n) {
       assetsData.push({
         asset,
         symbol: tokenInfo.symbol,
         totalDebtUSD: actualDebtUSD.toString(),
+        annualRatePercent,
         dailyInterestUSD: dailyInterestUSD.toString(),
-        annualRatePercent
+        weeklyInterestUSD: weeklyInterestUSD.toString(),
+        monthlyInterestUSD: monthlyInterestUSD.toString(),
+        ytdInterestUSD: ytdInterestUSD.toString(),
+        allTimeInterestUSD: allTimeInterestUSD.toString()
       });
     }
   }
 
   return {
     totalDailyInterestUSD: totalDailyInterestUSD.toString(),
+    totalWeeklyInterestUSD: totalWeeklyInterestUSD.toString(),
+    totalMonthlyInterestUSD: totalMonthlyInterestUSD.toString(),
+    totalYtdInterestUSD: totalYtdInterestUSD.toString(),
+    totalAllTimeInterestUSD: totalAllTimeInterestUSD.toString(),
     assets: assetsData
   };
 };

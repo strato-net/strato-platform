@@ -31,7 +31,7 @@ import {
   topUpJuniorNote,
   claimJuniorNote,
   getCDPStats,
-  getDailyInterestAccrued,
+  getInterestAccrued,
 } from "../services/cdp.service";
 import {
   validateDepositArgs,
@@ -480,14 +480,14 @@ class CDPController {
     }
   }
 
-  static async getDailyInterestAccrued(
+  static async getInterestAccrued(
     req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> {
     try {
       const { accessToken, address: userAddress } = req;
-      const result = await getDailyInterestAccrued(accessToken, userAddress as string);
+      const result = await getInterestAccrued(accessToken, userAddress as string);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
