@@ -292,7 +292,7 @@ const AssetDetail = () => {
 
         <main className="p-6">
           <div className="mb-6">
-            <Link to="/deposits" className="inline-flex items-center text-blue-600 hover:text-blue-800">
+            <Link to="/dashboard/deposits" className="inline-flex items-center text-blue-600 hover:text-blue-800">
               <ChevronLeft size={16} className="mr-1" /> Back to Deposits
             </Link>
           </div>
