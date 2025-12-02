@@ -6,9 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs as AntdTabs } from "antd";
 import BridgeOut from "@/components/bridge/BridgeOut";
 import WithdrawTransactionDetails from "@/components/dashboard/WithdrawTransactionDetails";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom";
 import { useBridgeContext } from "@/context/BridgeContext";
-import { Loader2 } from "lucide-react";
+import { Loader2, ArrowRight } from "lucide-react";
 import { formatBalance } from "@/utils/numberUtils";
 
 const WithdrawalsPage = () => {
@@ -17,7 +17,7 @@ const WithdrawalsPage = () => {
     "from-savings"
   );
   const [searchParams] = useSearchParams();
-  const { loadNetworksAndTokens, withdrawalSummary, loadingWithdrawalSummary, fetchWithdrawalSummary } =
+  const { loadNetworksAndTokens, withdrawalSummary, loadingWithdrawalSummary, fetchWithdrawalSummary, setTargetTransactionTab } =
     useBridgeContext();
 
   const withdrawalSummaryIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -86,7 +86,17 @@ const WithdrawalsPage = () => {
             <div className="w-full lg:w-[50%] flex">
               <Card className="shadow-sm flex-1 flex flex-col">
                 <CardHeader>
-                  <CardTitle>Withdraw Assets</CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle>Withdraw Assets</CardTitle>
+                    <Link
+                      to="/bridge-transactions"
+                      onClick={() => setTargetTransactionTab('WithdrawalInitiated')}
+                      className="flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors"
+                    >
+                      <ArrowRight size={16} />
+                      View Transactions
+                    </Link>
+                  </div>
                 </CardHeader>
                 <CardContent className="flex-1 flex flex-col min-h-0">
                   <div className="w-full bg-white/90 p-1.5 rounded-xl border border-gray-200 shadow-sm flex-1 flex flex-col min-h-0">

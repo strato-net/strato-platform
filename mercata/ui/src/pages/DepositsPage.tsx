@@ -31,7 +31,7 @@ const DepositsPage = () => {
   const { totalCDPDebt } = useCDP();
   const { loadNetworksAndTokens, setTargetTransactionTab } = useBridgeContext();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"convert" | "bridge-in">("convert");
+  const [activeTab, setActiveTab] = useState<"easy-savings" | "bridge-in">("easy-savings");
 
   // Extract CATA token from inactive tokens by address
   const cataToken = inactiveTokens?.find(token =>
@@ -113,8 +113,8 @@ const DepositsPage = () => {
                     activeKey={activeTab}
                     items={[
                       {
-                        key: "convert",
-                        label: "Convert",
+                        key: "easy-savings",
+                        label: "Easy Savings",
                       },
                       {
                         key: "bridge-in",
@@ -122,7 +122,7 @@ const DepositsPage = () => {
                       },
                     ]}
                     onChange={(value) =>
-                      setActiveTab(value as "convert" | "bridge-in")
+                      setActiveTab(value as "easy-savings" | "bridge-in")
                     }
                     className="custom-tabs"
                     style={
@@ -133,7 +133,7 @@ const DepositsPage = () => {
                     }
                   />
                     <div className="bg-white rounded-xl p-4 shadow-sm mt-4 flex-1 min-h-0 overflow-auto">
-                      <BridgeIn isConvert={activeTab === "convert"} />
+                      <BridgeIn isConvert={activeTab === "easy-savings"} />
                     </div>
                   </div>
                 </CardContent>
