@@ -238,9 +238,7 @@ const App = () => {
                                   path="/dashboard/rewards"
                                   element={
                                     <ProtectedRoute>
-                                      <DashboardWrapper>
-                                        <Rewards />
-                                      </DashboardWrapper>
+                                      <Rewards />
                                     </ProtectedRoute>
                                   }
                                 />
