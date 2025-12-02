@@ -75,6 +75,25 @@ interface AggregatedRevenueResponse {
   aggregated: RevenuePeriod;
 }
 
+interface InterestAccruedResponse {
+  totalDailyInterestUSD: string;
+  totalWeeklyInterestUSD: string;
+  totalMonthlyInterestUSD: string;
+  totalYtdInterestUSD: string;
+  totalAllTimeInterestUSD: string;
+  assets: {
+    asset: string;
+    symbol: string;
+    totalDebtUSD: string;
+    annualRatePercent: number;
+    dailyInterestUSD: string;
+    weeklyInterestUSD: string;
+    monthlyInterestUSD: string;
+    ytdInterestUSD: string;
+    allTimeInterestUSD: string;
+  }[];
+}
+
 const createEmptyRevenuePeriod = (): RevenuePeriod => ({
   daily: { total: '0', byAsset: [] },
   weekly: { total: '0', byAsset: [] },
@@ -117,10 +136,15 @@ const MercataStats = () => {
   const [revenueLoading, setRevenueLoading] = useState(true);
   const [revenueError, setRevenueError] = useState<string | null>(null);
 
+  // Interest Accrued state (CDP estimated interest)
+  const [interestAccrued, setInterestAccrued] = useState<InterestAccruedResponse | null>(null);
+  const [interestLoading, setInterestLoading] = useState(true);
+
   useEffect(() => {
     fetchTokenStats();
     fetchCDPStats();
     fetchProtocolRevenue();
+    fetchInterestAccrued();
   }, []);
 
   const fetchTokenStats = async () => {
@@ -182,6 +206,36 @@ const MercataStats = () => {
       setRevenueError('Failed to load protocol revenue');
     } finally {
       setRevenueLoading(false);
+    }
+  };
+
+  const fetchInterestAccrued = async () => {
+    try {
+      setInterestLoading(true);
+      const response = await api.get<InterestAccruedResponse>('/cdp/interest');
+      setInterestAccrued(response.data);
+    } catch (err) {
+      console.error('Failed to fetch interest accrued:', err);
+    } finally {
+      setInterestLoading(false);
+    }
+  };
+
+  const getEstimatedInterestForPeriod = (period: keyof RevenuePeriod): string => {
+    if (!interestAccrued) return '0';
+    switch (period) {
+      case 'daily':
+        return interestAccrued.totalDailyInterestUSD;
+      case 'weekly':
+        return interestAccrued.totalWeeklyInterestUSD;
+      case 'monthly':
+        return interestAccrued.totalMonthlyInterestUSD;
+      case 'ytd':
+        return interestAccrued.totalYtdInterestUSD;
+      case 'allTime':
+        return interestAccrued.totalAllTimeInterestUSD;
+      default:
+        return '0';
     }
   };
 
@@ -471,6 +525,20 @@ const MercataStats = () => {
                       <p className="text-xs text-muted-foreground">
                         {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} CDP fees
                       </p>
+                      <div className="mt-3 pt-3 border-t border-gray-200">
+                        <div className="text-lg font-semibold">
+                          {interestLoading ? (
+                            <Skeleton className="h-6 w-20" />
+                          ) : (
+                            `$${formatLargeNumber(parseFloat(formatUnits(BigInt(getEstimatedInterestForPeriod(selectedPeriod) || '0'), 18)))}`
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {selectedPeriod === 'allTime' 
+                            ? 'Actual accrued interest' 
+                            : `Est. ${selectedPeriod} accrued interest`}
+                        </p>
+                      </div>
                     </CardContent>
                   </Card>
                   
