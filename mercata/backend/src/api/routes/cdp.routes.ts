@@ -860,5 +860,71 @@ router.post("/bad-debt/claim-junior-note", authHandler.authorizeRequest(), CDPCo
  */
 router.get("/stats", authHandler.authorizeRequest(), CDPController.getCDPStats);
 
+/**
+ * @openapi
+ * /cdp/interest:
+ *   get:
+ *     summary: Get interest accrued across all CDP assets for multiple time periods
+ *     tags: [CDP]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Interest accrued per asset and totals for daily, weekly, monthly, YTD, and all-time periods
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 totalDailyInterestUSD:
+ *                   type: string
+ *                   description: Total daily interest accrued across all assets in USD (18 decimals)
+ *                 totalWeeklyInterestUSD:
+ *                   type: string
+ *                   description: Total weekly interest accrued across all assets in USD (18 decimals)
+ *                 totalMonthlyInterestUSD:
+ *                   type: string
+ *                   description: Total monthly interest accrued across all assets in USD (18 decimals)
+ *                 totalYtdInterestUSD:
+ *                   type: string
+ *                   description: Total year-to-date interest accrued across all assets in USD (18 decimals)
+ *                 totalAllTimeInterestUSD:
+ *                   type: string
+ *                   description: Total all-time interest accrued across all assets in USD (18 decimals)
+ *                 assets:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       asset:
+ *                         type: string
+ *                         description: Asset contract address
+ *                       symbol:
+ *                         type: string
+ *                         description: Asset symbol (e.g., WBTC, ETHST)
+ *                       totalDebtUSD:
+ *                         type: string
+ *                         description: Total debt in USD for this asset (18 decimals)
+ *                       annualRatePercent:
+ *                         type: number
+ *                         description: Annual stability fee rate as percentage
+ *                       dailyInterestUSD:
+ *                         type: string
+ *                         description: Daily interest accrued for this asset in USD (18 decimals)
+ *                       weeklyInterestUSD:
+ *                         type: string
+ *                         description: Weekly interest accrued for this asset in USD (18 decimals)
+ *                       monthlyInterestUSD:
+ *                         type: string
+ *                         description: Monthly interest accrued for this asset in USD (18 decimals)
+ *                       ytdInterestUSD:
+ *                         type: string
+ *                         description: Year-to-date interest accrued for this asset in USD (18 decimals)
+ *                       allTimeInterestUSD:
+ *                         type: string
+ *                         description: All-time interest accrued for this asset in USD (18 decimals)
+ */
+router.get("/interest", authHandler.authorizeRequest(true), CDPController.getInterestAccrued);
+
 
 export default router;
