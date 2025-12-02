@@ -89,3 +89,19 @@
   cd bootstrap-docker
   sudo ./strato --wipe
   ```
+
+## Git Hooks
+
+### Pre-commit: Trailing Whitespace Removal
+
+A pre-commit hook is available to automatically remove trailing whitespaces before committing.
+
+**Installation:**
+
+```bash
+cp scripts/hooks/pre-commit .git/hooks/pre-commit
+chmod +x .git/hooks/pre-commit
+```
+
+The hook uses `scripts/delete-trailing-whitespaces.sh --staged` to process only
+staged files and automatically re-stages them after cleaning.
