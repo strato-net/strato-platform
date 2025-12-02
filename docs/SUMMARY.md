@@ -3,6 +3,13 @@
 * [Introduction](README.md)
 * [Getting Started](getting-started.md)
 
+## Architecture
+
+* [Overview](architecture/README.md)
+* [STRATO Node API](architecture/strato-api.md)
+* [Smart Contracts](architecture/contracts.md)
+* [Infrastructure](architecture/infrastructure.md)
+
 ## Mercata APIs
 
 * [Overview](mercata/README.md)

@@ -2,28 +2,82 @@
 
 [![STRATO Mercata logo](https://www.stratomercata.com/images/stratomercata.com/2025.10.11/strato-mercata-logo.png)](https://stratomercata.com)
 
-Welcome to the STRATO Mercata Platform documentation. This guide covers the platform's features, APIs, and design architecture.
+Welcome to the STRATO Mercata Platform documentation. STRATO Mercata is an enterprise-grade blockchain platform with DeFi capabilities built by BlockApps.
 
-## Quick Links
+## Quick Start
 
 - **[Getting Started](getting-started.md)** - Prerequisites, build, and run instructions
-- **[Mercata APIs](mercata/README.md)** - API documentation for tokens, lending, pools, and more
-- **[Design Documents](design/README.md)** - Architecture and design specifications
 
-## Overview
+## Architecture
 
-STRATO Mercata is a blockchain platform that provides:
+Understanding the platform components and how they work together:
 
-- **Token Management** - Create and manage digital assets
-- **Lending & Pools** - DeFi lending functionality
+- **[Architecture Overview](architecture/README.md)** - High-level system architecture
+- **[STRATO Node API](architecture/strato-api.md)** - Blockchain node API reference
+- **[Smart Contracts](architecture/contracts.md)** - Contract architecture and SolidVM features
+- **[Infrastructure](architecture/infrastructure.md)** - NGINX, databases, and services
+
+## API Documentation
+
+### Mercata Backend
+
+The DeFi and token management REST API:
+
+- **[API Overview](mercata/README.md)** - Complete endpoint reference
+- **[Tokens](mercata/Tokens.md)** - Token management
+- **[Lending](mercata/Lending.md)** - Lending protocol
+- **[Pools](mercata/Pools.md)** - Liquidity pools and AMM
+- **[Bridge](mercata/Bridge.md)** - Cross-chain transfers
+- **[CDP](mercata/CDP.md)** - Collateralized Debt Positions
+- **[Rewards](mercata/Rewards.md)** - Rewards distribution
+- **[Admin](mercata/Admin.md)** - Platform administration
+- **[Voucher](mercata/Voucher.md)** - Fee voucher system
+
+### Supplementary
+
+- **[Lending Pool Overview](mercata/lending_pool_overview.md)** - Detailed lending mechanics
+- **[Lending API Test Plan](mercata/lending_api_test_plan.md)** - Testing documentation
+
+## Design Documents
+
+Technical specifications and architecture decisions:
+
+- **[Rewards System](design/rewards.md)** - Core rewards design
+- **[Rewards Chef](design/rewards-chef.md)** - MasterChef-style distribution
+
+## Features
+
+### Blockchain
+
+- **SolidVM** - Solidity-compatible smart contract execution
+- **Blockstanbul** - PBFT-based consensus mechanism
+- **Slipstream** - Real-time contract state indexing to PostgreSQL
+- **Ethereum Compatibility** - JSON-RPC interface
+
+### DeFi
+
+- **Token Factory** - ERC20 token creation and management
+- **Lending Pools** - Collateralized borrowing and lending
+- **AMM Pools** - Automated market making and swaps
+- **CDP Engine** - Collateralized debt positions
+- **Rewards Chef** - Multi-pool incentive distribution
 - **Bridge** - Cross-chain asset transfers
-- **Rewards System** - Incentive mechanisms
 
-## Prerequisites
+### Enterprise
 
-- Stack (build time dependency) - https://docs.haskellstack.org/en/stable/install_and_upgrade/
-- Docker with Compose plugin (runtime-only dependency) - https://docs.docker.com/engine/install/
+- **OAuth 2.0** - OpenID Connect authentication
+- **X.509 Certificates** - PKI-based identity
+- **Permissioned Networks** - Validator-controlled consensus
+- **HSM Support** - Hardware security module integration
+
+## Networks
+
+| Network | Purpose | Use Case |
+|---------|---------|----------|
+| **Helium** | Testnet | Development and testing |
+| **Upquark** | Mainnet | Production deployment |
 
 ## Support
 
-For more information, visit [stratomercata.com](https://stratomercata.com).
+- Website: [stratomercata.com](https://stratomercata.com)
+- GitHub: [blockapps/strato-platform](https://github.com/blockapps/strato-platform)
