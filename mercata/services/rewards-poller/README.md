@@ -53,7 +53,7 @@ cp .env.example .env
 
 #### Service
 - `PORT` - Service port (default: 3004)
-- `POLLING_INTERVAL` - Polling interval in milliseconds (default: 60000)
+- `POLLING_INTERVAL` - Polling interval in milliseconds (default: 600000)
 
 ### Optional Environment Variables
 
@@ -61,7 +61,7 @@ cp .env.example .env
 - `USDST_ADDRESS` - USDST token contract address (default: `937efa7e3a77e20bbdbd7c0d32b6514f368c1010`)
 
 #### Polling Configuration
-- `MAX_BATCH_SIZE` - Maximum number of actions per batch (default: `100`)
+- `MAX_BATCH_SIZE` - Maximum number of actions per batch (default: `50`)
 
 #### Balance Configuration
 - `GAS_FEE_USDST` - Gas fee in USDST, multiplied by 1e16 (default: `1` = 0.01 USDST)
@@ -93,8 +93,8 @@ USDST_ADDRESS=937efa7e3a77e20bbdbd7c0d32b6514f368c1010
 NODE_URL=https://your-strato-node-url
 
 # Polling Configuration
-POLLING_INTERVAL=60000
-MAX_BATCH_SIZE=100
+POLLING_INTERVAL=600000
+MAX_BATCH_SIZE=50
 
 # Balance Configuration
 GAS_FEE_USDST=1
