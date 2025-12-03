@@ -19,7 +19,7 @@ const Rewards = () => {
   const { userRewards, loading: userRewardsLoading, refetch: refetchUserRewards } = useRewardsUserInfo();
 
   useEffect(() => {
-    document.title = "Rewards | STRATO Mercata";
+    document.title = "Rewards";
   }, []);
 
   const handleClaimSuccess = () => {
