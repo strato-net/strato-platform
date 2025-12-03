@@ -94,6 +94,25 @@ interface InterestAccruedResponse {
   }[];
 }
 
+interface LendingInterestAccruedResponse {
+  totalDailyInterestUSD: string;
+  totalWeeklyInterestUSD: string;
+  totalMonthlyInterestUSD: string;
+  totalYtdInterestUSD: string;
+  totalAllTimeInterestUSD: string;
+  borrowableAsset: {
+    asset: string;
+    symbol: string;
+    totalDebtUSD: string;
+    annualRatePercent: number;
+    dailyInterestUSD: string;
+    weeklyInterestUSD: string;
+    monthlyInterestUSD: string;
+    ytdInterestUSD: string;
+    allTimeInterestUSD: string;
+  };
+}
+
 const createEmptyRevenuePeriod = (): RevenuePeriod => ({
   daily: { total: '0', byAsset: [] },
   weekly: { total: '0', byAsset: [] },
@@ -140,11 +159,16 @@ const MercataStats = () => {
   const [interestAccrued, setInterestAccrued] = useState<InterestAccruedResponse | null>(null);
   const [interestLoading, setInterestLoading] = useState(true);
 
+  // Lending Interest Accrued state
+  const [lendingInterestAccrued, setLendingInterestAccrued] = useState<LendingInterestAccruedResponse | null>(null);
+  const [lendingInterestLoading, setLendingInterestLoading] = useState(true);
+
   useEffect(() => {
     fetchTokenStats();
     fetchCDPStats();
     fetchProtocolRevenue();
     fetchInterestAccrued();
+    fetchLendingInterestAccrued();
   }, []);
 
   const fetchTokenStats = async () => {
@@ -221,6 +245,18 @@ const MercataStats = () => {
     }
   };
 
+  const fetchLendingInterestAccrued = async () => {
+    try {
+      setLendingInterestLoading(true);
+      const response = await api.get<LendingInterestAccruedResponse>('/lending/interest');
+      setLendingInterestAccrued(response.data);
+    } catch (err) {
+      console.error('Failed to fetch lending interest accrued:', err);
+    } finally {
+      setLendingInterestLoading(false);
+    }
+  };
+
   const getEstimatedInterestForPeriod = (period: keyof RevenuePeriod): string => {
     if (!interestAccrued) return '0';
     switch (period) {
@@ -234,6 +270,24 @@ const MercataStats = () => {
         return interestAccrued.totalYtdInterestUSD;
       case 'allTime':
         return interestAccrued.totalAllTimeInterestUSD;
+      default:
+        return '0';
+    }
+  };
+
+  const getLendingEstimatedInterestForPeriod = (period: keyof RevenuePeriod): string => {
+    if (!lendingInterestAccrued) return '0';
+    switch (period) {
+      case 'daily':
+        return lendingInterestAccrued.totalDailyInterestUSD;
+      case 'weekly':
+        return lendingInterestAccrued.totalWeeklyInterestUSD;
+      case 'monthly':
+        return lendingInterestAccrued.totalMonthlyInterestUSD;
+      case 'ytd':
+        return lendingInterestAccrued.totalYtdInterestUSD;
+      case 'allTime':
+        return lendingInterestAccrued.totalAllTimeInterestUSD;
       default:
         return '0';
     }
@@ -575,6 +629,20 @@ const MercataStats = () => {
                       <p className="text-xs text-muted-foreground">
                         {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} lending fees
                       </p>
+                      <div className="mt-3 pt-3 border-t border-gray-200">
+                        <div className="text-lg font-semibold">
+                          {lendingInterestLoading ? (
+                            <Skeleton className="h-6 w-20" />
+                          ) : (
+                            `$${formatLargeNumber(parseFloat(formatUnits(BigInt(getLendingEstimatedInterestForPeriod(selectedPeriod) || '0'), 18)))}`
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {selectedPeriod === 'allTime' 
+                            ? 'Actual accrued interest' 
+                            : `Est. ${selectedPeriod} accrued interest`}
+                        </p>
+                      </div>
                     </CardContent>
                   </Card>
 

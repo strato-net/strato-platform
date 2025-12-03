@@ -22,6 +22,7 @@ import {
   withdrawCollateralMax,
   pauseLendingPool,
   unpauseLendingPool,
+  getLendingInterestAccrued,
 } from "../services/lending.service";
 import {
   validateDepositLiquidityArgs,
@@ -393,6 +394,20 @@ class LendingController {
       return next();
     } catch (error) {
       return next(error);
+    }
+  }
+
+  static async getInterestAccrued(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress } = req;
+      const result = await getLendingInterestAccrued(accessToken, userAddress as string);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
     }
   }
 
