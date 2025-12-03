@@ -11,6 +11,19 @@ import { Pool } from '@/interface';
 import { rewardsEnabled } from '@/lib/constants';
 import LiquidityDepositModal from './LiquidityDepositModal';
 import LiquidityWithdrawModal from './LiquidityWithdrawModal';
+import { CompactRewardsDisplay } from '@/components/rewards/CompactRewardsDisplay';
+import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
+
+// Helper function to map pool names to activity IDs
+const getPoolActivityId = (poolName: string | undefined): number | null => {
+  if (!poolName) return null;
+  const name = poolName.toLowerCase();
+  if (name.includes('ethst') && name.includes('usdst')) return 1; // ETHST-USDST Swap LP
+  if (name.includes('wbtcst') && name.includes('usdst')) return 4; // WBTCST-USDST Swap LP
+  if (name.includes('goldst') && name.includes('usdst')) return 5; // GOLDST-USDST Swap LP
+  if (name.includes('silvst') && name.includes('usdst')) return 6; // SILVST-USDST Swap LP
+  return null;
+};
 
 
 const SwapPoolsSection = () => {
@@ -26,6 +39,7 @@ const SwapPoolsSection = () => {
   const { fetchPools, getPoolByAddress } = useSwapContext();
   const { fetchUsdstBalance, usdstBalance, voucherBalance } = useTokenContext();
   const { userAddress } = useUser();
+  const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
   useEffect(() => {
     fetchAndEnrichPools();
@@ -208,6 +222,17 @@ const SwapPoolsSection = () => {
                       <div className="text-sm text-gray-500">APY</div>
                       <div className="font-medium">{pool.apy ? `${pool.apy}%` : "N/A"}</div>
                     </div>
+                    {(() => {
+                      const activityId = getPoolActivityId(pool.poolName);
+                      return activityId ? (
+                        <CompactRewardsDisplay
+                          userRewards={userRewards}
+                          loading={rewardsLoading}
+                          activityIds={[activityId]}
+                          variant="button"
+                        />
+                      ) : null;
+                    })()}
                     <div className="flex space-x-2">
                       <Button
                         size="sm"

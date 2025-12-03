@@ -229,7 +229,7 @@ const SafetyModuleSection = () => {
             <CompactRewardsDisplay
               userRewards={userRewards}
               loading={rewardsLoading}
-              activityIds={[4]}
+              activityIds={[8]}
               variant="button"
             />
           </div>
@@ -302,7 +302,7 @@ const SafetyModuleSection = () => {
                   <CompactRewardsDisplay
                     userRewards={userRewards}
                     loading={rewardsLoading}
-                    activityIds={[4]}
+                    activityIds={[8]}
                     variant="inline"
                     inputAmount={stakeAmount}
                   />

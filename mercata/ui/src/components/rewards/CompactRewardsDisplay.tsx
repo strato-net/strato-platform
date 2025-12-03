@@ -114,10 +114,27 @@ export const CompactRewardsDisplay = ({
     : "0 points";
 
   const hasRewards = totalPending > 0n || totalEstimatedPerDay > 0n || inputAmountReward > 0n;
+  // Show button if activity exists, even if user has no stake yet
+  const hasActivity = filteredActivities.length > 0;
+
 
   // Button variant - for header
   if (variant === "button") {
-    if (loading || !hasRewards) return null;
+    // Show loading state instead of returning null
+    if (loading) {
+      return (
+        <Button variant="outline" size="sm" className="gap-2" disabled>
+          <Coins className="h-4 w-4" />
+          <span className="hidden sm:inline">Loading...</span>
+        </Button>
+      );
+    }
+
+    // Show button if activity exists, even if user has no stake/rewards yet
+    if (!hasActivity) {
+      console.log("[CompactRewardsDisplay] Activity not found - returning null for button variant");
+      return null;
+    }
 
     return (
       <Popover>
@@ -142,22 +159,46 @@ export const CompactRewardsDisplay = ({
                 </Button>
               </Link>
             </div>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Est. per Day</span>
-                <span className="font-medium">{totalEstimatedPerDayFormatted}</span>
-              </div>
-            </div>
-            {activitiesWithStake.map(({ activity }) => (
-              <div key={activity.activityId} className="pt-2 border-t text-xs">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">{truncateActivityName(activity.name)}</span>
-                  <Badge variant="outline" className="text-xs">
-                    {activity.activityType === 1 ? "One-Time" : "Position"}
-                  </Badge>
+            {hasRewards ? (
+              <>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Est. per Day</span>
+                    <span className="font-medium">{totalEstimatedPerDayFormatted}</span>
+                  </div>
                 </div>
+                {activitiesWithStake.length > 0 && activitiesWithStake.map(({ activity }) => (
+                  <div key={activity.activityId} className="pt-2 border-t text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">{truncateActivityName(activity.name)}</span>
+                      <Badge variant="outline" className="text-xs">
+                        {activity.activityType === 1 ? "One-Time" : "Position"}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </>
+            ) : (
+              <div className="text-sm text-muted-foreground py-2">
+                {filteredActivities.length > 0 ? (
+                  <div className="space-y-2">
+                    <p>No rewards yet. Start using the platform to earn rewards!</p>
+                    {filteredActivities.map(({ activity }) => (
+                      <div key={activity.activityId} className="pt-2 border-t text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">{truncateActivityName(activity.name)}</span>
+                          <Badge variant="outline" className="text-xs">
+                            {activity.activityType === 1 ? "One-Time" : "Position"}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p>No rewards available for this activity.</p>
+                )}
               </div>
-            ))}
+            )}
           </div>
         </PopoverContent>
       </Popover>

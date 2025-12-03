@@ -171,7 +171,7 @@ const LendingPoolSection = () => {
             <CompactRewardsDisplay
               userRewards={userRewards}
               loading={rewardsLoading}
-              activityIds={[1]}
+              activityIds={[3]}
               variant="button"
             />
           </div>
@@ -244,7 +244,7 @@ const LendingPoolSection = () => {
                   <CompactRewardsDisplay
                     userRewards={userRewards}
                     loading={rewardsLoading}
-                    activityIds={[1]}
+                    activityIds={[3]}
                     variant="inline"
                     inputAmount={depositAmount}
                   />

@@ -19,6 +19,19 @@ import { useSwapContext } from '@/context/SwapContext';
 import { usdstAddress, DEPOSIT_FEE, rewardsEnabled } from "@/lib/constants";
 import { Pool } from '@/interface';
 import { safeParseUnits } from '@/utils/numberUtils';
+import { CompactRewardsDisplay } from '@/components/rewards/CompactRewardsDisplay';
+import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
+
+// Helper function to map pool names to activity IDs
+const getPoolActivityId = (poolName: string | undefined): number | null => {
+  if (!poolName) return null;
+  const name = poolName.toLowerCase();
+  if (name.includes('ethst') && name.includes('usdst')) return 1; // ETHST-USDST Swap LP
+  if (name.includes('wbtcst') && name.includes('usdst')) return 4; // WBTCST-USDST Swap LP
+  if (name.includes('goldst') && name.includes('usdst')) return 5; // GOLDST-USDST Swap LP
+  if (name.includes('silvst') && name.includes('usdst')) return 6; // SILVST-USDST Swap LP
+  return null;
+};
 
 const formatNumber = (value: string | number): string => {
   try {
@@ -66,6 +79,7 @@ const LiquidityDepositModal = ({
   const { addLiquidityDualToken, addLiquiditySingleToken, getPoolByAddress, fetchTokenBalances, fetchPools } = useSwapContext();
   const { toast } = useToast();
   const { userAddress } = useUser();
+  const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
   const form = useForm<DepositFormValues>({
     defaultValues: {
@@ -630,6 +644,34 @@ const LiquidityDepositModal = ({
               })()}
             </div>
           </div>
+
+          {/* Estimated Rewards Display */}
+          {(() => {
+            const activityId = getPoolActivityId(selectedPool?.poolName);
+            if (!activityId) return null;
+            
+            // Calculate total input amount (sum of both tokens if in A&B mode, or the active token)
+            let totalInputAmount = "0";
+            if (depositMode === 'A&B') {
+              const token1 = parseFloat(token1Amount || "0");
+              const token2 = parseFloat(token2Amount || "0");
+              totalInputAmount = (token1 + token2).toString();
+            } else if (depositMode === 'A') {
+              totalInputAmount = token1Amount || "0";
+            } else if (depositMode === 'B') {
+              totalInputAmount = token2Amount || "0";
+            }
+            
+            return (totalInputAmount && parseFloat(totalInputAmount) > 0) ? (
+              <CompactRewardsDisplay
+                userRewards={userRewards}
+                loading={rewardsLoading || false}
+                activityIds={[activityId]}
+                variant="inline"
+                inputAmount={totalInputAmount}
+              />
+            ) : null;
+          })()}
 
           <div className="rounded-lg bg-gray-50 p-3">
             <div className="flex justify-between items-center text-sm text-gray-500">

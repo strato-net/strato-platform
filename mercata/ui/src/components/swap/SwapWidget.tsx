@@ -300,7 +300,7 @@ const TokenInput = ({
         <CompactRewardsDisplay
           userRewards={userRewards}
           loading={rewardsLoading || false}
-          activityIds={[3]}
+          activityIds={[9]}
           variant="inline"
           inputAmount={amount}
         />
