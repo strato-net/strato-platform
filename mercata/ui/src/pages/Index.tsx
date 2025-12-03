@@ -1,16 +1,21 @@
 
 import { useEffect } from 'react';
+import { useTheme } from 'next-themes';
 import Navbar from '../components/Navbar';
 import Hero from '../components/home/Hero';
 import MERCATALOGO from '@/assets/mercata.png';
 
 const Index = () => {
+  const { setTheme } = useTheme();
+
   useEffect(() => {
     document.title = "STRATO Mercata | Where Stability Meets Opportunity";
-  }, []);
+    // Force light mode on landing page
+    setTheme('light');
+  }, [setTheme]);
 
   return (
-    <div className="min-h-screen relative bg-white">
+    <div className="min-h-screen relative bg-background">
       <Navbar />
       <Hero />
       

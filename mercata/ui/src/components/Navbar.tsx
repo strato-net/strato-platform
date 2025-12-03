@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useUser } from '@/context/UserContext';
 import MERCATALOGO from '@/assets/mercata.png';
+import { ModeToggle } from './mode-toggle';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -24,7 +25,7 @@ const Navbar = () => {
   );
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-white bg-opacity-80 backdrop-blur-md shadow-sm">
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md shadow-sm">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center">
@@ -37,6 +38,7 @@ const Navbar = () => {
             </Link>
           </div>
           <div className="hidden md:flex items-center space-x-4">
+            {isLoggedIn && <ModeToggle />}
             {isLoggedIn && (
             <Link 
               to="/dashboard"
@@ -83,7 +85,7 @@ const Navbar = () => {
 
       {isMenuOpen && (
         <div className="md:hidden">
-          <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-white shadow-lg">
+          <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-background shadow-lg">
             <div className="pt-4 pb-2 border-t border-gray-200 space-y-2">
               {isLoggedIn && (
                 <Link 

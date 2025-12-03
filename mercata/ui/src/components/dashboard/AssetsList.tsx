@@ -36,8 +36,8 @@ const AssetsList = ({
   }, [tokens]);
 
   return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm w-full overflow-hidden">
-      <div className="p-5 border-b border-gray-100">
+    <div className="bg-card rounded-xl border border-border shadow-sm w-full overflow-hidden">
+      <div className="p-5 border-b border-border">
         <div className="flex justify-between items-center">
           <h2 className="font-bold text-lg">My Deposits</h2>
           {isDashboard && (
@@ -57,36 +57,36 @@ const AssetsList = ({
       </div>
 
       <div>
-        <div className="p-4 text-right border-t border-gray-100 flex justify-between">
+        <div className="p-4 text-right border-t border-border flex justify-between">
           <span className="font-bold">Earning Assets</span>
         </div>
         <div className="w-full overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
           <table style={{ minWidth: '700px', width: '100%' }}>
             <thead>
-              <tr className="bg-gray-50">
-                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4 min-w-[140px]">
+              <tr className="bg-muted/50">
+                <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4 min-w-[140px]">
                   Asset
                 </th>
-                <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4 min-w-[80px]">
+                <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4 min-w-[80px]">
                   Price
                 </th>
-                <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4 min-w-[80px]">
+                <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4 min-w-[80px]">
                   Change
                 </th>
-                <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4 min-w-[100px]">
+                <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4 min-w-[100px]">
                   Balance
                 </th>
-                <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4 min-w-[100px]">
+                <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4 min-w-[100px]">
                   Collateral Balance
                 </th>
-                <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4 min-w-[100px]">
+                <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4 min-w-[100px]">
                   Value
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-border">
               {shouldShowLoading ? (
-                <tr className="hover:bg-gray-50 transition-colors">
+                <tr className="hover:bg-muted/50 transition-colors">
                   <td
                     colSpan={6}
                     className="py-4 px-4 whitespace-nowrap w-full"
@@ -101,7 +101,7 @@ const AssetsList = ({
                   (asset, index) => (
                     <tr
                       key={index}
-                      className="hover:bg-gray-50 transition-colors"
+                      className="hover:bg-gray-50 dark:hover:bg-muted/50 transition-colors"
                     >
                       <td className="py-4 px-4">
                         <div className="flex items-center">
@@ -151,7 +151,7 @@ const AssetsList = ({
                         </div>
                       </td>
                       <td className="py-4 px-4 whitespace-nowrap text-right">
-                        <p className="font-medium text-gray-900">
+                        <p className="font-medium text-foreground">
                           {!asset?.price
                             ? "-"
                             : formatBalance(asset.price, undefined, 18, 2, 2, true)}
@@ -173,21 +173,21 @@ const AssetsList = ({
                         </div>
                       </td>
                       <td className="py-4 px-4 whitespace-nowrap text-right">
-                        <p className="font-medium text-gray-900">
+                        <p className="font-medium text-foreground">
                           {!asset?.balance || asset.balance === "0"
                             ? "-"
                             : formatBalance(asset.balance, undefined, 18,1, 4)}
                         </p>
                       </td>
                       <td className="py-4 px-4 whitespace-nowrap text-right">
-                        <p className="font-medium text-gray-900">
+                        <p className="font-medium text-foreground">
                           {!asset?.collateralBalance || asset.collateralBalance === "0"
                             ? "-"
                             : formatBalance(asset.collateralBalance, undefined, 18,1,4)}
                         </p>
                       </td>
                       <td className="py-4 px-4 whitespace-nowrap text-right">
-                        <p className="font-medium text-gray-900">
+                        <p className="font-medium text-foreground">
                           {!asset?.value || asset.value === "0.00" || parseFloat(asset.value) === 0
                             ? "-"
                             : `$${asset.value}`}
@@ -197,7 +197,7 @@ const AssetsList = ({
                   )
                 )
               ) : (
-                <tr className="hover:bg-gray-50 transition-colors">
+                <tr className="hover:bg-gray-50 dark:hover:bg-muted/50 transition-colors">
                   <td
                     colSpan={6}
                     className="py-4 px-4 whitespace-nowrap w-full"
@@ -215,7 +215,7 @@ const AssetsList = ({
 
       {isDashboard && (
         <div>
-          <div className="p-4 text-right border-t border-gray-100 flex justify-between">
+          <div className="p-4 text-right border-t border-border flex justify-between">
             <span className="font-bold">Non-earning Assets</span>
             <div className="flex gap-4">
               <Button
@@ -242,18 +242,18 @@ const AssetsList = ({
             <div className="overflow-y-auto max-h-[400px]">
               <table className="w-full table-fixed">
                 <thead>
-                  <tr className="bg-gray-50">
-                    <th className="w-[50%] text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
+                  <tr className="bg-muted/50">
+                    <th className="w-[50%] text-left text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
                       Asset
                     </th>
-                    <th className="w-[50%] text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
+                    <th className="w-[50%] text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
                       Balance
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-border">
                   {shouldShowInactiveLoading ? (
-                    <tr className="hover:bg-gray-50 transition-colors">
+                    <tr className="hover:bg-muted/50 transition-colors">
                       <td
                         colSpan={5}
                         className="py-4 px-4 whitespace-nowrap w-full"
@@ -267,7 +267,7 @@ const AssetsList = ({
                     inActiveTokens.map((asset, index) => (
                       <tr
                         key={index}
-                        className="hover:bg-gray-50 transition-colors"
+                        className="hover:bg-gray-50 dark:hover:bg-muted/50 transition-colors"
                       >
                         <td className="py-4 px-4">
                           <div className="flex items-center">
@@ -317,7 +317,7 @@ const AssetsList = ({
                           </div>
                         </td>
                         <td className="py-4 px-4 whitespace-nowrap text-right">
-                          <p className="font-medium text-gray-900">
+                          <p className="font-medium text-foreground">
                             {!asset?.balance || asset.balance === "0"
                               ? "-"
                               : formatBalance(asset.balance, undefined, 18,1,4)}
@@ -326,7 +326,7 @@ const AssetsList = ({
                       </tr>
                     ))
                   ) : (
-                    <tr className="hover:bg-gray-50 transition-colors">
+                    <tr className="hover:bg-gray-50 dark:hover:bg-muted/50 transition-colors">
                       <td
                         colSpan={5}
                         className="py-4 px-4 whitespace-nowrap w-full"

@@ -43,7 +43,7 @@ const MobileSidebar = ({ isOpen, onClose }: MobileSidebarProps) => {
       />
       
       {/* Mobile Sidebar */}
-      <div className={`fixed left-0 top-0 h-full w-64 bg-white text-gray-900 z-50 md:hidden transform transition-transform duration-300 ease-in-out border-r border-gray-200 ${
+      <div className={`fixed left-0 top-0 h-full w-64 bg-background text-foreground z-50 md:hidden transform transition-transform duration-300 ease-in-out border-r border-border ${
         isOpen ? 'translate-x-0' : '-translate-x-full'
       }`}>
         <div className="border-b border-gray-200">
@@ -72,12 +72,12 @@ const MobileSidebar = ({ isOpen, onClose }: MobileSidebarProps) => {
                     <Link
                       to={item.path}
                       onClick={onClose}
-                      className={`flex items-center px-4 py-2.5 rounded-md mx-2 transition-colors duration-200 ${active
-                          ? 'bg-muted text-black font-semibold border-l-4 border-primary'
-                          : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                        className={`flex items-center px-4 py-2.5 rounded-md mx-2 transition-colors duration-200 ${active
+                          ? 'bg-muted text-primary font-semibold border-l-4 border-primary'
+                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                         }`}
-                    >
-                      <span className={`flex-shrink-0 ${active ? 'text-black' : ''}`}>{item.icon}</span>
+                      >
+                        <span className={`flex-shrink-0 ${active ? 'text-primary' : ''}`}>{item.icon}</span>
                       <span className={`ml-3 ${active ? 'font-semibold' : ''}`}>{item.label}</span>
                     </Link>
                   </li>

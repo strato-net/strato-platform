@@ -116,10 +116,10 @@ const BadDebtView: React.FC = () => {
             </div>
           ) : (
             <div className="text-center">
-              <div className="text-3xl font-bold text-red-600">
+              <div className="text-3xl font-bold text-red-600 dark:text-red-400">
                 {formatNumber(totalBadDebt)} USDST
               </div>
-              <p className="text-sm text-gray-600 mt-2">
+              <p className="text-sm text-muted-foreground mt-2">
                 Total bad debt across all collateral assets (on-chain)
               </p>
             </div>

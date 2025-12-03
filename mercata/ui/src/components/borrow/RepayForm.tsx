@@ -205,16 +205,16 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance 
       <HealthImpactDisplay healthImpact={healthImpact} />
 
       {/* Payment Summary */}
-      <div className="space-y-2 pt-3 border-t">
+      <div className="space-y-2 pt-3 border-t border-border">
         <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-500">Payment Amount</span>
+          <span className="text-sm text-muted-foreground">Payment Amount</span>
           <span className="font-medium">
             {repayAmount ? `${formatCurrency(repayAmount)} USDST` : "0.00 USDST"}
           </span>
         </div>
         
         <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-500">Remaining Balance</span>
+          <span className="text-sm text-muted-foreground">Remaining Balance</span>
           <span className="font-medium">
             {(() => {
               try {
@@ -231,13 +231,13 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance 
       </div>
 
       {/* Transaction Fee */}
-      <div className="px-4 py-3 bg-gray-50 rounded-md">
+      <div className="px-4 py-3 bg-muted/50 rounded-md">
         <div className="flex justify-between text-sm mb-2">
-          <span className="text-gray-600">Transaction Fee</span>
+          <span className="text-muted-foreground">Transaction Fee</span>
           <span className="font-medium">{REPAY_FEE} USDST ({parseFloat(REPAY_FEE) * 100} voucher)</span>
         </div>
         { feeError && (
-          <p className="text-yellow-600 text-sm mt-1">{feeError}</p>
+          <p className="text-yellow-600 dark:text-yellow-500 text-sm mt-1">{feeError}</p>
         )}
       </div>
 

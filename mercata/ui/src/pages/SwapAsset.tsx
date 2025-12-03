@@ -12,7 +12,7 @@ const SwapAsset = () => {
   const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <DashboardSidebar />
       <MobileSidebar 
         isOpen={isMobileSidebarOpen} 
@@ -23,7 +23,7 @@ const SwapAsset = () => {
         <main className="p-6">
           <div className="max-w-2xl mx-auto space-y-6">
             {/* Main Swap Widget */}
-            <div className="bg-white shadow-md rounded-lg p-6">
+            <div className="bg-card shadow-md rounded-lg p-6 border border-border">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-semibold">Exchange your digital assets</h2>
                 {/* <CompactRewardsDisplay
@@ -42,7 +42,7 @@ const SwapAsset = () => {
           
           {/* Separate Swap History Section - Full Width */}
           <div className="mt-8 max-w-6xl mx-auto">
-            <div className="bg-white shadow-md rounded-lg p-6">
+            <div className="bg-card shadow-md rounded-lg p-6 border border-border">
               <SwapHistory />
             </div>
           </div>

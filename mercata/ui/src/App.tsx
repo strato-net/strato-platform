@@ -49,6 +49,7 @@ import Borrow from "./pages/Borrow";
 import { getConfig } from "./lib/config";
 import { useState, useEffect } from "react";
 import { initializeCsrfToken } from "./lib/csrf";
+import { ThemeProvider } from "@/components/theme-provider";
 
 const queryClient = new QueryClient();
 
@@ -112,8 +113,9 @@ const App = () => {
     return <div>Loading configuration...</div>;
   }
 
-    return (
+  return (
     <QueryClientProvider client={queryClient}>
+      <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
       <WagmiProvider config={wagmiConfig}>
       <RainbowKitProvider>
         <UserProvider>
@@ -259,8 +261,9 @@ const App = () => {
           </UserTokensProvider>
         </UserProvider>
       </RainbowKitProvider>
-    </WagmiProvider>
-  </QueryClientProvider>
+      </WagmiProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
   );
 };
 

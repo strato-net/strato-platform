@@ -128,7 +128,7 @@ const SwapPoolsSection = () => {
     <div>
       <div className="mb-4">
         <div className="relative">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search pairs..."
             value={searchQuery}
@@ -185,18 +185,18 @@ const SwapPoolsSection = () => {
                     </div>
                     <div>
                       <h3 className="font-medium">{pool.poolName}</h3>
-                      <div className="flex items-center text-xs text-gray-500 mt-1">
+                      <div className="flex items-center text-xs text-muted-foreground mt-1">
                         <span>Liquidity: {formatBalance(pool.lpToken._totalSupply, undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
                       </div>
-                      <div className="flex items-center text-xs text-gray-500 mt-1">
+                      <div className="flex items-center text-xs text-muted-foreground mt-1">
                         <span>Your Liquidity (Total): {formatBalance(pool.lpToken.totalBalance || "0", undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
                       </div>
                       {rewardsEnabled && pool.lpToken.stakedBalance !== undefined && (
                         <>
-                          <div className="flex items-center text-xs text-gray-400 mt-1 ml-2">
+                          <div className="flex items-center text-xs text-muted-foreground mt-1 ml-2">
                             <span>• Staked: {formatBalance(pool.lpToken.stakedBalance || "0", undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
                           </div>
-                          <div className="flex items-center text-xs text-gray-400 mt-1 ml-2">
+                          <div className="flex items-center text-xs text-muted-foreground mt-1 ml-2">
                             <span>• Unstaked: {formatBalance(pool.lpToken.balance || "0", undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
                           </div>
                         </>
@@ -205,7 +205,7 @@ const SwapPoolsSection = () => {
                   </div>
                   <div className="flex items-center justify-between sm:justify-end space-x-4">
                     <div className="text-left sm:text-right">
-                      <div className="text-sm text-gray-500">APY</div>
+                      <div className="text-sm text-muted-foreground">APY</div>
                       <div className="font-medium">{pool.apy ? `${pool.apy}%` : "N/A"}</div>
                     </div>
                     <div className="flex space-x-2">

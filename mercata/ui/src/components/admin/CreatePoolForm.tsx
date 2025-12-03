@@ -199,7 +199,7 @@ const CreatePoolForm = () => {
           </AlertDescription>
         </Alert>
 
-        <div className="flex items-center space-x-2 text-sm text-gray-600">
+        <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-muted-foreground">
           <Droplets className="h-4 w-4" />
           <span>
             The initial exchange rate will be determined by the ratio of initial liquidity amounts.

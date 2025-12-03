@@ -30,7 +30,7 @@ const Advanced = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <DashboardSidebar />
       <MobileSidebar 
         isOpen={isMobileSidebarOpen} 
@@ -79,7 +79,7 @@ const Advanced = () => {
                     </TabsList>
                     <TabsContent value="vaults">
                       <div className="space-y-6">
-                        <div className="border border-gray-200  bg-white rounded-xl p-4  flex flex-col">
+                        <div className="border border-border bg-card rounded-xl p-4 flex flex-col shadow-sm">
                           <MintWidget onSuccess={handleBorrowSuccess} />
                         </div>
                         <VaultsList 

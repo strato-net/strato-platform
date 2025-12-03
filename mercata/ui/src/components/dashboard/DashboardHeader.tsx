@@ -12,6 +12,7 @@ import { useAccount, useDisconnect } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
+import { ModeToggle } from '../mode-toggle';
 
 interface DashboardHeaderProps {
   title: string;
@@ -81,7 +82,7 @@ const DashboardHeader = ({ title, onMenuClick }: DashboardHeaderProps) => {
   };
 
   return (
-    <header className="bg-white border-b border-gray-100 py-4 px-6 flex items-center justify-between">
+    <header className="bg-background border-b border-border py-4 px-6 flex items-center justify-between">
       <div className="flex items-center">
         <button
           onClick={onMenuClick}
@@ -93,6 +94,7 @@ const DashboardHeader = ({ title, onMenuClick }: DashboardHeaderProps) => {
       </div>
 
       <div className="flex items-center space-x-4">
+        <ModeToggle />
         <div className="flex items-center">
           <div className="flex flex-col items-end mr-3">
             <span className="text-sm font-medium">{userName || "N/A"}</span>

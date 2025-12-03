@@ -39,7 +39,7 @@ const LoadingRow = () => (
 const EmptyRow = () => (
   <TableRow>
     <TableCell colSpan={7} className="text-center py-8">
-      <p className="text-gray-500">No swap history found for this pair</p>
+      <p className="text-muted-foreground">No swap history found for this pair</p>
     </TableCell>
   </TableRow>
 );
@@ -51,7 +51,7 @@ const SenderCell = ({ sender, copiedHash, onCopy }: { sender: string; copiedHash
         <TooltipTrigger asChild>
           <button
             onClick={() => onCopy(sender)}
-            className="flex items-center gap-1 hover:text-blue-600 hover:bg-blue-50 active:bg-blue-100 active:scale-95 transition-all duration-150 rounded px-1 py-0.5"
+            className="flex items-center gap-1 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 active:bg-blue-100 dark:active:bg-blue-900/30 active:scale-95 transition-all duration-150 rounded px-1 py-0.5"
           >
             <span>
               {copiedHash === sender ? 'Copied!' : formatHash(sender)}
@@ -101,7 +101,7 @@ const PaginationInfo = ({ currentPage, itemsPerPage, swapHistoryCount, swapHisto
   const totalPages = Math.ceil(swapHistoryCount / itemsPerPage);
   
   return (
-    <div className="text-sm text-gray-500">
+    <div className="text-sm text-muted-foreground">
       {totalPages > 1 ? (
         `Showing ${currentPage * itemsPerPage + 1} to ${Math.min((currentPage + 1) * itemsPerPage, swapHistoryCount)} of ${swapHistoryCount} swaps`
       ) : (
@@ -134,7 +134,7 @@ const PaginationControls = ({
       >
         Previous
       </Button>
-      <span className="text-sm text-gray-600">
+      <span className="text-sm text-muted-foreground">
         Page {currentPage + 1} of {totalPages}
         {swapHistoryLoading && <span className="ml-2 text-blue-500">Loading...</span>}
       </span>
@@ -216,7 +216,7 @@ const SwapHistory: React.FC = () => {
       <h3 className="text-lg font-semibold">Swap History</h3>
 
       {pool?.address ? (
-        <div ref={tableRef} className="bg-white rounded-lg border">
+        <div ref={tableRef} className="bg-card rounded-lg border border-border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -247,7 +247,7 @@ const SwapHistory: React.FC = () => {
             </TableBody>
           </Table>
 
-          <div className="flex items-center justify-between px-6 py-4 border-t">
+          <div className="flex items-center justify-between px-6 py-4 border-t border-border">
             <PaginationInfo
               currentPage={currentPage}
               itemsPerPage={ITEMS_PER_PAGE}
@@ -263,8 +263,8 @@ const SwapHistory: React.FC = () => {
           </div>
         </div>
       ) : (
-        <div className="bg-gray-50 rounded-lg p-6 text-center">
-          <p className="text-gray-500">
+        <div className="bg-muted/50 rounded-lg p-6 text-center">
+          <p className="text-muted-foreground">
             {poolLoading ? "Loading pool data..." : "Please select both token pairs to view swap history"}
           </p>
         </div>

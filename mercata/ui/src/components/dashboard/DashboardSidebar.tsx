@@ -59,11 +59,11 @@ const DashboardSidebar = () => {
   };
 
   const baseLinkClasses = "flex items-center px-4 py-2.5 rounded-md mx-2 transition-colors duration-200";
-  const activeLinkClasses = "bg-muted text-black font-semibold border-l-4 border-primary";
+  const activeLinkClasses = "bg-muted text-primary font-semibold border-l-4 border-primary";
   const inactiveLinkClasses = "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground";
 
   const NavIcon = ({ icon, active }: { icon: React.ReactNode; active: boolean }) => (
-    <span className={`flex-shrink-0 ${active ? 'text-black' : ''}`}>
+    <span className={`flex-shrink-0 ${active ? 'text-primary' : ''}`}>
       {icon}
     </span>
   );
