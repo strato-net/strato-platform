@@ -367,8 +367,16 @@ export const claimAllRewards = async (userAddress: string): Promise<{ success: b
     });
   }
   
-  const response = await api.post("/rewards/claim-all");
-  return response.data;
+  try {
+    const response = await api.post("/rewards/claim-all");
+    return response.data;
+  } catch (error: unknown) {
+    // Extract error message from response if available
+    const errorMessage = (error as { response?: { data?: { error?: string } }; message?: string })?.response?.data?.error 
+      || (error as Error)?.message 
+      || "Failed to claim rewards";
+    throw new Error(errorMessage);
+  }
 };
 
 /**
@@ -390,8 +398,16 @@ export const claimRewards = async (userAddress: string, activityIds: number[]): 
     throw new Error("At least one activity ID is required");
   }
   
-  const response = await api.post(`/rewards/claim/${activityIds[0]}`);
-  return response.data;
+  try {
+    const response = await api.post(`/rewards/claim/${activityIds[0]}`);
+    return response.data;
+  } catch (error: unknown) {
+    // Extract error message from response if available
+    const errorMessage = (error as { response?: { data?: { error?: string } }; message?: string })?.response?.data?.error 
+      || (error as Error)?.message 
+      || "Failed to claim rewards";
+    throw new Error(errorMessage);
+  }
 };
 
 

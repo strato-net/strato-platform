@@ -196,14 +196,14 @@ export const UserRewardsSection = ({
   
   // Total claimable = base unclaimed + new pending from all activities
   const totalClaimable = baseUnclaimed + totalNewPending;
-  const totalClaimableDecimal = totalClaimable > 0n
+  const totalClaimableDecimal = totalClaimable >= 0n
     ? formatBalance(totalClaimable.toString(), "points", 18, 18, 18)
     : null;
   // Extract just the numeric part (remove "points" suffix and any spaces)
   const numericPart = totalClaimableDecimal
     ? totalClaimableDecimal.replace(/\s*points?\s*$/i, '').trim()
     : null;
-  const totalClaimableFormatted = numericPart 
+  const totalClaimableFormatted = numericPart !== null
     ? formatRoundedWithCommas(roundByMagnitude(numericPart)) + " points" 
     : "?";
 
