@@ -37,30 +37,6 @@ export const clientSecret = process.env.OAUTH_CLIENT_SECRET;
 export const nodeUrl = process.env.NODE_URL;
 export const baseUrl = process.env.BASE_URL || "http://localhost";
 
-/*
-   Bridge Service URL used for autosave requests;
-   First priority is environment variable BRIDGE_SERVICE_URL;
-   If this is unset, we use the default bridge service url hardcoded below for each network;
-   We determine the network id from the node metadata endpoint.
-*/
-import { eth } from "../utils/mercataApiHelper"; // after nodeUrl is defined
-const defaultBridgeServiceFor: Record<string, string> = {
-  "114784819836269":"https://bridge.testnet.stratomercata.com", // Helium testnet
-  "33056204878082667":"https://bridge.stratomercata.com",       // Upquark mainnet
-};
-export let bridgeUrl: string | undefined;
-export async function initBridgeConfig() {
-  if (process.env.BRIDGE_SERVICE_URL) {
-    bridgeUrl = process.env.BRIDGE_SERVICE_URL;
-    return;
-  }
-
-  const accessToken = await getServiceToken();
-  const { data } = await eth.get(accessToken, `/metadata`);
-  const networkId: string = data.networkID;
-  bridgeUrl = defaultBridgeServiceFor[networkId];
-}
-
 // Smart contract addresses
 export const poolConfigurator = process.env.POOL_CONFIGURATOR || "0000000000000000000000000000000000001006";
 export const lendingRegistry = process.env.LENDING_REGISTRY || "0000000000000000000000000000000000001007";
@@ -71,4 +47,48 @@ export const adminRegistry = process.env.ADMIN_REGISTRY || "00000000000000000000
 export const voucher = process.env.VOUCHER_CONTRACT_ADDRESS || "000000000000000000000000000000000000100e";
 export const cdpRegistry = process.env.CDP_REGISTRY || "0000000000000000000000000000000000001012";
 export const rewardsChef = process.env.REWARDS_CHEF || "000000000000000000000000000000000000101f";
-export const rewards = process.env.REWARDS || "170147f58738c9f46112a874030420b823901f3b";
+
+/*
+   Network-specific defaults;
+   These are used to set bridge URL and rewards address based on network ID.
+*/
+export const defaultBridgeServiceFor: Record<string, string> = {
+  "114784819836269":"https://bridge.testnet.stratomercata.com", // Helium testnet
+  "33056204878082667":"https://bridge.stratomercata.com",       // Upquark mainnet
+};
+export const defaultRewardsAddressFor: Record<string, string> = {
+  "114784819836269": "170147f58738c9f46112a874030420b823901f3b", // Helium testnet
+  "33056204878082667": "x", // Upquark mainnet - TODO: replace "x" with actual Upquark rewards address
+};
+
+export let bridgeUrl: string | undefined;
+export let rewards: string | undefined;
+
+export function setBridgeConfig(networkId: string) {
+  if (process.env.BRIDGE_SERVICE_URL) {
+    bridgeUrl = process.env.BRIDGE_SERVICE_URL;
+  } else {
+    bridgeUrl = defaultBridgeServiceFor[networkId];
+  }
+}
+
+export function setRewardsConfig(networkId: string) {
+  if (process.env.REWARDS) {
+    rewards = process.env.REWARDS;
+  } else {
+    rewards = defaultRewardsAddressFor[networkId];
+  }
+}
+
+export async function initNetworkConfig() {
+  // Import eth here to avoid circular dependency (eth depends on nodeUrl)
+  const { eth } = await import("../utils/mercataApiHelper");
+  const accessToken = await getServiceToken();
+  const { data } = await eth.get(accessToken, `/metadata`);
+  const networkId = data.networkID;
+  if (!networkId) {
+    throw new Error("Network ID not found in metadata");
+  }
+  setBridgeConfig(networkId);
+  setRewardsConfig(networkId);
+}
