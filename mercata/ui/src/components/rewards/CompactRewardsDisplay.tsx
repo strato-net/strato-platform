@@ -4,6 +4,8 @@ import { UserRewardsData } from "@/services/rewardsService";
 import {
   calculatePendingRewards,
   calculateEstimatedRewardsPerDay,
+  formatRoundedWithCommas,
+  roundByMagnitude,
 } from "@/services/rewardsService";
 import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
 import { Coins } from "lucide-react";
@@ -56,13 +58,17 @@ export const CompactRewardsDisplay = ({
     totalEstimatedPerDay += BigInt(estimatedPerDay);
   });
 
-  const totalPendingFormatted = formatBalance(
+  const totalPendingDecimal = formatBalance(
     totalPending.toString(),
     "points",
     18,
-    2,
-    4
+    18,
+    18
   );
+  const totalPendingNumeric = totalPendingDecimal.replace(/\s*points?\s*$/i, '').trim();
+  const totalPendingFormatted = totalPendingNumeric 
+    ? formatRoundedWithCommas(roundByMagnitude(totalPendingNumeric)) + " points"
+    : "0 points";
   // Calculate 1% of input amount for estimated rewards
   let inputAmountReward = 0n;
   if (inputAmount && variant === "inline") {
@@ -78,21 +84,29 @@ export const CompactRewardsDisplay = ({
   // Add input amount reward (1%) to total estimated per day
   const totalEstimatedWithInput = totalEstimatedPerDay + inputAmountReward;
 
-  const totalEstimatedPerDayFormatted = formatBalance(
+  const totalEstimatedPerDayDecimal = formatBalance(
     totalEstimatedPerDay.toString(),
     "points",
     18,
-    2,
-    4
+    18,
+    18
   );
+  const totalEstimatedPerDayNumeric = totalEstimatedPerDayDecimal.replace(/\s*points?\s*$/i, '').trim();
+  const totalEstimatedPerDayFormatted = totalEstimatedPerDayNumeric
+    ? formatRoundedWithCommas(roundByMagnitude(totalEstimatedPerDayNumeric)) + " points"
+    : "0 points";
 
-  const totalEstimatedWithInputFormatted = formatBalance(
+  const totalEstimatedWithInputDecimal = formatBalance(
     totalEstimatedWithInput.toString(),
     "points",
     18,
-    2,
-    4
+    18,
+    18
   );
+  const totalEstimatedWithInputNumeric = totalEstimatedWithInputDecimal.replace(/\s*points?\s*$/i, '').trim();
+  const totalEstimatedWithInputFormatted = totalEstimatedWithInputNumeric
+    ? formatRoundedWithCommas(roundByMagnitude(totalEstimatedWithInputNumeric)) + " points"
+    : "0 points";
 
   const hasRewards = totalPending > 0n || totalEstimatedPerDay > 0n || inputAmountReward > 0n;
 
@@ -158,13 +172,17 @@ export const CompactRewardsDisplay = ({
     // Show existing rewards even if input is empty
     if (!hasRewards && inputAmountReward === 0n) return null;
 
-    const inputAmountRewardFormatted = formatBalance(
+    const inputAmountRewardDecimal = formatBalance(
       inputAmountReward.toString(),
       "points",
       18,
-      2,
-      4
+      18,
+      18
     );
+    const inputAmountRewardNumeric = inputAmountRewardDecimal.replace(/\s*points?\s*$/i, '').trim();
+    const inputAmountRewardFormatted = inputAmountRewardNumeric
+      ? formatRoundedWithCommas(roundByMagnitude(inputAmountRewardNumeric)) + " points"
+      : "0 points";
 
     // If input is empty, show only existing estimated rewards
     if (inputAmountReward === 0n) {
