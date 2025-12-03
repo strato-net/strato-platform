@@ -296,7 +296,7 @@ const TokenInput = ({
           </span>
         </div>
       )}
-      {isFromInput && (
+      {/* {isFromInput && (
         <CompactRewardsDisplay
           userRewards={userRewards}
           loading={rewardsLoading || false}
@@ -304,7 +304,7 @@ const TokenInput = ({
           variant="inline"
           inputAmount={amount}
         />
-      )}
+      )} */}
     </div>
   );
 };
