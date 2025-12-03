@@ -10,7 +10,6 @@ import HealthImpactDisplay from "@/components/ui/HealthImpactDisplay";
 import PercentageButtons from "../ui/PercentageButtons";
 import { useLendingContext } from "@/context/LendingContext";
 import { computeMaxTransferable, handleAmountInputChange } from "@/utils/transferValidation";
-import { CompactRewardsDisplay } from "@/components/rewards/CompactRewardsDisplay";
 import { UserRewardsData } from "@/services/rewardsService";
 
 interface BorrowFormProps {
@@ -172,13 +171,13 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
         {borrowAmountError && (
           <p className="text-red-600 text-sm">{borrowAmountError}</p>
         )}
-        <CompactRewardsDisplay
+        {/* <CompactRewardsDisplay
           userRewards={userRewards}
           loading={rewardsLoading || false}
           activityName="Lending Pool Borrow"
           variant="inline"
           inputAmount={borrowAmount}
-        />
+        /> */}
         <PercentageButtons
           value={borrowAmount}
           maxValue={maxAmount}

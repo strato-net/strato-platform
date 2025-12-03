@@ -13,6 +13,7 @@ interface RewardsOverviewProps {
   onRefresh?: () => void;
 }
 
+
 const truncateTokenAddress = (address: string, front: number = 6, back: number = 4) => {
   if (!address) return "";
   if (address.length <= front + back) return address;
@@ -133,17 +134,16 @@ export const RewardsOverview = ({ state, loading, onRefresh }: RewardsOverviewPr
             </div>
             <div className="flex-1">
               <p className="text-sm text-muted-foreground">Reward Token</p>
-              <p className="text-lg font-semibold">{state.rewardTokenSymbol || "?"}</p>
               {state.rewardToken && (
                 <div className="flex items-center gap-1 mt-1">
-                  <p className="text-xs text-muted-foreground font-mono">
+                  <p className="text-sm font-semibold font-mono">
                     {truncateTokenAddress(state.rewardToken)}
                   </p>
                   <CopyButton address={state.rewardToken} />
                 </div>
               )}
               {!state.rewardToken && (
-                <p className="text-xs text-muted-foreground mt-1 font-mono">?</p>
+                <p className="text-sm font-semibold mt-1">?</p>
               )}
             </div>
           </div>

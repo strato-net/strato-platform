@@ -184,11 +184,16 @@ export const UserRewardsSection = ({
   // Pre-calculate pending for each activity
   const activityPendingMap = new Map<number, bigint>();
   activitiesWithStake.forEach(({ activity, userInfo }) => {
-    if (userInfo?.stake && activity?.accRewardPerStake && userInfo?.userIndex) {
+    // Check for existence, not truthiness (0 is valid for userIndex)
+    if (
+      userInfo?.stake &&
+      activity?.accRewardPerStake !== undefined &&
+      userInfo?.userIndex !== undefined
+    ) {
       const pending = calculatePendingRewards(
         userInfo.stake,
         activity.accRewardPerStake,
-        userInfo.userIndex
+        userInfo.userIndex || "0" // Default to "0" if missing (though undefined check above should prevent this)
       );
       const pendingBig = safeBigInt(pending);
       activityPendingMap.set(activity.activityId, pendingBig);
