@@ -263,7 +263,7 @@ create' creator newAddress ch cc contractName' valList = do
   void . withCallInfo newAddress newAddress contract' "constructor" ch cc M.empty False False $ pure ()
 
   -- Run the constructor
-  runTheConstructors creator newAddress ch cc contractName' valList
+  runTheConstructors creator newAddress ch cc contractName' valList Nothing
 
   onTraced $ liftIO $ putStrLn $ C.green $ "Done Creating Contract: " ++ show newAddress ++ " of type " ++ labelToString contractName'
 
@@ -2216,8 +2216,12 @@ callBuiltin "fastForward" [SInteger seconds] = do
 
 callBuiltin x args = unknownFunction ("callBuiltin " ++ show args) x
 
-runTheConstructors :: MonadSM m => Address -> Address -> Keccak256 -> CC.CodeCollection -> SolidString -> ValList -> m ()
-runTheConstructors from to hsh cc contractName' argVals' = do
+-- | Run constructors for a contract and its parents.
+-- The last parameter tracks the proxy's logic contract address when deploying a Proxy contract.
+-- When a Proxy is deployed, we want parent contracts (like Ownable) to be registered
+-- with the proxied contract's name instead of their own name.
+runTheConstructors :: MonadSM m => Address -> Address -> Keccak256 -> CC.CodeCollection -> SolidString -> ValList -> Maybe Address -> m ()
+runTheConstructors from to hsh cc contractName' argVals' mProxyLogicAddr = do
   let !contract' =
         fromMaybe (missingType "contract inherits from nonexistent parent" contractName') $
           cc ^. CC.contracts . at contractName'
@@ -2228,6 +2232,11 @@ runTheConstructors from to hsh cc contractName' argVals' = do
             [ ((t, fromMaybe "" n), i)
               | (n, CC.IndexedType {CC.indexedTypeType = t, CC.indexedTypeIndex = i}) <- argPairs
             ]
+      -- Detect if this is a Proxy contract and extract the logic contract address
+      -- The first constructor argument of Proxy is the _logicContract address
+      proxyLogicAddr = case (labelToString contractName', argVals') of
+        ("Proxy", SAddress addr _ : _) -> Just addr
+        _ -> mProxyLogicAddr  -- Propagate from parent call
   onTraced $
     liftIO $
       putStrLn $
@@ -2273,7 +2282,7 @@ runTheConstructors from to hsh cc contractName' argVals' = do
     forM_ (reverse $ contract' ^. CC.parents) $ \parent -> do
       for_ (M.lookup parent . CC._funcConstructorCalls =<< contract' ^. CC.constructor) $ \args'' -> do
         vals <- traverse (getVar <=< expToVar) args''
-        runTheConstructors from to hsh cc parent vals
+        runTheConstructors from to hsh cc parent vals proxyLogicAddr
 
     case contract' ^. CC.constructor of
       Just theFunction -> do
@@ -2303,7 +2312,18 @@ runTheConstructors from to hsh cc contractName' argVals' = do
     cs <- Mod.get (Mod.Proxy @[CallInfo])
     userName <- getUsername $ currentAddress <$> cs
     addNewCodeCollection userName cc
-    addDelegatecall to to (Just userName) $ T.pack contractName'
+
+    -- Determine the contract name for the delegatecall entry
+    -- If we're deploying a Proxy and this is a parent contract (not Proxy itself),
+    -- use the proxied contract's name instead of the parent's name (e.g., "LendingPool" instead of "Ownable")
+    delegatecallContractName <- case (proxyLogicAddr, labelToString contractName') of
+      (Just logicAddr, name) | name /= "Proxy" -> do
+        -- Look up the contract name from the logic contract address
+        (proxiedName, _) <- getContractNameAndHash logicAddr
+        pure $ T.pack proxiedName
+      _ -> pure $ T.pack contractName'
+
+    addDelegatecall to to (Just userName) delegatecallContractName
 
   return ()
 
