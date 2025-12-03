@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { RewardsState } from "@/services/rewardsService";
-import { formatEmissionRatePerDay, formatEmissionRatePerWeek } from "@/services/rewardsService";
+import { RewardsState, formatEmissionRatePerDay, formatEmissionRatePerWeek, safeBigInt, roundByMagnitude, formatRoundedWithCommas } from "@/services/rewardsService";
+import { formatUnits } from "viem";
 import { Coins, Zap, Clock } from "lucide-react";
 
 interface RewardsOverviewProps {
@@ -48,8 +48,27 @@ export const RewardsOverview = ({ state, loading }: RewardsOverviewProps) => {
     );
   }
 
-  const emissionPerDay = formatEmissionRatePerDay(state.totalRewardsEmission);
-  const emissionPerWeek = formatEmissionRatePerWeek(state.totalRewardsEmission);
+  // Total Emission Rate should show the raw totalRewardsEmission (points per second)
+  // Convert to string first to handle numbers that might be in scientific notation
+  // Treat "0" as missing data (should show "?")
+  const totalRewardsEmissionStr = state.totalRewardsEmission ? String(state.totalRewardsEmission) : null;
+  const totalRewardsEmissionBig = totalRewardsEmissionStr ? safeBigInt(totalRewardsEmissionStr) : null;
+  const hasValidEmission = totalRewardsEmissionBig !== null && totalRewardsEmissionBig > 0n;
+  
+  const totalStakeStr = state.totalStake ? String(state.totalStake) : null;
+  const totalStakeBig = totalStakeStr ? safeBigInt(totalStakeStr) : null;
+  const hasValidStake = totalStakeBig !== null && totalStakeBig > 0n;
+
+  const emissionPerDay = hasValidEmission && totalRewardsEmissionStr
+    ? formatEmissionRatePerDay(totalRewardsEmissionStr)
+    : "?";
+  const emissionPerWeek = hasValidEmission && totalRewardsEmissionStr
+    ? formatEmissionRatePerWeek(totalRewardsEmissionStr)
+    : "?";
+  const totalStakeDecimal = hasValidStake && totalStakeStr
+    ? formatUnits(totalStakeBig, 18)
+    : null;
+  const totalStakeFormatted = totalStakeDecimal ? formatRoundedWithCommas(roundByMagnitude(totalStakeDecimal)) : "?";
 
   return (
     <Card>
@@ -65,8 +84,15 @@ export const RewardsOverview = ({ state, loading }: RewardsOverviewProps) => {
             </div>
             <div className="flex-1">
               <p className="text-sm text-muted-foreground">Total Emission Rate</p>
-              <p className="text-2xl font-semibold">{emissionPerDay} points/day</p>
-              <p className="text-xs text-muted-foreground mt-1">{emissionPerWeek} points/week</p>
+              <p className="text-2xl font-semibold">{emissionPerDay} {emissionPerDay !== "?" && "points/day"}</p>
+              {emissionPerWeek !== "?" && (
+                <p className="text-xs text-muted-foreground mt-1">{emissionPerWeek} points/week</p>
+              )}
+              {totalStakeFormatted !== "?" && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Total Stake: {totalStakeFormatted}
+                </p>
+              )}
             </div>
           </div>
 
@@ -76,9 +102,9 @@ export const RewardsOverview = ({ state, loading }: RewardsOverviewProps) => {
             </div>
             <div className="flex-1">
               <p className="text-sm text-muted-foreground">Reward Token</p>
-              <p className="text-lg font-semibold">CATA</p>
+              <p className="text-lg font-semibold">{state.rewardTokenSymbol || "?"}</p>
               <p className="text-xs text-muted-foreground mt-1 font-mono">
-                {truncateTokenAddress(state.rewardToken)}
+                {state.rewardToken ? truncateTokenAddress(state.rewardToken) : "?"}
               </p>
             </div>
           </div>
@@ -89,9 +115,15 @@ export const RewardsOverview = ({ state, loading }: RewardsOverviewProps) => {
             </div>
             <div className="flex-1">
               <p className="text-sm text-muted-foreground">Last Update</p>
-              <p className="text-lg font-semibold">Block {state.lastBlockHandled}</p>
+              <p className="text-lg font-semibold">
+                {state.lastBlockHandled && state.lastBlockHandled !== "0"
+                  ? `Block ${state.lastBlockHandled}`
+                  : "?"}
+              </p>
               <p className="text-xs text-muted-foreground mt-1">
-                {state.activityIds.length} {state.activityIds.length === 1 ? "activity" : "activities"}
+                {state.activityCount !== undefined && state.activityCount !== null && state.activityCount >= 0
+                  ? `${state.activityCount} ${state.activityCount === 1 ? "activity" : "activities"}`
+                  : "?"}
               </p>
             </div>
           </div>

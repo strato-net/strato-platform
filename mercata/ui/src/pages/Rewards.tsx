@@ -6,33 +6,21 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RewardsOverview } from "@/components/rewards/RewardsOverview";
 import { ActivitiesTable } from "@/components/rewards/ActivitiesTable";
 import { UserRewardsSection } from "@/components/rewards/UserRewardsSection";
-import { RewardsLeaderboard } from "@/components/rewards/RewardsLeaderboard";
-import { ActivityDetailModal } from "@/components/rewards/ActivityDetailModal";
 import { useRewards } from "@/hooks/useRewards";
 import { useRewardsActivities } from "@/hooks/useRewardsActivities";
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
-import { useRewardsLeaderboard } from "@/hooks/useRewardsLeaderboard";
-import { Activity } from "@/services/rewardsService";
 
 const Rewards = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"activities" | "my-rewards" | "leaderboard">("activities");
-  const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"activities" | "my-rewards">("activities");
 
   const { state, loading: stateLoading, refetch: refetchState } = useRewards();
   const { activities, loading: activitiesLoading, refetch: refetchActivities } = useRewardsActivities();
   const { userRewards, loading: userRewardsLoading, refetch: refetchUserRewards } = useRewardsUserInfo();
-  const { entries: leaderboardEntries, loading: leaderboardLoading } = useRewardsLeaderboard(10);
 
   useEffect(() => {
     document.title = "Rewards | STRATO Mercata";
   }, []);
-
-  const handleActivityClick = (activity: Activity) => {
-    setSelectedActivity(activity);
-    setIsDetailModalOpen(true);
-  };
 
   const handleClaimSuccess = () => {
     // Refetch all data after successful claim
@@ -40,11 +28,6 @@ const Rewards = () => {
     refetchActivities();
     refetchUserRewards();
   };
-
-  // Get user info for selected activity
-  const selectedActivityUserInfo = selectedActivity && userRewards
-    ? userRewards.activities.find((a) => a.activityId === selectedActivity.activityId)?.userInfo || null
-    : null;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -62,23 +45,21 @@ const Rewards = () => {
             <RewardsOverview state={state} loading={stateLoading} />
           </div>
 
-          {/* Tabs for Activities, My Rewards, and Leaderboard */}
+          {/* Tabs for Activities and My Rewards */}
           <Tabs
             value={activeTab}
-            onValueChange={(value) => setActiveTab(value as "activities" | "my-rewards" | "leaderboard")}
+            onValueChange={(value) => setActiveTab(value as "activities" | "my-rewards")}
             className="w-full"
           >
-            <TabsList className="grid w-full grid-cols-3 mb-6">
+            <TabsList className="grid w-full grid-cols-2 mb-6">
               <TabsTrigger value="activities">Activities</TabsTrigger>
               <TabsTrigger value="my-rewards">My Rewards</TabsTrigger>
-              <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
             </TabsList>
 
             <TabsContent value="activities">
               <ActivitiesTable
                 activities={activities}
                 loading={activitiesLoading}
-                onActivityClick={handleActivityClick}
               />
             </TabsContent>
 
@@ -89,22 +70,7 @@ const Rewards = () => {
                 onClaimSuccess={handleClaimSuccess}
               />
             </TabsContent>
-
-            <TabsContent value="leaderboard">
-              <RewardsLeaderboard
-                entries={leaderboardEntries}
-                loading={leaderboardLoading}
-              />
-            </TabsContent>
           </Tabs>
-
-          {/* Activity Detail Modal */}
-          <ActivityDetailModal
-            activity={selectedActivity}
-            userInfo={selectedActivityUserInfo}
-            open={isDetailModalOpen}
-            onOpenChange={setIsDetailModalOpen}
-          />
         </main>
       </div>
     </div>

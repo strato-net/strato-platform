@@ -21,9 +21,6 @@ export const useRewardsActivities = () => {
     };
 
     fetchData();
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchData, 30000);
-    return () => clearInterval(interval);
   }, []);
 
   return { activities, loading, error, refetch: () => fetchActivities().then(setActivities) };

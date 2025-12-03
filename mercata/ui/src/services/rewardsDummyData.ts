@@ -1,57 +1,87 @@
-import { Activity, RewardsState, UserRewardsData, LeaderboardEntry } from "./rewardsService";
+import { Activity, RewardsState, UserRewardsData } from "./rewardsService";
 
 // Dummy data for Rewards contract (before deployment)
 export const dummyRewardsState: RewardsState = {
   rewardToken: "2680dc6693021cd3fefb84351570874fbef8332a", // CATA address
+  rewardTokenSymbol: "CATA",
   totalRewardsEmission: "10000000000000000", // 0.01 CATA per second (1e16)
   lastBlockHandled: "12345678",
-  activityIds: [1, 2, 3, 4],
+  activityCount: 6,
+  totalStake: "5000000000000000000000", // 5000 tokens total across all activities
 };
 
 export const dummyActivities: Activity[] = [
   {
     activityId: 1,
-    name: "Lending Pool Liquidity",
+    name: "Normal Value (>= 0.01/day)",
     activityType: 0, // Position
-    emissionRate: "3000000000000000", // 0.003 CATA/sec
+    // emissionRate: 115740740740740 wei = 0.01 per day (should round to 2 decimals: 0.01)
+    emissionRate: "115740740740740",
     accRewardPerStake: "50000000000000000000", // 50 CATA per stake (scaled by 1e18)
-    lastUpdateTime: Math.floor(Date.now() / 1000) - 3600, // 1 hour ago
+    lastUpdateTime: String(Math.floor(Date.now() / 1000) - 3600), // 1 hour ago
     totalStake: "1000000000000000000000", // 1000 tokens
     allowedCaller: "0000000000000000000000000000000000001001",
     sourceContract: "0000000000000000000000000000000000001002",
   },
   {
     activityId: 2,
-    name: "Lending Pool Borrows",
+    name: "Normal Value Large (>= 0.01/day)",
     activityType: 0, // Position
-    emissionRate: "2000000000000000", // 0.002 CATA/sec
+    // emissionRate: 1157407407407400 wei = 0.1 per day (should round to 2 decimals: 0.10)
+    emissionRate: "1157407407407400",
     accRewardPerStake: "30000000000000000000", // 30 CATA per stake
-    lastUpdateTime: Math.floor(Date.now() / 1000) - 1800, // 30 minutes ago
+    lastUpdateTime: String(Math.floor(Date.now() / 1000) - 1800), // 30 minutes ago
     totalStake: "500000000000000000000", // 500 tokens
     allowedCaller: "0000000000000000000000000000000000001001",
     sourceContract: "0000000000000000000000000000000000001002",
   },
   {
     activityId: 3,
-    name: "Swap Activity",
+    name: "Small Value (< 0.01/day)",
     activityType: 1, // OneTime
-    emissionRate: "2500000000000000", // 0.0025 CATA/sec
+    // emissionRate: 115740740740 wei = 0.001 per day (should show extended precision: 0.001)
+    emissionRate: "115740740740",
     accRewardPerStake: "15000000000000000000", // 15 CATA per stake
-    lastUpdateTime: Math.floor(Date.now() / 1000) - 600, // 10 minutes ago
+    lastUpdateTime: String(Math.floor(Date.now() / 1000) - 600), // 10 minutes ago
     totalStake: "2000000000000000000000", // 2000 tokens
     allowedCaller: "0000000000000000000000000000000000001003",
     sourceContract: "0000000000000000000000000000000000001004",
   },
   {
     activityId: 4,
-    name: "Safety Module Staking",
+    name: "Small Value Very Small (< 0.01/day)",
     activityType: 0, // Position
-    emissionRate: "2500000000000000", // 0.0025 CATA/sec
+    // emissionRate: 1157407407 wei = 0.00001 per day (should show extended precision: 0.00001)
+    emissionRate: "1157407407",
     accRewardPerStake: "80000000000000000000", // 80 CATA per stake
-    lastUpdateTime: Math.floor(Date.now() / 1000) - 120, // 2 minutes ago
+    lastUpdateTime: String(Math.floor(Date.now() / 1000) - 120), // 2 minutes ago
     totalStake: "3000000000000000000000", // 3000 tokens
     allowedCaller: "0000000000000000000000000000000000001015",
     sourceContract: "0000000000000000000000000000000000001015",
+  },
+  {
+    activityId: 5,
+    name: "Near Tiny But Visible",
+    activityType: 0, // Position
+    // emissionRate: 104166666 wei = 0.000000009 per day (should show extended precision: 0.000000009)
+    emissionRate: "104166666",
+    accRewardPerStake: "10000000000000000000", // 10 CATA per stake
+    lastUpdateTime: String(Math.floor(Date.now() / 1000) - 60), // 1 minute ago
+    totalStake: "1000000000000000000000", // 1000 tokens
+    allowedCaller: "0000000000000000000000000000000000001001",
+    sourceContract: "0000000000000000000000000000000000001002",
+  },
+  {
+    activityId: 6,
+    name: "Tiny Value (< 0.00000001/day)",
+    activityType: 1, // OneTime
+    // emissionRate: 11574074 wei = 0.000000001 per day (should show "tiny")
+    emissionRate: "11574074",
+    accRewardPerStake: "5000000000000000000", // 5 CATA per stake
+    lastUpdateTime: String(Math.floor(Date.now() / 1000) - 30), // 30 seconds ago
+    totalStake: "500000000000000000000", // 500 tokens
+    allowedCaller: "0000000000000000000000000000000000001003",
+    sourceContract: "0000000000000000000000000000000000001004",
   },
 ];
 
@@ -102,73 +132,24 @@ export const getDummyUserRewards = (userAddress: string): UserRewardsData => {
         },
         activity: dummyActivities[3],
       },
+      {
+        activityId: 5,
+        userInfo: {
+          stake: "100000000000000000000", // 100 tokens
+          userIndex: "9000000000000000000", // 9 CATA per stake
+        },
+        activity: dummyActivities[4],
+      },
+      {
+        activityId: 6,
+        userInfo: {
+          stake: "50000000000000000000", // 50 tokens
+          userIndex: "4000000000000000000", // 4 CATA per stake
+        },
+        activity: dummyActivities[5],
+      },
     ],
   };
 };
 
-// Dummy leaderboard data
-export const getDummyLeaderboard = (): LeaderboardEntry[] => {
-  return [
-    {
-      address: "0x1234567890123456789012345678901234567890",
-      unclaimedRewards: "5000000000000000000", // 5 points
-      pendingRewards: "2500000000000000000", // 2.5 points
-      emissionRate: "50000000000000000", // 0.05 points/sec (highest emission)
-    },
-    {
-      address: "0x2345678901234567890123456789012345678901",
-      unclaimedRewards: "4000000000000000000", // 4 points
-      pendingRewards: "3000000000000000000", // 3 points
-      emissionRate: "45000000000000000", // 0.045 points/sec
-    },
-    {
-      address: "0x3456789012345678901234567890123456789012",
-      unclaimedRewards: "3500000000000000000", // 3.5 points
-      pendingRewards: "2000000000000000000", // 2 points
-      emissionRate: "40000000000000000", // 0.04 points/sec
-    },
-    {
-      address: "0x4567890123456789012345678901234567890123",
-      unclaimedRewards: "3000000000000000000", // 3 points
-      pendingRewards: "2500000000000000000", // 2.5 points
-      emissionRate: "35000000000000000", // 0.035 points/sec
-    },
-    {
-      address: "0x5678901234567890123456789012345678901234",
-      unclaimedRewards: "2500000000000000000", // 2.5 points
-      pendingRewards: "2000000000000000000", // 2 points
-      emissionRate: "30000000000000000", // 0.03 points/sec
-    },
-    {
-      address: "0x6789012345678901234567890123456789012345",
-      unclaimedRewards: "2000000000000000000", // 2 points
-      pendingRewards: "1500000000000000000", // 1.5 points
-      emissionRate: "25000000000000000", // 0.025 points/sec
-    },
-    {
-      address: "0x7890123456789012345678901234567890123456",
-      unclaimedRewards: "1800000000000000000", // 1.8 points
-      pendingRewards: "1200000000000000000", // 1.2 points
-      emissionRate: "20000000000000000", // 0.02 points/sec
-    },
-    {
-      address: "0x8901234567890123456789012345678901234567",
-      unclaimedRewards: "1500000000000000000", // 1.5 points
-      pendingRewards: "1000000000000000000", // 1 point
-      emissionRate: "15000000000000000", // 0.015 points/sec
-    },
-    {
-      address: "0x9012345678901234567890123456789012345678",
-      unclaimedRewards: "1200000000000000000", // 1.2 points
-      pendingRewards: "800000000000000000", // 0.8 points
-      emissionRate: "10000000000000000", // 0.01 points/sec
-    },
-    {
-      address: "0xa012345678901234567890123456789012345678",
-      unclaimedRewards: "1000000000000000000", // 1 point
-      pendingRewards: "500000000000000000", // 0.5 points
-      emissionRate: "5000000000000000", // 0.005 points/sec (lowest emission)
-    },
-  ];
-};
 

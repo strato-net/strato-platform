@@ -28,9 +28,6 @@ export const useRewardsUserInfo = () => {
     };
 
     fetchData();
-    // Refresh every 10 seconds for user data
-    const interval = setInterval(fetchData, 10000);
-    return () => clearInterval(interval);
   }, [userAddress, isLoggedIn]);
 
   return { userRewards, loading, error, refetch: () => userAddress ? fetchUserRewards(userAddress).then(setUserRewards) : Promise.resolve() };

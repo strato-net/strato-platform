@@ -8,7 +8,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Activity, RewardsUserInfo } from "@/services/rewardsService";
 import { formatBalance, calculateTokenValue } from "@/utils/numberUtils";
-import { formatEmissionRatePerDay, formatEmissionRatePerWeek } from "@/services/rewardsService";
+import { formatEmissionRatePerDay, formatEmissionRatePerWeek, roundByMagnitude } from "@/services/rewardsService";
 import { formatDistanceToNow } from "date-fns";
 import { CopyableHash } from "@/components/common/CopyableHash";
 import { Separator } from "@/components/ui/separator";
@@ -37,9 +37,11 @@ export const ActivityDetailModal = ({
   const totalTVLUSD = priceWei 
     ? calculateTokenValue(activity.totalStake, priceWei)
     : null;
+  const totalStakeDecimal = formatBalance(activity.totalStake, "", 18, 18, 18);
+  const totalStakeFormatted = roundByMagnitude(totalStakeDecimal);
   const totalTVLFormatted = totalTVLUSD 
     ? `$${parseFloat(totalTVLUSD).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-    : `$${formatBalance(activity.totalStake, "", 18, 2, 6)}`;
+    : totalStakeFormatted;
   const accRewardPerStakeFormatted = formatBalance(activity.accRewardPerStake, "", 18, 2, 6);
   const lastUpdate = new Date(Number(activity.lastUpdateTime) * 1000);
   const timeAgo = formatDistanceToNow(lastUpdate, { addSuffix: true });
@@ -47,11 +49,13 @@ export const ActivityDetailModal = ({
   const userTVLUSD = userInfo && priceWei
     ? calculateTokenValue(userInfo.stake, priceWei)
     : null;
+  const userStakeDecimal = userInfo ? formatBalance(userInfo.stake, "", 18, 18, 18) : "0";
+  const userStakeFormatted = roundByMagnitude(userStakeDecimal);
   const userTVLFormatted = userInfo
     ? (userTVLUSD 
         ? `$${parseFloat(userTVLUSD).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-        : `$${formatBalance(userInfo.stake, "", 18, 2, 6)}`)
-    : "$0";
+        : userStakeFormatted)
+    : "0";
   const userShare = userInfo && BigInt(activity.totalStake) > 0n
     ? (BigInt(userInfo.stake) * 10000n) / BigInt(activity.totalStake) / 100n
     : 0n;
@@ -60,13 +64,12 @@ export const ActivityDetailModal = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{activity.name}</DialogTitle>
-          <DialogDescription>
-            Activity #{activity.activityId} •{" "}
+          <DialogTitle className="flex items-center gap-2">
+            {activity.name}
             <Badge variant={activity.activityType === 0 ? "default" : "secondary"}>
               {activity.activityType === 0 ? "Position" : "One-Time"}
             </Badge>
-          </DialogDescription>
+          </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6">

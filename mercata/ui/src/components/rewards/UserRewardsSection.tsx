@@ -2,17 +2,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { UserRewardsData, claimAllRewards, claimRewards } from "@/services/rewardsService";
+import { UserRewardsData, claimAllRewards, claimRewards, safeBigInt } from "@/services/rewardsService";
 import {
   calculatePendingRewards,
-  calculateEstimatedRewardsPerDay,
   formatEmissionRatePerDay,
+  roundByMagnitude,
+  formatRoundedWithCommas,
 } from "@/services/rewardsService";
-import { formatBalance, calculateTokenValue } from "@/utils/numberUtils";
+import { formatBalance } from "@/utils/numberUtils";
 import { Loader2, Coins, TrendingUp, Percent } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
-import { useOracleContext } from "@/context/OracleContext";
 import { useUser } from "@/context/UserContext";
 
 interface UserRewardsSectionProps {
@@ -28,7 +28,6 @@ export const UserRewardsSection = ({
 }: UserRewardsSectionProps) => {
   const { toast } = useToast();
   const { userAddress } = useUser();
-  const { getPrice } = useOracleContext();
   const [claimingActivityIds, setClaimingActivityIds] = useState<number[]>([]);
   const [isClaimingAll, setIsClaimingAll] = useState(false);
 
@@ -161,26 +160,52 @@ export const UserRewardsSection = ({
     );
   }
 
-  const unclaimedFormatted = formatBalance(userRewards.unclaimedRewards, "points", 18, 2, 6);
-  const hasUnclaimed = BigInt(userRewards.unclaimedRewards) > 0n;
+  const unclaimedRewardsStr = userRewards.unclaimedRewards || "0";
+  const unclaimedFormatted = formatBalance(unclaimedRewardsStr, "points", 18, 2, 6);
+  const hasUnclaimed = safeBigInt(unclaimedRewardsStr) > 0n;
   const hasAnyRewards = hasUnclaimed || userRewards.activities.some(
-    (a) => BigInt(a.userInfo.stake) > 0n
+    (a) => safeBigInt(a.userInfo?.stake || "0") > 0n
   );
   const activitiesWithStake = userRewards.activities.filter(
-    (a) => BigInt(a.userInfo.stake) > 0n
+    (a) => safeBigInt(a.userInfo?.stake || "0") > 0n
   );
 
-  // Calculate total pending across all activities
-  let totalPending = BigInt(userRewards.unclaimedRewards);
+  // Calculate what user would receive if they claim:
+  // - claimAllRewards: settles all activities, then claims total unclaimedRewards[user]
+  // - claimRewards(activityId): settles that activity, then claims total unclaimedRewards[user]
+  // So both claim the total, but after settling different activities
+  
+  // Calculate new pending rewards that haven't been settled yet for each activity
+  const baseUnclaimed = safeBigInt(unclaimedRewardsStr);
+  let totalNewPending = 0n;
+  
+  // Pre-calculate pending for each activity
+  const activityPendingMap = new Map<number, bigint>();
   activitiesWithStake.forEach(({ activity, userInfo }) => {
-    const pending = calculatePendingRewards(
-      userInfo.stake,
-      activity.accRewardPerStake,
-      userInfo.userIndex
-    );
-    totalPending += BigInt(pending);
+    if (userInfo?.stake && activity?.accRewardPerStake && userInfo?.userIndex) {
+      const pending = calculatePendingRewards(
+        userInfo.stake,
+        activity.accRewardPerStake,
+        userInfo.userIndex
+      );
+      const pendingBig = safeBigInt(pending);
+      activityPendingMap.set(activity.activityId, pendingBig);
+      totalNewPending += pendingBig;
+    }
   });
-  const totalPendingFormatted = formatBalance(totalPending.toString(), "points", 18, 2, 6);
+  
+  // Total claimable = base unclaimed + new pending from all activities
+  const totalClaimable = baseUnclaimed + totalNewPending;
+  const totalClaimableDecimal = totalClaimable > 0n
+    ? formatBalance(totalClaimable.toString(), "points", 18, 18, 18)
+    : null;
+  // Extract just the numeric part (remove "points" suffix and any spaces)
+  const numericPart = totalClaimableDecimal
+    ? totalClaimableDecimal.replace(/\s*points?\s*$/i, '').trim()
+    : null;
+  const totalClaimableFormatted = numericPart 
+    ? formatRoundedWithCommas(roundByMagnitude(numericPart)) + " points" 
+    : "?";
 
   return (
     <div className="space-y-6">
@@ -195,10 +220,10 @@ export const UserRewardsSection = ({
             <div>
               <div className="flex items-center space-x-2 mb-2">
                 <Coins className="h-5 w-5 text-yellow-500" />
-                <p className="text-3xl font-bold">{unclaimedFormatted}</p>
+                <p className="text-3xl font-bold">{totalClaimableFormatted}</p>
               </div>
               <p className="text-sm text-muted-foreground">
-                Estimated total including pending: {totalPendingFormatted}
+                Amount you will receive if you click "Claim All"
               </p>
             </div>
             <Button
@@ -233,83 +258,61 @@ export const UserRewardsSection = ({
       ) : (
         <div className="space-y-4">
           <h3 className="text-lg font-semibold">Your Activity Positions</h3>
-          {activitiesWithStake.map(({ activity, userInfo }) => {
-            const priceWei = getPrice(activity.sourceContract);
-            const userTVLUSD = priceWei 
-              ? calculateTokenValue(userInfo.stake, priceWei)
-              : null;
-            const totalTVLUSD = priceWei 
-              ? calculateTokenValue(activity.totalStake, priceWei)
-              : null;
+          {activitiesWithStake.map(({ activity, userInfo, personalEmissionRate }) => {
+            // Format stake values with magnitude-aware rounding
+            const userStakeStr = userInfo?.stake || null;
+            const totalStakeStr = activity?.totalStake || null;
+            const userStakeDecimal = userStakeStr ? formatBalance(userStakeStr, "", 18, 18, 18) : null;
+            const totalStakeDecimal = totalStakeStr ? formatBalance(totalStakeStr, "", 18, 18, 18) : null;
+            const userStakeFormatted = userStakeDecimal ? formatRoundedWithCommas(roundByMagnitude(userStakeDecimal)) : "?";
+            const totalStakeFormatted = totalStakeDecimal ? formatRoundedWithCommas(roundByMagnitude(totalStakeDecimal)) : "?";
             
-            const userTVLFormatted = userTVLUSD 
-              ? `$${parseFloat(userTVLUSD).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-              : `$${formatBalance(userInfo.stake, "", 18, 2, 6)}`;
-            const totalTVLFormatted = totalTVLUSD 
-              ? `$${parseFloat(totalTVLUSD).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-              : `$${formatBalance(activity.totalStake, "", 18, 2, 6)}`;
-            
-            const share = BigInt(activity.totalStake) > 0n
-              ? (BigInt(userInfo.stake) * 10000n) / BigInt(activity.totalStake) / 100n
-              : 0n;
+            const share = totalStakeStr && userStakeStr && safeBigInt(totalStakeStr) > 0n
+              ? (safeBigInt(userStakeStr) * 10000n) / safeBigInt(totalStakeStr) / 100n
+              : null;
 
-            const pending = calculatePendingRewards(
-              userInfo.stake,
-              activity.accRewardPerStake,
-              userInfo.userIndex
-            );
-            const pendingFormatted = formatBalance(pending, "points", 18, 2, 6);
+            // Use personalEmissionRate (already calculated as emissionRate * (userStake / totalStake))
+            // Multiply by secondsPerDay to get estimated rewards per day
+            const secondsPerDay = BigInt(86400);
+            const personalEmissionRateStr = personalEmissionRate || null;
+            const personalEmissionRateBig = personalEmissionRateStr ? safeBigInt(personalEmissionRateStr) : null;
+            const estimatedPerDay = personalEmissionRateBig
+              ? (personalEmissionRateBig * secondsPerDay).toString()
+              : null;
+            const estimatedPerDayDecimal = estimatedPerDay
+              ? formatBalance(estimatedPerDay, "points", 18, 18, 18)
+              : null;
+            // Extract just the numeric part (remove "points" suffix and any spaces)
+            const estimatedPerDayNumeric = estimatedPerDayDecimal
+              ? estimatedPerDayDecimal.replace(/\s*points?\s*$/i, '').trim()
+              : null;
+            const estimatedPerDayFormatted = estimatedPerDayNumeric
+              ? formatRoundedWithCommas(roundByMagnitude(estimatedPerDayNumeric)) + " points"
+              : "?";
 
-            const estimatedPerDay = calculateEstimatedRewardsPerDay(
-              userInfo.stake,
-              activity.totalStake,
-              activity.emissionRate
-            );
-            const estimatedPerDayFormatted = formatBalance(estimatedPerDay, "points", 18, 2, 6);
-
-            const isClaiming = claimingActivityIds.includes(activity.activityId);
-            const hasPending = BigInt(pending) > 0n;
 
             return (
               <Card key={activity.activityId}>
                 <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="text-lg">{activity.name}</CardTitle>
-                      <CardDescription>
-                        Activity #{activity.activityId} •{" "}
-                        <Badge variant="secondary">
-                          {activity.activityType === 0 ? "Position" : "One-Time"}
-                        </Badge>
-                      </CardDescription>
-                    </div>
-                    {hasPending && (
-                      <Button
-                        onClick={() => handleClaimActivity([activity.activityId])}
-                        disabled={isClaiming}
-                        size="sm"
-                        variant="outline"
-                      >
-                        {isClaiming ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Claiming...
-                          </>
-                        ) : (
-                          "Claim"
-                        )}
-                      </Button>
-                    )}
+                  <div>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      {activity?.name || "?"}
+                      <Badge variant="secondary">
+                        {activity?.activityType !== undefined && activity?.activityType !== null
+                          ? (activity.activityType === 0 ? "Position" : "One-Time")
+                          : "?"}
+                      </Badge>
+                    </CardTitle>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div>
                       <div className="flex items-center space-x-2 mb-1">
                         <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                        <p className="text-sm text-muted-foreground">Your TVL</p>
+                        <p className="text-sm text-muted-foreground">Stake</p>
                       </div>
-                      <p className="text-lg font-semibold">{userTVLFormatted}</p>
+                      <p className="text-lg font-semibold">{userStakeFormatted}</p>
                     </div>
 
                     <div>
@@ -317,9 +320,9 @@ export const UserRewardsSection = ({
                         <Percent className="h-4 w-4 text-muted-foreground" />
                         <p className="text-sm text-muted-foreground">Pool Share</p>
                       </div>
-                      <p className="text-lg font-semibold">{share.toString()}%</p>
+                      <p className="text-lg font-semibold">{share !== null ? `${share.toString()}%` : "?"}</p>
                       <p className="text-xs text-muted-foreground">
-                        of {totalTVLFormatted} total
+                        of {totalStakeFormatted} total
                       </p>
                     </div>
 
@@ -328,12 +331,6 @@ export const UserRewardsSection = ({
                       <p className="text-lg font-semibold">{estimatedPerDayFormatted}</p>
                     </div>
 
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-1">Pending Rewards</p>
-                      <p className="text-lg font-semibold text-yellow-600 dark:text-yellow-400">
-                        {pendingFormatted}
-                      </p>
-                    </div>
                   </div>
                 </CardContent>
               </Card>

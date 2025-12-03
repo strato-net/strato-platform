@@ -21,9 +21,6 @@ export const useRewards = () => {
     };
 
     fetchState();
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchState, 30000);
-    return () => clearInterval(interval);
   }, []);
 
   return { state, loading, error, refetch: () => fetchRewardsState().then(setState) };

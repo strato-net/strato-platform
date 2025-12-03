@@ -3,26 +3,22 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Activity } from "@/services/rewardsService";
-import { formatBalance, calculateTokenValue } from "@/utils/numberUtils";
-import { formatEmissionRatePerDay, formatEmissionRatePerWeek } from "@/services/rewardsService";
+import { formatBalance } from "@/utils/numberUtils";
+import { formatEmissionRatePerDay, formatEmissionRatePerWeek, roundByMagnitude, formatRoundedWithCommas } from "@/services/rewardsService";
 import { formatDistanceToNow } from "date-fns";
-import { useOracleContext } from "@/context/OracleContext";
 
 interface ActivitiesTableProps {
   activities: Activity[];
   loading: boolean;
-  onActivityClick?: (activity: Activity) => void;
 }
 
-export const ActivitiesTable = ({ activities, loading, onActivityClick }: ActivitiesTableProps) => {
-  const { getPrice } = useOracleContext();
-
+export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) => {
   if (loading) {
     return (
       <Card>
         <CardHeader>
           <CardTitle>Activities</CardTitle>
-          <CardDescription>All reward activities in the system</CardDescription>
+          <CardDescription>My reward activities</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
@@ -40,7 +36,7 @@ export const ActivitiesTable = ({ activities, loading, onActivityClick }: Activi
       <Card>
         <CardHeader>
           <CardTitle>Activities</CardTitle>
-          <CardDescription>All reward activities in the system</CardDescription>
+          <CardDescription>My reward activities</CardDescription>
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground text-center py-8">No activities found</p>
@@ -53,7 +49,7 @@ export const ActivitiesTable = ({ activities, loading, onActivityClick }: Activi
     <Card>
       <CardHeader>
         <CardTitle>Activities</CardTitle>
-        <CardDescription>All reward activities in the system</CardDescription>
+        <CardDescription>My reward activities</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="rounded-md border">
@@ -64,41 +60,46 @@ export const ActivitiesTable = ({ activities, loading, onActivityClick }: Activi
                 <TableHead>Name</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Emission Rate</TableHead>
-                <TableHead>Total TVL</TableHead>
+                <TableHead>Total Stake</TableHead>
                 <TableHead>Last Update</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {activities.map((activity) => {
-                const emissionPerDay = formatEmissionRatePerDay(activity.emissionRate);
-                const emissionPerWeek = formatEmissionRatePerWeek(activity.emissionRate);
-                const priceWei = getPrice(activity.sourceContract);
-                const totalTVLUSD = priceWei 
-                  ? calculateTokenValue(activity.totalStake, priceWei)
-                  : null;
-                const totalStakeFormatted = totalTVLUSD 
-                  ? `$${parseFloat(totalTVLUSD).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                  : `$${formatBalance(activity.totalStake, "", 18, 2, 6)}`;
-                const lastUpdate = new Date(Number(activity.lastUpdateTime) * 1000);
-                const timeAgo = formatDistanceToNow(lastUpdate, { addSuffix: true });
+                const emissionRateStr = activity?.emissionRate || null;
+                const emissionPerDay = emissionRateStr ? formatEmissionRatePerDay(emissionRateStr) : "?";
+                const emissionPerWeek = emissionRateStr ? formatEmissionRatePerWeek(emissionRateStr) : "?";
+                // Use totalStake directly (not dollarized since we don't know which assets)
+                const totalStakeStr = activity?.totalStake || null;
+                const totalStakeDecimal = totalStakeStr ? formatBalance(totalStakeStr, "", 18, 18, 18) : null;
+                const totalStakeFormatted = totalStakeDecimal ? formatRoundedWithCommas(roundByMagnitude(totalStakeDecimal)) : "?";
+                const lastUpdateTimeStr = activity?.lastUpdateTime || null;
+                const lastUpdate = lastUpdateTimeStr ? new Date(Number(lastUpdateTimeStr) * 1000) : null;
+                const timeAgo = lastUpdate ? formatDistanceToNow(lastUpdate, { addSuffix: true }) : "?";
 
                 return (
                   <TableRow
-                    key={activity.activityId}
-                    className={onActivityClick ? "cursor-pointer hover:bg-muted/50" : ""}
-                    onClick={() => onActivityClick?.(activity)}
+                    key={activity?.activityId || Math.random()}
                   >
-                    <TableCell className="font-mono font-medium">{activity.activityId}</TableCell>
-                    <TableCell className="font-medium">{activity.name}</TableCell>
+                    <TableCell className="font-mono font-medium">
+                      {activity?.activityId !== undefined && activity?.activityId !== null ? activity.activityId : "?"}
+                    </TableCell>
+                    <TableCell className="font-medium">{activity?.name || "?"}</TableCell>
                     <TableCell>
                       <Badge variant="secondary">
-                        {activity.activityType === 0 ? "Position" : "One-Time"}
+                        {activity?.activityType !== undefined && activity?.activityType !== null
+                          ? (activity.activityType === 0 ? "Position" : "One-Time")
+                          : "?"}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       <div>
-                        <div className="font-medium">{emissionPerDay} points/day</div>
-                        <div className="text-xs text-muted-foreground">{emissionPerWeek} points/week</div>
+                        <div className="font-medium">
+                          {emissionPerDay} {emissionPerDay !== "?" && "points/day"}
+                        </div>
+                        {emissionPerWeek !== "?" && (
+                          <div className="text-xs text-muted-foreground">{emissionPerWeek} points/week</div>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>{totalStakeFormatted}</TableCell>
