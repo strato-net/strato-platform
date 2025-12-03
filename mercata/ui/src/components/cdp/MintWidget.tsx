@@ -8,6 +8,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { formatBalance as formatBalanceUtil, formatWeiToDecimalHP, formatNumber, formatDecimalToWeiHP } from "@/utils/numberUtils";
 import { api } from "@/lib/axios";
+import { CompactRewardsDisplay } from "@/components/rewards/CompactRewardsDisplay";
+import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 
 interface MintWidgetProps {
   onSuccess?: () => void; // Callback fired when borrow operation succeeds
@@ -31,6 +33,7 @@ const MintWidget: React.FC<MintWidgetProps> = ({ onSuccess, title = "Mint Agains
   const [maxBorrowLoading, setMaxBorrowLoading] = useState<boolean>(false);
   const { toast } = useToast();
   const { activeTokens } = useUserTokens();
+  const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
   const borrowRate = depositAsset?.stabilityFeeRate || 5.54;
   
@@ -874,6 +877,15 @@ const MintWidget: React.FC<MintWidgetProps> = ({ onSuccess, title = "Mint Agains
           <p className="text-sm text-gray-500">
             ${formatNumber(parseFloat(borrowAmount || "0"))}
           </p>
+          {borrowAmount && parseFloat(borrowAmount) > 0 && (
+            <CompactRewardsDisplay
+              userRewards={userRewards}
+              loading={rewardsLoading || false}
+              activityIds={[7]}
+              variant="inline"
+              inputAmount={borrowAmount}
+            />
+          )}
         </div>
       </div>
 

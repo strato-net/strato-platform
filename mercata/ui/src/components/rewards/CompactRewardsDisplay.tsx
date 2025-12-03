@@ -1,20 +1,13 @@
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { UserRewardsData } from "@/services/rewardsService";
 import {
   calculatePendingRewards,
   calculateEstimatedRewardsPerDay,
+  calculateEffectiveEmissionRate,
   formatRoundedWithCommas,
   roundByMagnitude,
 } from "@/services/rewardsService";
 import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
 import { Coins } from "lucide-react";
-import { Link } from "react-router-dom";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 
 interface CompactRewardsDisplayProps {
   userRewards: UserRewardsData | null;
@@ -24,14 +17,9 @@ interface CompactRewardsDisplayProps {
   inputAmount?: string; // Input amount for calculating 1% estimated rewards
 }
 
-const truncateActivityName = (name: string, maxLength: number = 30): string => {
-  if (!name || name.length <= maxLength) return name;
-  return name.substring(0, maxLength) + "...";
-};
 
 export const CompactRewardsDisplay = ({
   userRewards,
-  loading,
   activityIds,
   variant = "button",
   inputAmount,
@@ -48,6 +36,7 @@ export const CompactRewardsDisplay = ({
   let totalEstimatedPerDay = 0n;
 
   activitiesWithStake.forEach(({ activity, userInfo }) => {
+    // Calculate pending rewards using the calculatePendingRewards function
     const pending = calculatePendingRewards(
       userInfo.stake,
       activity.accRewardPerStake,
@@ -55,6 +44,7 @@ export const CompactRewardsDisplay = ({
     );
     totalPending += BigInt(pending);
 
+    // Calculate estimated rewards per day: (userStake / totalStake) * emissionRate * secondsPerDay
     const estimatedPerDay = calculateEstimatedRewardsPerDay(
       userInfo.stake,
       activity.totalStake,
@@ -63,17 +53,6 @@ export const CompactRewardsDisplay = ({
     totalEstimatedPerDay += BigInt(estimatedPerDay);
   });
 
-  const totalPendingDecimal = formatBalance(
-    totalPending.toString(),
-    "points",
-    18,
-    18,
-    18
-  );
-  const totalPendingNumeric = totalPendingDecimal.replace(/\s*points?\s*$/i, '').trim();
-  const totalPendingFormatted = totalPendingNumeric 
-    ? formatRoundedWithCommas(roundByMagnitude(totalPendingNumeric)) + " points"
-    : "0 points";
   // Calculate 1% of input amount for estimated rewards
   let inputAmountReward = 0n;
   if (inputAmount && variant === "inline") {
@@ -114,107 +93,10 @@ export const CompactRewardsDisplay = ({
     : "0 points";
 
   const hasRewards = totalPending > 0n || totalEstimatedPerDay > 0n || inputAmountReward > 0n;
-  // Show button if activity exists, even if user has no stake yet
-  const hasActivity = filteredActivities.length > 0;
-
-
-  // Button variant - for header
-  if (variant === "button") {
-    // Show loading state instead of returning null
-    if (loading) {
-      return (
-        <Button variant="outline" size="sm" className="gap-2" disabled>
-          <Coins className="h-4 w-4" />
-          <span className="hidden sm:inline">Loading...</span>
-        </Button>
-      );
-    }
-
-    // Show button if activity exists, even if user has no stake/rewards yet
-    if (!hasActivity) {
-      console.log("[CompactRewardsDisplay] Activity not found - returning null for button variant");
-      return null;
-    }
-
-    return (
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button variant="outline" size="sm" className="gap-2">
-            <Coins className="h-4 w-4" />
-            <span className="hidden sm:inline">Rewards</span>
-            {totalPending > 0n && (
-              <Badge variant="secondary" className="ml-1">
-                {totalPendingFormatted}
-              </Badge>
-            )}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-80" align="end">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h4 className="font-semibold text-sm">Your Rewards</h4>
-              <Link to="/dashboard/rewards">
-                <Button variant="ghost" size="sm" className="h-7 text-xs">
-                  View All
-                </Button>
-              </Link>
-            </div>
-            {hasRewards ? (
-              <>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Est. per Day</span>
-                    <span className="font-medium">{totalEstimatedPerDayFormatted}</span>
-                  </div>
-                </div>
-                {activitiesWithStake.length > 0 && activitiesWithStake.map(({ activity }) => (
-                  <div key={activity.activityId} className="pt-2 border-t text-xs">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">{truncateActivityName(activity.name)}</span>
-                      <Badge variant="outline" className="text-xs">
-                        {activity.activityType === 1 ? "One-Time" : "Position"}
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
-              </>
-            ) : (
-              <div className="text-sm text-muted-foreground py-2">
-                {filteredActivities.length > 0 ? (
-                  <div className="space-y-2">
-                    <p>No rewards yet. Start using the platform to earn rewards!</p>
-                    {filteredActivities.map(({ activity }) => (
-                      <div key={activity.activityId} className="pt-2 border-t text-xs">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">{truncateActivityName(activity.name)}</span>
-                          <Badge variant="outline" className="text-xs">
-                            {activity.activityType === 1 ? "One-Time" : "Position"}
-                          </Badge>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p>No rewards available for this activity.</p>
-                )}
-              </div>
-            )}
-          </div>
-        </PopoverContent>
-      </Popover>
-    );
-  }
 
   // Inline variant - for below input fields
   if (variant === "inline") {
-    if (loading) {
-      return (
-        <div className="text-sm text-muted-foreground mt-2">
-          Loading rewards...
-        </div>
-      );
-    }
-
+   
     // Show existing rewards even if input is empty
     if (!hasRewards && inputAmountReward === 0n) return null;
 
@@ -241,7 +123,32 @@ export const CompactRewardsDisplay = ({
       );
     }
 
-    // If input has value, show total with 1% breakdown
+    // Calculate effective emission rate based on input amount using the function
+    let totalEffectiveEmissionRate = 0n;
+    
+    filteredActivities.forEach(({ activity }) => {
+      const inputWei = safeParseUnits(inputAmount || "0", 18);
+      const effectiveEmissionRate = calculateEffectiveEmissionRate(
+        inputWei.toString(),
+        activity.totalStake,
+        activity.emissionRate
+      );
+      totalEffectiveEmissionRate += BigInt(effectiveEmissionRate);
+    });
+    
+    const effectiveRewardsPerDayDecimal = formatBalance(
+      totalEffectiveEmissionRate.toString(),
+      "points",
+      18,
+      18,
+      18
+    );
+    const effectiveRewardsPerDayNumeric = effectiveRewardsPerDayDecimal.replace(/\s*points?\s*$/i, '').trim();
+    const effectiveRewardsPerDayFormatted = effectiveRewardsPerDayNumeric
+      ? formatRoundedWithCommas(roundByMagnitude(effectiveRewardsPerDayNumeric)) + " points/day"
+      : "0 points/day";
+
+    // If input has value, show total with 1% breakdown and effective emission rate
     return (
       <div className="mt-2 space-y-1">
         <div className="flex items-center gap-2 text-sm">
@@ -251,9 +158,14 @@ export const CompactRewardsDisplay = ({
         </div>
         {inputAmountReward > 0n && (
           <div className="text-xs text-muted-foreground pl-6">
-            + {inputAmountRewardFormatted} points (1% of input)
+            + {inputAmountRewardFormatted} (1% of input)
           </div>
         )}
+        <div className="flex items-center gap-2 text-sm">
+          <Coins className="h-4 w-4 text-yellow-600" />
+          <span className="text-muted-foreground">Effective Emission Rate:</span>
+          <span className="font-medium">{effectiveRewardsPerDayFormatted}</span>
+        </div>
       </div>
     );
   }

@@ -221,6 +221,33 @@ export const calculateEstimatedRewardsPerDay = (
 };
 
 /**
+ * Calculate effective emission rate (scaled) for a user based on input amount
+ * This shows the emission rate the user will receive after depositing the input amount
+ * Formula: (inputAmount / (totalStake + inputAmount)) * emissionRate * secondsPerDay
+ */
+export const calculateEffectiveEmissionRate = (
+  inputAmount: string,
+  totalStake: string,
+  emissionRate: string
+): string => {
+  const inputWei = safeBigInt(inputAmount);
+  const totalStakeBig = safeBigInt(totalStake);
+  const emissionRateBig = safeBigInt(emissionRate);
+  
+  // Calculate new total stake after deposit
+  const newTotalStake = totalStakeBig + inputWei;
+  
+  if (newTotalStake === 0n || emissionRateBig === 0n) return "0";
+  
+  const secondsPerDay = 86400n;
+  
+  // Effective emission rate = (inputAmount / newTotalStake) * emissionRate * secondsPerDay
+  const effectiveEmissionRate = (inputWei * emissionRateBig * secondsPerDay) / newTotalStake;
+  
+  return effectiveEmissionRate.toString();
+};
+
+/**
  * Remove trailing zeros from a decimal string
  */
 const removeTrailingZeros = (value: string): string => {
