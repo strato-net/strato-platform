@@ -297,7 +297,11 @@ export const UserRewardsSection = ({
                 <CardHeader>
                   <div>
                     <CardTitle className="text-lg flex items-center gap-2">
-                      {activity?.name || "?"}
+                      {activity?.name 
+                        ? (activity.name.length > 30 
+                            ? activity.name.substring(0, 30) + "..." 
+                            : activity.name)
+                        : "?"}
                       <Badge variant="secondary">
                         {activity?.activityType !== undefined && activity?.activityType !== null
                           ? (activity.activityType === 0 ? "Position" : "One-Time")

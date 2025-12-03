@@ -14,6 +14,11 @@ interface ActivitiesTableProps {
   loading: boolean;
 }
 
+const truncateActivityName = (name: string, maxLength: number = 30): string => {
+  if (!name || name.length <= maxLength) return name;
+  return name.substring(0, maxLength) + "...";
+};
+
 export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) => {
   if (loading) {
     return (
@@ -114,7 +119,9 @@ export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) =
                     <TableCell className="font-mono font-medium">
                       {activity?.activityId !== undefined && activity?.activityId !== null ? activity.activityId : "?"}
                     </TableCell>
-                    <TableCell className="font-medium">{activity?.name || "?"}</TableCell>
+                    <TableCell className="font-medium">
+                      {activity?.name ? truncateActivityName(activity.name) : "?"}
+                    </TableCell>
                     <TableCell>
                       <Badge variant="secondary">
                         {activity?.activityType !== undefined && activity?.activityType !== null

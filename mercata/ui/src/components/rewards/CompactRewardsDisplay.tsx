@@ -24,6 +24,11 @@ interface CompactRewardsDisplayProps {
   inputAmount?: string; // Input amount for calculating 1% estimated rewards
 }
 
+const truncateActivityName = (name: string, maxLength: number = 30): string => {
+  if (!name || name.length <= maxLength) return name;
+  return name.substring(0, maxLength) + "...";
+};
+
 export const CompactRewardsDisplay = ({
   userRewards,
   loading,
@@ -146,7 +151,7 @@ export const CompactRewardsDisplay = ({
             {activitiesWithStake.map(({ activity }) => (
               <div key={activity.activityId} className="pt-2 border-t text-xs">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">{activity.name}</span>
+                  <span className="text-muted-foreground">{truncateActivityName(activity.name)}</span>
                   <Badge variant="outline" className="text-xs">
                     {activity.activityType === 0 ? "Position" : "One-Time"}
                   </Badge>
