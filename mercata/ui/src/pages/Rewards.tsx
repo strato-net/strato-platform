@@ -6,13 +6,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RewardsOverview } from "@/components/rewards/RewardsOverview";
 import { ActivitiesTable } from "@/components/rewards/ActivitiesTable";
 import { UserRewardsSection } from "@/components/rewards/UserRewardsSection";
+import { LeaderboardTable } from "@/components/rewards/LeaderboardTable";
 import { useRewards } from "@/hooks/useRewards";
 import { useRewardsActivities } from "@/hooks/useRewardsActivities";
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 
 const Rewards = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"activities" | "my-rewards">("activities");
+  const [activeTab, setActiveTab] = useState<"activities" | "my-rewards" | "leaderboard">("activities");
 
   const { state, loading: stateLoading, refetch: refetchState } = useRewards();
   const { activities, loading: activitiesLoading, refetch: refetchActivities } = useRewardsActivities();
@@ -54,15 +55,16 @@ const Rewards = () => {
             <RewardsOverview state={state} loading={stateLoading} onRefresh={handleRefresh} />
           </div>
 
-          {/* Tabs for Activities and My Rewards */}
+          {/* Tabs for Activities, My Rewards, and Leaderboard */}
           <Tabs
             value={activeTab}
-            onValueChange={(value) => setActiveTab(value as "activities" | "my-rewards")}
+            onValueChange={(value) => setActiveTab(value as "activities" | "my-rewards" | "leaderboard")}
             className="w-full"
           >
-            <TabsList className="grid w-full grid-cols-2 mb-6">
+            <TabsList className="grid w-full grid-cols-3 mb-6">
               <TabsTrigger value="activities">Activities</TabsTrigger>
               <TabsTrigger value="my-rewards">My Rewards</TabsTrigger>
+              <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
             </TabsList>
 
             <TabsContent value="activities">
@@ -78,6 +80,10 @@ const Rewards = () => {
                 loading={userRewardsLoading}
                 onClaimSuccess={handleClaimSuccess}
               />
+            </TabsContent>
+
+            <TabsContent value="leaderboard">
+              <LeaderboardTable />
             </TabsContent>
           </Tabs>
         </main>
