@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { UserRewardsData } from "@/services/rewardsService";
 import {
-  calculatePendingRewards,
+  calculateRealTimePendingRewards,
   calculateEstimatedRewardsPerDay,
   formatRoundedWithCommas,
   roundByMagnitude,
@@ -46,14 +46,29 @@ export const CompactRewardsDisplay = ({
 
   let totalPending = 0n;
   let totalEstimatedPerDay = 0n;
+  const currentTime = Math.floor(Date.now() / 1000); // Current Unix timestamp in seconds
 
   activitiesWithStake.forEach(({ activity, userInfo }) => {
-    const pending = calculatePendingRewards(
-      userInfo.stake,
-      activity.accRewardPerStake,
-      userInfo.userIndex
-    );
-    totalPending += BigInt(pending);
+    // Check all required fields are present for real-time calculation
+    if (
+      userInfo?.stake &&
+      activity?.accRewardPerStake !== undefined &&
+      userInfo?.userIndex !== undefined &&
+      activity?.emissionRate !== undefined &&
+      activity?.totalStake !== undefined &&
+      activity?.lastUpdateTime !== undefined
+    ) {
+      const pending = calculateRealTimePendingRewards(
+        userInfo.stake,
+        activity.accRewardPerStake,
+        userInfo.userIndex,
+        activity.emissionRate,
+        activity.totalStake,
+        activity.lastUpdateTime,
+        currentTime
+      );
+      totalPending += BigInt(pending);
+    }
 
     const estimatedPerDay = calculateEstimatedRewardsPerDay(
       userInfo.stake,
