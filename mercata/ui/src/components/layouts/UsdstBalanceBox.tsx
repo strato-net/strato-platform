@@ -70,10 +70,7 @@ const UsdstBalanceBox: React.FC = () => {
   useEffect(() => {
     const fetchUsdstToken = async () => {
       try {
-        const tokenResponse = await getToken(usdstAddress);
-        const token = Array.isArray(tokenResponse)
-          ? tokenResponse[0]
-          : tokenResponse;
+        const token = await getToken(usdstAddress);
         setUsdstToken(token);
       } catch (error) {
         console.error("Error fetching USDST token:", error);

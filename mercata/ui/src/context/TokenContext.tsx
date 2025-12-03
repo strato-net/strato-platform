@@ -147,8 +147,9 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
   const getToken = useCallback(async (address: string): Promise<Token | null> => {
     setLoading(true);
     try {
-      const res = await api.get<Token>(`/tokens/${address}`);
-      return res.data;
+      const res = await api.get<Token[]>(`/tokens/${address}`);
+      // Backend returns an array, so take the first element
+      return Array.isArray(res.data) ? res.data[0] || null : res.data;
     } catch (err) {
       return null;
     } finally {
