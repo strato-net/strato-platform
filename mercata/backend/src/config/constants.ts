@@ -32,6 +32,7 @@ export const constants = (() => {
   const CDPVault = `${CONTRACT_PREFIX}CDPVault`;
   const CDPRegistry = `${CONTRACT_PREFIX}CDPRegistry`;
   const RewardsChef = `${CONTRACT_PREFIX}RewardsChef`;
+  const Rewards = `${CONTRACT_PREFIX}Rewards`;
   const Voucher = `${CONTRACT_PREFIX}Voucher`;
   const Event = "event";
     
@@ -137,6 +138,7 @@ export const constants = (() => {
     CDPVault,
     CDPRegistry,
     RewardsChef,
+    Rewards,
     Voucher,
     mercataBridge,
     Event,

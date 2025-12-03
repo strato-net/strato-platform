@@ -4,9 +4,12 @@ import DashboardHeader from "../components/dashboard/DashboardHeader";
 import MobileSidebar from "../components/dashboard/MobileSidebar";
 import SwapWidget from "@/components/swap/SwapWidget";
 import SwapHistory from "@/components/swap/SwapHistory";
+import { CompactRewardsDisplay } from '@/components/rewards/CompactRewardsDisplay';
+import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 
 const SwapAsset = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -21,8 +24,19 @@ const SwapAsset = () => {
           <div className="max-w-2xl mx-auto space-y-6">
             {/* Main Swap Widget */}
             <div className="bg-white shadow-md rounded-lg p-6">
-              <h2 className="text-xl font-semibold mb-6">Exchange your digital assets</h2>
-              <SwapWidget />
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-semibold">Exchange your digital assets</h2>
+                {/* <CompactRewardsDisplay
+                  userRewards={userRewards}
+                  loading={rewardsLoading}
+                  activityIds={[3]}
+                  variant="button"
+                /> */}
+              </div>
+              <SwapWidget 
+                userRewards={userRewards}
+                rewardsLoading={rewardsLoading}
+              />
             </div>
           </div>
           
