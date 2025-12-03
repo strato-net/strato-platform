@@ -342,7 +342,7 @@ contract record Rewards is Ownable {
      */
     function setMaxBatchSize(uint256 newMaxBatchSize) external onlyOwner {
         require(newMaxBatchSize > 0, "Batch size must be greater than 0");
-        
+
         uint256 oldMaxBatchSize = maxBatchSize;
         maxBatchSize = newMaxBatchSize;
 
@@ -384,7 +384,7 @@ contract record Rewards is Ownable {
     /**
      * @dev Announce a new season for off-chain tracking and demarcation
      * @param seasonName Human-readable name for the season (e.g., "Season 2", "Q1 2025")
-     * 
+     *
      * This updates all activity indices first to ensure all rewards are properly
      * accrued at the season boundary before any subsequent parameter changes.
      */
@@ -393,10 +393,10 @@ contract record Rewards is Ownable {
         // This ensures pending rewards are calculated with current parameters
         // before governance makes any emission rate or config changes for the new season
         massUpdateActivitiesIndices();
-        
+
         // Increment season counter (SolidVM initializes to 0, so first call emits Season 1)
         currentSeason++;
-        
+
         emit SeasonAnnouncement(currentSeason, seasonName, block.timestamp);
     }
 
@@ -415,7 +415,7 @@ contract record Rewards is Ownable {
         Activity storage activity = activities[activityId];
         require(activity.sourceContract != address(0), "Activity does not exist");
         require(activity.activityType == ActivityType.Position, "Only for Position activities");
-        
+
         ActivityState storage state = activityStates[activityId];
         require(state.totalStake == 0, "Cannot change events while activity has stakes");
         require(newActionableEvents.length > 0, "At least one actionable event required");
@@ -473,7 +473,7 @@ contract record Rewards is Ownable {
         Activity storage activity = activities[activityId];
         require(activity.sourceContract != address(0), "Activity does not exist");
         require(activity.activityType == ActivityType.Position, "Only for Position activities");
-        
+
         ActivityState storage state = activityStates[activityId];
         require(state.totalStake == 0, "Cannot change events while activity has stakes");
 
@@ -525,7 +525,7 @@ contract record Rewards is Ownable {
         Activity storage activity = activities[activityId];
         require(activity.sourceContract != address(0), "Activity does not exist");
         require(activity.activityType == ActivityType.OneTime, "Only for OneTime activities");
-        
+
         ActivityState storage state = activityStates[activityId];
         require(state.totalStake == 0, "Cannot change events while activity has stakes");
         require(bytes(newEventName).length > 0, "Event name cannot be empty");
@@ -660,7 +660,7 @@ contract record Rewards is Ownable {
             blockNumbers.length == eventIndexes.length,
             "Array length mismatch"
         );
-        
+
         for (uint256 i = 0; i < sourceContracts.length; i++) {
             try {
                 Action action = Action({
@@ -811,7 +811,7 @@ contract record Rewards is Ownable {
 
         uint256 activityId = eventInfo.activityId;
         ActionType actionType = eventInfo.actionType;
-        
+
         Activity storage activity = activities[activityId];      // Config
         ActivityState storage state = activityStates[activityId]; // State
 
@@ -882,7 +882,7 @@ contract record Rewards is Ownable {
 
         // 3) Calculate new stake from delta
         uint256 newStake;
-        
+
         if (activity.activityType == ActivityType.OneTime) {
             // OneTime activities: apply weight multiplier to prevent unbounded stake growth
             // Note: If weightMultiplier is very low and action.amount is small, weighted may round to 0.
