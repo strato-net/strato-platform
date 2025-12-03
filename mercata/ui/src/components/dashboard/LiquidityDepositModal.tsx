@@ -22,14 +22,14 @@ import { safeParseUnits } from '@/utils/numberUtils';
 import { CompactRewardsDisplay } from '@/components/rewards/CompactRewardsDisplay';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 
-// Helper function to map pool names to activity IDs
-const getPoolActivityId = (poolName: string | undefined): number | null => {
+// Helper function to map pool names to activity names
+const getPoolActivityName = (poolName: string | undefined): string | null => {
   if (!poolName) return null;
   const name = poolName.toLowerCase();
-  if (name.includes('ethst') && name.includes('usdst')) return 1; // ETHST-USDST Swap LP
-  if (name.includes('wbtcst') && name.includes('usdst')) return 4; // WBTCST-USDST Swap LP
-  if (name.includes('goldst') && name.includes('usdst')) return 5; // GOLDST-USDST Swap LP
-  if (name.includes('silvst') && name.includes('usdst')) return 6; // SILVST-USDST Swap LP
+  if (name.includes('ethst') && name.includes('usdst')) return "ETHST-USDST Swap LP";
+  if (name.includes('wbtcst') && name.includes('usdst')) return "WBTCST-USDST Swap LP";
+  if (name.includes('goldst') && name.includes('usdst')) return "GOLDST-USDST Swap LP";
+  if (name.includes('silvst') && name.includes('usdst')) return "SILVST-USDST Swap LP";
   return null;
 };
 
@@ -647,8 +647,8 @@ const LiquidityDepositModal = ({
 
           {/* Estimated Rewards Display */}
           {(() => {
-            const activityId = getPoolActivityId(selectedPool?.poolName);
-            if (!activityId) return null;
+            const activityName = getPoolActivityName(selectedPool?.poolName);
+            if (!activityName) return null;
             
             // Calculate total input amount (sum of both tokens if in A&B mode, or the active token)
             let totalInputAmount = "0";
@@ -666,7 +666,7 @@ const LiquidityDepositModal = ({
               <CompactRewardsDisplay
                 userRewards={userRewards}
                 loading={rewardsLoading || false}
-                activityIds={[activityId]}
+                activityName={activityName}
                 variant="inline"
                 inputAmount={totalInputAmount}
               />

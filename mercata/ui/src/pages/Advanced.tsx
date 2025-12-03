@@ -87,7 +87,7 @@ const Advanced = () => {
                             <CompactRewardsDisplay
                               userRewards={userRewards}
                               loading={rewardsLoading}
-                              activityIds={[7]}
+                              activityName="CDP USDST Mint"
                               variant="button"
                             />
                           </div>

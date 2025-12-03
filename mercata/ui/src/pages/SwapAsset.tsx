@@ -29,7 +29,7 @@ const SwapAsset = () => {
                 <CompactRewardsDisplay
                   userRewards={userRewards}
                   loading={rewardsLoading}
-                  activityIds={[9]}
+                  activityName="ETHST-USDST Swap"
                   variant="button"
                 />
               </div>

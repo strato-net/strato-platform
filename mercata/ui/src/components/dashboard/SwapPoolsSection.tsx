@@ -14,14 +14,14 @@ import LiquidityWithdrawModal from './LiquidityWithdrawModal';
 import { CompactRewardsDisplay } from '@/components/rewards/CompactRewardsDisplay';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 
-// Helper function to map pool names to activity IDs
-const getPoolActivityId = (poolName: string | undefined): number | null => {
+// Helper function to map pool names to activity names
+const getPoolActivityName = (poolName: string | undefined): string | null => {
   if (!poolName) return null;
   const name = poolName.toLowerCase();
-  if (name.includes('ethst') && name.includes('usdst')) return 1; // ETHST-USDST Swap LP
-  if (name.includes('wbtcst') && name.includes('usdst')) return 4; // WBTCST-USDST Swap LP
-  if (name.includes('goldst') && name.includes('usdst')) return 5; // GOLDST-USDST Swap LP
-  if (name.includes('silvst') && name.includes('usdst')) return 6; // SILVST-USDST Swap LP
+  if (name.includes('ethst') && name.includes('usdst')) return "ETHST-USDST Swap LP";
+  if (name.includes('wbtcst') && name.includes('usdst')) return "WBTCST-USDST Swap LP";
+  if (name.includes('goldst') && name.includes('usdst')) return "GOLDST-USDST Swap LP";
+  if (name.includes('silvst') && name.includes('usdst')) return "SILVST-USDST Swap LP";
   return null;
 };
 
@@ -223,12 +223,12 @@ const SwapPoolsSection = () => {
                       <div className="font-medium">{pool.apy ? `${pool.apy}%` : "N/A"}</div>
                     </div>
                     {(() => {
-                      const activityId = getPoolActivityId(pool.poolName);
-                      return activityId ? (
+                      const activityName = getPoolActivityName(pool.poolName);
+                      return activityName ? (
                         <CompactRewardsDisplay
                           userRewards={userRewards}
                           loading={rewardsLoading}
-                          activityIds={[activityId]}
+                          activityName={activityName}
                           variant="button"
                         />
                       ) : null;

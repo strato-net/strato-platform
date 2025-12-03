@@ -300,7 +300,7 @@ const TokenInput = ({
         <CompactRewardsDisplay
           userRewards={userRewards}
           loading={rewardsLoading || false}
-          activityIds={[9]}
+          activityName="ETHST-USDST Swap"
           variant="inline"
           inputAmount={amount}
         />

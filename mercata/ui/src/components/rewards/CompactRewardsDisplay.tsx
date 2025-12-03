@@ -12,7 +12,7 @@ import { Coins } from "lucide-react";
 interface CompactRewardsDisplayProps {
   userRewards: UserRewardsData | null;
   loading: boolean;
-  activityIds: number[];
+  activityName: string; // Activity name to match (e.g., "ETHST-USDST Swap LP", "CDP USDST Mint")
   variant?: "button" | "inline";
   inputAmount?: string; // Input amount for calculating 1% estimated rewards
 }
@@ -20,12 +20,13 @@ interface CompactRewardsDisplayProps {
 
 export const CompactRewardsDisplay = ({
   userRewards,
-  activityIds,
+  activityName,
   variant = "button",
   inputAmount,
 }: CompactRewardsDisplayProps) => {
+  // Match activity by name (case-insensitive)
   const filteredActivities = userRewards?.activities.filter((item) =>
-    activityIds.includes(item.activityId)
+    item.activity.name.toLowerCase() === activityName.toLowerCase()
   ) || [];
 
   const activitiesWithStake = filteredActivities.filter(
@@ -96,10 +97,11 @@ export const CompactRewardsDisplay = ({
 
   // Inline variant - for below input fields
   if (variant === "inline") {
+    // Don't show anything until user enters input
+    if (!inputAmount || parseFloat(inputAmount) === 0 || inputAmountReward === 0n) {
+      return null;
+    }
    
-    // Show existing rewards even if input is empty
-    if (!hasRewards && inputAmountReward === 0n) return null;
-
     const inputAmountRewardDecimal = formatBalance(
       inputAmountReward.toString(),
       "points",
@@ -111,17 +113,6 @@ export const CompactRewardsDisplay = ({
     const inputAmountRewardFormatted = inputAmountRewardNumeric
       ? formatRoundedWithCommas(roundByMagnitude(inputAmountRewardNumeric)) + " points"
       : "0 points";
-
-    // If input is empty, show only existing estimated rewards
-    if (inputAmountReward === 0n) {
-      return (
-        <div className="mt-2 flex items-center gap-2 text-sm">
-          <Coins className="h-4 w-4 text-yellow-600" />
-          <span className="text-muted-foreground">Estimated Rewards:</span>
-          <span className="font-medium">{totalEstimatedPerDayFormatted}</span>
-        </div>
-      );
-    }
 
     // Calculate effective emission rate based on input amount using the function
     let totalEffectiveEmissionRate = 0n;

@@ -246,7 +246,7 @@ const Borrow = () => {
                   <CompactRewardsDisplay
                     userRewards={userRewards}
                     loading={rewardsLoading}
-                    activityIds={[2]}
+                    activityName="Lending Pool Borrow"
                     variant="button"
                   />
                 </div>
