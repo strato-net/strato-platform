@@ -605,24 +605,6 @@ const MercataStats = () => {
                   
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Swap Pool Revenue</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">
-                        {revenueLoading ? (
-                          <Skeleton className="h-8 w-24" />
-                        ) : (
-                          `$${formatLargeNumber(parseFloat(formatUnits(BigInt(swapRevenueByPeriod[selectedPeriod].total || '0'), 18)))}`
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} swap fees
-                      </p>
-                    </CardContent>
-                  </Card>
-                  
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium">Lending Revenue</CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -650,6 +632,24 @@ const MercataStats = () => {
                             : `Est. ${selectedPeriod} accrued interest`}
                         </p>
                       </div>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Swap Pool Revenue</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">
+                        {revenueLoading ? (
+                          <Skeleton className="h-8 w-24" />
+                        ) : (
+                          `$${formatLargeNumber(parseFloat(formatUnits(BigInt(swapRevenueByPeriod[selectedPeriod].total || '0'), 18)))}`
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} swap fees
+                      </p>
                     </CardContent>
                   </Card>
 
