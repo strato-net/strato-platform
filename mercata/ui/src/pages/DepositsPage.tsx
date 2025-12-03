@@ -55,7 +55,7 @@ const DepositsPage = () => {
   }, [earningAssets]);
 
   // Use centralized net balance calculation hook
-  const { netBalance: totalBalance } = useNetBalance({
+  const { netBalance: totalBalance, isLoading: isLoadingNetBalance } = useNetBalance({
     tokens: earningAssets,
     cataToken,
     loans,
@@ -147,6 +147,7 @@ const DepositsPage = () => {
                   value={`$${totalBalance.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`}
                   icon={<Wallet className="text-white" size={18} />}
                   color="bg-blue-500"
+                  isLoading={isLoadingNetBalance}
                 />
               </div>
               {/* My Deposits (Earning Assets) */}

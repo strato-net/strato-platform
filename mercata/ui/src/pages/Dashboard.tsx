@@ -98,7 +98,7 @@ const Dashboard = () => {
   }, [earningAssets]);
 
   // Use centralized net balance calculation hook
-  const { netBalance: totalBalance, cataBalance, totalBorrowed } = useNetBalance({
+  const { netBalance: totalBalance, cataBalance, totalBorrowed, isLoading: isLoadingNetBalance } = useNetBalance({
     tokens: earningAssets,
     cataToken,
     loans,
@@ -311,6 +311,7 @@ const Dashboard = () => {
               color="bg-blue-500"
               onClick={() => setActiveTab('netBalance')}
               isActive={activeTab === 'netBalance'}
+              isLoading={isLoadingNetBalance}
             />
 
             <AssetSummary
