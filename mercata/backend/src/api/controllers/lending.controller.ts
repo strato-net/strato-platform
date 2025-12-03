@@ -403,8 +403,8 @@ class LendingController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, address: userAddress } = req;
-      const result = await getLendingInterestAccrued(accessToken, userAddress as string);
+      const { accessToken } = req;
+      const result = await getLendingInterestAccrued(accessToken);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
