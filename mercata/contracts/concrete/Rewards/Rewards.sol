@@ -393,10 +393,10 @@ contract record Rewards is Ownable {
         // This ensures pending rewards are calculated with current parameters
         // before governance makes any emission rate or config changes for the new season
         massUpdateActivitiesIndices();
-        
+
         // Increment season counter (SolidVM initializes to 0, so first call emits Season 1)
         currentSeason++;
-        
+
         emit SeasonAnnouncement(currentSeason, seasonName, block.timestamp);
     }
 
@@ -473,7 +473,7 @@ contract record Rewards is Ownable {
         Activity storage activity = activities[activityId];
         require(activity.sourceContract != address(0), "Activity does not exist");
         require(activity.activityType == ActivityType.Position, "Only for Position activities");
-        
+
         ActivityState storage state = activityStates[activityId];
         require(state.totalStake == 0, "Cannot change events while activity has stakes");
 
