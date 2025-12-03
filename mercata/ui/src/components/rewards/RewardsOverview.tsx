@@ -3,6 +3,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { RewardsState, formatEmissionRatePerDay, formatEmissionRatePerWeek, safeBigInt, roundByMagnitude, formatRoundedWithCommas } from "@/services/rewardsService";
 import { formatUnits } from "viem";
 import { Coins, Zap, Clock } from "lucide-react";
+import CopyButton from "@/components/ui/copy";
 
 interface RewardsOverviewProps {
   state: RewardsState | null;
@@ -103,9 +104,17 @@ export const RewardsOverview = ({ state, loading }: RewardsOverviewProps) => {
             <div className="flex-1">
               <p className="text-sm text-muted-foreground">Reward Token</p>
               <p className="text-lg font-semibold">{state.rewardTokenSymbol || "?"}</p>
-              <p className="text-xs text-muted-foreground mt-1 font-mono">
-                {state.rewardToken ? truncateTokenAddress(state.rewardToken) : "?"}
-              </p>
+              {state.rewardToken && (
+                <div className="flex items-center gap-1 mt-1">
+                  <p className="text-xs text-muted-foreground font-mono">
+                    {truncateTokenAddress(state.rewardToken)}
+                  </p>
+                  <CopyButton address={state.rewardToken} />
+                </div>
+              )}
+              {!state.rewardToken && (
+                <p className="text-xs text-muted-foreground mt-1 font-mono">?</p>
+              )}
             </div>
           </div>
 
