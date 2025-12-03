@@ -10,13 +10,14 @@ import {
 import { checkBalances } from "../utils/balanceCheck";
 import { RewardsAction, NonEmptyArray } from "../types";
 import { blockTrackingService } from "../services/blockTrackingService";
+import { nextCursorAfter } from "../utils/eventHelpers";
 
 const processEvents = async (): Promise<void> => {
   try {
     logInfo("RewardsPolling", "Starting polling cycle");
     await checkBalances();
 
-    const { contractAddresses, eventNames, minBlockNumber, validPairs } = await getEventQueryParams();
+    const { contractAddresses, eventNames, cursor, validPairs } = await getEventQueryParams();
     
     if (contractAddresses.length === 0 || eventNames.length === 0) {
       throw new Error("No event mappings found");
@@ -25,7 +26,7 @@ const processEvents = async (): Promise<void> => {
     const allEvents = await getEventsBatch(
       contractAddresses,
       eventNames,
-      minBlockNumber,
+      cursor,
       validPairs
     );
 
@@ -45,11 +46,11 @@ const processEvents = async (): Promise<void> => {
     const maxBatchSize = config.polling.maxBatchSize;
     for (let i = 0; i < allActions.length; i += maxBatchSize) {
       const batch = allActions.slice(i, i + maxBatchSize) as NonEmptyArray<RewardsAction>;
-      const lastBlockInBatch = batch[batch.length - 1].blockNumber;
+      const last = batch[batch.length - 1];
       
       try {
         await batchHandleAction(batch);
-        await blockTrackingService.updateLastProcessedBlock(lastBlockInBatch);
+        await blockTrackingService.updateCursor(nextCursorAfter(last));
       } catch (error) {
         const errorMessage = (error as Error).message;
         const isContractFailure =
@@ -61,11 +62,13 @@ const processEvents = async (): Promise<void> => {
         if (isContractFailure) {
           logError("RewardsPolling", error as Error, {
             operation: "processEvents",
-            message: "Contract failure - updating block number to avoid retry loop",
+            message: "Contract failure - skipping batch",
             batchSize: batch.length,
-            lastBlock: lastBlockInBatch,
+            lastBlock: last.blockNumber,
+            lastEventIndex: last.eventIndex,
           });
-          await blockTrackingService.updateLastProcessedBlock(lastBlockInBatch);
+          await blockTrackingService.updateCursor(nextCursorAfter(last));
+          continue;
         } else {
           throw error;
         }

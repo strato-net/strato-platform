@@ -1,5 +1,5 @@
 import { cirrus } from "../utils/api";
-import { ProtocolEvent, CirrusEvent } from "../types";
+import { ProtocolEvent, CirrusEvent, EventCursor } from "../types";
 import { logError, logInfo } from "../utils/logger";
 import { config } from "../config";
 import { blockTrackingService } from "./blockTrackingService";
@@ -21,7 +21,7 @@ const MERCATA_PREFIX = "BlockApps-";
 const queryRegularEvents = async (
   eventAddresses: string[],
   eventEventNames: string[],
-  minBlockNumber: number,
+  cursor: EventCursor,
   mapping: AttributeMapping,
   validPairs: ValidEventPairs
 ): Promise<ProtocolEvent[]> => {
@@ -32,7 +32,7 @@ const queryRegularEvents = async (
   const params: Record<string, any> = {
     address: buildFilter(eventAddresses),
     event_name: buildFilter(eventEventNames),
-    block_number: `gte.${minBlockNumber}`,
+    block_number: `gte.${cursor.blockNumber}`,
     order: "block_number.asc,event_index.asc",
     select:
       "address,block_number,event_name,attributes,event_index,transaction_sender,block_timestamp",
@@ -45,6 +45,16 @@ const queryRegularEvents = async (
 
   const results = await Promise.all(
     (data as CirrusEvent[]).map(async (item) => {
+      const blockNumber = Number(item.block_number);
+      const eventIndex = Number(item.event_index);
+
+      if (
+        blockNumber < cursor.blockNumber ||
+        (blockNumber === cursor.blockNumber && eventIndex <= cursor.eventIndex)
+      ) {
+        return null;
+      }
+
       const pairKey = makeEventPairKey(item.address, item.event_name);
       if (!validPairs.has(pairKey)) {
         return null;
@@ -64,8 +74,8 @@ const queryRegularEvents = async (
       return {
         address: item.address,
         event_name: item.event_name,
-        block_number: Number(item.block_number),
-        event_index: Number(item.event_index),
+        block_number: blockNumber,
+        event_index: eventIndex,
         transaction_sender: item.transaction_sender,
         amount,
       } as ProtocolEvent;
@@ -83,7 +93,7 @@ const makeEventPairKey = (contract: string, eventName: string): string =>
 export const getEventQueryParams = async (): Promise<{
   contractAddresses: string[];
   eventNames: string[];
-  minBlockNumber: number;
+  cursor: EventCursor;
   validPairs: ValidEventPairs;
 }> => {
   const activitiesData = await cirrus.get("/mapping", {
@@ -119,24 +129,24 @@ export const getEventQueryParams = async (): Promise<{
     }
   }
 
-  let minBlockNumber = 0;
+  let cursor: EventCursor = { blockNumber: 0, eventIndex: 0 };
   try {
-    minBlockNumber = await blockTrackingService.getLastProcessedBlock();
+    cursor = await blockTrackingService.getCursor();
   } catch (error) {
     logError("CirrusService", error as Error, {
       operation: "getEventQueryParams",
     });
-    minBlockNumber = 0;
+    cursor = { blockNumber: 0, eventIndex: 0 };
   }
 
   logInfo(
     "CirrusService",
-    `Loaded activities: ${contractAddresses.size} contracts, ${eventNames.size} event names, minBlock: ${minBlockNumber}`
+    `Loaded activities: ${contractAddresses.size} contracts, ${eventNames.size} event names, cursor: blockNumber=${cursor.blockNumber}, eventIndex=${cursor.eventIndex}`
   );
   return {
     contractAddresses: [...contractAddresses],
     eventNames: [...eventNames],
-    minBlockNumber,
+    cursor,
     validPairs,
   };
 };
@@ -144,7 +154,7 @@ export const getEventQueryParams = async (): Promise<{
 export const getLPTokenTransferEvents = async (
   lpTokenAddresses: string[],
   lpEventNames: string[],
-  minBlockNumber: number
+  cursor: EventCursor
 ): Promise<ProtocolEvent[]> => {
   if (lpTokenAddresses.length === 0 || lpEventNames.length === 0) {
     return [];
@@ -153,7 +163,7 @@ export const getLPTokenTransferEvents = async (
   const params: Record<string, any> = {
     address: buildFilter(lpTokenAddresses),
     or: `(from.eq.${ZERO_ADDRESS},to.eq.${ZERO_ADDRESS})`,
-    block_number: `gte.${minBlockNumber}`,
+    block_number: `gte.${cursor.blockNumber}`,
     order: "block_number.asc,event_index.asc",
     select: "address,block_number,value::text,event_index,transaction_sender,from,to",
   };
@@ -171,6 +181,16 @@ export const getLPTokenTransferEvents = async (
 
   return data
     .filter((item) => {
+      const blockNumber = Number(item.block_number);
+      const eventIndex = Number(item.event_index || 0);
+
+      if (
+        blockNumber < cursor.blockNumber ||
+        (blockNumber === cursor.blockNumber && eventIndex <= cursor.eventIndex)
+      ) {
+        return false;
+      }
+
       const isMint = item.from === ZERO_ADDRESS;
       const isBurn = item.to === ZERO_ADDRESS;
       return (isMint && wantsMint) || (isBurn && wantsBurn);
@@ -192,7 +212,7 @@ export const getLPTokenTransferEvents = async (
 export const getEventsBatch = async (
   contractAddresses: string[],
   eventNames: string[],
-  minBlockNumber: number,
+  cursor: EventCursor,
   validPairs: ValidEventPairs
 ): Promise<ProtocolEvent[]> => {
   if (contractAddresses.length === 0 || eventNames.length === 0) {
@@ -207,11 +227,11 @@ export const getEventsBatch = async (
     queryRegularEvents(
       eventAddresses,
       eventEventNames,
-      minBlockNumber,
+      cursor,
       mapping,
       validPairs
     ),
-    getLPTokenTransferEvents(lpTokenAddresses, lpEventNames, minBlockNumber),
+    getLPTokenTransferEvents(lpTokenAddresses, lpEventNames, cursor),
   ]);
 
   const allEvents = sortEventsByBlock([...regularEvents, ...lpTransferEvents]);
@@ -222,7 +242,7 @@ export const getEventsBatch = async (
     {
       contractAddresses: contractAddresses.length,
       eventNames: eventNames.length,
-      minBlockNumber,
+      cursor: `blockNumber=${cursor.blockNumber}, eventIndex=${cursor.eventIndex}`,
     }
   );
 

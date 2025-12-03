@@ -2,114 +2,124 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { logInfo, logError } from '../utils/logger';
 import { BLOCK_TRACKING_FILE } from '../config';
+import { EventCursor } from '../types';
 
 const BLOCK_TRACKING_PATH = path.join(process.cwd(), BLOCK_TRACKING_FILE);
-const BLOCK_TRACKING_TMP_PATH = path.join(process.cwd(), `${BLOCK_TRACKING_FILE}.tmp`);
+const DIR = path.dirname(BLOCK_TRACKING_PATH);
 
 const MAX_REASONABLE_BLOCK = 1_000_000_000;
+const DEFAULT_CURSOR: EventCursor = { blockNumber: 0, eventIndex: 0 };
 
-interface BlockTrackingData {
-  lastProcessedBlock: number;
+function isCursor(x: any): x is EventCursor {
+  return (
+    x &&
+    typeof x.blockNumber === 'number' &&
+    typeof x.eventIndex === 'number' &&
+    Number.isSafeInteger(x.blockNumber) &&
+    Number.isSafeInteger(x.eventIndex) &&
+    x.blockNumber >= 0 &&
+    x.eventIndex >= 0
+  );
+}
+
+function validateCursor(cursor: EventCursor): EventCursor {
+  if (cursor.blockNumber > MAX_REASONABLE_BLOCK) {
+    logError(
+      'BlockTrackingService',
+      new Error(`Suspiciously high block number: ${cursor.blockNumber}`),
+      { operation: 'validateCursor' }
+    );
+  }
+  return cursor;
 }
 
 class BlockTrackingService {
-  private cachedBlock: number | null = null;
+  private cachedCursor: EventCursor | null = null;
+  private warnedBadFile = false;
 
-  private async loadBlockData(): Promise<number> {
-    if (this.cachedBlock !== null) {
-      return this.cachedBlock;
-    }
+  async getCursor(): Promise<EventCursor> {
+    if (this.cachedCursor) return this.cachedCursor;
 
     try {
-      const fileContent = await fs.readFile(BLOCK_TRACKING_PATH, 'utf-8');
-      const data = JSON.parse(fileContent) as BlockTrackingData;
-      
-      if (typeof data.lastProcessedBlock !== 'number') {
-        throw new Error('Invalid block number format in file');
+      const raw = await fs.readFile(BLOCK_TRACKING_PATH, 'utf-8');
+      const parsed = JSON.parse(raw);
+
+      if (!isCursor(parsed)) {
+        if (!this.warnedBadFile) {
+          this.warnedBadFile = true;
+          logError(
+            'BlockTrackingService',
+            new Error(`Invalid cursor file format at ${BLOCK_TRACKING_PATH}`),
+            { operation: 'getCursor', fileLength: raw.length }
+          );
+        }
+        this.cachedCursor = DEFAULT_CURSOR;
+        return DEFAULT_CURSOR;
       }
 
-      if (data.lastProcessedBlock < 0) {
-        logError('BlockTrackingService', new Error(`Invalid negative block number: ${data.lastProcessedBlock}`), {
-          operation: 'loadBlockData',
-        });
-        this.cachedBlock = 0;
-        return 0;
-      }
-
-      if (data.lastProcessedBlock > MAX_REASONABLE_BLOCK) {
-        logError('BlockTrackingService', new Error(`Suspiciously high block number: ${data.lastProcessedBlock}`), {
-          operation: 'loadBlockData',
-        });
-      }
-
-      this.cachedBlock = data.lastProcessedBlock;
-      return this.cachedBlock;
+      const cursor = validateCursor(parsed);
+      this.cachedCursor = cursor;
+      this.warnedBadFile = false;
+      return cursor;
     } catch (error: any) {
-      if (error?.code === 'ENOENT') {
-        this.cachedBlock = 0;
-        return 0;
+      if (error?.code !== 'ENOENT') {
+        if (!this.warnedBadFile) {
+          this.warnedBadFile = true;
+          logError('BlockTrackingService', error as Error, {
+            operation: 'getCursor',
+            filePath: BLOCK_TRACKING_PATH,
+          });
+        }
       }
 
-      logError('BlockTrackingService', error as Error, {
-        operation: 'loadBlockData',
-        filePath: BLOCK_TRACKING_PATH,
-      });
-      
-      this.cachedBlock = 0;
-      return 0;
+      this.cachedCursor = DEFAULT_CURSOR;
+      return DEFAULT_CURSOR;
     }
   }
 
-  private async saveBlockData(blockNumber: number): Promise<void> {
-    if (blockNumber < 0) {
-      throw new Error(`Cannot save negative block number: ${blockNumber}`);
+  async updateCursor(next: EventCursor): Promise<void> {
+    if (!isCursor(next)) throw new Error(`Invalid cursor: ${JSON.stringify(next)}`);
+
+    const cur = this.cachedCursor ?? await this.getCursor();
+
+    if (cur.blockNumber === next.blockNumber && cur.eventIndex === next.eventIndex) {
+      return;
     }
 
-    if (blockNumber > MAX_REASONABLE_BLOCK) {
-      logError('BlockTrackingService', new Error(`Suspiciously high block number: ${blockNumber}`), {
-        operation: 'saveBlockData',
-      });
+    const regressed =
+      next.blockNumber < cur.blockNumber ||
+      (next.blockNumber === cur.blockNumber && next.eventIndex < cur.eventIndex);
+    if (regressed) {
+      logError(
+        'BlockTrackingService',
+        new Error(`Refusing to write regressed cursor`),
+        { operation: 'updateCursor', current: cur, next }
+      );
+      return;
     }
 
+    await fs.mkdir(DIR, { recursive: true });
+
+    const tmpPath = `${BLOCK_TRACKING_PATH}.tmp.${process.pid}.${Date.now()}`;
     try {
-      const data: BlockTrackingData = { lastProcessedBlock: blockNumber };
-      const jsonContent = JSON.stringify(data, null, 2);
+      await fs.writeFile(tmpPath, JSON.stringify(next, null, 2), 'utf-8');
+      await fs.rename(tmpPath, BLOCK_TRACKING_PATH);
+      this.cachedCursor = next;
 
-      await fs.writeFile(BLOCK_TRACKING_TMP_PATH, jsonContent, 'utf-8');
-
-      try {
-        JSON.parse(jsonContent);
-      } catch (parseError) {
-        await fs.unlink(BLOCK_TRACKING_TMP_PATH).catch(() => {});
-        throw new Error('Generated invalid JSON');
-      }
-
-      await fs.rename(BLOCK_TRACKING_TMP_PATH, BLOCK_TRACKING_PATH);
-      this.cachedBlock = blockNumber;
-      logInfo('BlockTrackingService', `Saved last processed block: ${blockNumber}`);
+      logInfo(
+        'BlockTrackingService',
+        `Saved cursor: blockNumber=${next.blockNumber}, eventIndex=${next.eventIndex}`
+      );
     } catch (error) {
-      try {
-        await fs.unlink(BLOCK_TRACKING_TMP_PATH).catch(() => {});
-      } catch {
-      }
-
+      await fs.unlink(tmpPath).catch(() => {});
       logError('BlockTrackingService', error as Error, {
-        operation: 'saveBlockData',
+        operation: 'updateCursor',
         filePath: BLOCK_TRACKING_PATH,
-        blockNumber,
+        cursor: next,
       });
       throw error;
     }
   }
-
-  async getLastProcessedBlock(): Promise<number> {
-    return await this.loadBlockData();
-  }
-
-  async updateLastProcessedBlock(blockNumber: number): Promise<void> {
-    await this.saveBlockData(blockNumber);
-  }
 }
 
 export const blockTrackingService = new BlockTrackingService();
-

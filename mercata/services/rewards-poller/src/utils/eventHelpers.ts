@@ -1,5 +1,5 @@
 import JSONbig from "json-bigint";
-import { ProtocolEvent } from "../types";
+import { ProtocolEvent, RewardsAction, EventCursor } from "../types";
 
 const JSONbigString = JSONbig({ storeAsString: true });
 
@@ -24,3 +24,8 @@ export const sortEventsByBlock = (events: ProtocolEvent[]): ProtocolEvent[] => {
     return a.event_index - b.event_index;
   });
 };
+
+export const nextCursorAfter = (action: RewardsAction): EventCursor => ({
+  blockNumber: action.blockNumber,
+  eventIndex: action.eventIndex,
+});

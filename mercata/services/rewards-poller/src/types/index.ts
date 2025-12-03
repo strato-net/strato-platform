@@ -74,6 +74,11 @@ export interface RewardsAction {
   eventIndex: number;
 }
 
+export interface EventCursor {
+  blockNumber: number;
+  eventIndex: number;
+}
+
 export interface CirrusEvent {
   address: string;
   block_number: string;
