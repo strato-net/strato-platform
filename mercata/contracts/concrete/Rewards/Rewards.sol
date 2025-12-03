@@ -86,7 +86,7 @@ contract record Rewards is Ownable {
     event MaxBatchSizeUpdated(uint256 oldMaxBatchSize, uint256 newMaxBatchSize);
     event ActivityMinAmountUpdated(uint256 indexed activityId, uint256 oldMinAmount, uint256 newMinAmount);
     event ActivityWeightUpdated(uint256 indexed activityId, uint256 oldWeight, uint256 newWeight);
-    event SeasonAnnouncement(string seasonName, uint256 timestamp);
+    event SeasonAnnouncement(uint256 indexed seasonId, string seasonName, uint256 timestamp);
     event ActionProcessed(
         uint256 indexed activityId,
         address indexed user,
@@ -97,6 +97,15 @@ contract record Rewards is Ownable {
         uint256 blockNumber,
         uint256 eventIndex
     );
+    event ActionFailed(
+        address indexed sourceContract,
+        address indexed user,
+        string eventName,
+        uint256 blockNumber,
+        uint256 eventIndex,
+        string reason
+    );
+    event ActivityNameUpdated(uint256 indexed activityId, string newName);
 
     // ═════════════════════════════════════════════════════════════════════════
     // CONSTANTS
@@ -165,6 +174,9 @@ contract record Rewards is Ownable {
 
     // Maximum number of actions that can be processed in a single batch
     uint256 public maxBatchSize = 100;
+
+    // Current season ID (auto-incremented on each announceNewSeason call)
+    uint256 public currentSeason = 1;
 
     // ═════════════════════════════════════════════════════════════════════════
     // CONSTRUCTOR
@@ -272,6 +284,18 @@ contract record Rewards is Ownable {
     }
 
     /**
+     * @dev Update the name for an existing activity
+     * @param activityId The activity to update
+     * @param newName The new activity name
+     */
+    function setActivityName(uint256 activityId, string newName) external onlyOwner {
+        Activity storage activity = activities[activityId];
+        require(activity.sourceContract != address(0), "Activity does not exist");
+        activity.name = newName;
+        emit ActivityNameUpdated(activityId, newName);
+    }
+
+    /**
      * @dev Update the source contract for an existing activity
      * @param activityId The activity to update
      * @param newSourceContract The new source contract address
@@ -370,7 +394,10 @@ contract record Rewards is Ownable {
         // before governance makes any emission rate or config changes for the new season
         massUpdateActivitiesIndices();
         
-        emit SeasonAnnouncement(seasonName, block.timestamp);
+        // Increment season counter (SolidVM initializes to 0, so first call emits Season 1)
+        currentSeason++;
+        
+        emit SeasonAnnouncement(currentSeason, seasonName, block.timestamp);
     }
 
     /**
@@ -427,6 +454,60 @@ contract record Rewards is Ownable {
         for (uint256 j = 0; j < newActionableEvents.length; j++) {
             sourceEventInfo[sourceContract][newActionableEvents[j].eventName] = EventInfo(activityId, newActionableEvents[j].actionType);
         }
+    }
+
+    /**
+     * @dev Update the events for an existing Position activity - simplified for AdminRegistry
+     * @param activityId The activity to update
+     * @param depositEventName The new deposit event name
+     * @param withdrawEventName The new withdraw event name
+     *
+     * This function enforces that the activity has zero total stake to prevent
+     * inconsistent state between user stakes and event mappings.
+     */
+    function setPositionActivityEventsSimple(
+        uint256 activityId,
+        string depositEventName,
+        string withdrawEventName
+    ) external onlyOwner {
+        Activity storage activity = activities[activityId];
+        require(activity.sourceContract != address(0), "Activity does not exist");
+        require(activity.activityType == ActivityType.Position, "Only for Position activities");
+        
+        ActivityState storage state = activityStates[activityId];
+        require(state.totalStake == 0, "Cannot change events while activity has stakes");
+
+        address sourceContract = activity.sourceContract;
+
+        // Check for collisions with other activities (excluding current activity's events)
+        EventInfo storage depositInfo = sourceEventInfo[sourceContract][depositEventName];
+        require(
+            depositInfo.activityId == 0 || depositInfo.activityId == activityId,
+            "Deposit event name already exists for this source contract"
+        );
+        EventInfo storage withdrawInfo = sourceEventInfo[sourceContract][withdrawEventName];
+        require(
+            withdrawInfo.activityId == 0 || withdrawInfo.activityId == activityId,
+            "Withdraw event name already exists for this source contract"
+        );
+
+        // Remove old event mappings
+        for (uint256 oldIdx = 0; oldIdx < activity.actionableEvents.length; oldIdx++) {
+            delete sourceEventInfo[sourceContract][activity.actionableEvents[oldIdx].eventName].activityId;
+            delete sourceEventInfo[sourceContract][activity.actionableEvents[oldIdx].eventName].actionType;
+        }
+
+        // Create new actionable events array
+        ActionableEvent[] newActionableEvents = new ActionableEvent[](2);
+        newActionableEvents[0] = ActionableEvent(depositEventName, ActionType.Deposit);
+        newActionableEvents[1] = ActionableEvent(withdrawEventName, ActionType.Withdraw);
+
+        // Reassign the array
+        activity.actionableEvents = newActionableEvents;
+
+        // Register new event mappings
+        sourceEventInfo[sourceContract][depositEventName] = EventInfo(activityId, ActionType.Deposit);
+        sourceEventInfo[sourceContract][withdrawEventName] = EventInfo(activityId, ActionType.Withdraw);
     }
 
     /**
@@ -566,6 +647,10 @@ contract record Rewards is Ownable {
         uint256[] calldata blockNumbers,
         uint256[] calldata eventIndexes
     ) external onlyOwner {
+        // Workaround for SolidVM bug: initialize if zero
+        if (maxBatchSize == 0) {
+            maxBatchSize = 100;
+        }
         require(sourceContracts.length <= maxBatchSize, "Batch too large");
         require(
             sourceContracts.length == eventNames.length &&
@@ -577,15 +662,19 @@ contract record Rewards is Ownable {
         );
         
         for (uint256 i = 0; i < sourceContracts.length; i++) {
-            Action  action = Action({
-                sourceContract: sourceContracts[i],
-                eventName: eventNames[i],
-                user: users[i],
-                amount: amounts[i],
-                blockNumber: blockNumbers[i],
-                eventIndex: eventIndexes[i]
-            });
-            _handleAction(action);
+            try {
+                Action action = Action({
+                    sourceContract: sourceContracts[i],
+                    eventName: eventNames[i],
+                    user: users[i],
+                    amount: amounts[i],
+                    blockNumber: blockNumbers[i],
+                    eventIndex: eventIndexes[i]
+                });
+                _handleAction(action);
+            } catch {
+                emit ActionFailed(sourceContracts[i], users[i], eventNames[i], blockNumbers[i], eventIndexes[i], "Action failed");
+            }
         }
     }
 
@@ -806,10 +895,15 @@ contract record Rewards is Ownable {
             if (isIncrease) {
                 newStake = oldStake + action.amount;
             } else {
-                // If withdraw amount exceeds stake, event likely arrived out of order
-                // Revert so service can retry after processing earlier events
-                require(oldStake >= action.amount, "Insufficient stake");
-                newStake = oldStake - action.amount;
+                // If withdraw amount exceeds stake, cap at zero
+                // This handles pre-launch deposits that weren't tracked
+                if (oldStake >= action.amount) {
+                    newStake = oldStake - action.amount;
+                } else {
+                    // Pre-launch deposit scenario: withdraw exceeds tracked stake
+                    // Cap at zero - user doesn't earn rewards for pre-launch portion
+                    newStake = 0;
+                }
             }
         }
 
