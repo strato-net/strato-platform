@@ -1,8 +1,8 @@
-# STRATO Mercata Platform Documentation
+# STRATO Platform Documentation
 
 [![STRATO Mercata logo](https://www.stratomercata.com/images/stratomercata.com/2025.10.11/strato-mercata-logo.png)](https://stratomercata.com)
 
-Welcome to the STRATO Mercata Platform documentation. STRATO Mercata is an enterprise-grade blockchain platform with DeFi capabilities built by BlockApps.
+Welcome to the STRATO Platform documentation. STRATO is an enterprise-grade blockchain platform with DeFi capabilities built by BlockApps.
 
 ## Quick Start
 
@@ -79,5 +79,5 @@ Technical specifications and architecture decisions:
 
 ## Support
 
-- Website: [stratomercata.com](https://stratomercata.com)
+- Website: [strato.nexus](https://strato.nexus)
 - GitHub: [blockapps/strato-platform](https://github.com/blockapps/strato-platform)
