@@ -1,14 +1,14 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import { logInfo, logError } from '../utils/logger';
-import { BLOCK_TRACKING_FILE } from '../config';
+import { BLOCK_TRACKING_FILE, config } from '../config';
 import { EventCursor } from '../types';
+import { cirrus } from '../utils/api';
 
 const BLOCK_TRACKING_PATH = path.join(process.cwd(), BLOCK_TRACKING_FILE);
 const DIR = path.dirname(BLOCK_TRACKING_PATH);
 
 const MAX_REASONABLE_BLOCK = 1_000_000_000;
-const DEFAULT_CURSOR: EventCursor = { blockNumber: 0, eventIndex: 0 };
 
 function isCursor(x: any): x is EventCursor {
   return (
@@ -33,9 +33,63 @@ function validateCursor(cursor: EventCursor): EventCursor {
   return cursor;
 }
 
+async function getLatestCursorFromEvents(): Promise<EventCursor> {
+  const data = await cirrus.get('/event', {
+    params: {
+      address: `eq.${config.rewards.address}`,
+      event_name: 'eq.ActionProcessed',
+      order: 'block_number.desc,event_index.desc',
+      limit: 1,
+      select: 'block_number,event_index',
+    },
+  });
+
+  if (!Array.isArray(data) || data.length === 0) {
+    throw new Error(
+      `No ActionProcessed events found for Rewards contract ${config.rewards.address}`
+    );
+  }
+
+  const latestEvent = data[0];
+  const blockNumber = Number(latestEvent.block_number);
+  const eventIndex = Number(latestEvent.event_index);
+
+  if (!Number.isSafeInteger(blockNumber) || !Number.isSafeInteger(eventIndex)) {
+    throw new Error(
+      `Invalid event data: blockNumber=${latestEvent.block_number}, eventIndex=${latestEvent.event_index}`
+    );
+  }
+
+  return { blockNumber, eventIndex };
+}
+
 class BlockTrackingService {
   private cachedCursor: EventCursor | null = null;
   private warnedBadFile = false;
+
+  private async writeCursorToFile(cursor: EventCursor): Promise<void> {
+    await fs.mkdir(DIR, { recursive: true });
+
+    const tmpPath = `${BLOCK_TRACKING_PATH}.tmp.${process.pid}.${Date.now()}`;
+    try {
+      await fs.writeFile(tmpPath, JSON.stringify(cursor, null, 2), 'utf-8');
+      await fs.rename(tmpPath, BLOCK_TRACKING_PATH);
+      this.cachedCursor = cursor;
+
+      logInfo(
+        'BlockTrackingService',
+        `Saved cursor: blockNumber=${cursor.blockNumber}, eventIndex=${cursor.eventIndex}`
+      );
+    } catch (error) {
+      await fs.unlink(tmpPath).catch(() => {});
+      logError('BlockTrackingService', error as Error, {
+        operation: 'writeCursorToFile',
+        filePath: BLOCK_TRACKING_PATH,
+        cursor,
+      });
+      throw error;
+    }
+  }
 
   async getCursor(): Promise<EventCursor> {
     if (this.cachedCursor) return this.cachedCursor;
@@ -53,8 +107,9 @@ class BlockTrackingService {
             { operation: 'getCursor', fileLength: raw.length }
           );
         }
-        this.cachedCursor = DEFAULT_CURSOR;
-        return DEFAULT_CURSOR;
+        const cursor = await getLatestCursorFromEvents();
+        await this.writeCursorToFile(cursor);
+        return cursor;
       }
 
       const cursor = validateCursor(parsed);
@@ -62,18 +117,17 @@ class BlockTrackingService {
       this.warnedBadFile = false;
       return cursor;
     } catch (error: any) {
-      if (error?.code !== 'ENOENT') {
-        if (!this.warnedBadFile) {
-          this.warnedBadFile = true;
-          logError('BlockTrackingService', error as Error, {
-            operation: 'getCursor',
-            filePath: BLOCK_TRACKING_PATH,
-          });
-        }
+      if (error?.code !== 'ENOENT' && !this.warnedBadFile) {
+        this.warnedBadFile = true;
+        logError('BlockTrackingService', error as Error, {
+          operation: 'getCursor',
+          filePath: BLOCK_TRACKING_PATH,
+        });
       }
 
-      this.cachedCursor = DEFAULT_CURSOR;
-      return DEFAULT_CURSOR;
+      const cursor = await getLatestCursorFromEvents();
+      await this.writeCursorToFile(cursor);
+      return cursor;
     }
   }
 
@@ -98,27 +152,7 @@ class BlockTrackingService {
       return;
     }
 
-    await fs.mkdir(DIR, { recursive: true });
-
-    const tmpPath = `${BLOCK_TRACKING_PATH}.tmp.${process.pid}.${Date.now()}`;
-    try {
-      await fs.writeFile(tmpPath, JSON.stringify(next, null, 2), 'utf-8');
-      await fs.rename(tmpPath, BLOCK_TRACKING_PATH);
-      this.cachedCursor = next;
-
-      logInfo(
-        'BlockTrackingService',
-        `Saved cursor: blockNumber=${next.blockNumber}, eventIndex=${next.eventIndex}`
-      );
-    } catch (error) {
-      await fs.unlink(tmpPath).catch(() => {});
-      logError('BlockTrackingService', error as Error, {
-        operation: 'updateCursor',
-        filePath: BLOCK_TRACKING_PATH,
-        cursor: next,
-      });
-      throw error;
-    }
+    await this.writeCursorToFile(next);
   }
 }
 

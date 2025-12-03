@@ -99,6 +99,8 @@ export const startRewardsPolling = (): void => {
 export const initializeRewardsPolling = async () => {
   logInfo("RewardsPolling", "Initializing rewards polling...");
 
+  await blockTrackingService.getCursor();
+
   startRewardsPolling();
 
   logInfo("RewardsPolling", "Rewards polling initialized");

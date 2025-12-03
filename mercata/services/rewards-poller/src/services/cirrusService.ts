@@ -129,15 +129,7 @@ export const getEventQueryParams = async (): Promise<{
     }
   }
 
-  let cursor: EventCursor = { blockNumber: 0, eventIndex: 0 };
-  try {
-    cursor = await blockTrackingService.getCursor();
-  } catch (error) {
-    logError("CirrusService", error as Error, {
-      operation: "getEventQueryParams",
-    });
-    cursor = { blockNumber: 0, eventIndex: 0 };
-  }
+  const cursor = await blockTrackingService.getCursor();
 
   logInfo(
     "CirrusService",
