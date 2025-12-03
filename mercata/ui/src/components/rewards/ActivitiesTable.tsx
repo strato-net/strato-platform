@@ -6,6 +6,8 @@ import { Activity } from "@/services/rewardsService";
 import { formatBalance } from "@/utils/numberUtils";
 import { formatEmissionRatePerDay, formatEmissionRatePerWeek, roundByMagnitude, formatRoundedWithCommas } from "@/services/rewardsService";
 import { formatDistanceToNow } from "date-fns";
+import { Info } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ActivitiesTableProps {
   activities: Activity[];
@@ -59,8 +61,36 @@ export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) =
                 <TableHead>ID</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Type</TableHead>
-                <TableHead>Emission Rate</TableHead>
-                <TableHead>Total Stake</TableHead>
+                <TableHead>
+                  <div className="flex items-center gap-1">
+                    Emission Rate
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="max-w-xs">
+                          The rate at which rewards are emitted for this activity (points per second). This is the base emission rate before factoring in your stake.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                </TableHead>
+                <TableHead>
+                  <div className="flex items-center gap-1">
+                    Total Stake
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="max-w-xs">
+                          The total amount staked across all users in this activity. Your share of rewards is proportional to your stake relative to this total.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                </TableHead>
                 <TableHead>Last Update</TableHead>
               </TableRow>
             </TableHeader>

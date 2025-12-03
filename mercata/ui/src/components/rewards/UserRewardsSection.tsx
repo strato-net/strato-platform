@@ -10,10 +10,11 @@ import {
   formatRoundedWithCommas,
 } from "@/services/rewardsService";
 import { formatBalance } from "@/utils/numberUtils";
-import { Loader2, Coins, TrendingUp, Percent } from "lucide-react";
+import { Loader2, Coins, TrendingUp, Percent, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { useUser } from "@/context/UserContext";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface UserRewardsSectionProps {
   userRewards: UserRewardsData | null;
@@ -311,6 +312,16 @@ export const UserRewardsSection = ({
                       <div className="flex items-center space-x-2 mb-1">
                         <TrendingUp className="h-4 w-4 text-muted-foreground" />
                         <p className="text-sm text-muted-foreground">Stake</p>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="max-w-xs">
+                              Your total staked amount in this activity. This determines your share of rewards based on your proportion of the total stake.
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
                       </div>
                       <p className="text-lg font-semibold">{userStakeFormatted}</p>
                     </div>
