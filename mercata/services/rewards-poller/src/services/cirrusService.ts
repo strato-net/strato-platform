@@ -155,7 +155,7 @@ export const getLPTokenTransferEvents = async (
     or: `(from.eq.${ZERO_ADDRESS},to.eq.${ZERO_ADDRESS})`,
     block_number: `gte.${minBlockNumber}`,
     order: "block_number.asc,event_index.asc",
-    select: "address,block_number,value,event_index,transaction_sender,from,to",
+    select: "address,block_number,value::text,event_index,transaction_sender,from,to",
   };
 
   const data = await cirrus.get(`/${MERCATA_PREFIX}Token-Transfer`, {
@@ -184,7 +184,7 @@ export const getLPTokenTransferEvents = async (
         event_index: Number(item.event_index || 0),
         transaction_sender:
           item.transaction_sender || (isMint ? item.to : item.from),
-        amount: item.value?.toString() || "0",
+        amount: item.value || "0",
       };
     });
 };
