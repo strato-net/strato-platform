@@ -32,7 +32,7 @@ const queryRegularEvents = async (
   const params: Record<string, any> = {
     address: buildFilter(eventAddresses),
     event_name: buildFilter(eventEventNames),
-    block_number: `gt.${minBlockNumber}`,
+    block_number: `gte.${minBlockNumber}`,
     order: "block_number.asc,event_index.asc",
     select:
       "address,block_number,event_name,attributes,event_index,transaction_sender,block_timestamp",
@@ -153,7 +153,7 @@ export const getLPTokenTransferEvents = async (
   const params: Record<string, any> = {
     address: buildFilter(lpTokenAddresses),
     or: `(from.eq.${ZERO_ADDRESS},to.eq.${ZERO_ADDRESS})`,
-    block_number: `gt.${minBlockNumber}`,
+    block_number: `gte.${minBlockNumber}`,
     order: "block_number.asc,event_index.asc",
     select: "address,block_number,value,event_index,transaction_sender,from,to",
   };

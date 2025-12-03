@@ -45,11 +45,11 @@ const processEvents = async (): Promise<void> => {
     const maxBatchSize = config.polling.maxBatchSize;
     for (let i = 0; i < allActions.length; i += maxBatchSize) {
       const batch = allActions.slice(i, i + maxBatchSize) as NonEmptyArray<RewardsAction>;
-      const maxBlockInBatch = Math.max(...batch.map(a => a.blockNumber));
+      const lastBlockInBatch = batch[batch.length - 1].blockNumber;
       
       try {
         await batchHandleAction(batch);
-        await blockTrackingService.updateLastProcessedBlock(maxBlockInBatch);
+        await blockTrackingService.updateLastProcessedBlock(lastBlockInBatch);
       } catch (error) {
         const errorMessage = (error as Error).message;
         const isContractFailure =
@@ -63,9 +63,9 @@ const processEvents = async (): Promise<void> => {
             operation: "processEvents",
             message: "Contract failure - updating block number to avoid retry loop",
             batchSize: batch.length,
-            maxBlock: maxBlockInBatch,
+            lastBlock: lastBlockInBatch,
           });
-          await blockTrackingService.updateLastProcessedBlock(maxBlockInBatch);
+          await blockTrackingService.updateLastProcessedBlock(lastBlockInBatch);
         } else {
           throw error;
         }
