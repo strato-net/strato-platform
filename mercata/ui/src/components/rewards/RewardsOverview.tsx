@@ -2,12 +2,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { RewardsState, formatEmissionRatePerDay, formatEmissionRatePerWeek, safeBigInt, roundByMagnitude, formatRoundedWithCommas } from "@/services/rewardsService";
 import { formatUnits } from "viem";
-import { Coins, Zap, Clock } from "lucide-react";
+import { Coins, Zap, Clock, RefreshCw } from "lucide-react";
 import CopyButton from "@/components/ui/copy";
+import { Button } from "@/components/ui/button";
+import { useState } from "react";
 
 interface RewardsOverviewProps {
   state: RewardsState | null;
   loading: boolean;
+  onRefresh?: () => void;
 }
 
 const truncateTokenAddress = (address: string, front: number = 6, back: number = 4) => {
@@ -16,7 +19,18 @@ const truncateTokenAddress = (address: string, front: number = 6, back: number =
   return `${address.substring(0, front)}...${address.substring(address.length - back)}`;
 };
 
-export const RewardsOverview = ({ state, loading }: RewardsOverviewProps) => {
+export const RewardsOverview = ({ state, loading, onRefresh }: RewardsOverviewProps) => {
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    if (!onRefresh || isRefreshing) return;
+    try {
+      setIsRefreshing(true);
+      await onRefresh();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
   if (loading) {
     return (
       <Card>
@@ -74,8 +88,24 @@ export const RewardsOverview = ({ state, loading }: RewardsOverviewProps) => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Rewards Overview</CardTitle>
-        <CardDescription>Global rewards system statistics</CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Rewards Overview</CardTitle>
+            <CardDescription>Global rewards system statistics</CardDescription>
+          </div>
+          {onRefresh && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={loading || isRefreshing}
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${(loading || isRefreshing) ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

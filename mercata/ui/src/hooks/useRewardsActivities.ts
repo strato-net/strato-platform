@@ -23,6 +23,19 @@ export const useRewardsActivities = () => {
     fetchData();
   }, []);
 
-  return { activities, loading, error, refetch: () => fetchActivities().then(setActivities) };
+  const refetch = async () => {
+    try {
+      setLoading(true);
+      const data = await fetchActivities(true); // Force refresh to bypass cache
+      setActivities(data);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error("Failed to fetch activities"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { activities, loading, error, refetch };
 };
 

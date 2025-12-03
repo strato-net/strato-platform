@@ -21,7 +21,8 @@ class RewardsController {
   ): Promise<void> {
     try {
       const { accessToken } = req;
-      const overview = await fetchRewardsOverview(accessToken);
+      const forceRefresh = req.query.refresh === "true";
+      const overview = await fetchRewardsOverview(accessToken, forceRefresh);
       res.status(RestStatus.OK).json(overview);
     } catch (error) {
       next(error);
@@ -38,7 +39,8 @@ class RewardsController {
   ): Promise<void> {
     try {
       const { accessToken } = req;
-      const activities = await fetchAllActivities(accessToken);
+      const forceRefresh = req.query.refresh === "true";
+      const activities = await fetchAllActivities(accessToken, forceRefresh);
       res.status(RestStatus.OK).json(activities);
     } catch (error) {
       next(error);
@@ -56,13 +58,14 @@ class RewardsController {
     try {
       const { accessToken } = req;
       const { userAddress } = req.params;
+      const forceRefresh = req.query.refresh === "true";
 
       if (!userAddress) {
         res.status(RestStatus.BAD_REQUEST).json({ error: "User address is required" });
         return;
       }
 
-      const activities = await fetchUserActivities(accessToken, userAddress);
+      const activities = await fetchUserActivities(accessToken, userAddress, forceRefresh);
       res.status(RestStatus.OK).json(activities);
     } catch (error) {
       next(error);

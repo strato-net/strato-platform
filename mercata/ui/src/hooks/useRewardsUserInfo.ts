@@ -30,6 +30,22 @@ export const useRewardsUserInfo = () => {
     fetchData();
   }, [userAddress, isLoggedIn]);
 
-  return { userRewards, loading, error, refetch: () => userAddress ? fetchUserRewards(userAddress).then(setUserRewards) : Promise.resolve() };
+  const refetch = async () => {
+    if (!isLoggedIn || !userAddress) {
+      return;
+    }
+    try {
+      setLoading(true);
+      const data = await fetchUserRewards(userAddress, true); // Force refresh to bypass cache
+      setUserRewards(data);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error("Failed to fetch user rewards"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { userRewards, loading, error, refetch };
 };
 

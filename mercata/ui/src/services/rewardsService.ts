@@ -45,8 +45,9 @@ export interface UserRewardsData {
 
 /**
  * Fetch global Rewards contract state
+ * @param forceRefresh - If true, bypasses cache and fetches fresh data from blockchain
  */
-export const fetchRewardsState = async (): Promise<RewardsState> => {
+export const fetchRewardsState = async (forceRefresh: boolean = false): Promise<RewardsState> => {
   
   if (USE_DUMMY_DATA) {
     return new Promise((resolve) => {
@@ -55,7 +56,8 @@ export const fetchRewardsState = async (): Promise<RewardsState> => {
   }
   
   try {
-    const response = await api.get<RewardsState>("/rewards/overview");
+    const params = forceRefresh ? { refresh: "true" } : {};
+    const response = await api.get<RewardsState>("/rewards/overview", { params });
     return response.data;
   } catch (error) {
     console.error("Failed to fetch rewards overview from backend:", error);
@@ -65,15 +67,17 @@ export const fetchRewardsState = async (): Promise<RewardsState> => {
 
 /**
  * Fetch all activities in the system (without user-specific data)
+ * @param forceRefresh - If true, bypasses cache and fetches fresh data from blockchain
  */
-export const fetchActivities = async (): Promise<Activity[]> => {
+export const fetchActivities = async (forceRefresh: boolean = false): Promise<Activity[]> => {
   if (USE_DUMMY_DATA) {
     return new Promise((resolve) => {
       setTimeout(() => resolve(dummyActivities), 300);
     });
   }
   
-  const response = await api.get(`/rewards/activities`);
+  const params = forceRefresh ? { refresh: "true" } : {};
+  const response = await api.get(`/rewards/activities`, { params });
   const activities = response.data;
   
   // Map backend response to frontend Activity interface
@@ -120,15 +124,17 @@ export const fetchActivity = async (activityId: number): Promise<Activity> => {
 
 /**
  * Fetch user's rewards data
+ * @param forceRefresh - If true, bypasses cache and fetches fresh data from blockchain
  */
-export const fetchUserRewards = async (userAddress: string): Promise<UserRewardsData> => {
+export const fetchUserRewards = async (userAddress: string, forceRefresh: boolean = false): Promise<UserRewardsData> => {
   if (USE_DUMMY_DATA) {
     return new Promise((resolve) => {
       setTimeout(() => resolve(getDummyUserRewards(userAddress)), 300);
     });
   }
   
-  const response = await api.get(`/rewards/activities/${userAddress}`);
+  const params = forceRefresh ? { refresh: "true" } : {};
+  const response = await api.get(`/rewards/activities/${userAddress}`, { params });
   const data = response.data;
   
   // Backend now returns { unclaimedRewards: string, activities: UserActivity[] }

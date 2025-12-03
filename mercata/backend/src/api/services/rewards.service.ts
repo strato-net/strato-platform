@@ -59,10 +59,12 @@ export interface RewardsOverview {
 /**
  * Get global Rewards contract overview data
  * @param accessToken - Access token for authentication
+ * @param forceRefresh - If true, bypasses cache and fetches fresh data from blockchain
  * @returns Rewards overview data
  */
 export const fetchRewardsOverview = async (
-  accessToken: string
+  accessToken: string,
+  forceRefresh: boolean = false
 ): Promise<RewardsOverview> => {
   if (!config.rewards) {
     throw new Error("Rewards contract address not configured");
@@ -73,9 +75,9 @@ export const fetchRewardsOverview = async (
   try {
     // All these functions now use the same cached contract state, so they're fast
     const [contractData, activityIds, activityStatesMap] = await Promise.all([
-      fetchRewardsContractData(accessToken, rewardsAddress),
-      fetchActivityIds(accessToken, rewardsAddress),
-      fetchActivityStates(accessToken, rewardsAddress)
+      fetchRewardsContractData(accessToken, rewardsAddress, forceRefresh),
+      fetchActivityIds(accessToken, rewardsAddress, forceRefresh),
+      fetchActivityStates(accessToken, rewardsAddress, forceRefresh)
     ]);
 
     // Sum up total stake across all activities
@@ -129,11 +131,13 @@ export interface UserActivitiesResponse {
  * Get all activities with their states and user-specific data
  * @param accessToken - Access token for authentication
  * @param userAddress - User address to include user-specific data
+ * @param forceRefresh - If true, bypasses cache and fetches fresh data from blockchain
  * @returns User activities response with unclaimed rewards
  */
 export const fetchUserActivities = async (
   accessToken: string,
-  userAddress: string
+  userAddress: string,
+  forceRefresh: boolean = false
 ): Promise<UserActivitiesResponse> => {
   if (!config.rewards) {
     throw new Error("Rewards contract address not configured");
@@ -143,11 +147,11 @@ export const fetchUserActivities = async (
 
   try {
     // Fetch all activities and unclaimed rewards in parallel
-    const activitiesMap = await fetchActivities(accessToken, rewardsAddress);
+    const activitiesMap = await fetchActivities(accessToken, rewardsAddress, forceRefresh);
     const activities = Array.from(activitiesMap.values());
 
     if (activities.length === 0) {
-      const unclaimedRewards = await fetchUnclaimedRewards(accessToken, rewardsAddress, userAddress);
+      const unclaimedRewards = await fetchUnclaimedRewards(accessToken, rewardsAddress, userAddress, forceRefresh);
       return {
         unclaimedRewards,
         activities: []
@@ -158,9 +162,9 @@ export const fetchUserActivities = async (
 
     // Batch fetch all activity states, user info, and unclaimed rewards in parallel
     const [activityStatesMap, userInfoMap, unclaimedRewards] = await Promise.all([
-      fetchActivityStates(accessToken, rewardsAddress),
-      fetchUserInfo(accessToken, rewardsAddress, userAddress, activityIds),
-      fetchUnclaimedRewards(accessToken, rewardsAddress, userAddress)
+      fetchActivityStates(accessToken, rewardsAddress, forceRefresh),
+      fetchUserInfo(accessToken, rewardsAddress, userAddress, activityIds, forceRefresh),
+      fetchUnclaimedRewards(accessToken, rewardsAddress, userAddress, forceRefresh)
     ]);
 
     // Combine all data
@@ -220,10 +224,12 @@ export const fetchUserActivities = async (
 /**
  * Get all activities in the system (without user-specific data)
  * @param accessToken - Access token for authentication
+ * @param forceRefresh - If true, bypasses cache and fetches fresh data from blockchain
  * @returns Array of system activities
  */
 export const fetchAllActivities = async (
-  accessToken: string
+  accessToken: string,
+  forceRefresh: boolean = false
 ): Promise<SystemActivity[]> => {
   if (!config.rewards) {
     throw new Error("Rewards contract address not configured");
@@ -234,8 +240,8 @@ export const fetchAllActivities = async (
   try {
     // Fetch all activities and their states
     const [activitiesMap, activityStatesMap] = await Promise.all([
-      fetchActivities(accessToken, rewardsAddress),
-      fetchActivityStates(accessToken, rewardsAddress)
+      fetchActivities(accessToken, rewardsAddress, forceRefresh),
+      fetchActivityStates(accessToken, rewardsAddress, forceRefresh)
     ]);
 
     const activities = Array.from(activitiesMap.values());

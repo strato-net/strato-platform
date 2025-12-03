@@ -23,6 +23,19 @@ export const useRewards = () => {
     fetchState();
   }, []);
 
-  return { state, loading, error, refetch: () => fetchRewardsState().then(setState) };
+  const refetch = async () => {
+    try {
+      setLoading(true);
+      const data = await fetchRewardsState(true); // Force refresh to bypass cache
+      setState(data);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error("Failed to fetch rewards state"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { state, loading, error, refetch };
 };
 

@@ -29,6 +29,15 @@ const Rewards = () => {
     refetchUserRewards();
   };
 
+  const handleRefresh = async () => {
+    // Refetch all data when refresh button is clicked
+    await Promise.all([
+      refetchState(),
+      refetchActivities(),
+      refetchUserRewards(),
+    ]);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <DashboardSidebar />
@@ -42,7 +51,7 @@ const Rewards = () => {
         <main className="p-6">
           {/* Global Overview */}
           <div className="mb-6">
-            <RewardsOverview state={state} loading={stateLoading} />
+            <RewardsOverview state={state} loading={stateLoading} onRefresh={handleRefresh} />
           </div>
 
           {/* Tabs for Activities and My Rewards */}

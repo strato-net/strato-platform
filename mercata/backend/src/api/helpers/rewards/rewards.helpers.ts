@@ -11,24 +11,41 @@ let pendingRequest: Promise<any> | null = null;
 const CACHE_TTL = 5000; // 5 seconds cache
 
 /**
+ * Clear the contract state cache
+ * Useful for forcing fresh data from the blockchain
+ */
+export const clearContractStateCache = (): void => {
+  contractStateCache = null;
+  pendingRequest = null;
+};
+
+/**
  * Fetch contract state once and cache it
  * Uses promise caching to prevent concurrent duplicate requests
+ * @param forceRefresh - If true, bypasses cache and fetches fresh data
  */
 export const fetchContractState = async (
   accessToken: string,
-  rewardsAddress: string
+  rewardsAddress: string,
+  forceRefresh: boolean = false
 ): Promise<any> => {
+  // If forcing refresh, clear cache first
+  if (forceRefresh) {
+    contractStateCache = null;
+    pendingRequest = null;
+  }
+
   const now = Date.now();
   
   // Return cached state if it's still valid
-  if (contractStateCache && 
+  if (!forceRefresh && contractStateCache && 
       contractStateCache.address === rewardsAddress &&
       (now - contractStateCache.timestamp) < CACHE_TTL) {
     return contractStateCache.state;
   }
 
-  // If there's already a pending request, wait for it
-  if (pendingRequest) {
+  // If there's already a pending request and not forcing refresh, wait for it
+  if (!forceRefresh && pendingRequest) {
     return pendingRequest;
   }
 
@@ -85,13 +102,14 @@ export const calculatePersonalEmissionRate = (
  */
 export const fetchRewardsContractData = async (
   accessToken: string,
-  rewardsAddress: string
+  rewardsAddress: string,
+  forceRefresh: boolean = false
 ): Promise<{
   rewardToken: string;
   totalRewardsEmission: string;
   highestBlockSeen: string;
 }> => {
-  const state = await fetchContractState(accessToken, rewardsAddress);
+  const state = await fetchContractState(accessToken, rewardsAddress, forceRefresh);
   
   return {
     rewardToken: state?.rewardToken || "",
@@ -105,9 +123,10 @@ export const fetchRewardsContractData = async (
  */
 export const fetchActivityIds = async (
   accessToken: string,
-  rewardsAddress: string
+  rewardsAddress: string,
+  forceRefresh: boolean = false
 ): Promise<string[]> => {
-  const state = await fetchContractState(accessToken, rewardsAddress);
+  const state = await fetchContractState(accessToken, rewardsAddress, forceRefresh);
   const activityIds = state?.activityIds || [];
   
   // Filter out entries where value is empty string or null
@@ -119,9 +138,10 @@ export const fetchActivityIds = async (
  */
 export const fetchActivities = async (
   accessToken: string,
-  rewardsAddress: string
+  rewardsAddress: string,
+  forceRefresh: boolean = false
 ): Promise<Map<number, any>> => {
-  const state = await fetchContractState(accessToken, rewardsAddress);
+  const state = await fetchContractState(accessToken, rewardsAddress, forceRefresh);
   const activities = state?.activities || {};
   
   const activitiesMap = new Map<number, any>();
@@ -147,9 +167,10 @@ export const fetchActivities = async (
  */
 export const fetchActivityStates = async (
   accessToken: string,
-  rewardsAddress: string
+  rewardsAddress: string,
+  forceRefresh: boolean = false
 ): Promise<Map<number, any>> => {
-  const state = await fetchContractState(accessToken, rewardsAddress);
+  const state = await fetchContractState(accessToken, rewardsAddress, forceRefresh);
   const activityStates = state?.activityStates || {};
   
   const groupedStates = new Map<number, any>();
@@ -175,9 +196,10 @@ export const fetchUserInfo = async (
   accessToken: string,
   rewardsAddress: string,
   userAddress: string,
-  activityIds: number[]
+  activityIds: number[],
+  forceRefresh: boolean = false
 ): Promise<Map<number, { stake: string; userIndex: string }>> => {
-  const state = await fetchContractState(accessToken, rewardsAddress);
+  const state = await fetchContractState(accessToken, rewardsAddress, forceRefresh);
   const userInfo = state?.userInfo?.[userAddress.toLowerCase()] || {};
   
   const userInfoMap = new Map<number, { stake: string; userIndex: string }>();
@@ -199,9 +221,10 @@ export const fetchUserInfo = async (
 export const fetchUnclaimedRewards = async (
   accessToken: string,
   rewardsAddress: string,
-  userAddress: string
+  userAddress: string,
+  forceRefresh: boolean = false
 ): Promise<string> => {
-  const state = await fetchContractState(accessToken, rewardsAddress);
+  const state = await fetchContractState(accessToken, rewardsAddress, forceRefresh);
   const unclaimedRewards = state?.unclaimedRewards || {};
   
   return unclaimedRewards[userAddress.toLowerCase()] || "0";
