@@ -168,12 +168,12 @@ const LendingPoolSection = () => {
         <CardHeader className="px-2 py-2 md:px-6 md:py-6">
           <div className="flex justify-between items-center">
             <CardTitle>USDST Lending Pool</CardTitle>
-            {/* <CompactRewardsDisplay
+            <CompactRewardsDisplay
               userRewards={userRewards}
               loading={rewardsLoading}
               activityName="Lending Pool Liquidity"
               variant="button"
-            /> */}
+            />
           </div>
         </CardHeader>
         <CardContent className="px-2 py-2 md:px-6 md:py-6">
@@ -241,13 +241,13 @@ const LendingPoolSection = () => {
                     Transaction Fee: {LENDING_DEPOSIT_FEE} USDST
                   </div>
                   {/* Estimated Rewards */}
-                  {/* <CompactRewardsDisplay
+                  <CompactRewardsDisplay
                     userRewards={userRewards}
                     loading={rewardsLoading}
                     activityName="Lending Pool Liquidity"
                     variant="inline"
                     inputAmount={depositAmount}
-                  /> */}
+                  />
                   {/* Stake mUSDST Checkbox */}
                   {rewardsEnabled && (
                     <div className="flex items-center space-x-2 mt-3">
