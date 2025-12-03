@@ -1,6 +1,6 @@
 [![STRATO Mercata logo](https://www.stratomercata.com/images/stratomercata.com/2025.10.11/strato-mercata-logo.png)](https://stratomercata.com)
 
-# STRATO Mercata Platform
+# STRATO Platform
 
 ***NOTE:** README is WIP*
 
