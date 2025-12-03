@@ -77,6 +77,7 @@ export interface RewardsAction {
 export interface CirrusEvent {
   address: string;
   block_number: string;
+  block_timestamp: string;
   event_index: number;
   event_name: string;
   transaction_sender: string;

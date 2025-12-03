@@ -2,65 +2,72 @@ import { cirrus } from "../utils/api";
 import { ProtocolEvent, CirrusEvent } from "../types";
 import { logError, logInfo } from "../utils/logger";
 import { config } from "../config";
-import { readFileSync } from "fs";
-import { join } from "path";
 import { blockTrackingService } from "./blockTrackingService";
+import {
+  buildFilter,
+  parseJson,
+  sortEventsByBlock,
+  ZERO_ADDRESS,
+} from "../utils/eventHelpers";
+import {
+  loadAttributeMapping,
+  extractAmountFromAttributes,
+  splitAddressesAndEvents,
+  AttributeMapping,
+} from "../utils/attributeMapping";
 
 const MERCATA_PREFIX = "BlockApps-";
 
-interface AttributeMapping {
-  [contractAddress: string]: {
-    [eventName: string]: {
-      amount: string;
-    };
+const queryRegularEvents = async (
+  eventAddresses: string[],
+  eventEventNames: string[],
+  minBlockNumber: number,
+  mapping: AttributeMapping
+): Promise<ProtocolEvent[]> => {
+  if (eventAddresses.length === 0 || eventEventNames.length === 0) {
+    return [];
+  }
+
+  const params: Record<string, any> = {
+    address: buildFilter(eventAddresses),
+    event_name: buildFilter(eventEventNames),
+    block_number: `gt.${minBlockNumber}`,
+    order: "block_number.asc,event_index.asc",
+    select:
+      "address,block_number,event_name,attributes,event_index,transaction_sender,block_timestamp",
   };
-}
 
-let attributeMapping: AttributeMapping | null = null;
-
-const loadAttributeMapping = (): AttributeMapping => {
-  if (attributeMapping !== null) {
-    return attributeMapping;
+  const data = await cirrus.get("/event", { params });
+  if (!Array.isArray(data) || !data.length) {
+    return [];
   }
 
-  try {
-    const mappingPath = join(__dirname, "../config/attributeMapping.json");
-    const fileContent = readFileSync(mappingPath, "utf-8");
-    attributeMapping = JSON.parse(fileContent) as AttributeMapping;
-    logInfo("CirrusService", "Loaded attribute mapping from config");
-    return attributeMapping;
-  } catch (error) {
-    logError("CirrusService", error as Error, {
-      operation: "loadAttributeMapping",
-    });
-    attributeMapping = {};
-    return attributeMapping;
-  }
-};
+  const results = await Promise.all(
+    (data as CirrusEvent[]).map(async (item) => {
+      const attributes = parseJson(item.attributes);
+      console.log(attributes);
+      const amount = await extractAmountFromAttributes(
+        attributes,
+        item.address,
+        item.event_name,
+        mapping,
+        item.block_timestamp
+      );
 
-const extractAmountFromAttributes = (
-  attributes: Record<string, any>,
-  contractAddress: string,
-  eventName: string
-): string | null => {
-  const mapping = loadAttributeMapping();
-  const eventMapping = mapping[contractAddress]?.[eventName];
-  
-  if (eventMapping?.amount) {
-    const value = attributes[eventMapping.amount];
-    if (value !== undefined && value !== null) {
-      return value.toString();
-    }
-  }
-  
-  logError("CirrusService", new Error(`No attribute mapping found for contract ${contractAddress}, event ${eventName}`), {
-    operation: "extractAmountFromAttributes",
-    contractAddress,
-    eventName,
-    availableAttributes: Object.keys(attributes),
-  });
-  
-  return null;
+      if (amount === null) return null;
+
+      return {
+        address: item.address,
+        event_name: item.event_name,
+        block_number: Number(item.block_number),
+        event_index: Number(item.event_index),
+        transaction_sender: item.transaction_sender,
+        amount,
+      } as ProtocolEvent;
+    })
+  );
+
+  return results.filter((event): event is ProtocolEvent => event !== null);
 };
 
 export const getEventQueryParams = async (): Promise<{
@@ -68,9 +75,10 @@ export const getEventQueryParams = async (): Promise<{
   eventNames: string[];
   minBlockNumber: number;
 }> => {
-  const activitiesData = await cirrus.get(`/${MERCATA_PREFIX}Rewards-activities`, {
+  const activitiesData = await cirrus.get("/mapping", {
     params: {
       address: `eq.${config.rewards.address}`,
+      collection_name: `eq.activities`,
       select: "value->>sourceContract,value->>actionableEvents",
     },
   });
@@ -80,19 +88,20 @@ export const getEventQueryParams = async (): Promise<{
 
   if (Array.isArray(activitiesData) && activitiesData.length > 0) {
     for (const item of activitiesData) {
-      let actionableEventsArray: any[] = [];
-      
-      if (item.actionableEvents) {
-        if (typeof item.actionableEvents === "string") {
-          actionableEventsArray = JSON.parse(item.actionableEvents);
-        } else {
-          actionableEventsArray = item.actionableEvents;
-        }
+      if (!item.sourceContract || !item.actionableEvents) {
+        continue;
       }
-      
+
+      const actionableEventsArray =
+        typeof item.actionableEvents === "string"
+          ? JSON.parse(item.actionableEvents)
+          : [];
+
       for (const evt of actionableEventsArray) {
-        contractAddresses.add(item.sourceContract);
-        eventNames.add(evt.eventName);
+        if (evt.eventName) {
+          contractAddresses.add(item.sourceContract);
+          eventNames.add(evt.eventName);
+        }
       }
     }
   }
@@ -107,8 +116,10 @@ export const getEventQueryParams = async (): Promise<{
     minBlockNumber = 0;
   }
 
-  logInfo("CirrusService", `Loaded activities: ${contractAddresses.size} contracts, ${eventNames.size} event names, minBlock: ${minBlockNumber}`);
-  
+  logInfo(
+    "CirrusService",
+    `Loaded activities: ${contractAddresses.size} contracts, ${eventNames.size} event names, minBlock: ${minBlockNumber}`
+  );
   return {
     contractAddresses: [...contractAddresses],
     eventNames: [...eventNames],
@@ -116,67 +127,88 @@ export const getEventQueryParams = async (): Promise<{
   };
 };
 
-export const getEventsBatch = async (
-  contractAddresses: string[],
-  eventNames: string[],
-  minBlockNumber: number,
+export const getLPTokenTransferEvents = async (
+  lpTokenAddresses: string[],
+  lpEventNames: string[],
+  minBlockNumber: number
 ): Promise<ProtocolEvent[]> => {
-  if (contractAddresses.length === 0 || eventNames.length === 0) {
+  if (lpTokenAddresses.length === 0 || lpEventNames.length === 0) {
     return [];
   }
 
-  const addressFilter = contractAddresses.length === 1 
-    ? `eq.${contractAddresses[0]}`
-    : `in.(${contractAddresses.join(",")})`;
-  
-  const eventNameFilter = eventNames.length === 1
-    ? `eq.${eventNames[0]}`
-    : `in.(${eventNames.join(",")})`;
-
   const params: Record<string, any> = {
-    address: addressFilter,
-    event_name: eventNameFilter,
+    address: buildFilter(lpTokenAddresses),
+    or: `(from.eq.${ZERO_ADDRESS},to.eq.${ZERO_ADDRESS})`,
     block_number: `gt.${minBlockNumber}`,
     order: "block_number.asc,event_index.asc",
-    select: "address,block_number,event_name,attributes,event_index,transaction_sender",
+    select: "address,block_number,value,event_index,transaction_sender,from,to",
   };
 
-  const data = await cirrus.get("/event", { params });
+  const data = await cirrus.get(`/${MERCATA_PREFIX}Token-Transfer`, {
+    params,
+  });
 
   if (!Array.isArray(data) || !data.length) {
     return [];
   }
 
-  const events: ProtocolEvent[] = [];
+  const wantsMint = lpEventNames.includes("Minted");
+  const wantsBurn = lpEventNames.includes("Burned");
 
-  for (const item of data as CirrusEvent[]) {
-    const attributes = typeof item.attributes === "string" 
-      ? JSON.parse(item.attributes) 
-      : item.attributes;
-
-    const amount = extractAmountFromAttributes(attributes, item.address, item.event_name);
-    
-    if (amount === null) {
-      continue;
-    }
-
-    events.push({
-      address: item.address,
-      event_name: item.event_name,
-      block_number: Number(item.block_number),
-      event_index: Number(item.event_index),
-      transaction_sender: item.transaction_sender,
-      amount,
+  return data
+    .filter((item) => {
+      const isMint = item.from === ZERO_ADDRESS;
+      const isBurn = item.to === ZERO_ADDRESS;
+      return (isMint && wantsMint) || (isBurn && wantsBurn);
+    })
+    .map((item) => {
+      const isMint = item.from === ZERO_ADDRESS;
+      return {
+        address: item.address,
+        event_name: isMint ? "Minted" : "Burned",
+        block_number: Number(item.block_number),
+        event_index: Number(item.event_index || 0),
+        transaction_sender:
+          item.transaction_sender || (isMint ? item.to : item.from),
+        amount: item.value?.toString() || "0",
+      };
     });
-  }
-
-  logInfo("CirrusService", `Fetched ${events.length} events from event table`, {
-    contractAddresses: contractAddresses.length,
-    eventNames: eventNames.length,
-    minBlockNumber,
-  });
-
-  return events;
 };
 
+export const getEventsBatch = async (
+  contractAddresses: string[],
+  eventNames: string[],
+  minBlockNumber: number
+): Promise<ProtocolEvent[]> => {
+  if (contractAddresses.length === 0 || eventNames.length === 0) {
+    return [];
+  }
 
+  const mapping = loadAttributeMapping();
+  const { eventAddresses, lpTokenAddresses, eventEventNames, lpEventNames } =
+    splitAddressesAndEvents(contractAddresses, eventNames, mapping);
+
+  const [regularEvents, lpTransferEvents] = await Promise.all([
+    queryRegularEvents(
+      eventAddresses,
+      eventEventNames,
+      minBlockNumber,
+      mapping
+    ),
+    getLPTokenTransferEvents(lpTokenAddresses, lpEventNames, minBlockNumber),
+  ]);
+
+  const allEvents = sortEventsByBlock([...regularEvents, ...lpTransferEvents]);
+
+  logInfo(
+    "CirrusService",
+    `Fetched ${allEvents.length} events (${regularEvents.length} regular, ${lpTransferEvents.length} LP transfers)`,
+    {
+      contractAddresses: contractAddresses.length,
+      eventNames: eventNames.length,
+      minBlockNumber,
+    }
+  );
+
+  return allEvents;
+};

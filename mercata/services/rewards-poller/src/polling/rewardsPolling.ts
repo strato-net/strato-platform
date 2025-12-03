@@ -44,10 +44,31 @@ const processEvents = async (): Promise<void> => {
     const maxBatchSize = config.polling.maxBatchSize;
     for (let i = 0; i < allActions.length; i += maxBatchSize) {
       const batch = allActions.slice(i, i + maxBatchSize) as NonEmptyArray<RewardsAction>;
-      await batchHandleAction(batch);
-      
       const maxBlockInBatch = Math.max(...batch.map(a => a.blockNumber));
-      await blockTrackingService.updateLastProcessedBlock(maxBlockInBatch);
+      
+      try {
+        await batchHandleAction(batch);
+        await blockTrackingService.updateLastProcessedBlock(maxBlockInBatch);
+      } catch (error) {
+        const errorMessage = (error as Error).message;
+        const isContractFailure =
+          errorMessage.includes("Error running the transaction") ||
+          errorMessage.includes("solidity") ||
+          errorMessage.includes("Transaction failed") ||
+          errorMessage.includes("require failed");
+
+        if (isContractFailure) {
+          logError("RewardsPolling", error as Error, {
+            operation: "processEvents",
+            message: "Contract failure - updating block number to avoid retry loop",
+            batchSize: batch.length,
+            maxBlock: maxBlockInBatch,
+          });
+          await blockTrackingService.updateLastProcessedBlock(maxBlockInBatch);
+        } else {
+          throw error;
+        }
+      }
     }
 
     logInfo("RewardsPolling", `Processed ${allActions.length} actions`);

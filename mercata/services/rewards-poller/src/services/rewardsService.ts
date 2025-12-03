@@ -4,7 +4,7 @@ import { retryWithBackoff } from "../utils/retry";
 import { NonEmptyArray, RewardsAction, FunctionInput } from "../types";
 
 export const batchHandleAction = async (
-  actions: NonEmptyArray<RewardsAction>,
+  actions: NonEmptyArray<RewardsAction>
 ): Promise<void> => {
   const sourceContracts = actions.map((action) => action.sourceContract);
   const eventNames = actions.map((action) => action.eventName);
@@ -29,7 +29,6 @@ export const batchHandleAction = async (
 
   await retryWithBackoff(
     () => execute(input),
-    "RewardsService-batchHandleAction",
+    "RewardsService-batchHandleAction"
   );
 };
-

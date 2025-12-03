@@ -12,6 +12,9 @@ const config = {
   rewards: {
     address: process.env.REWARDS_CONTRACT_ADDRESS,
   },
+  priceOracle: {
+    address: process.env.PRICE_ORACLE_ADDRESS,
+  },
   usdst: {
     address: process.env.USDST_ADDRESS || '937efa7e3a77e20bbdbd7c0d32b6514f368c1010',
   },
@@ -66,6 +69,7 @@ const requiredEnvVars = [
   "CLIENT_ID",
   "OPENID_DISCOVERY_URL",
   "REWARDS_CONTRACT_ADDRESS",
+  "PRICE_ORACLE_ADDRESS",
   "NODE_URL",
 ];
 
