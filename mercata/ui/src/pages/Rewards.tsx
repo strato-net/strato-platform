@@ -12,7 +12,7 @@ import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 
 const Rewards = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"activities" | "my-rewards">("activities");
+  const [activeTab, setActiveTab] = useState<"activities" | "my-rewards">("my-rewards");
 
   const { state, loading: stateLoading, refetch: refetchState } = useRewards();
   const { activities, loading: activitiesLoading, refetch: refetchActivities } = useRewardsActivities();
@@ -61,22 +61,22 @@ const Rewards = () => {
             className="w-full"
           >
             <TabsList className="grid w-full grid-cols-2 mb-6">
-              <TabsTrigger value="activities">Activities</TabsTrigger>
               <TabsTrigger value="my-rewards">My Rewards</TabsTrigger>
+              <TabsTrigger value="activities">Activities</TabsTrigger>
             </TabsList>
-
-            <TabsContent value="activities">
-              <ActivitiesTable
-                activities={activities}
-                loading={activitiesLoading}
-              />
-            </TabsContent>
 
             <TabsContent value="my-rewards">
               <UserRewardsSection
                 userRewards={userRewards}
                 loading={userRewardsLoading}
                 onClaimSuccess={handleClaimSuccess}
+              />
+            </TabsContent>
+
+            <TabsContent value="activities">
+              <ActivitiesTable
+                activities={activities}
+                loading={activitiesLoading}
               />
             </TabsContent>
           </Tabs>
