@@ -243,12 +243,12 @@ const Borrow = () => {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle>Borrow & Repay</CardTitle>
-                  <CompactRewardsDisplay
+                  {/* <CompactRewardsDisplay
                     userRewards={userRewards}
                     loading={rewardsLoading}
                     activityIds={[2]}
                     variant="button"
-                  />
+                  /> */}
                 </div>
               </CardHeader>
               <CardContent>

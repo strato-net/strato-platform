@@ -175,7 +175,7 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
                 `${currentValue.toLocaleString('en-US', { 
                   minimumFractionDigits: 2, 
                   maximumFractionDigits: 2 
-                })} CATA Points`
+                })} Rewards Points`
               ) : tabType === 'borrowed' ? (
                 `${currentValue.toLocaleString('en-US', { 
                   minimumFractionDigits: 2, 
@@ -261,7 +261,7 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
                                 `${dataPoint.value.toLocaleString('en-US', { 
                                   minimumFractionDigits: 2, 
                                   maximumFractionDigits: 2 
-                                })} CATA Points`
+                                })} Rewards Points`
                               ) : tabType === 'borrowed' ? (
                                 `${dataPoint.value.toLocaleString('en-US', { 
                                   minimumFractionDigits: 2, 
