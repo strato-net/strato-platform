@@ -164,10 +164,6 @@ export const UserRewardsSection = ({
 
   const unclaimedRewardsStr = userRewards.unclaimedRewards || "0";
   const unclaimedFormatted = formatBalance(unclaimedRewardsStr, "points", 18, 2, 6);
-  const hasUnclaimed = safeBigInt(unclaimedRewardsStr) > 0n;
-  const hasAnyRewards = hasUnclaimed || userRewards.activities.some(
-    (a) => safeBigInt(a.userInfo?.stake || "0") > 0n
-  );
   const activitiesWithStake = userRewards.activities.filter(
     (a) => safeBigInt(a.userInfo?.stake || "0") > 0n
   );
@@ -203,6 +199,7 @@ export const UserRewardsSection = ({
   
   // Total claimable = base unclaimed + new pending from all activities
   const totalClaimable = baseUnclaimed + totalNewPending;
+  const hasClaimable = totalClaimable > 0n;
   const totalClaimableDecimal = totalClaimable >= 0n
     ? formatBalance(totalClaimable.toString(), "points", 18, 18, 18)
     : null;
@@ -235,7 +232,7 @@ export const UserRewardsSection = ({
             </div>
             <Button
               onClick={handleClaimAll}
-              disabled={!hasUnclaimed || isClaimingAll || !userAddress}
+              disabled={!hasClaimable || isClaimingAll || !userAddress}
               size="lg"
             >
               {isClaimingAll ? (
