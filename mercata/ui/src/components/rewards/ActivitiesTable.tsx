@@ -25,7 +25,7 @@ export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) =
       <Card>
         <CardHeader>
           <CardTitle>Activities</CardTitle>
-          <CardDescription>My reward activities</CardDescription>
+          <CardDescription>All reward activities</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
@@ -43,7 +43,7 @@ export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) =
       <Card>
         <CardHeader>
           <CardTitle>Activities</CardTitle>
-          <CardDescription>My reward activities</CardDescription>
+          <CardDescription>All reward activities</CardDescription>
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground text-center py-8">No activities found</p>
@@ -56,7 +56,7 @@ export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) =
     <Card>
       <CardHeader>
         <CardTitle>Activities</CardTitle>
-        <CardDescription>My reward activities</CardDescription>
+        <CardDescription>All reward activities</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="rounded-md border">
