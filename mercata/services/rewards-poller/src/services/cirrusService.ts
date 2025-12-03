@@ -22,7 +22,8 @@ const queryRegularEvents = async (
   eventAddresses: string[],
   eventEventNames: string[],
   minBlockNumber: number,
-  mapping: AttributeMapping
+  mapping: AttributeMapping,
+  validPairs: ValidEventPairs
 ): Promise<ProtocolEvent[]> => {
   if (eventAddresses.length === 0 || eventEventNames.length === 0) {
     return [];
@@ -44,8 +45,12 @@ const queryRegularEvents = async (
 
   const results = await Promise.all(
     (data as CirrusEvent[]).map(async (item) => {
+      const pairKey = makeEventPairKey(item.address, item.event_name);
+      if (!validPairs.has(pairKey)) {
+        return null;
+      }
+
       const attributes = parseJson(item.attributes);
-      console.log(attributes);
       const amount = await extractAmountFromAttributes(
         attributes,
         item.address,
@@ -70,10 +75,16 @@ const queryRegularEvents = async (
   return results.filter((event): event is ProtocolEvent => event !== null);
 };
 
+export type ValidEventPairs = Set<string>;
+
+const makeEventPairKey = (contract: string, eventName: string): string =>
+  `${contract}:${eventName}`;
+
 export const getEventQueryParams = async (): Promise<{
   contractAddresses: string[];
   eventNames: string[];
   minBlockNumber: number;
+  validPairs: ValidEventPairs;
 }> => {
   const activitiesData = await cirrus.get("/mapping", {
     params: {
@@ -85,6 +96,7 @@ export const getEventQueryParams = async (): Promise<{
 
   const contractAddresses = new Set<string>();
   const eventNames = new Set<string>();
+  const validPairs: ValidEventPairs = new Set<string>();
 
   if (Array.isArray(activitiesData) && activitiesData.length > 0) {
     for (const item of activitiesData) {
@@ -101,6 +113,7 @@ export const getEventQueryParams = async (): Promise<{
         if (evt.eventName) {
           contractAddresses.add(item.sourceContract);
           eventNames.add(evt.eventName);
+          validPairs.add(makeEventPairKey(item.sourceContract, evt.eventName));
         }
       }
     }
@@ -124,6 +137,7 @@ export const getEventQueryParams = async (): Promise<{
     contractAddresses: [...contractAddresses],
     eventNames: [...eventNames],
     minBlockNumber,
+    validPairs,
   };
 };
 
@@ -178,7 +192,8 @@ export const getLPTokenTransferEvents = async (
 export const getEventsBatch = async (
   contractAddresses: string[],
   eventNames: string[],
-  minBlockNumber: number
+  minBlockNumber: number,
+  validPairs: ValidEventPairs
 ): Promise<ProtocolEvent[]> => {
   if (contractAddresses.length === 0 || eventNames.length === 0) {
     return [];
@@ -193,7 +208,8 @@ export const getEventsBatch = async (
       eventAddresses,
       eventEventNames,
       minBlockNumber,
-      mapping
+      mapping,
+      validPairs
     ),
     getLPTokenTransferEvents(lpTokenAddresses, lpEventNames, minBlockNumber),
   ]);

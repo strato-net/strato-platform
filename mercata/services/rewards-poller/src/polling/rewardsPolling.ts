@@ -16,7 +16,7 @@ const processEvents = async (): Promise<void> => {
     logInfo("RewardsPolling", "Starting polling cycle");
     await checkBalances();
 
-    const { contractAddresses, eventNames, minBlockNumber } = await getEventQueryParams();
+    const { contractAddresses, eventNames, minBlockNumber, validPairs } = await getEventQueryParams();
     
     if (contractAddresses.length === 0 || eventNames.length === 0) {
       throw new Error("No event mappings found");
@@ -26,6 +26,7 @@ const processEvents = async (): Promise<void> => {
       contractAddresses,
       eventNames,
       minBlockNumber,
+      validPairs
     );
 
     const allActions: RewardsAction[] = allEvents.map((event) => ({
