@@ -10,11 +10,12 @@ import {
   formatRoundedWithCommas,
 } from "@/services/rewardsService";
 import { formatBalance } from "@/utils/numberUtils";
-import { Loader2, Coins, TrendingUp, Percent, Info } from "lucide-react";
+import { Loader2, Coins, TrendingUp, Info, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { useUser } from "@/context/UserContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { formatDistanceToNow } from "date-fns";
 
 interface UserRewardsSectionProps {
   userRewards: UserRewardsData | null;
@@ -267,10 +268,6 @@ export const UserRewardsSection = ({
             const totalStakeDecimal = totalStakeStr ? formatBalance(totalStakeStr, "", 18, 18, 18) : null;
             const userStakeFormatted = userStakeDecimal ? formatRoundedWithCommas(roundByMagnitude(userStakeDecimal)) : "?";
             const totalStakeFormatted = totalStakeDecimal ? formatRoundedWithCommas(roundByMagnitude(totalStakeDecimal)) : "?";
-            
-            const share = totalStakeStr && userStakeStr && safeBigInt(totalStakeStr) > 0n
-              ? (safeBigInt(userStakeStr) * 10000n) / safeBigInt(totalStakeStr) / 100n
-              : null;
 
             // Use personalEmissionRate (already calculated as emissionRate * (userStake / totalStake))
             // Multiply by secondsPerDay to get estimated rewards per day
@@ -291,6 +288,10 @@ export const UserRewardsSection = ({
               ? formatRoundedWithCommas(roundByMagnitude(estimatedPerDayNumeric)) + " points"
               : "?";
 
+            // Format last update time
+            const lastUpdateTimeStr = activity?.lastUpdateTime || null;
+            const lastUpdate = lastUpdateTimeStr ? new Date(Number(lastUpdateTimeStr) * 1000) : null;
+            const timeAgo = lastUpdate ? formatDistanceToNow(lastUpdate, { addSuffix: true }) : "?";
 
             return (
               <Card key={activity.activityId}>
@@ -304,14 +305,14 @@ export const UserRewardsSection = ({
                         : "?"}
                       <Badge variant="secondary">
                         {activity?.activityType !== undefined && activity?.activityType !== null
-                          ? (activity.activityType === 0 ? "Position" : "One-Time")
+                          ? (activity.activityType === 1 ? "One-Time" : "Position")
                           : "?"}
                       </Badge>
                     </CardTitle>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <div className="flex items-center space-x-2 mb-1">
                         <TrendingUp className="h-4 w-4 text-muted-foreground" />
@@ -328,22 +329,24 @@ export const UserRewardsSection = ({
                         </Tooltip>
                       </div>
                       <p className="text-lg font-semibold">{userStakeFormatted}</p>
-                    </div>
-
-                    <div>
-                      <div className="flex items-center space-x-2 mb-1">
-                        <Percent className="h-4 w-4 text-muted-foreground" />
-                        <p className="text-sm text-muted-foreground">Pool Share</p>
-                      </div>
-                      <p className="text-lg font-semibold">{share !== null ? `${share.toString()}%` : "?"}</p>
-                      <p className="text-xs text-muted-foreground">
-                        of {totalStakeFormatted} total
-                      </p>
+                      {totalStakeFormatted !== "?" && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          of {totalStakeFormatted} total
+                        </p>
+                      )}
                     </div>
 
                     <div>
                       <p className="text-sm text-muted-foreground mb-1">Estimated Rewards/Day</p>
                       <p className="text-lg font-semibold">{estimatedPerDayFormatted}</p>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center space-x-2 mb-1">
+                        <Clock className="h-4 w-4 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground">Last Update</p>
+                      </div>
+                      <p className="text-lg font-semibold">{timeAgo}</p>
                     </div>
 
                   </div>

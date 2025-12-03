@@ -125,7 +125,7 @@ export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) =
                     <TableCell>
                       <Badge variant="secondary">
                         {activity?.activityType !== undefined && activity?.activityType !== null
-                          ? (activity.activityType === 0 ? "Position" : "One-Time")
+                          ? (activity.activityType === 1 ? "One-Time" : "Position")
                           : "?"}
                       </Badge>
                     </TableCell>

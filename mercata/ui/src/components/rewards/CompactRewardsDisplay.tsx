@@ -153,7 +153,7 @@ export const CompactRewardsDisplay = ({
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">{truncateActivityName(activity.name)}</span>
                   <Badge variant="outline" className="text-xs">
-                    {activity.activityType === 0 ? "Position" : "One-Time"}
+                    {activity.activityType === 1 ? "One-Time" : "Position"}
                   </Badge>
                 </div>
               </div>

@@ -173,13 +173,11 @@ export const fetchUserActivities = async (
       const state = activityStatesMap.get(activityId);
       const userInfo = userInfoMap.get(activityId) || { stake: "0", userIndex: "0" };
 
-      // Convert activityType from string to number (it comes as "0" or "1" or address string)
+      // Convert activityType: "OneTime" or "1" -> 1, otherwise -> 0 (Position)
       let activityType = 0;
       if (activity.activityType) {
-        const activityTypeStr = activity.activityType.toString();
-        // If it's an address string (all zeros or non-numeric), treat as 0
-        // Otherwise parse as number
-        if (activityTypeStr === "1" || activityTypeStr === "0000000000000000000000000000000000000001") {
+        const activityTypeStr = String(activity.activityType);
+        if (activityTypeStr === "OneTime" || activityTypeStr === "1") {
           activityType = 1;
         } else {
           activityType = 0;
@@ -255,13 +253,11 @@ export const fetchAllActivities = async (
       const activityId = activity.activityId;
       const state = activityStatesMap.get(activityId);
 
-      // Convert activityType from string to number (it comes as "0" or "1" or address string)
+      // Convert activityType: "OneTime" or "1" -> 1, otherwise -> 0 (Position)
       let activityType = 0;
       if (activity.activityType) {
-        const activityTypeStr = activity.activityType.toString();
-        // If it's an address string (all zeros or non-numeric), treat as 0
-        // Otherwise parse as number
-        if (activityTypeStr === "1" || activityTypeStr === "0000000000000000000000000000000000000001") {
+        const activityTypeStr = String(activity.activityType);
+        if (activityTypeStr === "OneTime" || activityTypeStr === "1") {
           activityType = 1;
         } else {
           activityType = 0;

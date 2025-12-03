@@ -153,10 +153,18 @@ export const fetchActivities = async (
     const activityId = parseInt(activityIdStr, 10);
     if (!isNaN(activityId)) {
       const activity = activities[activityIdStr];
+      // Parse activityType: "OneTime" -> 1, otherwise -> 0 (Position)
+      let activityType = "0";
+      if (activity?.activityType) {
+        const activityTypeStr = String(activity.activityType);
+        if (activityTypeStr === "OneTime" || activityTypeStr === "1") {
+          activityType = "1";
+        }
+      }
       activitiesMap.set(activityId, {
         activityId,
         name: activity?.name || "",
-        activityType: activity?.activityType || "0",
+        activityType,
         emissionRate: activity?.emissionRate || "0",
         sourceContract: activity?.sourceContract || ""
       });
