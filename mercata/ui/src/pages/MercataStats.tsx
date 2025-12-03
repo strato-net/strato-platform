@@ -293,6 +293,13 @@ const MercataStats = () => {
     }
   };
 
+  // True accrued interest = paid (CDP revenue) + outstanding (unpaid)
+  const getCDPActualAccruedInterest = (period: keyof RevenuePeriod): string => {
+    const paidInterest = BigInt(cdpRevenueByPeriod[period]?.total || '0');
+    const outstandingInterest = BigInt(getEstimatedInterestForPeriod(period) || '0');
+    return (paidInterest + outstandingInterest).toString();
+  };
+
   const formatLargeNumber = (num: number): string => {
     if (num >= 1e9) return `${(num / 1e9).toFixed(2)}B`;
     if (num >= 1e6) return `${(num / 1e6).toFixed(2)}M`;
@@ -581,10 +588,10 @@ const MercataStats = () => {
                       </p>
                       <div className="mt-3 pt-3 border-t border-gray-200">
                         <div className="text-lg font-semibold">
-                          {interestLoading ? (
+                          {(revenueLoading || interestLoading) ? (
                             <Skeleton className="h-6 w-20" />
                           ) : (
-                            `$${formatLargeNumber(parseFloat(formatUnits(BigInt(getEstimatedInterestForPeriod(selectedPeriod) || '0'), 18)))}`
+                            `$${formatLargeNumber(parseFloat(formatUnits(BigInt(getCDPActualAccruedInterest(selectedPeriod) || '0'), 18)))}`
                           )}
                         </div>
                         <p className="text-xs text-muted-foreground">
