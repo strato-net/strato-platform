@@ -35,6 +35,21 @@ const convertStabilityFeeRateToAnnualPercentage = (stabilityFeeRateRay: string |
   return annualPercentage;
 };
 
+// Helper function for compound interest calculation (matches contract's per-second compounding)
+const getCompoundInterest = (
+  debtUSD: bigint,
+  stabilityFeeRate: bigint, // per-second rate in RAY
+  seconds: bigint
+): bigint => {
+  const factor = rpow(stabilityFeeRate, seconds, RAY);
+  return (debtUSD * (factor - RAY)) / RAY;
+};
+
+// Time constants for compound interest calculations
+const SECONDS_PER_DAY = 86400n;
+const SECONDS_PER_WEEK = 604800n;
+const SECONDS_PER_MONTH = 2592000n; // 30 days
+
 // Extract constants for consistency with lending service
 const {
   cdpRegistrySelectFields,
@@ -2083,23 +2098,20 @@ export const getInterestAccrued = async (
     const rateAccumulator = BigInt((globalState as any).rateAccumulator || RAY.toString());
     const actualDebtUSD = (totalScaledDebt * rateAccumulator) / RAY;
 
-    // Get annual rate as percentage (already converted)
+    // Get annual rate as percentage (for display)
     const annualRatePercent = convertStabilityFeeRateToAnnualPercentage(config.stabilityFeeRate);
 
-    // Using WAD precision for interest calculations
-    const annualRateWad = BigInt(Math.floor(annualRatePercent * Number(WAD) / 100));
+    // Use compound interest (matches contract's per-second compounding via rpow)
+    const stabilityFeeRate = BigInt(config.stabilityFeeRate);
 
-    // Daily interest = actualDebt * (annualRate / 100) / 365
-    const dailyInterestUSD = (actualDebtUSD * annualRateWad) / (365n * WAD);
+    // Compound interest for each period
+    const dailyInterestUSD = getCompoundInterest(actualDebtUSD, stabilityFeeRate, SECONDS_PER_DAY);
+    const weeklyInterestUSD = getCompoundInterest(actualDebtUSD, stabilityFeeRate, SECONDS_PER_WEEK);
+    const monthlyInterestUSD = getCompoundInterest(actualDebtUSD, stabilityFeeRate, SECONDS_PER_MONTH);
 
-    // Weekly interest = daily * 7
-    const weeklyInterestUSD = dailyInterestUSD * 7n;
-
-    // Monthly interest = daily * 30
-    const monthlyInterestUSD = dailyInterestUSD * 30n;
-
-    // YTD interest = daily * days elapsed this year
-    const ytdInterestUSD = dailyInterestUSD * BigInt(daysElapsedYTD);
+    // YTD interest using compound calculation
+    const secondsElapsedYTD = BigInt(daysElapsedYTD) * SECONDS_PER_DAY;
+    const ytdInterestUSD = getCompoundInterest(actualDebtUSD, stabilityFeeRate, secondsElapsedYTD);
 
     // All-time interest = total accumulated interest (rateAccumulator - RAY) * totalScaledDebt / RAY
     // This represents the cumulative interest that has accrued since inception
