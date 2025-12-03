@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { formatUnits } from 'viem';
 import { Token, EarningAsset } from '@mercata/shared-types';
 
@@ -6,13 +6,14 @@ interface UseNetBalanceProps {
   tokens: EarningAsset[];
   cataToken?: Token | null;
   loans: any;
-  totalCDPDebt: string;
+  totalCDPDebt: string | undefined;
 }
 
 interface NetBalanceResult {
   netBalance: number;
   cataBalance: number;
   totalBorrowed: number;
+  isLoading: boolean;
 }
 
 export const useNetBalance = ({
@@ -24,10 +25,44 @@ export const useNetBalance = ({
   const [result, setResult] = useState<NetBalanceResult>({
     netBalance: 0,
     cataBalance: 0,
-    totalBorrowed: 0
+    totalBorrowed: 0,
+    isLoading: true
   });
 
+  const hasSeenTokensWithData = useRef(false);
+  const calculationAttempted = useRef(false);
+
   useEffect(() => {
+    const isTokensLoaded = Array.isArray(tokens);
+    const isLoansLoaded = loans !== undefined;
+    const isTotalCDPDebtLoaded = totalCDPDebt !== undefined;
+
+    // Track if we've seen tokens with data
+    if (tokens?.length > 0) {
+      hasSeenTokensWithData.current = true;
+    }
+
+    const hasLendingPoolDebt = loans?.totalAmountOwed && BigInt(loans.totalAmountOwed) > 1n;
+    const hasCDPDebt = totalCDPDebt && BigInt(totalCDPDebt) > 1n;
+    const hasAnyDebt = hasLendingPoolDebt || hasCDPDebt;
+
+    const tokensIsEmpty = !tokens || tokens.length === 0;
+    const shouldWaitForTokens = tokensIsEmpty && hasAnyDebt && !hasSeenTokensWithData.current && !calculationAttempted.current;
+
+    const allDataLoaded = isTokensLoaded && isLoansLoaded && isTotalCDPDebtLoaded;
+
+    if (!allDataLoaded || shouldWaitForTokens) {
+      setResult({
+        netBalance: 0,
+        cataBalance: 0,
+        totalBorrowed: 0,
+        isLoading: true
+      });
+      return;
+    }
+
+    calculationAttempted.current = true;
+
     let total = 0;
     let cataTotal = 0;
 
@@ -71,19 +106,12 @@ export const useNetBalance = ({
 
     const totalDebt = lendingPoolDebt + cdpDebt;
     const netBalance = total - totalDebt;
-
-   
-    // Prevent flicker: Don't show negative balance if we're still loading assets
-    // If we have debt but no assets, we're likely in a loading state
-    if (netBalance < 0 && total === 0 && totalDebt > 0) {
-      // Skip update - keep previous state to avoid showing negative balance flash
-      return;
-    }
     
     setResult({
       netBalance,
       cataBalance: cataTotal,
-      totalBorrowed: totalDebt
+      totalBorrowed: totalDebt,
+      isLoading: false
     });
 
   }, [tokens, cataToken, loans, totalCDPDebt]);
