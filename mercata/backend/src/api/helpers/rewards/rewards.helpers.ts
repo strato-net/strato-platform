@@ -29,24 +29,28 @@ export const fetchContractState = async (
   rewardsAddress: string,
   forceRefresh: boolean = false
 ): Promise<any> => {
-  // If forcing refresh, clear cache first
-  if (forceRefresh) {
-    contractStateCache = null;
-    pendingRequest = null;
-  }
-
   const now = Date.now();
   
-  // Return cached state if it's still valid
+  // Return cached state if it's still valid and not forcing refresh
   if (!forceRefresh && contractStateCache && 
       contractStateCache.address === rewardsAddress &&
       (now - contractStateCache.timestamp) < CACHE_TTL) {
     return contractStateCache.state;
   }
 
-  // If there's already a pending request and not forcing refresh, wait for it
-  if (!forceRefresh && pendingRequest) {
-    return pendingRequest;
+  // If forcing refresh, clear cache but check if there's already a pending refresh request
+  // This allows concurrent refresh requests to share the same blockchain call
+  if (forceRefresh) {
+    contractStateCache = null;
+    // If there's already a pending request, it's likely a refresh - wait for it
+    if (pendingRequest) {
+      return pendingRequest;
+    }
+  } else {
+    // If not forcing refresh and there's a pending request, wait for it
+    if (pendingRequest) {
+      return pendingRequest;
+    }
   }
 
   // Create new request and cache the promise
