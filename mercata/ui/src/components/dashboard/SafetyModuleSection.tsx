@@ -226,12 +226,12 @@ const SafetyModuleSection = () => {
               <Shield className="h-5 w-5" />
               USDST Safety Module
             </CardTitle>
-            <CompactRewardsDisplay
+            {/* <CompactRewardsDisplay
               userRewards={userRewards}
               loading={rewardsLoading}
               activityIds={[4]}
               variant="button"
-            />
+            /> */}
           </div>
         </CardHeader>
         <CardContent className="px-2 py-2 md:px-6 md:py-6">
@@ -299,13 +299,13 @@ const SafetyModuleSection = () => {
                     Transaction Fee: {SAFETY_STAKE_FEE} USDST
                   </div>
                   {/* Estimated Rewards */}
-                  <CompactRewardsDisplay
+                  {/* <CompactRewardsDisplay
                     userRewards={userRewards}
                     loading={rewardsLoading}
                     activityIds={[4]}
                     variant="inline"
                     inputAmount={stakeAmount}
-                  />
+                  /> */}
                   {/* Stake sUSDST Checkbox - only show if rewards are enabled */}
                   {rewardsEnabled && (
                     <div className="flex items-center space-x-2 mt-3">

@@ -1,4 +1,4 @@
-import { HelpCircle } from "lucide-react";
+import { HelpCircle, Loader2 } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -13,6 +13,7 @@ interface AssetSummaryProps {
   tooltip?: string;
   onClick?: () => void;
   isActive?: boolean;
+  isLoading?: boolean;
 }
 
 const AssetSummary = ({
@@ -23,6 +24,7 @@ const AssetSummary = ({
   tooltip,
   onClick,
   isActive = false,
+  isLoading = false,
 }: AssetSummaryProps) => {
   return (
     <div 
@@ -46,7 +48,14 @@ const AssetSummary = ({
               </Tooltip>
             )}
           </div>
-          <h3 className="text-2xl font-bold mt-1">{value}</h3>
+          {isLoading ? (
+            <div className="flex items-center gap-2 mt-1">
+              <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+              <span className="text-gray-400 text-sm">Loading...</span>
+            </div>
+          ) : (
+            <h3 className="text-2xl font-bold mt-1">{value}</h3>
+          )}
         </div>
 
         <div

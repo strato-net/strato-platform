@@ -100,7 +100,7 @@ class RewardsController {
       );
 
       res.status(RestStatus.OK).json({
-        success: result.status === "success",
+        success: result.status === "Success",
         txHash: result.hash
       });
     } catch (error) {
@@ -145,7 +145,7 @@ class RewardsController {
       );
 
       res.status(RestStatus.OK).json({
-        success: result.status === "success",
+        success: result.status === "Success",
         txHash: result.hash
       });
     } catch (error) {

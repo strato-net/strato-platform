@@ -23,12 +23,12 @@ export const BRIDGE_MODE_LABELS = {
 } as const;
 
 export const BRIDGE_IN_MODE_LABELS = {
-  convert: {
-    title: "Convert to USDST",
-    description: "Convert stablecoins to USDST",
+  "easy-savings": {
+    title: "Easy Savings",
+    description: "Access high saving rates by converting stablecoins to USDST and lending",
     amountLabel: "Amount",
   },
-  bridge: {
+  "bridge": {
     title: "Bridge In Your Tokens",
     description: "Bridge your tokens from external networks to STRATO",
     amountLabel: "Amount",

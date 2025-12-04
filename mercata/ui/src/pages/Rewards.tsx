@@ -13,14 +13,14 @@ import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 
 const Rewards = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"activities" | "my-rewards" | "leaderboard">("activities");
+  const [activeTab, setActiveTab] = useState<"activities" | "my-rewards" | "leaderboard">("my-rewards");
 
   const { state, loading: stateLoading, refetch: refetchState } = useRewards();
   const { activities, loading: activitiesLoading, refetch: refetchActivities } = useRewardsActivities();
   const { userRewards, loading: userRewardsLoading, refetch: refetchUserRewards } = useRewardsUserInfo();
 
   useEffect(() => {
-    document.title = "Rewards | STRATO Mercata";
+    document.title = "Rewards";
   }, []);
 
   const handleClaimSuccess = () => {
@@ -62,17 +62,10 @@ const Rewards = () => {
             className="w-full"
           >
             <TabsList className="grid w-full grid-cols-3 mb-6">
+               <TabsTrigger value="my-rewards">My Rewards</TabsTrigger>
               <TabsTrigger value="activities">Activities</TabsTrigger>
-              <TabsTrigger value="my-rewards">My Rewards</TabsTrigger>
               <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
             </TabsList>
-
-            <TabsContent value="activities">
-              <ActivitiesTable
-                activities={activities}
-                loading={activitiesLoading}
-              />
-            </TabsContent>
 
             <TabsContent value="my-rewards">
               <UserRewardsSection
@@ -84,6 +77,12 @@ const Rewards = () => {
 
             <TabsContent value="leaderboard">
               <LeaderboardTable />
+              </TabsContent>
+            <TabsContent value="activities">
+              <ActivitiesTable
+                activities={activities}
+                loading={activitiesLoading}
+              />
             </TabsContent>
           </Tabs>
         </main>

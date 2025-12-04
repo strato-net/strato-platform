@@ -35,6 +35,21 @@ const convertStabilityFeeRateToAnnualPercentage = (stabilityFeeRateRay: string |
   return annualPercentage;
 };
 
+// Helper function for compound interest calculation (matches contract's per-second compounding)
+const getCompoundInterest = (
+  debtUSD: bigint,
+  stabilityFeeRate: bigint, // per-second rate in RAY
+  seconds: bigint
+): bigint => {
+  const factor = rpow(stabilityFeeRate, seconds, RAY);
+  return (debtUSD * (factor - RAY)) / RAY;
+};
+
+// Time constants for compound interest calculations
+const SECONDS_PER_DAY = 86400n;
+const SECONDS_PER_WEEK = 604800n;
+const SECONDS_PER_MONTH = 2592000n; // 30 days
+
 // Extract constants for consistency with lending service
 const {
   cdpRegistrySelectFields,
@@ -2014,6 +2029,125 @@ export const getCDPStats = async (
     });
     throw new Error("Failed to fetch CDP statistics");
   }
+};
+
+interface InterestData {
+  asset: string;
+  symbol: string;
+  totalDebtUSD: string;
+  annualRatePercent: number;
+  dailyInterestUSD: string;
+  weeklyInterestUSD: string;
+  monthlyInterestUSD: string;
+  ytdInterestUSD: string;
+  allTimeInterestUSD: string;
+}
+
+interface InterestResponse {
+  totalDailyInterestUSD: string;
+  totalWeeklyInterestUSD: string;
+  totalMonthlyInterestUSD: string;
+  totalYtdInterestUSD: string;
+  totalAllTimeInterestUSD: string;
+  assets: InterestData[];
+}
+
+export const getInterestAccrued = async (
+  accessToken: string,
+  userAddress: string
+): Promise<InterestResponse> => {
+  const registry = await getCDPRegistry(accessToken, userAddress, {}, "getInterestAccrued");
+  
+  if (!registry?.cdpEngine) {
+    throw new Error("CDP Engine not found");
+  }
+
+  const collateralConfigs = registry.cdpEngine.collateralConfigs || [];
+  const globalStates = registry.cdpEngine.collateralGlobalStates || [];
+
+  // Build a map of global states by asset
+  const globalStateMap = new Map(
+    globalStates.map((s: any) => [s.asset.toLowerCase(), s.CollateralGlobalState])
+  );
+
+  let totalDailyInterestUSD = 0n;
+  let totalWeeklyInterestUSD = 0n;
+  let totalMonthlyInterestUSD = 0n;
+  let totalYtdInterestUSD = 0n;
+  let totalAllTimeInterestUSD = 0n;
+
+  const assetsData: InterestData[] = [];
+
+  // Calculate days elapsed for YTD
+  const now = new Date();
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
+  const daysElapsedYTD = Math.floor((now.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+  for (const configEntry of collateralConfigs) {
+    const asset = configEntry.asset;
+    const config = configEntry.CollateralConfig;
+    const globalState = globalStateMap.get(asset.toLowerCase());
+
+    if (!config || !globalState) continue;
+
+    // Get token info for symbol
+    const tokenInfo = await getTokenInfo(accessToken, asset);
+
+    // Calculate actual debt: totalScaledDebt * rateAccumulator / RAY
+    const totalScaledDebt = BigInt((globalState as any).totalScaledDebt || "0");
+    const rateAccumulator = BigInt((globalState as any).rateAccumulator || RAY.toString());
+    const actualDebtUSD = (totalScaledDebt * rateAccumulator) / RAY;
+
+    // Get annual rate as percentage (for display)
+    const annualRatePercent = convertStabilityFeeRateToAnnualPercentage(config.stabilityFeeRate);
+
+    // Use compound interest (matches contract's per-second compounding via rpow)
+    const stabilityFeeRate = BigInt(config.stabilityFeeRate);
+
+    // Compound interest for each period
+    const dailyInterestUSD = getCompoundInterest(actualDebtUSD, stabilityFeeRate, SECONDS_PER_DAY);
+    const weeklyInterestUSD = getCompoundInterest(actualDebtUSD, stabilityFeeRate, SECONDS_PER_WEEK);
+    const monthlyInterestUSD = getCompoundInterest(actualDebtUSD, stabilityFeeRate, SECONDS_PER_MONTH);
+
+    // YTD interest using compound calculation
+    const secondsElapsedYTD = BigInt(daysElapsedYTD) * SECONDS_PER_DAY;
+    const ytdInterestUSD = getCompoundInterest(actualDebtUSD, stabilityFeeRate, secondsElapsedYTD);
+
+    // All-time interest = total accumulated interest (rateAccumulator - RAY) * totalScaledDebt / RAY
+    // This represents the cumulative interest that has accrued since inception
+    const allTimeInterestUSD = totalScaledDebt > 0n 
+      ? (totalScaledDebt * (rateAccumulator - RAY)) / RAY
+      : 0n;
+
+    totalDailyInterestUSD += dailyInterestUSD;
+    totalWeeklyInterestUSD += weeklyInterestUSD;
+    totalMonthlyInterestUSD += monthlyInterestUSD;
+    totalYtdInterestUSD += ytdInterestUSD;
+    totalAllTimeInterestUSD += allTimeInterestUSD;
+
+    if (actualDebtUSD > 0n) {
+      assetsData.push({
+        asset,
+        symbol: tokenInfo.symbol,
+        totalDebtUSD: actualDebtUSD.toString(),
+        annualRatePercent,
+        dailyInterestUSD: dailyInterestUSD.toString(),
+        weeklyInterestUSD: weeklyInterestUSD.toString(),
+        monthlyInterestUSD: monthlyInterestUSD.toString(),
+        ytdInterestUSD: ytdInterestUSD.toString(),
+        allTimeInterestUSD: allTimeInterestUSD.toString()
+      });
+    }
+  }
+
+  return {
+    totalDailyInterestUSD: totalDailyInterestUSD.toString(),
+    totalWeeklyInterestUSD: totalWeeklyInterestUSD.toString(),
+    totalMonthlyInterestUSD: totalMonthlyInterestUSD.toString(),
+    totalYtdInterestUSD: totalYtdInterestUSD.toString(),
+    totalAllTimeInterestUSD: totalAllTimeInterestUSD.toString(),
+    assets: assetsData
+  };
 };
 
 export const openJuniorNote = async (

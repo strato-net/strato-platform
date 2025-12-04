@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserRewardsData, claimAllRewards, claimRewards, safeBigInt } from "@/services/rewardsService";
 import {
-  calculatePendingRewards,
+  calculateRealTimePendingRewards,
   formatEmissionRatePerDay,
   roundByMagnitude,
   formatRoundedWithCommas,
@@ -164,10 +164,6 @@ export const UserRewardsSection = ({
 
   const unclaimedRewardsStr = userRewards.unclaimedRewards || "0";
   const unclaimedFormatted = formatBalance(unclaimedRewardsStr, "points", 18, 2, 6);
-  const hasUnclaimed = safeBigInt(unclaimedRewardsStr) > 0n;
-  const hasAnyRewards = hasUnclaimed || userRewards.activities.some(
-    (a) => safeBigInt(a.userInfo?.stake || "0") > 0n
-  );
   const activitiesWithStake = userRewards.activities.filter(
     (a) => safeBigInt(a.userInfo?.stake || "0") > 0n
   );
@@ -181,14 +177,27 @@ export const UserRewardsSection = ({
   const baseUnclaimed = safeBigInt(unclaimedRewardsStr);
   let totalNewPending = 0n;
   
-  // Pre-calculate pending for each activity
+  // Pre-calculate pending for each activity using real-time calculation
   const activityPendingMap = new Map<number, bigint>();
+  const currentTime = Math.floor(Date.now() / 1000); // Current Unix timestamp in seconds
   activitiesWithStake.forEach(({ activity, userInfo }) => {
-    if (userInfo?.stake && activity?.accRewardPerStake && userInfo?.userIndex) {
-      const pending = calculatePendingRewards(
+    // Check for existence, not truthiness (0 is valid for userIndex)
+    if (
+      userInfo?.stake &&
+      activity?.accRewardPerStake !== undefined &&
+      userInfo?.userIndex !== undefined &&
+      activity?.emissionRate !== undefined &&
+      activity?.totalStake !== undefined &&
+      activity?.lastUpdateTime !== undefined
+    ) {
+      const pending = calculateRealTimePendingRewards(
         userInfo.stake,
         activity.accRewardPerStake,
-        userInfo.userIndex
+        userInfo.userIndex || "0",
+        activity.emissionRate,
+        activity.totalStake,
+        activity.lastUpdateTime,
+        currentTime
       );
       const pendingBig = safeBigInt(pending);
       activityPendingMap.set(activity.activityId, pendingBig);
@@ -198,6 +207,7 @@ export const UserRewardsSection = ({
   
   // Total claimable = base unclaimed + new pending from all activities
   const totalClaimable = baseUnclaimed + totalNewPending;
+  const hasClaimable = totalClaimable > 0n;
   const totalClaimableDecimal = totalClaimable >= 0n
     ? formatBalance(totalClaimable.toString(), "points", 18, 18, 18)
     : null;
@@ -230,7 +240,7 @@ export const UserRewardsSection = ({
             </div>
             <Button
               onClick={handleClaimAll}
-              disabled={!hasUnclaimed || isClaimingAll || !userAddress}
+              disabled={!hasClaimable || isClaimingAll || !userAddress}
               size="lg"
             >
               {isClaimingAll ? (

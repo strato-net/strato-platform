@@ -98,7 +98,7 @@ const Dashboard = () => {
   }, [earningAssets]);
 
   // Use centralized net balance calculation hook
-  const { netBalance: totalBalance, cataBalance, totalBorrowed } = useNetBalance({
+  const { netBalance: totalBalance, cataBalance, totalBorrowed, isLoading: isLoadingNetBalance } = useNetBalance({
     tokens: earningAssets,
     cataToken,
     loans,
@@ -115,7 +115,7 @@ const Dashboard = () => {
     rewards: {
       data: rewardsHistoryCache[selectedTimeRange] || [],
       title: "Rewards",
-      subtitle: "CATA balance over time",
+      subtitle: "Reward Points over time",
       currentValue: cataBalance,
     },
     borrowed: {
@@ -311,11 +311,12 @@ const Dashboard = () => {
               color="bg-blue-500"
               onClick={() => setActiveTab('netBalance')}
               isActive={activeTab === 'netBalance'}
+              isLoading={isLoadingNetBalance}
             />
 
             <AssetSummary
               title="Rewards"
-              value={`${cataBalance.toLocaleString("en-US", { maximumFractionDigits: 2 })} CATA Points`}
+              value={`${cataBalance.toLocaleString("en-US", { maximumFractionDigits: 2 })} Reward Points`}
               icon={<Coins className="text-white" size={18} />}
               color="bg-purple-500"
               onClick={() => setActiveTab('rewards')}

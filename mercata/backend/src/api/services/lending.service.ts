@@ -35,6 +35,24 @@ const {
   RewardsChef,
 } = constants;
 
+// Extract constants for consistency with CDP service
+const RAY = BigInt(10) ** BigInt(27);
+
+
+// Helper function for fixed-point exponentiation (matches contract's _rpow)
+const rpow = (x: bigint, n: bigint, ray: bigint): bigint => {
+  let z = n % 2n !== 0n ? x : ray;
+  let xCopy = x;
+  let nCopy = n;
+  for (nCopy = nCopy / 2n; nCopy !== 0n; nCopy = nCopy / 2n) {
+    xCopy = (xCopy * xCopy) / ray;
+    if (nCopy % 2n !== 0n) {
+      z = (z * xCopy) / ray;
+    }
+  }
+  return z;
+};
+
 /**
  * Get the latest exchange rate for the lending pool from Cirrus events
  */
@@ -1294,6 +1312,130 @@ export const listLoansForLiquidation = async (
   }
 
   return results;
+};
+
+/**
+ * Get interest accrued for lending pool
+ * Uses compound interest formula matching contract's _accrue() function
+ */
+export const getLendingInterestAccrued = async (
+  accessToken: string,
+): Promise<{
+  totalDailyInterestUSD: string;
+  totalWeeklyInterestUSD: string;
+  totalMonthlyInterestUSD: string;
+  totalYtdInterestUSD: string;
+  totalAllTimeInterestUSD: string;
+  borrowableAsset: {
+    asset: string;
+    symbol: string;
+    totalDebtUSD: string;
+    annualRatePercent: number;
+    dailyInterestUSD: string;
+    weeklyInterestUSD: string;
+    monthlyInterestUSD: string;
+    ytdInterestUSD: string;
+    allTimeInterestUSD: string;
+  };
+}> => {
+  const registry = await getPool(accessToken, {
+    select:
+      `lendingPool:lendingPool_fkey(` +
+        `address,borrowableAsset,` +
+        `borrowIndex::text,totalScaledDebt::text,` +
+        `assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value)` +
+      `)`
+  });
+
+  if (!registry?.lendingPool?.borrowableAsset) {
+    throw new Error("Lending pool or borrowable asset not found");
+  }
+
+  const { borrowableAsset, borrowIndex: borrowIndexStr, totalScaledDebt: totalScaledDebtStr } = registry.lendingPool;
+  const totalScaledDebt = BigInt(totalScaledDebtStr || "0");
+  const borrowIndex = BigInt(borrowIndexStr || RAY.toString());
+
+  // Get asset config
+  const borrowableAssetConfig = registry.lendingPool.assetConfigs
+    ?.find((cfg: any) => cfg.asset?.toLowerCase() === borrowableAsset.toLowerCase())
+    ?.AssetConfig;
+
+  if (!borrowableAssetConfig?.perSecondFactorRAY) {
+    throw new Error("Borrowable asset configuration not found");
+  }
+
+  const perSecondFactorRAY = BigInt(borrowableAssetConfig.perSecondFactorRAY);
+  if (perSecondFactorRAY === 0n || perSecondFactorRAY === RAY) {
+    throw new Error("perSecondFactorRAY not set or invalid");
+  }
+
+  // Get token symbol
+  const tokenRows = await getTokens(accessToken, {
+    address: `eq.${borrowableAsset}`,
+    select: "address,_symbol"
+  });
+  const symbol = tokenRows?.[0]?._symbol || "UNKNOWN";
+
+  // Calculate actual debt and annual rate
+  const actualDebtUSD = (totalScaledDebt * borrowIndex) / RAY;
+  const annualRatePercent = (borrowableAssetConfig.interestRate || 0) / 100;
+
+  // Helper: Calculate compound interest for a time period
+  // Formula: idx1 = (idx0 * rpow(perSec, dt, RAY)) / RAY, Interest = (totalScaledDebt * (idx1 - idx0)) / RAY
+  const calculateCompoundInterest = (seconds: bigint): bigint => {
+    if (totalScaledDebt === 0n || seconds === 0n) return 0n;
+    const idx1 = (borrowIndex * rpow(perSecondFactorRAY, seconds, RAY)) / RAY;
+    return (totalScaledDebt * (idx1 - borrowIndex)) / RAY;
+  };
+
+  // Calculate time periods
+  const secondsPerDay = 86400n;
+  const secondsPerWeek = 604800n;
+  const secondsPerMonth = 2592000n;
+  const now = Math.floor(Date.now() / 1000);
+  const startOfYearTimestamp = Math.floor(new Date(new Date().getFullYear(), 0, 1).getTime() / 1000);
+  const secondsElapsedYTD = BigInt(now - startOfYearTimestamp);
+
+  // Calculate interest for each period
+  const dailyInterestUSD = calculateCompoundInterest(secondsPerDay);
+  const weeklyInterestUSD = calculateCompoundInterest(secondsPerWeek);
+  const monthlyInterestUSD = calculateCompoundInterest(secondsPerMonth);
+  
+  // YTD: Work backwards to find borrowIndex at start of year
+  const ytdInterestUSD = totalScaledDebt > 0n && secondsElapsedYTD > 0n
+    ? (() => {
+        const rpowResult = rpow(perSecondFactorRAY, secondsElapsedYTD, RAY);
+        const borrowIndexAtStartOfYear = (borrowIndex * RAY) / rpowResult;
+        return (totalScaledDebt * (borrowIndex - borrowIndexAtStartOfYear)) / RAY;
+      })()
+    : 0n;
+
+  // All-time interest (actual accrued)
+  const allTimeInterestUSD = totalScaledDebt > 0n 
+    ? (totalScaledDebt * (borrowIndex - RAY)) / RAY
+    : 0n;
+
+  // Format values as strings
+  const formatValue = (val: bigint) => val.toString();
+
+  return {
+    totalDailyInterestUSD: formatValue(dailyInterestUSD),
+    totalWeeklyInterestUSD: formatValue(weeklyInterestUSD),
+    totalMonthlyInterestUSD: formatValue(monthlyInterestUSD),
+    totalYtdInterestUSD: formatValue(ytdInterestUSD),
+    totalAllTimeInterestUSD: formatValue(allTimeInterestUSD),
+    borrowableAsset: {
+      asset: borrowableAsset,
+      symbol,
+      totalDebtUSD: formatValue(actualDebtUSD),
+      annualRatePercent,
+      dailyInterestUSD: formatValue(dailyInterestUSD),
+      weeklyInterestUSD: formatValue(weeklyInterestUSD),
+      monthlyInterestUSD: formatValue(monthlyInterestUSD),
+      ytdInterestUSD: formatValue(ytdInterestUSD),
+      allTimeInterestUSD: formatValue(allTimeInterestUSD)
+    }
+  };
 };
 
 export const listLiquidatableLoans = async (accessToken: string): Promise<LiquidationEntry[]> => {

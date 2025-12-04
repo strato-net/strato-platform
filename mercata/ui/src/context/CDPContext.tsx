@@ -7,7 +7,7 @@ type CDPContextType = {
   vaults: VaultData[];
   loading: boolean;
   refreshVaults: () => Promise<void>;
-  totalCDPDebt: string; // Total debt across all vaults in wei
+  totalCDPDebt: string | undefined;
 };
 
 const CDPContext = createContext<CDPContextType | undefined>(undefined);
@@ -20,6 +20,7 @@ export const CDPProvider = ({ children }: { children: React.ReactNode }) => {
   // ========== REFS ==========
   const vaultsIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const vaultsAbortControllerRef = useRef<AbortController | null>(null);
+  const hasFetchedVaults = useRef(false);
 
   const fetchVaults = useCallback(async (showLoading: boolean = false) => {
     if (!isLoggedIn) {
@@ -45,6 +46,7 @@ export const CDPProvider = ({ children }: { children: React.ReactNode }) => {
       
       if (!vaultsAbortControllerRef.current.signal.aborted) {
         setVaults(response.data);
+        hasFetchedVaults.current = true;
       }
     } catch (error: any) {
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
@@ -62,10 +64,12 @@ export const CDPProvider = ({ children }: { children: React.ReactNode }) => {
   }, [isLoggedIn]);
 
   // Calculate total CDP debt across all vaults
-  const totalCDPDebt = vaults.reduce((total, vault) => {
-    const vaultDebt = BigInt(vault.debtAmount || '0');
-    return (BigInt(total) + vaultDebt).toString();
-  }, '0');
+  const totalCDPDebt = hasFetchedVaults.current
+    ? vaults.reduce((total, vault) => {
+        const vaultDebt = BigInt(vault.debtAmount || '0');
+        return (BigInt(total) + vaultDebt).toString();
+      }, '0')
+    : undefined;
 
   // ========== POLLING EFFECTS ==========
   // Vaults polling (60s interval)
