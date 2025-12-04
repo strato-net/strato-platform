@@ -67,22 +67,46 @@ const calculateExchangeRates = (pool: Pool | null, fromAsset: SwapToken | null) 
 };
 
 /**
- * Get activity name for swap rewards based on asset symbol/name
- * Maps to activityType 1 (OneTime) swap activities
+ * Check if asset is USDST
  */
-const getSwapActivityName = (asset: SwapToken | null | undefined): string | null => {
+const isUSDSTAsset = (asset: SwapToken | null | undefined): boolean => {
+  if (!asset) return false;
+  const text = `${asset._symbol?.toUpperCase() || ""} ${asset._name?.toUpperCase() || ""}`;
+  return text.includes("USDST");
+};
+
+/**
+ * Get activity name for key asset (ETHST, WBTCST, GOLDST, SILVST)
+ */
+const getKeyAssetActivityName = (asset: SwapToken | null | undefined): string | null => {
   if (!asset) return null;
   
-  const symbol = asset._symbol?.toUpperCase() || "";
-  const name = asset._name?.toUpperCase() || "";
+  const text = `${asset._symbol?.toUpperCase() || ""} ${asset._name?.toUpperCase() || ""}`;
+  const activityMap: Record<string, string> = {
+    "ETHST": "ETHST-USDST Swap",
+    "WBTCST": "WBTCST-USDST Swap",
+    "GOLDST": "GOLDST-USDST Swap",
+    "SILVST": "SILVST-USDST Swap",
+  };
   
-  // Check by symbol or name
-  if (symbol.includes("ETHST") || name.includes("ETHST")) return "ETHST-USDST Swap";
-  if (symbol.includes("WBTCST") || name.includes("WBTCST")) return "WBTCST-USDST Swap";
-  if (symbol.includes("GOLDST") || name.includes("GOLDST")) return "GOLDST-USDST Swap";
-  if (symbol.includes("SILVST") || name.includes("SILVST")) return "SILVST-USDST Swap";
+  for (const [key, activityName] of Object.entries(activityMap)) {
+    if (text.includes(key)) return activityName;
+  }
   
   return null;
+};
+
+/**
+ * Get activity name for swap rewards
+ * If primary asset is USDST, checks secondary asset instead
+ */
+const getSwapActivityName = (
+  primaryAsset: SwapToken | null | undefined,
+  secondaryAsset?: SwapToken | null | undefined
+): string | null => {
+  return isUSDSTAsset(primaryAsset) 
+    ? getKeyAssetActivityName(secondaryAsset) 
+    : getKeyAssetActivityName(primaryAsset);
 };
 
 // ============================================================================
@@ -214,6 +238,7 @@ interface TokenInputProps {
   maxAmountWei: string;
   onChange: (value: string) => void;
   asset?: SwapToken;
+  otherAsset?: SwapToken; // Other asset in the swap pair (for determining activity name)
   onSelect: (asset: SwapToken) => void;
   tokens: SwapToken[];
   isOpen: boolean;
@@ -235,6 +260,7 @@ const TokenInput = ({
   maxAmountWei,
   onChange,
   asset,
+  otherAsset,
   onSelect,
   tokens,
   isOpen,
@@ -315,8 +341,9 @@ const TokenInput = ({
           </span>
         </div>
       )}
-      {isFromInput && (() => {
-        const activityName = getSwapActivityName(asset);
+      {/* Show rewards only if amount is entered and current asset is not USDST */}
+      {amount && parseFloat(amount) > 0 && !isUSDSTAsset(asset) && (() => {
+        const activityName = getSwapActivityName(asset, otherAsset);
         return activityName ? (
           <CompactRewardsDisplay
             userRewards={userRewards}
@@ -504,7 +531,6 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
     () => pairableTokens.filter(t => t.address !== fromAsset?.address),
     [pairableTokens, fromAsset?.address]
   );
-  const { userAddress } = useUser();
   const { fetchTokens } = useUserTokens();
   const { usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
   const { refreshLoans, refreshCollateral } = useLendingContext();
@@ -861,6 +887,7 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
         maxAmountWei={fromAssetAvailableBalance}
         onChange={(value) => handleAmountChange(true, value)}
         asset={fromAsset}
+        otherAsset={toAsset}
         onSelect={(asset) => asset.address !== toAsset?.address && setFromAsset({ ...asset, balance: asset.balance || "0" })}
         tokens={fromOptions}
         isOpen={fromPopoverOpen}
@@ -893,6 +920,7 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
         maxAmountWei={toAsset?.poolBalance || "0"}
         onChange={(value) => handleAmountChange(false, value)}
         asset={toAsset}
+        otherAsset={fromAsset}
         onSelect={(asset) => asset.address !== fromAsset?.address && setToAsset({ ...asset, balance: asset.balance || "0" })}
         tokens={toOptions}
         isOpen={toPopoverOpen}
