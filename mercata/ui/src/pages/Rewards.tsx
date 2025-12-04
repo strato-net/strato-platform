@@ -10,6 +10,7 @@ import { LeaderboardTable } from "@/components/rewards/LeaderboardTable";
 import { useRewards } from "@/hooks/useRewards";
 import { useRewardsActivities } from "@/hooks/useRewardsActivities";
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
+import { useRewardsLeaderboard } from "@/hooks/useRewardsLeaderboard";
 
 const Rewards = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -18,16 +19,27 @@ const Rewards = () => {
   const { state, loading: stateLoading, refetch: refetchState } = useRewards();
   const { activities, loading: activitiesLoading, refetch: refetchActivities } = useRewardsActivities();
   const { userRewards, loading: userRewardsLoading, refetch: refetchUserRewards } = useRewardsUserInfo();
+  const [leaderboardSortBy, setLeaderboardSortBy] = useState<"rewards" | "emissionRate">("rewards");
+  const [leaderboardLimit] = useState(10);
+  const [leaderboardPage, setLeaderboardPage] = useState(1);
+  const leaderboardOffset = (leaderboardPage - 1) * leaderboardLimit;
+  const { entries: leaderboardEntries, total: leaderboardTotal, loading: leaderboardLoading, refetch: refetchLeaderboard } = useRewardsLeaderboard(leaderboardLimit, leaderboardOffset, leaderboardSortBy);
 
   useEffect(() => {
     document.title = "Rewards";
   }, []);
+
+  // Reset page to 1 when sortBy changes
+  useEffect(() => {
+    setLeaderboardPage(1);
+  }, [leaderboardSortBy]);
 
   const handleClaimSuccess = () => {
     // Refetch all data after successful claim
     refetchState();
     refetchActivities();
     refetchUserRewards();
+    refetchLeaderboard();
   };
 
   const handleRefresh = async () => {
@@ -36,6 +48,7 @@ const Rewards = () => {
       refetchState(),
       refetchActivities(),
       refetchUserRewards(),
+      refetchLeaderboard(),
     ]);
   };
 
@@ -76,8 +89,19 @@ const Rewards = () => {
             </TabsContent>
 
             <TabsContent value="leaderboard">
-              <LeaderboardTable />
-              </TabsContent>
+              <LeaderboardTable 
+                entries={leaderboardEntries}
+                total={leaderboardTotal}
+                limit={leaderboardLimit}
+                currentPage={leaderboardPage}
+                loading={leaderboardLoading}
+                onSortChange={(sortBy) => {
+                  setLeaderboardSortBy(sortBy);
+                  setLeaderboardPage(1);
+                }}
+                onPageChange={setLeaderboardPage}
+              />
+            </TabsContent>
             <TabsContent value="activities">
               <ActivitiesTable
                 activities={activities}
