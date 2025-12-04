@@ -153,7 +153,7 @@ isDefault BDefault = True
 
 instance Format BasicValue where
   format (BInteger i) = show i
-  format (BString s) = ('"' :) . (++ "\"") $ UTF8.toString s
+  format (BString s) = show $ UTF8.toString s
   format (BDecimal v) = show v
   format (BBool True) = "true"
   format (BBool False) = "false"
