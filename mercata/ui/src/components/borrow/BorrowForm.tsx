@@ -174,9 +174,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
         )}
         <CompactRewardsDisplay
           userRewards={userRewards}
-          loading={rewardsLoading || false}
           activityName="Lending Pool Borrow"
-          variant="inline"
           inputAmount={borrowAmount}
         />
         <PercentageButtons

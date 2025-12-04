@@ -11,9 +11,7 @@ import { Coins } from "lucide-react";
 
 interface CompactRewardsDisplayProps {
   userRewards: UserRewardsData | null;
-  loading: boolean;
   activityName: string; // Activity name to match (e.g., "ETHST-USDST Swap LP", "CDP USDST Mint")
-  variant?: "button" | "inline";
   inputAmount?: string; // Input amount for calculating 1% estimated rewards
 }
 
@@ -21,7 +19,6 @@ interface CompactRewardsDisplayProps {
 export const CompactRewardsDisplay = ({
   userRewards,
   activityName,
-  variant = "button",
   inputAmount,
 }: CompactRewardsDisplayProps) => {
   // Match activity by name (case-insensitive)
@@ -56,7 +53,7 @@ export const CompactRewardsDisplay = ({
 
   // Calculate 1% of input amount for estimated rewards
   let inputAmountReward = 0n;
-  if (inputAmount && variant === "inline") {
+  if (inputAmount) {
     try {
       const inputWei = safeParseUnits(inputAmount || "0", 18);
       // 1% of input amount
@@ -68,18 +65,6 @@ export const CompactRewardsDisplay = ({
 
   // Add input amount reward (1%) to total estimated per day
   const totalEstimatedWithInput = totalEstimatedPerDay + inputAmountReward;
-
-  const totalEstimatedPerDayDecimal = formatBalance(
-    totalEstimatedPerDay.toString(),
-    "points",
-    18,
-    18,
-    18
-  );
-  const totalEstimatedPerDayNumeric = totalEstimatedPerDayDecimal.replace(/\s*points?\s*$/i, '').trim();
-  const totalEstimatedPerDayFormatted = totalEstimatedPerDayNumeric
-    ? formatRoundedWithCommas(roundByMagnitude(totalEstimatedPerDayNumeric)) + " points"
-    : "0 points";
 
   const totalEstimatedWithInputDecimal = formatBalance(
     totalEstimatedWithInput.toString(),
@@ -93,10 +78,9 @@ export const CompactRewardsDisplay = ({
     ? formatRoundedWithCommas(roundByMagnitude(totalEstimatedWithInputNumeric)) + " points"
     : "0 points";
 
-  const hasRewards = totalPending > 0n || totalEstimatedPerDay > 0n || inputAmountReward > 0n;
 
   // Inline variant - for below input fields
-  if (variant === "inline") {
+  
     // Don't show anything until user enters input
     if (!inputAmount || parseFloat(inputAmount) === 0 || inputAmountReward === 0n) {
       return null;
@@ -161,6 +145,6 @@ export const CompactRewardsDisplay = ({
     );
   }
 
-  return null;
-};
+
+
 

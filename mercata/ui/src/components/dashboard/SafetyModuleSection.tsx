@@ -228,9 +228,8 @@ const SafetyModuleSection = () => {
             </CardTitle>
             <CompactRewardsDisplay
               userRewards={userRewards}
-              loading={rewardsLoading}
+              inputAmount={stakeAmount}
               activityName="Safety Module"
-              variant="button"
             />
           </div>
         </CardHeader>
@@ -301,9 +300,7 @@ const SafetyModuleSection = () => {
                   {/* Estimated Rewards */}
                   <CompactRewardsDisplay
                     userRewards={userRewards}
-                    loading={rewardsLoading}
                     activityName="Safety Module"
-                    variant="inline"
                     inputAmount={stakeAmount}
                   />
                   {/* Stake sUSDST Checkbox - only show if rewards are enabled */}

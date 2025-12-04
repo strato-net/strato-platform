@@ -4,7 +4,6 @@ import DashboardHeader from "../components/dashboard/DashboardHeader";
 import MobileSidebar from "../components/dashboard/MobileSidebar";
 import SwapWidget from "@/components/swap/SwapWidget";
 import SwapHistory from "@/components/swap/SwapHistory";
-import { CompactRewardsDisplay } from '@/components/rewards/CompactRewardsDisplay';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 
 const SwapAsset = () => {
@@ -26,12 +25,6 @@ const SwapAsset = () => {
             <div className="bg-white shadow-md rounded-lg p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-semibold">Exchange your digital assets</h2>
-                <CompactRewardsDisplay
-                  userRewards={userRewards}
-                  loading={rewardsLoading}
-                  activityName="ETHST-USDST Swap"
-                  variant="button"
-                />
               </div>
               <SwapWidget 
                 userRewards={userRewards}

@@ -880,9 +880,7 @@ const MintWidget: React.FC<MintWidgetProps> = ({ onSuccess, title = "Mint Agains
           {borrowAmount && parseFloat(borrowAmount) > 0 && (
             <CompactRewardsDisplay
               userRewards={userRewards}
-              loading={rewardsLoading || false}
               activityName="CDP USDST Mint"
-              variant="inline"
               inputAmount={borrowAmount}
             />
           )}

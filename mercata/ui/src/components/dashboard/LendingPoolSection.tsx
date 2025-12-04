@@ -170,9 +170,8 @@ const LendingPoolSection = () => {
             <CardTitle>USDST Lending Pool</CardTitle>
             <CompactRewardsDisplay
               userRewards={userRewards}
-              loading={rewardsLoading}
               activityName="Lending Pool Liquidity"
-              variant="button"
+              inputAmount={depositAmount}
             />
           </div>
         </CardHeader>
@@ -243,9 +242,7 @@ const LendingPoolSection = () => {
                   {/* Estimated Rewards */}
                   <CompactRewardsDisplay
                     userRewards={userRewards}
-                    loading={rewardsLoading}
                     activityName="Lending Pool Liquidity"
-                    variant="inline"
                     inputAmount={depositAmount}
                   />
                   {/* Stake mUSDST Checkbox */}

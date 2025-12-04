@@ -66,6 +66,25 @@ const calculateExchangeRates = (pool: Pool | null, fromAsset: SwapToken | null) 
   };
 };
 
+/**
+ * Get activity name for swap rewards based on asset symbol/name
+ * Maps to activityType 1 (OneTime) swap activities
+ */
+const getSwapActivityName = (asset: SwapToken | null | undefined): string | null => {
+  if (!asset) return null;
+  
+  const symbol = asset._symbol?.toUpperCase() || "";
+  const name = asset._name?.toUpperCase() || "";
+  
+  // Check by symbol or name
+  if (symbol.includes("ETHST") || name.includes("ETHST")) return "ETHST-USDST Swap";
+  if (symbol.includes("WBTCST") || name.includes("WBTCST")) return "WBTCST-USDST Swap";
+  if (symbol.includes("GOLDST") || name.includes("GOLDST")) return "GOLDST-USDST Swap";
+  if (symbol.includes("SILVST") || name.includes("SILVST")) return "SILVST-USDST Swap";
+  
+  return null;
+};
+
 // ============================================================================
 // UI COMPONENTS
 // ============================================================================
@@ -296,15 +315,16 @@ const TokenInput = ({
           </span>
         </div>
       )}
-      {/* {isFromInput && (
-        <CompactRewardsDisplay
-          userRewards={userRewards}
-          loading={rewardsLoading || false}
-          activityName="ETHST-USDST Swap"
-          variant="inline"
-          inputAmount={amount}
-        />
-      )} */}
+      {isFromInput && (() => {
+        const activityName = getSwapActivityName(asset);
+        return activityName ? (
+          <CompactRewardsDisplay
+            userRewards={userRewards}
+            activityName={activityName}
+            inputAmount={amount}
+          />
+        ) : null;
+      })()}
     </div>
   );
 };

@@ -665,9 +665,7 @@ const LiquidityDepositModal = ({
             return (totalInputAmount && parseFloat(totalInputAmount) > 0) ? (
               <CompactRewardsDisplay
                 userRewards={userRewards}
-                loading={rewardsLoading || false}
                 activityName={activityName}
-                variant="inline"
                 inputAmount={totalInputAmount}
               />
             ) : null;

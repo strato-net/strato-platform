@@ -11,20 +11,7 @@ import { Pool } from '@/interface';
 import { rewardsEnabled } from '@/lib/constants';
 import LiquidityDepositModal from './LiquidityDepositModal';
 import LiquidityWithdrawModal from './LiquidityWithdrawModal';
-import { CompactRewardsDisplay } from '@/components/rewards/CompactRewardsDisplay';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
-
-// Helper function to map pool names to activity names
-const getPoolActivityName = (poolName: string | undefined): string | null => {
-  if (!poolName) return null;
-  const name = poolName.toLowerCase();
-  if (name.includes('ethst') && name.includes('usdst')) return "ETHST-USDST Swap LP";
-  if (name.includes('wbtcst') && name.includes('usdst')) return "WBTCST-USDST Swap LP";
-  if (name.includes('goldst') && name.includes('usdst')) return "GOLDST-USDST Swap LP";
-  if (name.includes('silvst') && name.includes('usdst')) return "SILVST-USDST Swap LP";
-  return null;
-};
-
 
 const SwapPoolsSection = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -222,17 +209,7 @@ const SwapPoolsSection = () => {
                       <div className="text-sm text-gray-500">APY</div>
                       <div className="font-medium">{pool.apy ? `${pool.apy}%` : "N/A"}</div>
                     </div>
-                    {(() => {
-                      const activityName = getPoolActivityName(pool.poolName);
-                      return activityName ? (
-                        <CompactRewardsDisplay
-                          userRewards={userRewards}
-                          loading={rewardsLoading}
-                          activityName={activityName}
-                          variant="button"
-                        />
-                      ) : null;
-                    })()}
+               
                     <div className="flex space-x-2">
                       <Button
                         size="sm"
