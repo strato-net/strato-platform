@@ -12,7 +12,7 @@ import { Coins } from "lucide-react";
 interface CompactRewardsDisplayProps {
   userRewards: UserRewardsData | null;
   activityName: string; // Activity name to match (e.g., "ETHST-USDST Swap LP", "CDP USDST Mint")
-  inputAmount?: string; // Input amount for calculating 1% estimated rewards
+  inputAmount?: string; // Input amount for calculating estimated rewards per day
 }
 
 export const CompactRewardsDisplay = ({
@@ -65,19 +65,35 @@ export const CompactRewardsDisplay = ({
     totalEstimatedPerDay += BigInt(estimatedPerDay);
   });
 
-  // Calculate 1% of input amount for estimated rewards
-  let inputAmountReward = 0n;
+  // Calculate estimated rewards per day with input using the same formula as "My Rewards" section
+  // Formula: ((oldStake + input) / (oldTotalStake + input)) * emissionRate * secondsPerDay
+  let totalEstimatedWithInput = 0n;
   if (inputAmount) {
     try {
       const inputWei = safeParseUnits(inputAmount || "0", 18);
-      // 1% of input amount
-      inputAmountReward = (inputWei * 1n) / 100n;
+      
+      filteredActivities.forEach(({ activity, userInfo }) => {
+        if (activity?.emissionRate !== undefined && activity?.totalStake !== undefined) {
+          const oldStake = BigInt(userInfo?.stake || "0");
+          const oldTotalStake = BigInt(activity.totalStake);
+          const newStake = oldStake + inputWei;
+          const newTotalStake = oldTotalStake + inputWei;
+          
+          // Use the same formula as calculateEstimatedRewardsPerDay but with adjusted stake values
+          if (newTotalStake > 0n) {
+            const estimatedPerDay = calculateEstimatedRewardsPerDay(
+              newStake.toString(),
+              newTotalStake.toString(),
+              activity.emissionRate
+            );
+            totalEstimatedWithInput += BigInt(estimatedPerDay);
+          }
+        }
+      });
     } catch {
-      inputAmountReward = 0n;
+      totalEstimatedWithInput = 0n;
     }
   }
-
-  const totalEstimatedWithInput = inputAmountReward;
 
   const totalEstimatedWithInputDecimal = formatBalance(
     totalEstimatedWithInput.toString(),
@@ -92,14 +108,14 @@ export const CompactRewardsDisplay = ({
   const totalEstimatedWithInputFormatted = totalEstimatedWithInputNumeric
     ? formatRoundedWithCommas(
         roundByMagnitude(totalEstimatedWithInputNumeric)
-      ) + " points"
-    : "0 points";
+      ) + " points/day"
+    : "0 points/day";
 
   // Don't show anything until user enters input
   if (
     !inputAmount ||
     parseFloat(inputAmount) === 0 ||
-    inputAmountReward === 0n
+    totalEstimatedWithInput === 0n
   ) {
     return null;
   }
@@ -132,7 +148,7 @@ export const CompactRewardsDisplay = ({
       " points/day"
     : "0 points/day";
 
-  // If input has value, show total with 1% breakdown and effective emission rate
+  // If input has value, show estimated rewards per day and effective emission rate
   return (
     <div className="mt-2 space-y-1">
       <div className="flex items-center gap-2 text-sm">
