@@ -36,11 +36,11 @@ const AssetsList = ({
   }, [tokens]);
 
   return (
-    <div className="bg-card rounded-xl border border-border shadow-sm w-full overflow-hidden">
-      <div className="p-5 border-b border-border">
-        <div className="flex justify-between items-center">
-          <h2 className="font-bold text-lg">My Deposits</h2>
-          {isDashboard && (
+    <div className="w-full overflow-hidden">
+      {isDashboard && (
+        <div className="p-5 border-b border-border">
+          <div className="flex justify-between items-center">
+            <h2 className="font-bold text-lg">My Deposits</h2>
             <Button
               size="sm"
             >
@@ -52,14 +52,21 @@ const AssetsList = ({
                 Add Deposits
               </a>
             </Button>
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
       <div>
-        <div className="p-4 text-right border-t border-border flex justify-between">
-          <span className="font-bold">Earning Assets</span>
-        </div>
+        {!isDashboard && (
+          <div className="p-4 text-right border-b border-border flex justify-between">
+            <span className="font-bold">Earning Assets</span>
+          </div>
+        )}
+        {isDashboard && (
+          <div className="p-4 text-right border-t border-border flex justify-between">
+            <span className="font-bold">Earning Assets</span>
+          </div>
+        )}
         <div className="w-full overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
           <table style={{ minWidth: '700px', width: '100%' }}>
             <thead>

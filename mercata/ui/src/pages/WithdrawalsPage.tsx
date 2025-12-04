@@ -107,7 +107,7 @@ const WithdrawalsPage = () => {
                   </div>
                 </CardHeader>
                 <CardContent className="flex-1 flex flex-col min-h-0">
-                  <div className="w-full bg-card/90 p-1.5 rounded-xl border border-border shadow-sm flex-1 flex flex-col min-h-0">
+                  <div className="w-full flex-1 flex flex-col min-h-0">
                     <AntdTabs
                       activeKey={activeTab}
                       items={[
@@ -131,7 +131,7 @@ const WithdrawalsPage = () => {
                         } as React.CSSProperties
                       }
                     />
-                    <div className="bg-card rounded-xl p-4 shadow-sm mt-4 flex-1 min-h-0 overflow-auto border border-border">
+                    <div className="mt-4 flex-1 min-h-0 overflow-auto">
                       <BridgeOut isConvert={activeTab === "from-savings"} />
                     </div>
                   </div>
