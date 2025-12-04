@@ -267,7 +267,7 @@ const AssetDetail = () => {
 
   if (!asset) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-background">
         <DashboardSidebar />
         <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 16rem)' }}>
           <DashboardHeader title="Asset Not Found" />
@@ -279,7 +279,7 @@ const AssetDetail = () => {
             <main className="p-6">
               <div className="text-center py-12">
                 <h2 className="text-2xl font-bold mb-4">Asset Not Found</h2>
-                <p className="text-gray-600 mb-6">The asset you are looking for does not exist or has been removed.</p>
+                <p className="text-muted-foreground mb-6">The asset you are looking for does not exist or has been removed.</p>
                 <Link to="/dashboard/deposits">
                   <Button>Back to Deposits</Button>
                 </Link>
@@ -299,7 +299,7 @@ const AssetDetail = () => {
 
   
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <DashboardSidebar />
 
       <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 16rem)' }}>
@@ -307,7 +307,7 @@ const AssetDetail = () => {
 
         <main className="p-6">
           <div className="mb-6">
-            <Link to="/dashboard/deposits" className="inline-flex items-center text-blue-600 hover:text-blue-800">
+            <Link to="/dashboard/deposits" className="inline-flex items-center text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
               <ChevronLeft size={16} className="mr-1" /> Back to Deposits
             </Link>
           </div>
@@ -320,7 +320,7 @@ const AssetDetail = () => {
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-semibold text-blue-600">{asset?.token?._symbol || asset?._symbol}</p>
+                      <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">{asset?.token?._symbol || asset?._symbol}</p>
                       <CardTitle className="text-xl">{asset?.token?._name || asset?._name}</CardTitle>
                     </div>
                     <div
@@ -335,7 +335,7 @@ const AssetDetail = () => {
                 <CardContent>
                   <div className="flex justify-center mb-6">
                     <div
-                      className="w-32 h-32 rounded-full bg-white border-4 flex items-center justify-center overflow-hidden relative"
+                      className="w-32 h-32 rounded-full bg-white dark:bg-secondary border-4 border-border flex items-center justify-center overflow-hidden relative"
                     >
                       {asset?.token?.images?.length > 0 || asset?.images?.length > 0 ? (
                         <img
@@ -345,7 +345,7 @@ const AssetDetail = () => {
                           onError={(e) => (e.currentTarget.style.display = "none")}
                         />
                       ) : (
-                        <span className="absolute inset-0 flex items-center justify-center text-center text-sm font-semibold text-gray-500 p-2">
+                        <span className="absolute inset-0 flex items-center justify-center text-center text-sm font-semibold text-muted-foreground p-2">
                           {asset?.token?._name || asset?._name}
                         </span>
                       )}
@@ -358,7 +358,7 @@ const AssetDetail = () => {
                       onMouseEnter={() => setShowPriceTooltip(true)}
                       onMouseLeave={() => setShowPriceTooltip(false)}
                     >
-                      <span className="text-gray-500">Current Price:</span>
+                      <span className="text-muted-foreground">Current Price:</span>
                       <div className="flex items-center gap-2">
                         <span className="font-medium">
                           {addCommasToInput(formatUnits(asset?.price?.toLocaleString("fullwide", { useGrouping: false }), 18))} USDST
@@ -384,7 +384,7 @@ const AssetDetail = () => {
                       
                       {/* Price timestamp tooltip */}
                       {showPriceTooltip && priceData.length > 0 && (
-                        <div className="absolute right-0 top-full mt-1 z-10 bg-gray-800 text-white text-xs rounded py-1 px-2 whitespace-nowrap shadow-lg">
+                        <div className="absolute right-0 top-full mt-1 z-10 bg-popover text-popover-foreground border text-xs rounded py-1 px-2 whitespace-nowrap shadow-lg">
                           Last updated: {(() => {
                             const latestEntry = priceData[priceData.length - 1];
                             if (latestEntry?.timestamp) {
@@ -403,12 +403,12 @@ const AssetDetail = () => {
                     </div>
 
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Balance:</span>
+                      <span className="text-muted-foreground">Balance:</span>
                       <span className="font-medium">{formatUnits(BigInt(asset?.balance || "0") + BigInt(asset?.collateralBalance || "0"), 18)}</span>
                     </div>
 
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Owner:</span>
+                      <span className="text-muted-foreground">Owner:</span>
                       <span className="font-medium">
                         {asset?.token?._owner
                           ? `${asset.token._owner.slice(0, 6)}...${asset.token._owner.slice(-4)}`
@@ -418,7 +418,7 @@ const AssetDetail = () => {
                     </div>
 
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Address:</span>
+                      <span className="text-muted-foreground">Address:</span>
                       <span className="font-medium">
                         {asset?.address
                           ? `${asset.address.slice(0, 6)}...${asset.address.slice(-4)}`
@@ -439,7 +439,7 @@ const AssetDetail = () => {
                     <div className="flex items-center gap-2 justify-center mb-4 text-green-600">
                       <div className="w-3 h-3 bg-green-500 rounded-full"></div>
                       <span className="text-sm font-medium">Wallet Connected</span>
-                      <span className="text-gray-500">Address:</span>
+                      <span className="text-muted-foreground">Address:</span>
                       <span className="font-medium">{asset?.address}</span>
                     </div>
                   )}
@@ -464,7 +464,7 @@ const AssetDetail = () => {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="mt-6">
                 <CardHeader>
                   <CardTitle>About {asset?.token?._name || asset?._name}</CardTitle>
                 </CardHeader>
@@ -472,7 +472,7 @@ const AssetDetail = () => {
                 <CardContent>
                   <div className="space-y-4">
                     <div
-                      className="prose max-w-none text-sm"
+                      className="prose dark:prose-invert max-w-none text-sm"
                       dangerouslySetInnerHTML={{ __html: asset?.token?.description || asset?.description }}
                     />
                   </div>
