@@ -98,6 +98,19 @@ const VoteTab = () => {
   const executed: object[] = (openIssues && openIssues['executed']) || [];
   const JSONBigNative = JSONBig({ useNativeBigInt: true });
 
+  const normalizeAndParse = (jsonString: string) => {
+    const normalized = jsonString
+      .replace(/\u201C/g, '"')
+      .replace(/\u201D/g, '"')
+      .replace(/\u2018/g, "'")
+      .replace(/\u2019/g, "'")
+      .replace(/\\8220/g, '"')
+      .replace(/\\8221/g, '"')
+      .replace(/\\8216/g, "'")
+      .replace(/\\8217/g, "'");
+    return JSONBigNative.parse(normalized);
+  };
+
   return (
     <div className="space-y-6">
       {/* List of Admins */}
@@ -212,7 +225,7 @@ const VoteTab = () => {
                   {issues.map((issue: any, index) => {
                     const issueId = issue.issueId;
                     const address = issue.target;
-                    const issueArgs = JSONBigNative.parse(issue.args);
+                    const issueArgs = normalizeAndParse(issue.args);
                     const threshold = (thresholds.find((v) => v.target === address && v.func === issue.func)?.threshold || globalThreshold)/100;
                     const votesNeeded = Math.ceil((admins.length * threshold)/100);
                     const hasUserVoted = votes.some((v) => v.issueId === issueId && v.voter === userAddress);
@@ -327,7 +340,7 @@ const VoteTab = () => {
                   {executed.map((issue: any, index) => {
                     const issueId = issue.issueId;
                     const address = issue.target;
-                    const issueArgs = JSONBigNative.parse(issue.args);
+                    const issueArgs = normalizeAndParse(issue.args);
                     return (
                       <TableRow key={`${issueId}-${index}`}>
                         <TableCell className="font-mono text-xs max-w-[80px] truncate">

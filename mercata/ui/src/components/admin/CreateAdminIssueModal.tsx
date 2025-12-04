@@ -101,16 +101,7 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
     }
     if (tag === 'array') {
       try {
-        const normalizedValue = value
-          .replace(/\u201C/g, '"')
-          .replace(/\u201D/g, '"')
-          .replace(/\u2018/g, "'")
-          .replace(/\u2019/g, "'")
-          .replace(/\\8220/g, '"')
-          .replace(/\\8221/g, '"')
-          .replace(/\\8216/g, "'")
-          .replace(/\\8217/g, "'");
-        const arr = JSON.parse(normalizedValue);
+        const arr = JSON.parse(value);
         if (!Array.isArray(arr)) {
           return [false, 'Invalid array'];
         }
