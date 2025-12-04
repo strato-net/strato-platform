@@ -99,7 +99,7 @@ const VoteTab = () => {
   const JSONBigNative = JSONBig({ useNativeBigInt: true });
 
   const normalizeAndParse = (jsonString: string) => {
-    const normalized = jsonString
+    let normalized = jsonString
       .replace(/\u201C/g, '"')
       .replace(/\u201D/g, '"')
       .replace(/\u2018/g, "'")
@@ -108,7 +108,14 @@ const VoteTab = () => {
       .replace(/\\8221/g, '"')
       .replace(/\\8216/g, "'")
       .replace(/\\8217/g, "'");
-    return JSONBigNative.parse(normalized);
+    normalized = normalized.replace(/\\"\\"/g, '\\"');
+    normalized = normalized.replace(/""([^"]+)""/g, '"$1"');
+    try {
+      return JSONBigNative.parse(normalized);
+    } catch (e) {
+      console.error('Failed to parse JSON:', normalized, e);
+      throw e;
+    }
   };
 
   return (
