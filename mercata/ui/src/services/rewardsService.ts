@@ -182,7 +182,7 @@ export const fetchUserRewards = async (userAddress: string, forceRefresh: boolea
 export { safeBigInt };
 
 /**
- * Calculate pending rewards for a user in an activity
+ * Calculate pending rewards for a user in an activity (using stale index)
  */
 export const calculatePendingRewards = (
   stake: string,
@@ -194,6 +194,56 @@ export const calculatePendingRewards = (
   if (stakeBig === 0n) return "0";
 
   const indexDelta = safeBigInt(accRewardPerStake) - safeBigInt(userIndex);
+  const pending = (stakeBig * indexDelta) / safeBigInt(precisionMultiplier);
+
+  return pending.toString();
+};
+
+/**
+ * Calculate real-time pending rewards for a user in an activity
+ * Accounts for time elapsed since last index update
+ * Formula matches contract's _updateActivityIndex logic
+ */
+export const calculateRealTimePendingRewards = (
+  stake: string,
+  accRewardPerStake: string,
+  userIndex: string,
+  emissionRate: string,
+  totalStake: string,
+  lastUpdateTime: string,
+  currentTime: number, // Unix timestamp in seconds
+  precisionMultiplier: string = "1000000000000000000"
+): string => {
+  const stakeBig = safeBigInt(stake);
+  if (stakeBig === 0n) return "0";
+
+  const lastUpdateBig = safeBigInt(lastUpdateTime);
+  const currentTimeBig = BigInt(currentTime);
+  
+  // If no time has passed, use stale calculation
+  if (currentTimeBig <= lastUpdateBig) {
+    return calculatePendingRewards(stake, accRewardPerStake, userIndex, precisionMultiplier);
+  }
+
+  // Calculate elapsed time in seconds
+  const elapsed = currentTimeBig - lastUpdateBig;
+  
+  // If no stake, no rewards accrue
+  const totalStakeBig = safeBigInt(totalStake);
+  if (totalStakeBig === 0n) {
+    return calculatePendingRewards(stake, accRewardPerStake, userIndex, precisionMultiplier);
+  }
+
+  // Calculate what the index would be if updated now (matches contract logic)
+  // reward = emissionRate * elapsed
+  // realTimeIndex = accRewardPerStake + (reward * PRECISION_MULTIPLIER) / totalStake
+  const emissionRateBig = safeBigInt(emissionRate);
+  const reward = emissionRateBig * elapsed;
+  const indexIncrement = (reward * safeBigInt(precisionMultiplier)) / totalStakeBig;
+  const realTimeIndex = safeBigInt(accRewardPerStake) + indexIncrement;
+
+  // Calculate pending using real-time index
+  const indexDelta = realTimeIndex - safeBigInt(userIndex);
   const pending = (stakeBig * indexDelta) / safeBigInt(precisionMultiplier);
 
   return pending.toString();
