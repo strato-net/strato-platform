@@ -11,16 +11,23 @@ import UnliftIO.Exception
 
 spec :: Spec
 spec = do
-  xdescribe "ByteString escaping" $ do
-    it "should be able to escape quotes" $ do
+  describe "ByteString escaping" $ do
+    -- escapeKey/unescapeKey only escape backslash (0x5c) and closing bracket (0x5d)
+    it "should escape backslash and closing bracket" $ do
       escapeKey "" `shouldBe` ""
-      escapeKey (B.singleton 0x22) `shouldBe` B.pack [0x5c, 0x22]
-      escapeKey "ok\"fail\"ok\"" `shouldBe` "ok\\\"fail\\\"ok\\\""
+      escapeKey (B.singleton 0x5c) `shouldBe` B.pack [0x5c, 0x5c]  -- \ -> \\
+      escapeKey (B.singleton 0x5d) `shouldBe` B.pack [0x5c, 0x5d]  -- ] -> \]
+      escapeKey "ok\\test]end" `shouldBe` "ok\\\\test\\]end"
 
-    it "should be able to unescape quotes" $ do
+    it "should unescape backslash and closing bracket" $ do
       unescapeKey "" `shouldBe` ""
-      unescapeKey (B.pack [0x5c, 0x22]) `shouldBe` B.singleton 0x22
-      unescapeKey "ok\\\"fail\\\"ok\\\"" `shouldBe` "ok\"fail\"ok\""
+      unescapeKey (B.pack [0x5c, 0x5c]) `shouldBe` B.singleton 0x5c  -- \\ -> \
+      unescapeKey (B.pack [0x5c, 0x5d]) `shouldBe` B.singleton 0x5d  -- \] -> ]
+      unescapeKey "ok\\\\test\\]end" `shouldBe` "ok\\test]end"
+
+    it "should not escape quotes" $ do
+      escapeKey (B.singleton 0x22) `shouldBe` B.singleton 0x22  -- " stays "
+      escapeKey "ok\"test\"end" `shouldBe` "ok\"test\"end"
 
   describe "BasicValue RLP encoding" $ do
     it "should be reversible" $ do
