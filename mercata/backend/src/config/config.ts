@@ -58,7 +58,7 @@ export const defaultBridgeServiceFor: Record<string, string> = {
 };
 export const defaultRewardsAddressFor: Record<string, string> = {
   "114784819836269": "170147f58738c9f46112a874030420b823901f3b", // Helium testnet
-  "33056204878082667": "x", // Upquark mainnet - TODO: replace "x" with actual Upquark rewards address
+  "33056204878082667": "4a116cf8cb056036632aef08f7c0df27c720f1c0", // Upquark mainnet
 };
 
 export let bridgeUrl: string | undefined;
