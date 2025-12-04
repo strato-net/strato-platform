@@ -168,11 +168,6 @@ const LendingPoolSection = () => {
         <CardHeader className="px-2 py-2 md:px-6 md:py-6">
           <div className="flex justify-between items-center">
             <CardTitle>USDST Lending Pool</CardTitle>
-            <CompactRewardsDisplay
-              userRewards={userRewards}
-              activityName="Lending Pool Liquidity"
-              inputAmount={depositAmount}
-            />
           </div>
         </CardHeader>
         <CardContent className="px-2 py-2 md:px-6 md:py-6">

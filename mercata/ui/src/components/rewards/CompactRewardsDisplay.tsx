@@ -15,16 +15,16 @@ interface CompactRewardsDisplayProps {
   inputAmount?: string; // Input amount for calculating 1% estimated rewards
 }
 
-
 export const CompactRewardsDisplay = ({
   userRewards,
   activityName,
   inputAmount,
 }: CompactRewardsDisplayProps) => {
   // Match activity by name (case-insensitive)
-  const filteredActivities = userRewards?.activities.filter((item) =>
-    item.activity.name.toLowerCase() === activityName.toLowerCase()
-  ) || [];
+  const filteredActivities =
+    userRewards?.activities.filter(
+      (item) => item.activity.name.toLowerCase() === activityName.toLowerCase()
+    ) || [];
 
   const activitiesWithStake = filteredActivities.filter(
     (a) => BigInt(a.userInfo.stake) > 0n
@@ -77,8 +77,7 @@ export const CompactRewardsDisplay = ({
     }
   }
 
-  // Add input amount reward (1%) to total estimated per day
-  const totalEstimatedWithInput = totalEstimatedPerDay + inputAmountReward;
+  const totalEstimatedWithInput = inputAmountReward;
 
   const totalEstimatedWithInputDecimal = formatBalance(
     totalEstimatedWithInput.toString(),
@@ -87,78 +86,65 @@ export const CompactRewardsDisplay = ({
     18,
     18
   );
-  const totalEstimatedWithInputNumeric = totalEstimatedWithInputDecimal.replace(/\s*points?\s*$/i, '').trim();
+  const totalEstimatedWithInputNumeric = totalEstimatedWithInputDecimal
+    .replace(/\s*points?\s*$/i, "")
+    .trim();
   const totalEstimatedWithInputFormatted = totalEstimatedWithInputNumeric
-    ? formatRoundedWithCommas(roundByMagnitude(totalEstimatedWithInputNumeric)) + " points"
+    ? formatRoundedWithCommas(
+        roundByMagnitude(totalEstimatedWithInputNumeric)
+      ) + " points"
     : "0 points";
 
-
-  // Inline variant - for below input fields
-  
-    // Don't show anything until user enters input
-    if (!inputAmount || parseFloat(inputAmount) === 0 || inputAmountReward === 0n) {
-      return null;
-    }
-   
-    const inputAmountRewardDecimal = formatBalance(
-      inputAmountReward.toString(),
-      "points",
-      18,
-      18,
-      18
-    );
-    const inputAmountRewardNumeric = inputAmountRewardDecimal.replace(/\s*points?\s*$/i, '').trim();
-    const inputAmountRewardFormatted = inputAmountRewardNumeric
-      ? formatRoundedWithCommas(roundByMagnitude(inputAmountRewardNumeric)) + " points"
-      : "0 points";
-
-    // Calculate effective emission rate based on input amount using the function
-    let totalEffectiveEmissionRate = 0n;
-    
-    filteredActivities.forEach(({ activity }) => {
-      const inputWei = safeParseUnits(inputAmount || "0", 18);
-      const effectiveEmissionRate = calculateEffectiveEmissionRate(
-        inputWei.toString(),
-        activity.totalStake,
-        activity.emissionRate
-      );
-      totalEffectiveEmissionRate += BigInt(effectiveEmissionRate);
-    });
-    
-    const effectiveRewardsPerDayDecimal = formatBalance(
-      totalEffectiveEmissionRate.toString(),
-      "points",
-      18,
-      18,
-      18
-    );
-    const effectiveRewardsPerDayNumeric = effectiveRewardsPerDayDecimal.replace(/\s*points?\s*$/i, '').trim();
-    const effectiveRewardsPerDayFormatted = effectiveRewardsPerDayNumeric
-      ? formatRoundedWithCommas(roundByMagnitude(effectiveRewardsPerDayNumeric)) + " points/day"
-      : "0 points/day";
-
-    // If input has value, show total with 1% breakdown and effective emission rate
-    return (
-      <div className="mt-2 space-y-1">
-        <div className="flex items-center gap-2 text-sm">
-          <Coins className="h-4 w-4 text-yellow-600" />
-          <span className="text-muted-foreground">Estimated Rewards:</span>
-          <span className="font-medium">{totalEstimatedWithInputFormatted} </span>
-        </div>
-        {inputAmountReward > 0n && (
-          <div className="text-xs text-muted-foreground pl-6">
-            + {inputAmountRewardFormatted} (1% of input)
-          </div>
-        )}
-        <div className="flex items-center gap-2 text-sm">
-          <Coins className="h-4 w-4 text-yellow-600" />
-          <span className="text-muted-foreground">Effective Emission Rate:</span>
-          <span className="font-medium">{effectiveRewardsPerDayFormatted}</span>
-        </div>
-      </div>
-    );
+  // Don't show anything until user enters input
+  if (
+    !inputAmount ||
+    parseFloat(inputAmount) === 0 ||
+    inputAmountReward === 0n
+  ) {
+    return null;
   }
 
+  // Calculate effective emission rate based on input amount using the function
+  let totalEffectiveEmissionRate = 0n;
 
+  filteredActivities.forEach(({ activity }) => {
+    const inputWei = safeParseUnits(inputAmount || "0", 18);
+    const effectiveEmissionRate = calculateEffectiveEmissionRate(
+      inputWei.toString(),
+      activity.totalStake,
+      activity.emissionRate
+    );
+    totalEffectiveEmissionRate += BigInt(effectiveEmissionRate);
+  });
 
+  const effectiveRewardsPerDayDecimal = formatBalance(
+    totalEffectiveEmissionRate.toString(),
+    "points",
+    18,
+    18,
+    18
+  );
+  const effectiveRewardsPerDayNumeric = effectiveRewardsPerDayDecimal
+    .replace(/\s*points?\s*$/i, "")
+    .trim();
+  const effectiveRewardsPerDayFormatted = effectiveRewardsPerDayNumeric
+    ? formatRoundedWithCommas(roundByMagnitude(effectiveRewardsPerDayNumeric)) +
+      " points/day"
+    : "0 points/day";
 
+  // If input has value, show total with 1% breakdown and effective emission rate
+  return (
+    <div className="mt-2 space-y-1">
+      <div className="flex items-center gap-2 text-sm">
+        <Coins className="h-4 w-4 text-yellow-600" />
+        <span className="text-muted-foreground">Estimated Rewards:</span>
+        <span className="font-medium">{totalEstimatedWithInputFormatted} </span>
+      </div>
+      <div className="flex items-center gap-2 text-sm">
+        <Coins className="h-4 w-4 text-yellow-600" />
+        <span className="text-muted-foreground">Effective Emission Rate:</span>
+        <span className="font-medium">{effectiveRewardsPerDayFormatted}</span>
+      </div>
+    </div>
+  );
+};
