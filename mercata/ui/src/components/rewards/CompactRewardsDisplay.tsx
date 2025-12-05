@@ -2,7 +2,6 @@ import { UserRewardsData } from "@/services/rewardsService";
 import {
   calculateRealTimePendingRewards,
   calculateEstimatedRewardsPerDay,
-  calculateEffectiveEmissionRate,
   formatRoundedWithCommas,
   roundByMagnitude,
 } from "@/services/rewardsService";
@@ -13,12 +12,14 @@ interface CompactRewardsDisplayProps {
   userRewards: UserRewardsData | null;
   activityName: string; // Activity name to match (e.g., "ETHST-USDST Swap LP", "CDP USDST Mint")
   inputAmount?: string; // Input amount for calculating estimated rewards per day
+  isWithdrawal?: boolean; // If true, inputAmount will be subtracted instead of added (for withdrawals)
 }
 
 export const CompactRewardsDisplay = ({
   userRewards,
   activityName,
   inputAmount,
+  isWithdrawal = false,
 }: CompactRewardsDisplayProps) => {
   // Match activity by name (case-insensitive)
   const filteredActivities =
@@ -34,6 +35,7 @@ export const CompactRewardsDisplay = ({
   let totalEstimatedPerDay = 0n;
   const currentTime = Math.floor(Date.now() / 1000); // Current Unix timestamp in seconds
 
+  // Calculate pending rewards for activities with stake
   activitiesWithStake.forEach(({ activity, userInfo }) => {
     // Check all required fields are present for real-time calculation
     if (
@@ -55,18 +57,23 @@ export const CompactRewardsDisplay = ({
       );
       totalPending += BigInt(pending);
     }
+  });
 
-    // Calculate estimated rewards per day: (userStake / totalStake) * emissionRate * secondsPerDay
-    const estimatedPerDay = calculateEstimatedRewardsPerDay(
-      userInfo.stake,
-      activity.totalStake,
-      activity.emissionRate
-    );
-    totalEstimatedPerDay += BigInt(estimatedPerDay);
+  // Calculate current emission rate per day for all filtered activities (including those with 0 stake)
+  filteredActivities.forEach(({ activity, userInfo }) => {
+    if (activity?.emissionRate !== undefined && activity?.totalStake !== undefined) {
+      const estimatedPerDay = calculateEstimatedRewardsPerDay(
+        userInfo?.stake || "0",
+        activity.totalStake,
+        activity.emissionRate
+      );
+      totalEstimatedPerDay += BigInt(estimatedPerDay);
+    }
   });
 
   // Calculate estimated rewards per day with input using the same formula as "My Rewards" section
-  // Formula: ((oldStake + input) / (oldTotalStake + input)) * emissionRate * secondsPerDay
+  // For deposits: Formula: ((oldStake + input) / (oldTotalStake + input)) * emissionRate * secondsPerDay
+  // For withdrawals: Formula: ((oldStake - input) / (oldTotalStake - input)) * emissionRate * secondsPerDay
   let totalEstimatedWithInput = 0n;
   if (inputAmount) {
     try {
@@ -76,11 +83,17 @@ export const CompactRewardsDisplay = ({
         if (activity?.emissionRate !== undefined && activity?.totalStake !== undefined) {
           const oldStake = BigInt(userInfo?.stake || "0");
           const oldTotalStake = BigInt(activity.totalStake);
-          const newStake = oldStake + inputWei;
-          const newTotalStake = oldTotalStake + inputWei;
+          
+          // For withdrawals, subtract the amount; for deposits, add it
+          const newStake = isWithdrawal 
+            ? (oldStake > inputWei ? oldStake - inputWei : 0n)
+            : oldStake + inputWei;
+          const newTotalStake = isWithdrawal
+            ? (oldTotalStake > inputWei ? oldTotalStake - inputWei : 0n)
+            : oldTotalStake + inputWei;
           
           // Use the same formula as calculateEstimatedRewardsPerDay but with adjusted stake values
-          if (newTotalStake > 0n) {
+          if (newTotalStake > 0n && newStake >= 0n) {
             const estimatedPerDay = calculateEstimatedRewardsPerDay(
               newStake.toString(),
               newTotalStake.toString(),
@@ -112,54 +125,47 @@ export const CompactRewardsDisplay = ({
     : "0 points/day";
 
   // Don't show anything until user enters input
+  // For withdrawals, show even if new rate is 0 (user withdrawing all)
   if (
     !inputAmount ||
-    parseFloat(inputAmount) === 0 ||
-    totalEstimatedWithInput === 0n
+    parseFloat(inputAmount) === 0
   ) {
     return null;
   }
+  
+  // For withdrawals, if new rate would be invalid (negative), don't show
+  if (isWithdrawal && totalEstimatedWithInput === 0n && totalEstimatedPerDay === 0n) {
+    return null;
+  }
 
-  // Calculate effective emission rate based on input amount using the function
-  let totalEffectiveEmissionRate = 0n;
-
-  filteredActivities.forEach(({ activity }) => {
-    const inputWei = safeParseUnits(inputAmount || "0", 18);
-    const effectiveEmissionRate = calculateEffectiveEmissionRate(
-      inputWei.toString(),
-      activity.totalStake,
-      activity.emissionRate
-    );
-    totalEffectiveEmissionRate += BigInt(effectiveEmissionRate);
-  });
-
-  const effectiveRewardsPerDayDecimal = formatBalance(
-    totalEffectiveEmissionRate.toString(),
+  // Format current emission rate per day (already calculated above as totalEstimatedPerDay)
+  const currentEmissionRateDecimal = formatBalance(
+    totalEstimatedPerDay.toString(),
     "points",
     18,
     18,
     18
   );
-  const effectiveRewardsPerDayNumeric = effectiveRewardsPerDayDecimal
+  const currentEmissionRateNumeric = currentEmissionRateDecimal
     .replace(/\s*points?\s*$/i, "")
     .trim();
-  const effectiveRewardsPerDayFormatted = effectiveRewardsPerDayNumeric
-    ? formatRoundedWithCommas(roundByMagnitude(effectiveRewardsPerDayNumeric)) +
+  const currentEmissionRateFormatted = currentEmissionRateNumeric
+    ? formatRoundedWithCommas(roundByMagnitude(currentEmissionRateNumeric)) +
       " points/day"
     : "0 points/day";
 
-  // If input has value, show estimated rewards per day and effective emission rate
+  // If input has value, show current and new emission rates per day
   return (
     <div className="mt-2 space-y-1">
       <div className="flex items-center gap-2 text-sm">
         <Coins className="h-4 w-4 text-yellow-600" />
-        <span className="text-muted-foreground">Estimated Rewards:</span>
-        <span className="font-medium">{totalEstimatedWithInputFormatted} </span>
+        <span className="text-muted-foreground">Current Emission Rate:</span>
+        <span className="font-medium">{currentEmissionRateFormatted}</span>
       </div>
       <div className="flex items-center gap-2 text-sm">
         <Coins className="h-4 w-4 text-yellow-600" />
-        <span className="text-muted-foreground">Effective Emission Rate:</span>
-        <span className="font-medium">{effectiveRewardsPerDayFormatted}</span>
+        <span className="text-muted-foreground">New Emission Rate:</span>
+        <span className="font-medium">{totalEstimatedWithInputFormatted}</span>
       </div>
     </div>
   );

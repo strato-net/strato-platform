@@ -226,11 +226,6 @@ const SafetyModuleSection = () => {
               <Shield className="h-5 w-5" />
               USDST Safety Module
             </CardTitle>
-            <CompactRewardsDisplay
-              userRewards={userRewards}
-              inputAmount={stakeAmount}
-              activityName="Safety Module"
-            />
           </div>
         </CardHeader>
         <CardContent className="px-2 py-2 md:px-6 md:py-6">

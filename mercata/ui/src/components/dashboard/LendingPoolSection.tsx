@@ -407,6 +407,13 @@ const LendingPoolSection = () => {
                   <div className="text-sm text-gray-500 mt-1">
                     Transaction Fee: {LENDING_WITHDRAW_FEE} USDST
                   </div>
+                  {/* Estimated Rewards Display */}
+                  <CompactRewardsDisplay
+                    userRewards={userRewards}
+                    activityName="Lending Pool Liquidity"
+                    inputAmount={withdrawAmount}
+                    isWithdrawal={true}
+                  />
                   {/* Include Staked mUSDST Checkbox */}
                   {rewardsEnabled && (
                     <div className="flex items-center space-x-2 mt-3">

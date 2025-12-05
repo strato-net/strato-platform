@@ -15,8 +15,21 @@ import { useToast } from '@/hooks/use-toast';
 import { useSwapContext } from '@/context/SwapContext';
 import { WITHDRAW_FEE, rewardsEnabled } from "@/lib/constants";
 import { Pool } from '@/interface';
-import { safeParseUnits, formatWeiAmount } from '@/utils/numberUtils';
+import { safeParseUnits, formatWeiAmount, formatUnits } from '@/utils/numberUtils';
 import { handleAmountInputChange, computeMaxTransferable } from '@/utils/transferValidation';
+import { CompactRewardsDisplay } from '@/components/rewards/CompactRewardsDisplay';
+import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
+
+// Helper function to map pool names to activity names
+const getPoolActivityName = (poolName: string | undefined): string | null => {
+  if (!poolName) return null;
+  const name = poolName.toLowerCase();
+  if (name.includes('ethst') && name.includes('usdst')) return "ETHST-USDST Swap LP";
+  if (name.includes('wbtcst') && name.includes('usdst')) return "WBTCST-USDST Swap LP";
+  if (name.includes('goldst') && name.includes('usdst')) return "GOLDST-USDST Swap LP";
+  if (name.includes('silvst') && name.includes('usdst')) return "SILVST-USDST Swap LP";
+  return null;
+};
 
 interface WithdrawFormValues {
   percent: string;
@@ -92,6 +105,7 @@ const LiquidityWithdrawModal = ({
     includeStakedLPToken?: boolean;
   }) => Promise<void>;
   const { toast } = useToast();
+  const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
   const form = useForm<WithdrawFormValues>({
     defaultValues: {
@@ -300,6 +314,36 @@ const LiquidityWithdrawModal = ({
               ) : null;
             })()}
           </div>
+
+          {/* Estimated Rewards Display */}
+          {(() => {
+            const activityName = getPoolActivityName(selectedPool?.poolName);
+            if (!activityName) return null;
+            
+            // Calculate LP token amount being withdrawn from percentage
+            let lpTokenAmountToWithdraw = "0";
+            if (withdrawPercent && selectedPool && availableLPBalance) {
+              try {
+                const value = BigInt(availableLPBalance);
+                const percent = parseFloat(withdrawPercent);
+                const percentScaled = BigInt(Math.floor(percent * 100));
+                const calculatedAmount = (value * percentScaled) / BigInt(10000);
+                // Convert to human-readable format (18 decimals)
+                lpTokenAmountToWithdraw = formatUnits(calculatedAmount, 18);
+              } catch {
+                lpTokenAmountToWithdraw = "0";
+              }
+            }
+            
+            return (lpTokenAmountToWithdraw && parseFloat(lpTokenAmountToWithdraw) > 0) ? (
+              <CompactRewardsDisplay
+                userRewards={userRewards}
+                activityName={activityName}
+                inputAmount={lpTokenAmountToWithdraw}
+                isWithdrawal={true}
+              />
+            ) : null;
+          })()}
 
           {/* Include Staked LP Token Checkbox - only show if pool has rewards program AND rewards are enabled */}
           {rewardsEnabled && selectedPool?.lpToken?.stakedBalance !== undefined && (
