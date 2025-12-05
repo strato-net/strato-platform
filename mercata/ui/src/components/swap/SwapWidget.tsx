@@ -67,46 +67,22 @@ const calculateExchangeRates = (pool: Pool | null, fromAsset: SwapToken | null) 
 };
 
 /**
- * Check if asset is USDST
+ * Get activity name for swap rewards based on asset symbol/name
+ * Maps to activityType 1 (OneTime) swap activities
  */
-const isUSDSTAsset = (asset: SwapToken | null | undefined): boolean => {
-  if (!asset) return false;
-  const text = `${asset._symbol?.toUpperCase() || ""} ${asset._name?.toUpperCase() || ""}`;
-  return text.includes("USDST");
-};
-
-/**
- * Get activity name for key asset (ETHST, WBTCST, GOLDST, SILVST)
- */
-const getKeyAssetActivityName = (asset: SwapToken | null | undefined): string | null => {
+const getSwapActivityName = (asset: SwapToken | null | undefined): string | null => {
   if (!asset) return null;
   
-  const text = `${asset._symbol?.toUpperCase() || ""} ${asset._name?.toUpperCase() || ""}`;
-  const activityMap: Record<string, string> = {
-    "ETHST": "ETHST-USDST Swap",
-    "WBTCST": "WBTCST-USDST Swap",
-    "GOLDST": "GOLDST-USDST Swap",
-    "SILVST": "SILVST-USDST Swap",
-  };
+  const symbol = asset._symbol?.toUpperCase() || "";
+  const name = asset._name?.toUpperCase() || "";
   
-  for (const [key, activityName] of Object.entries(activityMap)) {
-    if (text.includes(key)) return activityName;
-  }
+  // Check by symbol or name
+  if (symbol.includes("ETHST") || name.includes("ETHST")) return "ETHST-USDST Swap";
+  if (symbol.includes("WBTCST") || name.includes("WBTCST")) return "WBTCST-USDST Swap";
+  if (symbol.includes("GOLDST") || name.includes("GOLDST")) return "GOLDST-USDST Swap";
+  if (symbol.includes("SILVST") || name.includes("SILVST")) return "SILVST-USDST Swap";
   
   return null;
-};
-
-/**
- * Get activity name for swap rewards
- * If primary asset is USDST, checks secondary asset instead
- */
-const getSwapActivityName = (
-  primaryAsset: SwapToken | null | undefined,
-  secondaryAsset?: SwapToken | null | undefined
-): string | null => {
-  return isUSDSTAsset(primaryAsset) 
-    ? getKeyAssetActivityName(secondaryAsset) 
-    : getKeyAssetActivityName(primaryAsset);
 };
 
 // ============================================================================
@@ -238,7 +214,6 @@ interface TokenInputProps {
   maxAmountWei: string;
   onChange: (value: string) => void;
   asset?: SwapToken;
-  otherAsset?: SwapToken; // Other asset in the swap pair (for determining activity name)
   onSelect: (asset: SwapToken) => void;
   tokens: SwapToken[];
   isOpen: boolean;
@@ -249,8 +224,6 @@ interface TokenInputProps {
   onMaxClick: () => void;
   amountError?: string;
   loading: boolean;
-  userRewards?: UserRewardsData | null;
-  rewardsLoading?: boolean;
 }
 
 const TokenInput = ({
@@ -260,7 +233,6 @@ const TokenInput = ({
   maxAmountWei,
   onChange,
   asset,
-  otherAsset,
   onSelect,
   tokens,
   isOpen,
@@ -271,8 +243,6 @@ const TokenInput = ({
   onMaxClick,
   amountError,
   loading,
-  userRewards,
-  rewardsLoading,
 }: TokenInputProps) => {      
   return (
     <div className="bg-gray-50 p-4 rounded-lg">
@@ -341,17 +311,6 @@ const TokenInput = ({
           </span>
         </div>
       )}
-      {/* Show rewards only if amount is entered and current asset is not USDST */}
-      {amount && parseFloat(amount) > 0 && !isUSDSTAsset(asset) && (() => {
-        const activityName = getSwapActivityName(asset, otherAsset);
-        return activityName ? (
-          <CompactRewardsDisplay
-            userRewards={userRewards}
-            activityName={activityName}
-            inputAmount={amount}
-          />
-        ) : null;
-      })()}
     </div>
   );
 };
@@ -531,6 +490,7 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
     () => pairableTokens.filter(t => t.address !== fromAsset?.address),
     [pairableTokens, fromAsset?.address]
   );
+  const { userAddress } = useUser();
   const { fetchTokens } = useUserTokens();
   const { usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
   const { refreshLoans, refreshCollateral } = useLendingContext();
@@ -887,7 +847,6 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
         maxAmountWei={fromAssetAvailableBalance}
         onChange={(value) => handleAmountChange(true, value)}
         asset={fromAsset}
-        otherAsset={toAsset}
         onSelect={(asset) => asset.address !== toAsset?.address && setFromAsset({ ...asset, balance: asset.balance || "0" })}
         tokens={fromOptions}
         isOpen={fromPopoverOpen}
@@ -898,8 +857,6 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
         onMaxClick={() => handleMaxClick()}
         amountError={fromAmountError}
         loading={poolLoading}
-        userRewards={userRewards}
-        rewardsLoading={rewardsLoading}
       />
 
       <div className="flex justify-center">
@@ -920,7 +877,6 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
         maxAmountWei={toAsset?.poolBalance || "0"}
         onChange={(value) => handleAmountChange(false, value)}
         asset={toAsset}
-        otherAsset={fromAsset}
         onSelect={(asset) => asset.address !== fromAsset?.address && setToAsset({ ...asset, balance: asset.balance || "0" })}
         tokens={toOptions}
         isOpen={toPopoverOpen}
@@ -931,9 +887,27 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
         onMaxClick={() => {}}
         amountError={toAmountError}
         loading={poolLoading}
-        userRewards={userRewards}
-        rewardsLoading={rewardsLoading}
       />
+
+      {(() => {
+        // Activity name is based on pair type, so check either token
+        const activityName = getSwapActivityName(fromAsset) || getSwapActivityName(toAsset);
+        if (!activityName) return null;
+        
+        // Use amount from the reward-eligible token
+        const rewardEligibleToken = getSwapActivityName(fromAsset) ? fromAsset : toAsset;
+        const inputAmount = rewardEligibleToken === fromAsset ? fromAmount : toAmount;
+        
+        return (
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <CompactRewardsDisplay
+              userRewards={userRewards}
+              activityName={activityName}
+              inputAmount={inputAmount}
+            />
+          </div>
+        );
+      })()}
 
       <div className="flex flex-col gap-2 bg-gray-50 p-4 rounded-lg">
         <div className="flex justify-between text-sm">
