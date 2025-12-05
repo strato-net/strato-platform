@@ -448,13 +448,6 @@ router.post("/claim/:activityId", authHandler.authorizeRequest(), RewardsControl
  *           default: 0
  *           minimum: 0
  *         description: Number of entries to skip
- *       - in: query
- *         name: sortBy
- *         schema:
- *           type: string
- *           enum: [rewards, emissionRate]
- *           default: rewards
- *         description: Sort by total rewards or emission rate
  *     responses:
  *       200:
  *         description: Leaderboard response with entries and pagination info
@@ -472,12 +465,9 @@ router.post("/claim/:activityId", authHandler.authorizeRequest(), RewardsControl
  *                         type: integer
  *                       address:
  *                         type: string
- *                       emissionRate:
+ *                       totalRewardsEarned:
  *                         type: string
- *                       unclaimedRewards:
- *                         type: string
- *                       pendingRewards:
- *                         type: string
+ *                         description: Total rewards earned (unclaimed + pending rewards)
  *                 total:
  *                   type: integer
  *                   description: Total number of entries available

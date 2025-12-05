@@ -11,28 +11,37 @@ import { useRewards } from "@/hooks/useRewards";
 import { useRewardsActivities } from "@/hooks/useRewardsActivities";
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 import { useRewardsLeaderboard } from "@/hooks/useRewardsLeaderboard";
+import { useSearchParams } from "react-router-dom";
 
 const Rewards = () => {
+  const [searchParams] = useSearchParams();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"activities" | "my-rewards" | "leaderboard">("my-rewards");
+  const [activeTab, setActiveTab] = useState<"activities" | "my-rewards" | "leaderboard">(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam === "leaderboard" || tabParam === "activities" || tabParam === "my-rewards") {
+      return tabParam;
+    }
+    return "my-rewards";
+  });
 
   const { state, loading: stateLoading, refetch: refetchState } = useRewards();
   const { activities, loading: activitiesLoading, refetch: refetchActivities } = useRewardsActivities();
   const { userRewards, loading: userRewardsLoading, refetch: refetchUserRewards } = useRewardsUserInfo();
-  const [leaderboardSortBy, setLeaderboardSortBy] = useState<"rewards" | "emissionRate">("rewards");
   const [leaderboardLimit] = useState(10);
   const [leaderboardPage, setLeaderboardPage] = useState(1);
   const leaderboardOffset = (leaderboardPage - 1) * leaderboardLimit;
-  const { entries: leaderboardEntries, total: leaderboardTotal, loading: leaderboardLoading, refetch: refetchLeaderboard } = useRewardsLeaderboard(leaderboardLimit, leaderboardOffset, leaderboardSortBy);
+  const { entries: leaderboardEntries, total: leaderboardTotal, loading: leaderboardLoading, refetch: refetchLeaderboard } = useRewardsLeaderboard(leaderboardLimit, leaderboardOffset);
 
   useEffect(() => {
     document.title = "Rewards";
   }, []);
 
-  // Reset page to 1 when sortBy changes
   useEffect(() => {
-    setLeaderboardPage(1);
-  }, [leaderboardSortBy]);
+    const tabParam = searchParams.get("tab");
+    if (tabParam === "leaderboard" || tabParam === "activities" || tabParam === "my-rewards") {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams]);
 
   const handleClaimSuccess = () => {
     // Refetch all data after successful claim
@@ -95,10 +104,6 @@ const Rewards = () => {
                 limit={leaderboardLimit}
                 currentPage={leaderboardPage}
                 loading={leaderboardLoading}
-                onSortChange={(sortBy) => {
-                  setLeaderboardSortBy(sortBy);
-                  setLeaderboardPage(1);
-                }}
                 onPageChange={setLeaderboardPage}
               />
             </TabsContent>

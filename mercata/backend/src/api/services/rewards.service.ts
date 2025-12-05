@@ -272,9 +272,7 @@ export const fetchAllActivities = async (
 export interface LeaderboardEntry {
   rank: number;
   address: string;
-  emissionRate: string;
-  unclaimedRewards: string;
-  pendingRewards: string;
+  totalRewardsEarned: string;
 }
 
 /**
@@ -291,22 +289,16 @@ export const fetchLeaderboard = async (
   accessToken: string,
   forceRefresh: boolean = false,
   limit: number = 10,
-  offset: number = 0,
-  sortBy: "rewards" | "emissionRate" = "rewards"
+  offset: number = 0
 ): Promise<LeaderboardResponse> => {
   const rewardsAddress = getRewardsAddress();
 
   try {
     const users = await fetchAllUsersLeaderboard(accessToken, rewardsAddress, forceRefresh);
 
-    // Sort users
+    // Sort users by total rewards earned (unclaimed + pending)
     const sorted = users.sort((a, b) => {
-      if (sortBy === "emissionRate") {
-        return compareBigInt(BigInt(a.emissionRate), BigInt(b.emissionRate));
-      }
-      const totalA = BigInt(a.unclaimedRewards) + BigInt(a.pendingRewards);
-      const totalB = BigInt(b.unclaimedRewards) + BigInt(b.pendingRewards);
-      return compareBigInt(totalA, totalB);
+      return compareBigInt(BigInt(a.totalRewardsEarned), BigInt(b.totalRewardsEarned));
     });
 
     const total = sorted.length;

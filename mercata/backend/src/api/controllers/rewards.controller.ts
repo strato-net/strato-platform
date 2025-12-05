@@ -166,9 +166,8 @@ class RewardsController {
       const forceRefresh = req.query.refresh === "true";
       const limit = Math.max(1, Math.min(100, parseInt(req.query.limit as string, 10) || 10));
       const offset = Math.max(0, parseInt(req.query.offset as string, 10) || 0);
-      const sortBy = (req.query.sortBy as "rewards" | "emissionRate") || "rewards";
 
-      const leaderboard = await fetchLeaderboard(accessToken, forceRefresh, limit, offset, sortBy);
+      const leaderboard = await fetchLeaderboard(accessToken, forceRefresh, limit, offset);
       res.status(RestStatus.OK).json(leaderboard);
     } catch (error) {
       next(error);

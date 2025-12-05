@@ -45,9 +45,7 @@ export interface UserRewardsData {
 export interface LeaderboardEntry {
   rank: number;
   address: string;
-  emissionRate: string;
-  unclaimedRewards: string;
-  pendingRewards: string;
+  totalRewardsEarned: string;
 }
 
 export interface LeaderboardResponse {
@@ -486,19 +484,19 @@ export const claimRewards = async (userAddress: string, activityIds: number[]): 
  * @param forceRefresh - If true, bypasses cache and fetches fresh data from blockchain
  * @param limit - Maximum number of entries to return (default: 10)
  * @param offset - Number of entries to skip (default: 0)
- * @param sortBy - Sort by "rewards" (total) or "emissionRate" (default: "rewards")
  */
 export const fetchLeaderboard = async (
   forceRefresh: boolean = false,
   limit: number = 10,
-  offset: number = 0,
-  sortBy: "rewards" | "emissionRate" = "rewards"
+  offset: number = 0
 ): Promise<LeaderboardResponse> => {
-  const params: Record<string, string> = {};
-  if (forceRefresh) params.refresh = "true";
-  if (limit !== 10) params.limit = limit.toString();
-  if (offset !== 0) params.offset = offset.toString();
-  if (sortBy !== "rewards") params.sortBy = sortBy;
+  const params = Object.fromEntries(
+    [
+      forceRefresh && ["refresh", "true"],
+      limit !== 10 && ["limit", limit.toString()],
+      offset !== 0 && ["offset", offset.toString()],
+    ].filter(Boolean) as [string, string][]
+  );
 
   const response = await api.get<LeaderboardResponse>("/rewards/leaderboard", { params });
   return response.data;

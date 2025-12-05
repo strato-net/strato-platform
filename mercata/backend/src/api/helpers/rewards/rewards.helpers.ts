@@ -1,7 +1,6 @@
 import { cirrus, bloc } from "../../../utils/mercataApiHelper";
 import { constants } from "../../../config/constants";
 
-const { Rewards } = constants;
 
 /**
  * Cache for contract state to avoid multiple calls
@@ -271,6 +270,43 @@ export const fetchUnclaimedRewards = async (
 };
 
 /**
+ * Fetch total claimed rewards per user from RewardsClaimed events
+ */
+export const fetchClaimedRewards = async (
+  accessToken: string,
+  rewardsAddress: string
+): Promise<Map<string, bigint>> => {
+  try {
+    const { data: events = [] } = await cirrus.get(accessToken, "/event", {
+      params: {
+        address: `eq.${rewardsAddress}`,
+        event_name: `eq.RewardsClaimed`,
+        select: "attributes",
+      },
+    });
+
+    return events.reduce((map: Map<string, bigint>, event: any) => {
+      try {
+        const attrs = typeof event.attributes === 'string' 
+          ? JSON.parse(event.attributes) 
+          : event.attributes || {};
+        
+        if (attrs.user && attrs.amount) {
+          const user = attrs.user.toLowerCase();
+          map.set(user, (map.get(user) || 0n) + BigInt(attrs.amount));
+        }
+      } catch {
+        // Skip invalid event attributes
+      }
+      return map;
+    }, new Map<string, bigint>());
+  } catch (error) {
+    console.error("Failed to fetch claimed rewards:", error);
+    return new Map<string, bigint>();
+  }
+};
+
+/**
  * Calculate real-time pending rewards for a user in an activity
  */
 export const calculateRealTimePendingRewards = (
@@ -317,91 +353,62 @@ export const fetchAllUsersLeaderboard = async (
   accessToken: string,
   rewardsAddress: string,
   forceRefresh: boolean = false
-): Promise<Array<{
-  address: string;
-  emissionRate: string;
-  unclaimedRewards: string;
-  pendingRewards: string;
-}>> => {
+): Promise<Array<{ address: string; totalRewardsEarned: string }>> => {
   const state = await fetchContractState(accessToken, rewardsAddress, forceRefresh);
-  const userInfo = state?.userInfo || {};
-  const unclaimedRewards = state?.unclaimedRewards || {};
-  const activities = state?.activities || {};
-  const activityStates = state?.activityStates || {};
-  
+  const { userInfo = {}, unclaimedRewards = {}, activities = {}, activityStates = {} } = state || {};
+  const claimedRewardsMap = await fetchClaimedRewards(accessToken, rewardsAddress);
   const currentTime = Math.floor(Date.now() / 1000);
-  const users: Array<{
-    address: string;
-    emissionRate: bigint;
-    unclaimedRewards: bigint;
-    pendingRewards: bigint;
-  }> = [];
+  const userSet = new Set<string>();
 
-  // Process all users using Object.entries for cleaner iteration
-  Object.entries(userInfo).forEach(([userAddress, userActivities]) => {
-    const activitiesMap = userActivities || {};
-    let totalEmissionRate = 0n;
-    let totalPendingRewards = 0n;
+  // Process users with stake positions
+  const usersWithStake = Object.entries(userInfo)
+    .map(([userAddress, userActivities]) => {
+      const totalPending = Object.entries(userActivities || {})
+        .reduce((sum, [activityIdStr, userActivityInfo]) => {
+          const activityId = parseInt(activityIdStr, 10);
+          if (isNaN(activityId)) return sum;
 
-    // Calculate emission rate and pending rewards across all activities
-    Object.entries(activitiesMap).forEach(([activityIdStr, userActivityInfo]) => {
-      const activityId = parseInt(activityIdStr, 10);
-      if (isNaN(activityId)) return;
+          const activity = activities[activityIdStr];
+          const activityState = activityStates[activityIdStr];
+          if (!activity || !activityState || !userActivityInfo) return sum;
 
-      const activity = activities[activityIdStr];
-      const activityState = activityStates[activityIdStr];
-      if (!activity || !activityState || !userActivityInfo) return;
+          const stake = BigInt(userActivityInfo.stake || "0");
+          if (stake === 0n) return sum;
 
-      const userStake = userActivityInfo.stake || "0";
-      const userIndex = userActivityInfo.userIndex || "0";
-      const emissionRate = activity.emissionRate || "0";
-      const totalStake = activityState.totalStake || "0";
-      const accRewardPerStake = activityState.accRewardPerStake || "0";
-      const lastUpdateTime = activityState.lastUpdateTime || "0";
+          const pending = calculateRealTimePendingRewards(
+            userActivityInfo.stake || "0",
+            activityState.accRewardPerStake || "0",
+            userActivityInfo.userIndex || "0",
+            activity.emissionRate || "0",
+            activityState.totalStake || "0",
+            activityState.lastUpdateTime || "0",
+            currentTime
+          );
+          return sum + BigInt(pending);
+        }, 0n);
 
-      // Calculate personal emission rate using helper
-      const personalEmissionRate = calculatePersonalEmissionRate(userStake, totalStake, emissionRate);
-      if (personalEmissionRate !== "0") {
-        totalEmissionRate += BigInt(personalEmissionRate);
+      const unclaimed = BigInt(unclaimedRewards[userAddress] || "0");
+      const claimed = claimedRewardsMap.get(userAddress.toLowerCase()) || 0n;
+      const totalRewardsEarned = unclaimed + totalPending + claimed;
+
+      if (totalRewardsEarned > 0n) {
+        userSet.add(userAddress.toLowerCase());
+        return { address: userAddress, totalRewardsEarned };
       }
+      return null;
+    })
+    .filter((user): user is { address: string; totalRewardsEarned: bigint } => user !== null);
 
-      // Calculate pending rewards
-      const userStakeBig = BigInt(userStake);
-      if (userStakeBig > 0n) {
-        const pending = calculateRealTimePendingRewards(
-          userStake,
-          accRewardPerStake,
-          userIndex,
-          emissionRate,
-          totalStake,
-          lastUpdateTime,
-          currentTime
-        );
-        totalPendingRewards += BigInt(pending);
-      }
-    });
+  // Add users with only claimed rewards (no current stake)
+  const usersWithOnlyClaimed = Array.from(claimedRewardsMap.entries())
+    .filter(([userAddress, claimed]) => 
+      claimed > 0n && !userSet.has(userAddress.toLowerCase())
+    )
+    .map(([userAddress, claimed]) => ({ address: userAddress, totalRewardsEarned: claimed }));
 
-    const unclaimed = BigInt(unclaimedRewards[userAddress] || "0");
-    const totalRewards = unclaimed + totalPendingRewards;
-
-    // Only include users with rewards or stake
-    if (totalEmissionRate > 0n || totalRewards > 0n) {
-      users.push({
-        address: userAddress,
-        emissionRate: totalEmissionRate,
-        unclaimedRewards: unclaimed,
-        pendingRewards: totalPendingRewards,
-      });
-    }
-  });
-
-
-  // Convert to strings and return
-  return users.map((user) => ({
+  return [...usersWithStake, ...usersWithOnlyClaimed].map(user => ({
     address: user.address,
-    emissionRate: user.emissionRate.toString(),
-    unclaimedRewards: user.unclaimedRewards.toString(),
-    pendingRewards: user.pendingRewards.toString(),
+    totalRewardsEarned: user.totalRewardsEarned.toString(),
   }));
 };
 
