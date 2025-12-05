@@ -17,7 +17,7 @@ import CreateAdminIssueModal from './CreateAdminIssueModal';
 import CastVoteModal from './CastVoteModal';
 import AddAdminModal from './AddAdminModal';
 import RemoveAdminModal from './RemoveAdminModal';
-import JSONBig from 'json-bigint';
+import { parseJsonBigInt } from '@/utils/numberUtils';
 
 
 const VoteTab = () => {
@@ -96,27 +96,6 @@ const VoteTab = () => {
   const thresholds: any[] = (openIssues && openIssues['thresholds']) || [];
   const globalThreshold: number = (openIssues && openIssues['globalThreshold']) || 6000;
   const executed: object[] = (openIssues && openIssues['executed']) || [];
-  const JSONBigNative = JSONBig({ useNativeBigInt: true });
-
-  const normalizeAndParse = (jsonString: string) => {
-    let normalized = jsonString
-      .replace(/\u201C/g, '"')
-      .replace(/\u201D/g, '"')
-      .replace(/\u2018/g, "'")
-      .replace(/\u2019/g, "'")
-      .replace(/\\8220/g, '"')
-      .replace(/\\8221/g, '"')
-      .replace(/\\8216/g, "'")
-      .replace(/\\8217/g, "'");
-    normalized = normalized.replace(/\\"\\"/g, '\\"');
-    normalized = normalized.replace(/""([^"]+)""/g, '"$1"');
-    try {
-      return JSONBigNative.parse(normalized);
-    } catch (e) {
-      console.error('Failed to parse JSON:', normalized, e);
-      throw e;
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -232,7 +211,7 @@ const VoteTab = () => {
                   {issues.map((issue: any, index) => {
                     const issueId = issue.issueId;
                     const address = issue.target;
-                    const issueArgs = normalizeAndParse(issue.args);
+                    const issueArgs = parseJsonBigInt(typeof issue.args === 'string' ? issue.args : JSON.stringify(issue.args), { fallback: [] }) as any[];
                     const threshold = (thresholds.find((v) => v.target === address && v.func === issue.func)?.threshold || globalThreshold)/100;
                     const votesNeeded = Math.ceil((admins.length * threshold)/100);
                     const hasUserVoted = votes.some((v) => v.issueId === issueId && v.voter === userAddress);
@@ -347,7 +326,7 @@ const VoteTab = () => {
                   {executed.map((issue: any, index) => {
                     const issueId = issue.issueId;
                     const address = issue.target;
-                    const issueArgs = normalizeAndParse(issue.args);
+                    const issueArgs = parseJsonBigInt(typeof issue.args === 'string' ? issue.args : JSON.stringify(issue.args), { fallback: [] }) as any[];
                     return (
                       <TableRow key={`${issueId}-${index}`}>
                         <TableCell className="font-mono text-xs max-w-[80px] truncate">
