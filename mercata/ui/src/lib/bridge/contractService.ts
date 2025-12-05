@@ -5,6 +5,7 @@ import {
   ERC20_ABI, 
   NATIVE_TOKEN_ADDRESS, 
   PERMIT2_ADDRESS,
+  SUPPORTED_CHAINS,
 } from './constants';
 import { safeParseUnits, formatBalance } from '../../utils/numberUtils';
 import { 
@@ -18,11 +19,18 @@ import {
 } from './types';
 
 async function getClient(chainId: string) {
-    return createPublicClient({
-      chain: await resolveViemChain(chainId),
-      transport: http(),
-    });
-  }
+  const id = Number(chainId);
+  const alchemyKey = import.meta.env.VITE_ALCHEMY_API_KEY;
+  const transport =
+    id === SUPPORTED_CHAINS.MAINNET && alchemyKey
+      ? http(`https://eth-mainnet.g.alchemy.com/v2/${alchemyKey}`)
+      : http();
+
+  return createPublicClient({
+    chain: await resolveViemChain(chainId),
+    transport,
+  });
+}
 
 function formatAddress(address: string): `0x${string}` {
     return (address.startsWith('0x') ? address : `0x${address}`) as `0x${string}`;

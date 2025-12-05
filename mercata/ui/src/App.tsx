@@ -81,8 +81,11 @@ const App = () => {
     if (!loading) {
       const appName = "Mercata";
       const chains = [mainnet, polygon, sepolia] as const;
+      const alchemyApiKey = import.meta.env.VITE_ALCHEMY_API_KEY;
       const transports = {
-        [mainnet.id]: http(),
+        [mainnet.id]: alchemyApiKey
+          ? http(`https://eth-mainnet.g.alchemy.com/v2/${alchemyApiKey}`)
+          : http(),
         [polygon.id]: http(),
         [sepolia.id]: http(),
       };
