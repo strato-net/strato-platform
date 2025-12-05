@@ -39,7 +39,7 @@ async function getLatestCursorFromEvents(): Promise<EventCursor> {
     params: {
       address: `eq.${config.rewards.address}`,
       event_name: 'eq.ActionProcessed',
-      order: 'block_number.desc,event_index.desc',
+      order: 'id.desc',
       limit: 1,
       select: 'block_number,event_index,block_timestamp',
     },

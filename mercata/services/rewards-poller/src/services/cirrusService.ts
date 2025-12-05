@@ -33,7 +33,7 @@ const queryRegularEvents = async (
     address: buildFilter(eventAddresses),
     event_name: buildFilter(eventEventNames),
     block_timestamp: `gte.${cursor.block_timestamp}`,
-    order: "block_number.asc,event_index.asc",
+    order: "id.asc",
     select:
       "address,block_number,event_name,attributes,event_index,transaction_sender,block_timestamp",
   };
@@ -157,7 +157,7 @@ export const getLPTokenTransferEvents = async (
     address: buildFilter(lpTokenAddresses),
     or: `(from.eq.${ZERO_ADDRESS},to.eq.${ZERO_ADDRESS})`,
     block_timestamp: `gte.${cursor.block_timestamp}`,
-    order: "block_number.asc,event_index.asc",
+    order: "id.asc",
     select: "address,block_number,value::text,event_index,transaction_sender,from,to,block_timestamp",
   };
 
