@@ -6,7 +6,7 @@ import {
   roundByMagnitude,
 } from "@/services/rewardsService";
 import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
-import { Coins } from "lucide-react";
+import { TrendingUp, TrendingDown, Sparkles, Star } from "lucide-react";
 
 interface CompactRewardsDisplayProps {
   userRewards: UserRewardsData | null;
@@ -150,22 +150,79 @@ export const CompactRewardsDisplay = ({
     .replace(/\s*points?\s*$/i, "")
     .trim();
   const currentEmissionRateFormatted = currentEmissionRateNumeric
-    ? formatRoundedWithCommas(roundByMagnitude(currentEmissionRateNumeric)) +
-      " points/day"
-    : "0 points/day";
+    ? formatRoundedWithCommas(roundByMagnitude(currentEmissionRateNumeric))
+    : "0";
 
-  // If input has value, show current and new emission rates per day
+  // Calculate percentage change
+  const currentRateNum = parseFloat(currentEmissionRateNumeric || "0");
+  const newRateNum = parseFloat(totalEstimatedWithInputNumeric || "0");
+  const isIncrease = newRateNum > currentRateNum;
+  const isDecrease = newRateNum < currentRateNum;
+  const percentageChange = currentRateNum > 0
+    ? ((newRateNum - currentRateNum) / currentRateNum) * 100
+    : 0;
+  const percentageChangeFormatted = Math.abs(percentageChange).toFixed(1);
+
+  // Determine styling based on increase/decrease - inspired by yo.xyz design
+  const bgColor = isIncrease 
+    ? "bg-gradient-to-br from-green-50 via-emerald-50 to-green-100 border-green-300"
+    : isDecrease
+    ? "bg-gradient-to-br from-orange-50 via-red-50 to-orange-100 border-orange-300"
+    : "bg-gray-50 border-gray-200";
+  
+  const rateColor = isIncrease 
+    ? "text-green-600" 
+    : isDecrease 
+    ? "text-red-600" 
+    : "text-gray-800";
+  
+  const percentageBg = isIncrease
+    ? "bg-green-500"
+    : isDecrease
+    ? "bg-red-500"
+    : "bg-gray-500";
+
+  // If input has value, show enhanced display inspired by yo.xyz
   return (
-    <div className="mt-2 space-y-1">
-      <div className="flex items-center gap-2 text-sm">
-        <Coins className="h-4 w-4 text-yellow-600" />
-        <span className="text-muted-foreground">Current Emission Rate:</span>
-        <span className="font-medium">{currentEmissionRateFormatted}</span>
-      </div>
-      <div className="flex items-center gap-2 text-sm">
-        <Coins className="h-4 w-4 text-yellow-600" />
-        <span className="text-muted-foreground">New Emission Rate:</span>
-        <span className="font-medium">{totalEstimatedWithInputFormatted}</span>
+    <div className={`mt-3 p-4 ${bgColor} border-2 rounded-xl shadow-sm`}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          {/* Icon */}
+          <div className={`flex-shrink-0 ${isIncrease ? 'text-green-500' : isDecrease ? 'text-orange-500' : 'text-gray-500'}`}>
+            {isIncrease ? (
+              <Star className="h-5 w-5 fill-current" />
+            ) : isDecrease ? (
+              <TrendingDown className="h-5 w-5" />
+            ) : (
+              <Sparkles className="h-5 w-5" />
+            )}
+          </div>
+          
+          {/* Text and Rate */}
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
+            <span className="text-sm font-semibold text-gray-800 whitespace-nowrap">
+              {isIncrease ? "You'll Earn" : isDecrease ? "New Rate" : "Earning Rate"}
+            </span>
+            <span className={`text-lg font-bold ${rateColor} whitespace-nowrap`}>
+              {formatRoundedWithCommas(roundByMagnitude(totalEstimatedWithInputNumeric))}
+            </span>
+            <span className="text-sm text-gray-600 whitespace-nowrap">points/day</span>
+          </div>
+        </div>
+        
+        {/* Percentage Badge */}
+        {(isIncrease || isDecrease) && percentageChange !== 0 && (
+          <div className={`flex items-center gap-1.5 px-3 py-1.5 ${percentageBg} rounded-full shadow-sm flex-shrink-0`}>
+            {isIncrease ? (
+              <TrendingUp className="h-4 w-4 text-white" />
+            ) : (
+              <TrendingDown className="h-4 w-4 text-white" />
+            )}
+            <span className="text-sm font-bold text-white">
+              {isIncrease ? '+' : ''}{percentageChangeFormatted}%
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
