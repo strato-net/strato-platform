@@ -3,7 +3,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import UsdstBalanceBox from "@/components/layouts/UsdstBalanceBox";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { WagmiProvider } from "wagmi";
+import { Transport, WagmiProvider } from "wagmi";
 import { mainnet, polygon, sepolia } from "wagmi/chains";
 import {
   connectorsForWallets,
@@ -81,14 +81,9 @@ const App = () => {
     if (!loading) {
       const appName = "Mercata";
       const chains = [mainnet, polygon, sepolia] as const;
-      const alchemyApiKey = import.meta.env.VITE_ALCHEMY_API_KEY;
-      const transports = {
-        [mainnet.id]: alchemyApiKey
-          ? http(`https://eth-mainnet.g.alchemy.com/v2/${alchemyApiKey}`)
-          : http(),
-        [polygon.id]: http(),
-        [sepolia.id]: http(),
-      };
+      const transports: Record<number, Transport> = Object.fromEntries(
+        chains.map((chain) => [chain.id, http(`/api/rpc/${chain.id}`)])
+      );
 
       const connectors = connectorsForWallets(
         [

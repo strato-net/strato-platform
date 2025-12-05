@@ -19,6 +19,7 @@ import bridgeRoutes from "./routes/bridge.routes";
 import cdpRoutes from "./routes/cdp.routes";
 import rewardsRoutes from "./routes/rewards.routes";
 import protocolFeeRoutes from "./routes/protocolFee.routes";
+import rpcRoutes from "./routes/rpc.routes";
 
 const router = Router();
 
@@ -52,6 +53,9 @@ router.get("/vouchers/balance", authHandler.authorizeRequest(), TokensController
 
 // ----- Configuration Routes -----
 router.use("/config", configRoutes);
+
+// ----- RPC Proxy Routes -----
+router.use("/rpc", rpcRoutes);
 
 // ----- Oracle Routes -----
 router.use("/oracle", oracleRoutes);

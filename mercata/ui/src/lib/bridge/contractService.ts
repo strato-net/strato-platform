@@ -5,7 +5,6 @@ import {
   ERC20_ABI, 
   NATIVE_TOKEN_ADDRESS, 
   PERMIT2_ADDRESS,
-  SUPPORTED_CHAINS,
 } from './constants';
 import { safeParseUnits, formatBalance } from '../../utils/numberUtils';
 import { 
@@ -20,11 +19,7 @@ import {
 
 async function getClient(chainId: string) {
   const id = Number(chainId);
-  const alchemyKey = import.meta.env.VITE_ALCHEMY_API_KEY;
-  const transport =
-    id === SUPPORTED_CHAINS.MAINNET && alchemyKey
-      ? http(`https://eth-mainnet.g.alchemy.com/v2/${alchemyKey}`)
-      : http();
+  const transport = http(`/api/rpc/${id}`);
 
   return createPublicClient({
     chain: await resolveViemChain(chainId),
