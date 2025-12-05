@@ -1,5 +1,6 @@
 import { Router } from "express";
 import RpcController from "../controllers/rpc.controller";
+import authHandler from "../middleware/authHandler";
 
 const router = Router();
 
@@ -20,7 +21,7 @@ const router = Router();
  *       200:
  *         description: The response from the RPC endpoint
  */
-router.post("/:chainId", RpcController.proxy);
+router.post("/:chainId", authHandler.authorizeRequest(false), RpcController.proxy);
 
 export default router;
 
