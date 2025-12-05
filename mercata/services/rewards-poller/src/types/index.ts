@@ -60,6 +60,7 @@ export interface ProtocolEvent {
   address: string;
   event_name: string;
   block_number: number;
+  block_timestamp: string;
   event_index: number;
   transaction_sender: string;
   amount: string;
@@ -71,11 +72,13 @@ export interface RewardsAction {
   user: string;
   amount: string;
   blockNumber: number;
+  block_timestamp: string;
   eventIndex: number;
 }
 
 export interface EventCursor {
   blockNumber: number;
+  block_timestamp: string;
   eventIndex: number;
 }
 
