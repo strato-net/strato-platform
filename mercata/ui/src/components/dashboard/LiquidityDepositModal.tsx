@@ -645,19 +645,10 @@ const LiquidityDepositModal = ({
             </div>
           </div>
 
-          {/* Estimated Rewards Display */}
+          {/* Estimated Rewards Display - Always visible */}
           {(() => {
             const activityName = getPoolActivityName(selectedPool?.poolName);
             if (!activityName || !selectedPool) return null;
-            
-            // For dual-token mode, pass both token amounts for accurate LP calculation
-            // For single-token mode, we can't easily calculate LP tokens (involves swap + deposit)
-            // so we show an estimate based on the input amount
-            const hasInput = depositMode === 'A&B' 
-              ? (parseFloat(token1Amount || "0") > 0 && parseFloat(token2Amount || "0") > 0)
-              : (depositMode === 'A' ? parseFloat(token1Amount || "0") > 0 : parseFloat(token2Amount || "0") > 0);
-            
-            if (!hasInput) return null;
             
             // For A&B mode: pass pool data and both token amounts for accurate LP calculation
             // For single token mode: pass input amount (less accurate estimate)
@@ -666,10 +657,11 @@ const LiquidityDepositModal = ({
                 <CompactRewardsDisplay
                   userRewards={userRewards}
                   activityName={activityName}
-                  inputAmount={token1Amount || "0"}
+                  inputAmount={token1Amount || ""}
                   poolData={selectedPool}
-                  tokenAAmount={token1Amount || "0"}
-                  tokenBAmount={token2Amount || "0"}
+                  tokenAAmount={token1Amount || ""}
+                  tokenBAmount={token2Amount || ""}
+                  actionLabel="Deposit"
                 />
               );
             } else {
@@ -680,10 +672,11 @@ const LiquidityDepositModal = ({
                 <CompactRewardsDisplay
                   userRewards={userRewards}
                   activityName={activityName}
-                  inputAmount={singleTokenAmount || "0"}
+                  inputAmount={singleTokenAmount || ""}
                   poolData={selectedPool}
-                  tokenAAmount={depositMode === 'A' ? singleTokenAmount : "0"}
-                  tokenBAmount={depositMode === 'B' ? singleTokenAmount : "0"}
+                  tokenAAmount={depositMode === 'A' ? singleTokenAmount : ""}
+                  tokenBAmount={depositMode === 'B' ? singleTokenAmount : ""}
+                  actionLabel="Deposit"
                 />
               );
             }

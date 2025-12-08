@@ -239,6 +239,7 @@ const LendingPoolSection = () => {
                     userRewards={userRewards}
                     activityName="Lending Pool Liquidity"
                     inputAmount={depositAmount}
+                    actionLabel="Deposit"
                   />
                   {/* Stake mUSDST Checkbox */}
                   {rewardsEnabled && (
@@ -413,6 +414,7 @@ const LendingPoolSection = () => {
                     activityName="Lending Pool Liquidity"
                     inputAmount={withdrawAmount}
                     isWithdrawal={true}
+                    actionLabel="Withdraw"
                   />
                   {/* Include Staked mUSDST Checkbox */}
                   {rewardsEnabled && (

@@ -297,6 +297,7 @@ const SafetyModuleSection = () => {
                     userRewards={userRewards}
                     activityName="Safety Module"
                     inputAmount={stakeAmount}
+                    actionLabel="Stake"
                   />
                   {/* Stake sUSDST Checkbox - only show if rewards are enabled */}
                   {rewardsEnabled && (
