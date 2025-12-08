@@ -70,6 +70,22 @@ type MonadSequencer m =
     (Keccak256 `A.Alters` ()) m
   )
 
+-- | Main sequencer pipeline.
+--
+-- The sequencer is a simple pipeline that:
+-- 1. Fetches events from two sources (Kafka 'unseqevents' topic and Blockstanbul timers),
+--    unified via the coproduct 'SeqLoopEvent' (either 'TimerFire' or 'UnseqEvents')
+-- 2. Transforms 'SeqLoopEvent' to 'SeqOutEvent' via 'eventHandler'
+-- 3. Writes 'SeqOutEvent' back to Kafka ('seq_vm_events' and 'seq_p2p_events' topics)
+--
+-- @
+-- [fuseChannels]        →        [eventHandler]        →        [writeToKafka]
+--      ↓                              ↓                              ↓
+-- SeqLoopEvent                 SeqLoopEvent → SeqOutEvent        SeqOutEvent
+-- (TimerFire | UnseqEvents)    (transformation)                  (to Kafka)
+-- @
+--
+-- Note: 'initSequencer' runs before the main loop to yield initial events (e.g., 'VmSelfAddress').
 sequencer :: SequencerM ()
 sequencer = fuseChannels >>= \source -> runConduit $ (initSequencer >> (source .| eventHandler)) .| writeToKafka
 
