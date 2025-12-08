@@ -25,7 +25,7 @@ class RpcController {
       // Proxy request to upstream RPC provider
       let response;
       try {
-        const upstreamRes = await fetch(upstream, requestPayload);
+        const upstreamRes = await fetch(upstream, {...requestPayload, signal: AbortSignal.timeout(5000)});
         response = await upstreamRes.json();
         if (!upstreamRes.ok || !response.result) throw new Error(); //fallback
         res.status(upstreamRes.status).json(response);
