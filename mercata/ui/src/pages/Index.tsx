@@ -2,7 +2,7 @@
 import { useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import Hero from '../components/home/Hero';
-import MERCATALOGO from '@/assets/mercata.png';
+import MERCATALOGO from '@/assets/strato.png';
 
 const Index = () => {
   useEffect(() => {
