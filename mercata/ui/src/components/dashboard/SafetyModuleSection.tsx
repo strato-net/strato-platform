@@ -13,11 +13,13 @@ import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { SAFETY_STAKE_FEE, SAFETY_REDEEM_FEE, usdstAddress, safetyModuleAddress, rewardsEnabled } from "@/lib/constants";
 import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
+import { CompactRewardsDisplay } from "@/components/rewards/CompactRewardsDisplay";
+import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 
 const SafetyModuleSection = () => {
   const { userAddress } = useUser();
-  const { activeTokens: tokens, loading: tokensLoading, fetchTokens, fetchUsdstBalance, usdstBalance } = useUserTokens();
-  const { approveToken } = useTokenContext();
+  const { activeTokens: tokens, loading: tokensLoading, fetchTokens } = useUserTokens();
+  const { fetchUsdstBalance, usdstBalance, approveToken } = useTokenContext();
   const {
     safetyInfo,
     loading,
@@ -33,24 +35,23 @@ const SafetyModuleSection = () => {
   const [stakeSUSDST, setStakeSUSDST] = useState<boolean>(rewardsEnabled);
   const [includeStakedSUSDST, setIncludeStakedSUSDST] = useState<boolean>(false);
   const { toast } = useToast();
+  const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
 
   const refreshData = (signal?: AbortSignal) => {
-    if (!userAddress) return;
     fetchTokens(signal);
     refreshSafetyInfo(signal);
-    fetchUsdstBalance(userAddress);
+    fetchUsdstBalance();
   };
 
-  // Fetch on userAddress change only, with abort controller
+  // Fetch on mount, with abort controller
   useEffect(() => {
-    if (!userAddress) return;
     const abortController = new AbortController();
     refreshData(abortController.signal);
     return () => {
       abortController.abort();
     };
-  }, [userAddress]);
+  }, []);
 
   // usdstBalance is now coming directly from useUserTokens() context
 
@@ -225,6 +226,12 @@ const SafetyModuleSection = () => {
               <Shield className="h-5 w-5" />
               USDST Safety Module
             </CardTitle>
+            {/* <CompactRewardsDisplay
+              userRewards={userRewards}
+              loading={rewardsLoading}
+              activityIds={[4]}
+              variant="button"
+            /> */}
           </div>
         </CardHeader>
         <CardContent className="px-2 py-2 md:px-6 md:py-6">
@@ -291,6 +298,14 @@ const SafetyModuleSection = () => {
                   <div className="text-sm text-gray-500 mt-1">
                     Transaction Fee: {SAFETY_STAKE_FEE} USDST
                   </div>
+                  {/* Estimated Rewards */}
+                  {/* <CompactRewardsDisplay
+                    userRewards={userRewards}
+                    loading={rewardsLoading}
+                    activityIds={[4]}
+                    variant="inline"
+                    inputAmount={stakeAmount}
+                  /> */}
                   {/* Stake sUSDST Checkbox - only show if rewards are enabled */}
                   {rewardsEnabled && (
                     <div className="flex items-center space-x-2 mt-3">

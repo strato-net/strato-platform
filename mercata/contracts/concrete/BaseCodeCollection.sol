@@ -143,7 +143,7 @@ contract record Mercata is Authorizable {
         // Create Services
         address mercataBridgeImpl = address(new MercataBridge(implOwnerIgnored));
         mercataBridge = MercataBridge(address(new Proxy(mercataBridgeImpl, this)));
-        mercataBridge.initialize(address(tokenFactory));
+        mercataBridge.initialize(address(tokenFactory), address(lendingRegistry));
         Ownable(mercataBridge).transferOwnership(address(adminRegistry));
 
         // Create RewardsChef (without initialization - to be initialized in tests)

@@ -146,6 +146,75 @@ export const formatAmount = (amount: string): string => {
 };
 
 /**
+ * Safely convert a value to BigInt, handling numbers in scientific notation
+ */
+export const safeBigInt = (value: string | number | bigint | undefined | null): bigint => {
+  if (value === undefined || value === null) return 0n;
+  if (typeof value === 'bigint') return value;
+  
+  const str = String(value);
+  if (!str || str === "0") return 0n;
+  
+  // If it's in scientific notation, convert it properly
+  if (str.includes('e') || str.includes('E')) {
+    const num = parseFloat(str);
+    if (isNaN(num) || !isFinite(num)) return 0n;
+    
+    // Parse scientific notation manually to avoid precision issues
+    const parts = str.toLowerCase().split('e');
+    if (parts.length === 2) {
+      const baseStr = parts[0];
+      const exponent = parseInt(parts[1]);
+      
+      if (!isNaN(exponent)) {
+        const baseParts = baseStr.split('.');
+        const integerPart = baseParts[0] || '0';
+        const decimalPart = baseParts[1] || '';
+        
+        if (exponent > 0) {
+          // Move decimal point to the right
+          if (exponent >= decimalPart.length) {
+            // All decimal digits become integer digits, pad with zeros
+            const newInteger = integerPart + decimalPart + '0'.repeat(exponent - decimalPart.length);
+            return BigInt(newInteger);
+          } else {
+            // Some decimal digits remain (shouldn't happen for integers, but handle it)
+            const newInteger = integerPart + decimalPart.substring(0, exponent);
+            return BigInt(newInteger);
+          }
+        } else {
+          // Move decimal point to the left (makes number smaller, so for BigInt we round to 0)
+          return 0n;
+        }
+      }
+    }
+    
+    // Fallback: try toLocaleString which handles large numbers better
+    try {
+      // Use a locale that doesn't use grouping and shows full precision
+      const fixed = num.toLocaleString('en-US', { 
+        useGrouping: false, 
+        maximumFractionDigits: 0,
+        notation: 'standard'
+      });
+      return BigInt(fixed);
+    } catch {
+      // Last resort: floor the number and convert
+      const sign = num < 0 ? '-' : '';
+      const absNum = Math.abs(num);
+      // For very large numbers, Math.floor might lose precision, but it's our last option
+      const integerPart = Math.floor(absNum);
+      return BigInt(sign + integerPart.toString());
+    }
+  }
+  
+  // Remove any decimal point and everything after it for BigInt conversion
+  const cleanStr = str.split('.')[0];
+  if (!cleanStr || cleanStr === '') return 0n;
+  return BigInt(cleanStr);
+};
+
+/**
   * Formats a balance with symbol, from wei/smallest unit into a human-readable string.
  */
 export const formatBalance = (
@@ -156,7 +225,7 @@ export const formatBalance = (
   maxPrecision?: number,
   isPrice?: boolean
 ): string => {
-  const raw = BigInt(balance.toString());
+  const raw = safeBigInt(balance);
 
   if (raw === 0n) {
     const zero = minPrecision !== undefined ? `0.${"0".repeat(minPrecision)}` : "0";
@@ -188,7 +257,7 @@ export const formatBalance = (
  */
 export const formatWeiAmount = (weiAmount: string, decimals: number = 18): string => {
   try {
-    const formatted = formatUnits(BigInt(weiAmount), decimals);
+    const formatted = formatUnits(safeBigInt(weiAmount), decimals);
     // Remove trailing zeros after decimal point and limit to 6 decimal places
     if (formatted.includes('.')) {
       const cleaned = formatted.replace(/(\.\d*?[1-9])0+$/g, '$1').replace(/\.0+$/, '');
@@ -218,7 +287,7 @@ export const formatCurrency = (value: string | number): string => {
   });
 };
 
-export const toWei = (s: string): bigint => BigInt(s || "0");
+export const toWei = (s: string): bigint => safeBigInt(s || "0");
 
 /**
  * Convert wei string to decimal for display with high precision (handles raw integer strings from backend)
@@ -227,7 +296,7 @@ export const toWei = (s: string): bigint => BigInt(s || "0");
 export const formatWeiToDecimalHP = (weiString: string, decimals: number): string => {
   if (!weiString || weiString === '0') return '0';
   
-  const wei = BigInt(weiString);
+  const wei = safeBigInt(weiString);
   const divisor = BigInt(10) ** BigInt(decimals);
   const quotient = wei / divisor;
   const remainder = wei % divisor;
@@ -335,11 +404,11 @@ export const calculateTokenValue = (
 
   try {
     const balance = rawBalance 
-      ? parseFloat(formatUnits(BigInt(rawBalance.toString()), 18))
+      ? parseFloat(formatUnits(safeBigInt(rawBalance), 18))
       : 0;
-    const price = parseFloat(formatUnits(BigInt(rawPrice.toString()), 18));
+    const price = parseFloat(formatUnits(safeBigInt(rawPrice), 18));
     const collateral = rawCollateral 
-      ? parseFloat(formatUnits(BigInt(rawCollateral.toString()), 18))
+      ? parseFloat(formatUnits(safeBigInt(rawCollateral), 18))
       : 0;
     
     const totalBalance = balance + collateral;
@@ -352,3 +421,74 @@ export const calculateTokenValue = (
 };
 
 export { formatUnits } from "ethers";
+
+import { jsonrepair } from "jsonrepair";
+import JSONBigInt from "json-bigint";
+
+// Configure JSON parser with native BigInt support for handling large numbers (e.g., wei values)
+const J = JSONBigInt({ useNativeBigInt: true });
+
+// Safe character normalization: removes problematic Unicode characters
+// - Removes BOM (Byte Order Mark) and zero-width spaces
+// - Replaces non-breaking spaces with regular spaces
+// - Converts Unicode smart quotes to standard ASCII quotes
+const normalize = (s: string) =>
+  s
+    .replace(/[\uFEFF\u200B]/g, "")
+    .replace(/\u00A0/g, " ")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2018\u2019]/g, "'");
+
+// Converts \822x escape sequences to smart quotes first (JSON-safe),
+// which will then be normalized to ASCII quotes via normalize()
+// This avoids creating ""word"" artifacts that break JSON parsing
+const fix822x = (s: string) =>
+  s
+    .replace(/\\8220/g, "\u201C")
+    .replace(/\\8221/g, "\u201D")
+    .replace(/\\8216/g, "\u2018")
+    .replace(/\\8217/g, "\u2019");
+
+// Targeted fix: only collapses ""word"" when it appears as a JSON token pattern
+// (e.g., :""transfer"" or ,""transfer"") to avoid rewriting valid content elsewhere
+const collapseDoubledQuotesToken = (s: string) =>
+  s.replace(/:\s*""([^"]+)""/g, ':"$1"').replace(/,\s*""([^"]+)""/g, ',"$1"');
+
+// Parses JSON string: normalizes characters, repairs malformed JSON, then parses with BigInt support
+const parseText = (s: string) => J.parse(jsonrepair(normalize(fix822x(s))));
+
+/**
+ * Parses JSON strings with BigInt support, handling malformed JSON and Unicode issues.
+ * Attempts double parsing: if the first parse returns a string, tries parsing again
+ * (handles cases where JSON is double-encoded as a string).
+ * 
+ * The inner layer fix (collapseDoubledQuotesToken) is only applied to the parsed string,
+ * not the raw input, to avoid rewriting valid content in unintended places.
+ * 
+ * @param input - JSON string to parse (may be malformed or contain Unicode issues)
+ * @param fallback - Value to return if parsing fails (defaults to null)
+ * @param label - Label for error logging (defaults to "parseJsonBigInt")
+ * @returns Parsed value with BigInt support, or fallback if parsing fails
+ */
+export const parseJsonBigInt = <T>(
+  input: string,
+  { fallback = null as T | null, label = "parseJsonBigInt" } = {}
+): unknown | T => {
+  try {
+    const v = parseText(input);
+    // If result is a string, it might be double-encoded JSON - try parsing again
+    if (typeof v !== "string") return v;
+    try {
+      // Inner layer only: handle the ""transfer"" artifact if it exists in the nested JSON
+      return parseText(collapseDoubledQuotesToken(v));
+    } catch {
+      // If second parse fails, return the string value as-is
+      return v;
+    }
+  } catch (e) {
+    console.error(`[${label}] failed`, {
+      err: e instanceof Error ? `${e.name}: ${e.message}` : String(e),
+    });
+    return fallback;
+  }
+};

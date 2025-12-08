@@ -45,15 +45,18 @@ library:
 tests:
   storage-test:
     source-dirs: test/
-    main: StorageTest.hs
+    main: Main.hs
     ghc-options: -dynamic
-    other-modules: []
+    other-modules:
+      - BasicValueStringTest
+      - StorageTest
     dependencies:
       - bytestring
       - ethereum-rlp
+      - format
       - hspec
+      - persistent
       - solid-vm-model
-      - strato-model
       - unliftio
 
 benchmarks:

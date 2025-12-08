@@ -1,0 +1,81 @@
+{
+  "0000000000000000000000000000000000001004": {
+    "Deposited": {
+      "amount": "mTokenMinted"
+    },
+    "Withdrawn": {
+      "amount": "mTokenBurned"
+    },
+    "Borrowed": {
+      "amount": "amount"
+    }
+  },
+  "0000000000000000000000000000000000001011": {
+    "USDSTMinted": {
+      "amount": "amountUSD"
+    },
+    "USDSTBurned": {
+      "amount": "amountUSD"
+    }
+  },
+  "0000000000000000000000000000000000001015": {
+    "Staked": {
+      "amount": "sharesOut"
+    },
+    "Redeemed": {
+      "amount": "sharesIn"
+    }
+  },
+  "0000000000000000000000000000000000001017": {
+    "Swap": {
+      "amount": "amountIn"
+    }
+  },
+  "0000000000000000000000000000000000001018": {
+    "Minted": {
+      "amount": "value"
+    },
+    "Burned": {
+      "amount": "value"
+    }
+  },
+  "0000000000000000000000000000000000001019": {
+    "Swap": {
+      "amount": "amountIn"
+    }
+  },
+  "000000000000000000000000000000000000101a": {
+    "Minted": {
+      "amount": "value"
+    },
+    "Burned": {
+      "amount": "value"
+    }
+  },
+  "000000000000000000000000000000000000101b": {
+    "Swap": {
+      "amount": "amountIn"
+    }
+  },
+  "000000000000000000000000000000000000101c": {
+    "Minted": {
+      "amount": "value"
+    },
+    "Burned": {
+      "amount": "value"
+    }
+  },
+  "000000000000000000000000000000000000101d": {
+    "Swap": {
+      "amount": "amountIn"
+    }
+  },
+  "000000000000000000000000000000000000101e": {
+    "Minted": {
+      "amount": "value"
+    },
+    "Burned": {
+      "amount": "value"
+    }
+  }
+}

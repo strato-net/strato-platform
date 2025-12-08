@@ -3,6 +3,7 @@ import { CircleArrowDown, CircleArrowUp, HelpCircle, PauseCircle } from "lucide-
 import { useLendingContext } from "@/context/LendingContext";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
+import { useTokenContext } from "@/context/TokenContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,10 +14,13 @@ import { useToast } from "@/hooks/use-toast";
 import { LENDING_DEPOSIT_FEE, LENDING_WITHDRAW_FEE } from "@/lib/constants";
 import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
 import { rewardsEnabled } from "@/lib/constants";
+import { CompactRewardsDisplay } from "@/components/rewards/CompactRewardsDisplay";
+import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 
 const LendingPoolSection = () => {
   const { userAddress } = useUser();
-  const { activeTokens: tokens, loading, fetchTokens, fetchUsdstBalance } = useUserTokens();
+  const { activeTokens: tokens, loading, fetchTokens } = useUserTokens();
+  const { fetchUsdstBalance } = useTokenContext();
   const {
     liquidityInfo,
     loadingLiquidity,
@@ -31,18 +35,19 @@ const LendingPoolSection = () => {
   const [stakeMToken, setStakeMToken] = useState<boolean>(rewardsEnabled ? true : false);
   const [includeStakedMToken, setIncludeStakedMToken] = useState<boolean>(false);
   const { toast } = useToast();
+  const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
   const refreshLendingData = (signal?: AbortSignal) => {
-    if (!userAddress) return;
     fetchTokens(signal);
     refreshLiquidity(signal);
-    fetchUsdstBalance(userAddress);
+    fetchUsdstBalance();
   };
 
   const getMaxWithdrawableAmount = (): bigint => {
     if (includeStakedMToken) {
       // Calculate total value in USDST using total mTokens
-      const totalMTokenWei = BigInt(liquidityInfo?.withdrawable?.userBalanceTotal || "0");
+      // Note: userBalanceTotal doesn't exist in TokenInfo, using userBalance instead
+      const totalMTokenWei = BigInt(liquidityInfo?.withdrawable?.userBalance || "0");
       const exchangeRateWei = BigInt(liquidityInfo?.exchangeRate || "0");
 
       if (totalMTokenWei === 0n || exchangeRateWei === 0n) {
@@ -61,15 +66,14 @@ const LendingPoolSection = () => {
     }
   };
 
-  // 1. Fetch on userAddress change only, with abort controller
+  // 1. Fetch on mount, with abort controller
   useEffect(() => {
-    if (!userAddress) return;
     const abortController = new AbortController();
     refreshLendingData(abortController.signal);
     return () => {
       abortController.abort();
     };
-  }, [userAddress]);
+  }, []);
 
 
   const isDepositAmountValid = () => {
@@ -133,7 +137,6 @@ const LendingPoolSection = () => {
         } else {
           await withdrawLiquidity({
             amount: amountWei,
-            includeStakedMToken,
           });
         }
       }
@@ -165,6 +168,12 @@ const LendingPoolSection = () => {
         <CardHeader className="px-2 py-2 md:px-6 md:py-6">
           <div className="flex justify-between items-center">
             <CardTitle>USDST Lending Pool</CardTitle>
+            {/* <CompactRewardsDisplay
+              userRewards={userRewards}
+              loading={rewardsLoading}
+              activityIds={[1]}
+              variant="button"
+            /> */}
           </div>
         </CardHeader>
         <CardContent className="px-2 py-2 md:px-6 md:py-6">
@@ -231,6 +240,14 @@ const LendingPoolSection = () => {
                   <div className="text-sm text-gray-500 mt-1">
                     Transaction Fee: {LENDING_DEPOSIT_FEE} USDST
                   </div>
+                  {/* Estimated Rewards */}
+                  {/* <CompactRewardsDisplay
+                    userRewards={userRewards}
+                    loading={rewardsLoading}
+                    activityIds={[1]}
+                    variant="inline"
+                    inputAmount={depositAmount}
+                  /> */}
                   {/* Stake mUSDST Checkbox */}
                   {rewardsEnabled && (
                     <div className="flex items-center space-x-2 mt-3">
@@ -390,7 +407,7 @@ const LendingPoolSection = () => {
                       formatBalance(getMaxWithdrawableAmount(), undefined, 18, 2)
                     )}{" "}
                     USDST ({includeStakedMToken
-                      ? (liquidityInfo?.withdrawable?.userBalanceTotal ? formatBalance(liquidityInfo?.withdrawable?.userBalanceTotal || 0n,"mUSDST", 18) : "0.00")
+                      ? (liquidityInfo?.withdrawable?.userBalance ? formatBalance(liquidityInfo?.withdrawable?.userBalance || 0n,"mUSDST", 18) : "0.00")
                       : (liquidityInfo?.withdrawable?.userBalance ? formatBalance(liquidityInfo?.withdrawable?.userBalance || 0n,"mUSDST", 18) : "0.00")
                     } )
                   </div>
@@ -620,8 +637,8 @@ const LendingPoolSection = () => {
                       <span className="text-gray-400 animate-pulse">
                         Loading...
                       </span>
-                    ) : liquidityInfo?.withdrawable?.userBalanceTotal ? (
-                      formatBalance(liquidityInfo.withdrawable.userBalanceTotal || 0n, undefined, 18, 2, 2)
+                    ) : liquidityInfo?.withdrawable?.userBalance ? (
+                      formatBalance(liquidityInfo.withdrawable.userBalance || 0n, undefined, 18, 2, 2)
                     ) : (
                       "0.00"
                     )}
@@ -629,20 +646,8 @@ const LendingPoolSection = () => {
                 </div>
                 {rewardsEnabled && (
                   <>
-                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start pl-4">
-                      <span className="text-gray-400 text-xs sm:text-sm">• Staked</span>
-                      <span className="font-medium text-xs sm:text-sm sm:text-right">
-                        {loadingLiquidity ? (
-                          <span className="text-gray-400 animate-pulse">
-                            Loading...
-                          </span>
-                        ) : liquidityInfo?.withdrawable?.userBalanceStaked ? (
-                          formatBalance(liquidityInfo.withdrawable.userBalanceStaked || 0n, undefined, 18, 2, 2)
-                        ) : (
-                          "0.00"
-                        )}
-                      </span>
-                    </div>
+                    {/* Note: userBalanceStaked doesn't exist in TokenInfo interface */}
+                    {/* If staked balance tracking is needed, it should be added to the interface */}
                     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start pl-4">
                       <span className="text-gray-400 text-xs sm:text-sm">• Unstaked</span>
                       <span className="font-medium text-xs sm:text-sm sm:text-right">

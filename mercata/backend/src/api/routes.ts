@@ -9,6 +9,7 @@ import authHandler from "./middleware/authHandler";
 import TokensController from "./controllers/tokens.controller";
 import userRoutes from "./routes/user.routes";
 import tokensRoutes from "./routes/tokens.routes";
+import tokensV2Routes from "./routes/tokens.v2.routes";
 import configRoutes from "./routes/config.routes";
 import oracleRoutes from "./routes/oracle.routes";
 import swapRoutes from "./routes/swap.routes";
@@ -25,6 +26,9 @@ const router = Router();
 
 // ----- User Routes -----
 router.use("/user", userRoutes);
+
+// ----- Token V2 Routes (must be before v1 routes to avoid /:address matching) -----
+router.use("/tokens/v2", tokensV2Routes);
 
 // ----- Token Routes -----
 router.use("/tokens", tokensRoutes);

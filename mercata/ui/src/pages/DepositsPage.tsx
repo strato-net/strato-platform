@@ -1,4 +1,5 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useMemo } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import MobileSidebar from '../components/dashboard/MobileSidebar';
@@ -8,103 +9,67 @@ import {
   CardHeader, 
   CardTitle 
 } from "@/components/ui/card";
+import { Tabs as AntdTabs } from "antd";
 import AssetSummary from '@/components/dashboard/AssetSummary';
 import AssetsGrid from '@/components/dashboard/AssetsGrid';
-import { Wallet } from 'lucide-react';
+import { Wallet, ArrowRight } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
-import { useUserTokens } from '@/context/UserTokensContext';
+import { useTokenContext } from '@/context/TokenContext';
 import { useLendingContext } from '@/context/LendingContext';
-import { formatUnits } from 'viem';
-import { formatUnits as formatUnitsEthers } from 'ethers';
 import { useCDP } from '@/context/CDPContext';
-import { useSwapContext } from '@/context/SwapContext';
 import { useNetBalance } from '@/hooks/useNetBalance';
-import { useSafetyContext } from '@/context/SafetyContext';
 import AssetsList from '@/components/dashboard/AssetsList';
-import ExchangeCart from './ExchangeCart';
-import { useSearchParams } from 'react-router-dom';
+import BridgeIn from '@/components/bridge/BridgeIn';
+import { useBridgeContext } from '@/context/BridgeContext';
 import { cataAddress } from '@/lib/constants';
 
 const DepositsPage = () => {
+  const location = useLocation();
   const { userAddress } = useUser();
-  const { activeTokens: tokens, inactiveTokens, allActiveTokens, loading, allActiveLoading, fetchTokens, fetchAllActiveTokens, fetchUsdstBalance } = useUserTokens();
-  const { loans, liquidityInfo, refreshLoans } = useLendingContext();
-  const { totalCDPDebt, refreshVaults } = useCDP();
-  const { userPools } = useSwapContext();
-  const { safetyInfo, refreshSafetyInfo } = useSafetyContext();
+  const { earningAssets, getEarningAssets, inactiveTokens, loadingEarningAssets } = useTokenContext();
+  const { loans } = useLendingContext();
+  const { totalCDPDebt } = useCDP();
+  const { loadNetworksAndTokens, setTargetTransactionTab } = useBridgeContext();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"easy-savings" | "bridge-in">("easy-savings");
 
   // Extract CATA token from inactive tokens by address
   const cataToken = inactiveTokens?.find(token =>
     token.address === cataAddress
   );
 
+  // Sort earning assets by value first, then categorize
+  const { nonPoolTokens, sortedEarningAssets } = useMemo(() => {
+    const sorted = [...earningAssets].sort((a, b) => {
+      const valueA = parseFloat(a.value || "0");
+      const valueB = parseFloat(b.value || "0");
+      return valueB - valueA;
+    });
+    const nonPool: typeof earningAssets = [];
+    for (const token of sorted) {
+      if (!token.isPoolToken) {
+        nonPool.push(token);
+      }
+    }
+    return { nonPoolTokens: nonPool, sortedEarningAssets: sorted };
+  }, [earningAssets]);
+
   // Use centralized net balance calculation hook
-  const { netBalance: totalBalance } = useNetBalance({
-    tokens,
+  const { netBalance: totalBalance, isLoading: isLoadingNetBalance } = useNetBalance({
+    tokens: earningAssets,
     cataToken,
     loans,
-    liquidityInfo,
-    totalCDPDebt,
-    safetyInfo
+    totalCDPDebt
   });
-  const [searchParams] = useSearchParams();
-
-  const initialTab = searchParams.get('tab') === 'convert' ? 'usdc' : undefined;
-
-  // Add visibility state to prevent flashing
-  const [isComponentMounted, setIsComponentMounted] = useState(false);
-
-  // Handle vault action success with debounced refresh
-  const handleVaultActionSuccess = () => {
-    // Use a longer delay to ensure transaction is processed and tab state is preserved
-    setTimeout(() => {
-      fetchTokens();
-      refreshLoans(); 
-      refreshVaults(); 
-      refreshSafetyInfo();
-      if (userAddress) {
-        fetchUsdstBalance(userAddress);
-      }
-    }, 1000); // Longer delay to ensure smooth UX
-  };
 
   useEffect(() => {
-    // Set mounted state immediately to prevent flash
-    setIsComponentMounted(true);
+    const hasExistingEarningAssets = earningAssets.length > 0;
     
-    // Fetch data
-    fetchTokens();
-    fetchAllActiveTokens();
-  }, [userAddress, fetchTokens, fetchAllActiveTokens]);
-
-  // Net balance calculation is now handled by the useNetBalance hook above
-
-  // Don't render anything until component is properly mounted
-  if (!isComponentMounted) {
-    return null;
-  }
-
-  // Show loading state while data is being fetched
-  if (loading || allActiveLoading) {
-    return (
-      <div className="h-screen bg-gray-50 overflow-hidden">
-        <DashboardSidebar />
-        <MobileSidebar 
-          isOpen={isMobileSidebarOpen} 
-          onClose={() => setIsMobileSidebarOpen(false)} 
-        />
-        <div className="h-screen flex flex-col transition-all duration-300 md:pl-64" style={{ paddingLeft: 'var(--sidebar-width, 0rem)' }}>
-          <DashboardHeader title="Deposits" onMenuClick={() => setIsMobileSidebarOpen(true)} />
-          <main className="flex-1 p-6 overflow-y-auto">
-            <div className="flex justify-center items-center h-full">
-              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
-            </div>
-          </main>
-        </div>
-      </div>
-    );
-  }
+    getEarningAssets(!hasExistingEarningAssets);
+    loadNetworksAndTokens().catch((error) => {
+      console.error('Failed to load networks and tokens:', error);
+    });
+  }, [location.pathname, userAddress, getEarningAssets, loadNetworksAndTokens]);
 
   return (
     <div className="h-screen bg-gray-50 overflow-hidden">
@@ -116,28 +81,89 @@ const DepositsPage = () => {
       <div className="h-screen flex flex-col transition-all duration-300 md:pl-64" style={{ paddingLeft: 'var(--sidebar-width, 0rem)' }}>
         <DashboardHeader title="Deposits" onMenuClick={() => setIsMobileSidebarOpen(true)} />
         <main className="flex-1 p-6 overflow-y-auto">
-          <div className="mb-8 flex flex-col lg:flex-row gap-6 items-start">
-            <div className="w-full lg:w-[40%] lg:min-w-[400px] lg:max-w-[600px] lg:sticky lg:top-0">
-              {/* Asset Summary */}
-              <div className="mb-6">
-                <AssetSummary 
-                  title="Net Balance" 
+          <style>{`
+            .custom-tabs .ant-tabs-tab {
+              justify-content: center !important;
+            }
+            .custom-tabs .ant-tabs-tab-btn {
+              justify-content: center !important;
+              text-align: center !important;
+              width: 100% !important;
+            }
+          `}</style>
+          <div className="mb-8 flex flex-col lg:flex-row gap-6 items-stretch">
+            <div className="w-full lg:w-[50%] flex">
+              <Card className="shadow-sm flex-1 flex flex-col">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle>Deposit Assets</CardTitle>
+                    <Link
+                      to="/bridge-transactions"
+                      onClick={() => setTargetTransactionTab('DepositRecorded')}
+                      className="flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors"
+                    >
+                      <ArrowRight size={16} />
+                      View Transactions
+                    </Link>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 flex flex-col min-h-0">
+                  <div className="w-full bg-white/90 p-1.5 rounded-xl border border-gray-200 shadow-sm flex-1 flex flex-col min-h-0">
+                  <AntdTabs
+                    activeKey={activeTab}
+                    items={[
+                      {
+                        key: "easy-savings",
+                        label: "Easy Savings",
+                      },
+                      {
+                        key: "bridge-in",
+                        label: "Bridge In",
+                      },
+                    ]}
+                    onChange={(value) =>
+                      setActiveTab(value as "easy-savings" | "bridge-in")
+                    }
+                    className="custom-tabs"
+                    style={
+                      {
+                        "--ant-primary-color": "#3b82f6",
+                        "--ant-primary-color-hover": "#2563eb",
+                      } as React.CSSProperties
+                    }
+                  />
+                    <div className="bg-white rounded-xl p-4 shadow-sm mt-4 flex-1 min-h-0 overflow-auto">
+                      <BridgeIn isConvert={activeTab === "easy-savings"} />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+            <div className="w-full lg:w-[50%] flex flex-col gap-6">
+              {/* Net Balance moved to right column */}
+              <div className="flex-[0.5] flex">
+                <AssetSummary
+                  title="Net Balance"
                   value={`$${totalBalance.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`}
                   icon={<Wallet className="text-white" size={18} />}
                   color="bg-blue-500"
+                  isLoading={isLoadingNetBalance}
                 />
               </div>
-              <ExchangeCart onVaultActionSuccess={handleVaultActionSuccess} initialTab={initialTab} />
-            </div>
-            <div className="flex-1 min-w-0 max-w-full">
-              {/* Render AssetsList when data is loaded */}
-              <AssetsList 
-                loading={loading} 
-                tokens={tokens} 
-                inActiveTokens={inactiveTokens} 
-                isDashboard={false}
-                shouldPreventFlash={true}
-              />
+              {/* My Deposits (Earning Assets) */}
+              <Card className="shadow-sm flex-[4.5] flex flex-col min-h-0">
+                <CardHeader>
+                  <CardTitle>My Deposits</CardTitle>
+                </CardHeader>
+                <CardContent className="flex-1 min-h-0 overflow-auto">
+                  <AssetsList 
+                    loading={loadingEarningAssets} 
+                    tokens={nonPoolTokens} 
+                    inActiveTokens={inactiveTokens} 
+                    isDashboard={false}
+                  />
+                </CardContent>
+              </Card>
             </div>
           </div>
           {/* Assets List */}
@@ -146,7 +172,7 @@ const DepositsPage = () => {
               <CardTitle>Available Assets</CardTitle>
             </CardHeader>
             <CardContent>
-              <AssetsGrid loading={allActiveLoading} assets={allActiveTokens} />
+              <AssetsGrid loading={loadingEarningAssets} assets={sortedEarningAssets} />
             </CardContent>
           </Card>
         </main>

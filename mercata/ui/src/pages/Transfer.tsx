@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Token } from "@/interface";
 
 import { useUser } from "@/context/UserContext";
-import { useUserTokens } from "@/context/UserTokensContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { useToast } from "@/hooks/use-toast";
 import { usdstAddress, TRANSFER_FEE } from "@/lib/constants";
@@ -25,8 +24,7 @@ import { sortTokensCompareFn } from "@/lib/tokenPriority";
 
 const Transfer = () => {
   const { userAddress } = useUser();
-  const { usdstBalance, voucherBalance, fetchUsdstBalance, loadingUsdstBalance } = useUserTokens();
-  const { getTransferableTokens, transferToken } = useTokenContext();
+  const { usdstBalance, voucherBalance, fetchUsdstBalance, loadingUsdstBalance, getTransferableTokens, transferToken } = useTokenContext();
   const { toast } = useToast();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   
@@ -80,13 +78,11 @@ const Transfer = () => {
     return { activeTokens: active, inactiveTokens: inactive };
   }, [tokens]);
 
-  // Fetch USDST balance when user changes
+  // Fetch USDST balance on mount
   useEffect(() => {
-    if (userAddress) {
-      fetchUserTokens();
-      fetchUsdstBalance(userAddress);
-    }
-  }, [userAddress, fetchUserTokens, fetchUsdstBalance]);
+    fetchUserTokens();
+    fetchUsdstBalance();
+  }, [fetchUserTokens, fetchUsdstBalance]);
 
   const handleConfirmTransfer = async () => {
     if (!fromAsset || !recipient || !fromAmount) return;
@@ -115,9 +111,7 @@ const Transfer = () => {
         setFromAsset(null)
       }
       // Refresh USDST balance since gas fees were paid
-      if (userAddress) {
-        await fetchUsdstBalance(userAddress);
-      }
+      await fetchUsdstBalance();
     } catch (error) {
       // Error handling is now done globally by axios interceptor
       console.error("Transfer error:", error);

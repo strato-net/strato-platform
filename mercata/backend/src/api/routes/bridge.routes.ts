@@ -61,6 +61,48 @@ router.post("/requestWithdrawal", authHandler.authorizeRequest(), BridgeControll
 
 /**
  * @openapi
+ * /bridge/requestAutoSave:
+ *   post:
+ *     summary: Request auto save
+ *     tags: [Bridge]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - externalChainId
+ *               - externalTxHash
+ *             properties:
+ *               externalChainId:
+ *                 type: string
+ *                 description: External chain identifier (numeric string)
+ *               externalTxHash:
+ *                 type: string
+ *                 description: External transaction hash
+ *     responses:
+ *       200:
+ *         description: Auto save request submitted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     status:
+ *                       type: string
+ *                     hash:
+ *                       type: string
+ */
+router.post("/requestAutoSave", authHandler.authorizeRequest(), BridgeController.requestAutoSave);
+
+/**
+ * @openapi
  * /bridge/bridgeableTokens/{chainId}:
  *   get:
  *     summary: List tokens that can withdraw to a chain
@@ -98,46 +140,6 @@ router.post("/requestWithdrawal", authHandler.authorizeRequest(), BridgeControll
  *                     type: string
  */
 router.get("/bridgeableTokens/:chainId", authHandler.authorizeRequest(false), BridgeController.getBridgeableTokens);
-
-/**
- * @openapi
- * /bridge/redeemableTokens/{chainId}:
- *   get:
- *     summary: List tokens eligible for redemption
- *     tags: [Bridge]
- *     parameters:
- *       - name: chainId
- *         in: path
- *         required: true
- *         description: External chain identifier (numeric string)
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Tokens that can be redeemed on the target chain
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   stratoToken:
- *                     type: string
- *                   stratoTokenName:
- *                     type: string
- *                   stratoTokenSymbol:
- *                     type: string
- *                   externalToken:
- *                     type: string
- *                   externalName:
- *                     type: string
- *                   externalSymbol:
- *                     type: string
- *                   externalChainId:
- *                     type: string
- */
-router.get("/redeemableTokens/:chainId", authHandler.authorizeRequest(false), BridgeController.getRedeemableTokens);
 
 /**
  * @openapi
@@ -224,5 +226,33 @@ router.get("/networkConfigs", authHandler.authorizeRequest(false), BridgeControl
  *                   type: integer
  */
 router.get("/transactions/:type", authHandler.authorizeRequest(), BridgeController.getTransactions);
+
+/**
+ * @openapi
+ * /bridge/withdrawalSummary:
+ *   get:
+ *     summary: Get withdrawal summary statistics for the authenticated user
+ *     tags: [Bridge]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Withdrawal summary statistics
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 totalWithdrawn30d:
+ *                   type: string
+ *                   description: Total withdrawn in last 30 days in wei (string format)
+ *                 pendingWithdrawals:
+ *                   type: number
+ *                   description: Count of pending withdrawals
+ *                 availableToWithdraw:
+ *                   type: string
+ *                   description: Available balance to withdraw in wei (string format)
+ */
+router.get("/withdrawalSummary", authHandler.authorizeRequest(), BridgeController.getWithdrawalSummary);
 
 export default router;

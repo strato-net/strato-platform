@@ -17,41 +17,22 @@ import {
   Permit2Types
 } from './types';
 
-/**
- * Bridge Contract Service
- * Handles all blockchain interactions for the bridge functionality
- */
-class BridgeContractService {
-  private async getClient(chainId: string) {
+async function getClient(chainId: string) {
     return createPublicClient({
       chain: await resolveViemChain(chainId),
       transport: http(),
     });
   }
 
-  /**
-   * Formats an address to ensure it starts with 0x
-   */
-  formatAddress(address: string): `0x${string}` {
+function formatAddress(address: string): `0x${string}` {
     return (address.startsWith('0x') ? address : `0x${address}`) as `0x${string}`;
   }
 
-  // ============================================
-  // Permit2 Functions
-  // ============================================
-
-  /**
-   * Generates a timestamp-based nonce for Permit2
-   * Uses unordered nonces to avoid state tracking
-   */
-  getPermit2Nonce(): bigint {
+export function getPermit2Nonce(): bigint {
     return BigInt(Date.now());
   }
 
-  /**
-   * Gets the EIP-712 domain for Permit2 signatures
-   */
-  getPermit2Domain(chainId: string): Permit2Domain {
+export function getPermit2Domain(chainId: string): Permit2Domain {
     return {
       name: "Permit2",
       chainId: parseInt(chainId),
@@ -59,10 +40,7 @@ class BridgeContractService {
     };
   }
 
-  /**
-   * Gets the EIP-712 types for Permit2 signatures
-   */
-  getPermit2Types(): Permit2Types {
+export function getPermit2Types(): Permit2Types {
     return {
       PermitTransferFrom: [
         { name: "permitted", type: "TokenPermissions" },
@@ -77,10 +55,7 @@ class BridgeContractService {
     } as const;
   }
 
-  /**
-   * Creates a Permit2 message for signing
-   */
-  createPermit2Message({
+export function createPermit2Message({
     token,
     amount,
     spender,
@@ -95,32 +70,29 @@ class BridgeContractService {
   }) {
     return {
       permitted: {
-        token: this.formatAddress(token),
+      token: formatAddress(token),
         amount
       },
-      spender: this.formatAddress(spender),
+    spender: formatAddress(spender),
       nonce,
       deadline
     };
   }
 
-  /**
-   * Checks if a token has approved Permit2 for spending
-   */
-  async checkPermit2Approval({
+export async function checkPermit2Approval({
     token,
     owner,
     amount,
     chainId
   }: Permit2Params): Promise<Permit2ApprovalResult> {
-    const client = await this.getClient(chainId);
+  const client = await getClient(chainId);
     
     const allowance = await client.readContract({
-      address: this.formatAddress(token),
+    address: formatAddress(token),
       abi: ERC20_ABI,
       functionName: "allowance",
       args: [
-        this.formatAddress(owner),
+      formatAddress(owner),
         PERMIT2_ADDRESS as `0x${string}`
       ]
     });
@@ -131,14 +103,7 @@ class BridgeContractService {
     };
   }
 
-  // ============================================
-  // Token Functions
-  // ============================================
-
-  /**
-   * Gets token configuration from the DepositRouter contract
-   */
-  async getTokenConfig({ 
+export async function getTokenConfig({ 
     tokenAddress, 
     chainId, 
     depositRouterAddress 
@@ -150,11 +115,11 @@ class BridgeContractService {
     minAmount: string;
     isPermitted: boolean;
   }> {
-    const client = await this.getClient(chainId.toString());
-    const normalizedAddress = this.formatAddress(tokenAddress);
+  const client = await getClient(chainId.toString());
+  const normalizedAddress = formatAddress(tokenAddress);
     
     const config = await client.readContract({
-      address: this.formatAddress(depositRouterAddress),
+    address: formatAddress(depositRouterAddress),
       abi: DEPOSIT_ROUTER_ABI,
       functionName: "tokenConfig",
       args: [normalizedAddress]
@@ -166,14 +131,7 @@ class BridgeContractService {
     };
   }
 
-  // ============================================
-  // Validation Functions
-  // ============================================
-
-  /**
-   * Validates if a deposit can be made through the router contract
-   */
-  async validateRouterContract({ 
+export async function validateRouterContract({ 
     depositRouterAddress, 
     amount, 
     decimals, 
@@ -181,13 +139,12 @@ class BridgeContractService {
     tokenAddress
   }: ValidationParams): Promise<ContractValidationResult> {
     try {
-      const client = await this.getClient(chainId);
-      const normalizedTokenAddress = this.formatAddress(tokenAddress);
+    const client = await getClient(chainId);
+    const normalizedTokenAddress = formatAddress(tokenAddress);
       const depositAmount = safeParseUnits(amount, parseInt(decimals) || 18);
       
-      // Get token configuration from router
       const config = await client.readContract({
-        address: this.formatAddress(depositRouterAddress),
+      address: formatAddress(depositRouterAddress),
         abi: DEPOSIT_ROUTER_ABI,
         functionName: "tokenConfig",
         args: [normalizedTokenAddress]
@@ -195,20 +152,16 @@ class BridgeContractService {
       const minAmount = config[0];
       const isPermitted = config[1];
 
-      // Check if deposit is allowed using canDeposit
       const canDeposit = await client.readContract({
-        address: this.formatAddress(depositRouterAddress),
+      address: formatAddress(depositRouterAddress),
         abi: DEPOSIT_ROUTER_ABI,
         functionName: "canDeposit",
         args: [normalizedTokenAddress, depositAmount]
       });
 
-      // Determine token type for error messages
       const tokenType = normalizedTokenAddress === NATIVE_TOKEN_ADDRESS ? "ETH" : "ERC20";
       
-      // Check if operation is permitted
       if (!canDeposit) {
-        // Check if it's because token is not permitted
         if (!isPermitted) {
           return {
             isValid: false,
@@ -218,7 +171,6 @@ class BridgeContractService {
             depositAmount: depositAmount.toString()
           };
         }
-        // Check if it's because amount is below minimum
         if (depositAmount < minAmount) {
           return {
             isValid: false,
@@ -228,7 +180,6 @@ class BridgeContractService {
             depositAmount: depositAmount.toString()
           };
         }
-        // Fallback for other reasons
         return {
           isValid: false,
           error: `Deposit validation failed. Please check your input and try again.`,
@@ -238,7 +189,6 @@ class BridgeContractService {
         };
       }
 
-      // All validations passed
       return {
         isValid: true,
         isAllowed: true,
@@ -254,19 +204,12 @@ class BridgeContractService {
     }
   }
 
-  // ============================================
-  // Transaction Helpers
-  // ============================================
-
-  /**
-   * Waits for a transaction to be confirmed
-   */
-  async waitForTransaction(
+export async function waitForTransaction(
     txHash: `0x${string}`, 
     chainId: string, 
     confirmations = 1
   ): Promise<boolean> {
-    const client = await this.getClient(chainId);
+  const client = await getClient(chainId);
     
     const receipt = await client.waitForTransactionReceipt({
       hash: txHash,
@@ -276,57 +219,55 @@ class BridgeContractService {
     return receipt.status === 'success';
   }
 
-  /**
-   * Estimates gas for a transaction
-   */
-  async estimateGas({
-    address,
-    abi,
-    functionName,
-    args,
-    value,
+export async function simulateDeposit({
+  depositRouter,
+  isNative,
+  tokenAddress,
+  amount,
+  userAddress,
     account,
-    chainId
+  chainId,
+  permitData
   }: {
-    address: string;
-    abi: any;
-    functionName: string;
-    args?: any[];
-    value?: bigint;
+  depositRouter: string;
+  isNative: boolean;
+  tokenAddress?: string;
+  amount: bigint;
+  userAddress: string;
     account: string;
     chainId: string;
-  }): Promise<bigint> {
-    const client = await this.getClient(chainId);
-    
-    return await client.estimateContractGas({
-      address: this.formatAddress(address),
-      abi,
-      functionName,
-      args,
-      value,
-      account: this.formatAddress(account)
-    });
-  }
+  permitData?: { nonce: bigint; deadline: bigint; signature: string };
+}): Promise<void> {
+  const client = await getClient(chainId);
+  const routerAddress = formatAddress(depositRouter);
+  const accountAddress = formatAddress(account);
 
-  /**
-   * Gets the current block number
-   */
-  async getBlockNumber(chainId: string): Promise<bigint> {
-    const client = await this.getClient(chainId);
-    return await client.getBlockNumber();
-  }
-
-  /**
-   * Checks if an address is a contract
-   */
-  async isContract(address: string, chainId: string): Promise<boolean> {
-    const client = await this.getClient(chainId);
-    const code = await client.getBytecode({ 
-      address: this.formatAddress(address) 
+  if (isNative) {
+    await client.simulateContract({
+      address: routerAddress,
+      abi: DEPOSIT_ROUTER_ABI,
+      functionName: "depositETH",
+      args: [formatAddress(userAddress)],
+      value: amount,
+      account: accountAddress,
     });
-    return !!code && code !== '0x';
+  } else {
+    if (!permitData || !tokenAddress) {
+      throw new Error("Permit data and token address are required for ERC20 deposits");
+    }
+    await client.simulateContract({
+      address: routerAddress,
+      abi: DEPOSIT_ROUTER_ABI,
+      functionName: "deposit",
+      args: [
+        formatAddress(tokenAddress),
+        amount,
+        formatAddress(userAddress),
+        permitData.nonce,
+        permitData.deadline,
+        permitData.signature as `0x${string}`
+      ],
+      account: accountAddress,
+    });
   }
 }
-
-// Export singleton instance
-export const bridgeContractService = new BridgeContractService();

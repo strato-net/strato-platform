@@ -1,3 +1,5 @@
+import {TransactionResponse} from "./common-types";
+
 // ============================================================================
 // NETWORK CONFIG TYPES
 // ============================================================================
@@ -29,12 +31,12 @@ export interface BridgeToken {
   stratoTokenName: string;       // From TokenFactory (not in AssetInfo)
   stratoTokenSymbol: string;     // From TokenFactory (not in AssetInfo)
   externalChainId: string;       // Matches AssetInfo.externalChainId
-  permissions: number;           // Matches AssetInfo.permissions
   externalName: string;          // Matches AssetInfo.externalName
   externalToken: string;         // Matches AssetInfo.externalToken
   externalSymbol: string;        // Matches AssetInfo.externalSymbol
   externalDecimals: string;      // Matches AssetInfo.externalDecimals
   maxPerWithdrawal: string;      // Matches AssetInfo.maxPerWithdrawal
+  bridgeable: boolean;           // true if stratoToken !== USDST, false otherwise
 }
 
 // ============================================================================
@@ -97,9 +99,19 @@ export interface WithdrawalRequestParams {
 }
 
 /**
- * Response from withdrawal request
+ * Parameters for requesting automatic supply of liquidity
+ * to the lending pool upon deposit completion
  */
-export interface WithdrawalRequestResponse {
-  status: string;
-  hash: string;
+export interface AutoSaveRequestParams {
+  externalChainId: string;
+  externalTxHash: string;
+}
+
+/**
+ * Response from withdrawal summary endpoint
+ */
+export interface WithdrawalSummaryResponse {
+  totalWithdrawn30d: string;      // Total withdrawn in last 30 days in wei (string format)
+  pendingWithdrawals: number;      // Count of pending withdrawals
+  availableToWithdraw: string;     // Available balance to withdraw in wei (string format)
 }

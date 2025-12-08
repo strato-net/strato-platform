@@ -1,14 +1,23 @@
 import { Request, Response, NextFunction } from "express";
 import { 
-  requestWithdrawal, 
+  requestWithdrawal,
+  requestAutoSave,
   getBridgeableTokens,
-  getRedeemableTokens,
   getNetworkConfigs,
-  getBridgeTransactions
+  getBridgeTransactions,
+  getWithdrawalSummary
 } from "../services/bridge.service";
-import { validateRequestWithdrawal, validateTransactionType } from "../validators/bridge.validators";
+import { validateRequestWithdrawal, validateAutoSave, validateTransactionType } from "../validators/bridge.validators";
 import { validateRawParams } from "../validators/common.validators";
-import { NetworkConfig, BridgeToken, BridgeTransactionResponse, WithdrawalRequestParams, WithdrawalRequestResponse } from "@mercata/shared-types";
+import {
+  NetworkConfig,
+  BridgeToken,
+  BridgeTransactionResponse,
+  WithdrawalRequestParams,
+  AutoSaveRequestParams,
+  TransactionResponse,
+  WithdrawalSummaryResponse
+} from "@mercata/shared-types";
 import { isUserAdmin } from "../services/user.service";
 
 class BridgeController {
@@ -21,8 +30,28 @@ class BridgeController {
       const { accessToken, body, address: userAddress } = req;
       validateRequestWithdrawal(body);
       
-      const result: WithdrawalRequestResponse = await requestWithdrawal(accessToken, body as WithdrawalRequestParams, userAddress as string);
+      const result: TransactionResponse = await requestWithdrawal(accessToken, body as WithdrawalRequestParams, userAddress as string);
 
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
+  static async requestAutoSave(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, body, address: userAddress } = req;
+      validateAutoSave(body);
+   
+      const result: TransactionResponse = await requestAutoSave(accessToken, body as AutoSaveRequestParams, userAddress as string);
+   
       res.json({
         success: true,
         data: result,
@@ -47,27 +76,6 @@ class BridgeController {
       }
       
       const result: BridgeToken[] = await getBridgeableTokens(accessToken, chainId);
-      res.json(result);
-    } catch (error: any) {
-      next(error);
-    }
-  }
-
-  static async getRedeemableTokens(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { accessToken } = req;
-      const { chainId } = req.params;
-      
-      if (!chainId) {
-        res.status(400).json({ error: "chainId parameter is required" });
-        return;
-      }
-      
-      const result: BridgeToken[] = await getRedeemableTokens(accessToken, chainId);
       res.json(result);
     } catch (error: any) {
       next(error);
@@ -107,6 +115,20 @@ class BridgeController {
       const addressToUse = (context === 'admin' && isAdmin) ? undefined : userAddress;
       
       const result: BridgeTransactionResponse = await getBridgeTransactions(accessToken, validatedType, addressToUse, queryParams);
+      res.json(result);
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
+  static async getWithdrawalSummary(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress } = req;
+      const result: WithdrawalSummaryResponse = await getWithdrawalSummary(accessToken, userAddress as string);
       res.json(result);
     } catch (error: any) {
       next(error);

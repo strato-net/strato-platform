@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import MobileSidebar from "../components/dashboard/MobileSidebar";
@@ -7,82 +7,246 @@ import AssetsList from "../components/dashboard/AssetsList";
 import DashboardFAQ from "../components/dashboard/DashboardFAQ";
 import BorrowingSection from "../components/dashboard/BorrowingSection";
 import { Wallet, Coins, Shield, Banknote, Loader2 } from "lucide-react";
-import { useUserTokens } from "@/context/UserTokensContext";
+import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
-import { useLendingMetrics } from "@/hooks/useLendingMetrics";
 import { usePendingRewards } from "@/hooks/usePendingRewards";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams, useNavigate, useLocation } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-import { formatUnits } from "viem";
-import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
 import { useNetBalance } from "@/hooks/useNetBalance";
 import MyPoolParticipationSection from "@/components/dashboard/MyPoolParticipationSection";
+import PortfolioValueChart from "@/components/dashboard/PortfolioValueChart";
 import { useLendingContext } from "@/context/LendingContext";
-import { useSwapContext } from "@/context/SwapContext";
 import { useCDP } from "@/context/CDPContext";
-import { useSafetyContext } from "@/context/SafetyContext";
 import { cataAddress, rewardsEnabled } from "@/lib/constants";
 import { api } from "@/lib/axios";
+import { BalanceSnapshot } from "@mercata/shared-types";
+
+const TIME_RANGES = ["1d", "7d", "1m", "3m", "6m", "1y", "all"] as const;
+type TimeRange = typeof TIME_RANGES[number];
+
+type TabType = 'netBalance' | 'rewards' | 'borrowed';
 
 const Dashboard = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const { userAddress } = useUser();
-  const { activeTokens: tokens, inactiveTokens, loading, fetchTokens } = useUserTokens();
-  const { 
-    availableBorrowingPower, 
-    currentBorrowed, 
-    averageInterestRate, 
-  } = useLendingMetrics();
-  const { loans } = useLendingContext();
+  const {
+    earningAssets,
+    getEarningAssets,
+    inactiveTokens,
+    getInactiveTokens,
+    getBalanceHistory,
+    getCataBalanceHistory,
+    getBorrowingHistory,
+    loadingEarningAssets,
+    loadingInactiveTokens,
+    netBalanceHistoryCache,
+    rewardsHistoryCache,
+    borrowedHistoryCache,
+    loadingBalanceHistory,
+    setNetBalanceHistoryCache,
+    setRewardsHistoryCache,
+    setBorrowedHistoryCache,
+    setLoadingBalanceHistory,
+  } = useTokenContext();
+  const [activeTab, setActiveTab] = useState<TabType>(() => {
+    const stored = localStorage.getItem('dashboard-activeTab');
+    if (stored && ['netBalance', 'rewards', 'borrowed'].includes(stored)) {
+      return stored as TabType;
+    }
+    return 'netBalance';
+  });
+  const { loans, refreshLoans } = useLendingContext();
+  const { totalCDPDebt, refreshVaults } = useCDP();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const { loadingLiquidity, liquidityInfo, refreshLoans } = useLendingContext();
+  const [selectedTimeRange, setSelectedTimeRange] = useState<TimeRange>(() => {
+    const stored = localStorage.getItem('dashboard-timeRange');
+    if (stored && TIME_RANGES.includes(stored as TimeRange)) {
+      return stored as TimeRange;
+    }
+    return '1d';
+  });
 
-  const { totalCDPDebt } = useCDP();
-  const { poolsLoading: loadingUserPools, userPools, fetchUserPositions } = useSwapContext();
-  const { safetyInfo } = useSafetyContext();
   const { pendingRewards, refetch: refetchPendingRewards } = usePendingRewards(rewardsEnabled, 30000);
   const [isClaiming, setIsClaiming] = useState(false);
 
   // Extract CATA token from inactive tokens by address
-  const cataToken = inactiveTokens?.find(token =>
-    token.address === cataAddress
+  const cataToken = useMemo(() => 
+    inactiveTokens?.find(token => token.address === cataAddress),
+    [inactiveTokens]
   );
 
+  // Sort earning assets by value, then categorize in a single pass
+  const { nonPoolTokens, poolTokens } = useMemo(() => {
+    const sorted = [...earningAssets].sort((a, b) => {
+      const valueA = parseFloat(a.value || "0");
+      const valueB = parseFloat(b.value || "0");
+      return valueB - valueA;
+    });
+    const nonPool: typeof earningAssets = [];
+    const pool: typeof earningAssets = [];
+    for (const token of sorted) {
+      if (token.isPoolToken) {
+        pool.push(token);
+      } else {
+        nonPool.push(token);
+      }
+    }
+    return { nonPoolTokens: nonPool, poolTokens: pool };
+  }, [earningAssets]);
+
   // Use centralized net balance calculation hook
-  const { netBalance: totalBalance, cataBalance, totalBorrowed } = useNetBalance({
-    tokens,
+  const { netBalance: totalBalance, cataBalance, totalBorrowed, isLoading: isLoadingNetBalance } = useNetBalance({
+    tokens: earningAssets,
     cataToken,
     loans,
-    liquidityInfo,
-    totalCDPDebt,
-    safetyInfo
+    totalCDPDebt
   });
 
-
-  // Add visibility states to prevent flashing
-  const [isComponentMounted, setIsComponentMounted] = useState(false);
-  const [isDataInitialized, setIsDataInitialized] = useState(false);
+  const chartConfig = useMemo(() => ({
+    netBalance: {
+      data: netBalanceHistoryCache[selectedTimeRange] || [],
+      title: "Portfolio Value",
+      subtitle: "Net balance over time",
+      currentValue: totalBalance,
+    },
+    rewards: {
+      data: rewardsHistoryCache[selectedTimeRange] || [],
+      title: "Rewards",
+      subtitle: "Reward Points over time",
+      currentValue: cataBalance,
+    },
+    borrowed: {
+      data: borrowedHistoryCache[selectedTimeRange] || [],
+      title: "Borrowed",
+      subtitle: "Total borrowed over time",
+      currentValue: totalBorrowed,
+    },
+  }), [netBalanceHistoryCache, rewardsHistoryCache, borrowedHistoryCache, selectedTimeRange, totalBalance, cataBalance, totalBorrowed]);
 
   useEffect(() => {
     document.title = "Dashboard | STRATO Mercata";
     
-    // Set mounted state immediately to prevent flash
-    setIsComponentMounted(true);
+    const hasExistingEarningAssets = earningAssets.length > 0;
+    const hasExistingInactiveTokens = inactiveTokens.length > 0;
     
-    // Remove the timeout to prevent loading flash
-    fetchTokens();
+    getEarningAssets(!hasExistingEarningAssets);
+    getInactiveTokens(!hasExistingInactiveTokens);
     refreshLoans();
-    fetchUserPositions();
+    refreshVaults();
+  }, [location.pathname, userAddress, getEarningAssets, getInactiveTokens, refreshLoans, refreshVaults]);
 
-    // Mark data as initialized after a brief delay to ensure proper rendering
-    const initTimer = setTimeout(() => {
-      setIsDataInitialized(true);
-    }, 100);
+  useEffect(() => {
+    localStorage.setItem('dashboard-activeTab', activeTab);
+    localStorage.setItem('dashboard-timeRange', selectedTimeRange);
+  }, [activeTab, selectedTimeRange]);
 
-    return () => clearTimeout(initTimer);
-  }, [userAddress]);
+  const netBalanceCacheRef = useRef(netBalanceHistoryCache);
+  const rewardsCacheRef = useRef(rewardsHistoryCache);
+  const borrowedCacheRef = useRef(borrowedHistoryCache);
+
+  useEffect(() => {
+    netBalanceCacheRef.current = netBalanceHistoryCache;
+    rewardsCacheRef.current = rewardsHistoryCache;
+    borrowedCacheRef.current = borrowedHistoryCache;
+  }, [netBalanceHistoryCache, rewardsHistoryCache, borrowedHistoryCache]);
+
+  const prefetchOtherRanges = useCallback((primaryRange: TimeRange, tab: TabType) => {
+    const rangesToPrefetch = TIME_RANGES.filter(range => range !== primaryRange);
+    
+    rangesToPrefetch.forEach(range => {
+      (async () => {
+        try {
+          if (tab === 'netBalance') {
+            if (netBalanceCacheRef.current[range]) return;
+            const data = await getBalanceHistory(range, '');
+            setNetBalanceHistoryCache(range, data);
+          } else if (tab === 'rewards') {
+            if (rewardsCacheRef.current[range]) return;
+            const data = await getCataBalanceHistory(range, '');
+            setRewardsHistoryCache(range, data);
+          } else if (tab === 'borrowed') {
+            if (borrowedCacheRef.current[range]) return;
+            const data = await getBorrowingHistory(range, '');
+            setBorrowedHistoryCache(range, data);
+          }
+        } catch (err) {
+          // ignore background errors
+        }
+      })();
+    });
+  }, [getBalanceHistory, getCataBalanceHistory, getBorrowingHistory, setNetBalanceHistoryCache, setRewardsHistoryCache, setBorrowedHistoryCache]);
+
+  const tabConfig = useMemo(() => ({
+    netBalance: {
+      fetchFn: getBalanceHistory,
+      setCache: setNetBalanceHistoryCache,
+    },
+    rewards: {
+      fetchFn: getCataBalanceHistory,
+      setCache: setRewardsHistoryCache,
+    },
+    borrowed: {
+      fetchFn: getBorrowingHistory,
+      setCache: setBorrowedHistoryCache,
+    },
+  }), [getBalanceHistory, getCataBalanceHistory, getBorrowingHistory, setNetBalanceHistoryCache, setRewardsHistoryCache, setBorrowedHistoryCache]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadRange = async () => {
+      const config = tabConfig[activeTab];
+      const cache = activeTab === 'netBalance' 
+        ? netBalanceCacheRef.current 
+        : activeTab === 'rewards' 
+        ? rewardsCacheRef.current 
+        : borrowedCacheRef.current;
+      const cached = cache[selectedTimeRange];
+      
+      if (cached && cached.length > 0) {
+        setLoadingBalanceHistory(false);
+        prefetchOtherRanges(selectedTimeRange, activeTab);
+        
+        (async () => {
+          try {
+            const data = await config.fetchFn(selectedTimeRange, '');
+            if (isMounted) {
+              config.setCache(selectedTimeRange, data);
+            }
+          } catch (err) {
+            // ignore background errors
+          }
+        })();
+        return;
+      }
+
+      setLoadingBalanceHistory(true);
+      try {
+        const data = await config.fetchFn(selectedTimeRange, '');
+        if (!isMounted) return;
+        config.setCache(selectedTimeRange, data);
+      } catch (err) {
+      } finally {
+        if (isMounted) {
+          setLoadingBalanceHistory(false);
+          prefetchOtherRanges(selectedTimeRange, activeTab);
+        }
+      }
+    };
+
+    loadRange();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedTimeRange, activeTab, tabConfig, prefetchOtherRanges, setLoadingBalanceHistory]);
+
+  const onTimeRangeChange = useCallback((duration: string) => {
+    setSelectedTimeRange(duration as TimeRange);
+  }, []);
 
   useEffect(() => {
     if (!searchParams) return;
@@ -99,8 +263,6 @@ const Dashboard = () => {
     }
   }, [searchParams]);
 
-  // Net balance calculation is now handled by the useNetBalance hook above
-
   const handleClaimRewards = async () => {
     if (isClaiming || parseFloat(pendingRewards) <= 0) {
       return;
@@ -115,20 +277,16 @@ const Dashboard = () => {
         description: `Successfully claimed ${pendingRewards} CATA tokens!`,
       });
 
-      // Refresh data after successful claim
+      // Refresh data after successful claim (silent refresh)
       await Promise.all([
-        fetchTokens(),
+        getEarningAssets(false),
+        getInactiveTokens(false),
         refetchPendingRewards(),
       ]);
     } finally {
       setIsClaiming(false);
     }
   };
-
-  // Don't render anything until component is properly mounted
-  if (!isComponentMounted) {
-    return null;
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -151,13 +309,18 @@ const Dashboard = () => {
               value={`$${totalBalance.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`}
               icon={<Wallet className="text-white" size={18} />}
               color="bg-blue-500"
+              onClick={() => setActiveTab('netBalance')}
+              isActive={activeTab === 'netBalance'}
+              isLoading={isLoadingNetBalance}
             />
 
             <AssetSummary
               title="Rewards"
-              value={`${cataBalance.toLocaleString("en-US", { maximumFractionDigits: 2 })} CATA Points`}
+              value={`${cataBalance.toLocaleString("en-US", { maximumFractionDigits: 2 })} Reward Points`}
               icon={<Coins className="text-white" size={18} />}
               color="bg-purple-500"
+              onClick={() => setActiveTab('rewards')}
+              isActive={activeTab === 'rewards'}
             />
 
             {rewardsEnabled && (
@@ -176,44 +339,49 @@ const Dashboard = () => {
               value={`${totalBorrowed.toFixed(2)} USDST`}
               icon={<Shield className="text-white" size={18} />}
               color="bg-orange-500"
+              onClick={() => setActiveTab('borrowed')}
+              isActive={activeTab === 'borrowed'}
             />
           </div>
 
-          {/* Only render lower sections after data initialization to prevent flash */}
-          {isDataInitialized && (
-            <>
-              <div className="mb-8">
-                <AssetsList 
-                  loading={loading} 
-                  tokens={tokens} 
-                  inActiveTokens={inactiveTokens} 
-                  shouldPreventFlash={true}
-                />
-              </div>
+          {/* Portfolio Value Chart */}
+          <div className="mb-8">
+            <PortfolioValueChart 
+              data={chartConfig[activeTab].data || []}
+              onTimeRangeChange={onTimeRangeChange}
+              selectedTimeRange={selectedTimeRange}
+              isLoading={loadingBalanceHistory}
+              tabType={activeTab}
+              title={chartConfig[activeTab].title}
+              subtitle={chartConfig[activeTab].subtitle}
+              currentValue={chartConfig[activeTab].currentValue}
+            />
+          </div>
 
-              <div className="mb-8">
-                <BorrowingSection 
-                  loanData={loans}
-                />
-              </div>
+          <div className="mb-8">
+            <AssetsList 
+              loading={loadingEarningAssets || loadingInactiveTokens} 
+              tokens={nonPoolTokens} 
+              inActiveTokens={inactiveTokens} 
+            />
+          </div>
 
-              <div className="mb-8">
-                <MyPoolParticipationSection 
-                  loadingUserPools={loadingUserPools} 
-                  loadingLiquidity={loadingLiquidity} 
-                  liquidityInfo={liquidityInfo} 
-                  userPools={userPools}
-                  shouldPreventFlash={true}
-                  safetyInfo={safetyInfo}
-                  loadingSafety={loading}
-                /> 
-              </div>
+          <div className="mb-8">
+            <BorrowingSection 
+              loanData={loans}
+            />
+          </div>
 
-              <div className="mb-8">
-                <DashboardFAQ />
-              </div>
-            </>
-          )}
+          <div className="mb-8">
+            <MyPoolParticipationSection 
+              poolTokens={poolTokens}
+              loading={loadingEarningAssets || loadingInactiveTokens}
+            />
+          </div>
+
+          <div className="mb-8">
+            <DashboardFAQ />
+          </div>
         </main>
       </div>
     </div>

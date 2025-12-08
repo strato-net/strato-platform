@@ -9,6 +9,7 @@ import { ArrowDownUp, Check, ChevronDown, HelpCircle } from "lucide-react";
 import { Pool, SwapToken } from "@/interface";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
+import { useTokenContext } from "@/context/TokenContext";
 import { useLendingContext } from "@/context/LendingContext";
 import { useToast } from '@/hooks/use-toast';
 import { useSwapContext } from "@/context/SwapContext";
@@ -27,6 +28,8 @@ import { usePoolPolling } from "@/hooks/useSmartPolling";
 import { calculateSwapOutput, calculateSwapInput, calculateImpact } from "@/helpers/swapCalculations";
 import { computeMaxTransferable, handleAmountInputChange } from "@/utils/transferValidation";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { CompactRewardsDisplay } from "@/components/rewards/CompactRewardsDisplay";
+import { UserRewardsData } from "@/services/rewardsService";
 
 // ============================================================================
 // CONSTANTS
@@ -202,6 +205,8 @@ interface TokenInputProps {
   onMaxClick: () => void;
   amountError?: string;
   loading: boolean;
+  userRewards?: UserRewardsData | null;
+  rewardsLoading?: boolean;
 }
 
 const TokenInput = ({
@@ -221,6 +226,8 @@ const TokenInput = ({
   onMaxClick,
   amountError,
   loading,
+  userRewards,
+  rewardsLoading,
 }: TokenInputProps) => {      
   return (
     <div className="bg-gray-50 p-4 rounded-lg">
@@ -289,6 +296,15 @@ const TokenInput = ({
           </span>
         </div>
       )}
+      {/* {isFromInput && (
+        <CompactRewardsDisplay
+          userRewards={userRewards}
+          loading={rewardsLoading || false}
+          activityIds={[3]}
+          variant="inline"
+          inputAmount={amount}
+        />
+      )} */}
     </div>
   );
 };
@@ -445,7 +461,12 @@ const SlippageControl = ({ slippage, autoSlippage, onSlippageChange, onAutoToggl
 // ============================================================================
 // MAIN SWAP WIDGET COMPONENT
 // ============================================================================
-const SwapWidget = () => {
+interface SwapWidgetProps {
+  userRewards?: UserRewardsData | null;
+  rewardsLoading?: boolean;
+}
+
+const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
   // ========================================================================
   // CONTEXT & HOOKS
   // ========================================================================
@@ -464,7 +485,8 @@ const SwapWidget = () => {
     [pairableTokens, fromAsset?.address]
   );
   const { userAddress } = useUser();
-  const { usdstBalance, voucherBalance, fetchUsdstBalance, fetchTokens } = useUserTokens();
+  const { fetchTokens } = useUserTokens();
+  const { usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
   const { refreshLoans, refreshCollateral } = useLendingContext();
   const { toast } = useToast();
 
@@ -531,7 +553,6 @@ const SwapWidget = () => {
     toAsset,
     getPoolByTokenPair,
     fetchUsdstBalance,
-    userAddress,
     interval: POLL_INTERVAL
   });
 
@@ -565,11 +586,11 @@ const SwapWidget = () => {
 
   // Initial setup and user-dependent effects
   useEffect(() => {
-    if (userAddress) fetchUsdstBalance(userAddress);
+    fetchUsdstBalance();
     if (swappableTokens.length > 0) {
       initialTokenSetup();
     }
-  }, [userAddress, fetchUsdstBalance, swappableTokens.length]);
+  }, [fetchUsdstBalance, swappableTokens.length]);
 
   // Fetch pairable tokens when fromAsset changes
   useEffect(() => {
@@ -763,7 +784,7 @@ const SwapWidget = () => {
       await refreshSwapHistory()
       // Refresh all contexts to ensure borrow page shows updated balances
       await Promise.all([
-        fetchUsdstBalance(userAddress),
+        fetchUsdstBalance(),
         fetchTokens(),           // Refresh UserTokensContext
         refreshLoans(),          // Refresh LendingContext
         refreshCollateral(),     // Refresh LendingContext
@@ -830,6 +851,8 @@ const SwapWidget = () => {
         onMaxClick={() => handleMaxClick()}
         amountError={fromAmountError}
         loading={poolLoading}
+        userRewards={userRewards}
+        rewardsLoading={rewardsLoading}
       />
 
       <div className="flex justify-center">
@@ -860,6 +883,8 @@ const SwapWidget = () => {
         onMaxClick={() => {}}
         amountError={toAmountError}
         loading={poolLoading}
+        userRewards={userRewards}
+        rewardsLoading={rewardsLoading}
       />
 
       <div className="flex flex-col gap-2 bg-gray-50 p-4 rounded-lg">
