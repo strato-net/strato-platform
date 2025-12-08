@@ -315,10 +315,10 @@ const LiquidityWithdrawModal = ({
             })()}
           </div>
 
-          {/* Estimated Rewards Display */}
+          {/* Estimated Rewards Display - Always visible */}
           {(() => {
             const activityName = getPoolActivityName(selectedPool?.poolName);
-            if (!activityName || !withdrawPercent || parseFloat(withdrawPercent) <= 0 || !availableLPBalance) return null;
+            if (!activityName) return null;
             
             // Pass withdrawPercent and availableLPBalance for accurate stake calculation
             // The component will calculate: stakeChange = availableLPBalance × withdrawPercent
@@ -327,8 +327,8 @@ const LiquidityWithdrawModal = ({
                 userRewards={userRewards}
                 activityName={activityName}
                 isWithdrawal={true}
-                withdrawPercent={withdrawPercent}
-                availableLPBalance={availableLPBalance}
+                withdrawPercent={withdrawPercent || ""}
+                availableLPBalance={availableLPBalance || "0"}
               />
             );
           })()}
