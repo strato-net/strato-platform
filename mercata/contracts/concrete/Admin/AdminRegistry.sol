@@ -56,10 +56,18 @@ contract record AdminRegistry is Ownable {
         return adminMap[_admin] > 0;
     }
 
-    function voteToDismissIssue(string _issueId) external returns (bool, variadic) {
+    function dismissIssue(string _issueId) external {
         require(currentIssues[_issueId], "Issue does not exist or is not active");
+        require(votes[_issueId].length == 1, "Only issues with a single vote can be dismissed");
+        require(votes[_issueId][0] == msg.sender, "Only the proposer can dismiss their issue");
         
-        return castVoteOnIssue(this, "_dismissIssueById", _issueId);
+        for (uint i = 0; i < votes[_issueId].length; i++) {
+            votesMap[_issueId][votes[_issueId][i]] = 0;
+            votes[_issueId][i] = address(0);
+        }
+        votes[_issueId].length = 0;
+        delete currentIssues[_issueId];
+        emit IssueDismissed(msg.sender, _issueId);
     }
 
     function castVoteOnIssue(address _target, string _func, variadic _args) public returns (bool, variadic) {
@@ -134,26 +142,16 @@ contract record AdminRegistry is Ownable {
         return keccak256(_target, _func, _args);
     }
 
-    function _clearIssue(string _issueId) internal {
+    function _executeIssue(address _sender, string _issueId, address _target, string _func, variadic _args) internal returns (variadic) {
+        variadic ret = _target.call(_func, _args);
         for (uint i = 0; i < votes[_issueId].length; i++) {
             votesMap[_issueId][votes[_issueId][i]] = 0;
             votes[_issueId][i] = address(0);
         }
         votes[_issueId].length = 0;
         delete currentIssues[_issueId];
-    }
-
-    function _executeIssue(address _sender, string _issueId, address _target, string _func, variadic _args) internal returns (variadic) {
-        variadic ret = _target.call(_func, _args);
-        _clearIssue(_issueId);
         emit IssueExecuted(msg.sender, _sender, _issueId, _target, _func, _args);
         return ret;
-    }
-
-    function _dismissIssueById(string _targetIssueId) external onlyOwner {
-        require(currentIssues[_targetIssueId], "Issue does not exist or is not active");
-        _clearIssue(_targetIssueId);
-        emit IssueDismissed(msg.sender, _targetIssueId);
     }
 
     function _addAdmin(address _admin) external onlyOwner {
@@ -197,7 +195,6 @@ contract record AdminRegistry is Ownable {
                 _func != "_removeAdmin" &&
                 _func != "_shouldExecute" &&
                 _func != "_swapAdmin" &&
-                _func != "_dismissIssueById" &&
                 _func != "setVotingThreshold" &&
                 _func != "setDefaultVotingThresholdBps" &&
                 _func != "createContract" &&
