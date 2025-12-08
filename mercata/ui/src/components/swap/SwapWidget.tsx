@@ -894,9 +894,9 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
         const activityName = getSwapActivityName(fromAsset) || getSwapActivityName(toAsset);
         if (!activityName) return null;
         
-        // Use amount from the reward-eligible token
-        const rewardEligibleToken = getSwapActivityName(fromAsset) ? fromAsset : toAsset;
-        const inputAmount = rewardEligibleToken === fromAsset ? fromAmount : toAmount;
+        // Always use fromAmount since rewards track `amountIn` (the input token amount)
+        // Regardless of swap direction, the amount being tracked is what the user swaps IN
+        const inputAmount = fromAmount;
         
         return (
           <div className="bg-gray-50 p-4 rounded-lg">

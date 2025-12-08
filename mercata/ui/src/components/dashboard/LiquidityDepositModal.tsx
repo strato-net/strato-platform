@@ -648,27 +648,45 @@ const LiquidityDepositModal = ({
           {/* Estimated Rewards Display */}
           {(() => {
             const activityName = getPoolActivityName(selectedPool?.poolName);
-            if (!activityName) return null;
+            if (!activityName || !selectedPool) return null;
             
-            // Calculate total input amount (sum of both tokens if in A&B mode, or the active token)
-            let totalInputAmount = "0";
+            // For dual-token mode, pass both token amounts for accurate LP calculation
+            // For single-token mode, we can't easily calculate LP tokens (involves swap + deposit)
+            // so we show an estimate based on the input amount
+            const hasInput = depositMode === 'A&B' 
+              ? (parseFloat(token1Amount || "0") > 0 && parseFloat(token2Amount || "0") > 0)
+              : (depositMode === 'A' ? parseFloat(token1Amount || "0") > 0 : parseFloat(token2Amount || "0") > 0);
+            
+            if (!hasInput) return null;
+            
+            // For A&B mode: pass pool data and both token amounts for accurate LP calculation
+            // For single token mode: pass input amount (less accurate estimate)
             if (depositMode === 'A&B') {
-              const token1 = parseFloat(token1Amount || "0");
-              const token2 = parseFloat(token2Amount || "0");
-              totalInputAmount = (token1 + token2).toString();
-            } else if (depositMode === 'A') {
-              totalInputAmount = token1Amount || "0";
-            } else if (depositMode === 'B') {
-              totalInputAmount = token2Amount || "0";
+              return (
+                <CompactRewardsDisplay
+                  userRewards={userRewards}
+                  activityName={activityName}
+                  inputAmount={token1Amount || "0"}
+                  poolData={selectedPool}
+                  tokenAAmount={token1Amount || "0"}
+                  tokenBAmount={token2Amount || "0"}
+                />
+              );
+            } else {
+              // Single token mode - pass the active token amount
+              // Note: This is an estimate since single-token deposits involve a swap
+              const singleTokenAmount = depositMode === 'A' ? token1Amount : token2Amount;
+              return (
+                <CompactRewardsDisplay
+                  userRewards={userRewards}
+                  activityName={activityName}
+                  inputAmount={singleTokenAmount || "0"}
+                  poolData={selectedPool}
+                  tokenAAmount={depositMode === 'A' ? singleTokenAmount : "0"}
+                  tokenBAmount={depositMode === 'B' ? singleTokenAmount : "0"}
+                />
+              );
             }
-            
-            return (totalInputAmount && parseFloat(totalInputAmount) > 0) ? (
-              <CompactRewardsDisplay
-                userRewards={userRewards}
-                activityName={activityName}
-                inputAmount={totalInputAmount}
-              />
-            ) : null;
           })()}
 
           <div className="rounded-lg bg-gray-50 p-3">

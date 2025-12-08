@@ -318,31 +318,19 @@ const LiquidityWithdrawModal = ({
           {/* Estimated Rewards Display */}
           {(() => {
             const activityName = getPoolActivityName(selectedPool?.poolName);
-            if (!activityName) return null;
+            if (!activityName || !withdrawPercent || parseFloat(withdrawPercent) <= 0 || !availableLPBalance) return null;
             
-            // Calculate LP token amount being withdrawn from percentage
-            let lpTokenAmountToWithdraw = "0";
-            if (withdrawPercent && selectedPool && availableLPBalance) {
-              try {
-                const value = BigInt(availableLPBalance);
-                const percent = parseFloat(withdrawPercent);
-                const percentScaled = BigInt(Math.floor(percent * 100));
-                const calculatedAmount = (value * percentScaled) / BigInt(10000);
-                // Convert to human-readable format (18 decimals)
-                lpTokenAmountToWithdraw = formatUnits(calculatedAmount, 18);
-              } catch {
-                lpTokenAmountToWithdraw = "0";
-              }
-            }
-            
-            return (lpTokenAmountToWithdraw && parseFloat(lpTokenAmountToWithdraw) > 0) ? (
+            // Pass withdrawPercent and availableLPBalance for accurate stake calculation
+            // The component will calculate: stakeChange = availableLPBalance × withdrawPercent
+            return (
               <CompactRewardsDisplay
                 userRewards={userRewards}
                 activityName={activityName}
-                inputAmount={lpTokenAmountToWithdraw}
                 isWithdrawal={true}
+                withdrawPercent={withdrawPercent}
+                availableLPBalance={availableLPBalance}
               />
-            ) : null;
+            );
           })()}
 
           {/* Include Staked LP Token Checkbox - only show if pool has rewards program AND rewards are enabled */}
