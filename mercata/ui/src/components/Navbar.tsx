@@ -31,7 +31,7 @@ const Navbar = () => {
             <Link to="/" className="flex-shrink-0">
               <img 
                 src={STRATOLOGO} 
-                alt="STRATO mercata" 
+                alt="STRATO" 
                 className="h-10" 
               />
             </Link>

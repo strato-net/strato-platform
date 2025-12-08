@@ -50,7 +50,7 @@ const MobileSidebar = ({ isOpen, onClose }: MobileSidebarProps) => {
           <div className="p-4 flex items-center justify-between">
             <img 
               src={STRATOLOGO} 
-              alt="STRATO mercata" 
+              alt="STRATO" 
               className="h-12" 
             />
             <button
