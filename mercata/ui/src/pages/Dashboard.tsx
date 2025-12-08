@@ -6,7 +6,7 @@ import AssetSummary from "../components/dashboard/AssetSummary";
 import AssetsList from "../components/dashboard/AssetsList";
 import DashboardFAQ from "../components/dashboard/DashboardFAQ";
 import BorrowingSection from "../components/dashboard/BorrowingSection";
-import { Wallet, Coins, Shield, Banknote, Loader2 } from "lucide-react";
+import { Wallet, Coins, Shield, Banknote, Loader2, Trophy } from "lucide-react";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
 import { usePendingRewards } from "@/hooks/usePendingRewards";
@@ -20,6 +20,8 @@ import { useCDP } from "@/context/CDPContext";
 import { cataAddress, rewardsEnabled } from "@/lib/constants";
 import { api } from "@/lib/axios";
 import { BalanceSnapshot } from "@mercata/shared-types";
+import { useUserLeaderboardRank } from "@/hooks/useUserLeaderboardRank";
+import { Button } from "@/components/ui/button";
 
 const TIME_RANGES = ["1d", "7d", "1m", "3m", "6m", "1y", "all"] as const;
 type TimeRange = typeof TIME_RANGES[number];
@@ -71,6 +73,7 @@ const Dashboard = () => {
 
   const { pendingRewards, refetch: refetchPendingRewards } = usePendingRewards(rewardsEnabled, 30000);
   const [isClaiming, setIsClaiming] = useState(false);
+  const { rank: userRank, loading: rankLoading } = useUserLeaderboardRank();
 
   // Extract CATA token from inactive tokens by address
   const cataToken = useMemo(() => 
@@ -321,6 +324,33 @@ const Dashboard = () => {
               color="bg-purple-500"
               onClick={() => setActiveTab('rewards')}
               isActive={activeTab === 'rewards'}
+              additionalContent={
+                <div className="mt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs border-blue-200 hover:bg-blue-50 hover:border-blue-300 text-blue-700 font-medium"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate("/dashboard/rewards?tab=leaderboard");
+                    }}
+                  >
+                    {rankLoading ? (
+                      <>
+                        <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                        Loading...
+                      </>
+                    ) : userRank !== null ? (
+                      <>
+                        <Trophy className="h-3.5 w-3.5 mr-1.5 text-yellow-500" />
+                        Rank #{userRank} - View Leaderboard
+                      </>
+                    ) : (
+                      "View Leaderboard"
+                    )}
+                  </Button>
+                </div>
+              }
             />
 
             {rewardsEnabled && (

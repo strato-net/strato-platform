@@ -14,6 +14,7 @@ interface AssetSummaryProps {
   onClick?: () => void;
   isActive?: boolean;
   isLoading?: boolean;
+  additionalContent?: React.ReactNode;
 }
 
 const AssetSummary = ({
@@ -25,6 +26,7 @@ const AssetSummary = ({
   onClick,
   isActive = false,
   isLoading = false,
+  additionalContent,
 }: AssetSummaryProps) => {
   return (
     <div 
@@ -34,7 +36,7 @@ const AssetSummary = ({
       onClick={onClick}
     >
       <div className="flex justify-between items-start">
-        <div>
+        <div className="flex-1">
           <div className="flex items-center gap-1">
             <p className="text-gray-500 text-sm">{title}</p>
             {tooltip && (
@@ -56,10 +58,15 @@ const AssetSummary = ({
           ) : (
             <h3 className="text-2xl font-bold mt-1">{value}</h3>
           )}
+          {additionalContent && (
+            <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+              {additionalContent}
+            </div>
+          )}
         </div>
 
         <div
-          className={`w-10 h-10 rounded-full flex items-center justify-center ${color} transition-opacity`}
+          className={`w-10 h-10 rounded-full flex items-center justify-center ${color} transition-opacity flex-shrink-0`}
         >
           {icon}
         </div>
