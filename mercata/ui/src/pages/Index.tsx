@@ -2,7 +2,7 @@
 import { useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import Hero from '../components/home/Hero';
-import MERCATALOGO from '@/assets/strato.png';
+import STRATOLOGO from '@/assets/strato.png';
 
 const Index = () => {
   useEffect(() => {
@@ -19,7 +19,7 @@ const Index = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div>
               <div className="flex items-center mb-4">
-                <img src={MERCATALOGO} alt="STRATO Mercata" className="h-10 mr-3" />
+                <img src={STRATOLOGO} alt="STRATO Mercata" className="h-10 mr-3" />
                 <span className="sr-only">STRATO Mercata</span>
               </div>
               <p className="text-gray-400 text-sm">
