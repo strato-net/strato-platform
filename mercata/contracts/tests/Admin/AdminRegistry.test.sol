@@ -575,4 +575,45 @@ contract Describe_AdminRegistry is Authorizable {
         require(adminRegistry.isAdminAddress(admin1), "Admin1 should still be an admin after failed removal");
     }
 
+    // ============ ISSUE DISMISSAL TESTS ============
+
+    function it_admin_registry_can_dismiss_issue_with_voting() {
+        // Create an issue but don't execute it (only one vote)
+        string memory issueId = adminRegistry.getIssueId(address(token), "mint", admin3, 1000e18);
+        adminRegistry.castVoteOnIssue(address(token), "mint", admin3, 1000e18);
+        
+        // Verify issue exists and has votes
+        require(adminRegistry.currentIssues(issueId), "Issue should exist");
+        require(adminRegistry.votesMap(issueId, admin1) > 0, "Issue should have votes");
+        require(ERC20(token).balanceOf(admin3) == 0, "Token should not be minted yet");
+        
+        // First vote to dismiss - should not dismiss yet (threshold not met)
+        (bool dismissed1, variadic result1) = adminRegistry.voteToDismissIssue(issueId);
+        require(!dismissed1, "Should not dismiss with only one vote");
+        require(adminRegistry.currentIssues(issueId), "Issue should still exist");
+        
+        // Second vote to dismiss - should dismiss now
+        (bool dismissed2, variadic result2) = user1.do(address(adminRegistry), "voteToDismissIssue", issueId);
+        require(dismissed2, "Should dismiss with two votes");
+        
+        // Verify issue is cleared
+        require(!adminRegistry.currentIssues(issueId), "Issue should be dismissed");
+        require(adminRegistry.votesMap(issueId, admin1) == 0, "Original issue votes should be cleared");
+        require(adminRegistry.votes(issueId, 0) == address(0), "Votes array should be empty");
+        require(ERC20(token).balanceOf(admin3) == 0, "Token should still not be minted");
+    }
+
+    function it_admin_registry_cannot_dismiss_nonexistent_issue() {
+        string memory fakeIssueId = "nonexistent_issue_id";
+        
+        // Try to dismiss an issue that doesn't exist
+        bool reverted = false;
+        try {
+            adminRegistry.voteToDismissIssue(fakeIssueId);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should revert when trying to dismiss non-existent issue");
+    }
+
 }
