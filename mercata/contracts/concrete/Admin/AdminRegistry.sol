@@ -7,6 +7,8 @@ contract record AdminRegistry is Ownable {
 
     mapping (string => address[]) public record votes;
     mapping (string => mapping (address => uint)) public record votesMap;
+    mapping (string => address[]) public record noVotes;
+    mapping (string => mapping (address => uint)) public record noVotesMap;
     mapping (string => bool) public record currentIssues;
 
     mapping (address => mapping (string => mapping (address => bool))) public record whitelist;
@@ -56,6 +58,10 @@ contract record AdminRegistry is Ownable {
     }
 
     function castVoteOnIssue(address _target, string _func, variadic _args) public returns (bool, variadic) {
+        return castVoteOnIssue(_target, _func, _args, true);
+    }
+
+    function castVoteOnIssue(address _target, string _func, variadic _args, bool _voteYes) public returns (bool, variadic) {
         if (adminMap[msg.sender] != 0 || adminMap[_target] != 0) {
             address sender = msg.sender;
             if (adminMap[msg.sender] == 0) {
@@ -72,14 +78,29 @@ contract record AdminRegistry is Ownable {
                 _target = msg.sender;
             }
             string issueId = _getIssueId(_target, _func, _args);
-            bool hasVoted = votesMap[issueId][sender] != 0;
+            bool hasVotedYes = votesMap[issueId][sender] != 0;
+            bool hasVotedNo = noVotesMap[issueId][sender] != 0;
 
             _createIssue(sender, issueId, _target, _func, _args);
 
-            if (!hasVoted) {
-                votes[issueId].push(sender);
-                votesMap[issueId][sender] = votes[issueId].length;
-                emit IssueVoted(msg.sender, sender, issueId, _target, _func, _args);
+            if (_voteYes) {
+                if (hasVotedNo) {
+                    _removeNoVote(issueId, sender);
+                }
+                if (!hasVotedYes) {
+                    votes[issueId].push(sender);
+                    votesMap[issueId][sender] = votes[issueId].length;
+                    emit IssueVoted(msg.sender, sender, issueId, _target, _func, _args);
+                }
+            } else {
+                if (hasVotedYes) {
+                    _removeYesVote(issueId, sender);
+                }
+                if (!hasVotedNo) {
+                    noVotes[issueId].push(sender);
+                    noVotesMap[issueId][sender] = noVotes[issueId].length;
+                    emit IssueVoted(msg.sender, sender, issueId, _target, _func, _args);
+                }
             }
 
             if (_shouldExecute(issueId, _target, _func, _args)) {
@@ -89,7 +110,6 @@ contract record AdminRegistry is Ownable {
                 return (false, issueId);
             }
         } else {
-            // Non-admin path: only execute if whitelisted
             address sender = msg.sender;
             address target = _target;
             require(whitelist[target][_func][sender] || whitelist[sender][_func][target], "Only an admin or a whitelisted account can call castVoteOnIssue");
@@ -104,16 +124,20 @@ contract record AdminRegistry is Ownable {
     }
 
     function _shouldExecute(string _issueId, address _target, string _func, variadic _args) internal returns (bool) {
-        uint issueVotes = votes[_issueId].length;
+        uint yesVotes = votes[_issueId].length;
+        uint noVotesCount = noVotes[_issueId].length;
 
         uint votingThresholdBps = votingThresholds[_target][_func];
         if (votingThresholdBps == 0) votingThresholdBps = defaultVotingThresholdBps;
 
-        return 10000 * issueVotes >= votingThresholdBps * admins.length;
+        bool hasEnoughYes = 10000 * yesVotes >= votingThresholdBps * admins.length;
+        bool hasEnoughNo = 10000 * noVotesCount >= votingThresholdBps * admins.length;
+        
+        return hasEnoughYes && !hasEnoughNo;
     }
 
     function _createIssue(address _sender, string _issueId, address _target, string _func, variadic _args) internal {
-        if(votes[_issueId].length == 0) {
+        if(votes[_issueId].length == 0 && noVotes[_issueId].length == 0) {
             currentIssues[_issueId] = true;
             emit IssueCreated(msg.sender, _sender, _issueId, _target, _func, _args);
         }
@@ -127,6 +151,28 @@ contract record AdminRegistry is Ownable {
         return keccak256(_target, _func, _args);
     }
 
+    function _removeYesVote(string _issueId, address _voter) internal {
+        uint index = votesMap[_issueId][_voter];
+        require(index > 0, "Not a yes vote");
+        
+        address last = votes[_issueId][votes[_issueId].length - 1];
+        votes[_issueId][index - 1] = last;
+        votesMap[_issueId][last] = index;
+        votesMap[_issueId][_voter] = 0;
+        votes[_issueId].length--;
+    }
+
+    function _removeNoVote(string _issueId, address _voter) internal {
+        uint index = noVotesMap[_issueId][_voter];
+        require(index > 0, "Not a no vote");
+        
+        address last = noVotes[_issueId][noVotes[_issueId].length - 1];
+        noVotes[_issueId][index - 1] = last;
+        noVotesMap[_issueId][last] = index;
+        noVotesMap[_issueId][_voter] = 0;
+        noVotes[_issueId].length--;
+    }
+
     function _executeIssue(address _sender, string _issueId, address _target, string _func, variadic _args) internal returns (variadic) {
         variadic ret = _target.call(_func, _args);
         for (uint i = 0; i < votes[_issueId].length; i++) {
@@ -134,6 +180,11 @@ contract record AdminRegistry is Ownable {
             votes[_issueId][i] = address(0);
         }
         votes[_issueId].length = 0;
+        for (uint i = 0; i < noVotes[_issueId].length; i++) {
+            noVotesMap[_issueId][noVotes[_issueId][i]] = 0;
+            noVotes[_issueId][i] = address(0);
+        }
+        noVotes[_issueId].length = 0;
         delete currentIssues[_issueId];
         emit IssueExecuted(msg.sender, _sender, _issueId, _target, _func, _args);
         return ret;

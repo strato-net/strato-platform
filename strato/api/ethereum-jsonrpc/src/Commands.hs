@@ -9,18 +9,22 @@ import qualified APIProxy as API
 import Binary
 import Blockchain.Constants
 import Blockchain.Data.Transaction
-import Blockchain.EthConf
+import Blockchain.Data.TXOrigin
+import Blockchain.EthConf (runKafkaMConfigured, ethConf, quarryConfig)
+import Blockchain.EthConf.Model (coinbaseAddress)
 import Blockchain.KafkaTopics
-import Blockchain.Sequencer.Event
-import Blockchain.Sequencer.Kafka
+import Blockchain.Model.WrappedBlock (IngestTx (..))
+import Blockchain.Sequencer.Event (IngestEvent (IETx), JsonRpcCommand (..), VmEvent (..))
+import Blockchain.Sequencer.Kafka (writeUnseqEvents, writeSeqVmEvents)
 import Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
-import Blockchain.Stream.Raw
-import Control.Monad.Composable.Kafka
+import Blockchain.Strato.Model.MicroTime (getCurrentMicrotime)
+import Control.Monad.Composable.Kafka (fetchItems, execKafka, Offset)
 import Control.Monad.IO.Class
 import Control.Monad.Except
+import Control.Exception (try, SomeException, throwIO, evaluate)
+import Data.Maybe (fromMaybe)
 import qualified Data.Aeson as JSON
 import qualified Data.Aeson.KeyMap as KM
-import Data.Binary
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
@@ -28,6 +32,8 @@ import qualified Data.ByteString.Lazy.Char8 as BLC
 import qualified Data.Map as M
 import qualified Data.Text as T
 import qualified Data.Vector as V
+import EthereumToStrato
+import EthereumTransaction
 import Network.JsonRpc.Server
 import Network.Kafka
 import System.Random
@@ -169,7 +175,7 @@ eth_coinbase = toMethod "eth_coinbase" f ()
   where
     f :: RpcResult Server String
     f = do
-      return $ coinbaseAddress $ quarryConfig ethConf
+      return $ coinbaseAddress (quarryConfig ethConf)
 
 eth_mining :: Method Server
 eth_mining = toMethod "eth_mining" f ()
@@ -238,14 +244,9 @@ emitKafkaJsonRlpCommand c = do
 waitForResponse :: String -> Offset -> IO B.ByteString
 waitForResponse id offset = do
   putStrLn $ "before wait: " ++ show offset
-  maybeResponses <- fetchBytesIO (lookupTopic "jsonrpcresponse") offset
+  responses <- runKafkaMConfigured "ethereum-jsonrpc" $ fetchItems (lookupTopic "jsonrpcresponse") offset
 
   putStrLn "something has come"
-
-  let responses = map (decode . BLC.fromStrict) $
-        case maybeResponses of
-          Nothing -> error "can't connect to Kafka"
-          Just v -> v
 
   putStrLn $ "fetched " ++ show responses
 
@@ -256,14 +257,8 @@ waitForResponse id offset = do
 
 callVM :: JsonRpcCommand -> IO B.ByteString
 callVM c = do
-  lastOffsetOrError <-
-    liftIO $
-      runKafkaConfigured "ethereum-jsonrpc" $
-        getLastOffset LatestTime 0 (lookupTopic "jsonrpcresponse")
-  let lastOffset =
-        case lastOffsetOrError of
-          Left e -> error $ show e
-          Right val -> val
+  lastOffset <- runKafkaMConfigured "ethereum-jsonrpc" $
+    execKafka $ getLastOffset LatestTime 0 (lookupTopic "jsonrpcresponse")
 
   emitKafkaJsonRlpCommand c
 
@@ -353,7 +348,7 @@ eth_call = toMethod "eth_call" f (Required "codeString" :+: Required "blockStrin
     f codeString blockString = do
       let id = "qqqq"
       let nope = error "jsonrpc.eth_call.createMessageTX"
-      _ <- liftIO $ createMessageTX nope nope nope nope nope nope nope nope
+      _ <- liftIO $ createMessageTX nope nope nope nope nope nope nope
       case strToByteString codeString of
         Left err -> throwError $ rpcError (-32602) $ T.pack err
         Right codeBytes -> do
@@ -411,11 +406,55 @@ eth_sendTransaction = toMethod "eth_sendTransaction" f ()
       undefined
 
 eth_sendRawTransaction :: Method Server
-eth_sendRawTransaction = toMethod "eth_sendRawTransaction" f ()
+eth_sendRawTransaction = toMethod "eth_sendRawTransaction" f (Required "rawTxHex" :+: ())
   where
-    f :: RpcResult Server String
-    f = do
-      undefined
+    f :: String -> RpcResult Server String
+    f rawTxHex = do
+      result <- liftIO $ try $ processTransaction rawTxHex
+      case result of
+        Right txHash -> return txHash
+        Left e -> throwError $ rpcError (-32603) $ T.pack $ "Internal error: " ++ show (e :: SomeException)
+    
+    processTransaction :: String -> IO String
+    processTransaction rawTxHex = do
+      -- Remove 0x prefix if present
+      let hexStr = if take 2 rawTxHex == "0x" then drop 2 rawTxHex else rawTxHex
+      
+      -- 1. Decode hex string to ByteString
+      rawTxBytes <- case B16.decode $ BC.pack hexStr of
+        Right bytes -> return bytes
+        Left err -> throwIO $ userError $ "Invalid hex: " ++ err
+      
+      -- 2. Parse Ethereum transaction (wrap in evaluate to catch pure exceptions)
+      ethTxResult <- try $ evaluate $ case decodeEthereumRLP rawTxBytes of
+        Right tx -> tx
+        Left err -> error err
+      ethTx <- case ethTxResult of
+        Right tx -> return tx
+        Left e -> throwIO $ userError $ "Failed to decode transaction: " ++ show (e :: SomeException)
+      
+      -- 3. Verify signature and recover sender (wrap in evaluate to catch pure exceptions)
+      senderResult <- try $ evaluate $ fromMaybe (error "Invalid transaction signature") $ recoverEthereumSender ethTx
+      _sender <- case senderResult of
+        Right addr -> return addr
+        Left e -> throwIO $ userError $ "Failed to recover sender: " ++ show (e :: SomeException)
+      
+      -- 4. Convert to Strato transaction
+      stratoTx <- case ethereumToStratoTransaction ethTx of
+        Right tx -> return tx
+        Left err -> throwIO $ userError err
+      
+      -- 5. Create IngestEvent and submit via Kafka
+      ts <- getCurrentMicrotime
+      let ingestTx = IngestTx {itOrigin = API, itTransaction = stratoTx}
+      let ieTx = IETx ts ingestTx
+      let txHash = transactionHash stratoTx
+      
+      -- 6. Submit to Kafka
+      _ <- runKafkaMConfigured "strato-api" $ writeUnseqEvents [ieTx]
+      
+      -- 7. Return transaction hash in Ethereum format (0x-prefixed hex)
+      return $ "0x" ++ (BC.unpack $ B16.encode $ keccak256ToByteString txHash)
 
 eth_estimateGas :: Method Server
 eth_estimateGas = toMethod "eth_estimateGas" f ()

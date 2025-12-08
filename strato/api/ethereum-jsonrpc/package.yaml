@@ -16,12 +16,18 @@ executables:
       - binary
       - blaze-builder
       - blockapps-data
+      - blockapps-datadefs
+      - blockapps-secp256k1-haskell
+      - blockDB
       - bytestring
+      - clock
       - containers
+      - ethereum-rlp
       - http-client
       - http-types
       - json-rpc-server
       - kafka-monad
+      - milena
       - mtl
       - random
       - strato-conf
