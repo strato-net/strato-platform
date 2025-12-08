@@ -329,6 +329,7 @@ const LiquidityWithdrawModal = ({
                 isWithdrawal={true}
                 withdrawPercent={withdrawPercent || ""}
                 availableLPBalance={availableLPBalance || "0"}
+                actionLabel="Withdraw"
               />
             );
           })()}

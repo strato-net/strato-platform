@@ -882,6 +882,7 @@ const MintWidget: React.FC<MintWidgetProps> = ({ onSuccess, title = "Mint Agains
               userRewards={userRewards}
               activityName="CDP USDST Mint"
               inputAmount={borrowAmount}
+              actionLabel="Borrow"
             />
           )}
         </div>

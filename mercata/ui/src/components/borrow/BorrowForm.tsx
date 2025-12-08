@@ -176,6 +176,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
           userRewards={userRewards}
           activityName="Lending Pool Borrow"
           inputAmount={borrowAmount}
+          actionLabel="Borrow"
         />
         <PercentageButtons
           value={borrowAmount}

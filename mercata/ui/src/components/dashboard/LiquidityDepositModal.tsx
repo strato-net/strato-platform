@@ -661,6 +661,7 @@ const LiquidityDepositModal = ({
                   poolData={selectedPool}
                   tokenAAmount={token1Amount || ""}
                   tokenBAmount={token2Amount || ""}
+                  actionLabel="Deposit"
                 />
               );
             } else {
@@ -675,6 +676,7 @@ const LiquidityDepositModal = ({
                   poolData={selectedPool}
                   tokenAAmount={depositMode === 'A' ? singleTokenAmount : ""}
                   tokenBAmount={depositMode === 'B' ? singleTokenAmount : ""}
+                  actionLabel="Deposit"
                 />
               );
             }

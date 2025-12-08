@@ -26,6 +26,8 @@ interface CompactRewardsDisplayProps {
   // For LP withdrawals: percentage and available balance
   withdrawPercent?: string;
   availableLPBalance?: string;
+  // Action label for display (e.g., "Deposit", "Withdraw", "Swap")
+  actionLabel?: string;
 }
 
 // ============================================================================
@@ -167,6 +169,7 @@ export const CompactRewardsDisplay = ({
   tokenBAmount,
   withdrawPercent,
   availableLPBalance,
+  actionLabel = isWithdrawal ? "Withdraw" : "Deposit",
 }: CompactRewardsDisplayProps) => {
   // ─────────────────────────────────────────────────────────────────────────
   // FILTER MATCHING ACTIVITIES
@@ -261,54 +264,42 @@ export const CompactRewardsDisplay = ({
   // RENDER
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className="mt-3 p-4 bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 border-2 border-amber-200 rounded-xl shadow-sm">
+    <div className="mt-3 p-3 bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 border border-amber-200 rounded-lg shadow-sm max-w-sm">
       {/* Current Rate - Always visible */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div className="flex-shrink-0 text-amber-500">
-            <Coins className="h-5 w-5" />
-          </div>
-          <div className="flex items-center gap-2 flex-wrap min-w-0">
-            <span className="text-sm font-semibold text-amber-800 whitespace-nowrap">
-              Current Rewards
-            </span>
-            <span className="text-lg font-bold text-amber-700 whitespace-nowrap">
-              {formattedCurrentRate}
-            </span>
-            <span className="text-sm text-amber-600 whitespace-nowrap">points/day</span>
-          </div>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <Coins className="h-4 w-4 text-amber-500 flex-shrink-0" />
+          <span className="text-sm font-medium text-amber-800">Earning Now</span>
+          <span className="text-sm font-semibold text-amber-700">{formattedCurrentRate}</span>
+          <span className="text-sm text-amber-600">pts/day</span>
         </div>
-        <Sparkles className="h-4 w-4 text-amber-400" />
+        <Sparkles className="h-3.5 w-3.5 text-amber-400 flex-shrink-0" />
       </div>
 
       {/* New Rate - Shows when user types input */}
       {hasValidInput && (
-        <div className={`mt-3 pt-3 border-t ${isIncrease ? 'border-green-200' : isDecrease ? 'border-red-200' : 'border-amber-200'}`}>
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 flex-1 min-w-0">
+        <div className={`mt-2 pt-2 border-t ${isIncrease ? 'border-green-200' : isDecrease ? 'border-red-200' : 'border-amber-200'}`}>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
               <div className={`flex-shrink-0 ${isIncrease ? 'text-green-500' : isDecrease ? 'text-red-500' : 'text-gray-500'}`}>
-                {isIncrease ? <Star className="h-5 w-5 fill-current" /> : isDecrease ? <TrendingDown className="h-5 w-5" /> : <Sparkles className="h-5 w-5" />}
+                {isIncrease ? <Star className="h-4 w-4 fill-current" /> : isDecrease ? <TrendingDown className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
               </div>
-              <div className="flex items-center gap-2 flex-wrap min-w-0">
-                <span className="text-sm font-semibold text-gray-700 whitespace-nowrap">
-                  {isIncrease ? "You'll Earn" : isDecrease ? "New Rate" : "New Rate"}
-                </span>
-                <span className={`text-lg font-bold whitespace-nowrap ${isIncrease ? 'text-green-600' : isDecrease ? 'text-red-600' : 'text-gray-700'}`}>
-                  {formattedNewRate}
-                </span>
-                <span className="text-sm text-gray-500 whitespace-nowrap">points/day</span>
-              </div>
+              <span className="text-sm font-medium text-gray-700">After {actionLabel}</span>
+              <span className={`text-sm font-semibold ${isIncrease ? 'text-green-600' : isDecrease ? 'text-red-600' : 'text-gray-700'}`}>
+                {formattedNewRate}
+              </span>
+              <span className="text-sm text-gray-500">pts/day</span>
             </div>
 
             {/* Percentage Badge */}
             {(isIncrease || isDecrease) && percentageChange !== 0 && (
-              <div className={`flex items-center gap-1.5 px-3 py-1.5 ${isIncrease ? 'bg-green-500' : 'bg-red-500'} rounded-full shadow-sm flex-shrink-0`}>
+              <div className={`flex items-center gap-1 px-2 py-0.5 ${isIncrease ? 'bg-green-500' : 'bg-red-500'} rounded-full flex-shrink-0`}>
                 {isIncrease ? (
-                  <TrendingUp className="h-4 w-4 text-white" />
+                  <TrendingUp className="h-3 w-3 text-white" />
                 ) : (
-                  <TrendingDown className="h-4 w-4 text-white" />
+                  <TrendingDown className="h-3 w-3 text-white" />
                 )}
-                <span className="text-sm font-bold text-white">
+                <span className="text-xs font-semibold text-white">
                   {isIncrease ? "+" : ""}{formattedPercentage}%
                 </span>
               </div>

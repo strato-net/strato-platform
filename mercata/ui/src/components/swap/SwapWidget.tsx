@@ -904,6 +904,7 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
               userRewards={userRewards}
               activityName={activityName}
               inputAmount={inputAmount}
+              actionLabel="Swap"
             />
           </div>
         );
