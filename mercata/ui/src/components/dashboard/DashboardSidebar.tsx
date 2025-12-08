@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Wallet, ArrowLeft, ArrowRight, Book, ArrowRightLeft, Send, Shield, Activity, BarChart3, Coins ,Droplets, Download} from 'lucide-react';
 import { useUser } from '@/context/UserContext';
-import MERCATALOGO from '@/assets/mercata.png';
+import MERCATALOGO from '@/assets/strato.png';
 import MERCATAICON from '@/assets/icon.png';
 import {
   Tooltip,

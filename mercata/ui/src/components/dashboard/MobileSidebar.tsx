@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Wallet, Book, ArrowRightLeft, Send, Shield, X, Activity, BarChart3,Droplets, Download } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
-import MERCATALOGO from '@/assets/mercata.png';
+import MERCATALOGO from '@/assets/strato.png';
 
 interface MobileSidebarProps {
   isOpen: boolean;
