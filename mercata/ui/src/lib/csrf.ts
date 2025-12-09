@@ -24,3 +24,9 @@ export async function initializeCsrfToken(): Promise<void> {
   }
 }
 
+/**
+ * Get fetch options for Transport that includes CSRF token
+ */
+export function getCsrfFetchOptions(): RequestInit {
+  return {headers: {"X-CSRF-TOKEN": getCsrfToken()}}
+}
