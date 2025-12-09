@@ -894,9 +894,11 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
         const activityName = getSwapActivityName(fromAsset) || getSwapActivityName(toAsset);
         if (!activityName) return null;
         
-        // Always use fromAmount since rewards track `amountIn` (the input token amount)
-        // Regardless of swap direction, the amount being tracked is what the user swaps IN
-        const inputAmount = fromAmount;
+        // Swap rewards are tracked in USDST terms, so use the USDST side of the swap
+        // - If swapping FROM USDST, use fromAmount
+        // - If swapping TO USDST, use toAmount
+        const isFromUsdst = fromAsset?.address?.toLowerCase() === usdstAddress.toLowerCase();
+        const inputAmount = isFromUsdst ? fromAmount : toAmount;
         
         return (
           <div className="bg-gray-50 p-4 rounded-lg">
