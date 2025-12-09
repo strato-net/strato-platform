@@ -15,6 +15,7 @@ function isCursor(x: any): x is EventCursor {
     x &&
     typeof x.blockNumber === 'number' &&
     typeof x.eventIndex === 'number' &&
+    typeof x.block_timestamp === 'string' &&
     Number.isSafeInteger(x.blockNumber) &&
     Number.isSafeInteger(x.eventIndex) &&
     x.blockNumber >= 0 &&
@@ -38,9 +39,9 @@ async function getLatestCursorFromEvents(): Promise<EventCursor> {
     params: {
       address: `eq.${config.rewards.address}`,
       event_name: 'eq.ActionProcessed',
-      order: 'block_number.desc,event_index.desc',
+      order: 'id.desc',
       limit: 1,
-      select: 'block_number,event_index',
+      select: 'block_number,event_index,block_timestamp',
     },
   });
 
@@ -53,6 +54,7 @@ async function getLatestCursorFromEvents(): Promise<EventCursor> {
   const latestEvent = data[0];
   const blockNumber = Number(latestEvent.block_number);
   const eventIndex = Number(latestEvent.event_index);
+  const block_timestamp = latestEvent.block_timestamp;
 
   if (!Number.isSafeInteger(blockNumber) || !Number.isSafeInteger(eventIndex)) {
     throw new Error(
@@ -60,7 +62,13 @@ async function getLatestCursorFromEvents(): Promise<EventCursor> {
     );
   }
 
-  return { blockNumber, eventIndex };
+  if (typeof block_timestamp !== 'string') {
+    throw new Error(
+      `Invalid event data: block_timestamp=${block_timestamp}`
+    );
+  }
+
+  return { blockNumber, eventIndex, block_timestamp };
 }
 
 class BlockTrackingService {
@@ -78,7 +86,7 @@ class BlockTrackingService {
 
       logInfo(
         'BlockTrackingService',
-        `Saved cursor: blockNumber=${cursor.blockNumber}, eventIndex=${cursor.eventIndex}`
+        `Saved cursor: blockNumber=${cursor.blockNumber}, eventIndex=${cursor.eventIndex}, block_timestamp=${cursor.block_timestamp}`
       );
     } catch (error) {
       await fs.unlink(tmpPath).catch(() => {});

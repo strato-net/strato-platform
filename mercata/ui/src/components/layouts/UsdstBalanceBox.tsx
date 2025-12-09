@@ -187,7 +187,7 @@ const UsdstBalanceBox: React.FC = () => {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1">
               <p className="text-xs font-medium text-gray-600">USDST Balance</p>
-              <InfoTooltip content="USDST is used to pay for gas fees on the STRATO Mercata network">
+              <InfoTooltip content="USDST is used to pay for gas fees on the STRATO network">
                 <HelpCircle className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
               </InfoTooltip>
             </div>

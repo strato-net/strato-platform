@@ -42,6 +42,19 @@ export interface UserRewardsData {
   }>;
 }
 
+export interface LeaderboardEntry {
+  rank: number;
+  address: string;
+  totalRewardsEarned: string;
+}
+
+export interface LeaderboardResponse {
+  entries: LeaderboardEntry[];
+  total: number;
+  offset: number;
+  limit: number;
+}
+
 
 /**
  * Fetch global Rewards contract state
@@ -523,6 +536,29 @@ export const claimRewards = async (userAddress: string, activityIds: number[]): 
       || "Failed to claim rewards";
     throw new Error(errorMessage);
   }
+};
+
+/**
+ * Fetch leaderboard data
+ * @param forceRefresh - If true, bypasses cache and fetches fresh data from blockchain
+ * @param limit - Maximum number of entries to return (default: 10)
+ * @param offset - Number of entries to skip (default: 0)
+ */
+export const fetchLeaderboard = async (
+  forceRefresh: boolean = false,
+  limit: number = 10,
+  offset: number = 0
+): Promise<LeaderboardResponse> => {
+  const params = Object.fromEntries(
+    [
+      forceRefresh && ["refresh", "true"],
+      limit !== 10 && ["limit", limit.toString()],
+      offset !== 0 && ["offset", offset.toString()],
+    ].filter(Boolean) as [string, string][]
+  );
+
+  const response = await api.get<LeaderboardResponse>("/rewards/leaderboard", { params });
+  return response.data;
 };
 
 

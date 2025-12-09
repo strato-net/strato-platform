@@ -421,3 +421,74 @@ export const calculateTokenValue = (
 };
 
 export { formatUnits } from "ethers";
+
+import { jsonrepair } from "jsonrepair";
+import JSONBigInt from "json-bigint";
+
+// Configure JSON parser with native BigInt support for handling large numbers (e.g., wei values)
+const J = JSONBigInt({ useNativeBigInt: true });
+
+// Safe character normalization: removes problematic Unicode characters
+// - Removes BOM (Byte Order Mark) and zero-width spaces
+// - Replaces non-breaking spaces with regular spaces
+// - Converts Unicode smart quotes to standard ASCII quotes
+const normalize = (s: string) =>
+  s
+    .replace(/[\uFEFF\u200B]/g, "")
+    .replace(/\u00A0/g, " ")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2018\u2019]/g, "'");
+
+// Converts \822x escape sequences to smart quotes first (JSON-safe),
+// which will then be normalized to ASCII quotes via normalize()
+// This avoids creating ""word"" artifacts that break JSON parsing
+const fix822x = (s: string) =>
+  s
+    .replace(/\\8220/g, "\u201C")
+    .replace(/\\8221/g, "\u201D")
+    .replace(/\\8216/g, "\u2018")
+    .replace(/\\8217/g, "\u2019");
+
+// Targeted fix: only collapses ""word"" when it appears as a JSON token pattern
+// (e.g., :""transfer"" or ,""transfer"") to avoid rewriting valid content elsewhere
+const collapseDoubledQuotesToken = (s: string) =>
+  s.replace(/:\s*""([^"]+)""/g, ':"$1"').replace(/,\s*""([^"]+)""/g, ',"$1"');
+
+// Parses JSON string: normalizes characters, repairs malformed JSON, then parses with BigInt support
+const parseText = (s: string) => J.parse(jsonrepair(normalize(fix822x(s))));
+
+/**
+ * Parses JSON strings with BigInt support, handling malformed JSON and Unicode issues.
+ * Attempts double parsing: if the first parse returns a string, tries parsing again
+ * (handles cases where JSON is double-encoded as a string).
+ * 
+ * The inner layer fix (collapseDoubledQuotesToken) is only applied to the parsed string,
+ * not the raw input, to avoid rewriting valid content in unintended places.
+ * 
+ * @param input - JSON string to parse (may be malformed or contain Unicode issues)
+ * @param fallback - Value to return if parsing fails (defaults to null)
+ * @param label - Label for error logging (defaults to "parseJsonBigInt")
+ * @returns Parsed value with BigInt support, or fallback if parsing fails
+ */
+export const parseJsonBigInt = <T>(
+  input: string,
+  { fallback = null as T | null, label = "parseJsonBigInt" } = {}
+): unknown | T => {
+  try {
+    const v = parseText(input);
+    // If result is a string, it might be double-encoded JSON - try parsing again
+    if (typeof v !== "string") return v;
+    try {
+      // Inner layer only: handle the ""transfer"" artifact if it exists in the nested JSON
+      return parseText(collapseDoubledQuotesToken(v));
+    } catch {
+      // If second parse fails, return the string value as-is
+      return v;
+    }
+  } catch (e) {
+    console.error(`[${label}] failed`, {
+      err: e instanceof Error ? `${e.name}: ${e.message}` : String(e),
+    });
+    return fallback;
+  }
+};

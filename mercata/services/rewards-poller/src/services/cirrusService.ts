@@ -32,8 +32,8 @@ const queryRegularEvents = async (
   const params: Record<string, any> = {
     address: buildFilter(eventAddresses),
     event_name: buildFilter(eventEventNames),
-    block_number: `gte.${cursor.blockNumber}`,
-    order: "block_number.asc,event_index.asc",
+    block_timestamp: `gte.${cursor.block_timestamp}`,
+    order: "id.asc",
     select:
       "address,block_number,event_name,attributes,event_index,transaction_sender,block_timestamp",
   };
@@ -75,6 +75,7 @@ const queryRegularEvents = async (
         address: item.address,
         event_name: item.event_name,
         block_number: blockNumber,
+        block_timestamp: item.block_timestamp,
         event_index: eventIndex,
         transaction_sender: item.transaction_sender,
         amount,
@@ -133,7 +134,7 @@ export const getEventQueryParams = async (): Promise<{
 
   logInfo(
     "CirrusService",
-    `Loaded activities: ${contractAddresses.size} contracts, ${eventNames.size} event names, cursor: blockNumber=${cursor.blockNumber}, eventIndex=${cursor.eventIndex}`
+    `Loaded activities: ${contractAddresses.size} contracts, ${eventNames.size} event names, cursor: blockNumber=${cursor.blockNumber}, eventIndex=${cursor.eventIndex}, block_timestamp=${cursor.block_timestamp}`
   );
   return {
     contractAddresses: [...contractAddresses],
@@ -155,9 +156,9 @@ export const getLPTokenTransferEvents = async (
   const params: Record<string, any> = {
     address: buildFilter(lpTokenAddresses),
     or: `(from.eq.${ZERO_ADDRESS},to.eq.${ZERO_ADDRESS})`,
-    block_number: `gte.${cursor.blockNumber}`,
-    order: "block_number.asc,event_index.asc",
-    select: "address,block_number,value::text,event_index,transaction_sender,from,to",
+    block_timestamp: `gte.${cursor.block_timestamp}`,
+    order: "id.asc",
+    select: "address,block_number,value::text,event_index,transaction_sender,from,to,block_timestamp",
   };
 
   const data = await cirrus.get(`/${MERCATA_PREFIX}Token-Transfer`, {
@@ -193,6 +194,7 @@ export const getLPTokenTransferEvents = async (
         address: item.address,
         event_name: isMint ? "Minted" : "Burned",
         block_number: Number(item.block_number),
+        block_timestamp: item.block_timestamp,
         event_index: Number(item.event_index || 0),
         transaction_sender:
           item.transaction_sender || (isMint ? item.to : item.from),

@@ -29,7 +29,7 @@ const Transfer = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   
   useEffect(() => {
-    document.title = "Transfer Assets | STRATO Mercata";
+    document.title = "Transfer Assets | STRATO";
   }, []);
   const [tokens, setTokens] = useState<Token[]>([]);
   const [recipient, setRecipient] = useState<string>("");
