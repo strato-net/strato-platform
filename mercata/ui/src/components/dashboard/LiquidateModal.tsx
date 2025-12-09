@@ -201,7 +201,7 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
         <div className="space-y-6 py-4">
           <div className="space-y-3">
             <label className="text-sm font-medium">Repay Amount ({loan.assetSymbol})</label>
-            <div className="flex justify-between text-xs text-gray-500">
+            <div className="flex justify-between text-xs text-muted-foreground">
               <span>Total debt: {isFinite(totalDebtEth) ? totalDebtEth.toFixed(6) : "0.000000"} {loan.assetSymbol}</span>
               <span>Max repayable now: {isFinite(maxRepayEth) ? maxRepayEth.toFixed(6) : "0.000000"} {loan.assetSymbol}</span>
             </div>
@@ -225,7 +225,7 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
 
           <div className="space-y-3">
             <label className="text-sm font-medium">Min Collateral Out ({collateral.symbol || "COLL"}) - Optional</label>
-            <div className="text-xs text-gray-500 mb-2">
+            <div className="text-xs text-muted-foreground mb-2">
               Set a minimum collateral amount to receive (slippage protection). Leave at 0 to accept any amount.
             </div>
             <div className="relative">
@@ -242,32 +242,32 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
 
           <div className="grid grid-cols-2 gap-4 text-sm pt-2">
             <div>
-              <span className="text-gray-500">Seized Collateral</span>
+              <span className="text-muted-foreground">Seized Collateral</span>
               <div className="font-medium flex items-center gap-2 mt-1">
                 <TokenIcon symbol={collateral.symbol || "COLL"} size="sm" />
                 <span>{seizedTokensEth.toFixed(4)} {collateral.symbol || "COLL"}</span>
               </div>
-              <div className="text-xs text-gray-500 mt-1">
+              <div className="text-xs text-muted-foreground mt-1">
                 Value: ${(seizedTokensEth * collPriceUsd).toFixed(2)} (includes {(bonusPct * 100).toFixed(0)}% bonus)
               </div>
             </div>
             <div>
-              <span className="text-gray-500">Repay Amount (USDST)</span>
+              <span className="text-muted-foreground">Repay Amount (USDST)</span>
               <div className="font-medium">{repayUsdCost.toFixed(2)}</div>
             </div>
           </div>
 
-          <div className="p-4 bg-gray-50 rounded-md">
+          <div className="p-4 bg-muted/50 rounded-md">
             <div className="flex justify-between items-center">
-              <span className="text-gray-600">Estimated Profit</span>
+              <span className="text-muted-foreground">Estimated Profit</span>
               <span className={profitUsd >= 0 ? "text-green-600 font-semibold text-lg" : "text-red-600 font-semibold text-lg"}>
                 ${profitUsd.toFixed(2)}
               </span>
             </div>
           </div>
 
-          <div className="px-4 py-3 bg-gray-50 rounded-md text-sm">
-            <p className="text-gray-600">
+          <div className="px-4 py-3 bg-muted/50 rounded-md text-sm">
+            <p className="text-muted-foreground">
               Liquidating this position will allow you to repay part of the debt in exchange for collateral at a discount. 
               The profit shown is based on current market prices.
             </p>

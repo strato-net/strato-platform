@@ -127,21 +127,21 @@ const VoteTab = () => {
         </CardHeader>
         <CardContent>
           <div className="mb-4">
-            <span className="text-sm text-gray-500 dark:text-muted-foreground">
+            <span className="text-sm text-muted-foreground">
               {admins.length} admin{admins.length !== 1 ? 's' : ''} registered
             </span>
           </div>
           
           {admins.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-gray-500 dark:text-muted-foreground">No admins found</p>
+              <p className="text-muted-foreground">No admins found</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {admins.map((admin: {address: string}, index: number) => (
                 <div 
                   key={`${admin.address}-${index}`}
-                  className="flex items-center justify-between p-3 border rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors dark:bg-card dark:border-border dark:hover:bg-muted/50"
+                  className="flex items-center justify-between p-3 border rounded-lg bg-muted/50 hover:bg-muted transition-colors border-border"
                 >
                   <div className="flex items-center space-x-2">
                     <span className="font-mono text-sm dark:text-foreground">
@@ -184,14 +184,14 @@ const VoteTab = () => {
 
         <CardContent>
           <div className="mb-4">
-            <span className="text-sm text-gray-500 dark:text-muted-foreground">
+            <span className="text-sm text-muted-foreground">
               Showing {issues.length} open issues
             </span>
           </div>
           
           {issues.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-gray-500 dark:text-muted-foreground">No open issues found</p>
+              <p className="text-muted-foreground">No open issues found</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -217,7 +217,7 @@ const VoteTab = () => {
                     const hasUserVoted = votes.some((v) => v.issueId === issueId && v.voter === userAddress);
 
                     return (
-                      <TableRow key={`${issueId}-${index}`} className={`dark:border-border dark:hover:bg-muted/50 ${hasUserVoted ? 'bg-green-50 dark:bg-green-900/20' : ''}`}>
+                      <TableRow key={`${issueId}-${index}`} className={`border-border hover:bg-muted/50 ${hasUserVoted ? 'bg-green-500/10' : ''}`}>
                         <TableCell className="font-medium text-sm max-w-[120px] truncate dark:text-foreground">
                           <div className="flex items-center space-x-2">
                             {hasUserVoted && (
@@ -301,14 +301,14 @@ const VoteTab = () => {
         </CardHeader>
         <CardContent>
           <div className="mb-4">
-            <span className="text-sm text-gray-500 dark:text-muted-foreground">
+            <span className="text-sm text-muted-foreground">
               Showing {executed.length} executed issues
             </span>
           </div>
           
           {executed.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-gray-500 dark:text-muted-foreground">No executed issues found</p>
+              <p className="text-muted-foreground">No executed issues found</p>
             </div>
           ) : (
             <div className="overflow-x-auto">

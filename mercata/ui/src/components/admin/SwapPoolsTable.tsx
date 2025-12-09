@@ -43,7 +43,7 @@ const SwapPoolsTable = () => {
       <CardHeader>
         <CardTitle>Swap Pools Overview</CardTitle>
         <div className="relative">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400 dark:text-muted-foreground" />
+          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search pool pairs..."
             value={searchQuery}
@@ -58,7 +58,7 @@ const SwapPoolsTable = () => {
             <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
           </div>
         ) : !pools.length ? (
-          <div className="flex justify-center items-center h-12 text-gray-500 dark:text-muted-foreground">
+          <div className="flex justify-center items-center h-12 text-muted-foreground">
             <div>No pools available</div>
           </div>
         ) : (
@@ -77,7 +77,7 @@ const SwapPoolsTable = () => {
               </thead>
               <tbody>
                 {filteredPools.map((pool, index) => (
-                  <tr key={index} className="border-b hover:bg-gray-50 dark:hover:bg-muted/50">
+                  <tr key={index} className="border-b hover:bg-muted/50">
                     <td className="py-4 px-2 md:px-4">
                       <div className="flex items-center">
                         <div className="flex items-center mr-3">
@@ -86,11 +86,11 @@ const SwapPoolsTable = () => {
                               <img
                                 src={pool.tokenA.images[0].value}
                                 alt={pool.tokenA._name || pool.poolName?.split('/')[0]}
-                                className="w-8 h-8 md:w-6 md:h-6 rounded-full border-2 border-white dark:border-gray-800 object-contain bg-white dark:bg-gray-800"
+                                className="w-8 h-8 md:w-6 md:h-6 rounded-full border-2 border-background object-contain bg-background"
                               />
                             ) : (
                               <div
-                                className="w-8 h-8 md:w-6 md:h-6 rounded-full flex items-center justify-center text-xs text-white font-medium border-2 border-white dark:border-gray-800 flex-shrink-0"
+                                className="w-8 h-8 md:w-6 md:h-6 rounded-full flex items-center justify-center text-xs text-white font-medium border-2 border-background flex-shrink-0"
                                 style={{ backgroundColor: "#ef4444" }}
                               >
                                 {pool.poolName?.slice(0, 2)}
@@ -102,11 +102,11 @@ const SwapPoolsTable = () => {
                               <img
                                 src={pool.tokenB.images[0].value}
                                 alt={pool.tokenB._name || pool.poolName?.split('/')[1]}
-                                className="w-8 h-8 md:w-6 md:h-6 rounded-full border-2 border-white dark:border-gray-800 object-contain bg-white dark:bg-gray-800"
+                                className="w-8 h-8 md:w-6 md:h-6 rounded-full border-2 border-background object-contain bg-background"
                               />
                             ) : (
                               <div
-                                className="w-8 h-8 md:w-6 md:h-6 rounded-full flex items-center justify-center text-xs text-white font-medium border-2 border-white dark:border-gray-800 flex-shrink-0"
+                                className="w-8 h-8 md:w-6 md:h-6 rounded-full flex items-center justify-center text-xs text-white font-medium border-2 border-background flex-shrink-0"
                                 style={{ backgroundColor: "#ef4444" }}
                               >
                                 {pool.poolName?.split('/')[1]?.slice(0, 2)}
@@ -116,13 +116,13 @@ const SwapPoolsTable = () => {
                         </div>
                         <div className="min-w-0">
                           <div className="font-medium truncate">{pool.poolName}</div>
-                          <div className="text-sm text-gray-500 dark:text-muted-foreground truncate">{pool.poolSymbol}</div>
+                          <div className="text-sm text-muted-foreground truncate">{pool.poolSymbol}</div>
                         </div>
                       </div>
                     </td>
                     <td className="py-4 px-2 md:px-4">
                       <div className="flex items-center space-x-1 md:space-x-2">
-                        <span className="font-mono text-xs md:text-sm text-gray-600 dark:text-muted-foreground">
+                        <span className="font-mono text-xs md:text-sm text-muted-foreground">
                           {pool.address ? `${pool.address.slice(0, 6)}...${pool.address.slice(-4)}` : 'N/A'}
                         </span>
                         {pool.address && (

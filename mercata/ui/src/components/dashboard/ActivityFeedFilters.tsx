@@ -74,7 +74,7 @@ const ActivityFeedFilters = memo(({
   );
 
   return (
-    <div className="mb-4 sm:mb-6 p-3 sm:p-4 border rounded-lg bg-gray-50 dark:bg-card dark:border-border">
+    <div className="mb-4 sm:mb-6 p-3 sm:p-4 border rounded-lg bg-muted/50 border-border">
       <div className="flex items-center gap-2 mb-2 sm:mb-3">
         <Filter className="h-3 w-3 sm:h-4 sm:w-4" />
         <span className="text-sm sm:text-base font-medium">Filters</span>
@@ -93,7 +93,7 @@ const ActivityFeedFilters = memo(({
 
       <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4">
         <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 w-full sm:w-auto">
-          <label className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 sm:min-w-fit">Contract:</label>
+          <label className="text-xs sm:text-sm font-medium text-foreground sm:min-w-fit">Contract:</label>
           <Select
             value={filters.contract_name || "all"}
             onValueChange={handleContractChange}
@@ -113,7 +113,7 @@ const ActivityFeedFilters = memo(({
         </div>
 
         <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 w-full sm:w-auto">
-          <label className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 sm:min-w-fit">Event:</label>
+          <label className="text-xs sm:text-sm font-medium text-foreground sm:min-w-fit">Event:</label>
           <Select
             value={filters.event_name || "all"}
             onValueChange={handleEventChange}
@@ -134,7 +134,7 @@ const ActivityFeedFilters = memo(({
 
         {userAddress && (
           <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-2">
-            <div className="hidden sm:block w-px h-6 bg-gray-300 dark:bg-gray-700 mx-2"></div>
+            <div className="hidden sm:block w-px h-6 bg-border mx-2"></div>
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>

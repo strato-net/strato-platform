@@ -566,7 +566,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-8">
-            <div className="text-gray-500">Loading positions...</div>
+            <div className="text-muted-foreground">Loading positions...</div>
           </div>
         </CardContent>
       </Card>
@@ -587,8 +587,8 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center justify-center py-8 text-center">
-            <div className="text-gray-500 mb-4">No positions found</div>
-            <div className="text-sm text-gray-400">Create your first position by depositing collateral and borrowing USDST above</div>
+            <div className="text-muted-foreground mb-4">No positions found</div>
+            <div className="text-sm text-muted-foreground/70">Create your first position by depositing collateral and borrowing USDST above</div>
           </div>
         </CardContent>
       </Card>
@@ -784,7 +784,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                   ) : (
                     <>
                       <div className="mb-2">
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-muted-foreground">
                           Transaction Fee: {activeActions[position.asset] === 'deposit' || activeActions[position.asset] === 'repay' ? '0.02' : '0.01'} USDST
                         </p>
                       </div>

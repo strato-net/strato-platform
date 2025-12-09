@@ -322,7 +322,7 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
         
         {/* Time Range Selector */}
         {onTimeRangeChange && (
-          <div className="flex flex-wrap items-center justify-center gap-2 mt-4 pt-4 border-t border-gray-200">
+          <div className="flex flex-wrap items-center justify-center gap-2 mt-4 pt-4 border-t border-border">
             {[
               { label: '1 Day', value: '1d' },
               { label: '1 Week', value: '7d' },

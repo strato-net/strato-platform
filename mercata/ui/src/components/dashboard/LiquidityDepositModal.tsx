@@ -647,13 +647,13 @@ const LiquidityDepositModal = ({
               <span>{DEPOSIT_FEE} USDST ({parseFloat(DEPOSIT_FEE) * 100} voucher)</span>
             </div>
             {selectedPool && BigInt(selectedPool.lpToken._totalSupply) === BigInt(0) && (
-              <div className="flex justify-between items-center mt-2 text-sm text-gray-500">
+              <div className="flex justify-between items-center mt-2 text-sm text-muted-foreground">
                 <span>Initial liquidity provider:</span>
                 <span>You set the initial price ratio</span>
               </div>
             )}
             {selectedPool && BigInt(selectedPool.lpToken._totalSupply) > BigInt(0) && (
-              <div className="flex justify-between items-center mt-2 text-sm text-gray-500">
+              <div className="flex justify-between items-center mt-2 text-sm text-muted-foreground">
                 <span>Subsequent liquidity:</span>
                 <span className="text-right">Token A amount is calculated based on current pool ratio</span>
               </div>

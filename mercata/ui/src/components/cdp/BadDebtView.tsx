@@ -109,7 +109,7 @@ const BadDebtView: React.FC = () => {
             <div className="text-center py-8">
               <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
               <div className="text-red-600 font-medium mb-2">Failed to load on-chain data</div>
-              <div className="text-sm text-gray-600 mb-4">{error}</div>
+              <div className="text-sm text-muted-foreground mb-4">{error}</div>
               <Button onClick={handleRefresh} disabled={refreshing}>
                 {refreshing ? "Retrying..." : "Retry"}
               </Button>

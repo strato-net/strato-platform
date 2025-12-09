@@ -28,7 +28,7 @@ const InfoTooltip = ({ children, content }: { children: React.ReactNode; content
           onClick={handleToggle}
         >
           {children}
-          <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+          <HelpCircle className="h-4 w-4 text-muted-foreground hover:text-foreground" />
         </div>
         {showTooltip && (
           <div className="absolute top-full left-0 mt-2 z-50 bg-popover border rounded-md px-3 py-1.5 text-sm text-popover-foreground shadow-md max-w-xs">
@@ -44,7 +44,7 @@ const InfoTooltip = ({ children, content }: { children: React.ReactNode; content
       <TooltipTrigger asChild>
         <div className="inline-flex items-center gap-1 cursor-help">
           {children}
-          <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+          <HelpCircle className="h-4 w-4 text-muted-foreground hover:text-foreground" />
         </div>
       </TooltipTrigger>
       <TooltipContent className="max-w-xs">

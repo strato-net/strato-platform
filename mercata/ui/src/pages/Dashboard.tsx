@@ -328,7 +328,7 @@ const Dashboard = () => {
                 title="Pending CATA"
                 value={`${parseFloat(pendingRewards).toLocaleString("en-US", { maximumFractionDigits: 2 })} CATA`}
                 icon={isClaiming ? <Loader2 className="text-white animate-spin" size={18} /> : <Banknote className="text-white" size={18} />}
-                color={parseFloat(pendingRewards) > 0 ? "bg-green-500" : "bg-gray-500"}
+                color={parseFloat(pendingRewards) > 0 ? "bg-green-500" : "bg-muted-foreground"}
                 onClick={parseFloat(pendingRewards) > 0 && !isClaiming ? handleClaimRewards : undefined}
                 tooltip={isClaiming ? "Processing claim..." : (parseFloat(pendingRewards) > 0 ? "Click to claim your rewards" : undefined)}
               />

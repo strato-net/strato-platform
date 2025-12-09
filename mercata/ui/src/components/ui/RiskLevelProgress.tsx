@@ -44,7 +44,7 @@ const RiskLevelProgress = ({ riskLevel }: RiskLevelProgressProps) => {
           />
         </Progress>
 
-        <div className="flex justify-between mt-1 text-xs text-gray-500">
+        <div className="flex justify-between mt-1 text-xs text-muted-foreground">
           <span>Safe</span>
           <span>Risk Increases →</span>
           <span>Liquidation</span>

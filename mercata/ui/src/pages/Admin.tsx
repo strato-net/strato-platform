@@ -21,9 +21,9 @@ const Admin = () => {
   const [activeTab, setActiveTab] = useState('tokens');
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-background">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="bg-white dark:bg-card border-b border-gray-200 dark:border-border">
+      <div className="bg-card border-b border-border">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-4">
@@ -49,7 +49,7 @@ const Admin = () => {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h2 className="text-3xl font-bold mb-2 text-foreground">Platform Administration</h2>
-          <p className="text-gray-600 dark:text-muted-foreground">Manage tokens, pools, liquidity, and asset pricing</p>
+          <p className="text-muted-foreground">Manage tokens, pools, liquidity, and asset pricing</p>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 ">

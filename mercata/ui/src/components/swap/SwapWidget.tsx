@@ -349,25 +349,25 @@ const SwapDialog = ({
       </DialogHeader>
       <div className="py-4 space-y-4">
         <div className="flex justify-between">
-          <span className="text-gray-600">You pay:</span>
+          <span className="text-muted-foreground">You pay:</span>
           <span className="font-semibold">
             {fromAmount} {fromAsset?._symbol || ""}
           </span>
         </div>
         <div className="flex justify-between">
-          <span className="text-gray-600">You receive:</span>
+          <span className="text-muted-foreground">You receive:</span>
           <span className="font-semibold">
             {toAmount} {toAsset?._symbol || ""}
           </span>
         </div>
         <div className="flex justify-between">
-          <span className="text-gray-600">Minimum received (after slippage):</span>
+          <span className="text-muted-foreground">Minimum received (after slippage):</span>
           <span className="font-semibold">
             {toAmountMin} {toAsset?._symbol || ""}
           </span>
         </div>
         <div className="flex justify-between">
-          <span className="text-gray-600">Exchange rate:</span>
+          <span className="text-muted-foreground">Exchange rate:</span>
           <span>
             1 {fromAsset?._symbol || ""} ≈ {exchangeRate} {toAsset?._symbol || ""}
           </span>
@@ -405,17 +405,17 @@ const SlippageControl = ({ slippage, autoSlippage, onSlippageChange, onAutoToggl
   const isLowSlippage = slippage < 1;
   const slippageClass = isHighSlippage || isLowSlippage
     ? 'border-yellow-400 text-yellow-600'
-    : 'border-gray-300 text-gray-700';
+    : 'border-border text-foreground';
 
   return (
     <div className="flex flex-col gap-1 mt-2">
       <div className="flex items-center justify-between text-sm mb-1">
-        <span className="text-gray-600">Max slippage</span>
+        <span className="text-muted-foreground">Max slippage</span>
         <div className="flex items-center gap-2">
           <button
             className={`px-3 py-1 rounded-full text-xs font-medium border ${
-              autoSlippage ? 'bg-gray-200 text-gray-700' : 'bg-transparent text-gray-500'
-              } border-gray-300`}
+              autoSlippage ? 'bg-muted text-foreground' : 'bg-transparent text-muted-foreground'
+              } border-border`}
             onClick={() => {
               onAutoToggle(true);
               onSlippageChange(DEFAULT_SLIPPAGE);
@@ -425,8 +425,8 @@ const SlippageControl = ({ slippage, autoSlippage, onSlippageChange, onAutoToggl
           </button>
           <button
             className={`px-3 py-1 rounded-full text-xs font-medium border ${
-              !autoSlippage ? 'bg-gray-200 text-gray-700' : 'bg-transparent text-gray-500'
-              } border-gray-300`}
+              !autoSlippage ? 'bg-muted text-foreground' : 'bg-transparent text-muted-foreground'
+              } border-border`}
             onClick={() => onAutoToggle(false)}
           >
             Manual

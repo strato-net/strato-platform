@@ -335,7 +335,7 @@ const AssetDetail = () => {
                 <CardContent>
                   <div className="flex justify-center mb-6">
                     <div
-                      className="w-32 h-32 rounded-full bg-white dark:bg-secondary border-4 border-border flex items-center justify-center overflow-hidden relative"
+                      className="w-32 h-32 rounded-full bg-card border-4 border-border flex items-center justify-center overflow-hidden relative"
                     >
                       {asset?.token?.images?.length > 0 || asset?.images?.length > 0 ? (
                         <img

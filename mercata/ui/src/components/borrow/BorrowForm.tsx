@@ -232,7 +232,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
         const eligibleCollateralTokens = collateralInfo || [];
 
         const borrowInfoMessage = (
-          <p className="text-gray-600 mt-2">
+          <p className="text-muted-foreground mt-2">
             Borrowing against your assets allows you to access liquidity
             without selling your holdings. Be mindful of the risk level, as
             high borrowing increases liquidation risk during market
@@ -243,7 +243,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
         if (isZeroAvailable) {
           return (
             <div className="mt-2">
-              <p className="text-gray-600">
+              <p className="text-muted-foreground">
                 You currently have no available borrowing power. Supply collateral to enable borrowing.
               </p>
               {borrowInfoMessage}
@@ -254,7 +254,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
         if (eligibleCollateralTokens.length === 0) {
           return (
             <div className="mt-2">
-              <p className="text-gray-600">
+              <p className="text-muted-foreground">
                 You have no eligible collateral. Supply assets to enable borrowing.
               </p>
               {borrowInfoMessage}

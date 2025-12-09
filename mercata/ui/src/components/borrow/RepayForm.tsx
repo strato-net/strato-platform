@@ -91,7 +91,7 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance 
 
   if (!loans) {
     return (
-      <div className="text-center text-gray-500 py-8">
+      <div className="text-center text-muted-foreground py-8">
         No active loan to repay
       </div>
     );
@@ -102,7 +102,7 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance 
       {/* Loan Details */}
       <div className="space-y-2">
         <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-500">Total Amount Owed</span>
+          <span className="text-sm text-muted-foreground">Total Amount Owed</span>
           <span className="font-normal">
             {(() => {
               try {
@@ -118,7 +118,7 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance 
 
         {loans?.totalAmountOwedPreview && (
           <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-500">Projected Debt</span>
+            <span className="text-sm text-muted-foreground">Projected Debt</span>
             <span className="font-medium">
               {(() => {
                 try {
@@ -141,7 +141,7 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance 
       {/* Repay Amount Input */}
       <div className="space-y-3">
         <label className="text-sm font-medium">Repay Amount (USDST)</label>
-        <div className="flex justify-between items-center text-xs text-gray-500">
+        <div className="flex justify-between items-center text-xs text-muted-foreground">
           <span>Min: 0.01 USDST</span>
           <div>
             <button
@@ -155,7 +155,7 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance 
                 disabled={(() => {
                 return BigInt(maxAmount) === 0n;
               })()}
-              className="px-2 py-1 mr-1 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-700 text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100"
+              className="px-2 py-1 mr-1 bg-muted hover:bg-muted/80 rounded-full text-foreground text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
               title={(() => {
                 const owed = BigInt(loans?.totalAmountOwed || 0);
                 return owed === 0n ? "No amount available to repay" : "Set to total debt (Repay All)";
@@ -180,7 +180,7 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance 
               handleAmountInputChange(value, setRepayAmount, setRepayAmountError, maxAmount);
             }}
           />
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">USDST</span>
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">USDST</span>
         </div>
         {repayAmountError && (
           <p className="text-red-600 text-sm">{repayAmountError}</p>

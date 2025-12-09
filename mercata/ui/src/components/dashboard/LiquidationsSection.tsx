@@ -106,7 +106,7 @@ const LiquidationsSection: React.FC = () => {
                   <div className="hidden md:flex md:items-center md:justify-between">
                     <div className="flex items-center gap-4">
                       {/* Expand icon */}
-                      <div className="text-gray-500">
+                      <div className="text-muted-foreground">
                         {expanded[ln.id] ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                       </div>
                       

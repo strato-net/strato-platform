@@ -46,7 +46,7 @@ const MobileSidebar = ({ isOpen, onClose }: MobileSidebarProps) => {
       <div className={`fixed left-0 top-0 h-full w-64 bg-background text-foreground z-50 md:hidden transform transition-transform duration-300 ease-in-out border-r border-border ${
         isOpen ? 'translate-x-0' : '-translate-x-full'
       }`}>
-        <div className="border-b border-gray-200">
+        <div className="border-b border-border">
           <div className="p-4 flex items-center justify-between">
             <img 
               src={STRATOLOGO} 
@@ -55,7 +55,7 @@ const MobileSidebar = ({ isOpen, onClose }: MobileSidebarProps) => {
             />
             <button
               onClick={onClose}
-              className="rounded-md p-1 hover:bg-gray-100 text-gray-700"
+              className="rounded-md p-1 hover:bg-muted text-foreground"
             >
               <X size={16} />
             </button>

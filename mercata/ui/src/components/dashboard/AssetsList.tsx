@@ -108,7 +108,7 @@ const AssetsList = ({
                   (asset, index) => (
                     <tr
                       key={index}
-                      className="hover:bg-gray-50 dark:hover:bg-muted/50 transition-colors"
+                      className="hover:bg-muted/50 transition-colors"
                     >
                       <td className="py-4 px-4">
                         <div className="flex items-center">
@@ -145,7 +145,7 @@ const AssetsList = ({
                             <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <p className="text-gray-500 text-xs truncate">
+                                  <p className="text-muted-foreground text-xs truncate">
                                     {asset?._symbol || ""}
                                   </p>
                                 </TooltipTrigger>
@@ -168,8 +168,8 @@ const AssetsList = ({
                         <div
                           className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                             (asset as any)?.["change"] >= 0
-                            ? "bg-green-50 text-green-600"
-                            : "bg-red-50 text-red-600"
+                            ? "bg-green-500/10 text-green-500"
+                            : "bg-red-500/10 text-red-500"
                             }`}
                         >
                           {(asset as any)?.["change"] !== undefined
@@ -204,7 +204,7 @@ const AssetsList = ({
                   )
                 )
               ) : (
-                <tr className="hover:bg-gray-50 dark:hover:bg-muted/50 transition-colors">
+                <tr className="hover:bg-muted/50 transition-colors">
                   <td
                     colSpan={6}
                     className="py-4 px-4 whitespace-nowrap w-full"
@@ -274,7 +274,7 @@ const AssetsList = ({
                     inActiveTokens.map((asset, index) => (
                       <tr
                         key={index}
-                        className="hover:bg-gray-50 dark:hover:bg-muted/50 transition-colors"
+                        className="hover:bg-muted/50 transition-colors"
                       >
                         <td className="py-4 px-4">
                           <div className="flex items-center">
@@ -311,7 +311,7 @@ const AssetsList = ({
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <p className="text-gray-500 text-xs truncate">
+                                    <p className="text-muted-foreground text-xs truncate">
                                       {asset?._symbol || ""}
                                     </p>
                                   </TooltipTrigger>
@@ -333,7 +333,7 @@ const AssetsList = ({
                       </tr>
                     ))
                   ) : (
-                    <tr className="hover:bg-gray-50 dark:hover:bg-muted/50 transition-colors">
+                    <tr className="hover:bg-muted/50 transition-colors">
                       <td
                         colSpan={5}
                         className="py-4 px-4 whitespace-nowrap w-full"

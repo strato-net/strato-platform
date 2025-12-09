@@ -580,7 +580,7 @@ const CollateralConfigManager = () => {
                                 {asset.isSupported ? 'Supported' : 'Not Supported'}
                               </Badge>
                             </div>
-                            <p className="text-sm text-gray-500 font-mono">{asset.asset}</p>
+                            <p className="text-sm text-muted-foreground font-mono">{asset.asset}</p>
                           </div>
                           
                           <div className="flex items-center space-x-2">
@@ -651,23 +651,23 @@ const CollateralConfigManager = () => {
                         
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
                           <div>
-                            <p className="text-sm text-gray-500">Liquidation Ratio</p>
+                            <p className="text-sm text-muted-foreground">Liquidation Ratio</p>
                             <p className="font-semibold">{formatValue(asset.liquidationRatio.toString(), 'percentage')}</p>
                           </div>
                           <div>
-                            <p className="text-sm text-gray-500">Min CR</p>
+                            <p className="text-sm text-muted-foreground">Min CR</p>
                             <p className="font-semibold">{formatValue((asset.minCR || asset.liquidationRatio).toString(), 'percentage')}</p>
                           </div>
                           <div>
-                            <p className="text-sm text-gray-500">Penalty</p>
+                            <p className="text-sm text-muted-foreground">Penalty</p>
                             <p className="font-semibold">{formatValue(asset.liquidationPenaltyBps.toString(), 'bps')}</p>
                           </div>
                           <div>
-                            <p className="text-sm text-gray-500">Close Factor</p>
+                            <p className="text-sm text-muted-foreground">Close Factor</p>
                             <p className="font-semibold">{formatValue(asset.closeFactorBps.toString(), 'bps')}</p>
                           </div>
                           <div>
-                            <p className="text-sm text-gray-500">Debt Floor</p>
+                            <p className="text-sm text-muted-foreground">Debt Floor</p>
                             <p className="font-semibold">{formatValue(asset.debtFloor, 'usd')}</p>
                           </div>
                         </div>
