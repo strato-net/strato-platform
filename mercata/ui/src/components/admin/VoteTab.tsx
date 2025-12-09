@@ -100,11 +100,11 @@ const VoteTab = () => {
   return (
     <div className="space-y-6">
       {/* List of Admins */}
-      <Card>
+      <Card className="dark:bg-card">
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div className="space-y-1">
-            <CardTitle>Admins</CardTitle>
-            <CardDescription>Current administrators with voting rights</CardDescription>
+            <CardTitle className="dark:text-foreground">Admins</CardTitle>
+            <CardDescription className="dark:text-muted-foreground">Current administrators with voting rights</CardDescription>
           </div>
 
           <div className="flex flex-row gap-2 shrink-0">
@@ -127,24 +127,24 @@ const VoteTab = () => {
         </CardHeader>
         <CardContent>
           <div className="mb-4">
-            <span className="text-sm text-gray-500">
+            <span className="text-sm text-muted-foreground">
               {admins.length} admin{admins.length !== 1 ? 's' : ''} registered
             </span>
           </div>
           
           {admins.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-gray-500">No admins found</p>
+              <p className="text-muted-foreground">No admins found</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {admins.map((admin: {address: string}, index: number) => (
                 <div 
                   key={`${admin.address}-${index}`}
-                  className="flex items-center justify-between p-3 border rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
+                  className="flex items-center justify-between p-3 border rounded-lg bg-muted/50 hover:bg-muted transition-colors border-border"
                 >
                   <div className="flex items-center space-x-2">
-                    <span className="font-mono text-sm">
+                    <span className="font-mono text-sm dark:text-foreground">
                       {admin && admin.address !== 'Unknown' 
                         ? `${admin.address.slice(0, 6)}...${admin.address.slice(-4)}`
                         : admin.address
@@ -166,11 +166,11 @@ const VoteTab = () => {
 
 
       { }
-      <Card>
+      <Card className="dark:bg-card">
         <CardHeader className="flex flex-row items-start justify-between space-y-0">
           <div className="space-y-1">
-            <CardTitle>Vote on Issues</CardTitle>
-            <CardDescription>Vote on pending administrative issues</CardDescription>
+            <CardTitle className="dark:text-foreground">Vote on Issues</CardTitle>
+            <CardDescription className="dark:text-muted-foreground">Vote on pending administrative issues</CardDescription>
           </div>
 
           <Button
@@ -184,27 +184,27 @@ const VoteTab = () => {
 
         <CardContent>
           <div className="mb-4">
-            <span className="text-sm text-gray-500">
+            <span className="text-sm text-muted-foreground">
               Showing {issues.length} open issues
             </span>
           </div>
           
           {issues.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-gray-500">No open issues found</p>
+              <p className="text-muted-foreground">No open issues found</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[120px]">Issue ID</TableHead>
-                    <TableHead className="w-[120px]">Contract</TableHead>
-                    <TableHead className="w-[80px]">Function</TableHead>
-                    <TableHead className="w-[60px]">Votes Cast</TableHead>
-                    <TableHead className="w-[60px]">Votes Needed</TableHead>
-                    <TableHead className="w-[60px]">Voting Threshold</TableHead>
-                    <TableHead className="w-[60px]">Vote</TableHead>
+                  <TableRow className="dark:border-border dark:hover:bg-transparent">
+                    <TableHead className="w-[120px] dark:text-muted-foreground">Issue ID</TableHead>
+                    <TableHead className="w-[120px] dark:text-muted-foreground">Contract</TableHead>
+                    <TableHead className="w-[80px] dark:text-muted-foreground">Function</TableHead>
+                    <TableHead className="w-[60px] dark:text-muted-foreground">Votes Cast</TableHead>
+                    <TableHead className="w-[60px] dark:text-muted-foreground">Votes Needed</TableHead>
+                    <TableHead className="w-[60px] dark:text-muted-foreground">Voting Threshold</TableHead>
+                    <TableHead className="w-[60px] dark:text-muted-foreground">Vote</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -217,11 +217,11 @@ const VoteTab = () => {
                     const hasUserVoted = votes.some((v) => v.issueId === issueId && v.voter === userAddress);
 
                     return (
-                      <TableRow key={`${issueId}-${index}`} className={hasUserVoted ? 'bg-green-50' : ''}>
-                        <TableCell className="font-medium text-sm max-w-[120px] truncate">
+                      <TableRow key={`${issueId}-${index}`} className={`border-border hover:bg-muted/50 ${hasUserVoted ? 'bg-green-500/10' : ''}`}>
+                        <TableCell className="font-medium text-sm max-w-[120px] truncate dark:text-foreground">
                           <div className="flex items-center space-x-2">
                             {hasUserVoted && (
-                              <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
+                              <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400 flex-shrink-0" />
                             )}
                             <span>
                               {issueId && issueId !== 'Unknown' 
@@ -234,7 +234,7 @@ const VoteTab = () => {
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className="font-mono text-xs max-w-[120px]">
+                        <TableCell className="font-mono text-xs max-w-[120px] dark:text-foreground">
                           <div className="flex items-center space-x-2">
                             <span>
                               {address && address !== 'Unknown' 
@@ -247,16 +247,16 @@ const VoteTab = () => {
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className="text-sm max-w-[90px]">
+                        <TableCell className="text-sm max-w-[90px] dark:text-foreground">
                           {issue.func}
                         </TableCell>
-                        <TableCell className="text-sm max-w-[90px]">
+                        <TableCell className="text-sm max-w-[90px] dark:text-foreground">
                           {votes.filter((v) => v.issueId === issueId).length}
                         </TableCell>
-                        <TableCell className="text-sm max-w-[90px]">
+                        <TableCell className="text-sm max-w-[90px] dark:text-foreground">
                           {votesNeeded}
                         </TableCell>
-                        <TableCell className="text-sm max-w-[90px]">
+                        <TableCell className="text-sm max-w-[90px] dark:text-foreground">
                           {`${threshold}%`}
                         </TableCell>
                         <TableCell className="max-w-[60px]">
@@ -272,12 +272,12 @@ const VoteTab = () => {
                                 votesNeeded,
                                 threshold
                               })}
-                              className="bg-strato-blue hover:bg-strato-blue/90 text-xs"
+                              className="bg-strato-blue hover:bg-strato-blue/90 text-xs dark:text-white"
                             >
                               View Vote
                             </Button>
                             {hasUserVoted && (
-                              <span className="text-xs text-green-600 font-medium">You voted</span>
+                              <span className="text-xs text-green-600 dark:text-green-400 font-medium">You voted</span>
                             )}
                           </div>
                         </TableCell>
@@ -292,34 +292,34 @@ const VoteTab = () => {
       </Card>
 
       {/* List Executed Issues */}
-      <Card>
+      <Card className="dark:bg-card">
         <CardHeader>
-          <CardTitle>Executed Issues</CardTitle>
-          <CardDescription>
+          <CardTitle className="dark:text-foreground">Executed Issues</CardTitle>
+          <CardDescription className="dark:text-muted-foreground">
             Issues that have already been executed
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="mb-4">
-            <span className="text-sm text-gray-500">
+            <span className="text-sm text-muted-foreground">
               Showing {executed.length} executed issues
             </span>
           </div>
           
           {executed.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-gray-500">No executed issues found</p>
+              <p className="text-muted-foreground">No executed issues found</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[80px]">Issue ID</TableHead>
-                    <TableHead className="w-[80px]">Contract</TableHead>
-                    <TableHead className="w-[80px]">Function</TableHead>
-                    <TableHead className="w-[190px]">Arguments</TableHead>
-                    <TableHead className="w-[80px]">Executor</TableHead>
+                  <TableRow className="dark:border-border dark:hover:bg-transparent">
+                    <TableHead className="w-[80px] dark:text-muted-foreground">Issue ID</TableHead>
+                    <TableHead className="w-[80px] dark:text-muted-foreground">Contract</TableHead>
+                    <TableHead className="w-[80px] dark:text-muted-foreground">Function</TableHead>
+                    <TableHead className="w-[190px] dark:text-muted-foreground">Arguments</TableHead>
+                    <TableHead className="w-[80px] dark:text-muted-foreground">Executor</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -328,8 +328,8 @@ const VoteTab = () => {
                     const address = issue.target;
                     const issueArgs = parseJsonBigInt(typeof issue.args === 'string' ? issue.args : JSON.stringify(issue.args), { fallback: [] }) as any[];
                     return (
-                      <TableRow key={`${issueId}-${index}`}>
-                        <TableCell className="font-mono text-xs max-w-[80px] truncate">
+                      <TableRow key={`${issueId}-${index}`} className="dark:border-border dark:hover:bg-muted/50">
+                        <TableCell className="font-mono text-xs max-w-[80px] truncate dark:text-foreground">
                           <div className="flex items-center space-x-2">
                             <span>
                               {issueId && issueId !== 'Unknown' 
@@ -342,7 +342,7 @@ const VoteTab = () => {
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className="font-mono text-xs max-w-[80px] truncate">
+                        <TableCell className="font-mono text-xs max-w-[80px] truncate dark:text-foreground">
                           <div className="flex items-center space-x-2">
                             <span>
                               {address && address !== 'Unknown' 
@@ -355,13 +355,13 @@ const VoteTab = () => {
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className="text-sm max-w-[80px]">
+                        <TableCell className="text-sm max-w-[80px] dark:text-foreground">
                           {issue.func}
                         </TableCell>
-                        <TableCell className="font-mono text-xs max-w-[300px] truncate">
+                        <TableCell className="font-mono text-xs max-w-[300px] truncate dark:text-foreground">
                           {issueArgs.join(', ')}
                         </TableCell>
-                        <TableCell className="font-mono text-xs max-w-[80px] truncate">
+                        <TableCell className="font-mono text-xs max-w-[80px] truncate dark:text-foreground">
                           <div className="flex items-center space-x-2">
                             <span>
                               {issue.executor && issue.executor !== 'Unknown' 

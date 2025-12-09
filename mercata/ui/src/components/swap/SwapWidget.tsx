@@ -245,12 +245,12 @@ const TokenInput = ({
   loading,
 }: TokenInputProps) => {      
   return (
-    <div className="bg-gray-50 p-4 rounded-lg">
+    <div className="bg-muted/50 p-4 rounded-lg border border-border">
       <div className="flex flex-col sm:flex-row sm:justify-between mb-2">
-        <label className="text-sm text-gray-600 font-semibold">{label}</label>
+        <label className="text-sm text-muted-foreground font-semibold">{label}</label>
         {isFromInput && (
           <span className={`text-sm mt-1 sm:mt-0 flex gap-1 ${
-            toWei(maxAmountWei) === 0n ? "text-red-600" : "text-gray-600"
+            toWei(maxAmountWei) === 0n ? "text-red-600" : "text-muted-foreground"
           }`}>
             Available for swap: <AnimatedNumber 
               value={maxAmountWei !== "0" ? formatBalance(maxAmountWei, asset?._symbol || "", undefined, 2, 6) : "0"} 
@@ -277,7 +277,7 @@ const TokenInput = ({
             placeholder="0.00"
             inputMode="decimal"
             disabled={toWei(maxAmountWei) === 0n && isFromInput}
-            className={`p-2 bg-transparent border-none text-lg font-medium focus:outline-none${
+            className={`p-2 bg-transparent border-none text-lg font-medium focus:outline-none text-foreground placeholder:text-muted-foreground ${
               amountError ? " border border-red-500 rounded-md" : ""
               } ${(toWei(maxAmountWei) === 0n && isFromInput) ? "opacity-50 cursor-not-allowed" : ""}`}
           />
@@ -297,13 +297,13 @@ const TokenInput = ({
       </div>
       {asset && (
         <div className="mt-2 flex justify-between">
-          <span className="text-sm text-gray-500">
+          <span className="text-sm text-muted-foreground">
             User Balance: <AnimatedNumber 
               value={userBalanceWei !== "0" ? formatBalance(userBalanceWei, asset._symbol || "", undefined, 2, 6) : "0"} 
               isLoading={loading} 
             />
           </span>
-          <span className="text-sm text-gray-500">
+          <span className="text-sm text-muted-foreground">
             Pool Balance: <AnimatedNumber 
               value={poolBalanceWei !== "0" ? formatBalance(poolBalanceWei, asset._symbol || "", undefined, 2, 6) : "0"} 
               isLoading={loading} 
@@ -355,25 +355,25 @@ const SwapDialog = ({
       </DialogHeader>
       <div className="py-4 space-y-4">
         <div className="flex justify-between">
-          <span className="text-gray-600">You pay:</span>
+          <span className="text-muted-foreground">You pay:</span>
           <span className="font-semibold">
             {fromAmount} {fromAsset?._symbol || ""}
           </span>
         </div>
         <div className="flex justify-between">
-          <span className="text-gray-600">You receive:</span>
+          <span className="text-muted-foreground">You receive:</span>
           <span className="font-semibold">
             {toAmount} {toAsset?._symbol || ""}
           </span>
         </div>
         <div className="flex justify-between">
-          <span className="text-gray-600">Minimum received (after slippage):</span>
+          <span className="text-muted-foreground">Minimum received (after slippage):</span>
           <span className="font-semibold">
             {toAmountMin} {toAsset?._symbol || ""}
           </span>
         </div>
         <div className="flex justify-between">
-          <span className="text-gray-600">Exchange rate:</span>
+          <span className="text-muted-foreground">Exchange rate:</span>
           <span>
             1 {fromAsset?._symbol || ""} ≈ {exchangeRate} {toAsset?._symbol || ""}
           </span>
@@ -411,17 +411,17 @@ const SlippageControl = ({ slippage, autoSlippage, onSlippageChange, onAutoToggl
   const isLowSlippage = slippage < 1;
   const slippageClass = isHighSlippage || isLowSlippage
     ? 'border-yellow-400 text-yellow-600'
-    : 'border-gray-300 text-gray-700';
+    : 'border-border text-foreground';
 
   return (
     <div className="flex flex-col gap-1 mt-2">
       <div className="flex items-center justify-between text-sm mb-1">
-        <span className="text-gray-600">Max slippage</span>
+        <span className="text-muted-foreground">Max slippage</span>
         <div className="flex items-center gap-2">
           <button
             className={`px-3 py-1 rounded-full text-xs font-medium border ${
-              autoSlippage ? 'bg-gray-200 text-gray-700' : 'bg-transparent text-gray-500'
-              } border-gray-300`}
+              autoSlippage ? 'bg-muted text-foreground' : 'bg-transparent text-muted-foreground'
+              } border-border`}
             onClick={() => {
               onAutoToggle(true);
               onSlippageChange(DEFAULT_SLIPPAGE);
@@ -431,8 +431,8 @@ const SlippageControl = ({ slippage, autoSlippage, onSlippageChange, onAutoToggl
           </button>
           <button
             className={`px-3 py-1 rounded-full text-xs font-medium border ${
-              !autoSlippage ? 'bg-gray-200 text-gray-700' : 'bg-transparent text-gray-500'
-              } border-gray-300`}
+              !autoSlippage ? 'bg-muted text-foreground' : 'bg-transparent text-muted-foreground'
+              } border-border`}
             onClick={() => onAutoToggle(false)}
           >
             Manual
@@ -864,7 +864,7 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
           onClick={handleSwapAssets}
           variant="outline"
           size="icon"
-          className="rounded-full bg-gray-100"
+          className="rounded-full bg-muted hover:bg-muted/80 border-border"
         >
           <ArrowDownUp className="h-4 w-4" />
         </Button>
@@ -889,6 +889,7 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
         loading={poolLoading}
       />
 
+
       {(() => {
         // Activity name is based on pair type, so check either token
         const activityName = getSwapActivityName(fromAsset) || getSwapActivityName(toAsset);
@@ -901,42 +902,40 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
         const inputAmount = isFromUsdst ? fromAmount : toAmount;
         
         return (
-          <div className="bg-gray-50 p-4 rounded-lg">
             <CompactRewardsDisplay
               userRewards={userRewards}
               activityName={activityName}
               inputAmount={inputAmount}
               actionLabel="Swap"
             />
-          </div>
         );
       })()}
 
-      <div className="flex flex-col gap-2 bg-gray-50 p-4 rounded-lg">
+      <div className="flex flex-col gap-2 bg-muted/50 p-4 rounded-lg border border-border">
         <div className="flex justify-between text-sm">
-          <span className="text-gray-600 decoration-2">Exchange Rate</span>
+          <span className="text-muted-foreground decoration-2">Exchange Rate</span>
           <span className="font-medium inline-flex items-center gap-1">
             1 {fromAsset?._symbol || ""} ≈ <AnimatedNumber value={exchangeRate} isLoading={poolLoading} /> {toAsset?._symbol || ""}
           </span>
         </div>
         <div className="flex justify-between text-sm">
-          <span className="text-gray-400">Exchange Rate (Spot)</span>
-          <span className="font-medium text-gray-400 inline-flex items-center gap-1">
+          <span className="text-muted-foreground/70">Exchange Rate (Spot)</span>
+          <span className="font-medium text-muted-foreground/70 inline-flex items-center gap-1">
             1 {fromAsset?._symbol || ""} ≈ <AnimatedNumber value={oracleExchangeRate} isLoading={poolLoading} /> {toAsset?._symbol || ""}
           </span>
         </div>
         <div className="my-1"></div>
         <div className="flex justify-between text-sm">
-          <span className="text-gray-600">Transaction Fee</span>
+          <span className="text-muted-foreground">Transaction Fee</span>
           <span className="font-medium">{SWAP_FEE} USDST ({parseFloat(SWAP_FEE) * 100} voucher)</span>
         </div>
         
         <div className="flex justify-between text-sm items-center">
           <div className="flex items-center gap-1">
-            <span className="text-gray-600">Price Impact</span>
+            <span className="text-muted-foreground">Price Impact</span>
             <Tooltip>
               <TooltipTrigger asChild>
-                <HelpCircle className="h-3.5 w-3.5 text-gray-400 hover:text-gray-600 cursor-help" />
+                <HelpCircle className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground cursor-help" />
               </TooltipTrigger>
               <TooltipContent className="max-w-xs">
                 <p>Difference between the current pool price and your average trade price. Larger trades cause higher impact.</p>
@@ -944,8 +943,8 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
             </Tooltip>
           </div>
           <span className={`font-medium ${
-            priceImpact === null ? 'text-gray-400' :
-            priceImpact < 1 ? 'text-gray-700' :
+            priceImpact === null ? 'text-muted-foreground' :
+            priceImpact < 1 ? 'text-foreground' :
             priceImpact < 5 ? 'text-yellow-600' :
             'text-red-600'
           }`}>

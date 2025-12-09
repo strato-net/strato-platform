@@ -79,7 +79,7 @@ const AssetCard = ({ id, name, symbol, price, deposit, collateralBalance, image,
             <AssetAvatar />
             <div>
               <h3 className="font-medium">{name}</h3>
-              <p className="text-sm text-gray-500">{symbol}</p>
+              <p className="text-sm text-muted-foreground">{symbol}</p>
             </div>
           </div>
         </div>
@@ -87,7 +87,7 @@ const AssetCard = ({ id, name, symbol, price, deposit, collateralBalance, image,
         <div className="space-y-2 mb-4">
           {assetDetails.map(({ label, value }) => (
             <div key={label} className="flex justify-between">
-              <span className="text-xs sm:text-sm text-gray-500">{label}</span>
+              <span className="text-xs sm:text-sm text-muted-foreground">{label}</span>
               <span className="font-medium text-xs sm:text-sm">{value}</span>
             </div>
           ))}

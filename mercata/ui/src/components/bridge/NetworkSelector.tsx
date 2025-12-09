@@ -43,7 +43,7 @@ const NetworkSelector: React.FC<NetworkSelectorProps> = ({
   );
 
   const StratoInput = ({ id }: { id: string }) => (
-    <Input id={id} value="STRATO" disabled className="bg-gray-50" />
+    <Input id={id} value="STRATO" disabled className="bg-muted" />
   );
 
   return (

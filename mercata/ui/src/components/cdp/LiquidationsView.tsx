@@ -387,7 +387,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           {liquidatableVaults.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-muted-foreground">
               No liquidatable positions found
             </div>
           ) : (
@@ -401,7 +401,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
                 <div key={vaultKey} className="border rounded-lg">
                   {/* Collapsed View */}
                   <div 
-                    className="p-4 cursor-pointer hover:bg-gray-50 flex items-center justify-between"
+                    className="p-4 cursor-pointer hover:bg-muted/50 flex items-center justify-between"
                     onClick={() => toggleExpanded(vaultKey)}
                   >
                     <div className="flex items-center space-x-2">
@@ -409,27 +409,27 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
                     </div>
                     <div className="flex items-center space-x-8">
                       <div>
-                        <span className="text-gray-500">Borrower</span>
+                        <span className="text-muted-foreground">Borrower</span>
                         <div className="font-medium font-mono text-sm">
                           {vault.borrower ? `${vault.borrower.slice(0, 6)}...${vault.borrower.slice(-4)}` : "Unknown"}
                         </div>
                       </div>
                       <div>
-                        <span className="text-gray-500">Borrowed</span>
+                        <span className="text-muted-foreground">Borrowed</span>
                         <div className="font-medium">{formatNumber(parseFloat(formatWeiToDecimalHP(vault.debtAmount, 18)))} USDST</div>
                       </div>
                       <div>
-                        <span className="text-gray-500">Health Factor</span>
-                        <div className="font-medium text-red-600">{formatNumber(vault.healthFactor)}</div>
+                        <span className="text-muted-foreground">Health Factor</span>
+                        <div className="font-medium text-red-600 dark:text-red-400">{formatNumber(vault.healthFactor)}</div>
                       </div>
                     </div>
                   </div>
 
                   {/* Expanded View */}
                   {isExpanded && (
-                    <div className="border-t bg-gray-50">
+                    <div className="border-t bg-muted/30">
                       {/* Table Header */}
-                      <div className="grid grid-cols-4 gap-4 p-4 text-sm text-gray-500 font-medium border-b">
+                      <div className="grid grid-cols-4 gap-4 p-4 text-sm text-muted-foreground font-medium border-b border-border">
                         <div>Collateral Asset</div>
                         <div>Amount</div>
                         <div>Value (USD)</div>
@@ -455,7 +455,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
                       <div className="p-4">
                         {/* Transaction Fee Display */}
                         <div className="text-center mb-3">
-                          <p className="text-xs text-gray-500">
+                          <p className="text-xs text-muted-foreground">
                             Transaction Fee: 0.02 USDST
                           </p>
                         </div>

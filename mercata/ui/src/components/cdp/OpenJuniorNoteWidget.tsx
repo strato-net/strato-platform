@@ -288,10 +288,10 @@ const OpenJuniorNoteWidget: React.FC<OpenJuniorNoteWidgetProps> = ({ onSuccess, 
                   key={asset.asset}
                   className={`p-3 border rounded-lg cursor-pointer transition-all hover:shadow-sm ${
                     isSelected 
-                      ? 'border-blue-500 bg-blue-50 shadow-sm' 
+                      ? 'border-blue-500 bg-blue-500/10 shadow-sm' 
                       : hasRealBadDebt
-                        ? 'border-gray-200 hover:border-gray-300 bg-white'
-                        : 'border-gray-100 bg-gray-50 opacity-60'
+                        ? 'border-border hover:border-border/80 bg-card'
+                        : 'border-border/50 bg-muted/50 opacity-60'
                   } ${!hasRealBadDebt ? 'cursor-not-allowed' : ''}`}
                   onClick={() => {
                     if (hasRealBadDebt) {
@@ -310,17 +310,17 @@ const OpenJuniorNoteWidget: React.FC<OpenJuniorNoteWidgetProps> = ({ onSuccess, 
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold ${
                         hasRealBadDebt 
                           ? isSelected 
-                            ? 'bg-blue-100 text-blue-700' 
-                            : 'bg-red-100 text-red-700'
-                          : 'bg-gray-100 text-gray-500'
+                            ? 'bg-blue-500/20 text-blue-500' 
+                            : 'bg-red-500/20 text-red-500'
+                          : 'bg-muted text-muted-foreground'
                       }`}>
                         {asset.symbol.slice(0, 3).toUpperCase()}
                       </div>
                       <div>
-                        <div className={`font-medium ${hasRealBadDebt ? 'text-gray-900' : 'text-gray-500'}`}>
+                        <div className={`font-medium ${hasRealBadDebt ? 'text-foreground' : 'text-muted-foreground'}`}>
                           {asset.symbol}
                         </div>
-                        <div className="text-xs text-gray-500 font-mono">
+                        <div className="text-xs text-muted-foreground font-mono">
                           {asset.asset.slice(0, 8)}...{asset.asset.slice(-6)}
                         </div>
                       </div>
@@ -329,13 +329,13 @@ const OpenJuniorNoteWidget: React.FC<OpenJuniorNoteWidgetProps> = ({ onSuccess, 
                       <div className={`font-bold ${
                         hasRealBadDebt 
                           ? isSelected 
-                            ? 'text-blue-700' 
-                            : 'text-red-600'
-                          : 'text-gray-400'
+                            ? 'text-blue-500' 
+                            : 'text-red-500'
+                          : 'text-muted-foreground'
                       }`}>
                         {formatNumber(badDebtDecimal)} USDST
                       </div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-muted-foreground">
                         {hasRealBadDebt ? 'Bad Debt' : 'No bad debt'}
                       </div>
                     </div>
@@ -353,7 +353,7 @@ const OpenJuniorNoteWidget: React.FC<OpenJuniorNoteWidgetProps> = ({ onSuccess, 
             })}
           </div>
           {supportedAssets.length === 0 && (
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-muted-foreground">
               <div className="text-sm">No supported assets found</div>
             </div>
           )}
@@ -387,7 +387,7 @@ const OpenJuniorNoteWidget: React.FC<OpenJuniorNoteWidgetProps> = ({ onSuccess, 
             </Button>
           </div>
           <div className="space-y-1">
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-muted-foreground">
               Balance: {usdstBalance && parseFloat(usdstBalance) > 0 
                 ? formatBalanceUtil(usdstBalance, undefined, 18, 1, 4) 
                 : "0"
@@ -403,12 +403,12 @@ const OpenJuniorNoteWidget: React.FC<OpenJuniorNoteWidgetProps> = ({ onSuccess, 
 
         {/* Expected Cap Preview */}
         {expectedCap > 0 && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <div className="text-sm font-medium text-blue-900 mb-1">Expected Note Cap</div>
-            <div className="text-lg font-bold text-blue-800">
+          <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+            <div className="text-sm font-medium text-blue-500 mb-1">Expected Note Cap</div>
+            <div className="text-lg font-bold text-blue-500">
               ~{formatNumber(expectedCap)} USDST
             </div>
-            <div className="text-xs text-blue-600">
+            <div className="text-xs text-blue-500/80">
               Includes 10% premium for bad debt recovery
             </div>
           </div>
@@ -417,7 +417,7 @@ const OpenJuniorNoteWidget: React.FC<OpenJuniorNoteWidgetProps> = ({ onSuccess, 
         {/* Transaction Fee */}
         {parseFloat(burnAmount || "0") > 0 && (
           <div className="text-center">
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-muted-foreground">
               Transaction Fee: 0.01 USDST
             </p>
           </div>

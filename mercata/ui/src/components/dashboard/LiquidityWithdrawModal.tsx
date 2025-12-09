@@ -188,7 +188,7 @@ const LiquidityWithdrawModal = ({
           <div className="grid grid-cols-1 gap-4">
             <div className="rounded-lg border p-3">
               <div className="flex justify-between mb-2">
-                <span className="text-sm text-gray-500">Percent</span>
+                <span className="text-sm text-muted-foreground">Percent</span>
               </div>
               <div className="flex items-center">
                 <Input
@@ -200,7 +200,7 @@ const LiquidityWithdrawModal = ({
                     handleAmountInputChange(value, setWithdrawPercent, setWithdrawPercentError, "100", 0);
                   }}
                 />
-                <div className="flex items-center space-x-2 bg-gray-100 rounded-md px-2 py-1">
+                <div className="flex items-center space-x-2 bg-muted rounded-md px-2 py-1">
                   {selectedPool && (
                     <>
                       <div className="flex items-center">
@@ -262,9 +262,9 @@ const LiquidityWithdrawModal = ({
             </div>
           </div>
 
-          <div className="rounded-lg bg-gray-50 p-3">
+          <div className="rounded-lg bg-muted/50 p-3">
             <div className="flex justify-between items-center text-sm">
-              <span className="text-gray-500">{tokenALabel} position</span>
+              <span className="text-muted-foreground">{tokenALabel} position</span>
               <span className="font-medium">
                 {selectedPool?.lpToken?._totalSupply === "0" ? "0" :
                   (Number(BigInt(totalLiquidityBalance || "0") * BigInt(selectedPool?.tokenA.poolBalance || "0") / BigInt(selectedPool?.lpToken?._totalSupply || "1")) / 1e18).toFixed(10)}
@@ -272,14 +272,14 @@ const LiquidityWithdrawModal = ({
             </div>
             {selectedPool && withdrawPercent && selectedPool.lpToken._totalSupply !== "0" && (
               <div className="flex justify-between items-center text-sm mt-1">
-                <span className="text-gray-500">New {tokenALabel} position</span>
+                <span className="text-muted-foreground">New {tokenALabel} position</span>
                 <span className="font-medium text-blue-600">
                   {(Number(BigInt(availableLPBalance || "0") * BigInt(selectedPool.tokenA.poolBalance || "0") * (BigInt(10000) - BigInt(Math.floor(Number(withdrawPercent) * 100 || 0))) / (BigInt(selectedPool.lpToken._totalSupply || "1") * BigInt(10000))) / 1e18).toFixed(10)}
                 </span>
               </div>
             )}
             <div className="flex justify-between items-center text-sm mt-1">
-              <span className="text-gray-500">{tokenBLabel} position</span>
+              <span className="text-muted-foreground">{tokenBLabel} position</span>
               <span className="font-medium">
                 {selectedPool?.lpToken?._totalSupply === "0" ? "0" :
                   (Number(BigInt(totalLiquidityBalance || "0") * BigInt(selectedPool?.tokenB.poolBalance || "0") / BigInt(selectedPool?.lpToken?._totalSupply || "1")) / 1e18).toFixed(10)}
@@ -287,13 +287,13 @@ const LiquidityWithdrawModal = ({
             </div>
             {selectedPool && withdrawPercent && selectedPool.lpToken._totalSupply !== "0" && (
               <div className="flex justify-between items-center text-sm mt-1">
-                <span className="text-gray-500">New {tokenBLabel} position</span>
+                <span className="text-muted-foreground">New {tokenBLabel} position</span>
                 <span className="font-medium text-blue-600">
                   {(Number(BigInt(availableLPBalance || "0") * BigInt(selectedPool.tokenB.poolBalance || "0") * (BigInt(10000) - BigInt(Math.floor(Number(withdrawPercent) * 100))) / (BigInt(selectedPool.lpToken._totalSupply || "1") * BigInt(10000))) / 1e18).toFixed(10)}
                 </span>
               </div>
             )}
-            <div className="flex justify-between items-center text-sm mt-5 text-gray-500">
+            <div className="flex justify-between items-center text-sm mt-5 text-muted-foreground">
               <span>Transaction fee</span>
               <span>{WITHDRAW_FEE} USDST ({parseFloat(WITHDRAW_FEE) * 100} voucher)</span>
             </div>
@@ -350,7 +350,7 @@ const LiquidityWithdrawModal = ({
               </label>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                  <HelpCircle className="h-4 w-4 text-muted-foreground hover:text-foreground cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent>
                   <p className="max-w-xs text-sm">
