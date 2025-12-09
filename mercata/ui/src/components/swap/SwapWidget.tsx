@@ -49,7 +49,11 @@ const calculateExchangeRates = (pool: Pool | null, fromAsset: SwapToken | null) 
   if (!pool || !fromAsset?.address) return { 
     exchangeRateRaw: undefined, 
     exchangeRate: undefined, 
-    oracleExchangeRate: undefined 
+    oracleExchangeRate: undefined,
+    invertedExchangeRate: undefined,
+    invertedOracleExchangeRate: undefined,
+    isFractionalRate: false,
+    isFractionalOracleRate: false
   };
   
   const isAToB = pool.tokenA?.address === fromAsset.address;
@@ -58,11 +62,24 @@ const calculateExchangeRates = (pool: Pool | null, fromAsset: SwapToken | null) 
   
   // Strip commas from raw rate in case backend sends pre-formatted data
   const cleanRate = poolRate && poolRate !== "0" ? String(poolRate).replace(/,/g, '') : undefined;
+  const cleanOracleRate = oracleRate && oracleRate !== "0" ? String(oracleRate).replace(/,/g, '') : undefined;
+  
+  // Get inverted rates for display when rate is fractional
+  const invertedPoolRate = isAToB ? pool.bToARatio : pool.aToBRatio;
+  const invertedOracleRate = isAToB ? pool.oracleBToARatio : pool.oracleAToBRatio;
+  
+  // Check if rates are fractional (less than 1) - these are harder to understand
+  const isFractionalRate = cleanRate ? parseFloat(cleanRate) < 1 : false;
+  const isFractionalOracleRate = cleanOracleRate ? parseFloat(cleanOracleRate) < 1 : false;
   
   return {
     exchangeRateRaw: cleanRate,
     exchangeRate: poolRate && poolRate !== "0" ? formatAmount(poolRate) : undefined,
-    oracleExchangeRate: oracleRate && oracleRate !== "0" ? formatAmount(oracleRate) : undefined
+    oracleExchangeRate: oracleRate && oracleRate !== "0" ? formatAmount(oracleRate) : undefined,
+    invertedExchangeRate: invertedPoolRate && invertedPoolRate !== "0" ? formatAmount(invertedPoolRate) : undefined,
+    invertedOracleExchangeRate: invertedOracleRate && invertedOracleRate !== "0" ? formatAmount(invertedOracleRate) : undefined,
+    isFractionalRate,
+    isFractionalOracleRate
   };
 };
 
@@ -118,13 +135,7 @@ const AnimatedNumber = ({ value, isLoading }: { value: string | undefined; isLoa
     return <LoadingSpinner />;
   }
 
-  return (
-    <span 
-      className={`transition-opacity duration-200 ${isChanging ? 'opacity-70' : 'opacity-100'}`}
-    >
-      {displayValue}
-    </span>
-  );
+  return <>{displayValue}</>;
 };
 
 // ============================================================================
@@ -325,7 +336,9 @@ interface SwapDialogProps {
   toAmount: string;
   fromAsset?: SwapToken;
   toAsset?: SwapToken;
-  exchangeRate: string;
+  exchangeRate?: string;
+  invertedExchangeRate?: string;
+  isFractionalRate: boolean;
   isHighPriceImpact: boolean;
   toAmountMin: string;
   onConfirm: () => void;
@@ -340,6 +353,8 @@ const SwapDialog = ({
   fromAsset,
   toAsset,
   exchangeRate,
+  invertedExchangeRate,
+  isFractionalRate,
   isHighPriceImpact,
   toAmountMin,
   onConfirm,
@@ -374,8 +389,11 @@ const SwapDialog = ({
         </div>
         <div className="flex justify-between">
           <span className="text-muted-foreground">Exchange rate:</span>
-          <span>
-            1 {fromAsset?._symbol || ""} ≈ {exchangeRate} {toAsset?._symbol || ""}
+          <span className="flex flex-col items-end gap-0.5">
+            <span className="font-semibold">1 {fromAsset?._symbol || ""} ≈ {exchangeRate} {toAsset?._symbol || ""}</span>
+            {invertedExchangeRate && (
+              <span className="text-muted-foreground/70">1 {toAsset?._symbol || ""} ≈ {invertedExchangeRate} {fromAsset?._symbol || ""}</span>
+            )}
           </span>
         </div>
         {isHighPriceImpact && (
@@ -516,7 +534,7 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
   // ========================================================================
   
   // Exchange rates (both pool and oracle)
-  const { exchangeRateRaw, exchangeRate, oracleExchangeRate } = calculateExchangeRates(pool, fromAsset);
+  const { exchangeRateRaw, exchangeRate, oracleExchangeRate, invertedExchangeRate, invertedOracleExchangeRate, isFractionalRate, isFractionalOracleRate } = calculateExchangeRates(pool, fromAsset);
 
   // Price impact calculation - use raw rate for calculations
   const priceImpact = useMemo(() => {
@@ -889,40 +907,30 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
         loading={poolLoading}
       />
 
-
-      {(() => {
-        // Activity name is based on pair type, so check either token
-        const activityName = getSwapActivityName(fromAsset) || getSwapActivityName(toAsset);
-        if (!activityName) return null;
-        
-        // Swap rewards are tracked in USDST terms, so use the USDST side of the swap
-        // - If swapping FROM USDST, use fromAmount
-        // - If swapping TO USDST, use toAmount
-        const isFromUsdst = fromAsset?.address?.toLowerCase() === usdstAddress.toLowerCase();
-        const inputAmount = isFromUsdst ? fromAmount : toAmount;
-        
-        return (
-            <CompactRewardsDisplay
-              userRewards={userRewards}
-              activityName={activityName}
-              inputAmount={inputAmount}
-              actionLabel="Swap"
-            />
-        );
-      })()}
-
       <div className="flex flex-col gap-2 bg-muted/50 p-4 rounded-lg border border-border">
-        <div className="flex justify-between text-sm">
-          <span className="text-muted-foreground decoration-2">Exchange Rate</span>
-          <span className="font-medium inline-flex items-center gap-1">
-            1 {fromAsset?._symbol || ""} ≈ <AnimatedNumber value={exchangeRate} isLoading={poolLoading} /> {toAsset?._symbol || ""}
-          </span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-muted-foreground/70">Exchange Rate (Spot)</span>
-          <span className="font-medium text-muted-foreground/70 inline-flex items-center gap-1">
-            1 {fromAsset?._symbol || ""} ≈ <AnimatedNumber value={oracleExchangeRate} isLoading={poolLoading} /> {toAsset?._symbol || ""}
-          </span>
+        <div className="flex flex-col gap-1 text-sm">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Exchange Rate</span>
+            {!exchangeRate ? (
+              <LoadingSpinner />
+            ) : (
+              <span className="font-medium text-foreground">
+                1 {fromAsset?._symbol || ""} ≈ {exchangeRate} ({oracleExchangeRate}*) {toAsset?._symbol || ""}
+              </span>
+            )}
+          </div>
+          {exchangeRate && (
+            <>
+              <div className="flex justify-end">
+                <span className="text-muted-foreground/70">
+                  1 {toAsset?._symbol || ""} ≈ {invertedExchangeRate} ({invertedOracleExchangeRate}*) {fromAsset?._symbol || ""}
+                </span>
+              </div>
+              <div className="flex justify-end">
+                <span className="text-xs text-muted-foreground/70">* spot price</span>
+              </div>
+            </>
+          )}
         </div>
         <div className="my-1"></div>
         <div className="flex justify-between text-sm">
@@ -993,6 +1001,8 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
         fromAsset={fromAsset}
         toAsset={toAsset}
         exchangeRate={exchangeRate}
+        invertedExchangeRate={invertedExchangeRate}
+        isFractionalRate={isFractionalRate}
         isHighPriceImpact={(priceImpact ?? 0) >= 5}
         toAmountMin={formatAmount(formatUnits(toAmountMinWei))}
         onConfirm={handleSwap}
