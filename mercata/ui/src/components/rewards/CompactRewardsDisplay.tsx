@@ -300,7 +300,7 @@ export const CompactRewardsDisplay = ({
                   <TrendingDown className="h-3 w-3 text-white" />
                 )}
                 <span className="text-xs font-semibold text-white">
-                  {isIncrease ? "+" : ""}{formattedPercentage}%
+                  {isIncrease ? "+" : "-"}{formattedPercentage}%
                 </span>
               </div>
             )}
