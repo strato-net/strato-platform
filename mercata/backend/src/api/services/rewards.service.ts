@@ -3,15 +3,34 @@ import { constants } from "../../config/constants";
 import { cirrus } from "../../utils/mercataApiHelper";
 import {
   calculatePersonalEmissionRate,
+  parseActivityType,
   fetchRewardsContractData,
   fetchActivityIds,
   fetchActivities,
   fetchActivityStates,
   fetchUserInfo,
-  fetchUnclaimedRewards
+  fetchUnclaimedRewards,
+  fetchAllUsersLeaderboard
 } from "../helpers/rewards/rewards.helpers";
 
 const { Token } = constants;
+
+/**
+ * Get rewards contract address or throw error
+ */
+const getRewardsAddress = (): string => {
+  if (!config.rewards) {
+    throw new Error("Rewards contract address not configured");
+  }
+  return config.rewards;
+};
+
+/**
+ * Compare two BigInt values for sorting (returns -1, 0, or 1)
+ */
+const compareBigInt = (a: bigint, b: bigint): number => {
+  return a < b ? 1 : a > b ? -1 : 0;
+};
 
 /**
  * Activity with user-specific data
@@ -66,11 +85,7 @@ export const fetchRewardsOverview = async (
   accessToken: string,
   forceRefresh: boolean = false
 ): Promise<RewardsOverview> => {
-  if (!config.rewards) {
-    throw new Error("Rewards contract address not configured");
-  }
-
-  const rewardsAddress = config.rewards;
+  const rewardsAddress = getRewardsAddress();
 
   try {
     // All these functions now use the same cached contract state, so they're fast
@@ -139,11 +154,7 @@ export const fetchUserActivities = async (
   userAddress: string,
   forceRefresh: boolean = false
 ): Promise<UserActivitiesResponse> => {
-  if (!config.rewards) {
-    throw new Error("Rewards contract address not configured");
-  }
-
-  const rewardsAddress = config.rewards;
+  const rewardsAddress = getRewardsAddress();
 
   try {
     // Fetch all activities and unclaimed rewards in parallel
@@ -173,21 +184,10 @@ export const fetchUserActivities = async (
       const state = activityStatesMap.get(activityId);
       const userInfo = userInfoMap.get(activityId) || { stake: "0", userIndex: "0" };
 
-      // Convert activityType: "OneTime" or "1" -> 1, otherwise -> 0 (Position)
-      let activityType = 0;
-      if (activity.activityType) {
-        const activityTypeStr = String(activity.activityType);
-        if (activityTypeStr === "OneTime" || activityTypeStr === "1") {
-          activityType = 1;
-        } else {
-          activityType = 0;
-        }
-      }
-
       const baseActivity = {
         activityId,
         name: activity.name || "",
-        activityType,
+        activityType: parseActivityType(activity.activityType),
         emissionRate: activity.emissionRate || "0",
         accRewardPerStake: state?.accRewardPerStake || "0",
         lastUpdateTime: state?.lastUpdateTime || "0",
@@ -229,11 +229,7 @@ export const fetchAllActivities = async (
   accessToken: string,
   forceRefresh: boolean = false
 ): Promise<SystemActivity[]> => {
-  if (!config.rewards) {
-    throw new Error("Rewards contract address not configured");
-  }
-
-  const rewardsAddress = config.rewards;
+  const rewardsAddress = getRewardsAddress();
 
   try {
     // Fetch all activities and their states
@@ -253,21 +249,10 @@ export const fetchAllActivities = async (
       const activityId = activity.activityId;
       const state = activityStatesMap.get(activityId);
 
-      // Convert activityType: "OneTime" or "1" -> 1, otherwise -> 0 (Position)
-      let activityType = 0;
-      if (activity.activityType) {
-        const activityTypeStr = String(activity.activityType);
-        if (activityTypeStr === "OneTime" || activityTypeStr === "1") {
-          activityType = 1;
-        } else {
-          activityType = 0;
-        }
-      }
-
       return {
         activityId,
         name: activity.name || "",
-        activityType,
+        activityType: parseActivityType(activity.activityType),
         emissionRate: activity.emissionRate || "0",
         accRewardPerStake: state?.accRewardPerStake || "0",
         lastUpdateTime: state?.lastUpdateTime || "0",
@@ -277,6 +262,57 @@ export const fetchAllActivities = async (
     });
   } catch (error) {
     console.error("Failed to fetch all activities:", error);
+    throw error;
+  }
+};
+
+/**
+ * Leaderboard entry
+ */
+export interface LeaderboardEntry {
+  rank: number;
+  address: string;
+  totalRewardsEarned: string;
+}
+
+/**
+ * Leaderboard response with pagination info
+ */
+export interface LeaderboardResponse {
+  entries: LeaderboardEntry[];
+  total: number;
+  offset: number;
+  limit: number;
+}
+
+export const fetchLeaderboard = async (
+  accessToken: string,
+  forceRefresh: boolean = false,
+  limit: number = 10,
+  offset: number = 0
+): Promise<LeaderboardResponse> => {
+  const rewardsAddress = getRewardsAddress();
+
+  try {
+    const users = await fetchAllUsersLeaderboard(accessToken, rewardsAddress, forceRefresh);
+
+    // Sort users by total rewards earned (unclaimed + pending)
+    const sorted = users.sort((a, b) => {
+      return compareBigInt(BigInt(a.totalRewardsEarned), BigInt(b.totalRewardsEarned));
+    });
+
+    const total = sorted.length;
+    const paginated = sorted.slice(offset, offset + limit);
+
+    // Assign ranks and map entries
+    const entries = paginated.map((entry, index) => ({
+      rank: offset + index + 1,
+      ...entry,
+    }));
+
+    return { entries, total, offset, limit };
+  } catch (error) {
+    console.error("Failed to fetch leaderboard:", error);
     throw error;
   }
 };

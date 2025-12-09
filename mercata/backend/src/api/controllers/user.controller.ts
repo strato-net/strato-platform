@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
-import { getAdmin, isUserAdmin, addAdmin, removeAdmin, castVoteOnIssue, castVoteOnIssueById, getOpenIssues,
+import { getAdmin, isUserAdmin, addAdmin, removeAdmin, castVoteOnIssue, castVoteOnIssueById, dismissIssue, getOpenIssues,
          contractSearch, getContractDetails,
  } from "../services/user.service";
 import { validateUserAddress, validateAddressField } from "../validators/common.validators";
@@ -122,6 +122,28 @@ class UserController {
       const result = await castVoteOnIssueById(accessToken, actorAddress as string, issueId);
       res.status(RestStatus.OK).json({ 
         message: "Vote cast successfully", 
+        issueId,
+        status: result.status,
+        hash: result.hash,
+      });
+      next();
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  static async dismissIssue(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: actorAddress } = req;
+      const { issueId } = req.body;
+      
+      const result = await dismissIssue(accessToken, actorAddress as string, issueId);
+      res.status(RestStatus.OK).json({ 
+        message: "Issue dismissed successfully", 
         issueId,
         status: result.status,
         hash: result.hash,

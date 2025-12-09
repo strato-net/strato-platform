@@ -19,6 +19,19 @@ import { useSwapContext } from '@/context/SwapContext';
 import { usdstAddress, DEPOSIT_FEE, rewardsEnabled } from "@/lib/constants";
 import { Pool } from '@/interface';
 import { safeParseUnits } from '@/utils/numberUtils';
+import { CompactRewardsDisplay } from '@/components/rewards/CompactRewardsDisplay';
+import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
+
+// Helper function to map pool names to activity names
+const getPoolActivityName = (poolName: string | undefined): string | null => {
+  if (!poolName) return null;
+  const name = poolName.toLowerCase();
+  if (name.includes('ethst') && name.includes('usdst')) return "ETHST-USDST Swap LP";
+  if (name.includes('wbtcst') && name.includes('usdst')) return "WBTCST-USDST Swap LP";
+  if (name.includes('goldst') && name.includes('usdst')) return "GOLDST-USDST Swap LP";
+  if (name.includes('silvst') && name.includes('usdst')) return "SILVST-USDST Swap LP";
+  return null;
+};
 
 const formatNumber = (value: string | number): string => {
   try {
@@ -66,6 +79,7 @@ const LiquidityDepositModal = ({
   const { addLiquidityDualToken, addLiquiditySingleToken, getPoolByAddress, fetchTokenBalances, fetchPools } = useSwapContext();
   const { toast } = useToast();
   const { userAddress } = useUser();
+  const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
   const form = useForm<DepositFormValues>({
     defaultValues: {
@@ -631,8 +645,47 @@ const LiquidityDepositModal = ({
             </div>
           </div>
 
+
+          {/* Estimated Rewards Display - Always visible */}
+          {(() => {
+            const activityName = getPoolActivityName(selectedPool?.poolName);
+            if (!activityName || !selectedPool) return null;
+            
+            // For A&B mode: pass pool data and both token amounts for accurate LP calculation
+            // For single token mode: pass input amount (less accurate estimate)
+            if (depositMode === 'A&B') {
+              return (
+                <CompactRewardsDisplay
+                  userRewards={userRewards}
+                  activityName={activityName}
+                  inputAmount={token1Amount || ""}
+                  poolData={selectedPool}
+                  tokenAAmount={token1Amount || ""}
+                  tokenBAmount={token2Amount || ""}
+                  actionLabel="Deposit"
+                />
+              );
+            } else {
+              // Single token mode - pass the active token amount
+              // Note: This is an estimate since single-token deposits involve a swap
+              const singleTokenAmount = depositMode === 'A' ? token1Amount : token2Amount;
+              return (
+                <CompactRewardsDisplay
+                  userRewards={userRewards}
+                  activityName={activityName}
+                  inputAmount={singleTokenAmount || ""}
+                  poolData={selectedPool}
+                  tokenAAmount={depositMode === 'A' ? singleTokenAmount : ""}
+                  tokenBAmount={depositMode === 'B' ? singleTokenAmount : ""}
+                  actionLabel="Deposit"
+                />
+              );
+            }
+          })()}
+
           <div className="rounded-lg bg-muted/50 p-3">
             <div className="flex justify-between items-center text-sm text-muted-foreground">
+
               <span>APY</span>
               <span className="font-medium">{selectedPool?.apy ? `${selectedPool.apy}%` : "N/A"}</span>
             </div>
