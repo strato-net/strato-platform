@@ -21,7 +21,7 @@ import { parseJsonBigInt } from '@/utils/numberUtils';
 
 
 const VoteTab = () => {
-  const { userAddress, openIssuesLoading, openIssues, getOpenIssues, castVoteOnIssue, castVoteOnIssueById, addAdmin, removeAdmin } = useUser();
+  const { userAddress, openIssuesLoading, openIssues, getOpenIssues, castVoteOnIssue, castVoteOnIssueById, dismissIssue, addAdmin, removeAdmin } = useUser();
   const [createOpen, setCreateOpen] = useState(false);
   const [voteModalOpen, setVoteModalOpen] = useState(false);
   const [addAdminOpen, setAddAdminOpen] = useState(false);
@@ -393,6 +393,9 @@ const VoteTab = () => {
         onOpenChange={setVoteModalOpen}
         issue={selectedIssue}
         onCastVote={handleCastVoteOnIssueById}
+        onDismissIssue={dismissIssue}
+        votes={votes}
+        userAddress={userAddress}
       />
       <AddAdminModal
         open={addAdminOpen}
