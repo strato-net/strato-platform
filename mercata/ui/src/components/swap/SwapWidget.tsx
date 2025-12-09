@@ -116,13 +116,7 @@ const AnimatedNumber = ({ value, isLoading }: { value: string | undefined; isLoa
     return <LoadingSpinner />;
   }
 
-  return (
-    <span 
-      className={`transition-opacity duration-200 ${isChanging ? 'opacity-70' : 'opacity-100'}`}
-    >
-      {displayValue}
-    </span>
-  );
+  return <>{displayValue}</>;
 };
 
 // ============================================================================
@@ -389,10 +383,10 @@ const SwapDialog = ({
         </div>
         <div className="flex justify-between">
           <span className="text-gray-600">Exchange rate:</span>
-          <span className="flex flex-col items-end">
-            <span>1 {fromAsset?._symbol || ""} ≈ {exchangeRate} {toAsset?._symbol || ""}</span>
-            {isFractionalRate && invertedExchangeRate && (
-              <span className="text-xs text-gray-400">(1 {toAsset?._symbol || ""} ≈ {invertedExchangeRate} {fromAsset?._symbol || ""})</span>
+          <span className="flex flex-col items-end gap-0.5">
+            <span className="font-semibold">1 {fromAsset?._symbol || ""} ≈ {exchangeRate} {toAsset?._symbol || ""}</span>
+            {invertedExchangeRate && (
+              <span className="text-gray-400">1 {toAsset?._symbol || ""} ≈ {invertedExchangeRate} {fromAsset?._symbol || ""}</span>
             )}
           </span>
         </div>
@@ -912,31 +906,29 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
       />
 
       <div className="flex flex-col gap-2 bg-gray-50 p-4 rounded-lg">
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600 decoration-2">Exchange Rate</span>
-          <span className="font-medium inline-flex flex-col items-end gap-0.5">
-            <span className="inline-flex items-center gap-1">
-              1 {fromAsset?._symbol || ""} ≈ <AnimatedNumber value={exchangeRate} isLoading={poolLoading} /> {toAsset?._symbol || ""}
-            </span>
-            {isFractionalRate && invertedExchangeRate && (
-              <span className="text-xs text-gray-400 inline-flex items-center gap-1">
-                (1 {toAsset?._symbol || ""} ≈ <AnimatedNumber value={invertedExchangeRate} isLoading={poolLoading} /> {fromAsset?._symbol || ""})
+        <div className="flex flex-col gap-1 text-sm">
+          <div className="flex justify-between">
+            <span className="text-gray-600">Exchange Rate</span>
+            {!exchangeRate ? (
+              <LoadingSpinner />
+            ) : (
+              <span className="font-medium">
+                1 {fromAsset?._symbol || ""} ≈ {exchangeRate} ({oracleExchangeRate}*) {toAsset?._symbol || ""}
               </span>
             )}
-          </span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-400">Exchange Rate (Spot)</span>
-          <span className="font-medium text-gray-400 inline-flex flex-col items-end gap-0.5">
-            <span className="inline-flex items-center gap-1">
-              1 {fromAsset?._symbol || ""} ≈ <AnimatedNumber value={oracleExchangeRate} isLoading={poolLoading} /> {toAsset?._symbol || ""}
-            </span>
-            {isFractionalOracleRate && invertedOracleExchangeRate && (
-              <span className="text-xs inline-flex items-center gap-1">
-                (1 {toAsset?._symbol || ""} ≈ <AnimatedNumber value={invertedOracleExchangeRate} isLoading={poolLoading} /> {fromAsset?._symbol || ""})
-              </span>
-            )}
-          </span>
+          </div>
+          {exchangeRate && (
+            <>
+              <div className="flex justify-end">
+                <span className="text-gray-400">
+                  1 {toAsset?._symbol || ""} ≈ {invertedExchangeRate} ({invertedOracleExchangeRate}*) {fromAsset?._symbol || ""}
+                </span>
+              </div>
+              <div className="flex justify-end">
+                <span className="text-xs text-gray-400">* spot price</span>
+              </div>
+            </>
+          )}
         </div>
         <div className="my-1"></div>
         <div className="flex justify-between text-sm">
