@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { Clock, CheckCircle2, AlertCircle } from "lucide-react";
 import { Table, Select, Space, Card } from "antd";
 import { FrownOutlined, CopyOutlined } from "@ant-design/icons";
@@ -11,14 +11,6 @@ import { formatWeiToDecimalHP } from "@/utils/numberUtils";
 import { ensureHexPrefix } from "@/utils/numberUtils";
 import { usdstAddress } from "@/lib/constants";
 import { useIsMobile } from "@/hooks/use-mobile";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
 
 const DepositTransactionDetails = ({ context }: { context?: string }) => {
   const isMobile = useIsMobile();
@@ -35,53 +27,6 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
     fetchDepositTransactions,
     availableNetworks,
   } = useBridgeContext();
-
-  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
-
-  const paginationInfo = useMemo(() => {
-    const startItem = transactions.length > 0 ? (currentPage - 1) * ITEMS_PER_PAGE + 1 : 0;
-    const endItem = Math.min(currentPage * ITEMS_PER_PAGE, totalCount);
-    return { startItem, endItem };
-  }, [transactions.length, currentPage, totalCount]);
-
-  const paginationItems = useMemo(() => {
-    if (totalPages <= 1) return [];
-    
-    const pages: Array<{ type: 'page' | 'ellipsis'; number?: number }> = [];
-    const maxVisiblePages = isMobile ? 3 : 7;
-    const halfVisible = Math.floor(maxVisiblePages / 2);
-    
-    let startPage = Math.max(1, currentPage - halfVisible);
-    let endPage = Math.min(totalPages, currentPage + halfVisible);
-    
-    if (endPage - startPage + 1 < maxVisiblePages) {
-      if (startPage === 1) {
-        endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-      } else {
-        startPage = Math.max(1, endPage - maxVisiblePages + 1);
-      }
-    }
-    
-    if (startPage > 1) {
-      pages.push({ type: 'page', number: 1 });
-      if (startPage > 2) {
-        pages.push({ type: 'ellipsis' });
-      }
-    }
-    
-    for (let i = startPage; i <= endPage; i++) {
-      pages.push({ type: 'page', number: i });
-    }
-    
-    if (endPage < totalPages) {
-      if (endPage < totalPages - 1) {
-        pages.push({ type: 'ellipsis' });
-      }
-      pages.push({ type: 'page', number: totalPages });
-    }
-    
-    return pages;
-  }, [currentPage, totalPages, isMobile]);
 
   useEffect(() => {
     const loadTransactions = async () => {
@@ -262,6 +207,32 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
         .deposit-history-table .ant-table-tbody > tr:hover > td {
           background: hsl(var(--muted) / 0.5) !important;
         }
+        .deposit-history-table .ant-pagination {
+            color: hsl(var(--foreground)) !important;
+            display: flex !important;
+            justify-content: center !important;
+        }
+        .deposit-history-table .ant-pagination-item {
+            background: transparent !important;
+        }
+        .deposit-history-table .ant-pagination-item:hover {
+            background: transparent !important;
+        }
+        .deposit-history-table .ant-pagination-item a {
+            color: hsl(var(--foreground)) !important;
+        }
+        .deposit-history-table .ant-pagination-item-active {
+            background: transparent !important;
+            border-color: hsl(var(--primary)) !important;
+        }
+        .deposit-history-table .ant-pagination-item-active a {
+            color: hsl(var(--primary)) !important;
+        }
+        .deposit-history-table .ant-pagination-prev .ant-pagination-item-link,
+        .deposit-history-table .ant-pagination-next .ant-pagination-item-link {
+            color: hsl(var(--foreground)) !important;
+            background: transparent !important;
+        }
         .deposit-history-table .ant-select-selector {
             background-color: hsl(var(--background)) !important;
             border-color: hsl(var(--border)) !important;
@@ -351,19 +322,22 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
         </Space>
       </Card>
       
-      <div className="mb-4">
-        <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-          Showing {paginationInfo.startItem}-{paginationInfo.endItem} of {totalCount} items
-        </div>
-      </div>
-
       <div className="bg-card rounded-xl shadow-sm border border-border overflow-x-auto">
         <Table
           columns={columns}
           dataSource={transactions}
           loading={isLoading}
           scroll={isMobile ? { x: 'max-content' } : undefined}
-          pagination={false}
+          pagination={{
+            current: currentPage,
+            total: totalCount,
+            pageSize: ITEMS_PER_PAGE,
+            onChange: (page) => setCurrentPage(page),
+            showSizeChanger: false,
+            showTotal: (total, range) =>
+              `${range[0]}-${range[1]} of ${total} items`,
+            simple: isMobile,
+          }}
           locale={{
             emptyText: (
               <div className="py-12 text-center text-muted-foreground">
@@ -379,50 +353,6 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
           rowKey={(_, index) => index}
         />
       </div>
-
-      {totalPages > 1 && (
-        <div className="mt-6 sm:mt-8 pb-12 sm:pb-0">
-          <Pagination>
-            <PaginationContent className="flex flex-wrap sm:flex-nowrap justify-center gap-0 sm:gap-1">
-              <PaginationItem>
-                <PaginationPrevious 
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  className={currentPage === 1 || isLoading ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                />
-              </PaginationItem>
-              
-              {paginationItems.map((item, index) => {
-                if (item.type === 'ellipsis') {
-                  return (
-                    <PaginationItem key={`ellipsis-${index}`} className="hidden sm:flex">
-                      <span className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">...</span>
-                    </PaginationItem>
-                  );
-                }
-                
-                return (
-                  <PaginationItem key={item.number}>
-                    <PaginationLink
-                      onClick={() => setCurrentPage(item.number!)}
-                      isActive={currentPage === item.number}
-                      className={`cursor-pointer px-2 sm:px-3 ${isLoading ? 'opacity-50 pointer-events-none' : ''}`}
-                    >
-                      {item.number}
-                    </PaginationLink>
-                  </PaginationItem>
-                );
-              })}
-              
-              <PaginationItem>
-                <PaginationNext 
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                  className={currentPage === totalPages || isLoading ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </div>
-      )}
     </div>
   );
 };
