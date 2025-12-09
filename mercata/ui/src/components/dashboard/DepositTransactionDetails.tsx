@@ -209,6 +209,14 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
         }
         .deposit-history-table .ant-pagination {
             color: hsl(var(--foreground)) !important;
+            display: flex !important;
+            justify-content: center !important;
+        }
+        .deposit-history-table .ant-pagination-item {
+            background: transparent !important;
+        }
+        .deposit-history-table .ant-pagination-item:hover {
+            background: transparent !important;
         }
         .deposit-history-table .ant-pagination-item a {
             color: hsl(var(--foreground)) !important;

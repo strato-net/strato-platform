@@ -215,6 +215,14 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
         }
         .withdrawal-history-table .ant-pagination {
             color: hsl(var(--foreground)) !important;
+            display: flex !important;
+            justify-content: center !important;
+        }
+        .withdrawal-history-table .ant-pagination-item {
+            background: transparent !important;
+        }
+        .withdrawal-history-table .ant-pagination-item:hover {
+            background: transparent !important;
         }
         .withdrawal-history-table .ant-pagination-item a {
             color: hsl(var(--foreground)) !important;
@@ -354,4 +362,4 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
   );
 };
 
-export default WithdrawTransactionDetails; 
+export default WithdrawTransactionDetails;
