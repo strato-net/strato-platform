@@ -905,10 +905,12 @@ corePeerSlipstream = do
   runConduit $
     sourceFlushTQueue slipstreamSource
       .| ( do
-             yield $ Right initialSlipstreamQueries
-             awaitForever $ processTheMessages . concat
+             yieldMany $ Right <$> initialSlipstreamQueries
+             awaitForever $ \vmes -> do
+              _ <- mapInput (const ()) (const Nothing) . processTheMessages $ concat vmes
+              pure ()
          )
       .| ( awaitForever $ \case
            Left txr -> lift $ Mod.yield txr
-           Right cmds  -> lift $ traverse_ Mod.output cmds
+           Right cmds  -> lift $ Mod.output cmds
          )

@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from 'react';
 import { Pool, SwapHistoryEntry, SetPoolRatesParams, SwapToken, SwapContextType } from '@/interface';
 import {api} from '@/lib/axios';
+import { useUser } from '@/context/UserContext';
 
 // ============================================================================
 // TYPES
@@ -11,6 +12,8 @@ import {api} from '@/lib/axios';
 const SwapContext = createContext<SwapContextType | undefined>(undefined);
 
 export const SwapProvider = ({ children }: { children: ReactNode }) => {
+  const { isLoggedIn } = useUser();
+  
   // ============================================================================
   // STATE
   // ============================================================================
@@ -19,6 +22,7 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
   const [swappableTokens, setSwappableTokens] = useState<SwapToken[]>([]);
   const [pairableTokens, setPairableTokens] = useState<SwapToken[]>([]);
   const [userPools, setUserPools] = useState<Pool[]>([]);
+  const [pools, setPools] = useState<Pool[]>([]);
   
   // Loading states
   const [loading, setLoading] = useState<boolean>(false); // For POST operations
@@ -189,10 +193,13 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     setPoolsLoading(true);
     setError(null);
     try {
-      const res = await api.get('/swap-pools');
-      return res.data || [];
+      const res = await api.get<Pool[]>('/swap-pools');
+      const list = res.data || [];
+      setPools(list);
+      return list;
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Failed to fetch LP tokens');
+      setPools([]);
       return [];
     } finally {
       setPoolsLoading(false);
@@ -314,8 +321,11 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
   // INITIALIZATION
   // ============================================================================
   useEffect(() => {
+    if (!isLoggedIn) return;
+    
     fetchSwappableTokens();
-  }, [fetchSwappableTokens]);
+    fetchPools();
+  }, [fetchSwappableTokens, fetchPools, isLoggedIn]);
 
   // ============================================================================
   // PROVIDER
@@ -356,7 +366,8 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
         swapHistory,
         swapHistoryCount,
         swapHistoryLoading,
-        setPoolRates
+        setPoolRates,
+        pools
       }}
     >
       {children}

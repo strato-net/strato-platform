@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+
+# Pre-commit hook to remove trailing whitespaces from staged files
+# Uses the delete-trailing-whitespaces.sh script with --staged flag
+
+set -euo pipefail
+
+SCRIPT_DIR="$(git rev-parse --show-toplevel)/scripts"
+WHITESPACE_SCRIPT="$SCRIPT_DIR/delete-trailing-whitespaces.sh"
+
+if [[ ! -x "$WHITESPACE_SCRIPT" ]]; then
+    echo "Error: $WHITESPACE_SCRIPT not found or not executable" >&2
+    exit 1
+fi
+
+# Run the script on staged files
+"$WHITESPACE_SCRIPT" --staged
+
+# Re-add any files that were modified by the script
+git diff --cached --name-only --diff-filter=ACM | while read -r file; do
+    if [[ -f "$file" ]] && git diff --name-only "$file" 2>/dev/null | grep -q .; then
+        git add "$file"
+    fi
+done

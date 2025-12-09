@@ -10,7 +10,7 @@ import "../../abstract/ERC20/access/Ownable.sol";
  */
 
 contract record PoolConfigurator is Ownable {
-   
+
     LendingRegistry public registry;
 
     event AssetConfigured(address indexed asset, uint ltv, uint liquidationThreshold, uint liquidationBonus, uint interestRate, uint reserveFactor, uint perSecondFactorRAY);
@@ -59,7 +59,7 @@ contract record PoolConfigurator is Ownable {
     ) external onlyOwner {
         // Set all registry components
         registry.setAllComponents(lendingPool, liquidityPool, collateralVault, rateStrategy, priceOracle);
-        
+
         // Set token factory
         LendingPool pool = LendingPool(registry.getLendingPool());
         pool.setTokenFactory(tokenFactory);
@@ -67,7 +67,7 @@ contract record PoolConfigurator is Ownable {
         // Set initial debt ceilings and safety share
         pool.setDebtCeilings(debtCeilingAssetUnits, debtCeilingUSD);
         pool.setSafetyShareBps(safetyShareBps);
-        
+
         // Configure all assets if provided
         if (assets.length > 0) {
             // Validate array lengths match
@@ -77,13 +77,13 @@ contract record PoolConfigurator is Ownable {
             require(interestRates.length == assets.length, "Interest rates length mismatch");
             require(reserveFactors.length == assets.length, "Reserve factors length mismatch");
             require(perSecondFactorsRAY.length == assets.length, "per-second factors length mismatch");
-            
+
             for (uint i = 0; i < assets.length; i++) {
                 pool.configureAsset(
-                    assets[i], 
-                    ltvs[i], 
-                    liquidationThresholds[i], 
-                    liquidationBonuses[i], 
+                    assets[i],
+                    ltvs[i],
+                    liquidationThresholds[i],
+                    liquidationBonuses[i],
                     interestRates[i],
                     reserveFactors[i],
                     perSecondFactorsRAY[i]
@@ -120,14 +120,14 @@ contract record PoolConfigurator is Ownable {
         require(interestRates.length == assets.length, "Interest rates length mismatch");
         require(reserveFactors.length == assets.length, "Reserve factors length mismatch");
         require(perSecondFactorsRAY.length == assets.length, "per-second factors length mismatch");
-        
+
         for (uint i = 0; i < assets.length; i++) {
             LendingPool pool = LendingPool(registry.getLendingPool());
             pool.configureAsset(
-                assets[i], 
-                ltvs[i], 
-                liquidationThresholds[i], 
-                liquidationBonuses[i], 
+                assets[i],
+                ltvs[i],
+                liquidationThresholds[i],
+                liquidationBonuses[i],
                 interestRates[i],
                 reserveFactors[i],
                 perSecondFactorsRAY[i]
@@ -272,4 +272,4 @@ contract record PoolConfigurator is Ownable {
         pool.recognizeBadDebt(borrower);
     }
 
-} 
+}

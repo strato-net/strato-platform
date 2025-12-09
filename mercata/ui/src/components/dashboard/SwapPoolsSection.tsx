@@ -4,14 +4,14 @@ import { Button } from "@/components/ui/button";
 import { CircleArrowDown, CircleArrowUp, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useUser } from '@/context/UserContext';
-import { useUserTokens } from '@/context/UserTokensContext';
+import { useTokenContext } from '@/context/TokenContext';
 import { formatBalance } from '@/utils/numberUtils';
 import { useSwapContext } from '@/context/SwapContext';
 import { Pool } from '@/interface';
 import { rewardsEnabled } from '@/lib/constants';
 import LiquidityDepositModal from './LiquidityDepositModal';
 import LiquidityWithdrawModal from './LiquidityWithdrawModal';
-
+import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 
 const SwapPoolsSection = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -24,18 +24,17 @@ const SwapPoolsSection = () => {
   const operationInProgressRef = useRef(false);
 
   const { fetchPools, getPoolByAddress } = useSwapContext();
-  const { fetchUsdstBalance, usdstBalance, voucherBalance } = useUserTokens();
+  const { fetchUsdstBalance, usdstBalance, voucherBalance } = useTokenContext();
   const { userAddress } = useUser();
+  const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
   useEffect(() => {
     fetchAndEnrichPools();
   }, [fetchPools]);
 
   useEffect(() => {
-    if (userAddress) {
-      fetchUsdstBalance(userAddress);
-    }
-  }, [userAddress, fetchUsdstBalance]);
+    fetchUsdstBalance();
+  }, [fetchUsdstBalance]);
 
   useEffect(() => {
     if (selectedPool && isDepositModalOpen) {
@@ -45,7 +44,7 @@ const SwapPoolsSection = () => {
           if (updatedPool) {
             setSelectedPool(updatedPool);
           }
-          await fetchUsdstBalance(userAddress);
+          await fetchUsdstBalance();
         } catch (error) {
           console.error('Error polling pool:', error);
         }
@@ -104,17 +103,13 @@ const SwapPoolsSection = () => {
   const handleDepositSuccess = async () => {
     // Refresh all data after successful deposit
     await fetchAndEnrichPools();
-    if (userAddress) {
-      await fetchUsdstBalance(userAddress);
-    }
+    await fetchUsdstBalance();
   };
 
   const handleWithdrawSuccess = async () => {
     // Refresh all data after successful withdrawal
     await fetchAndEnrichPools();
-    if (userAddress) {
-      await fetchUsdstBalance(userAddress);
-    }
+    await fetchUsdstBalance();
   };
 
 
@@ -214,6 +209,7 @@ const SwapPoolsSection = () => {
                       <div className="text-sm text-gray-500">APY</div>
                       <div className="font-medium">{pool.apy ? `${pool.apy}%` : "N/A"}</div>
                     </div>
+               
                     <div className="flex space-x-2">
                       <Button
                         size="sm"

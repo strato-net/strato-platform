@@ -1,18 +1,16 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Plus, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
-import { Token } from "../../interface";
-import { formatUnits } from "ethers";
-import { formatBalance, safeParseUnits, calculateTokenValue } from "@/utils/numberUtils";
+import { Token as TokenType, EarningAsset } from "@mercata/shared-types";
+import { formatBalance } from "@/utils/numberUtils";
 
 interface AssetsProps {
   loading: boolean;
-  tokens: Token[];
+  tokens: EarningAsset[];
   isDashboard?: boolean;
-  inActiveTokens: Token[];
-  shouldPreventFlash?: boolean;
+  inActiveTokens: TokenType[];
 }
 
 const AssetsList = ({
@@ -20,13 +18,22 @@ const AssetsList = ({
   tokens,
   inActiveTokens,
   isDashboard = true,
-  shouldPreventFlash = false,
 }: AssetsProps) => {
   const [showNonEarningAssetsTable, setShowNonEarningAssetsTable] =
     useState(false);
 
-  // Don't show loading indicator immediately if shouldPreventFlash is true
-  const shouldShowLoading = loading && !shouldPreventFlash;
+  const hasEarningAssets = tokens.length > 0;
+  const hasInactiveTokens = inActiveTokens.length > 0;
+  const shouldShowLoading = loading && !hasEarningAssets;
+  const shouldShowInactiveLoading = loading && !hasInactiveTokens;
+
+  const sortedTokens = useMemo(() => {
+    return [...tokens].sort((a, b) => {
+      const valueA = parseFloat(a.value || "0");
+      const valueB = parseFloat(b.value || "0");
+      return valueB - valueA;
+    });
+  }, [tokens]);
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm w-full overflow-hidden">
@@ -89,8 +96,8 @@ const AssetsList = ({
                     </div>
                   </td>
                 </tr>
-              ) : tokens.length > 0 ? (
-                tokens.map(
+              ) : sortedTokens.length > 0 ? (
+                sortedTokens.map(
                   (asset, index) => (
                     <tr
                       key={index}
@@ -98,10 +105,10 @@ const AssetsList = ({
                     >
                       <td className="py-4 px-4">
                         <div className="flex items-center">
-                          {asset?.token?.images?.[0] ? (
+                          {asset?.images?.[0] ? (
                             <img
-                              src={asset.token.images[0].value}
-                              alt={asset.token._name}
+                              src={asset.images[0].value}
+                              alt={asset._name}
                               className="w-8 h-8 rounded-full object-cover"
                             />
                           ) : (
@@ -109,7 +116,7 @@ const AssetsList = ({
                               className="w-8 h-8 rounded-full flex items-center justify-center text-xs text-white font-medium"
                               style={{ backgroundColor: "red" }}
                             >
-                              {asset?.token?._symbol?.slice(0, 2) || "??"}
+                              {asset?._symbol?.slice(0, 2) || "??"}
                             </div>
                           )}
                           <div className="ml-3 min-w-0 flex-1">
@@ -117,14 +124,14 @@ const AssetsList = ({
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Link
-                                    to={`/dashboard/deposits/${asset?.token?.address || ''}`}
+                                    to={`/dashboard/deposits/${asset?.address || ''}`}
                                     className="font-medium text-blue-600 truncate hover:text-blue-800 underline transition-colors"
                                   >
-                                    {asset?.token?._name || ""}
+                                    {asset?._name || ""}
                                   </Link>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                  <p>{asset?.token?._name || ""}</p>
+                                  <p>{asset?._name || ""}</p>
                                 </TooltipContent>
                               </Tooltip>
                             </TooltipProvider>
@@ -132,11 +139,11 @@ const AssetsList = ({
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <p className="text-gray-500 text-xs truncate">
-                                    {asset?.token?._symbol || ""}
+                                    {asset?._symbol || ""}
                                   </p>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                  <p>{asset?.token?._symbol || ""}</p>
+                                  <p>{asset?._symbol || ""}</p>
                                 </TooltipContent>
                               </Tooltip>
                             </TooltipProvider>
@@ -145,7 +152,7 @@ const AssetsList = ({
                       </td>
                       <td className="py-4 px-4 whitespace-nowrap text-right">
                         <p className="font-medium text-gray-900">
-                          {!asset?.["price"]
+                          {!asset?.price
                             ? "-"
                             : formatBalance(asset.price, undefined, 18, 2, 2, true)}
                         </p>
@@ -153,37 +160,37 @@ const AssetsList = ({
                       <td className="py-4 px-4 whitespace-nowrap text-right">
                         <div
                           className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                            asset?.["change"] >= 0
+                            (asset as any)?.["change"] >= 0
                             ? "bg-green-50 text-green-600"
                             : "bg-red-50 text-red-600"
                             }`}
                         >
-                          {asset?.["change"] !== undefined
-                            ? `${asset?.["change"] >= 0 ? "+" : ""}${
-                              asset?.["change"]
+                          {(asset as any)?.["change"] !== undefined
+                            ? `${(asset as any)?.["change"] >= 0 ? "+" : ""}${
+                              (asset as any)?.["change"]
                             }%`
                             : "-"}
                         </div>
                       </td>
                       <td className="py-4 px-4 whitespace-nowrap text-right">
                         <p className="font-medium text-gray-900">
-                          {!asset?.balance
+                          {!asset?.balance || asset.balance === "0"
                             ? "-"
                             : formatBalance(asset.balance, undefined, 18,1, 4)}
                         </p>
                       </td>
                       <td className="py-4 px-4 whitespace-nowrap text-right">
                         <p className="font-medium text-gray-900">
-                          {!asset?.collateralBalance
+                          {!asset?.collateralBalance || asset.collateralBalance === "0"
                             ? "-"
                             : formatBalance(asset.collateralBalance, undefined, 18,1,4)}
                         </p>
                       </td>
                       <td className="py-4 px-4 whitespace-nowrap text-right">
                         <p className="font-medium text-gray-900">
-                          {!asset?.["price"] || asset.price === "0" || (!asset?.balance && !asset?.collateralBalance)
+                          {!asset?.value || asset.value === "0.00" || parseFloat(asset.value) === 0
                             ? "-"
-                            : `$${calculateTokenValue(asset.balance || "0", asset.price, asset.collateralBalance || "0")}`}
+                            : `$${asset.value}`}
                         </p>
                       </td>
                     </tr>
@@ -245,7 +252,7 @@ const AssetsList = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {shouldShowLoading ? (
+                  {shouldShowInactiveLoading ? (
                     <tr className="hover:bg-gray-50 transition-colors">
                       <td
                         colSpan={5}
@@ -264,10 +271,10 @@ const AssetsList = ({
                       >
                         <td className="py-4 px-4">
                           <div className="flex items-center">
-                            {asset?.token?.images?.[0] ? (
+                            {asset?.images?.[0] ? (
                               <img
-                                src={asset.token.images[0].value}
-                                alt={asset.token._name}
+                                src={asset.images[0].value}
+                                alt={asset._name}
                                 className="w-8 h-8 rounded-full object-cover"
                               />
                             ) : (
@@ -275,7 +282,7 @@ const AssetsList = ({
                                 className="w-8 h-8 rounded-full flex items-center justify-center text-xs text-white font-medium"
                                 style={{ backgroundColor: "red" }}
                               >
-                                {asset?.token?._symbol?.slice(0, 2) || "??"}
+                                {asset?._symbol?.slice(0, 2) || "??"}
                               </div>
                             )}
                             <div className="ml-3 min-w-0 flex-1">
@@ -283,14 +290,14 @@ const AssetsList = ({
                                 <Tooltip>
                                   <TooltipTrigger asChild>
                                     <Link
-                                      to={`/dashboard/deposits/${asset?.token?.address || ''}`}
+                                      to={`/dashboard/deposits/${asset?.address || ''}`}
                                       className="font-medium text-blue-600 truncate hover:text-blue-800 underline transition-colors"
                                     >
-                                      {asset?.token?._name || ""}
+                                      {asset?._name || ""}
                                     </Link>
                                   </TooltipTrigger>
                                   <TooltipContent>
-                                    <p>{asset?.token?._name || ""}</p>
+                                    <p>{asset?._name || ""}</p>
                                   </TooltipContent>
                                 </Tooltip>
                               </TooltipProvider>
@@ -298,11 +305,11 @@ const AssetsList = ({
                                 <Tooltip>
                                   <TooltipTrigger asChild>
                                     <p className="text-gray-500 text-xs truncate">
-                                      {asset?.token?._symbol || ""}
+                                      {asset?._symbol || ""}
                                     </p>
                                   </TooltipTrigger>
                                   <TooltipContent>
-                                    <p>{asset?.token?._symbol || ""}</p>
+                                    <p>{asset?._symbol || ""}</p>
                                   </TooltipContent>
                                 </Tooltip>
                               </TooltipProvider>
@@ -311,7 +318,7 @@ const AssetsList = ({
                         </td>
                         <td className="py-4 px-4 whitespace-nowrap text-right">
                           <p className="font-medium text-gray-900">
-                            {!asset?.balance
+                            {!asset?.balance || asset.balance === "0"
                               ? "-"
                               : formatBalance(asset.balance, undefined, 18,1,4)}
                           </p>

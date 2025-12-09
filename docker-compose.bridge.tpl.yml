@@ -1,0 +1,52 @@
+#bridge-version:<VERSION>
+volumes:
+  bridgedata:
+    driver: local
+services:
+  bridge:
+    environment:
+    - BRIDGE_ADDRESS=${BRIDGE_ADDRESS}
+    - NODE_URL=${NODE_URL}
+    - BA_USERNAME=${BA_USERNAME}
+    - BA_PASSWORD=${BA_PASSWORD}
+    - SAFE_API_KEY=${SAFE_API_KEY}
+    - SAFE_ADDRESS=${SAFE_ADDRESS}
+    - SAFE_PROPOSER_PRIVATE_KEY=${SAFE_PROPOSER_PRIVATE_KEY}
+    - SAFE_PROPOSER_ADDRESS=${SAFE_PROPOSER_ADDRESS}
+    - OPENID_DISCOVERY_URL=${OPENID_DISCOVERY_URL}
+    - CLIENT_ID=${CLIENT_ID}
+    - CLIENT_SECRET=${CLIENT_SECRET}
+    - TRANSACTION_APPROVER_EMAILS=${TRANSACTION_APPROVER_EMAILS}
+    - SENDGRID_API_KEY=${SENDGRID_API_KEY}
+    - CHAIN_1_RPC_URL=${CHAIN_1_RPC_URL}
+    - CHAIN_11155111_RPC_URL=${CHAIN_11155111_RPC_URL}
+    build: .
+    image: ${BRIDGE_IMAGE:-<REPO_URL>bridge:<VERSION>}
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+    volumes:
+    - bridgedata:/app/data
+  nginx:
+    depends_on:
+    - bridge
+    environment:
+    - OPENID_DISCOVERY_URL=${OPENID_DISCOVERY_URL}
+    - ssl=${ssl}
+    - sslCertFileType=${sslCertFileType}
+    build: .
+    image: ${BRIDGENGINX_IMAGE:-<REPO_URL>bridge-nginx:<VERSION>}
+    ports:
+    - ${HTTP_PORT:-80}:80 #TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT
+    - ${HTTPS_PORT:-443}:443 #TAG_REMOVE_WHEN_NO_SSL
+    volumes:
+    - ./ssl:/tmp/ssl:ro
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"

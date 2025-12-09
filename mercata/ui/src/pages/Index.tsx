@@ -2,11 +2,11 @@
 import { useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import Hero from '../components/home/Hero';
-import MERCATALOGO from '@/assets/mercata.png';
+import STRATOLOGO from '@/assets/strato.png';
 
 const Index = () => {
   useEffect(() => {
-    document.title = "STRATO Mercata | Where Stability Meets Opportunity";
+    document.title = "STRATO | Where Stability Meets Opportunity";
   }, []);
 
   return (
@@ -19,8 +19,8 @@ const Index = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div>
               <div className="flex items-center mb-4">
-                <img src={MERCATALOGO} alt="STRATO Mercata" className="h-10 mr-3" />
-                <span className="sr-only">STRATO Mercata</span>
+                <img src={STRATOLOGO} alt="STRATO" className="h-10 mr-3" />
+                <span className="sr-only">STRATO</span>
               </div>
               <p className="text-gray-400 text-sm">
                 Where Stability Meets Opportunity. Easily earn on vaulted gold, silver & crypto.

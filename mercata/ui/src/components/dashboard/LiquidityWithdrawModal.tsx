@@ -15,8 +15,21 @@ import { useToast } from '@/hooks/use-toast';
 import { useSwapContext } from '@/context/SwapContext';
 import { WITHDRAW_FEE, rewardsEnabled } from "@/lib/constants";
 import { Pool } from '@/interface';
-import { safeParseUnits, formatWeiAmount } from '@/utils/numberUtils';
+import { safeParseUnits, formatWeiAmount, formatUnits } from '@/utils/numberUtils';
 import { handleAmountInputChange, computeMaxTransferable } from '@/utils/transferValidation';
+import { CompactRewardsDisplay } from '@/components/rewards/CompactRewardsDisplay';
+import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
+
+// Helper function to map pool names to activity names
+const getPoolActivityName = (poolName: string | undefined): string | null => {
+  if (!poolName) return null;
+  const name = poolName.toLowerCase();
+  if (name.includes('ethst') && name.includes('usdst')) return "ETHST-USDST Swap LP";
+  if (name.includes('wbtcst') && name.includes('usdst')) return "WBTCST-USDST Swap LP";
+  if (name.includes('goldst') && name.includes('usdst')) return "GOLDST-USDST Swap LP";
+  if (name.includes('silvst') && name.includes('usdst')) return "SILVST-USDST Swap LP";
+  return null;
+};
 
 interface WithdrawFormValues {
   percent: string;
@@ -92,6 +105,7 @@ const LiquidityWithdrawModal = ({
     includeStakedLPToken?: boolean;
   }) => Promise<void>;
   const { toast } = useToast();
+  const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
   const form = useForm<WithdrawFormValues>({
     defaultValues: {
@@ -300,6 +314,25 @@ const LiquidityWithdrawModal = ({
               ) : null;
             })()}
           </div>
+
+          {/* Estimated Rewards Display - Always visible */}
+          {(() => {
+            const activityName = getPoolActivityName(selectedPool?.poolName);
+            if (!activityName) return null;
+            
+            // Pass withdrawPercent and availableLPBalance for accurate stake calculation
+            // The component will calculate: stakeChange = availableLPBalance × withdrawPercent
+            return (
+              <CompactRewardsDisplay
+                userRewards={userRewards}
+                activityName={activityName}
+                isWithdrawal={true}
+                withdrawPercent={withdrawPercent || ""}
+                availableLPBalance={availableLPBalance || "0"}
+                actionLabel="Withdraw"
+              />
+            );
+          })()}
 
           {/* Include Staked LP Token Checkbox - only show if pool has rewards program AND rewards are enabled */}
           {rewardsEnabled && selectedPool?.lpToken?.stakedBalance !== undefined && (

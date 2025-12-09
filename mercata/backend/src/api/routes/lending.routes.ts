@@ -741,4 +741,68 @@ router.post("/safety/redeem", authHandler.authorizeRequest(), SafetyController.r
  */
 router.post("/safety/redeem-all", authHandler.authorizeRequest(), SafetyController.redeemAll);
 
+/**
+ * @openapi
+ * /lending/interest:
+ *   get:
+ *     summary: Get interest accrued for lending pool for multiple time periods
+ *     tags: [Lending]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Interest accrued for daily, weekly, monthly, YTD, and all-time periods
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 totalDailyInterestUSD:
+ *                   type: string
+ *                   description: Total daily interest accrued in USD (18 decimals)
+ *                 totalWeeklyInterestUSD:
+ *                   type: string
+ *                   description: Total weekly interest accrued in USD (18 decimals)
+ *                 totalMonthlyInterestUSD:
+ *                   type: string
+ *                   description: Total monthly interest accrued in USD (18 decimals)
+ *                 totalYtdInterestUSD:
+ *                   type: string
+ *                   description: Total year-to-date interest accrued in USD (18 decimals)
+ *                 totalAllTimeInterestUSD:
+ *                   type: string
+ *                   description: Total all-time interest accrued in USD (18 decimals)
+ *                 borrowableAsset:
+ *                   type: object
+ *                   properties:
+ *                     asset:
+ *                       type: string
+ *                       description: Borrowable asset contract address
+ *                     symbol:
+ *                       type: string
+ *                       description: Asset symbol (e.g., USDST)
+ *                     totalDebtUSD:
+ *                       type: string
+ *                       description: Total debt in USD for this asset (18 decimals)
+ *                     annualRatePercent:
+ *                       type: number
+ *                       description: Annual interest rate as percentage
+ *                     dailyInterestUSD:
+ *                       type: string
+ *                       description: Daily interest accrued in USD (18 decimals)
+ *                     weeklyInterestUSD:
+ *                       type: string
+ *                       description: Weekly interest accrued in USD (18 decimals)
+ *                     monthlyInterestUSD:
+ *                       type: string
+ *                       description: Monthly interest accrued in USD (18 decimals)
+ *                     ytdInterestUSD:
+ *                       type: string
+ *                       description: Year-to-date interest accrued in USD (18 decimals)
+ *                     allTimeInterestUSD:
+ *                       type: string
+ *                       description: All-time interest accrued in USD (18 decimals)
+ */
+router.get("/interest", authHandler.authorizeRequest(true), LendingController.getInterestAccrued);
+
 export default router;

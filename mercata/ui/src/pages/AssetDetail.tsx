@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChevronLeft, Wallet, ArrowUp, ArrowDown } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { useUserTokens } from '@/context/UserTokensContext';
+import { useTokenContext } from '@/context/TokenContext';
 import { Token, PriceHistoryEntry, SwapHistoryEntry } from '@/interface';
 import { formatUnits } from 'ethers';
 import { api } from '@/lib/axios';
@@ -196,6 +197,8 @@ const AssetDetail = () => {
   const [showPriceTooltip, setShowPriceTooltip] = useState(false);
   const { userAddress } = useUser()
   const { activeTokens: assets, inactiveTokens, loading, fetchTokens, allActiveTokens } = useUserTokens()
+  const { getToken } = useTokenContext();
+  const [fetchingSingleAsset, setFetchingSingleAsset] = useState(false);
 
   const PRICE_WINDOW = 30; // Number of days to show in the price chart
   const getChartColor = (currentPrice: string | undefined, priceData: PricePoint[]): string => {
@@ -247,8 +250,20 @@ const AssetDetail = () => {
 
     if (foundAsset) {
       setupAsset(foundAsset);
+    } else if (id && !fetchingSingleAsset) {
+      setFetchingSingleAsset(true);
+      getToken(id)
+        .then((token) => {
+          if (token && token.address) {
+            setupAsset(token);
+          }
+        })
+        .catch()
+        .finally(() => {
+          setFetchingSingleAsset(false);
+        });
     }
-  }, [id, assets, inactiveTokens, allActiveTokens]);  
+  }, [id, assets, inactiveTokens, allActiveTokens, getToken]);
 
   if (!asset) {
     return (
@@ -256,7 +271,7 @@ const AssetDetail = () => {
         <DashboardSidebar />
         <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 16rem)' }}>
           <DashboardHeader title="Asset Not Found" />
-          {loading ?
+          {loading || fetchingSingleAsset ?
             <div className="flex justify-center items-center h-40">
               <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
             </div>

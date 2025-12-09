@@ -1,21 +1,30 @@
 import { Avatar, AvatarFallback } from "../ui/avatar";
 import { useUser } from '@/context/UserContext';
 import CopyButton from '../ui/copy';
-import { LogOutIcon, Menu } from 'lucide-react';
+import { LogOutIcon, Menu, Copy } from 'lucide-react';
 import {
   Popover,
   PopoverTrigger,
   PopoverContent,
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
+import { useAccount, useDisconnect } from 'wagmi';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useToast } from '@/hooks/use-toast';
 
 interface DashboardHeaderProps {
   title: string;
   onMenuClick?: () => void;
 }
 
+const GRADIENT_BUTTON_CLASS = "w-full bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90";
+
 const DashboardHeader = ({ title, onMenuClick }: DashboardHeaderProps) => {
-  const { userAddress, userName, logout } = useUser()
+  const { userAddress, userName, logout } = useUser();
+  const { address: walletAddress, isConnected } = useAccount();
+  const { disconnect } = useDisconnect();
+  const { toast } = useToast();
 
   const truncateAddress = (address: string | null | undefined, front: number = 6, back: number = 4) => {
     if (!address) return "N/A";
@@ -23,9 +32,52 @@ const DashboardHeader = ({ title, onMenuClick }: DashboardHeaderProps) => {
     return `${address.substring(0, front)}...${address.substring(address.length - back)}`;
   };
 
-  const getAvatarFallback = () => {
-    if (!userName) return "NA";
-    return userName.substring(0, 2).toUpperCase();
+  const copyAddress = async (address: string | null, label: string) => {
+    if (address) {
+      await navigator.clipboard.writeText(address);
+      toast({
+        title: 'Address copied!',
+        description: `${label} address copied to clipboard`,
+        duration: 2000,
+      });
+    }
+  };
+
+  const AddressRow = ({ address, onCopy, showTooltip = false, textColor = "text-gray-700" }: { 
+    address: string | null; 
+    onCopy: () => void;
+    showTooltip?: boolean;
+    textColor?: string;
+  }) => {
+    const content = (
+      <div className={`flex items-center justify-between w-full gap-1 text-xs font-mono ${textColor} cursor-pointer`}>
+        <span className="flex-1 min-w-0">{truncateAddress(address, 16, 8)}</span>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onCopy();
+          }}
+          className="hover:text-gray-900 transition-colors flex-shrink-0"
+        >
+          <Copy size={12} />
+        </button>
+      </div>
+    );
+
+    if (showTooltip && address) {
+      return (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>{content}</TooltipTrigger>
+            <TooltipContent>
+              <p>{address}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
+
+    return content;
   };
 
   return (
@@ -51,27 +103,79 @@ const DashboardHeader = ({ title, onMenuClick }: DashboardHeaderProps) => {
           </div>
           <Popover>
             <PopoverTrigger asChild>
-              <Avatar className="w-8 h-8 bg-strato-blue cursor-pointer">
-                <AvatarFallback className="text-white text-xs bg-strato-blue">
-                  {getAvatarFallback()}
-                </AvatarFallback>
-              </Avatar>
+              <div className="relative">
+                <Avatar className="w-8 h-8 bg-strato-blue cursor-pointer">
+                  <AvatarFallback className="text-white text-xs bg-strato-blue">
+                    {userName ? userName.substring(0, 2).toUpperCase() : "NA"}
+                  </AvatarFallback>
+                </Avatar>
+                <div
+                  className={`absolute top-0 right-0 w-3 h-3 rounded-full border-2 border-white ${
+                    isConnected ? "bg-green-500" : "bg-red-500"
+                  }`}
+                />
+              </div>
             </PopoverTrigger>
             <PopoverContent className="w-full p-3 shadow-md mt-2" align="end" side="bottom">
-              <div className="flex flex-col space-y-0.5">
-                <div className="text-sm font-medium">{userName || "N/A"}</div>
-                <div className="text-xs text-gray-600 break-all !mb-1">
-                  {truncateAddress(userAddress, 16, 8)}
+              <div className="flex flex-col space-y-3">
+                <div className="flex flex-col space-y-0.5">
+                  <div className="text-sm font-medium">{userName || "N/A"}</div>
+                  <AddressRow 
+                    address={userAddress} 
+                    onCopy={() => copyAddress(userAddress, 'User')}
+                    textColor="text-gray-600"
+                  />
                 </div>
 
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={logout}
-                >
-                  <LogOutIcon />
-                  Logout
-                </Button>
+                <div className="border-t border-gray-200 pt-3">
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="text-xs font-medium text-gray-500">External Wallet</div>
+                    <div
+                      className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                        isConnected ? "bg-green-50 text-green-600" : "bg-red-50 text-red-600"
+                      }`}
+                    >
+                      {isConnected ? "Connected" : "Disconnected"}
+                    </div>
+                  </div>
+                  {isConnected ? (
+                    <div className="flex flex-col space-y-2">
+                      <AddressRow 
+                        address={walletAddress} 
+                        onCopy={() => copyAddress(walletAddress, 'Wallet')}
+                        showTooltip
+                      />
+                      <Button onClick={() => disconnect()} className={GRADIENT_BUTTON_CLASS}>
+                        Disconnect Wallet
+                      </Button>
+                    </div>
+                  ) : (
+                    <ConnectButton.Custom>
+                      {({ openConnectModal, authenticationStatus, mounted }) => {
+                        const ready = mounted && authenticationStatus !== 'loading';
+                        if (!ready) return null;
+
+                        return (
+                          <Button onClick={openConnectModal} className={GRADIENT_BUTTON_CLASS}>
+                            Connect Wallet
+                          </Button>
+                        );
+                      }}
+                    </ConnectButton.Custom>
+                  )}
+                </div>
+
+                <div className="border-t border-gray-200 pt-3">
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={logout}
+                    className="w-full"
+                  >
+                    <LogOutIcon />
+                    Logout
+                  </Button>
+                </div>
               </div>
             </PopoverContent>
           </Popover>

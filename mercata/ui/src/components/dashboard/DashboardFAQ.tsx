@@ -12,8 +12,8 @@ const DashboardFAQ = () => {
       answer: "You can borrow against your deposited assets. The amount you can borrow depends on the collateralization ratio of each asset. Keep your risk level below 80% to avoid liquidation."
     },
     {
-      question: "What are CATA Rewards?",
-      answer: "CATA points is the reward system on STRATO Mercata. Points are rewarded based on your deposits and platform activity."
+      question: "What are Reward Points?",
+      answer: "Reward Points is the reward system on STRATO. Points are rewarded based on your deposits and platform activity."
     },
     {
       question: "How secure are my assets?",

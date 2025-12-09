@@ -63,10 +63,10 @@ import Test.Hspec
 -- import UnliftIO
 -- import UnliftIO.Concurrent (threadDelay)
 -- import Prelude hiding (round)
--- 
+--
 -- instance Eq SomeException where
 --   _ == _ = True -- for the purpose of my test, all exceptions are equal
--- 
+--
 spec :: Spec
 spec = pure ()
 --   describe "network simulation" $ do
@@ -102,7 +102,7 @@ spec = pure ()
 --         serverUnseqEvs `shouldBe` []
 --         let clientTxs = [t | UnseqEvents [IETx _ (IngestTx _ t)] <- clientUnseqs']
 --         clientTxs `shouldBe` [otBaseTx otx]
--- 
+--
 --     it "should update the round number on every node in the network" $ do
 --         privKeys <- traverse (const newPrivateKey) [(1 :: Integer) .. 7]
 --         let identities =
@@ -152,7 +152,7 @@ spec = pure ()
 --         runForTwoSeconds $ concurrently_ (runNetworkOld peers connections') postTimeoutEvent
 --         ctxs <- atomically $ traverse (readTVar . _p2pTestContext) peers
 --         ifor_ ctxs $ \i ctx -> (i, _round . _view <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 1 :: Maybe Word256)
--- 
+--
 --     it "should update the round number after failing on a divided network first" $ do
 --       privKeys <- traverse (const newPrivateKey) [(1 :: Integer) .. 3]
 --       let validatorsPrivKeys' = privKeys
@@ -219,7 +219,7 @@ spec = pure ()
 --                              (peers !! 0, peers !! 2),
 --                              (peers !! 1, peers !! 2)
 --                            ]
--- 
+--
 --         atomically $
 --           modifyTVar'
 --             ((peers !! 0) ^. p2pTestContext)
@@ -230,7 +230,7 @@ spec = pure ()
 --         runForTwoSeconds $ concurrently_ (runNetworkOld peers connections'') (concurrently_ postTimeoutPrimary2 postTimeoutSecondary)
 --         ctxs2 <- atomically $ traverse (readTVar . _p2pTestContext) peers
 --         ifor_ ctxs2 $ \i ctx -> (i, _round . _view <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 1001 :: Maybe Word256)
--- 
+--
 --     it "can register and unregister a cert on the main chain" $ do
 --         -- TODO: use registry at 0x509
 --         privKeys <- traverse (const newPrivateKey) [(1 :: Integer) .. 2]
@@ -253,10 +253,10 @@ spec = pure ()
 --                           ]
 --         let src =
 --               [r|
---   
+--
 --   contract RegisterCert {
 --     event CertificateRegistered(string cert);
---   
+--
 --     constructor(address _user, string _cert) {
 --       emit CertificateRegistered(_cert);
 --     }
@@ -301,7 +301,7 @@ spec = pure ()
 --         void . timeout 5000000 $ concurrently_ (runNetworkOld peers connections') routine
 --         ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
 --         for_ ctxs1 $ \ctx -> (ctx ^. x509certMap) `shouldNotBe` M.empty
--- 
+--
 --     it "can add vote in a new validator" $ do
 --         privKeys <- traverse (const newPrivateKey) [(1 :: Integer) .. 3]
 --         let validatorAddresses = fromPrivateKey <$> privKeys
@@ -341,17 +341,17 @@ spec = pure ()
 --                   U.unsignedTransactionChainId = Nothing
 --                 }
 --             signedTx = mkSignedTx (privKeys !! 0) setupTx txMd
--- 
+--
 --             routine = do
 --               threadDelay 200000
 --               for_ peers $ postEvent (TimerFire 0)
 --               threadDelay 200000
 --               flip postEvent (peers !! 0) $ UnseqEvents [toIetx signedTx]
--- 
+--
 --         void . timeout 5000000 $ concurrently_ (runNetworkOld peers connections') routine
 --         ctxs <- atomically $ traverse (readTVar . _p2pTestContext) peers
 --         ifor_ ctxs $ \i ctx -> (i, Set.size . _validators <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 2)
--- 
+--
 --     it "can add and remove vote in a new validator" $ do
 --         privKeys <- traverse (const newPrivateKey) [(1 :: Integer) .. 3]
 --         let validatorAddresses = fromPrivateKey <$> privKeys
@@ -403,7 +403,7 @@ spec = pure ()
 --                   U.unsignedTransactionChainId = Nothing
 --                 }
 --             signedRemoveTx = mkSignedTx (privKeys !! 0) removeTx removeTxMd
--- 
+--
 --             routine1 = do
 --               threadDelay 200000
 --               for_ peers $ postEvent (TimerFire 0)
@@ -418,11 +418,11 @@ spec = pure ()
 --               postEvent (TimerFire 2) (peers !! 0)
 --               threadDelay 200000
 --               flip postEvent (peers !! 0) $ UnseqEvents [toIetx signedRemoveTx]
--- 
+--
 --         void . timeout 10000000 $ concurrently_ (runNetworkOld peers connections') routine1
 --         ctxs2 <- atomically $ traverse (readTVar . _p2pTestContext) peers
 --         ifor_ ctxs2 $ \i ctx -> (i, Set.size . _validators <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 1)
--- 
+--
 --     it "can sync a new node after voting in a new validator" $ do
 --         privKeys <- traverse (const newPrivateKey) [(1 :: Integer) .. 4]
 --         let validatorAddresses = fromPrivateKey <$> privKeys
@@ -471,7 +471,7 @@ spec = pure ()
 --               [r|
 --   contract B {
 --     uint y;
---   
+--
 --     constructor() {
 --       y = 47;
 --     }
@@ -504,7 +504,7 @@ spec = pure ()
 --               flip postEvent (peers !! 0) $ UnseqEvents [toIetx signedTx]
 --               threadDelay 10000000
 --               runNetworkOld (drop 3 peers) (drop 3 connections')
---   
+--
 --         void . timeout 20000000 $ concurrently_ (runNetworkOld (take 3 peers) (take 3 connections')) (concurrently_ (void . timeout 4000000 $ mainChainRoutine 0) routine)
 --         ctxs <- atomically $ traverse (readTVar . _p2pTestContext) peers
 --         ifor_ ctxs $ \i ctx -> (i, Set.size . _validators <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 3)
@@ -525,7 +525,7 @@ spec = pure ()
 --         privKey <- newPrivateKey
 --         let validatorAddress = fromPrivateKey privKey
 --             validatorInfo = "Admin"
---         cert <- selfSignCert privKey validatorInfo 
+--         cert <- selfSignCert privKey validatorInfo
 --         validator <- createPeer' privKey validatorInfo [(validatorAddress, validatorInfo)] [cert] "node1" "1.1.1.1"
 --         ts <- liftIO getCurrentMicrotime
 --         let toIetx = IETx ts . IngestTx Origin.API
@@ -542,10 +542,10 @@ spec = pure ()
 --                   U.unsignedTransactionChainId = Nothing
 --                 }
 --             signedTx n = mkSignedTx privKey (tx n) txMd
--- 
+--
 --             reachNonceLim = do
 --               for [0..10] (\n -> flip postEvent validator $ UnseqEvents [toIetx $ signedTx n]) --nonce limit is 10; will trigger]
--- 
+--
 --         void . timeout 10000000 $ concurrently_ (runNode validator) reachNonceLim
 --         ctx <- atomically $ readTVar . _p2pTestContext $ validator
 --         bestBlockNumber (_bestBlock ctx) `shouldNotBe` 0 --create at least 1 block
@@ -562,7 +562,7 @@ spec = pure ()
 --               [ ("node1", "1.2.3.4"),
 --                 ("node2", "5.6.7.8")
 --               ]
---         
+--
 --         ts <- liftIO getCurrentMicrotime
 --         let toIetx = IETx ts . IngestTx Origin.API
 --             src = "contract Test{}"
@@ -582,17 +582,17 @@ spec = pure ()
 --               flip postEvent (peers !! 0) $ UnseqEvents [toIetx $ signedTx 1 n]
 --               threadDelay 500000
 --               routine (n + 1)
---         
---         let corruptPBFT p2pev = case p2pev of 
+--
+--         let corruptPBFT p2pev = case p2pev of
 --               -- sneakily add on an extra tx
 --               P2pBlockstanbul (WireMessage auth (Preprepare v b)) -> P2pBlockstanbul (WireMessage auth (Preprepare v b{blockReceiptTransactions = (signedTx 0 0) : blockReceiptTransactions b}))
 --               msg -> msg
 --         conn <- createConnectionWithModifications (peers !! 0) (peers !! 1) corruptPBFT corruptPBFT -- oh no someone is corrupting msgs! :0
---         
+--
 --         void . timeout 2000000 $ concurrently_ (runNetworkOld peers [conn]) (routine 0)
 --         ctx <- atomically $ readTVar . _p2pTestContext $ peers !! 0
 --         bestBlockNumber (_bestBlock ctx) `shouldBe` -1 -- no canonical blocks added (val starts at -1, not 0)
--- 
+--
 --   describe "Testing contracts that call other contracts by addresss" $ do
 --     --Note to the developer
 --     --These contracts are shoved into the txrIndexer ..... Take this into consideration
@@ -635,13 +635,13 @@ spec = pure ()
 --                   U.unsignedTransactionChainId = Nothing
 --                 }
 --             signedTx = mkSignedTx (privKeys !! 0) setupTx txMd
---   
+--
 --             mainChainSrc =
 --               [r|
 --   contract B {
 --     uint y;
 --     string powPow = "Example of Different States";
---   
+--
 --     constructor() {
 --       y = 47;
 --     }
@@ -666,7 +666,7 @@ spec = pure ()
 --       x = address(_add).delegatecall("gg(int, int)", 333333333, 333333333);
 --       yes =  _add.delegatecall("gg()");
 --       _add.delegatecall("ggg()");
---       //1.delegatecall("ggg()"); //This will make error.... because we shouldn't be able to call delegate on anything but an address type 
+--       //1.delegatecall("ggg()"); //This will make error.... because we shouldn't be able to call delegate on anything but an address type
 --     }
 --   }
 --   |]
@@ -695,21 +695,21 @@ spec = pure ()
 --             mkMainChainTx =
 --               let utx = mainChainUtx {U.unsignedTransactionNonce = Nonce 1}
 --                in mkSignedTx (privKeys !! 1) utx mainChainTxMd
---   
+--
 --             mainChainRoutine n = do
 --               threadDelay 200000
 --               flip postEvent (peers !! 1) $ UnseqEvents [toIetx $ mkMainChainTx]
 --               let x = getNewAddress_unsafe (fromPrivateKey (privKeys !! 1)) 1
---   
+--
 --               let args' = "(0x" <> T.pack (formatAddressWithoutColor x) <> ")"
 --               let mainChainTxMdC = M.fromList [("src", mainChainSrcC), ("name", mainChainContractNameC), ("args", args')]
 --               let mkMainChainTx2 n' =
 --                     let utx = mainChainUtx2 {U.unsignedTransactionNonce = Nonce n'}
 --                      in mkSignedTx (privKeys !! 1) utx mainChainTxMdC
 --               flip postEvent (peers !! 1) $ UnseqEvents [toIetx $ mkMainChainTx2 n]
---   
+--
 --               mainChainRoutine $ n + 1
---   
+--
 --             routine = do
 --               threadDelay 200000
 --               for_ peers $ postEvent (TimerFire 0)
@@ -717,15 +717,15 @@ spec = pure ()
 --               flip postEvent (peers !! 0) $ UnseqEvents [toIetx signedTx]
 --               threadDelay 10000000
 --               runNetworkOld (drop 3 peers) (drop 3 connections')
---   
+--
 --         void . timeout 20000000 $ concurrently_ (runNetworkOld (take 3 peers) (take 3 connections')) (concurrently_ (void . timeout 4000000 $ mainChainRoutine 0) routine)
---   
+--
 --         bHash <- fmap (bestBlockHash . _bestBlock) . readTVarIO . _p2pTestContext $ peers !! 1
 --         let varsToLookUp = [".powPow", ".getMoney", ".y"]
 --         (contractA'sStateVars, contractB'sStateVars) <- runNoLoggingT . runResourceT . flip runReaderT (peers !! 1) $ do
 --           let contractLookup n = map (getNewAddress_unsafe (fromPrivateKey (privKeys !! 1)) n,) varsToLookUp :: [(Address, BC.ByteString)]
 --               lookupStorageVals = traverse $ fmap (fmap fromVal) . VMC.withCurrentBlockHash bHash . A.lookup (A.Proxy @RawStorageValue)
 --           on (liftA2 (,)) (lookupStorageVals . contractLookup) 1 2
---   
+--
 --         contractA'sStateVars `shouldBe` [Just (BString "Example of Different States"), Nothing, Just (BInteger 47)]
 --         contractB'sStateVars `shouldBe` [Just (BString "Other Example of different states"), Just (BString "Nice I did this"), Just (BInteger 5)]

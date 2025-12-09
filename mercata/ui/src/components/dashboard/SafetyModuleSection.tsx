@@ -13,11 +13,13 @@ import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { SAFETY_STAKE_FEE, SAFETY_REDEEM_FEE, usdstAddress, safetyModuleAddress, rewardsEnabled } from "@/lib/constants";
 import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
+import { CompactRewardsDisplay } from "@/components/rewards/CompactRewardsDisplay";
+import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 
 const SafetyModuleSection = () => {
   const { userAddress } = useUser();
-  const { activeTokens: tokens, loading: tokensLoading, fetchTokens, fetchUsdstBalance, usdstBalance } = useUserTokens();
-  const { approveToken } = useTokenContext();
+  const { activeTokens: tokens, loading: tokensLoading, fetchTokens } = useUserTokens();
+  const { fetchUsdstBalance, usdstBalance, approveToken } = useTokenContext();
   const {
     safetyInfo,
     loading,
@@ -33,24 +35,23 @@ const SafetyModuleSection = () => {
   const [stakeSUSDST, setStakeSUSDST] = useState<boolean>(rewardsEnabled);
   const [includeStakedSUSDST, setIncludeStakedSUSDST] = useState<boolean>(false);
   const { toast } = useToast();
+  const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
 
   const refreshData = (signal?: AbortSignal) => {
-    if (!userAddress) return;
     fetchTokens(signal);
     refreshSafetyInfo(signal);
-    fetchUsdstBalance(userAddress);
+    fetchUsdstBalance();
   };
 
-  // Fetch on userAddress change only, with abort controller
+  // Fetch on mount, with abort controller
   useEffect(() => {
-    if (!userAddress) return;
     const abortController = new AbortController();
     refreshData(abortController.signal);
     return () => {
       abortController.abort();
     };
-  }, [userAddress]);
+  }, []);
 
   // usdstBalance is now coming directly from useUserTokens() context
 
@@ -291,6 +292,13 @@ const SafetyModuleSection = () => {
                   <div className="text-sm text-gray-500 mt-1">
                     Transaction Fee: {SAFETY_STAKE_FEE} USDST
                   </div>
+                  {/* Estimated Rewards */}
+                  <CompactRewardsDisplay
+                    userRewards={userRewards}
+                    activityName="Safety Module"
+                    inputAmount={stakeAmount}
+                    actionLabel="Stake"
+                  />
                   {/* Stake sUSDST Checkbox - only show if rewards are enabled */}
                   {rewardsEnabled && (
                     <div className="flex items-center space-x-2 mt-3">

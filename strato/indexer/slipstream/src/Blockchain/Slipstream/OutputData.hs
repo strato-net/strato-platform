@@ -22,8 +22,7 @@ module Blockchain.Slipstream.OutputData (
   SlipstreamQuery(..),
   slipstreamQueryPostgres,
   slipstreamQueryText,
-  outputData,
-  outputDataDedup,
+  dedupC,
   ProcessedCollectionRow(..),
   pipeInsertGlobalEventTable,
   insertIndexTable,
@@ -35,10 +34,7 @@ module Blockchain.Slipstream.OutputData (
   createCollectionTable,
   createExpandEventTables,
   notifyPostgREST,
-  cirrusInfo,
-  cirrusConnStr,
   aggEventToCollectionRows,
-  dbQueryCatchError,
   valueToSQLText',
   initialSlipstreamQueries
   ) where
@@ -52,10 +48,7 @@ import           Control.Monad
 import qualified Data.Aeson                      as Aeson
 import           Data.Bool                       (bool)
 import qualified Data.Set as Set
-import           Data.ByteString                 (ByteString)
 import qualified Data.ByteString.Base16         as Base16
-import qualified Data.ByteString.Char8           as BC
-import qualified Data.ByteString                 as B
 import qualified Data.ByteString.Lazy            as BL
 import           Data.Map                        (Map)
 import qualified Data.Map.Strict                 as Map
@@ -65,28 +58,21 @@ import qualified Data.Text                       as T
 import           Bloc.Server.Utils               (partitionWith)
 import           BlockApps.Logging
 import           Blockchain.Slipstream.Data.Action
-import           Blockchain.Slipstream.Data.CirrusTables
 import qualified Blockchain.Slipstream.Events               as E
-import           Blockchain.Slipstream.Options
 import           Blockchain.Slipstream.QueryFormatHelper
 import           Blockchain.Slipstream.SolidityValue
 import           Blockchain.Strato.Model.Address
 import qualified Blockchain.Strato.Model.Event   as Action
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Stream.Action        (Delegatecall(..))
-import           Data.Text.Encoding              (decodeUtf8, decodeUtf8', encodeUtf8)
+import           Data.Text.Encoding              (decodeUtf8, decodeUtf8')
 import           Data.Time
-import qualified Database.Esqueleto              as E
-import           Database.Persist                (insert_)
-import           Database.Persist.Postgresql     (runSqlPool, SqlPersistT)
-import           Blockchain.Slipstream.PostgresqlTypedShim
 import           SolidVM.Model.CodeCollection    hiding (Contract, contractName, contracts, parents)
 import qualified SolidVM.Model.CodeCollection.VarDef as VarDef
 import           SolidVM.Model.SolidString
 import           SolidVM.Model.Storable
 import qualified SolidVM.Model.Type              as SVMType
 import           Text.Printf
-import           UnliftIO.Exception              (SomeException, handle)
 import qualified Data.Text.Encoding as TE
 
 newtype First b a = First {unFirst :: (a, b)}
@@ -118,6 +104,7 @@ data SlipstreamQuery = CreateTable
                         , tableColumns :: TableColumns
                         , primaryKeyColumns :: [Text]
                         , tableConstraint :: Maybe TableConstraint
+                        , tableIndexes :: [(Text, [Text])]
                         }
                      | CreateView
                         { viewName :: TableName
@@ -136,6 +123,7 @@ data SlipstreamQuery = CreateTable
                         , values :: [[Maybe Value]]
                         , onConflict :: Maybe OnConflict
                         }
+                     | InsertDelegatecall Delegatecall
                      | CreateFkeyFunction ForeignKeyInfo
                      | RefreshMaterializedView TableName
                      | NotifyPostgREST
@@ -143,17 +131,6 @@ data SlipstreamQuery = CreateTable
 
 slipstreamQueryPostgres :: SlipstreamQuery -> Text
 slipstreamQueryPostgres = slipstreamQueryText sqlTypePostgres
-
-performSQLQueriesFromQuery :: (MonadLogger m, MonadUnliftIO m) =>
-                              PGConnection -> [SlipstreamQuery] -> m ()
-performSQLQueriesFromQuery conn slipstreamQueries = do
-  forM_ slipstreamQueries $ \slipstreamQuery -> do
-    dbQueryCatchError conn . slipstreamQueryPostgres $ slipstreamQuery
-
-performSQLQueries :: (MonadLogger m, MonadUnliftIO m) =>
-                     PGConnection -> [SqlPersistT m ()] -> m ()
-performSQLQueries conn slipstreamQueries = do
-  handle handlePostgresError $ runSqlPool (sequence_ slipstreamQueries) conn
 
 slipstreamQueryText :: (SqlType -> Text) -> SlipstreamQuery -> Text
 slipstreamQueryText sqlTypeText CreateTable{..} = T.concat $
@@ -183,9 +160,18 @@ slipstreamQueryText sqlTypeText CreateTable{..} = T.concat $
         , " "
         , wrapAndEscapeDouble fCols
         ]
-  , ");"
+  , ");\n"
+  , T.concat $ (\(indexName, indexCols) -> T.concat
+      [ "CREATE INDEX IF NOT EXISTS "
+      , wrapEscapeDouble indexName
+      , " ON "
+      , tableNameToDoubleQuoteText tableName
+      , wrapAndEscapeDouble indexCols
+      , ";\n"
+      ]
+    ) <$> tableIndexes
   ] ++ (case tableName of
-    HistoryTableName c n ->
+    HistoryTableName c n@"storage" ->
       let normalTableName = indexTableName c n
           triggerFunctionName = "\"" <> "insert_or_update_" <> tableNameToText normalTableName <> "_history_table" <> "\""
        in [ "\n\n",
@@ -193,16 +179,70 @@ slipstreamQueryText sqlTypeText CreateTable{..} = T.concat $
             "CREATE OR REPLACE FUNCTION ", triggerFunctionName, "() RETURNS TRIGGER AS $$\n",
             "BEGIN\n",
             "    RAISE NOTICE 'Trigger fired for % on table ", tableNameToText normalTableName, ": %', TG_OP, NEW.address;\n",
+            "  UPDATE ",
+            tableNameToDoubleQuoteText tableName <> " h\n",
+            "  SET valid_to = CAST(NEW.block_timestamp AS timestamp)\n",
+            "  WHERE h.address = NEW.address\n",
+            "    AND h.valid_to = 'infinity'::timestamp;\n",
             "    IF TG_OP = 'INSERT' THEN\n",
             "        RAISE NOTICE 'Inserting into history table ", tableNameToText tableName, " for address: %', NEW.address;\n",
             "        INSERT INTO ",
             tableNameToDoubleQuoteText tableName,
-            " VALUES (NEW.*);\n",
+            "  SELECT NEW.*,\n",
+            "         CAST(NEW.block_timestamp AS timestamp),\n",
+            "         'infinity'::timestamp;\n",
             "    ELSIF TG_OP = 'UPDATE' THEN\n",
             "        RAISE NOTICE 'Updating history table ", tableNameToText tableName, " for address: %', NEW.address;\n",
             "        INSERT INTO ",
             tableNameToDoubleQuoteText tableName,
-            " VALUES (NEW.*);\n",
+            "  SELECT NEW.*,\n",
+            "         CAST(NEW.block_timestamp AS timestamp),\n",
+            "         'infinity'::timestamp;\n",
+            "    END IF;\n",
+            "    RETURN NEW;\n",
+            "END;\n",
+            "$$ LANGUAGE plpgsql;\n\n",
+            -- Create trigger for insert operations
+            "CREATE OR REPLACE TRIGGER \"after_insert_on_",
+            tableNameToText normalTableName, "\"",
+            "\nAFTER INSERT ON ",
+            tableNameToDoubleQuoteText normalTableName,
+            "\nFOR EACH ROW EXECUTE PROCEDURE ", triggerFunctionName, "();\n\n",
+            -- Create trigger for update operations
+            "CREATE OR REPLACE TRIGGER \"after_update_on_",
+            tableNameToText normalTableName, "\"",
+            "\nAFTER UPDATE ON ",
+            tableNameToDoubleQuoteText normalTableName,
+            "\nFOR EACH ROW EXECUTE PROCEDURE ", triggerFunctionName, "();"
+          ]
+    HistoryTableName c n@"mapping" ->
+      let normalTableName = indexTableName c n
+          triggerFunctionName = "\"" <> "insert_or_update_" <> tableNameToText normalTableName <> "_history_table" <> "\""
+       in [ "\n\n",
+            -- Create or replace the function for handling insert and update triggers
+            "CREATE OR REPLACE FUNCTION ", triggerFunctionName, "() RETURNS TRIGGER AS $$\n",
+            "BEGIN\n",
+            "    RAISE NOTICE 'Trigger fired for % on table ", tableNameToText normalTableName, ": %.%', TG_OP, NEW.address, NEW.path;\n",
+            "  UPDATE ",
+            tableNameToDoubleQuoteText tableName <> " h\n",
+            "  SET valid_to = CAST(NEW.block_timestamp AS timestamp)\n",
+            "  WHERE h.address = NEW.address\n",
+            "    AND h.path = NEW.path\n",
+            "    AND h.valid_to = 'infinity'::timestamp;\n",
+            "    IF TG_OP = 'INSERT' THEN\n",
+            "        RAISE NOTICE 'Inserting into history table ", tableNameToText tableName, " for address: %.%', NEW.address, NEW.path;\n",
+            "        INSERT INTO ",
+            tableNameToDoubleQuoteText tableName,
+            "  SELECT NEW.*,\n",
+            "         CAST(NEW.block_timestamp AS timestamp),\n",
+            "         'infinity'::timestamp;\n",
+            "    ELSIF TG_OP = 'UPDATE' THEN\n",
+            "        RAISE NOTICE 'Updating history table ", tableNameToText tableName, " for address: %.%', NEW.address, NEW.path;\n",
+            "        INSERT INTO ",
+            tableNameToDoubleQuoteText tableName,
+            "  SELECT NEW.*,\n",
+            "         CAST(NEW.block_timestamp AS timestamp),\n",
+            "         'infinity'::timestamp;\n",
             "    END IF;\n",
             "    RETURN NEW;\n",
             "END;\n",
@@ -273,11 +313,12 @@ slipstreamQueryText _ CreateView{..} =
                 _ -> ""
             , " ELSE "
             , case t of
-                SqlBool    -> "false::boolean"
-                SqlDecimal -> "0::numeric"
-                SqlText    -> "''::text"
-                SqlJsonb   -> "to_jsonb(''::text)"
-                SqlSerial  -> "0::numeric"
+                SqlBool      -> "false::boolean"
+                SqlDecimal   -> "0::numeric"
+                SqlText      -> "''::text"
+                SqlJsonb     -> "to_jsonb(''::text)"
+                SqlTimestamp -> "'infinity'::timestamp)"
+                SqlSerial    -> "0::numeric"
             , " END AS "
             , wrapEscapeDouble $ if c `Set.member` baseColumnSet then "arg_" <> c else c
             ]) <$> cols') viewColumns
@@ -310,11 +351,12 @@ slipstreamQueryText _ CreateView{..} =
                   _ -> ""
               , " ELSE "
               , case t of
-                  SqlBool    -> "false::boolean"
-                  SqlDecimal -> "'0'::text"
-                  SqlText    -> "''::text"
-                  SqlJsonb   -> "to_jsonb(''::text)"
-                  SqlSerial  -> "0::numeric"
+                  SqlBool      -> "false::boolean"
+                  SqlDecimal   -> "'0'::text"
+                  SqlText      -> "''::text"
+                  SqlJsonb     -> "to_jsonb(''::text)"
+                  SqlTimestamp -> "'infinity'::timestamp)"
+                  SqlSerial    -> "0::numeric"
               , " END)"
               ]
             ]) cols') <$> jsonbColumns)
@@ -378,6 +420,7 @@ slipstreamQueryText _ InsertTable{..} = T.concat $
         maybe "" (", " <>) mExtraSQL,
         ";"
       ])
+slipstreamQueryText _ InsertDelegatecall{} = ""
 slipstreamQueryText _ (CreateFkeyFunction ForeignKeyInfo{..}) = T.concat
   [ "CREATE OR REPLACE FUNCTION \""
   , fkiColumnName
@@ -445,10 +488,7 @@ data ProcessedCollectionRow = ProcessedCollectionRow
   }
   deriving (Show)
 
-crashOnSQLError :: Bool
-crashOnSQLError = False
-
-type OutputM m = (MonadLogger m, MonadIO m, MonadUnliftIO m)
+type OutputM m = (MonadLogger m, MonadIO m)
 
 fillEmptyEntries :: Functor f => [f Text] -> [f Text]
 fillEmptyEntries = zipWith go [(1 :: Int) ..]
@@ -478,68 +518,14 @@ tableUpsert = csv . map go
       let y = wrapDoubleQuotes $ escapeQuotes x
        in wrap1 y " = excluded."
 
-cirrusInfo :: PGDatabase
-cirrusInfo =
-  PGDatabase
-    { pgDBAddr = Left (flags_pghost, show flags_pgport),
-      pgDBTLS = TlsDisabled,
-      pgDBUser = BC.pack flags_pguser :: B.ByteString,
-      pgDBPass = BC.pack flags_password :: B.ByteString,
-      pgDBName = BC.pack flags_database :: B.ByteString,
-      pgDBDebug = False,
-      pgDBLogMessage = runLoggingT . $logInfoLS "pglog",
-      pgDBParams = []
-    }
-
-cirrusConnStr :: ByteString
-cirrusConnStr =
-    BC.pack $
-        "host="     ++ flags_pghost     ++ " " ++
-        "port="     ++ show flags_pgport ++ " " ++
-        "user="     ++ flags_pguser     ++ " " ++
-        "password=" ++ flags_password ++ " " ++
-        "dbname="   ++ flags_database
-
-dbQueryCatchError :: (MonadLogger m, MonadUnliftIO m) => PGConnection -> Text -> m ()
-dbQueryCatchError conn insrt = handle handlePostgresError $ dbQuery conn insrt
-
-dbQuery :: (MonadLogger m, MonadUnliftIO m) => PGConnection -> Text -> m ()
-dbQuery conn insrt = do
-  $logDebugS "outputData" insrt
-  liftIO . void . pgQuery conn $! encodeUtf8 insrt
-
-handlePostgresError :: MonadLogger m => SomeException -> m ()
-handlePostgresError e =
-  if crashOnSQLError
-    then error . show $ e
-    else $logErrorLS "handlePGError" e
-
-outputData ::
-  OutputM m =>
-  ConduitM () SlipstreamQuery m a ->
-  ConduitM i [SlipstreamQuery] m a
-outputData c = do
-  (a, _) <- lift . runConduit $ c `fuseBoth` sinkList -- mapM_C (dbQueryCatchError conn)
-  pure a
-
-dedupC :: (MonadUnliftIO m, MonadLogger m) => PGConnection -> ConduitM SlipstreamQuery SlipstreamQuery m ()
-dedupC conn = go Set.empty
+dedupC :: (MonadLogger m, Ord a) => ConduitM a a m ()
+dedupC = go Set.empty
   where go seen = await >>= \case
           Just a | not (a `Set.member` seen) -> do
-                     lift $ performSQLQueriesFromQuery conn [a]
+                     yield a
                      go (Set.insert a seen)
           Just _ -> go seen
           Nothing -> pure ()
-
-outputDataDedup ::
-  OutputM m =>
-  PGConnection ->
-  ConduitM () SlipstreamQuery m a ->
-  ConduitM i [SlipstreamQuery] m a
-outputDataDedup conn c = do
-  (a, cmds) <- lift . runConduit $ c `fuseBoth` (dedupC conn .| sinkList) -- mapM_C (dbQueryCatchError conn))
-  lift $ performSQLQueriesFromQuery conn cmds
-  pure a
 
 baseColumns :: TableColumns
 baseColumns =
@@ -578,27 +564,25 @@ baseMappingColumns =
 
 notifyPostgREST ::
   OutputM m =>
-  PGConnection ->
   ConduitM i SlipstreamQuery m ()
-notifyPostgREST conn = lift $ performSQLQueriesFromQuery conn [NotifyPostgREST]
+notifyPostgREST = yield NotifyPostgREST
 
 createIndexTable ::
   OutputM m=>
   --
-  PGConnection ->
   ContractF () ->
   CodeCollectionF () ->
   (Text, Text) ->
   [Text] ->
   ConduitM () SlipstreamQuery m [ForeignKeyInfo]
-createIndexTable conn contract cc (creator, n) inherited = do
+createIndexTable contract cc (creator, n) inherited = do
   let tableName = indexTableName creator n
       -- histTableName = historyTableName creator a n
       cols = getTableColumnAndType False cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
       contractCols = ["creator", "contract_name"]
       cols' = (\(x, t, _) -> (x, t)) <$> cols
       fkeys = mapMaybe (\(x, t, mf) -> (\f -> ForeignKeyInfo tableName (indexTableName creator f) x t) <$> mf) cols
-  lift $ performSQLQueriesFromQuery conn [CreateView
+  yield $ CreateView
     tableName
     inherited
     storageTableName
@@ -607,19 +591,18 @@ createIndexTable conn contract cc (creator, n) inherited = do
     [(cols', "data")]
     []
     ["address"]
-    []]
+    []
   pure fkeys
 
 createCollectionTable ::
   OutputM m =>
-  PGConnection ->
   (Text, Text) ->
   ContractF () ->
   CodeCollectionF () ->
   [Text] ->
   (Text, [SVMType.Type], SVMType.Type) ->
   ConduitM () SlipstreamQuery m (Maybe ForeignKeyInfo)
-createCollectionTable conn (creator, n) c cc inherited (collectionName, keyTypes, valueType) = do
+createCollectionTable (creator, n) c cc inherited (collectionName, keyTypes, valueType) = do
   let tableName = collectionTableName creator n collectionName
       keySqlTypes = fromMaybe SqlText . solidityTypeToSQLType False (Just c) cc <$> keyTypes
       keyNames = keyColumnNames keySqlTypes
@@ -637,7 +620,7 @@ createCollectionTable conn (creator, n) c cc inherited (collectionName, keyTypes
         )) <$> (structDef c cc =<< mStructName)
       mappingCols = (fst <$> baseMappingColumns)
         ++ maybe ["value"] (const []) mStructVal
-  lift $ performSQLQueriesFromQuery conn [CreateView
+  yield $ CreateView
     tableName
     inherited
     mappingTableName
@@ -650,20 +633,19 @@ createCollectionTable conn (creator, n) c cc inherited (collectionName, keyTypes
     , ([Right "value"], Just "IS", "NOT NULL")
     , ([Right "value", Left "::text"], Just "NOT IN", "('\"\"', '0', 'false')")
     , ([Left "jsonb_typeof(", Right "value", Left ")"], Just "IS", "NOT NULL")
-    ]]
+    ]
   pure $ case getTableColumnAndType False cc [("value", valueType)] of
     [(x, _, Just f)] -> Just $ ForeignKeyInfo tableName (indexTableName creator f) x SqlJsonb
     _ -> Nothing
 
 createEventArrayTable ::
   OutputM m =>
-  PGConnection ->
   (Text, Text, Text) ->
   CodeCollectionF () ->
   [Text] ->
   (Text, SVMType.Type) ->
   ConduitM () SlipstreamQuery m (Maybe ForeignKeyInfo)
-createEventArrayTable conn (creator, n, e) cc inherited (arr, arrType) = do
+createEventArrayTable (creator, n, e) cc inherited (arr, arrType) = do
   let keyTypes (SVMType.Array t _) = SqlDecimal : keyTypes t
       keyTypes _                   = []
       tableName = eventCollectionTableName creator n e arr
@@ -676,7 +658,7 @@ createEventArrayTable conn (creator, n, e) cc inherited (arr, arrType) = do
   $logInfoS "createEventArrayTable/tableExists"  $ T.pack ( "Table Name: " ++ show tableName ++ ", table exists: ")
   $logInfoS "createEventArrayTable/(creator, n, e) " (T.pack $ show (creator, n, e))
   $logInfoS "createEventArrayTable/(arr, arrType) " (T.pack $ show (arr, arrType))
-  lift $ performSQLQueriesFromQuery conn [CreateView
+  yield $ CreateView
     tableName
     inherited
     eventArrayTableName
@@ -687,17 +669,16 @@ createEventArrayTable conn (creator, n, e) cc inherited (arr, arrType) = do
     (["address", "block_hash", "event_index", "collection_name"] ++ (fst <$> keyNames))
     [ ([Right "event_name"], Nothing, wrapEscapeSingle $ tableNameEventName tableName)
     , ([Right "collection_name"], Nothing, wrapEscapeSingle $ tableNameCollectionName tableName)
-    ]]
+    ]
   pure $ case getTableColumnAndType False cc [("value", arrType)] of
     [(x, _, Just f)] -> Just $ ForeignKeyInfo tableName (indexTableName creator f) x SqlJsonb
     _ -> Nothing
 
 insertIndexTable ::
   OutputM m =>
-  PGConnection ->
   E.ProcessedContract ->
   ConduitM () SlipstreamQuery m ()
-insertIndexTable conn cs =
+insertIndexTable cs =
   let cs' = (\c@E.ProcessedContract {contractData = contractData} -> (c, contractData)) cs
       processContract :: (E.ProcessedContract, Map StoragePath BasicValue) -> [SlipstreamQuery]
       processContract (contract, list) =
@@ -716,40 +697,22 @@ insertIndexTable conn cs =
               dataUpdateSQL = jsonbUpdateClause tblText "data"
           in [ InsertTable storageTableName keySt [valsForSQL] . Just $ OnConflict ["address"] conflictUpdateCols (Just dataUpdateSQL)
              ]
-   in lift $ performSQLQueriesFromQuery conn $ processContract cs'
+   in yieldMany $ processContract cs'
 
 insertDelegatecall ::
   OutputM m =>
-  PGConnection ->
   Delegatecall ->
   ConduitM () SlipstreamQuery m ()
-insertDelegatecall conn (Delegatecall storageAddress codeAddress Nothing contractName) = do
-  lift $ performSQLQueries conn
-    [
-      E.insertSelect $ do
-        src <- E.from $ \c -> do
-          E.where_ (c E.^. ContractAddress E.==. E.val (StorageKey codeAddress))
-          return c
-          -- Build an Insertion MyTable by listing *non-id* fields in schema order:
-        pure $ Contract
-          E.<#  (E.val $ StorageKey storageAddress)
-          E.<&> (src E.^. ContractCreator)
-          E.<&> (E.val contractName)
-    ]
-
-insertDelegatecall conn (Delegatecall s _ (Just c) n) = do
-  lift $ performSQLQueries conn
-    [insert_ $ Contract (StorageKey s) c n]
+insertDelegatecall = yield . InsertDelegatecall
 
 insertCollectionTable ::
   OutputM m =>
-  PGConnection ->
   [ProcessedCollectionRow] ->
   ConduitM () SlipstreamQuery m ()
-insertCollectionTable _ [] = error "insertCollectionTable: unhandled empty list"
-insertCollectionTable conn maps = do
+insertCollectionTable [] = error "insertCollectionTable: unhandled empty list"
+insertCollectionTable maps = do
   let results = processGroupedData maps
-  lift $ performSQLQueriesFromQuery conn results
+  yieldMany results
 
 refreshMaterializedView ::
   -- OutputM m =>
@@ -768,10 +731,9 @@ processGroupedData [] = []
 
 createFkeyFunctions ::
   OutputM m =>
-  PGConnection ->
   [ForeignKeyInfo] ->
   ConduitM () SlipstreamQuery m ()
-createFkeyFunctions conn rows = lift $ performSQLQueriesFromQuery conn $ CreateFkeyFunction <$> rows
+createFkeyFunctions rows = yieldMany $ CreateFkeyFunction <$> rows
 
 eventBaseColumnsQuery :: [(Text, SqlType)]
 eventBaseColumnsQuery =
@@ -841,6 +803,12 @@ insertCollectionTableQuery rows =
               . Map.fromList
               $ (\(t,k) -> (ValueString t, k))
               <$> keyColumnNames (collectionDataKeys m)
+            , SimpleValue . ValueString $ T.concat
+                [ collection_name m
+                , "["
+                , T.intercalate "][" $ fromMaybe "NULL" . valueToSQLText' False <$> collectionDataKeys m
+                , "]"
+                ]
             , val
             ]
        in (m, isObject,) $ Just <$> keyValuePairs
@@ -856,9 +824,9 @@ insertCollectionTableQuery rows =
       let tblName = mappingTableName
           tblText = tableNameToDoubleQuoteText tblName
 
-          onConflictCols = ["address", "collection_name", "key"]
+          onConflictCols = ["address", "path"]
 
-          columns = baseMappingColumns ++ [("key", SqlJsonb), ("value", SqlJsonb)]
+          columns = baseMappingColumns ++ [("key", SqlJsonb), ("path", SqlText), ("value", SqlJsonb)]
 
           baseFields =
             [ ValueAddress . address,
@@ -907,6 +875,7 @@ insertEventArrayTableQuery ms =
                     ValueString . T.pack . keccak256ToHex . blockHash,
                     ValueString . tshow . blockTimestamp,
                     ValueInt False Nothing . blockNumber,
+                    const $ ValueString "",
                     ValueInt False Nothing . fromIntegral . maybe 0 snd . eventInfo,
                     ValueString . collection_name,
                     ValueString . collection_type
@@ -918,26 +887,24 @@ insertEventArrayTableQuery ms =
 -- globals{createdEvents}
 createExpandEventTables ::
   OutputM m =>
-  PGConnection ->
   ContractF () ->
   CodeCollectionF () ->
   (Text, Text) ->
   [Text] ->
   ConduitM () SlipstreamQuery m [ForeignKeyInfo]
-createExpandEventTables conn c cc nameParts inherited = fmap concat . mapM go . Map.toList $ c ^. events
+createExpandEventTables c cc nameParts inherited = fmap concat . mapM go . Map.toList $ c ^. events
   where
-    go (evName, ev) = createEventTable conn nameParts evName ev cc inherited
+    go (evName, ev) = createEventTable nameParts evName ev cc inherited
 
 createEventTable ::
   OutputM m =>
-  PGConnection ->
   (Text, Text) ->
   SolidString ->
   EventF () ->
   CodeCollectionF () ->
   [Text] ->
   ConduitM () SlipstreamQuery m [ForeignKeyInfo]
-createEventTable conn (creator, n) evName ev cc inherited = do
+createEventTable (creator, n) evName ev cc inherited = do
   $logInfoS "createEventTable" . T.pack $ show ev
   let (crtr, cname) = constructTableNameParameters creator n
       eventTable = EventTableName crtr cname (escapeQuotes $ labelToText evName)
@@ -947,7 +914,7 @@ createEventTable conn (creator, n) evName ev cc inherited = do
       fcols = mapMaybe (\(x, t, mf) -> (\f -> ForeignKeyInfo eventTable (indexTableName creator f) x t) <$> mf) cols
       arrayNamesAndTypes = [(key, entry) | (key, IndexedType _ (SVMType.Array entry _)) <- map evLogToPair $ ev ^. eventLogs]
   $logInfoS "keys" (T.pack $ show arrayNamesAndTypes)
-  lift $ performSQLQueriesFromQuery conn $
+  yieldMany $
     (\i ->
       let tableName' = if i then indexedEventTableName eventTable else eventTable
           cols' = (\(x, v, _) -> (x, v)) <$> cols
@@ -963,7 +930,7 @@ createEventTable conn (creator, n) evName ev cc inherited = do
             [([Right "event_name"], Nothing, wrapEscapeSingle $ tableNameEventName tableName')]
     ) <$> [False] -- , (True, tableNameToText tableName)]
   arrayFkeys <- forM arrayNamesAndTypes $
-    createEventArrayTable conn (crtr, cname, escapeQuotes $ labelToText evName) cc inherited
+    createEventArrayTable (crtr, cname, escapeQuotes $ labelToText evName) cc inherited
   pure $ fcols ++ catMaybes arrayFkeys
 
 -- Function to convert AggregateEvent to ProcessedCollectionRow
@@ -1001,10 +968,10 @@ getArraysFromEvents evArgs = do
          in (arrayName, zip (map (SimpleValue . ValueString . T.pack . show) [0 :: Int ..])
                             (map (SimpleValue . ValueString . T.pack) elements))
 
-pipeInsertGlobalEventTable :: OutputM m => PGConnection -> [AggregateEvent] -> ConduitM () SlipstreamQuery m ()
-pipeInsertGlobalEventTable conn aggregatedEvents = do
+pipeInsertGlobalEventTable :: OutputM m => [AggregateEvent] -> ConduitM () SlipstreamQuery m ()
+pipeInsertGlobalEventTable aggregatedEvents = do
   queries <- lift (mapM insertGlobalEventTable aggregatedEvents)
-  lift $ performSQLQueriesFromQuery conn queries
+  yieldMany queries
 
 insertGlobalEventTable :: OutputM m => AggregateEvent -> m SlipstreamQuery
 insertGlobalEventTable agEv = do
@@ -1150,6 +1117,9 @@ contractTableName = indexTableName "" "contract"
 mappingTableName :: TableName
 mappingTableName = indexTableName "" "mapping"
 
+mappingHistoryTableName :: TableName
+mappingHistoryTableName = historyTableName "" "mapping"
+
 eventArrayTableName :: TableName
 eventArrayTableName = indexTableName "" "event_array"
 
@@ -1173,9 +1143,12 @@ initialSlipstreamQueries =
       , ("block_timestamp", SqlText)
       , ("block_number", SqlText)
       , ("data", SqlJsonb)
+      , ("valid_from", SqlTimestamp)
+      , ("valid_to", SqlTimestamp)
       ]
       []
       Nothing
+      [("storage_history_idx", ["address","valid_to"])]
 {-  , CreateTable
       contractTableName
       [ ("address", SqlText)
@@ -1193,10 +1166,29 @@ initialSlipstreamQueries =
       , ("collection_name", SqlText)
       , ("collection_type", SqlText)
       , ("key", SqlJsonb)
+      , ("path", SqlText)
       , ("value", SqlJsonb)
       ]
-      ["address", "collection_name", "key"]
+      ["address", "path"]
       (Just $ Foreign "contract_mapping" ["address"] storageTableName ["address"])
+      [("mapping_idx", ["address","path"])]
+  , CreateTable
+      mappingHistoryTableName
+      [ ("address", SqlText)
+      , ("block_hash", SqlText)
+      , ("block_timestamp", SqlText)
+      , ("block_number", SqlText)
+      , ("collection_name", SqlText)
+      , ("collection_type", SqlText)
+      , ("key", SqlJsonb)
+      , ("path", SqlText)
+      , ("value", SqlJsonb)
+      , ("valid_from", SqlTimestamp)
+      , ("valid_to", SqlTimestamp)
+      ]
+      []
+      Nothing
+      [("mapping_history_idx", ["address","path","valid_to"])]
   , CreateTable
       globalEventTableName
       [ ("id", SqlSerial)
@@ -1211,12 +1203,14 @@ initialSlipstreamQueries =
       ]
       ["address", "block_hash", "event_index"]
       (Just $ Foreign "contract_event" ["address"] storageTableName ["address"])
+      []
   , CreateTable
       eventArrayTableName
       [ ("address", SqlText)
       , ("block_hash", SqlText)
       , ("block_timestamp", SqlText)
       , ("block_number", SqlText)
+      , ("transaction_sender", SqlText)
       , ("event_name", SqlText)
       , ("event_index", SqlDecimal)
       , ("collection_name", SqlText)
@@ -1226,4 +1220,5 @@ initialSlipstreamQueries =
       ]
       ["address", "block_hash", "event_index", "collection_name", "key"]
       (Just $ Foreign "event_event_array" ["address", "block_hash", "event_index"] globalEventTableName ["address", "block_hash", "event_index"])
+      []
   ]

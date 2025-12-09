@@ -443,11 +443,17 @@ router.get("/config/:asset", authHandler.authorizeRequest(true), CDPController.g
  * @openapi
  * /cdp/assets:
  *   get:
- *     summary: List supported collateral assets
+ *     summary: List collateral assets (optionally filter by support status)
  *     tags: [CDP]
+ *     parameters:
+ *       - in: query
+ *         name: supported
+ *         schema:
+ *           type: boolean
+ *         description: If true, returns only supported assets (isSupported === true). If false or omitted, returns all assets (including unsupported). Defaults to false (returns all).
  *     responses:
  *       200:
- *         description: Supported asset configurations
+ *         description: Asset configurations. Returns all assets by default, or only supported assets if 'supported=true' query parameter is provided.
  *         content:
  *           application/json:
  *             schema:
@@ -456,7 +462,7 @@ router.get("/config/:asset", authHandler.authorizeRequest(true), CDPController.g
  *                 type: object
  *                 additionalProperties: true
  */
-router.get("/assets", authHandler.authorizeRequest(true), CDPController.getSupportedAssets);
+router.get("/assets", authHandler.authorizeRequest(true), CDPController.getAssets);
 
 /**
  * @openapi
@@ -576,6 +582,37 @@ router.post("/admin/set-collateral-config", authHandler.authorizeRequest(true), 
  *               additionalProperties: true
  */
 router.post("/admin/set-asset-paused", authHandler.authorizeRequest(true), CDPController.setAssetPaused);
+
+/**
+ * @openapi
+ * /cdp/admin/set-asset-supported:
+ *   post:
+ *     summary: Toggle support for a collateral asset (admin)
+ *     tags: [CDP]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - asset
+ *               - supported
+ *             properties:
+ *               asset:
+ *                 type: string
+ *               supported:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: Support toggle transaction result
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               additionalProperties: true
+ */
+router.post("/admin/set-asset-supported", authHandler.authorizeRequest(true), CDPController.setAssetSupported);
 
 /**
  * @openapi
@@ -822,6 +859,72 @@ router.post("/bad-debt/claim-junior-note", authHandler.authorizeRequest(), CDPCo
  *                         description: Number of vaults for this asset
  */
 router.get("/stats", authHandler.authorizeRequest(), CDPController.getCDPStats);
+
+/**
+ * @openapi
+ * /cdp/interest:
+ *   get:
+ *     summary: Get interest accrued across all CDP assets for multiple time periods
+ *     tags: [CDP]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Interest accrued per asset and totals for daily, weekly, monthly, YTD, and all-time periods
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 totalDailyInterestUSD:
+ *                   type: string
+ *                   description: Total daily interest accrued across all assets in USD (18 decimals)
+ *                 totalWeeklyInterestUSD:
+ *                   type: string
+ *                   description: Total weekly interest accrued across all assets in USD (18 decimals)
+ *                 totalMonthlyInterestUSD:
+ *                   type: string
+ *                   description: Total monthly interest accrued across all assets in USD (18 decimals)
+ *                 totalYtdInterestUSD:
+ *                   type: string
+ *                   description: Total year-to-date interest accrued across all assets in USD (18 decimals)
+ *                 totalAllTimeInterestUSD:
+ *                   type: string
+ *                   description: Total all-time interest accrued across all assets in USD (18 decimals)
+ *                 assets:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       asset:
+ *                         type: string
+ *                         description: Asset contract address
+ *                       symbol:
+ *                         type: string
+ *                         description: Asset symbol (e.g., WBTC, ETHST)
+ *                       totalDebtUSD:
+ *                         type: string
+ *                         description: Total debt in USD for this asset (18 decimals)
+ *                       annualRatePercent:
+ *                         type: number
+ *                         description: Annual stability fee rate as percentage
+ *                       dailyInterestUSD:
+ *                         type: string
+ *                         description: Daily interest accrued for this asset in USD (18 decimals)
+ *                       weeklyInterestUSD:
+ *                         type: string
+ *                         description: Weekly interest accrued for this asset in USD (18 decimals)
+ *                       monthlyInterestUSD:
+ *                         type: string
+ *                         description: Monthly interest accrued for this asset in USD (18 decimals)
+ *                       ytdInterestUSD:
+ *                         type: string
+ *                         description: Year-to-date interest accrued for this asset in USD (18 decimals)
+ *                       allTimeInterestUSD:
+ *                         type: string
+ *                         description: All-time interest accrued for this asset in USD (18 decimals)
+ */
+router.get("/interest", authHandler.authorizeRequest(true), CDPController.getInterestAccrued);
 
 
 export default router;

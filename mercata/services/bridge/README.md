@@ -1,6 +1,6 @@
 # Mercata Bridge Service
 
-The Mercata Bridge Service is responsible for seamlessly bridging assets between multiple blockchain networks and the STRATO Mercata testnet. It manages deposits and withdrawals using a Safe multisig wallet and monitors blockchain activity in real-time using dynamic RPC connections.
+The Mercata Bridge Service is responsible for seamlessly bridging assets between multiple blockchain networks and the STRATO testnet. It manages deposits and withdrawals using a Safe multisig wallet and monitors blockchain activity in real-time using dynamic RPC connections.
 
 ## Features
 

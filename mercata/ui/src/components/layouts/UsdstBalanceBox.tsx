@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { useUserTokens } from "@/context/UserTokensContext";
 import { useUser } from "@/context/UserContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { Card, CardContent } from "@/components/ui/card";
@@ -54,28 +53,24 @@ const InfoTooltip = ({ children, content }: { children: React.ReactNode; content
 };
 
 const UsdstBalanceBox: React.FC = () => {
-  const { userAddress } = useUser();
-  const { usdstBalance, voucherBalance, loadingUsdstBalance, fetchUsdstBalance } =
-    useUserTokens();
-  const { getToken } = useTokenContext();
+  const { userAddress, isLoggedIn } = useUser();
+  const { usdstBalance, voucherBalance, loadingUsdstBalance, fetchUsdstBalance, getToken } =
+    useTokenContext();
   const location = useLocation();
   const [isMinimized, setIsMinimized] = useState(false);
   const [usdstToken, setUsdstToken] = useState<Token | null>(null);
 
   useEffect(() => {
-    if (userAddress) {
-      fetchUsdstBalance(userAddress);
+    if (isLoggedIn) {
+      fetchUsdstBalance();
     }
-  }, [userAddress, fetchUsdstBalance]);
+  }, [fetchUsdstBalance, isLoggedIn]);
 
   // Fetch USDST token info for image
   useEffect(() => {
     const fetchUsdstToken = async () => {
       try {
-        const tokenResponse = await getToken(usdstAddress);
-        const token = Array.isArray(tokenResponse)
-          ? tokenResponse[0]
-          : tokenResponse;
+        const token = await getToken(usdstAddress);
         setUsdstToken(token);
       } catch (error) {
         console.error("Error fetching USDST token:", error);
@@ -192,7 +187,7 @@ const UsdstBalanceBox: React.FC = () => {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1">
               <p className="text-xs font-medium text-gray-600">USDST Balance</p>
-              <InfoTooltip content="USDST is used to pay for gas fees on the STRATO Mercata network">
+              <InfoTooltip content="USDST is used to pay for gas fees on the STRATO network">
                 <HelpCircle className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
               </InfoTooltip>
             </div>

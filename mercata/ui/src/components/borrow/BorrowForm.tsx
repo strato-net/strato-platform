@@ -10,6 +10,8 @@ import HealthImpactDisplay from "@/components/ui/HealthImpactDisplay";
 import PercentageButtons from "../ui/PercentageButtons";
 import { useLendingContext } from "@/context/LendingContext";
 import { computeMaxTransferable, handleAmountInputChange } from "@/utils/transferValidation";
+import { UserRewardsData } from "@/services/rewardsService";
+import { CompactRewardsDisplay } from "../rewards/CompactRewardsDisplay";
 
 interface BorrowFormProps {
   loans: NewLoanData | null;
@@ -20,9 +22,11 @@ interface BorrowFormProps {
   collateralInfo: CollateralData[] | null;
   startPolling?: () => void;
   stopPolling?: () => void;
+  userRewards?: UserRewardsData | null;
+  rewardsLoading?: boolean;
 }
 
-const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalance, collateralInfo, startPolling, stopPolling }: BorrowFormProps) => {
+const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalance, collateralInfo, startPolling, stopPolling, userRewards, rewardsLoading }: BorrowFormProps) => {
   const [borrowAmount, setBorrowAmount] = useState<string>("");
   const [borrowAmountError, setBorrowAmountError] = useState<string>("");
   const [feeError, setFeeError] = useState<string>("");
@@ -168,6 +172,12 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
         {borrowAmountError && (
           <p className="text-red-600 text-sm">{borrowAmountError}</p>
         )}
+        <CompactRewardsDisplay
+          userRewards={userRewards}
+          activityName="Lending Pool Borrow"
+          inputAmount={borrowAmount}
+          actionLabel="Borrow"
+        />
         <PercentageButtons
           value={borrowAmount}
           maxValue={maxAmount}

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import CopyButton from '../ui/copy';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface CastVoteModalProps {
   open: boolean;
@@ -18,6 +19,9 @@ interface CastVoteModalProps {
     threshold: number;
   } | null;
   onCastVote: (issueId: string) => Promise<void> | void;
+  onDismissIssue?: (issueId: string) => Promise<void> | void;
+  votes?: Array<{ issueId: string; index: number; voter: string }>;
+  userAddress?: string | null;
 }
 
 const CastVoteModal: React.FC<CastVoteModalProps> = ({
@@ -25,9 +29,13 @@ const CastVoteModal: React.FC<CastVoteModalProps> = ({
   onOpenChange,
   issue,
   onCastVote,
+  onDismissIssue,
+  votes = [],
+  userAddress,
 }) => {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDismissing, setIsDismissing] = useState(false);
 
   const handleSubmit = async () => {
     if (!issue) return;
@@ -42,12 +50,60 @@ const CastVoteModal: React.FC<CastVoteModalProps> = ({
       });
 
       onOpenChange(false);
-    } catch (err) {
-      console.error('Cast vote failed:', err);
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const handleDismiss = async () => {
+    if (!issue || !onDismissIssue) return;
+
+    setIsDismissing(true);
+    try {
+      await onDismissIssue(issue.issueId);
+      
+      toast({
+        title: 'Issue Dismissed Successfully',
+        description: 'The issue has been dismissed.',
+      });
+
+      onOpenChange(false);
+    } finally {
+      setIsDismissing(false);
+    }
+  };
+
+  // Check if dismiss button should be enabled
+  const canDismiss = issue && onDismissIssue && userAddress && votes.length > 0
+    ? (() => {
+        const issueVotes = votes.filter(v => v.issueId === issue.issueId);
+        return issueVotes.length === 1 && issueVotes[0]?.voter === userAddress;
+      })()
+    : false;
+
+  // Get tooltip message for disabled button
+  const getTooltipMessage = (): string | null => {
+    if (!issue || !onDismissIssue || !userAddress || votes.length === 0) {
+      return null;
+    }
+    
+    const issueVotes = votes.filter(v => v.issueId === issue.issueId);
+    if (issueVotes.length === 0) {
+      return null;
+    }
+    
+    if (issueVotes.length > 1) {
+      return "Only issues with a single vote can be dismissed";
+    }
+    
+    if (issueVotes[0]?.voter !== userAddress) {
+      return "Only the proposer can dismiss this issue";
+    }
+    
+    return null;
+  };
+
+  const tooltipMessage = getTooltipMessage();
 
   if (!issue) return null;
 
@@ -127,29 +183,62 @@ const CastVoteModal: React.FC<CastVoteModalProps> = ({
         </div>
 
         {/* Actions */}
-        <div className="flex justify-end gap-3 pt-4 border-t flex-shrink-0">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={isSubmitting}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={isSubmitting}
-            className="bg-strato-blue hover:bg-strato-blue/90"
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Casting Vote...
-              </>
-            ) : (
-              'Confirm Vote'
-            )}
-          </Button>
+        <div className="flex justify-between gap-3 pt-4 border-t flex-shrink-0">
+          <div>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleDismiss}
+                      disabled={!onDismissIssue || !canDismiss || isDismissing || isSubmitting}
+                      className="text-red-600 border-red-600 hover:bg-red-50"
+                    >
+                      {isDismissing ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Dismissing...
+                        </>
+                      ) : (
+                        'Dismiss Issue'
+                      )}
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {(!onDismissIssue || !canDismiss) && tooltipMessage && (
+                  <TooltipContent>
+                    <p>{tooltipMessage}</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+          <div className="flex gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={isSubmitting || isDismissing}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={isSubmitting || isDismissing}
+              className="bg-strato-blue hover:bg-strato-blue/90"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Casting Vote...
+                </>
+              ) : (
+                'Confirm Vote'
+              )}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

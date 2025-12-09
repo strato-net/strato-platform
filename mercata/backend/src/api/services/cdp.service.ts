@@ -35,6 +35,21 @@ const convertStabilityFeeRateToAnnualPercentage = (stabilityFeeRateRay: string |
   return annualPercentage;
 };
 
+// Helper function for compound interest calculation (matches contract's per-second compounding)
+const getCompoundInterest = (
+  debtUSD: bigint,
+  stabilityFeeRate: bigint, // per-second rate in RAY
+  seconds: bigint
+): bigint => {
+  const factor = rpow(stabilityFeeRate, seconds, RAY);
+  return (debtUSD * (factor - RAY)) / RAY;
+};
+
+// Time constants for compound interest calculations
+const SECONDS_PER_DAY = 86400n;
+const SECONDS_PER_WEEK = 604800n;
+const SECONDS_PER_MONTH = 2592000n; // 30 days
+
 // Extract constants for consistency with lending service
 const {
   cdpRegistrySelectFields,
@@ -1063,6 +1078,16 @@ export const getAssetConfig = async (
   const config = configEntry.CollateralConfig;
   const tokenInfo = await getTokenInfo(accessToken, asset);
   
+  // Check isSupportedAsset mapping - if asset is not in the mapping, it's disabled (false)
+  // The Cirrus query returns entries with 'key' field (asset address) and 'value' field (boolean)
+  const supportedAssetEntry = registry.cdpEngine.isSupportedAsset?.find(
+    (entry: any) => {
+      const entryKey = entry.key || entry.asset;
+      return entryKey?.toLowerCase() === asset.toLowerCase();
+    }
+  );
+  const isSupported = supportedAssetEntry?.value === true;
+  
   return {
     asset,
     symbol: tokenInfo.symbol,
@@ -1075,39 +1100,102 @@ export const getAssetConfig = async (
     debtCeiling: config.debtCeiling,
     unitScale: config.unitScale,
     isPaused: config.isPaused,
-    isSupported: true,
+    isSupported,
   };
 };
 
+// Get all collateral assets (regardless of support status) - used by admin
+export const getAllCollateralAssets = async (
+  accessToken: string,
+): Promise<AssetConfig[]> => {
+  const [{ data: [registryData] }, { data: symbols }] = await Promise.all([
+    cirrus.get(accessToken, `/${CDPRegistry}`, {
+      params: {
+        select: `cdpEngine:cdpEngine_fkey(collateralConfigs:${CDPEngine}-collateralConfigs(asset:key,CollateralConfig:value),isSupportedAsset:${CDPEngine}-isSupportedAsset!inner(asset:key,value))`,
+        address: `eq.${cdpRegistry}`,
+      },
+    }),
+    cirrus.get(accessToken, `/${Token}`, {
+      params: {
+        select: "address,_symbol",
+        "status": "eq.2",
+      },
+    }),
+  ]);
+
+  const supportedMap = new Map(registryData.cdpEngine.isSupportedAsset.map((a: any) => [a.asset, a.value]));
+  const symbolMap = new Map(symbols.map((s: any) => [s.address, s._symbol]));
+
+  return registryData.cdpEngine.collateralConfigs
+    .filter((config: any) => symbolMap.has(config.asset))
+    .map((config: any) => {
+      const cfg = config.CollateralConfig;
+      return {
+        asset: config.asset,
+        symbol: symbolMap.get(config.asset),
+        liquidationRatio: Number(cfg.liquidationRatio) / Number(WAD) * 100,
+        minCR: Number(cfg.minCR) / Number(WAD) * 100,
+        liquidationPenaltyBps: parseInt(cfg.liquidationPenaltyBps),
+        closeFactorBps: parseInt(cfg.closeFactorBps),
+        stabilityFeeRate: convertStabilityFeeRateToAnnualPercentage(cfg.stabilityFeeRate),
+        debtFloor: cfg.debtFloor,
+        debtCeiling: cfg.debtCeiling,
+        unitScale: cfg.unitScale,
+        isPaused: cfg.isPaused,
+        isSupported: supportedMap.get(config.asset),
+      };
+    });
+};
+
+// Get only supported collateral assets (isSupported === true) - used by user-facing components
 export const getSupportedAssets = async (
   accessToken: string,
-  userAddress: string
 ): Promise<AssetConfig[]> => {
-  const registry = await getCDPRegistry(accessToken, userAddress, {}, "getSupportedAssets");
-  
-  if (!registry?.cdpEngine) {
-    throw new Error("CDP Engine not found");
-  }
-
-  const configEntries = registry.cdpEngine.collateralConfigs || [];
-  if (configEntries.length === 0) return [];
-
-  // Check each asset individually and filter to only active tokens
-  const activeConfigPromises = configEntries.map(async (entry: any) => {
-    const isActive = await isTokenActive(accessToken, entry.asset);
-    return isActive ? entry : null;
-  });
-  
-  const activeConfigEntries = (await Promise.all(activeConfigPromises))
-    .filter((entry: any) => entry !== null);
-
-  // Build asset configs for active tokens
-  const configPromises = activeConfigEntries.map(async (entry: any) => 
-    getAssetConfig(accessToken, userAddress, entry.asset)
+  const { data: [registryData] } = await cirrus.get(
+    accessToken,
+    `/${CDPRegistry}`,
+    {
+      params: {
+        select: `cdpEngine:cdpEngine_fkey(collateralConfigs:${CDPEngine}-collateralConfigs(asset:key,CollateralConfig:value),isSupportedAsset:${CDPEngine}-isSupportedAsset!inner(asset:key,value))`,
+        "cdpEngine.isSupportedAsset.value": "eq.true",
+        address: `eq.${cdpRegistry}`,
+      },
+    }
   );
-  
-  const configs = await Promise.all(configPromises);
-  return configs.filter((config: AssetConfig | null): config is AssetConfig => config !== null);
+
+  const supportedAssetAddresses = registryData.cdpEngine.isSupportedAsset.map(
+    (asset: any) => asset.asset
+  );
+
+  const { data: symbols } = await cirrus.get(accessToken, `/${Token}`, {
+    params: {
+      select: "address,_symbol",
+      "status": "eq.2",
+      address: `in.(${supportedAssetAddresses.join(",")})`,
+    },
+  });
+
+  const symbolMap = new Map(symbols.map((s: any) => [s.address, s._symbol]));
+
+  return registryData.cdpEngine.collateralConfigs
+    .filter((config: any) => symbolMap.has(config.asset))
+    .map((config: any) => {
+      const cfg = config.CollateralConfig;
+      return {
+        asset: config.asset,
+        symbol: symbolMap.get(config.asset),
+        liquidationRatio: Number(cfg.liquidationRatio) / Number(WAD) * 100,
+        minCR: Number(cfg.minCR) / Number(WAD) * 100,
+        liquidationPenaltyBps: parseInt(cfg.liquidationPenaltyBps),
+        closeFactorBps: parseInt(cfg.closeFactorBps),
+        stabilityFeeRate: convertStabilityFeeRateToAnnualPercentage(cfg.stabilityFeeRate),
+        debtFloor: cfg.debtFloor,
+        debtCeiling: cfg.debtCeiling,
+        unitScale: cfg.unitScale,
+        isPaused: cfg.isPaused,
+        isSupported: true,
+      };
+    });
 };
 
 export const getMaxLiquidatable = async (
@@ -1296,6 +1384,33 @@ export const setGlobalPaused = async (
   );
 };
 
+export const setAssetSupported = async (
+  accessToken: string,
+  userAddress: string,
+  body: { asset: string; supported: boolean }
+): Promise<{ status: string; hash: string }> => {
+  const registry = await getCDPRegistry(accessToken, userAddress, {}, "setAssetSupported");
+  
+  if (!registry?.cdpEngine) {
+    throw new Error("CDP Engine not found");
+  }
+
+  const tx: FunctionInput = {
+    contractName: extractContractName(CDPEngine),
+    contractAddress: registry.cdpEngine.address,
+    method: "setSupportedAsset",
+    args: {
+      asset: body.asset,
+      supported: body.supported,
+    },
+  };
+
+  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
+  );
+};
+
 export const getGlobalPaused = async (
   accessToken: string,
   userAddress: string
@@ -1313,8 +1428,8 @@ export const getAllCollateralConfigs = async (
   accessToken: string,
   userAddress: string
 ): Promise<AssetConfig[]> => {
-  // This is the same as getSupportedAssets but with a different name for clarity
-  return getSupportedAssets(accessToken, userAddress);
+  // Return all collateral assets (regardless of support status) for admin view
+  return getAllCollateralAssets(accessToken);
 };
 
 export const getBadDebt = async (
@@ -1914,6 +2029,125 @@ export const getCDPStats = async (
     });
     throw new Error("Failed to fetch CDP statistics");
   }
+};
+
+interface InterestData {
+  asset: string;
+  symbol: string;
+  totalDebtUSD: string;
+  annualRatePercent: number;
+  dailyInterestUSD: string;
+  weeklyInterestUSD: string;
+  monthlyInterestUSD: string;
+  ytdInterestUSD: string;
+  allTimeInterestUSD: string;
+}
+
+interface InterestResponse {
+  totalDailyInterestUSD: string;
+  totalWeeklyInterestUSD: string;
+  totalMonthlyInterestUSD: string;
+  totalYtdInterestUSD: string;
+  totalAllTimeInterestUSD: string;
+  assets: InterestData[];
+}
+
+export const getInterestAccrued = async (
+  accessToken: string,
+  userAddress: string
+): Promise<InterestResponse> => {
+  const registry = await getCDPRegistry(accessToken, userAddress, {}, "getInterestAccrued");
+  
+  if (!registry?.cdpEngine) {
+    throw new Error("CDP Engine not found");
+  }
+
+  const collateralConfigs = registry.cdpEngine.collateralConfigs || [];
+  const globalStates = registry.cdpEngine.collateralGlobalStates || [];
+
+  // Build a map of global states by asset
+  const globalStateMap = new Map(
+    globalStates.map((s: any) => [s.asset.toLowerCase(), s.CollateralGlobalState])
+  );
+
+  let totalDailyInterestUSD = 0n;
+  let totalWeeklyInterestUSD = 0n;
+  let totalMonthlyInterestUSD = 0n;
+  let totalYtdInterestUSD = 0n;
+  let totalAllTimeInterestUSD = 0n;
+
+  const assetsData: InterestData[] = [];
+
+  // Calculate days elapsed for YTD
+  const now = new Date();
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
+  const daysElapsedYTD = Math.floor((now.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+  for (const configEntry of collateralConfigs) {
+    const asset = configEntry.asset;
+    const config = configEntry.CollateralConfig;
+    const globalState = globalStateMap.get(asset.toLowerCase());
+
+    if (!config || !globalState) continue;
+
+    // Get token info for symbol
+    const tokenInfo = await getTokenInfo(accessToken, asset);
+
+    // Calculate actual debt: totalScaledDebt * rateAccumulator / RAY
+    const totalScaledDebt = BigInt((globalState as any).totalScaledDebt || "0");
+    const rateAccumulator = BigInt((globalState as any).rateAccumulator || RAY.toString());
+    const actualDebtUSD = (totalScaledDebt * rateAccumulator) / RAY;
+
+    // Get annual rate as percentage (for display)
+    const annualRatePercent = convertStabilityFeeRateToAnnualPercentage(config.stabilityFeeRate);
+
+    // Use compound interest (matches contract's per-second compounding via rpow)
+    const stabilityFeeRate = BigInt(config.stabilityFeeRate);
+
+    // Compound interest for each period
+    const dailyInterestUSD = getCompoundInterest(actualDebtUSD, stabilityFeeRate, SECONDS_PER_DAY);
+    const weeklyInterestUSD = getCompoundInterest(actualDebtUSD, stabilityFeeRate, SECONDS_PER_WEEK);
+    const monthlyInterestUSD = getCompoundInterest(actualDebtUSD, stabilityFeeRate, SECONDS_PER_MONTH);
+
+    // YTD interest using compound calculation
+    const secondsElapsedYTD = BigInt(daysElapsedYTD) * SECONDS_PER_DAY;
+    const ytdInterestUSD = getCompoundInterest(actualDebtUSD, stabilityFeeRate, secondsElapsedYTD);
+
+    // All-time interest = total accumulated interest (rateAccumulator - RAY) * totalScaledDebt / RAY
+    // This represents the cumulative interest that has accrued since inception
+    const allTimeInterestUSD = totalScaledDebt > 0n 
+      ? (totalScaledDebt * (rateAccumulator - RAY)) / RAY
+      : 0n;
+
+    totalDailyInterestUSD += dailyInterestUSD;
+    totalWeeklyInterestUSD += weeklyInterestUSD;
+    totalMonthlyInterestUSD += monthlyInterestUSD;
+    totalYtdInterestUSD += ytdInterestUSD;
+    totalAllTimeInterestUSD += allTimeInterestUSD;
+
+    if (actualDebtUSD > 0n) {
+      assetsData.push({
+        asset,
+        symbol: tokenInfo.symbol,
+        totalDebtUSD: actualDebtUSD.toString(),
+        annualRatePercent,
+        dailyInterestUSD: dailyInterestUSD.toString(),
+        weeklyInterestUSD: weeklyInterestUSD.toString(),
+        monthlyInterestUSD: monthlyInterestUSD.toString(),
+        ytdInterestUSD: ytdInterestUSD.toString(),
+        allTimeInterestUSD: allTimeInterestUSD.toString()
+      });
+    }
+  }
+
+  return {
+    totalDailyInterestUSD: totalDailyInterestUSD.toString(),
+    totalWeeklyInterestUSD: totalWeeklyInterestUSD.toString(),
+    totalMonthlyInterestUSD: totalMonthlyInterestUSD.toString(),
+    totalYtdInterestUSD: totalYtdInterestUSD.toString(),
+    totalAllTimeInterestUSD: totalAllTimeInterestUSD.toString(),
+    assets: assetsData
+  };
 };
 
 export const openJuniorNote = async (

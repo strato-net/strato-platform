@@ -9,6 +9,7 @@ import { ArrowDownUp, Check, ChevronDown, HelpCircle } from "lucide-react";
 import { Pool, SwapToken } from "@/interface";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
+import { useTokenContext } from "@/context/TokenContext";
 import { useLendingContext } from "@/context/LendingContext";
 import { useToast } from '@/hooks/use-toast';
 import { useSwapContext } from "@/context/SwapContext";
@@ -27,6 +28,8 @@ import { usePoolPolling } from "@/hooks/useSmartPolling";
 import { calculateSwapOutput, calculateSwapInput, calculateImpact } from "@/helpers/swapCalculations";
 import { computeMaxTransferable, handleAmountInputChange } from "@/utils/transferValidation";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { CompactRewardsDisplay } from "@/components/rewards/CompactRewardsDisplay";
+import { UserRewardsData } from "@/services/rewardsService";
 
 // ============================================================================
 // CONSTANTS
@@ -44,9 +47,9 @@ const isValidInputAmount = (amount: string): boolean => {
 
 const calculateExchangeRates = (pool: Pool | null, fromAsset: SwapToken | null) => {
   if (!pool || !fromAsset?.address) return { 
-    exchangeRateRaw: "0", 
-    exchangeRate: "0", 
-    oracleExchangeRate: "0" 
+    exchangeRateRaw: undefined, 
+    exchangeRate: undefined, 
+    oracleExchangeRate: undefined 
   };
   
   const isAToB = pool.tokenA?.address === fromAsset.address;
@@ -54,29 +57,48 @@ const calculateExchangeRates = (pool: Pool | null, fromAsset: SwapToken | null) 
   const oracleRate = isAToB ? pool.oracleAToBRatio : pool.oracleBToARatio;
   
   // Strip commas from raw rate in case backend sends pre-formatted data
-  const cleanRate = String(poolRate || "0").replace(/,/g, '');
+  const cleanRate = poolRate && poolRate !== "0" ? String(poolRate).replace(/,/g, '') : undefined;
   
   return {
     exchangeRateRaw: cleanRate,
-    exchangeRate: poolRate && poolRate !== "0" ? formatAmount(poolRate) : "0",
-    oracleExchangeRate: oracleRate && oracleRate !== "0" ? formatAmount(oracleRate) : "0"
+    exchangeRate: poolRate && poolRate !== "0" ? formatAmount(poolRate) : undefined,
+    oracleExchangeRate: oracleRate && oracleRate !== "0" ? formatAmount(oracleRate) : undefined
   };
+};
+
+/**
+ * Get activity name for swap rewards based on asset symbol/name
+ * Maps to activityType 1 (OneTime) swap activities
+ */
+const getSwapActivityName = (asset: SwapToken | null | undefined): string | null => {
+  if (!asset) return null;
+  
+  const symbol = asset._symbol?.toUpperCase() || "";
+  const name = asset._name?.toUpperCase() || "";
+  
+  // Check by symbol or name
+  if (symbol.includes("ETHST") || name.includes("ETHST")) return "ETHST-USDST Swap";
+  if (symbol.includes("WBTCST") || name.includes("WBTCST")) return "WBTCST-USDST Swap";
+  if (symbol.includes("GOLDST") || name.includes("GOLDST")) return "GOLDST-USDST Swap";
+  if (symbol.includes("SILVST") || name.includes("SILVST")) return "SILVST-USDST Swap";
+  
+  return null;
 };
 
 // ============================================================================
 // UI COMPONENTS
 // ============================================================================
 const LoadingSpinner = () => (
-  <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary" />
+  <span className="inline-flex items-center animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary" />
 );
 
-const AnimatedNumber = ({ value, isLoading }: { value: string; isLoading: boolean }) => {
+const AnimatedNumber = ({ value, isLoading }: { value: string | undefined; isLoading: boolean }) => {
   const [displayValue, setDisplayValue] = useState(value);
   const [isChanging, setIsChanging] = useState(false);
 
   useEffect(() => {
-    if (isLoading) {
-      // Don't fade out during loading, just keep showing current value
+    if (isLoading || value === undefined) {
+      // Don't fade out during loading or when value is undefined
       return;
     }
     
@@ -90,6 +112,11 @@ const AnimatedNumber = ({ value, isLoading }: { value: string; isLoading: boolea
       return () => clearTimeout(timer);
     }
   }, [value, isLoading, displayValue]);
+
+  // Show spinner when value is undefined
+  if (value === undefined) {
+    return <LoadingSpinner />;
+  }
 
   return (
     <span 
@@ -440,7 +467,12 @@ const SlippageControl = ({ slippage, autoSlippage, onSlippageChange, onAutoToggl
 // ============================================================================
 // MAIN SWAP WIDGET COMPONENT
 // ============================================================================
-const SwapWidget = () => {
+interface SwapWidgetProps {
+  userRewards?: UserRewardsData | null;
+  rewardsLoading?: boolean;
+}
+
+const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
   // ========================================================================
   // CONTEXT & HOOKS
   // ========================================================================
@@ -459,7 +491,8 @@ const SwapWidget = () => {
     [pairableTokens, fromAsset?.address]
   );
   const { userAddress } = useUser();
-  const { usdstBalance, voucherBalance, fetchUsdstBalance, fetchTokens } = useUserTokens();
+  const { fetchTokens } = useUserTokens();
+  const { usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
   const { refreshLoans, refreshCollateral } = useLendingContext();
   const { toast } = useToast();
 
@@ -526,7 +559,6 @@ const SwapWidget = () => {
     toAsset,
     getPoolByTokenPair,
     fetchUsdstBalance,
-    userAddress,
     interval: POLL_INTERVAL
   });
 
@@ -560,11 +592,11 @@ const SwapWidget = () => {
 
   // Initial setup and user-dependent effects
   useEffect(() => {
-    if (userAddress) fetchUsdstBalance(userAddress);
+    fetchUsdstBalance();
     if (swappableTokens.length > 0) {
       initialTokenSetup();
     }
-  }, [userAddress, fetchUsdstBalance, swappableTokens.length]);
+  }, [fetchUsdstBalance, swappableTokens.length]);
 
   // Fetch pairable tokens when fromAsset changes
   useEffect(() => {
@@ -758,7 +790,7 @@ const SwapWidget = () => {
       await refreshSwapHistory()
       // Refresh all contexts to ensure borrow page shows updated balances
       await Promise.all([
-        fetchUsdstBalance(userAddress),
+        fetchUsdstBalance(),
         fetchTokens(),           // Refresh UserTokensContext
         refreshLoans(),          // Refresh LendingContext
         refreshCollateral(),     // Refresh LendingContext
@@ -857,21 +889,40 @@ const SwapWidget = () => {
         loading={poolLoading}
       />
 
+      {(() => {
+        // Activity name is based on pair type, so check either token
+        const activityName = getSwapActivityName(fromAsset) || getSwapActivityName(toAsset);
+        if (!activityName) return null;
+        
+        // Swap rewards are tracked in USDST terms, so use the USDST side of the swap
+        // - If swapping FROM USDST, use fromAmount
+        // - If swapping TO USDST, use toAmount
+        const isFromUsdst = fromAsset?.address?.toLowerCase() === usdstAddress.toLowerCase();
+        const inputAmount = isFromUsdst ? fromAmount : toAmount;
+        
+        return (
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <CompactRewardsDisplay
+              userRewards={userRewards}
+              activityName={activityName}
+              inputAmount={inputAmount}
+              actionLabel="Swap"
+            />
+          </div>
+        );
+      })()}
+
       <div className="flex flex-col gap-2 bg-gray-50 p-4 rounded-lg">
         <div className="flex justify-between text-sm">
           <span className="text-gray-600 decoration-2">Exchange Rate</span>
-          <span className="font-medium">
+          <span className="font-medium inline-flex items-center gap-1">
             1 {fromAsset?._symbol || ""} ≈ <AnimatedNumber value={exchangeRate} isLoading={poolLoading} /> {toAsset?._symbol || ""}
           </span>
         </div>
         <div className="flex justify-between text-sm">
           <span className="text-gray-400">Exchange Rate (Spot)</span>
-          <span className="font-medium text-gray-400">
-            {oracleExchangeRate === "0" ? (
-              "Price data unavailable"
-            ) : (
-              <>1 {fromAsset?._symbol || ""} ≈ <AnimatedNumber value={oracleExchangeRate} isLoading={poolLoading} /> {toAsset?._symbol || ""}</>
-            )}
+          <span className="font-medium text-gray-400 inline-flex items-center gap-1">
+            1 {fromAsset?._symbol || ""} ≈ <AnimatedNumber value={oracleExchangeRate} isLoading={poolLoading} /> {toAsset?._symbol || ""}
           </span>
         </div>
         <div className="my-1"></div>

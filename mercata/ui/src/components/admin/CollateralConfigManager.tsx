@@ -5,11 +5,17 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
-  Plus, Settings, AlertTriangle, Pause, Play, Edit, Save, X, Loader2
+  Plus, Settings, AlertTriangle, Pause, Play, Edit, Save, X, Loader2, ChevronDown, Ban
 } from 'lucide-react';
 import { cdpService, AssetConfig } from '@/services/cdpService';
 import { toast } from 'sonner';
 import { Form, Input, Switch, Button as AntButton } from 'antd';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { ExclamationCircleOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { handleRecipientAddress, handleAdminNumericInputChange } from '@/utils/transferValidation';
 
@@ -84,8 +90,9 @@ const CollateralConfigManager = () => {
   const loadAssets = useCallback(async () => {
     try {
       setLoading(true);
-      const supportedAssets = await cdpService.getSupportedAssets();
-      setAssets(supportedAssets);
+      // Use getAllCollateralConfigs to get all assets (including unsupported) for admin view
+      const allAssets = await cdpService.getAllCollateralConfigs();
+      setAssets(allAssets);
     } catch (error) {
       console.error('Failed to load assets:', error);
       toast.error('Failed to load assets');
@@ -209,6 +216,20 @@ const CollateralConfigManager = () => {
     } catch (error) {
       console.error('Failed to toggle asset pause:', error);
       toast.error('Failed to toggle asset pause');
+    } finally {
+      setLoading(false);
+    }
+  }, [loadAssets]);
+
+  const handleToggleDisable = useCallback(async (asset: string, supported: boolean) => {
+    try {
+      setLoading(true);
+      await cdpService.setAssetSupported(asset, supported);
+      toast.success(`Asset ${supported ? 'enabled' : 'disabled'} successfully`);
+      await loadAssets();
+    } catch (error) {
+      console.error('Failed to toggle asset support:', error);
+      toast.error('Failed to toggle asset support');
     } finally {
       setLoading(false);
     }
@@ -549,10 +570,13 @@ const CollateralConfigManager = () => {
                           <div className="space-y-2">
                             <div className="flex items-center space-x-2">
                               <h3 className="font-semibold">{asset.symbol}</h3>
-                              <Badge variant={asset.isPaused ? "destructive" : "default"}>
-                                {asset.isPaused ? 'Paused' : 'Active'}
-                              </Badge>
-                              <Badge variant="outline">
+                              {asset.isPaused && asset.isSupported && (
+                                <Badge variant="destructive">Paused</Badge>
+                              )}
+                              {!asset.isPaused && asset.isSupported && (
+                                <Badge variant="default">Active</Badge>
+                              )}
+                              <Badge variant={asset.isSupported ? "outline" : "destructive"}>
                                 {asset.isSupported ? 'Supported' : 'Not Supported'}
                               </Badge>
                             </div>
@@ -570,24 +594,58 @@ const CollateralConfigManager = () => {
                               Edit
                             </Button>
                             
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleTogglePause(asset.asset, !asset.isPaused)}
-                              disabled={loading}
-                            >
-                              {asset.isPaused ? (
-                                <>
-                                  <Play className="h-4 w-4 mr-1" />
-                                  Unpause
-                                </>
-                              ) : (
-                                <>
-                                  <Pause className="h-4 w-4 mr-1" />
-                                  Pause
-                                </>
-                              )}
-                            </Button>
+                            {!asset.isSupported ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleToggleDisable(asset.asset, true)}
+                                disabled={loading}
+                              >
+                                <Play className="h-4 w-4 mr-1" />
+                                Enable
+                              </Button>
+                            ) : (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={loading}
+                                  >
+                                    <Settings className="h-4 w-4 mr-1" />
+                                    Actions
+                                    <ChevronDown className="h-4 w-4 ml-1" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  {asset.isPaused ? (
+                                    <DropdownMenuItem
+                                      onClick={() => handleTogglePause(asset.asset, false)}
+                                      disabled={loading}
+                                    >
+                                      <Play className="h-4 w-4 mr-2" />
+                                      Unpause
+                                    </DropdownMenuItem>
+                                  ) : (
+                                    <DropdownMenuItem
+                                      onClick={() => handleTogglePause(asset.asset, true)}
+                                      disabled={loading}
+                                    >
+                                      <Pause className="h-4 w-4 mr-2" />
+                                      Pause
+                                    </DropdownMenuItem>
+                                  )}
+                                  <DropdownMenuItem
+                                    onClick={() => handleToggleDisable(asset.asset, false)}
+                                    disabled={loading}
+                                    className="text-destructive focus:text-destructive"
+                                  >
+                                    <Ban className="h-4 w-4 mr-2" />
+                                    Disable
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
                           </div>
                         </div>
                         

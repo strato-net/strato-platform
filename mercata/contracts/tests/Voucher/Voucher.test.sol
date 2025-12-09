@@ -89,7 +89,7 @@ contract Describe_Voucher {
 
     function it_voucher_reverts_minting_after_ownership_transfer() {
         Ownable(voucher).transferOwnership(address(user1));
-        
+
         bool reverted = false;
         try {
             voucher.mint(owner, 1000e18);
@@ -102,7 +102,7 @@ contract Describe_Voucher {
     function it_voucher_allows_minting_by_new_owner() {
         uint256 mintAmount = 1000e18;
         Ownable(voucher).transferOwnership(address(user1));
-        
+
         user1.do(address(voucher), "mint", address(user1), mintAmount);
         require(ERC20(voucher).balanceOf(address(user1)) == mintAmount, "New owner should be able to mint");
     }
@@ -155,7 +155,7 @@ contract Describe_Voucher {
     function it_voucher_transfer_always_returns_false() {
         uint256 mintAmount = 1000e18;
         voucher.mint(owner, mintAmount);
-        
+
         bool result = ERC20(voucher).transfer(address(user1), 100e18);
         require(result == false, "Transfer should always return false");
         require(ERC20(voucher).balanceOf(owner) == mintAmount, "Balance should not change after transfer");
@@ -165,7 +165,7 @@ contract Describe_Voucher {
     function it_voucher_transfer_from_always_returns_false() {
         uint256 mintAmount = 1000e18;
         voucher.mint(owner, mintAmount);
-        
+
         bool result = user1.do(address(voucher), "transferFrom", owner, address(user2), 100e18);
         require(result == false, "TransferFrom should always return false");
         require(ERC20(voucher).balanceOf(owner) == mintAmount, "Balance should not change after transferFrom");
@@ -185,18 +185,18 @@ contract Describe_Voucher {
     function it_voucher_transfer_restrictions_work_with_any_amount() {
         uint256 mintAmount = 1000e18;
         voucher.mint(owner, mintAmount);
-        
+
         // Try different amounts
         bool result1 = ERC20(voucher).transfer(address(user1), 0);
         bool result2 = ERC20(voucher).transfer(address(user1), 1);
         bool result3 = ERC20(voucher).transfer(address(user1), mintAmount);
         bool result4 = ERC20(voucher).transfer(address(user1), 2**256 - 1);
-        
+
         require(result1 == false, "Transfer with 0 amount should return false");
         require(result2 == false, "Transfer with 1 amount should return false");
         require(result3 == false, "Transfer with full balance should return false");
         require(result4 == false, "Transfer with max amount should return false");
-        
+
         require(ERC20(voucher).balanceOf(owner) == mintAmount, "Balance should not change");
         require(ERC20(voucher).balanceOf(address(user1)) == 0, "Recipient balance should remain 0");
     }
@@ -213,7 +213,7 @@ contract Describe_Voucher {
     function it_voucher_handles_zero_amount_operations() {
         voucher.mint(owner, 0);
         require(ERC20(voucher).balanceOf(owner) == 0, "Zero amount mint should work");
-        
+
         voucher.mint(owner, 1000e18);
         voucher.burn(owner, 0);
         require(ERC20(voucher).balanceOf(owner) == 1000e18, "Zero amount burn should work");
@@ -232,11 +232,11 @@ contract Describe_Voucher {
         uint256 amount1 = 1000e18;
         uint256 amount2 = 2000e18;
         uint256 amount3 = 1500e18;
-        
+
         voucher.mint(address(user1), amount1);
         voucher.mint(address(user2), amount2);
         voucher.mint(address(user3), amount3);
-        
+
         require(ERC20(voucher).balanceOf(address(user1)) == amount1, "User1 balance not correct");
         require(ERC20(voucher).balanceOf(address(user2)) == amount2, "User2 balance not correct");
         require(ERC20(voucher).balanceOf(address(user3)) == amount3, "User3 balance not correct");
@@ -248,7 +248,7 @@ contract Describe_Voucher {
     function it_voucher_maintains_transfer_restrictions_after_minting() {
         uint256 mintAmount = 1000e18;
         voucher.mint(owner, mintAmount);
-        
+
         // Even with tokens, transfers should still be restricted
         bool result = ERC20(voucher).transfer(address(user1), 100e18);
         require(result == false, "Transfer should still be restricted after minting");
@@ -260,7 +260,7 @@ contract Describe_Voucher {
         uint256 burnAmount = 300e18;
         voucher.mint(owner, mintAmount);
         voucher.burn(owner, burnAmount);
-        
+
         // Even after burning, transfers should still be restricted
         bool result = ERC20(voucher).transfer(address(user1), 100e18);
         require(result == false, "Transfer should still be restricted after burning");
@@ -271,15 +271,15 @@ contract Describe_Voucher {
         uint256 mintAmount = 1000e18;
         voucher.mint(owner, mintAmount);
         Ownable(voucher).transferOwnership(address(user1));
-        
+
         // Old owner should not be able to transfer
         bool result1 = ERC20(voucher).transfer(address(user2), 100e18);
         require(result1 == false, "Old owner should not be able to transfer");
-        
+
         // New owner should also not be able to transfer (voucher restriction)
         bool result2 = user1.do(address(voucher), "transfer", address(user2), 100e18);
         require(result2 == false, "New owner should also not be able to transfer");
-        
+
         require(ERC20(voucher).balanceOf(owner) == mintAmount, "Balance should not change");
     }
 
@@ -289,32 +289,32 @@ contract Describe_Voucher {
         // 1. Initial state
         require(ERC20(voucher).totalSupply() == 0, "Should start with zero supply");
         require(Ownable(voucher).owner() == owner, "Should have correct owner");
-        
+
         // 2. Mint tokens
         uint256 mintAmount1 = 1000e18;
         uint256 mintAmount2 = 2000e18;
         voucher.mint(address(user1), mintAmount1);
         voucher.mint(address(user2), mintAmount2);
-        
+
         require(ERC20(voucher).totalSupply() == mintAmount1 + mintAmount2, "Total supply should be correct");
         require(ERC20(voucher).balanceOf(address(user1)) == mintAmount1, "User1 balance should be correct");
         require(ERC20(voucher).balanceOf(address(user2)) == mintAmount2, "User2 balance should be correct");
-        
+
         // 3. Verify transfer restrictions
         bool transferResult = ERC20(voucher).transfer(address(user3), 100e18);
         require(transferResult == false, "Transfer should be restricted");
-        
+
         // 4. Burn tokens
         uint256 burnAmount = 500e18;
         user1.do(address(voucher), "burn", address(user1), burnAmount);
-        
+
         require(ERC20(voucher).totalSupply() == mintAmount1 + mintAmount2 - burnAmount, "Total supply should be updated");
         require(ERC20(voucher).balanceOf(address(user1)) == mintAmount1 - burnAmount, "User1 balance should be updated");
-        
+
         // 5. Transfer ownership
         Ownable(voucher).transferOwnership(address(user3));
         require(Ownable(voucher).owner() == address(user3), "Ownership should be transferred");
-        
+
         // 6. New owner can mint
         uint256 mintAmount3 = 500e18;
         user3.do(address(voucher), "mint", address(user3), mintAmount3);
@@ -326,17 +326,17 @@ contract Describe_Voucher {
         voucher.mint(owner, 1000e18);
         voucher.mint(address(user1), 2000e18);
         voucher.mint(address(user2), 1500e18);
-        
+
         // Burn from different addresses
         voucher.burn(owner, 300e18);
         user1.do(address(voucher), "burn", address(user1), 500e18);
-        
+
         // Verify final state
         require(ERC20(voucher).balanceOf(owner) == 700e18, "Owner balance not correct");
         require(ERC20(voucher).balanceOf(address(user1)) == 1500e18, "User1 balance not correct");
         require(ERC20(voucher).balanceOf(address(user2)) == 1500e18, "User2 balance not correct");
         require(ERC20(voucher).totalSupply() == 3700e18, "Total supply not correct");
-        
+
         // Verify transfer restrictions still apply
         bool result = ERC20(voucher).transfer(address(user3), 100e18);
         require(result == false, "Transfer should still be restricted");

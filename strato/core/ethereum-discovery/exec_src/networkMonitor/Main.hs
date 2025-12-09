@@ -29,7 +29,7 @@ main = do
   where
     loop :: (MonadIO m, MonadLogger m) => Map String NetworkInterface -> m ()
     loop old = forever $ do
-      new <- liftIO $ getNetworkInterfaceMap      
+      new <- liftIO $ getNetworkInterfaceMap
       if old /= new
         then do
           let diffs = Map.unionWith (\(a1,b1) (a2,b2) -> (a1 <|> a2, b1 <|> b2))
@@ -39,7 +39,7 @@ main = do
               changes = [(o, n) | (_, Just (Changed o n)) <- events]
               connected = [i | (_, Just (Connected i)) <- events]
               disconnected = [i | (_, Just (Disconnected i)) <- events]
-          
+
           forM_ connected $ \theInterface ->
             $logInfoS "main" $ T.pack $ "Connected: " ++ format theInterface
           forM_ disconnected $ \theInterface ->

@@ -5,7 +5,7 @@ import { usc } from "../../utils/importer";
 import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
 import { getPool as getLendingRegistry } from "./lending.service";
-import { createCompletePriceMap } from "../helpers/oracle.helper";
+import { getCompletePriceMap } from "../helpers/oracle.helper";
 import { getOraclePrices } from "./oracle.service";
 import { getBridgeAssets } from "./bridge.service";
 import { getTokenDetails } from "../helpers/cirrusHelpers";
@@ -54,8 +54,7 @@ export const getTokens = async (
       });
 
     // Process price data
-    const rawPrices = lendingResponse.oracle?.prices || [];
-    const priceMap = await createCompletePriceMap(accessToken, rawPrices);
+    const priceMap = await getCompletePriceMap(accessToken);
 
     return (response.data as any[]).map((token) => ({
       ...token,
@@ -128,16 +127,7 @@ export const getBalance = async (
         "value->>collateral": `gt.0`
       }
     }),
-    // Get all oracle prices (includes LP token prices via createCompletePriceMap)
-    getOraclePrices(accessToken).then(async (priceMap) => {
-      // Convert Map to array format for createCompletePriceMap
-      const rawPriceArray = Array.from(priceMap.entries()).map(([key, value]) => ({
-        key,
-        value: parseFloat(value)
-      }));
-      // Use createCompletePriceMap to include LP token and mToken prices
-      return await createCompletePriceMap(accessToken, rawPriceArray);
-    })
+    getCompletePriceMap(accessToken)
   ]);
 
   const collateralMap = new Map<string, bigint>();
@@ -161,14 +151,14 @@ export const getBalance = async (
   const allTokens = [
     ...balanceData.map((t: any) => ({
       ...t,
-      price: rawPrices.get(t.address) || "0",
+      price: (rawPrices.get(t.address) || 0n).toString(),
       collateralBalance: (collateralMap.get(t.address) || 0n).toString(),
     })),
     ...tokensWithCollateralOnly.map((a) => ({
       address: a,
       user: address,
       balance: "0",
-      price: rawPrices.get(a) || "0",
+      price: (rawPrices.get(a) || 0n).toString(),
       collateralBalance: (collateralMap.get(a) || 0n).toString(),
       token: tokenDetails.get(a),
     })),
