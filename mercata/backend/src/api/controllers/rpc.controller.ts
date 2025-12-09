@@ -34,7 +34,7 @@ class RpcController {
 
       // If upstream RPC provider fails, use fallback RPC provider
       catch (error) {
-        console.log("RPC error; using fallback. Error:", error, "Request:", req.body, "Response:", response);
+        console.log("RPC error; using fallback.");
         const fallbackRes = await fetch(fallback, requestPayload);
         res.status(fallbackRes.status).json(await fallbackRes.json());
       }

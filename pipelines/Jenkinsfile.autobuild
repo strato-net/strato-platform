@@ -303,12 +303,17 @@ pipeline {
                 }
                 unstash 'bootstrapDocker'
                 dir("bootstrap-docker"){
-                  withCredentials([usernamePassword(credentialsId: 'mercata-testnet-buildtest-client', passwordVariable: 'BUILDTEST_CLIENT_SECRET', usernameVariable: 'BUILDTEST_CLIENT_ID')]) {
+                  withCredentials([usernamePassword(credentialsId: 'mercata-testnet-buildtest-client', passwordVariable: 'BUILDTEST_CLIENT_SECRET', usernameVariable: 'BUILDTEST_CLIENT_ID'),
+                                   string(credentialsId: 'BUILDTEST_RPC_URL_SEPOLIA', variable: 'BUILDTEST_RPC_URL_SEPOLIA'),
+                                   string(credentialsId: 'BUILDTEST_RPC_URL_SEPOLIA_FALLBACK', variable: 'BUILDTEST_RPC_URL_SEPOLIA_FALLBACK')
+                                   ]) {
                     writeFile file: "strato-run.sh", text: """#!/bin/bash
                         NODE_HOST='buildtest.mercata-testnet.blockapps.net' \\
                           network='helium' \\
                           OAUTH_CLIENT_ID='$BUILDTEST_CLIENT_ID' \\
                           OAUTH_CLIENT_SECRET='$BUILDTEST_CLIENT_SECRET' \\
+                          RPC_URL_SEPOLIA='$BUILDTEST_RPC_URL_SEPOLIA' \\
+                          RPC_URL_SEPOLIA_FALLBACK='$BUILDTEST_RPC_URL_SEPOLIA_FALLBACK' \\
                           ssl='true' \\
                           ./strato
                     """
