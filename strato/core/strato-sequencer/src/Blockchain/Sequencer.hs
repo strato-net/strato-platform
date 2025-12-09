@@ -53,6 +53,14 @@ import Text.Printf
 
 type SeqOutEvent = Either [P2pEvent] [VmEvent]
 
+-- | Yield events to the P2P layer (via @seq_p2p_events@ topic).
+yieldToP2p :: Monad m => [P2pEvent] -> ConduitT i SeqOutEvent m ()
+yieldToP2p = yield . Left
+
+-- | Yield events to the VM (via @seq_vm_events@ topic).
+yieldToVm :: Monad m => [VmEvent] -> ConduitT i SeqOutEvent m ()
+yieldToVm = yield . Right
+
 instance MonadMonitor m => MonadMonitor (ConduitT i o m) where
   doIO = lift . doIO
 
@@ -101,7 +109,7 @@ initSequencer = do
     Nothing -> pure ()
     Just ctx -> do
       let selfAddr = fromJust $ _selfAddr ctx
-      yield $ Right [VmSelfAddress selfAddr]
+      yieldToVm [VmSelfAddress selfAddr]
   logF "Sequencer startup"
   logF "Sequencer initialized"
   bootstrapBlockstanbul
@@ -172,32 +180,27 @@ unseqEventHandler events = do
           lift $ A.delete (A.Proxy @DependentBlockEntry) k
         (IEGetMPNodes srs) -> do
           record "inevent_type_get_mp_nodes" "GetMPNodes" 1
-          yield $ Left [P2pGetMPNodes srs]
-          return ()
+          yieldToP2p [P2pGetMPNodes srs]
         (IEGetMPNodesRequest o srs) -> do
           record "inevent_type_get_mp_nodes_request" "GetMPNodesRequest" 1
-          yield $ Right [VmGetMPNodesRequest o srs]
-          return ()
+          yieldToVm [VmGetMPNodesRequest o srs]
         (IEMPNodesResponse o nds)-> do
           record "inevent_type_mp_nodes_response" "MPNodesResponse" 1
-          yield $ Left [P2pMPNodesResponse o nds]
-          return ()
+          yieldToP2p [P2pMPNodesResponse o nds]
         (IEMPNodesReceived nds) -> do
           record "inevent_type_mp_nodes_received" "MPNodesReceived" 1
-          yield $ Right [VmMPNodesReceived nds]
-          return ()
+          yieldToVm [VmMPNodesReceived nds]
         (IEPreprepareResponse decis) -> do
           record "inevent_type_preprepare_response" "PreprepareResponse" 1
           blockstanbulSend [PreprepareResponse decis]
         (IEFlushMempool req) -> do
           record "inevent_type_flush_mempool" "FlushMempool" 1
-          yield $ Right [VmFlushMempool req]
-          return ()
+          yieldToVm [VmFlushMempool req]
 
 bootstrapBlockstanbul :: (MonadBlockstanbul m, Mod.Accessible View m) =>
                          ConduitT i SeqOutEvent m ()
 bootstrapBlockstanbul = do
-  yield $ Right [VmCreateBlockCommand]
+  yieldToVm [VmCreateBlockCommand]
   lift createFirstTimer
 
 blockstanbulSend ::
@@ -260,9 +263,9 @@ blockstanbulSend' msg = do
     pure (p2pevs, vmevs)
 
   $logDebugS "seq/pbft/send_p2p" . T.pack $ format p2pevs
-  yield $ Left p2pevs
+  yieldToP2p p2pevs
   $logDebugS "seq/pbft/send_vm" . T.pack $ format vmevs
-  yield $ Right vmevs
+  yieldToVm vmevs
   where
     vmEvenP2pCheckptFilterHelper :: [OutEvent] -> ([VmEvent], [P2pEvent])
     vmEvenP2pCheckptFilterHelper (x : xs) = do
@@ -302,9 +305,8 @@ transformFullTransactions pairs = do
 
   let txs = catMaybes mOtxs
   lift . logF $ "Sending " ++ show (length txs) ++ " public transactions to P2P and the VM"
-  yield . Right $ map pairToVmTx txs
-  yield . Left $ map (P2pTx . snd) txs
-  return ()
+  yieldToVm $ map pairToVmTx txs
+  yieldToP2p $ map (P2pTx . snd) txs
 
 expandBlock ::
   ( MonadLogger m,
@@ -342,8 +344,8 @@ runConsensus sb = do
   if not hasPBFT
     then do
       obs <- lift $ expandBlock sb
-      for_ obs $ \ob -> yield $ Left [P2pBlock ob]
-      yield . Right $ map VmBlock obs
+      for_ obs $ \ob -> yieldToP2p [P2pBlock ob]
+      yieldToVm $ map VmBlock obs
     else do
       let blk = sequencedBlockToBlock sb
       routed <-
