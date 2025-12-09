@@ -388,11 +388,11 @@ const SwapDialog = ({
           </span>
         </div>
         <div className="flex justify-between">
-          <span className="text-gray-600">Exchange rate:</span>
+          <span className="text-muted-foreground">Exchange rate:</span>
           <span className="flex flex-col items-end gap-0.5">
             <span className="font-semibold">1 {fromAsset?._symbol || ""} ≈ {exchangeRate} {toAsset?._symbol || ""}</span>
             {invertedExchangeRate && (
-              <span className="text-gray-400">1 {toAsset?._symbol || ""} ≈ {invertedExchangeRate} {fromAsset?._symbol || ""}</span>
+              <span className="text-muted-foreground/70">1 {toAsset?._symbol || ""} ≈ {invertedExchangeRate} {fromAsset?._symbol || ""}</span>
             )}
           </span>
         </div>
@@ -907,14 +907,14 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
         loading={poolLoading}
       />
 
-      <div className="flex flex-col gap-2 bg-gray-50 p-4 rounded-lg">
+      <div className="flex flex-col gap-2 bg-muted/50 p-4 rounded-lg border border-border">
         <div className="flex flex-col gap-1 text-sm">
           <div className="flex justify-between">
-            <span className="text-gray-600">Exchange Rate</span>
+            <span className="text-muted-foreground">Exchange Rate</span>
             {!exchangeRate ? (
               <LoadingSpinner />
             ) : (
-              <span className="font-medium">
+              <span className="font-medium text-foreground">
                 1 {fromAsset?._symbol || ""} ≈ {exchangeRate} ({oracleExchangeRate}*) {toAsset?._symbol || ""}
               </span>
             )}
@@ -922,12 +922,12 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
           {exchangeRate && (
             <>
               <div className="flex justify-end">
-                <span className="text-gray-400">
+                <span className="text-muted-foreground/70">
                   1 {toAsset?._symbol || ""} ≈ {invertedExchangeRate} ({invertedOracleExchangeRate}*) {fromAsset?._symbol || ""}
                 </span>
               </div>
               <div className="flex justify-end">
-                <span className="text-xs text-gray-400">* spot price</span>
+                <span className="text-xs text-muted-foreground/70">* spot price</span>
               </div>
             </>
           )}
