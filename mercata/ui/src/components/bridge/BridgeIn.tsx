@@ -48,6 +48,7 @@ import TokenSelector from "./TokenSelector";
 import PercentageButtons from "@/components/ui/PercentageButtons";
 import DepositTransactionSummary from "./DepositTransactionSummary";
 import AdvancedOptionsDropdown from "./AdvancedOptionsDropdown";
+import DepositProgressModal, { DepositStep } from "./DepositProgressModal";
 
 interface BridgeInProps {
   isConvert?: boolean;
@@ -90,6 +91,11 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
   });
   const [isTokenPermitted, setIsTokenPermitted] = useState(true);
   const [autoDeposit, setAutoDeposit] = useState(isConvert);
+  const [progressModalOpen, setProgressModalOpen] = useState(false);
+  const [currentStep, setCurrentStep] = useState<DepositStep>("confirm_tx");
+  const [progressTxHash, setProgressTxHash] = useState<string>();
+  const [progressError, setProgressError] = useState<string>();
+  const [progressIsNative, setProgressIsNative] = useState(true);
 
   // Computed values
   const modeLabels = BRIDGE_IN_MODE_LABELS[isConvert ? "easy-savings" : "bridge"];
@@ -404,12 +410,26 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
     }
 
     setIsLoading(true);
-    toast({ title: "Waiting for confirmation", description: "Please confirm the transaction in your wallet" });
+    setProgressError(undefined);
+    
+    // Determine if native token before opening modal
+    const isNative = BigInt(selectedToken.externalToken || "0") === 0n;
+    setProgressIsNative(isNative);
+    
+    setProgressModalOpen(true);
 
     try {
       const activeChainId = currentNetwork.chainId;
       const depositRouter = currentNetwork.depositRouter;
-      const isNative = BigInt(selectedToken.externalToken || "0") === 0n;
+      
+      // Set initial step based on whether it's Easy Savings or Bridge In, and if it needs approval
+      if (!isNative) {
+        // ERC20 tokens need approval for both Easy Savings and Bridge In
+        setCurrentStep("approve");
+      } else {
+        // Native tokens (ETH) go straight to confirm
+        setCurrentStep("confirm_tx");
+      }
       const depositAmount = safeParseUnits(
         amount,
         parseInt(selectedToken.externalDecimals || "18"),
@@ -431,12 +451,44 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
         | { signature: string; nonce: bigint; deadline: bigint }
         | undefined;
       if (!isNative) {
-        await ensureAllowanceOrPermit({
-          tokenAddress: selectedToken.externalToken,
+        // Step: Approve Token (for both Easy Savings and Bridge In with ERC20 tokens)
+        setCurrentStep("approve");
+        
+        const approval = await checkPermit2Approval({
+          token: selectedToken.externalToken,
           owner: address,
           amount: depositAmount,
           chainId: activeChainId,
         });
+
+        if (!approval.isApproved) {
+          toast({
+            title: "Approval Required",
+            description: "Approving Permit2 to spend your tokens...",
+          });
+
+          const approveTx = await writeContractAsync({
+            address: ensureHexPrefix(selectedToken.externalToken),
+            abi: ERC20_ABI,
+            functionName: "approve",
+            args: [PERMIT2_ADDRESS as `0x${string}`, BigInt(2) ** BigInt(256) - BigInt(1)],
+            chain: await resolveViemChain(activeChainId),
+            account: address as `0x${string}`,
+          });
+
+          await waitForTransaction(approveTx, activeChainId);
+          
+          toast({
+            title: "Approval Successful",
+            description: "Approval confirmed. Processing transaction...",
+          });
+        }
+        
+        // Move to sign_permit step after approval completes (or if already approved)
+        // This ensures the "approve" step shows as completed (green) before moving to sign_permit
+        setCurrentStep("sign_permit");
+        
+        // Build permit (this involves message signing, not a transaction)
         permitData = await buildPermit({
           tokenAddress: selectedToken.externalToken,
           amount: depositAmount,
@@ -444,6 +496,9 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
           chainId: activeChainId,
           owner: address,
         });
+        
+        // Move to confirm_tx step after permit is signed
+        setCurrentStep("confirm_tx");
       }
 
       await simulateDeposit({
@@ -457,6 +512,10 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
         permitData,
       });
 
+      // Step: Confirm Transaction (for native tokens, this is already set above)
+      if (isNative && currentStep !== "confirm_tx") {
+        setCurrentStep("confirm_tx");
+      }
       const chain = await resolveViemChain(activeChainId);
 
       let txHash: `0x${string}`;
@@ -492,49 +551,44 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
       });
       }
 
-      const explorerUrl = getExplorerUrl(activeChainId, txHash);
-      toast({
-        title: "Transaction Sent",
-        description: (
-          <div>
-            <p>Transaction submitted: {formatTxHash(txHash)}</p>
-            <a
-              href={explorerUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 hover:text-blue-800 underline text-sm"
-            >
-              View on Explorer →
-            </a>
-          </div>
-        ),
-      });
-
+      setProgressTxHash(txHash);
+      
+      // Step: Waiting for Transaction
+      setCurrentStep("waiting_tx");
       const success = await waitForTransaction(txHash, activeChainId);
       if (!success) {
         throw new Error("Transaction reverted");
       }
 
-      toast({
-        title: "Bridge Initiated",
-        description:
-          "Your deposit has been submitted successfully. The relayer will process it shortly.",
-      });
+      const pendingTxKey = `pending_deposit_${txHash}_${activeChainId}`;
+      const pendingTxData = {
+        txHash,
+        chainId: activeChainId.toString(),
+        timestamp: Date.now(),
+      };
+      localStorage.setItem(pendingTxKey, JSON.stringify(pendingTxData));
 
+      // Step: Waiting for Autosave (if Easy Savings) or Complete
+      if (autoDeposit) {
+        setCurrentStep("waiting_autosave");
+        await requestAutoSave({
+          externalChainId: activeChainId,
+          externalTxHash: txHash,
+        });
+      }
+
+      // Step: Complete
+      setCurrentStep("complete");
       setAmount("");
 
       await Promise.all([
         isNative ? refetchNative() : refetchToken(),
         fetchUsdstBalance(),
-        autoDeposit
-          ? requestAutoSave({
-              externalChainId: activeChainId,
-              externalTxHash: txHash,
-            })
-          : Promise.resolve(),
       ]);
     } catch (error: any) {
       const bridgeError = normalizeError(error);
+      setCurrentStep("error");
+      setProgressError(bridgeError.userMessage);
       toast({
         title: "Transaction Failed",
         description: bridgeError.userMessage,
@@ -656,6 +710,22 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
       {networkError && (
         <p className="text-sm text-red-500">{networkError}</p>
       )}
+
+      <DepositProgressModal
+        open={progressModalOpen}
+        currentStep={currentStep}
+        txHash={progressTxHash}
+        chainId={currentNetwork?.chainId ? parseInt(currentNetwork.chainId) : undefined}
+        isEasySavings={isConvert}
+        isNative={progressIsNative}
+        error={progressError}
+        onClose={() => {
+          setProgressModalOpen(false);
+          setCurrentStep("confirm_tx");
+          setProgressTxHash(undefined);
+          setProgressError(undefined);
+        }}
+      />
     </div>
   );
 };
