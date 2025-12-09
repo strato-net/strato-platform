@@ -142,6 +142,15 @@ eventHandler = forever $ timeAction seqLoopTiming $ do
       withLabel seqLoopEvents "unseq" (flip unsafeAddCounter . fromIntegral . length $ unseqEvents)
       timeAction seqSplitEventsTiming $ unseqEventHandler unseqEvents
 
+-- | Handles a batch of 'IngestEvent's from the @unseqevents@ Kafka topic.
+--
+-- Processing happens in two phases:
+--
+-- 1. __Bulk processing__: 'IEBlock' and 'IETx' events are extracted and processed
+--    in bulk via 'transformBlocks' and 'transformFullTransactions' for efficiency.
+--
+-- 2. __Individual handling__: Remaining event types are processed one by one,
+--    with 'IEBlock' and 'IETx' skipped (already handled in phase 1).
 unseqEventHandler ::
   ( MonadSequencer m
   ) =>
