@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Wallet, Book, ArrowRightLeft, Send, Shield, X, Activity, BarChart3,Droplets, Download } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
-import MERCATALOGO from '@/assets/mercata.png';
+import STRATOLOGO from '@/assets/strato.png';
 
 interface MobileSidebarProps {
   isOpen: boolean;
@@ -49,8 +49,8 @@ const MobileSidebar = ({ isOpen, onClose }: MobileSidebarProps) => {
         <div className="border-b border-gray-200">
           <div className="p-4 flex items-center justify-between">
             <img 
-              src={MERCATALOGO} 
-              alt="STRATO mercata" 
+              src={STRATOLOGO} 
+              alt="STRATO" 
               className="h-12" 
             />
             <button

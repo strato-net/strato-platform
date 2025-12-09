@@ -9,7 +9,7 @@ const ActivityFeed = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
-    document.title = "Activity Feed | STRATO Mercata";
+    document.title = "Activity Feed | STRATO";
   }, []);
 
   return (

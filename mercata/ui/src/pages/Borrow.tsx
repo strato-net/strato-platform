@@ -61,7 +61,7 @@ const Borrow = () => {
   });
 
   useEffect(() => {
-    document.title = "Borrow Assets | STRATO Mercata";
+    document.title = "Borrow Assets | STRATO";
   }, []);
 
 

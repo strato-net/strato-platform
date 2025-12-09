@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useUser } from '@/context/UserContext';
-import MERCATALOGO from '@/assets/mercata.png';
 import { ModeToggle } from './mode-toggle';
+import STRATOLOGO from '@/assets/strato.png';
+
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -31,8 +32,8 @@ const Navbar = () => {
           <div className="flex items-center">
             <Link to="/" className="flex-shrink-0">
               <img 
-                src={MERCATALOGO} 
-                alt="STRATO mercata" 
+                src={STRATOLOGO} 
+                alt="STRATO" 
                 className="h-10" 
               />
             </Link>
