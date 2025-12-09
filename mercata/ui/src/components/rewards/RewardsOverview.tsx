@@ -2,10 +2,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { RewardsState, formatEmissionRatePerDay, formatEmissionRatePerWeek, safeBigInt, roundByMagnitude, formatRoundedWithCommas } from "@/services/rewardsService";
 import { formatUnits } from "viem";
-import { Coins, Zap, Clock, RefreshCw } from "lucide-react";
+import { Coins, Zap, Clock, RefreshCw, Star } from "lucide-react";
 import CopyButton from "@/components/ui/copy";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { useTokenContext } from "@/context/TokenContext";
+import { useNetBalance } from "@/hooks/useNetBalance";
+import { useLendingContext } from "@/context/LendingContext";
+import { useCDP } from "@/context/CDPContext";
+import { cataAddress } from "@/lib/constants";
 
 interface RewardsOverviewProps {
   state: RewardsState | null;
@@ -22,6 +27,23 @@ const truncateTokenAddress = (address: string, front: number = 6, back: number =
 
 export const RewardsOverview = ({ state, loading, onRefresh }: RewardsOverviewProps) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const { earningAssets, inactiveTokens } = useTokenContext();
+  const { loans } = useLendingContext();
+  const { totalCDPDebt } = useCDP();
+
+  // Get CATA token from inactive tokens
+  const cataToken = useMemo(() => 
+    inactiveTokens?.find(token => token.address === cataAddress),
+    [inactiveTokens]
+  );
+
+  // Get cataBalance from useNetBalance hook
+  const { cataBalance } = useNetBalance({
+    tokens: earningAssets,
+    cataToken,
+    loans,
+    totalCDPDebt
+  });
 
   const handleRefresh = async () => {
     if (!onRefresh || isRefreshing) return;
@@ -40,7 +62,8 @@ export const RewardsOverview = ({ state, loading, onRefresh }: RewardsOverviewPr
           <CardDescription>Global rewards system statistics</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Skeleton className="h-20" />
             <Skeleton className="h-20" />
             <Skeleton className="h-20" />
             <Skeleton className="h-20" />
@@ -109,7 +132,7 @@ export const RewardsOverview = ({ state, loading, onRefresh }: RewardsOverviewPr
         </div>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="flex items-start space-x-3">
             <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
               <Zap className="h-5 w-5 text-blue-600 dark:text-blue-400" />
@@ -125,6 +148,19 @@ export const RewardsOverview = ({ state, loading, onRefresh }: RewardsOverviewPr
                   Total Stake: {totalStakeFormatted}
                 </p>
               )}
+            </div>
+          </div>
+
+          <div className="flex items-start space-x-3">
+            <div className="p-2 bg-amber-100 dark:bg-amber-900 rounded-lg">
+              <Star className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm text-muted-foreground">Total Earned</p>
+              <p className="text-2xl font-semibold">
+                {cataBalance.toLocaleString("en-US", { maximumFractionDigits: 2 })}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">Reward Points</p>
             </div>
           </div>
 
