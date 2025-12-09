@@ -244,6 +244,9 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
             border-color: hsl(var(--border)) !important;
             color: hsl(var(--foreground)) !important;
         }
+        .withdrawal-history-table .ant-select-selection-item {
+            color: hsl(var(--foreground)) !important;
+        }
         .withdrawal-history-table .ant-select-arrow {
             color: hsl(var(--muted-foreground)) !important;
         }
