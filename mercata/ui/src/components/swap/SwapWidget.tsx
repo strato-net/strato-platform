@@ -902,14 +902,12 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
         const inputAmount = isFromUsdst ? fromAmount : toAmount;
         
         return (
-          <div className="bg-gray-50 p-4 rounded-lg">
             <CompactRewardsDisplay
               userRewards={userRewards}
               activityName={activityName}
               inputAmount={inputAmount}
               actionLabel="Swap"
             />
-          </div>
         );
       })()}
 

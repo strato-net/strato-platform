@@ -264,31 +264,31 @@ export const CompactRewardsDisplay = ({
   // RENDER
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className="mt-3 p-3 bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 border border-amber-200 rounded-lg shadow-sm max-w-sm">
+    <div className="mt-3 p-3 bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 dark:from-amber-950 dark:via-yellow-950 dark:to-orange-950 border border-amber-200 dark:border-amber-800 rounded-lg shadow-sm max-w-sm">
       {/* Current Rate - Always visible */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <Coins className="h-4 w-4 text-amber-500 flex-shrink-0" />
-          <span className="text-sm font-medium text-amber-800">Earning Now</span>
-          <span className="text-sm font-semibold text-amber-700">{formattedCurrentRate}</span>
-          <span className="text-sm text-amber-600">pts/day</span>
+          <span className="text-sm font-medium text-amber-800 dark:text-amber-200">Earning Now</span>
+          <span className="text-sm font-semibold text-amber-700 dark:text-amber-300">{formattedCurrentRate}</span>
+          <span className="text-sm text-amber-600 dark:text-amber-400">pts/day</span>
         </div>
         <Sparkles className="h-3.5 w-3.5 text-amber-400 flex-shrink-0" />
       </div>
 
       {/* New Rate - Shows when user types input */}
       {hasValidInput && (
-        <div className={`mt-2 pt-2 border-t ${isIncrease ? 'border-green-200' : isDecrease ? 'border-red-200' : 'border-amber-200'}`}>
+        <div className={`mt-2 pt-2 border-t ${isIncrease ? 'border-green-200 dark:border-green-800' : isDecrease ? 'border-red-200 dark:border-red-800' : 'border-amber-200 dark:border-amber-800'}`}>
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 flex-1 min-w-0">
-              <div className={`flex-shrink-0 ${isIncrease ? 'text-green-500' : isDecrease ? 'text-red-500' : 'text-gray-500'}`}>
+              <div className={`flex-shrink-0 ${isIncrease ? 'text-green-500' : isDecrease ? 'text-red-500' : 'text-gray-500 dark:text-gray-400'}`}>
                 {isIncrease ? <Star className="h-4 w-4 fill-current" /> : isDecrease ? <TrendingDown className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
               </div>
-              <span className="text-sm font-medium text-gray-700">After {actionLabel}</span>
-              <span className={`text-sm font-semibold ${isIncrease ? 'text-green-600' : isDecrease ? 'text-red-600' : 'text-gray-700'}`}>
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">After {actionLabel}</span>
+              <span className={`text-sm font-semibold ${isIncrease ? 'text-green-600 dark:text-green-400' : isDecrease ? 'text-red-600 dark:text-red-400' : 'text-gray-700 dark:text-gray-300'}`}>
                 {formattedNewRate}
               </span>
-              <span className="text-sm text-gray-500">pts/day</span>
+              <span className="text-sm text-gray-500 dark:text-gray-400">pts/day</span>
             </div>
 
             {/* Percentage Badge */}
