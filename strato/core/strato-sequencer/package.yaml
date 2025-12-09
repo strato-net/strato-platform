@@ -50,6 +50,8 @@ library:
     - containers
     - mtl
     - stm-chans
+    - transformers
+    - resourcet
 
 executables:
   strato-sequencer:

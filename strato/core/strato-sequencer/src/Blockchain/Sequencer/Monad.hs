@@ -9,7 +9,6 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE UndecidableInstances #-}
 
 {-# OPTIONS -fno-warn-orphans #-}
 
@@ -132,11 +131,6 @@ instance HasNamespace Checkpoint where
   type NSKey Checkpoint = ()
   namespace _ = "chkpt"
 -}
-instance (MonadIO m, Mod.Accessible DependentBlockDB m) => (Keccak256 `A.Alters` DependentBlockEntry) m where
-  lookup _ k = lookupDependentBlockDB k
-  insert _ k v = insertDependentBlockDB k v
-  delete _ k = deleteDependentBlockDB k
-
 instance Monad m => Mod.Modifiable SeenTransactionDB (StateT SequencerContext m) where
   get _ = use seenTransactionDB
   put _ = modify' . (.~) seenTransactionDB

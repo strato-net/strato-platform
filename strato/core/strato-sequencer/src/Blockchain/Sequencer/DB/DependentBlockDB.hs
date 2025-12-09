@@ -1,6 +1,8 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -128,3 +130,8 @@ buildEmissionChain b =
       return []
   where
     theBlock = sequencedBlockToOutputBlock b
+
+instance (MonadIO m, Accessible DependentBlockDB m) => (Keccak256 `Alters` DependentBlockEntry) m where
+  lookup _ k = lookupDependentBlockDB k
+  insert _ k v = insertDependentBlockDB k v
+  delete _ k = deleteDependentBlockDB k
