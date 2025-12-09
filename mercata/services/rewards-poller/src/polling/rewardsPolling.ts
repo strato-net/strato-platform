@@ -36,6 +36,7 @@ const processEvents = async (): Promise<void> => {
       user: event.transaction_sender,
       amount: event.amount,
       blockNumber: event.block_number,
+      block_timestamp: event.block_timestamp,
       eventIndex: event.event_index,
     }));
 

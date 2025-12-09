@@ -28,4 +28,5 @@ export const sortEventsByBlock = (events: ProtocolEvent[]): ProtocolEvent[] => {
 export const nextCursorAfter = (action: RewardsAction): EventCursor => ({
   blockNumber: action.blockNumber,
   eventIndex: action.eventIndex,
+  block_timestamp: action.block_timestamp,
 });

@@ -127,7 +127,7 @@ const Dashboard = () => {
   }), [netBalanceHistoryCache, rewardsHistoryCache, borrowedHistoryCache, selectedTimeRange, totalBalance, cataBalance, totalBorrowed]);
 
   useEffect(() => {
-    document.title = "Dashboard | STRATO Mercata";
+    document.title = "Dashboard | STRATO";
     
     const hasExistingEarningAssets = earningAssets.length > 0;
     const hasExistingInactiveTokens = inactiveTokens.length > 0;

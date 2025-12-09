@@ -13,7 +13,7 @@ const DashboardFAQ = () => {
     },
     {
       question: "What are Reward Points?",
-      answer: "Reward Points is the reward system on STRATO Mercata. Points are rewarded based on your deposits and platform activity."
+      answer: "Reward Points is the reward system on STRATO. Points are rewarded based on your deposits and platform activity."
     },
     {
       question: "How secure are my assets?",
