@@ -160,3 +160,88 @@
   animation: gradient-flow 15s ease infinite;
   background-size: 200% 200%;
 }
+
+/* Ant Design Table - Theme-aware styles */
+.ant-table-themed .ant-table {
+  background: transparent !important;
+}
+.ant-table-themed .ant-table-thead > tr > th {
+  background: hsl(var(--muted) / 0.5) !important;
+  color: hsl(var(--muted-foreground)) !important;
+  border-bottom: 1px solid hsl(var(--border)) !important;
+}
+.ant-table-themed .ant-table-tbody > tr > td {
+  border-bottom: 1px solid hsl(var(--border)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+.ant-table-themed .ant-table-tbody > tr:hover > td {
+  background: hsl(var(--muted) / 0.5) !important;
+}
+.ant-table-themed .ant-table-tbody > tr.highlight-row > td {
+  background: hsl(var(--primary) / 0.15) !important;
+}
+.ant-table-themed .ant-table-tbody > tr.highlight-row:hover > td {
+  background: hsl(var(--primary) / 0.25) !important;
+}
+.ant-table-themed .ant-pagination {
+  color: hsl(var(--foreground)) !important;
+  display: flex !important;
+  justify-content: center !important;
+}
+.ant-table-themed .ant-pagination-item {
+  background: transparent !important;
+}
+.ant-table-themed .ant-pagination-item:hover {
+  background: transparent !important;
+}
+.ant-table-themed .ant-pagination-item a {
+  color: hsl(var(--foreground)) !important;
+}
+.ant-table-themed .ant-pagination-item-active {
+  background: transparent !important;
+  border-color: hsl(var(--primary)) !important;
+}
+.ant-table-themed .ant-pagination-item-active a {
+  color: hsl(var(--primary)) !important;
+}
+.ant-table-themed .ant-pagination-prev .ant-pagination-item-link,
+.ant-table-themed .ant-pagination-next .ant-pagination-item-link {
+  color: hsl(var(--foreground)) !important;
+  background: transparent !important;
+}
+.ant-table-themed .ant-pagination-total-text {
+  color: hsl(var(--muted-foreground)) !important;
+}
+.ant-table-themed .ant-select-selector {
+  background-color: hsl(var(--background)) !important;
+  border-color: hsl(var(--border)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+.ant-table-themed .ant-select-selection-item {
+  color: hsl(var(--foreground)) !important;
+}
+.ant-table-themed .ant-select-arrow {
+  color: hsl(var(--muted-foreground)) !important;
+}
+.ant-table-themed .ant-table-placeholder {
+  background: transparent !important;
+}
+.ant-table-themed .ant-table-placeholder .ant-empty-description {
+  color: hsl(var(--muted-foreground)) !important;
+}
+
+/* Ant Design Select dropdown - global override (renders in portal) */
+.ant-select-dropdown {
+  background-color: hsl(var(--popover)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+}
+.ant-select-item {
+  color: hsl(var(--foreground)) !important;
+}
+.ant-select-item-option-selected {
+  background-color: hsl(var(--accent)) !important;
+  color: hsl(var(--accent-foreground)) !important;
+}
+.ant-select-item-option-active {
+  background-color: hsl(var(--accent) / 0.5) !important;
+}
