@@ -10,6 +10,7 @@ import { LeaderboardTable } from "@/components/rewards/LeaderboardTable";
 import { useRewards } from "@/hooks/useRewards";
 import { useRewardsActivities } from "@/hooks/useRewardsActivities";
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
+import { useTokenContext } from "@/context/TokenContext";
 import { useRewardsLeaderboard } from "@/hooks/useRewardsLeaderboard";
 import { useSearchParams } from "react-router-dom";
 
@@ -27,6 +28,7 @@ const Rewards = () => {
   const { state, loading: stateLoading, refetch: refetchState } = useRewards();
   const { activities, loading: activitiesLoading, refetch: refetchActivities } = useRewardsActivities();
   const { userRewards, loading: userRewardsLoading, refetch: refetchUserRewards } = useRewardsUserInfo();
+  const { inactiveTokens, getInactiveTokens } = useTokenContext();
   const [leaderboardLimit] = useState(10);
   const [leaderboardPage, setLeaderboardPage] = useState(1);
   const leaderboardOffset = (leaderboardPage - 1) * leaderboardLimit;
@@ -34,6 +36,10 @@ const Rewards = () => {
 
   useEffect(() => {
     document.title = "Rewards";
+    // Fetch inactive tokens (includes CATA) if not already loaded
+    if (inactiveTokens.length === 0) {
+      getInactiveTokens(true);
+    }
   }, []);
 
   useEffect(() => {
@@ -57,6 +63,7 @@ const Rewards = () => {
       refetchState(),
       refetchActivities(),
       refetchUserRewards(),
+      getInactiveTokens(false), // Refresh CATA balance (Total Earned)
       refetchLeaderboard(),
     ]);
   };
