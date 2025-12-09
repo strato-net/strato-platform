@@ -1,19 +1,13 @@
 
 import { useEffect } from 'react';
-import { useTheme } from 'next-themes';
 import Navbar from '../components/Navbar';
 import Hero from '../components/home/Hero';
 import STRATOLOGODARK from '@/assets/strato-dark.png';
 
 const Index = () => {
-  const { setTheme } = useTheme();
-
   useEffect(() => {
-
     document.title = "STRATO | Where Stability Meets Opportunity";
-    // Force light mode on landing page
-    setTheme('light');
-  }, [setTheme]);
+  }, []);
 
 
   return (
