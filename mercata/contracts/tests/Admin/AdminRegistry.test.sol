@@ -575,4 +575,74 @@ contract Describe_AdminRegistry is Authorizable {
         require(adminRegistry.isAdminAddress(admin1), "Admin1 should still be an admin after failed removal");
     }
 
+    // ============ ISSUE DISMISSAL TESTS ============
+
+    function it_admin_registry_can_dismiss_issue_as_proposer() {
+        // Create an issue but don't execute it (only one vote)
+        string memory issueId = adminRegistry.getIssueId(address(token), "mint", admin3, 1000e18);
+        adminRegistry.castVoteOnIssue(address(token), "mint", admin3, 1000e18);
+
+        // Verify issue exists and has votes
+        require(adminRegistry.currentIssues(issueId), "Issue should exist");
+        require(adminRegistry.votesMap(issueId, admin1) > 0, "Issue should have votes");
+        require(ERC20(token).balanceOf(admin3) == 0, "Token should not be minted yet");
+
+        // Proposer dismisses their own issue
+        adminRegistry.dismissIssue(issueId);
+
+        // Verify issue is cleared
+        require(!adminRegistry.currentIssues(issueId), "Issue should be dismissed");
+        require(adminRegistry.votesMap(issueId, admin1) == 0, "Original issue votes should be cleared");
+        require(adminRegistry.votes(issueId, 0) == address(0), "Votes array should be empty");
+        require(ERC20(token).balanceOf(admin3) == 0, "Token should still not be minted");
+    }
+
+    function it_admin_registry_cannot_dismiss_issue_with_multiple_votes() {
+        // Add a third admin
+        adminRegistry.addAdmin(admin3);
+        user1.do(address(adminRegistry), "addAdmin", admin3);
+
+        // Set threshold to 100% so 2 votes won't execute (need 3 votes with 3 admins)
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "setVotingThreshold", address(token), "mint", 10000);
+        user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "setVotingThreshold", address(token), "mint", 10000);
+
+        // Create an issue with proposer's vote
+        string memory issueId = adminRegistry.getIssueId(address(token), "mint", nonAdmin, 1000e18);
+        adminRegistry.castVoteOnIssue(address(token), "mint", nonAdmin, 1000e18);
+
+        // Verify first vote is recorded
+        require(adminRegistry.votes(issueId, 0) == admin1, "First vote should be recorded");
+        require(adminRegistry.currentIssues(issueId), "Issue should exist");
+
+        // Another admin votes on the issue
+        user1.do(address(adminRegistry), "castVoteOnIssue", address(token), "mint", nonAdmin, 1000e18);
+
+        // Verify both votes are recorded and issue still exists (not executed with 2/3 votes, need 3)
+        require(adminRegistry.votes(issueId, 0) == admin1, "First vote should still be recorded");
+        require(adminRegistry.votes(issueId, 1) == address(user1), "Second vote should be recorded");
+        require(adminRegistry.currentIssues(issueId), "Issue should still exist");
+
+        // Proposer tries to dismiss - should fail because there are multiple votes
+        bool reverted = false;
+        try {
+            adminRegistry.dismissIssue(issueId);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should revert when trying to dismiss issue with multiple votes");
+    }
+
+    function it_admin_registry_cannot_dismiss_nonexistent_issue() {
+        string memory fakeIssueId = "nonexistent_issue_id";
+
+        // Try to dismiss an issue that doesn't exist
+        bool reverted = false;
+        try {
+            adminRegistry.dismissIssue(fakeIssueId);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should revert when trying to dismiss non-existent issue");
+    }
+
 }

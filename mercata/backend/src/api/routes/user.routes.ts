@@ -214,6 +214,35 @@ router.post("/admin/vote/by-id", authHandler.authorizeRequest(), UserController.
 
 /**
  * @openapi
+ * /user/admin/dismiss:
+ *   post:
+ *     summary: Dismiss an issue (only works if proposer is the only voter)
+ *     tags: [Admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - issueId
+ *             properties:
+ *               issueId:
+ *                 type: string
+ *                 description: The ID of the issue to dismiss
+ *     responses:
+ *       200:
+ *         description: Issue dismissed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               additionalProperties: true
+ */
+router.post("/admin/dismiss", authHandler.authorizeRequest(), UserController.dismissIssue);
+
+/**
+ * @openapi
  * /user/admin/issues:
  *   get:
  *     summary: List open administrative issues

@@ -66,6 +66,25 @@ const calculateExchangeRates = (pool: Pool | null, fromAsset: SwapToken | null) 
   };
 };
 
+/**
+ * Get activity name for swap rewards based on asset symbol/name
+ * Maps to activityType 1 (OneTime) swap activities
+ */
+const getSwapActivityName = (asset: SwapToken | null | undefined): string | null => {
+  if (!asset) return null;
+  
+  const symbol = asset._symbol?.toUpperCase() || "";
+  const name = asset._name?.toUpperCase() || "";
+  
+  // Check by symbol or name
+  if (symbol.includes("ETHST") || name.includes("ETHST")) return "ETHST-USDST Swap";
+  if (symbol.includes("WBTCST") || name.includes("WBTCST")) return "WBTCST-USDST Swap";
+  if (symbol.includes("GOLDST") || name.includes("GOLDST")) return "GOLDST-USDST Swap";
+  if (symbol.includes("SILVST") || name.includes("SILVST")) return "SILVST-USDST Swap";
+  
+  return null;
+};
+
 // ============================================================================
 // UI COMPONENTS
 // ============================================================================
@@ -205,8 +224,6 @@ interface TokenInputProps {
   onMaxClick: () => void;
   amountError?: string;
   loading: boolean;
-  userRewards?: UserRewardsData | null;
-  rewardsLoading?: boolean;
 }
 
 const TokenInput = ({
@@ -226,8 +243,6 @@ const TokenInput = ({
   onMaxClick,
   amountError,
   loading,
-  userRewards,
-  rewardsLoading,
 }: TokenInputProps) => {      
   return (
     <div className="bg-muted/50 p-4 rounded-lg border border-border">
@@ -296,15 +311,6 @@ const TokenInput = ({
           </span>
         </div>
       )}
-      {/* {isFromInput && (
-        <CompactRewardsDisplay
-          userRewards={userRewards}
-          loading={rewardsLoading || false}
-          activityIds={[3]}
-          variant="inline"
-          inputAmount={amount}
-        />
-      )} */}
     </div>
   );
 };
@@ -851,8 +857,6 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
         onMaxClick={() => handleMaxClick()}
         amountError={fromAmountError}
         loading={poolLoading}
-        userRewards={userRewards}
-        rewardsLoading={rewardsLoading}
       />
 
       <div className="flex justify-center">
@@ -883,9 +887,31 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
         onMaxClick={() => {}}
         amountError={toAmountError}
         loading={poolLoading}
-        userRewards={userRewards}
-        rewardsLoading={rewardsLoading}
       />
+
+
+      {(() => {
+        // Activity name is based on pair type, so check either token
+        const activityName = getSwapActivityName(fromAsset) || getSwapActivityName(toAsset);
+        if (!activityName) return null;
+        
+        // Swap rewards are tracked in USDST terms, so use the USDST side of the swap
+        // - If swapping FROM USDST, use fromAmount
+        // - If swapping TO USDST, use toAmount
+        const isFromUsdst = fromAsset?.address?.toLowerCase() === usdstAddress.toLowerCase();
+        const inputAmount = isFromUsdst ? fromAmount : toAmount;
+        
+        return (
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <CompactRewardsDisplay
+              userRewards={userRewards}
+              activityName={activityName}
+              inputAmount={inputAmount}
+              actionLabel="Swap"
+            />
+          </div>
+        );
+      })()}
 
       <div className="flex flex-col gap-2 bg-muted/50 p-4 rounded-lg border border-border">
         <div className="flex justify-between text-sm">

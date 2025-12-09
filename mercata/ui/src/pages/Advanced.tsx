@@ -13,6 +13,8 @@ import VaultsList from '@/components/cdp/VaultsList';
 import LiquidationsView from '@/components/cdp/LiquidationsView';
 import BadDebtView from '@/components/cdp/BadDebtView';
 import { useCDP } from '@/context/CDPContext';
+import { CompactRewardsDisplay } from '@/components/rewards/CompactRewardsDisplay';
+import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 
 const Advanced = () => {
   const [activeTab, setActiveTab] = useState<"lending" | "swap" | "liquidations" | "safety" | "mint">("mint");
@@ -20,6 +22,7 @@ const Advanced = () => {
   const [borrowActiveTab, setBorrowActiveTab] = useState('vaults');
   const { refreshVaults } = useCDP();
   const [vaultsRefreshTrigger, setVaultsRefreshTrigger] = useState(0);
+  const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
   const handleBorrowSuccess = () => {
     setVaultsRefreshTrigger(prev => prev + 1);
@@ -79,7 +82,18 @@ const Advanced = () => {
                     </TabsList>
                     <TabsContent value="vaults">
                       <div className="space-y-6">
+
                         <div className="border border-border bg-card rounded-xl p-4 flex flex-col shadow-sm">
+
+                       
+                          <div className="flex items-center justify-end mb-4">
+                            <CompactRewardsDisplay
+                              userRewards={userRewards}
+                              loading={rewardsLoading}
+                              activityName="CDP USDST Mint"
+                              variant="button"
+                            />
+                          </div>
                           <MintWidget onSuccess={handleBorrowSuccess} />
                         </div>
                         <VaultsList 

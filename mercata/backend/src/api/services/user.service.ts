@@ -144,6 +144,26 @@ export const castVoteOnIssue = async (
   }
 };
 
+// Dismiss an issue (only works if proposer is the only voter)
+export const dismissIssue = async (
+  accessToken: string,
+  userAddress: string,
+  issueId: string,
+): Promise<{ status: string; hash: string }> => {
+  const tx = await buildFunctionTx({
+    contractName: extractContractName(AdminRegistry),
+    contractAddress: adminRegistry,
+    method: "dismissIssue",
+    args: { _issueId: issueId },
+  }, userAddress, accessToken);
+
+  const { status, hash } = await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, tx)
+  );
+
+  return { status, hash };
+};
+
 // Cast a vote on an issue by issueId
 export const castVoteOnIssueById = async (
   accessToken: string,
