@@ -207,7 +207,7 @@ const ConfigureAssetModal = ({
                                   {...field}
                                   className="pr-8"
                                 />
-                                <span className="absolute right-3 top-2.5 text-gray-500">%</span>
+                                <span className="absolute right-3 top-2.5 text-muted-foreground">%</span>
                               </div>
                             </FormControl>
                             <FormDescription>
@@ -241,7 +241,7 @@ const ConfigureAssetModal = ({
                                   {...field}
                                   className="pr-8"
                                 />
-                                <span className="absolute right-3 top-2.5 text-gray-500">%</span>
+                                <span className="absolute right-3 top-2.5 text-muted-foreground">%</span>
                               </div>
                             </FormControl>
                             <FormDescription>
@@ -276,7 +276,7 @@ const ConfigureAssetModal = ({
                                 {...field}
                                 className="pr-8"
                               />
-                              <span className="absolute right-3 top-2.5 text-gray-500">%</span>
+                              <span className="absolute right-3 top-2.5 text-muted-foreground">%</span>
                             </div>
                           </FormControl>
                           <FormDescription>
@@ -325,7 +325,7 @@ const ConfigureAssetModal = ({
                                 {...field}
                                 className="pr-8"
                               />
-                              <span className="absolute right-3 top-2.5 text-gray-500">%</span>
+                              <span className="absolute right-3 top-2.5 text-muted-foreground">%</span>
                             </div>
                           </FormControl>
                           <FormDescription>
@@ -404,7 +404,7 @@ const ConfigureAssetModal = ({
                                 {...field}
                                 className="pr-8"
                               />
-                              <span className="absolute right-3 top-2.5 text-gray-500">%</span>
+                              <span className="absolute right-3 top-2.5 text-muted-foreground">%</span>
                             </div>
                           </FormControl>
                           <FormDescription>

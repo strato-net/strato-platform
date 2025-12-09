@@ -320,7 +320,7 @@ const MercataStats = () => {
   };
   
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <DashboardSidebar />
       <MobileSidebar 
         isOpen={isMobileSidebarOpen} 
@@ -372,7 +372,7 @@ const MercataStats = () => {
                   </CardHeader>
                   <CardContent>
                     {error ? (
-                      <div className="text-center text-red-500 py-8">{error}</div>
+                      <div className="text-center text-destructive py-8">{error}</div>
                     ) : loading ? (
                       <div className="space-y-3">
                         {[...Array(5)].map((_, i) => (
@@ -395,7 +395,7 @@ const MercataStats = () => {
                                 <TableCell className="font-medium">
                                   <div>
                                     <div className="font-semibold">{token.symbol}</div>
-                                    <div className="text-sm text-gray-500">{token.name}</div>
+                                    <div className="text-sm text-muted-foreground">{token.name}</div>
                                   </div>
                                 </TableCell>
                                 <TableCell className="text-right">{formatSupply(token.totalSupply)}</TableCell>
@@ -466,7 +466,7 @@ const MercataStats = () => {
                   </CardHeader>
                   <CardContent>
                     {cdpError ? (
-                      <div className="text-center text-red-500 py-8">{cdpError}</div>
+                      <div className="text-center text-destructive py-8">{cdpError}</div>
                     ) : cdpLoading ? (
                       <div className="space-y-3">
                         {[...Array(5)].map((_, i) => (
@@ -491,7 +491,7 @@ const MercataStats = () => {
                                 <TableCell>
                                   <div>
                                     <div>{asset.symbol}</div>
-                                    <div className="text-sm text-gray-500">{asset.asset.slice(0, 6)}...{asset.asset.slice(-4)}</div>
+                                    <div className="text-sm text-muted-foreground">{asset.asset.slice(0, 6)}...{asset.asset.slice(-4)}</div>
                                   </div>
                                 </TableCell>
                                 <TableCell className="text-right">{asset.numberOfVaults}</TableCell>
@@ -521,8 +521,8 @@ const MercataStats = () => {
                       onClick={() => setSelectedPeriod('daily')}
                       className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                         selectedPeriod === 'daily' 
-                          ? 'bg-blue-600 text-white' 
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                          ? 'bg-blue-600 text-white dark:bg-blue-700' 
+                          : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
                       }`}
                     >
                       Daily
@@ -531,8 +531,8 @@ const MercataStats = () => {
                       onClick={() => setSelectedPeriod('weekly')}
                       className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                         selectedPeriod === 'weekly' 
-                          ? 'bg-blue-600 text-white' 
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                          ? 'bg-blue-600 text-white dark:bg-blue-700' 
+                          : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
                       }`}
                     >
                       Weekly
@@ -541,8 +541,8 @@ const MercataStats = () => {
                       onClick={() => setSelectedPeriod('monthly')}
                       className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                         selectedPeriod === 'monthly' 
-                          ? 'bg-blue-600 text-white' 
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                          ? 'bg-blue-600 text-white dark:bg-blue-700' 
+                          : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
                       }`}
                     >
                       Monthly
@@ -551,8 +551,8 @@ const MercataStats = () => {
                       onClick={() => setSelectedPeriod('ytd')}
                       className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                         selectedPeriod === 'ytd' 
-                          ? 'bg-blue-600 text-white' 
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                          ? 'bg-blue-600 text-white dark:bg-blue-700' 
+                          : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
                       }`}
                     >
                       YTD
@@ -561,8 +561,8 @@ const MercataStats = () => {
                       onClick={() => setSelectedPeriod('allTime')}
                       className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                         selectedPeriod === 'allTime' 
-                          ? 'bg-blue-600 text-white' 
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                          ? 'bg-blue-600 text-white dark:bg-blue-700' 
+                          : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
                       }`}
                     >
                       All Time
@@ -586,7 +586,7 @@ const MercataStats = () => {
                       <p className="text-xs text-muted-foreground">
                         {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} CDP fees
                       </p>
-                      <div className="mt-3 pt-3 border-t border-gray-200">
+                      <div className="mt-3 pt-3 border-t border-border">
                         <div className="text-lg font-semibold">
                           {(revenueLoading || interestLoading) ? (
                             <Skeleton className="h-6 w-20" />
@@ -618,7 +618,7 @@ const MercataStats = () => {
                       <p className="text-xs text-muted-foreground">
                         {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} lending fees
                       </p>
-                      <div className="mt-3 pt-3 border-t border-gray-200">
+                      <div className="mt-3 pt-3 border-t border-border">
                         <div className="text-lg font-semibold">
                           {lendingInterestLoading ? (
                             <Skeleton className="h-6 w-20" />
@@ -671,12 +671,12 @@ const MercataStats = () => {
                     </CardContent>
                   </Card>
                   
-                  <Card className="border-2 border-green-500">
+                  <Card className="border-2 border-green-500 dark:border-green-700">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium">Combined Revenue</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold text-green-600">
+                      <div className="text-2xl font-bold text-green-600 dark:text-green-400">
                         {revenueLoading ? (
                           <Skeleton className="h-8 w-24" />
                         ) : (
@@ -704,7 +704,7 @@ const MercataStats = () => {
                   </CardHeader>
                   <CardContent>
                     {revenueError ? (
-                      <div className="text-center text-red-500 py-8">{revenueError}</div>
+                      <div className="text-center text-destructive py-8">{revenueError}</div>
                     ) : revenueLoading ? (
                       <div className="space-y-3">
                         {[...Array(3)].map((_, i) => (
@@ -712,7 +712,7 @@ const MercataStats = () => {
                         ))}
                       </div>
                     ) : aggregatedRevenueByPeriod[selectedPeriod].byAsset.length === 0 ? (
-                      <div className="text-center text-gray-500 py-8">No revenue data available for this period</div>
+                      <div className="text-center text-muted-foreground py-8">No revenue data available for this period</div>
                     ) : (
                       <div className="overflow-x-auto">
                         <Table>
@@ -729,7 +729,7 @@ const MercataStats = () => {
                                   <TableCell>
                                     <div>
                                       <div className="font-semibold">{item.symbol}</div>
-                                      <div className="text-sm text-gray-500">{item.asset.slice(0, 6)}...{item.asset.slice(-4)}</div>
+                                      <div className="text-sm text-muted-foreground">{item.asset.slice(0, 6)}...{item.asset.slice(-4)}</div>
                                     </div>
                                   </TableCell>
                                   <TableCell className="text-right font-semibold">

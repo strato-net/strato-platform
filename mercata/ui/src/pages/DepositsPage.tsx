@@ -72,7 +72,7 @@ const DepositsPage = () => {
   }, [location.pathname, userAddress, getEarningAssets, loadNetworksAndTokens]);
 
   return (
-    <div className="h-screen bg-gray-50 overflow-hidden">
+    <div className="h-screen bg-background overflow-hidden">
       <DashboardSidebar />
       <MobileSidebar 
         isOpen={isMobileSidebarOpen} 
@@ -89,6 +89,14 @@ const DepositsPage = () => {
               justify-content: center !important;
               text-align: center !important;
               width: 100% !important;
+              color: hsl(var(--muted-foreground)) !important;
+            }
+            .custom-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
+              color: hsl(var(--primary)) !important;
+              text-shadow: none !important;
+            }
+            .custom-tabs .ant-tabs-ink-bar {
+              background: hsl(var(--primary)) !important;
             }
           `}</style>
           <div className="mb-8 flex flex-col lg:flex-row gap-6 items-stretch">
@@ -108,7 +116,7 @@ const DepositsPage = () => {
                   </div>
                 </CardHeader>
                 <CardContent className="flex-1 flex flex-col min-h-0">
-                  <div className="w-full bg-white/90 p-1.5 rounded-xl border border-gray-200 shadow-sm flex-1 flex flex-col min-h-0">
+                  <div className="w-full flex-1 flex flex-col min-h-0">
                   <AntdTabs
                     activeKey={activeTab}
                     items={[
@@ -127,12 +135,12 @@ const DepositsPage = () => {
                     className="custom-tabs"
                     style={
                       {
-                        "--ant-primary-color": "#3b82f6",
-                        "--ant-primary-color-hover": "#2563eb",
+                        "--ant-primary-color": "hsl(var(--primary))",
+                        "--ant-primary-color-hover": "hsl(var(--primary))",
                       } as React.CSSProperties
                     }
                   />
-                    <div className="bg-white rounded-xl p-4 shadow-sm mt-4 flex-1 min-h-0 overflow-auto">
+                    <div className="mt-4 flex-1 min-h-0 overflow-auto">
                       <BridgeIn isConvert={activeTab === "easy-savings"} />
                     </div>
                   </div>

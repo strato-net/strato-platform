@@ -20,9 +20,9 @@ const calculateHealthFactor = (cr: number, lt: number): number => {
 
 // Get health factor color based on value
 const getHealthFactorColor = (healthFactor: number): string => {
-  if (healthFactor >= 1.5) return "text-black"; // Healthy - black
-  if (healthFactor >= 1.0) return "text-yellow-600"; // Warning - yellow
-  return "text-red-600"; // Danger - red
+  if (healthFactor >= 1.5) return "text-foreground"; // Healthy - standard text color
+  if (healthFactor >= 1.0) return "text-yellow-600 dark:text-yellow-500"; // Warning - yellow
+  return "text-red-600 dark:text-red-400"; // Danger - red
 };
 
 // Format percentage with reasonable precision
@@ -566,7 +566,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-8">
-            <div className="text-gray-500">Loading positions...</div>
+            <div className="text-muted-foreground">Loading positions...</div>
           </div>
         </CardContent>
       </Card>
@@ -587,8 +587,8 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center justify-center py-8 text-center">
-            <div className="text-gray-500 mb-4">No positions found</div>
-            <div className="text-sm text-gray-400">Create your first position by depositing collateral and borrowing USDST above</div>
+            <div className="text-muted-foreground mb-4">No positions found</div>
+            <div className="text-sm text-muted-foreground/70">Create your first position by depositing collateral and borrowing USDST above</div>
           </div>
         </CardContent>
       </Card>
@@ -627,11 +627,11 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
             return (
             <div
               key={`${position.asset}-${index}`}
-              className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
+              className="border border-border rounded-lg p-4 hover:bg-muted/50 transition-colors"
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-xs font-semibold">
+                  <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center text-xs font-semibold">
                     {position.symbol.slice(0, 2)}
                   </div>
                   <div>
@@ -679,20 +679,20 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
 
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                 <div>
-                  <p className="text-xs text-gray-500 mb-1">Collateral</p>
+                  <p className="text-xs text-muted-foreground mb-1">Collateral</p>
                   <p className="font-semibold">{formatNumber(parseFloat(formatWeiToDecimalHP(position.collateralAmount, position.collateralAmountDecimals)))} {position.symbol}</p>
-                  <p className="text-xs text-gray-400">${formatNumber(parseFloat(formatWeiToDecimalHP(position.collateralValueUSD, 18)))}</p>
+                  <p className="text-xs text-muted-foreground">${formatNumber(parseFloat(formatWeiToDecimalHP(position.collateralValueUSD, 18)))}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 mb-1">Debt</p>
+                  <p className="text-xs text-muted-foreground mb-1">Debt</p>
                   <p className="font-semibold">{formatNumber(parseFloat(formatWeiToDecimalHP(position.debtAmount, 18)))} USDST</p>
-                  <p className="text-xs text-gray-400">${formatNumber(parseFloat(formatWeiToDecimalHP(position.debtValueUSD, 18)))}</p>
+                  <p className="text-xs text-muted-foreground">${formatNumber(parseFloat(formatWeiToDecimalHP(position.debtValueUSD, 18)))}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 mb-1">Health Factor</p>
+                  <p className="text-xs text-muted-foreground mb-1">Health Factor</p>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <p className={`font-semibold cursor-help ${hasDebt ? getHealthFactorColor(healthFactor) : 'text-green-600'}`}>
+                      <p className={`font-semibold cursor-help ${hasDebt ? getHealthFactorColor(healthFactor) : 'text-green-600 dark:text-green-400'}`}>
                         {hasDebt ? formatNumber(healthFactor) : '∞'}
                       </p>
                     </TooltipTrigger>
@@ -707,7 +707,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                   </Tooltip>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 mb-1">Stability Fee</p>
+                  <p className="text-xs text-muted-foreground mb-1">Stability Fee</p>
                   <p className="font-semibold">{formatPercentage(position.stabilityFeeRate)}</p>
                 </div>
               </div>
@@ -784,7 +784,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                   ) : (
                     <>
                       <div className="mb-2">
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-muted-foreground">
                           Transaction Fee: {activeActions[position.asset] === 'deposit' || activeActions[position.asset] === 'repay' ? '0.02' : '0.01'} USDST
                         </p>
                       </div>

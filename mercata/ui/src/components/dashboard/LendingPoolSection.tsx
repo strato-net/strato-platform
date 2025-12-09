@@ -168,19 +168,13 @@ const LendingPoolSection = () => {
         <CardHeader className="px-2 py-2 md:px-6 md:py-6">
           <div className="flex justify-between items-center">
             <CardTitle>USDST Lending Pool</CardTitle>
-            {/* <CompactRewardsDisplay
-              userRewards={userRewards}
-              loading={rewardsLoading}
-              activityIds={[1]}
-              variant="button"
-            /> */}
           </div>
         </CardHeader>
         <CardContent className="px-2 py-2 md:px-6 md:py-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div>
               <div className="flex flex-col space-y-4">
-                <div className="bg-white rounded-lg p-4 border">
+                <div className="bg-card rounded-lg p-4 border border-border">
                   <h3 className="font-medium mb-3">Deposit</h3>
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-start space-y-2 sm:space-y-0 sm:space-x-2">
                     <div className="relative flex-1">
@@ -191,7 +185,7 @@ const LendingPoolSection = () => {
                         onChange={(e) => setDepositAmount(e.target.value)}
                         className={`pl-16 ${!isDepositAmountValid() ? 'text-red-600' : ''}`}
                       />
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-medium">USDST</span>
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-medium">USDST</span>
                     </div>
                     <Button
                       onClick={() => handleLiquidityAction("deposit")}
@@ -208,7 +202,7 @@ const LendingPoolSection = () => {
                       )}
                     </Button>
                   </div>
-                  <div className="text-sm text-gray-500 mt-1">
+                  <div className="text-sm text-muted-foreground mt-1">
                     <button
                       type="button"
                       onClick={() => {
@@ -228,7 +222,7 @@ const LendingPoolSection = () => {
                     </button>
                     Available:{" "}
                     {loadingLiquidity ?
-                      <span className="text-gray-400 animate-pulse">
+                      <span className="text-muted-foreground animate-pulse">
                         Loading...
                       </span>
                       : liquidityInfo?.supplyable?.userBalance
@@ -237,17 +231,16 @@ const LendingPoolSection = () => {
                     USDST
                   </div>
                   {/* Fee Display */}
-                  <div className="text-sm text-gray-500 mt-1">
+                  <div className="text-sm text-muted-foreground mt-1">
                     Transaction Fee: {LENDING_DEPOSIT_FEE} USDST
                   </div>
                   {/* Estimated Rewards */}
-                  {/* <CompactRewardsDisplay
+                  <CompactRewardsDisplay
                     userRewards={userRewards}
-                    loading={rewardsLoading}
-                    activityIds={[1]}
-                    variant="inline"
+                    activityName="Lending Pool Liquidity"
                     inputAmount={depositAmount}
-                  /> */}
+                    actionLabel="Deposit"
+                  />
                   {/* Stake mUSDST Checkbox */}
                   {rewardsEnabled && (
                     <div className="flex items-center space-x-2 mt-3">
@@ -264,7 +257,7 @@ const LendingPoolSection = () => {
                       </label>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                          <HelpCircle className="h-4 w-4 text-muted-foreground hover:text-foreground cursor-help" />
                         </TooltipTrigger>
                         <TooltipContent>
                           <p className="max-w-xs text-sm">
@@ -325,7 +318,7 @@ const LendingPoolSection = () => {
                   </Button>
                 </div>
 
-                <div className="bg-white rounded-lg p-4 border">
+                <div className="bg-card rounded-lg p-4 border border-border">
                   <h3 className="font-medium mb-3">Withdraw</h3>
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-start space-y-2 sm:space-y-0 sm:space-x-2">
                     <div className="relative flex-1">
@@ -336,7 +329,7 @@ const LendingPoolSection = () => {
                         onChange={(e) => setWithdrawAmount(e.target.value)}
                         className={`pl-16 ${!isWithdrawAmountValid() ? 'text-red-600' : ''}`}
                       />
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-medium">USDST</span>
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-medium">USDST</span>
                     </div>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -368,13 +361,13 @@ const LendingPoolSection = () => {
                         </span>
                       </TooltipTrigger>
                       {liquidityInfo?.isPaused && (
-                        <TooltipContent className="bg-orange-50 border-orange-200 text-orange-900">
+                        <TooltipContent className="bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-900 text-orange-900 dark:text-orange-400">
                           <p>Lending Pool is on pause. This action currently disabled.</p>
                         </TooltipContent>
                       )}
                     </Tooltip>
                   </div>
-                  <div className="text-sm text-gray-500 mt-1">
+                  <div className="text-sm text-muted-foreground mt-1">
                     <button
                       type="button"
                       onClick={() => {
@@ -400,7 +393,7 @@ const LendingPoolSection = () => {
                     </button>
                     Withdrawable:{" "}
                     {loadingLiquidity ? (
-                      <span className="text-gray-400 animate-pulse">
+                      <span className="text-muted-foreground animate-pulse">
                         Loading...
                       </span>
                     ) : (
@@ -412,9 +405,17 @@ const LendingPoolSection = () => {
                     } )
                   </div>
                   {/* Fee Display */}
-                  <div className="text-sm text-gray-500 mt-1">
+                  <div className="text-sm text-muted-foreground mt-1">
                     Transaction Fee: {LENDING_WITHDRAW_FEE} USDST
                   </div>
+                  {/* Estimated Rewards Display */}
+                  <CompactRewardsDisplay
+                    userRewards={userRewards}
+                    activityName="Lending Pool Liquidity"
+                    inputAmount={withdrawAmount}
+                    isWithdrawal={true}
+                    actionLabel="Withdraw"
+                  />
                   {/* Include Staked mUSDST Checkbox */}
                   {rewardsEnabled && (
                     <div className="flex items-center space-x-2 mt-3">
@@ -431,7 +432,7 @@ const LendingPoolSection = () => {
                       </label>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                          <HelpCircle className="h-4 w-4 text-muted-foreground hover:text-foreground cursor-help" />
                         </TooltipTrigger>
                         <TooltipContent>
                           <p className="max-w-xs text-sm">
@@ -516,7 +517,7 @@ const LendingPoolSection = () => {
                       </span>
                     </TooltipTrigger>
                     {liquidityInfo?.isPaused && (
-                      <TooltipContent className="bg-orange-50 border-orange-200 text-orange-900">
+                      <TooltipContent className="bg-orange-500/10 border-orange-500/30 text-orange-500">
                         <p>Lending Pool is on pause. This action currently disabled.</p>
                       </TooltipContent>
                     )}
@@ -525,16 +526,16 @@ const LendingPoolSection = () => {
               </div>
             </div>
 
-            <div className="bg-white rounded-lg p-4 border">
+                <div className="bg-card rounded-lg p-4 border border-border">
               <div className="flex justify-between mb-4">
                 <h3 className="font-medium">Pool Stats</h3>
               </div>
               <div className="space-y-3">
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-gray-500 text-sm sm:text-base">Total USDST Supplied</span>
+                  <span className="text-muted-foreground text-sm sm:text-base">Total USDST Supplied</span>
                   <span className="font-medium text-sm sm:text-base sm:text-right">
                     {loadingLiquidity ? (
-                      <span className="text-gray-400 animate-pulse">
+                      <span className="text-muted-foreground animate-pulse">
                         Loading...
                       </span>
                     ) : liquidityInfo ? (
@@ -545,10 +546,10 @@ const LendingPoolSection = () => {
                   </span>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-gray-500 text-sm sm:text-base">Total USDST Borrowed</span>
+                  <span className="text-muted-foreground text-sm sm:text-base">Total USDST Borrowed</span>
                   <span className="font-medium text-sm sm:text-base sm:text-right">
                     {loadingLiquidity ? (
-                      <span className="text-gray-400 animate-pulse">
+                      <span className="text-muted-foreground animate-pulse">
                         Loading...
                       </span>
                     ) : liquidityInfo?.totalBorrowed ? (
@@ -559,14 +560,14 @@ const LendingPoolSection = () => {
                   </span>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-gray-500 text-sm sm:text-base">Utilization Rate</span>
+                  <span className="text-muted-foreground text-sm sm:text-base">Utilization Rate</span>
                   <span className="font-medium text-sm sm:text-base">{liquidityInfo?.utilizationRate || '0'}%</span>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-gray-500 text-sm sm:text-base">Available Liquidity</span>
+                  <span className="text-muted-foreground text-sm sm:text-base">Available Liquidity</span>
                   <span className="font-medium text-sm sm:text-base sm:text-right">
                      {loadingLiquidity ? (
-                      <span className="text-gray-400 animate-pulse">
+                      <span className="text-muted-foreground animate-pulse">
                         Loading...
                       </span>
                     ) : liquidityInfo?.availableLiquidity ? (
@@ -577,10 +578,10 @@ const LendingPoolSection = () => {
                   </span>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-gray-500 text-sm sm:text-base">Total Collateral Value</span>
+                  <span className="text-muted-foreground text-sm sm:text-base">Total Collateral Value</span>
                   <span className="font-medium text-sm sm:text-base sm:text-right">
                     {loadingLiquidity ? (
-                      <span className="text-gray-400 animate-pulse">
+                      <span className="text-muted-foreground animate-pulse">
                         Loading...
                       </span>
                     ) : liquidityInfo?.totalCollateralValue ? (
@@ -591,10 +592,10 @@ const LendingPoolSection = () => {
                   </span>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-gray-500 text-sm sm:text-base">Borrow Index</span>
+                  <span className="text-muted-foreground text-sm sm:text-base">Borrow Index</span>
                   <span className="font-medium text-sm sm:text-base sm:text-right">
                     {loadingLiquidity ? (
-                      <span className="text-gray-400 animate-pulse">Loading...</span>
+                      <span className="text-muted-foreground animate-pulse">Loading...</span>
                     ) : liquidityInfo?.borrowIndex ? (
                       (() => {
                         const s = formatUnits(liquidityInfo.borrowIndex || 0, 27);
@@ -607,10 +608,10 @@ const LendingPoolSection = () => {
                   </span>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-gray-500 text-sm sm:text-base">Reserves Accrued</span>
+                  <span className="text-muted-foreground text-sm sm:text-base">Reserves Accrued</span>
                   <span className="font-medium text-sm sm:text-base sm:text-right">
                     {loadingLiquidity ? (
-                      <span className="text-gray-400 animate-pulse">Loading...</span>
+                      <span className="text-muted-foreground animate-pulse">Loading...</span>
                     ) : liquidityInfo?.reservesAccrued ? (
                       formatBalance(liquidityInfo.reservesAccrued || 0n, undefined, 18, 2, 2, true)
                     ) : (
@@ -619,22 +620,22 @@ const LendingPoolSection = () => {
                   </span>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-gray-500 text-sm sm:text-base">Supply APY</span>
+                  <span className="text-muted-foreground text-sm sm:text-base">Supply APY</span>
                   <span className="font-medium text-sm sm:text-base">{liquidityInfo?.supplyAPY ? `${liquidityInfo.supplyAPY}%` : "N/A"}</span>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-gray-500 text-sm sm:text-base">Max Supply APY</span>
+                  <span className="text-muted-foreground text-sm sm:text-base">Max Supply APY</span>
                   <span className="font-medium text-sm sm:text-base">{liquidityInfo?.maxSupplyAPY ? `${liquidityInfo.maxSupplyAPY}%` : "N/A"}</span>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-gray-500 text-sm sm:text-base">Borrow APY</span>
+                  <span className="text-muted-foreground text-sm sm:text-base">Borrow APY</span>
                   <span className="font-medium text-sm sm:text-base">{liquidityInfo?.borrowAPY ? `${liquidityInfo.borrowAPY}%` : "N/A"}</span>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-gray-500 text-sm sm:text-base">Your mUSDST (Total)</span>
+                  <span className="text-muted-foreground text-sm sm:text-base">Your mUSDST (Total)</span>
                   <span className="font-medium text-sm sm:text-base sm:text-right">
                     {loadingLiquidity ? (
-                      <span className="text-gray-400 animate-pulse">
+                      <span className="text-muted-foreground animate-pulse">
                         Loading...
                       </span>
                     ) : liquidityInfo?.withdrawable?.userBalance ? (
@@ -649,10 +650,10 @@ const LendingPoolSection = () => {
                     {/* Note: userBalanceStaked doesn't exist in TokenInfo interface */}
                     {/* If staked balance tracking is needed, it should be added to the interface */}
                     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start pl-4">
-                      <span className="text-gray-400 text-xs sm:text-sm">• Unstaked</span>
+                      <span className="text-muted-foreground text-xs sm:text-sm">• Unstaked</span>
                       <span className="font-medium text-xs sm:text-sm sm:text-right">
                         {loadingLiquidity ? (
-                          <span className="text-gray-400 animate-pulse">
+                          <span className="text-muted-foreground animate-pulse">
                             Loading...
                           </span>
                         ) : liquidityInfo?.withdrawable?.userBalance ? (
@@ -665,7 +666,7 @@ const LendingPoolSection = () => {
                   </>
                 )}
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-gray-500 text-sm sm:text-base">Conversion Rate</span>
+                  <span className="text-muted-foreground text-sm sm:text-base">Conversion Rate</span>
                   <span className="font-medium text-sm sm:text-base sm:text-right">{liquidityInfo?.exchangeRate ? "1 mUSDST = " + formatUnits(liquidityInfo?.exchangeRate || 0, 18) + " USDST" : "N/A"}</span>
                 </div>
               </div>

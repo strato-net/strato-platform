@@ -79,7 +79,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
         const addressUrl = addr ? `${base}/address/${addr}` : '';
         return (
           <div>
-            <div className="text-xs text-gray-500 mb-1">{chainName}</div>
+            <div className="text-xs text-muted-foreground mb-1">{chainName}</div>
             {addr ? (
               <div className="group relative flex items-center gap-2">
                 <a
@@ -91,7 +91,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
                   {`${addr.slice(0, 6)}...${addr.slice(-4)}`}
                 </a>
                 <CopyOutlined
-                  className="text-gray-400 hover:text-blue-500 cursor-pointer transition-colors"
+                  className="text-muted-foreground hover:text-blue-500 cursor-pointer transition-colors"
                   onClick={() => handleCopyToClipboard(addr)}
                 />
               </div>
@@ -116,7 +116,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
       key: "ethTokenSymbol",
       render: (_: any, record: any) => (
         <div className="flex flex-col gap-1">
-          <span className="text-sm text-gray-700">{
+          <span className="text-sm text-foreground">{
             record.externalSymbol ||
             (record.externalName === 'Ether' ? 'ETH' : record.externalName) ||
             '-'
@@ -130,7 +130,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
       key: "token",
       render: (_: any, record: any) => (
         <div className="flex flex-col gap-1">
-          <span className="text-sm text-gray-700">{record.stratoTokenSymbol || '-'}</span>
+          <span className="text-sm text-foreground">{record.stratoTokenSymbol || '-'}</span>
         </div>
       ),
       width: 150,
@@ -171,7 +171,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
           );
         }
         return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-foreground">
             <AlertCircle className="h-3 w-3 mr-1" />
             Unknown
           </span>
@@ -189,8 +189,8 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
   ];
 
   return (
-    <div className="space-y-4">
-      <Card className="bg-white/80 rounded-xl shadow-sm border border-gray-200">
+    <div className="space-y-4 ant-table-themed">
+      <Card className="bg-card rounded-xl shadow-sm border border-border">
         <Space 
           size="large" 
           direction={isMobile ? "vertical" : "horizontal"} 
@@ -198,7 +198,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
           style={isMobile ? { width: '100%' } : {}}
         >
           <div className={isMobile ? "w-full" : ""}>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-foreground mb-1">
               Type
             </label>
             <Select
@@ -216,7 +216,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
             />
           </div>
           <div className={isMobile ? "w-full" : ""}>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-foreground mb-1">
               Status Filter
             </label>
             <Select
@@ -230,7 +230,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
             />
           </div>
           <div className={isMobile ? "w-full" : ""}>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-foreground mb-1">
               Chain Filter
             </label>
             <Select
@@ -249,7 +249,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
         </Space>
       </Card>
       
-      <div className="bg-white/80 rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
+      <div className="bg-card rounded-xl shadow-sm border border-border overflow-x-auto">
         <Table
           columns={columns}
           dataSource={transactions}
@@ -267,10 +267,10 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
           }}
           locale={{
             emptyText: (
-              <div className="py-12 text-center text-gray-500">
+              <div className="py-12 text-center text-muted-foreground">
                 <div className="flex flex-col items-center justify-center gap-2">
-                  <FrownOutlined style={{ fontSize: 48, color: "#bdbdbd" }} />
-                  <span className="text-lg font-semibold text-gray-400">
+                  <FrownOutlined style={{ fontSize: 48, color: "currentColor" }} />
+                  <span className="text-lg font-semibold text-muted-foreground">
                     Sorry, no data found
                   </span>
                 </div>
