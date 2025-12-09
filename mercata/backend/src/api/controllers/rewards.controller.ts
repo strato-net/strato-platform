@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
-import { fetchUserActivities, fetchRewardsOverview, fetchAllActivities } from "../services/rewards.service";
+import { fetchUserActivities, fetchRewardsOverview, fetchAllActivities, fetchLeaderboard } from "../services/rewards.service";
 import { strato } from "../../utils/mercataApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
@@ -148,6 +148,27 @@ class RewardsController {
         success: result.status === "Success",
         txHash: result.hash
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Get leaderboard data
+   */
+  static async getLeaderboard(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken } = req;
+      const forceRefresh = req.query.refresh === "true";
+      const limit = Math.max(1, Math.min(100, parseInt(req.query.limit as string, 10) || 10));
+      const offset = Math.max(0, parseInt(req.query.offset as string, 10) || 0);
+
+      const leaderboard = await fetchLeaderboard(accessToken, forceRefresh, limit, offset);
+      res.status(RestStatus.OK).json(leaderboard);
     } catch (error) {
       next(error);
     }
