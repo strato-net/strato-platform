@@ -168,12 +168,6 @@ const LendingPoolSection = () => {
         <CardHeader className="px-2 py-2 md:px-6 md:py-6">
           <div className="flex justify-between items-center">
             <CardTitle>USDST Lending Pool</CardTitle>
-            {/* <CompactRewardsDisplay
-              userRewards={userRewards}
-              loading={rewardsLoading}
-              activityIds={[1]}
-              variant="button"
-            /> */}
           </div>
         </CardHeader>
         <CardContent className="px-2 py-2 md:px-6 md:py-6">
@@ -241,13 +235,12 @@ const LendingPoolSection = () => {
                     Transaction Fee: {LENDING_DEPOSIT_FEE} USDST
                   </div>
                   {/* Estimated Rewards */}
-                  {/* <CompactRewardsDisplay
+                  <CompactRewardsDisplay
                     userRewards={userRewards}
-                    loading={rewardsLoading}
-                    activityIds={[1]}
-                    variant="inline"
+                    activityName="Lending Pool Liquidity"
                     inputAmount={depositAmount}
-                  /> */}
+                    actionLabel="Deposit"
+                  />
                   {/* Stake mUSDST Checkbox */}
                   {rewardsEnabled && (
                     <div className="flex items-center space-x-2 mt-3">
@@ -415,6 +408,14 @@ const LendingPoolSection = () => {
                   <div className="text-sm text-gray-500 mt-1">
                     Transaction Fee: {LENDING_WITHDRAW_FEE} USDST
                   </div>
+                  {/* Estimated Rewards Display */}
+                  <CompactRewardsDisplay
+                    userRewards={userRewards}
+                    activityName="Lending Pool Liquidity"
+                    inputAmount={withdrawAmount}
+                    isWithdrawal={true}
+                    actionLabel="Withdraw"
+                  />
                   {/* Include Staked mUSDST Checkbox */}
                   {rewardsEnabled && (
                     <div className="flex items-center space-x-2 mt-3">

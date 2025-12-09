@@ -11,7 +11,7 @@ import { Pool } from '@/interface';
 import { rewardsEnabled } from '@/lib/constants';
 import LiquidityDepositModal from './LiquidityDepositModal';
 import LiquidityWithdrawModal from './LiquidityWithdrawModal';
-
+import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 
 const SwapPoolsSection = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -26,6 +26,7 @@ const SwapPoolsSection = () => {
   const { fetchPools, getPoolByAddress } = useSwapContext();
   const { fetchUsdstBalance, usdstBalance, voucherBalance } = useTokenContext();
   const { userAddress } = useUser();
+  const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
   useEffect(() => {
     fetchAndEnrichPools();
@@ -208,6 +209,7 @@ const SwapPoolsSection = () => {
                       <div className="text-sm text-gray-500">APY</div>
                       <div className="font-medium">{pool.apy ? `${pool.apy}%` : "N/A"}</div>
                     </div>
+               
                     <div className="flex space-x-2">
                       <Button
                         size="sm"

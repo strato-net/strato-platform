@@ -11,6 +11,7 @@ import PercentageButtons from "../ui/PercentageButtons";
 import { useLendingContext } from "@/context/LendingContext";
 import { computeMaxTransferable, handleAmountInputChange } from "@/utils/transferValidation";
 import { UserRewardsData } from "@/services/rewardsService";
+import { CompactRewardsDisplay } from "../rewards/CompactRewardsDisplay";
 
 interface BorrowFormProps {
   loans: NewLoanData | null;
@@ -171,13 +172,12 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
         {borrowAmountError && (
           <p className="text-red-600 text-sm">{borrowAmountError}</p>
         )}
-        {/* <CompactRewardsDisplay
+        <CompactRewardsDisplay
           userRewards={userRewards}
-          loading={rewardsLoading || false}
-          activityIds={[2]}
-          variant="inline"
+          activityName="Lending Pool Borrow"
           inputAmount={borrowAmount}
-        /> */}
+          actionLabel="Borrow"
+        />
         <PercentageButtons
           value={borrowAmount}
           maxValue={maxAmount}

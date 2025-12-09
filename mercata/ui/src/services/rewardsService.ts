@@ -284,6 +284,65 @@ export const calculateEstimatedRewardsPerDay = (
 };
 
 /**
+ * Calculate effective emission rate (scaled) for a user based on input amount
+ * This shows the emission rate the user will receive after depositing the input amount
+ * Formula: (inputAmount / (totalStake + inputAmount)) * emissionRate * secondsPerDay
+ */
+export const calculateEffectiveEmissionRate = (
+  inputAmount: string,
+  totalStake: string,
+  emissionRate: string
+): string => {
+  const inputWei = safeBigInt(inputAmount);
+  const totalStakeBig = safeBigInt(totalStake);
+  const emissionRateBig = safeBigInt(emissionRate);
+  
+  // Calculate new total stake after deposit
+  const newTotalStake = totalStakeBig + inputWei;
+  
+  if (newTotalStake === 0n || emissionRateBig === 0n) return "0";
+  
+  const secondsPerDay = 86400n;
+  
+  // Effective emission rate = (inputAmount / newTotalStake) * emissionRate * secondsPerDay
+  const effectiveEmissionRate = (inputWei * emissionRateBig * secondsPerDay) / newTotalStake;
+  
+  return effectiveEmissionRate.toString();
+};
+
+/**
+ * Calculate new personal emission rate (per second) after adding input amount
+ * This shows the user's total share of the activity's emission rate after deposit
+ * Formula: ((oldStake + inputAmount) / (oldTotalStake + inputAmount)) * activityEmissionRate
+ * @param oldStake User's current stake
+ * @param inputAmount Amount being added
+ * @param oldTotalStake Current total stake in the activity
+ * @param activityEmissionRate Activity's emission rate (per second)
+ * @returns New personal emission rate in CATA per second
+ */
+export const calculateNewPersonalEmissionRate = (
+  oldStake: string,
+  inputAmount: string,
+  oldTotalStake: string,
+  activityEmissionRate: string
+): string => {
+  const oldStakeBig = safeBigInt(oldStake);
+  const inputWei = safeBigInt(inputAmount);
+  const oldTotalStakeBig = safeBigInt(oldTotalStake);
+  const emissionRateBig = safeBigInt(activityEmissionRate);
+  
+  const newStake = oldStakeBig + inputWei;
+  const newTotalStake = oldTotalStakeBig + inputWei;
+  
+  if (newTotalStake === 0n || emissionRateBig === 0n) return "0";
+  
+  // Personal emission rate = (newStake / newTotalStake) * activityEmissionRate
+  const newPersonalEmissionRate = (newStake * emissionRateBig) / newTotalStake;
+  
+  return newPersonalEmissionRate.toString();
+};
+
+/**
  * Remove trailing zeros from a decimal string
  */
 const removeTrailingZeros = (value: string): string => {
