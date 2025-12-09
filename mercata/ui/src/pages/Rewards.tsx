@@ -9,6 +9,7 @@ import { UserRewardsSection } from "@/components/rewards/UserRewardsSection";
 import { useRewards } from "@/hooks/useRewards";
 import { useRewardsActivities } from "@/hooks/useRewardsActivities";
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
+import { useTokenContext } from "@/context/TokenContext";
 
 const Rewards = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -17,9 +18,14 @@ const Rewards = () => {
   const { state, loading: stateLoading, refetch: refetchState } = useRewards();
   const { activities, loading: activitiesLoading, refetch: refetchActivities } = useRewardsActivities();
   const { userRewards, loading: userRewardsLoading, refetch: refetchUserRewards } = useRewardsUserInfo();
+  const { inactiveTokens, getInactiveTokens } = useTokenContext();
 
   useEffect(() => {
     document.title = "Rewards";
+    // Fetch inactive tokens (includes CATA) if not already loaded
+    if (inactiveTokens.length === 0) {
+      getInactiveTokens(true);
+    }
   }, []);
 
   const handleClaimSuccess = () => {
@@ -35,6 +41,7 @@ const Rewards = () => {
       refetchState(),
       refetchActivities(),
       refetchUserRewards(),
+      getInactiveTokens(false), // Refresh CATA balance (Total Earned)
     ]);
   };
 
