@@ -3,7 +3,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import UsdstBalanceBox from "@/components/layouts/UsdstBalanceBox";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { WagmiProvider } from "wagmi";
+import { Transport, WagmiProvider } from "wagmi";
 import { mainnet, polygon, sepolia } from "wagmi/chains";
 import {
   connectorsForWallets,
@@ -48,8 +48,9 @@ import { SwapProvider } from "@/context/SwapContext";
 import Borrow from "./pages/Borrow";
 import { getConfig } from "./lib/config";
 import { useState, useEffect } from "react";
-import { initializeCsrfToken } from "./lib/csrf";
 import { ThemeProvider } from "@/components/theme-provider";
+import { initializeCsrfToken, getCsrfFetchOptions } from "./lib/csrf";
+
 
 const queryClient = new QueryClient();
 
@@ -82,11 +83,9 @@ const App = () => {
     if (!loading) {
       const appName = "Mercata";
       const chains = [mainnet, polygon, sepolia] as const;
-      const transports = {
-        [mainnet.id]: http(),
-        [polygon.id]: http(),
-        [sepolia.id]: http(),
-      };
+      const transports: Record<number, Transport> = Object.fromEntries(
+        chains.map((chain) => [chain.id, http(`/api/rpc/${chain.id}`, {fetchOptions: getCsrfFetchOptions()})])
+      );
 
       const connectors = connectorsForWallets(
         [

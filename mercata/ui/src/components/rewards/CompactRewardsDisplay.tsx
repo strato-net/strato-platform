@@ -180,23 +180,46 @@ export const CompactRewardsDisplay = ({
     ) || [];
 
   // ─────────────────────────────────────────────────────────────────────────
-  // CALCULATE CURRENT RATE
+  // CALCULATE CURRENT RATE (using backend's personalEmissionRate for accuracy)
   // ─────────────────────────────────────────────────────────────────────────
   let currentRate = 0n;
-  filteredActivities.forEach(({ activity, userInfo }) => {
-    if (activity?.emissionRate && activity?.totalStake) {
-      currentRate += BigInt(
-        calculateEstimatedRewardsPerDay(
+  
+  // Store derived totalStake for use in new rate calculation
+  const derivedTotalStakes: Map<number, bigint> = new Map();
+  
+  filteredActivities.forEach(({ activity, userInfo, personalEmissionRate }) => {
+    if (activity?.emissionRate) {
+      // Use backend's personalEmissionRate if available (more accurate than cached totalStake)
+      if (personalEmissionRate && BigInt(personalEmissionRate) > 0n) {
+        // Backend rate is per second, convert to per day
+        const backendRatePerDay = BigInt(personalEmissionRate) * 86400n;
+        currentRate += backendRatePerDay;
+        
+        // Derive actual totalStake from personalEmissionRate for use in estimates
+        // Formula: personalEmissionRate = (userStake * emissionRate) / totalStake
+        // So: totalStake = (userStake * emissionRate) / personalEmissionRate
+        const userStakeBig = BigInt(userInfo?.stake || "0");
+        const emissionRateBig = BigInt(activity.emissionRate);
+        const personalRateBig = BigInt(personalEmissionRate);
+        
+        if (personalRateBig > 0n) {
+          const derivedTotalStake = (userStakeBig * emissionRateBig) / personalRateBig;
+          derivedTotalStakes.set(activity.activityId, derivedTotalStake);
+        }
+      } else if (activity?.totalStake) {
+        // Fallback to calculated rate if no personalEmissionRate
+        const rate = calculateEstimatedRewardsPerDay(
           userInfo?.stake || "0",
           activity.totalStake,
           activity.emissionRate
-        )
-      );
+        );
+        currentRate += BigInt(rate);
+      }
     }
   });
 
   // ─────────────────────────────────────────────────────────────────────────
-  // CALCULATE NEW RATE WITH INPUT
+  // CALCULATE NEW RATE WITH INPUT (using derived totalStake for accuracy)
   // ─────────────────────────────────────────────────────────────────────────
   const hasInput = inputAmount || (isWithdrawal && withdrawPercent && availableLPBalance);
   let newRate = 0n;
@@ -204,7 +227,7 @@ export const CompactRewardsDisplay = ({
   if (hasInput) {
     try {
       filteredActivities.forEach(({ activity, userInfo }) => {
-        if (activity?.emissionRate && activity?.totalStake) {
+        if (activity?.emissionRate) {
           const stakeChange = calculateStakeChange(
             activityName,
             isWithdrawal,
@@ -216,21 +239,24 @@ export const CompactRewardsDisplay = ({
             availableLPBalance
           );
 
+          // Use derived totalStake if available, otherwise fall back to cached
+          const actualTotalStake = derivedTotalStakes.get(activity.activityId) 
+            || BigInt(activity.totalStake || "0");
+
           const { newStake, newTotalStake } = calculateNewStakes(
             BigInt(userInfo?.stake || "0"),
-            BigInt(activity.totalStake),
+            actualTotalStake,
             stakeChange,
             isWithdrawal
           );
 
           if (newTotalStake > 0n) {
-            newRate += BigInt(
-              calculateEstimatedRewardsPerDay(
-                newStake.toString(),
-                newTotalStake.toString(),
-                activity.emissionRate
-              )
+            const rate = calculateEstimatedRewardsPerDay(
+              newStake.toString(),
+              newTotalStake.toString(),
+              activity.emissionRate
             );
+            newRate += BigInt(rate);
           }
         }
       });
