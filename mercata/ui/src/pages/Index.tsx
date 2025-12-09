@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { useTheme } from 'next-themes';
 import Navbar from '../components/Navbar';
 import Hero from '../components/home/Hero';
-import STRATOLOGO from '@/assets/strato.png';
+import STRATOLOGODARK from '@/assets/strato-dark.png';
 
 const Index = () => {
   const { setTheme } = useTheme();
@@ -26,7 +26,7 @@ const Index = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div>
               <div className="flex items-center mb-4">
-                <img src={STRATOLOGO} alt="STRATO" className="h-10 mr-3" />
+                <img src={STRATOLOGODARK} alt="STRATO" className="h-10 mr-3" />
                 <span className="sr-only">STRATO</span>
               </div>
               <p className="text-muted-foreground text-sm">

@@ -1,13 +1,17 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTheme } from 'next-themes';
 import { useUser } from '@/context/UserContext';
 import { ModeToggle } from './mode-toggle';
 import STRATOLOGO from '@/assets/strato.png';
+import STRATOLOGODARK from '@/assets/strato-dark.png';
 
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { isLoggedIn, logout, loading } = useUser();
+  const { resolvedTheme } = useTheme();
+  const logo = resolvedTheme === 'dark' ? STRATOLOGODARK : STRATOLOGO;
 
   const handleAuthClick = () => {
     // Don't do anything if still loading
@@ -32,7 +36,7 @@ const Navbar = () => {
           <div className="flex items-center">
             <Link to="/" className="flex-shrink-0">
               <img 
-                src={STRATOLOGO} 
+                src={logo} 
                 alt="STRATO" 
                 className="h-10" 
               />

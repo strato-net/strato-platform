@@ -1,7 +1,9 @@
 import { Link, useLocation } from 'react-router-dom';
+import { useTheme } from 'next-themes';
 import { LayoutDashboard, Wallet, Book, ArrowRightLeft, Send, Shield, X, Activity, BarChart3,Droplets, Download } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import STRATOLOGO from '@/assets/strato.png';
+import STRATOLOGODARK from '@/assets/strato-dark.png';
 
 interface MobileSidebarProps {
   isOpen: boolean;
@@ -11,6 +13,8 @@ interface MobileSidebarProps {
 const MobileSidebar = ({ isOpen, onClose }: MobileSidebarProps) => {
   const { isAdmin } = useUser();
   const location = useLocation();
+  const { resolvedTheme } = useTheme();
+  const logo = resolvedTheme === 'dark' ? STRATOLOGODARK : STRATOLOGO;
 
   const allNavItems = [
     { icon: <LayoutDashboard size={20} />, label: 'Overview', path: '/dashboard' },
@@ -49,7 +53,7 @@ const MobileSidebar = ({ isOpen, onClose }: MobileSidebarProps) => {
         <div className="border-b border-border">
           <div className="p-4 flex items-center justify-between">
             <img 
-              src={STRATOLOGO} 
+              src={logo} 
               alt="STRATO" 
               className="h-12" 
             />
