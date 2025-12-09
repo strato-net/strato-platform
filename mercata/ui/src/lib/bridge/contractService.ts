@@ -18,11 +18,14 @@ import {
 } from './types';
 
 async function getClient(chainId: string) {
-    return createPublicClient({
-      chain: await resolveViemChain(chainId),
-      transport: http(),
-    });
-  }
+  const id = Number(chainId);
+  const transport = http(`/api/rpc/${id}`);
+
+  return createPublicClient({
+    chain: await resolveViemChain(chainId),
+    transport,
+  });
+}
 
 function formatAddress(address: string): `0x${string}` {
     return (address.startsWith('0x') ? address : `0x${address}`) as `0x${string}`;
