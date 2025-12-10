@@ -8,7 +8,7 @@ import LendingPoolSection from '@/components/dashboard/LendingPoolSection';
 import SwapPoolsSection from '@/components/dashboard/SwapPoolsSection';
 import LiquidationsSection from '@/components/dashboard/LiquidationsSection';
 import SafetyModuleSection from '@/components/dashboard/SafetyModuleSection';
-import MintWidget from '@/components/cdp/MintWidget';
+import MintPlanner from '@/components/cdp/MintPlanner';
 import VaultsList from '@/components/cdp/VaultsList';
 import LiquidationsView from '@/components/cdp/LiquidationsView';
 import BadDebtView from '@/components/cdp/BadDebtView';
@@ -19,11 +19,7 @@ const Advanced = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [borrowActiveTab, setBorrowActiveTab] = useState('vaults');
   const { refreshVaults } = useCDP();
-  const [vaultsRefreshTrigger, setVaultsRefreshTrigger] = useState(0);
-
-  const handleBorrowSuccess = () => {
-    setVaultsRefreshTrigger(prev => prev + 1);
-  };
+  const vaultsRefreshTrigger = 0;
 
   const handleVaultActionSuccess = () => {
     refreshVaults();
@@ -79,8 +75,8 @@ const Advanced = () => {
                     </TabsList>
                     <TabsContent value="vaults">
                       <div className="space-y-6">
-                        <div className="border border-gray-200  bg-white rounded-xl p-4  flex flex-col">
-                          <MintWidget onSuccess={handleBorrowSuccess} />
+                        <div className="border border-gray-200  bg-white rounded-xl p-4  flex flex-col space-y-6">
+                          <MintPlanner />
                         </div>
                         <VaultsList 
                           refreshTrigger={vaultsRefreshTrigger} 
