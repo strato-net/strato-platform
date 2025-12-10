@@ -30,7 +30,7 @@ import {
 
 type Allocation = {
   vault: AssetConfig & { address: string; symbol: string };
-  borrowAmount: number;
+  mintAmount: number;
   crAfter: number;
   type: "existing" | "new";
   requiredCollateralUSD?: number;
@@ -121,9 +121,9 @@ const getCompoundInterest = (
 };
 
 const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
-  title = "Borrow against collateral (CDP)",
+  title = "Mint against collateral (CDP)",
 }) => {
-  const [borrowAmountInput, setBorrowAmountInput] = useState<string>("");
+  const [mintAmountInput, setMintAmountInput] = useState<string>("");
   const [riskLevel, setRiskLevel] = useState<"low" | "medium" | "high">("medium");
   const [assets, setAssets] = useState<AssetConfig[]>([]);
   const [loading, setLoading] = useState(false);
@@ -190,11 +190,11 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
     return 0;
   }, [prices]);
 
-  const borrowAmount = useMemo(() => {
-    const parsed = parseFloat((borrowAmountInput || "").replace(/,/g, ""));
+  const mintAmount = useMemo(() => {
+    const parsed = parseFloat((mintAmountInput || "").replace(/,/g, ""));
     if (!isFinite(parsed) || parsed <= 0) return 0;
     return parsed;
-  }, [borrowAmountInput]);
+  }, [mintAmountInput]);
 
   const assetSummaries = useMemo(() => {
     const tokensByAddress = activeTokens.reduce<
@@ -279,11 +279,11 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
   }, [riskLevel, assets]);
 
   const plan = useMemo(() => {
-    if (borrowAmount <= 0 || assets.length === 0) {
-      return { allocations: [] as Allocation[], newVault: null as Allocation | null, projectedCR: 0, remaining: borrowAmount };
+    if (mintAmount <= 0 || assets.length === 0) {
+      return { allocations: [] as Allocation[], newVault: null as Allocation | null, projectedCR: 0, remaining: mintAmount };
     }
 
-    let remaining = borrowAmount;
+    let remaining = mintAmount;
     const allocations: Allocation[] = [];
 
     const assetByAddress = assets.reduce<Record<string, AssetConfig>>((acc, a) => {
@@ -310,25 +310,25 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
       const collateralUSD = parseFloat(formatUnits(BigInt(vault.collateralValueUSD || "0"), 18));
       const debtUSD = parseFloat(formatUnits(BigInt(vault.debtValueUSD || "0"), 18));
       const effectiveCR = getEffectiveCR(vault.asset);
-      const maxBorrowAtTarget = Math.max(0, (collateralUSD * 100) / effectiveCR - debtUSD);
-      if (maxBorrowAtTarget <= 0 || remaining <= 0) return;
+      const maxMintAtTarget = Math.max(0, (collateralUSD * 100) / effectiveCR - debtUSD);
+      if (maxMintAtTarget <= 0 || remaining <= 0) return;
 
-      const borrowHere = Math.min(maxBorrowAtTarget, remaining);
-      if (borrowHere > 0) {
-        const totalDebt = debtUSD + borrowHere;
+      const mintHere = Math.min(maxMintAtTarget, remaining);
+      if (mintHere > 0) {
+        const totalDebt = debtUSD + mintHere;
         const crAfter = totalDebt > 0 ? (collateralUSD / totalDebt) * 100 : effectiveCR;
         const collateralTokens = parseFloat(formatUnits(BigInt(vault.collateralAmount || "0"), vault.collateralAmountDecimals || 18));
         const priceUSD = priceForAsset(vault.asset, vault);
         allocations.push({
           vault: { ...config!, address: vault.asset, symbol: config?.symbol || vault.symbol || "Asset" },
-          borrowAmount: borrowHere,
+          mintAmount: mintHere,
           crAfter,
           type: "existing",
           collateralInVaultUSD: collateralUSD,
           collateralInVaultTokens: collateralTokens,
           stabilityFee: config?.stabilityFeeRate,
         });
-        remaining = Math.max(0, remaining - borrowHere);
+        remaining = Math.max(0, remaining - mintHere);
       }
     });
 
@@ -366,7 +366,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
         const requiredCollateralTokens = priceUSD > 0 ? requiredCollateralUSD / priceUSD : 0;
         newVault = {
           vault: { ...choice.config, address: choice.config.asset || "", symbol: choice.config.symbol || "Asset" },
-          borrowAmount: remaining,
+          mintAmount: remaining,
           crAfter: effectiveCR,
           type: "new",
           requiredCollateralUSD,
@@ -377,19 +377,19 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
       }
     }
 
-    const totalDebt = allocations.reduce((sum, a) => sum + a.borrowAmount, 0) + (newVault?.borrowAmount || 0);
+    const totalDebt = allocations.reduce((sum, a) => sum + a.mintAmount, 0) + (newVault?.mintAmount || 0);
     const totalCollateralUSD =
       allocations.reduce((sum, a) => sum + (a.collateralInVaultUSD || 0), 0) + (newVault?.requiredCollateralUSD || 0);
     const projectedCR = totalDebt > 0 ? (totalCollateralUSD / totalDebt) * 100 : 0;
 
     return { allocations, newVault, projectedCR, remaining };
-  }, [assets, borrowAmount, vaults, activeTokens, priceForAsset, getEffectiveCR]);
+  }, [assets, mintAmount, vaults, activeTokens, priceForAsset, getEffectiveCR]);
 
-  // Calculate required collateral USD based on per-vault CR and borrow allocation
+  // Calculate required collateral USD based on per-vault CR and mint allocation
   const requiredCollateralUSD = useMemo(() => {
-    if (borrowAmount <= 0 || selectedVaults.size === 0) return 0;
+    if (mintAmount <= 0 || selectedVaults.size === 0) return 0;
     
-    // Calculate borrow allocation per vault (proportional to collateral)
+    // Calculate mint allocation per vault (proportional to collateral)
     const vaultCollaterals = assetSummaries
       .filter((a) => selectedVaults.has(a.address))
       .map((asset) => {
@@ -409,14 +409,14 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
     // Calculate required collateral for each vault based on its effective CR
     let totalRequired = 0;
     for (const { asset, totalCollateralUSD } of vaultCollaterals) {
-      const borrowAllocation = (totalCollateralUSD / totalCollateralAllVaults) * borrowAmount;
+      const mintAllocation = (totalCollateralUSD / totalCollateralAllVaults) * mintAmount;
       const effectiveCR = getEffectiveCR(asset.address);
-      const requiredForVault = (borrowAllocation * effectiveCR) / 100;
+      const requiredForVault = (mintAllocation * effectiveCR) / 100;
       totalRequired += requiredForVault;
     }
 
     return totalRequired;
-  }, [borrowAmount, selectedVaults, assetSummaries, depositInputs, getEffectiveCR]);
+  }, [mintAmount, selectedVaults, assetSummaries, depositInputs, getEffectiveCR]);
 
   const existingCollateralUSD = useMemo(() => {
     return assetSummaries
@@ -442,10 +442,10 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
   }, [assetSummaries, depositInputs, selectedVaults]);
 
   const projectedCR = useMemo(() => {
-    if (borrowAmount <= 0) return 0;
+    if (mintAmount <= 0) return 0;
     const totalCollateralUSD = existingCollateralUSD + depositTotals.depositUSD;
-    return borrowAmount > 0 ? (totalCollateralUSD / borrowAmount) * 100 : 0;
-  }, [borrowAmount, depositTotals.depositUSD, existingCollateralUSD]);
+    return mintAmount > 0 ? (totalCollateralUSD / mintAmount) * 100 : 0;
+  }, [mintAmount, depositTotals.depositUSD, existingCollateralUSD]);
 
   const collateralGapUSD = Math.max(0, requiredCollateralUSD - (existingCollateralUSD + depositTotals.depositUSD));
 
@@ -465,28 +465,28 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
 
   // Calculate projected interest costs using exponential compounding
   const projectedInterestCosts = useMemo(() => {
-    if (borrowAmount <= 0 || weightedAverageAPR <= 0) {
+    if (mintAmount <= 0 || weightedAverageAPR <= 0) {
       return { daily: 0, weekly: 0, monthly: 0, yearly: 0 };
     }
     
     return {
-      daily: getCompoundInterest(borrowAmount, weightedAverageAPR, SECONDS_PER_DAY),
-      weekly: getCompoundInterest(borrowAmount, weightedAverageAPR, SECONDS_PER_WEEK),
-      monthly: getCompoundInterest(borrowAmount, weightedAverageAPR, SECONDS_PER_MONTH),
-      yearly: getCompoundInterest(borrowAmount, weightedAverageAPR, SECONDS_PER_YEAR),
+      daily: getCompoundInterest(mintAmount, weightedAverageAPR, SECONDS_PER_DAY),
+      weekly: getCompoundInterest(mintAmount, weightedAverageAPR, SECONDS_PER_WEEK),
+      monthly: getCompoundInterest(mintAmount, weightedAverageAPR, SECONDS_PER_MONTH),
+      yearly: getCompoundInterest(mintAmount, weightedAverageAPR, SECONDS_PER_YEAR),
     };
-  }, [borrowAmount, weightedAverageAPR]);
+  }, [mintAmount, weightedAverageAPR]);
 
-  // Calculate total existing collateral from all vaults (for quick borrow planning)
+  // Calculate total existing collateral from all vaults (for quick mint planning)
   const totalExistingCollateralUSD = useMemo(() => {
     return assetSummaries.reduce((sum, a) => sum + (a.existingCollateralUSD || 0), 0);
   }, [assetSummaries]);
 
-  // Auto-select optimal vaults and calculate deposits for Quick Borrow
-  // Algorithm: Prioritize lowest stability fee rate, allocate borrow amount per vault,
+  // Auto-select optimal vaults and calculate deposits for Quick Mint
+  // Algorithm: Prioritize lowest stability fee rate, allocate mint amount per vault,
   // add deposits until vault's effective CR is reached, then move to next vault
-  const quickBorrowPlan = useMemo(() => {
-    if (borrowAmount <= 0 || assetSummaries.length === 0) {
+  const quickMintPlan = useMemo(() => {
+    if (mintAmount <= 0 || assetSummaries.length === 0) {
       return { selectedVaults: new Set<string>(), autoDeposits: {} };
     }
 
@@ -499,11 +499,11 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
 
     const autoSelected = new Set<string>();
     const autoDeposits: Record<string, string> = {};
-    let remainingBorrowAmount = borrowAmount;
+    let remainingMintAmount = mintAmount;
 
-    // Allocate borrow amount across vaults, prioritizing lowest fee
+    // Allocate mint amount across vaults, prioritizing lowest fee
     for (const asset of sortedAssets) {
-      if (remainingBorrowAmount <= 0) break;
+      if (remainingMintAmount <= 0) break;
 
       const priceUSD = asset.priceUSD || 0;
       if (priceUSD <= 0) continue;
@@ -513,22 +513,22 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
       const balanceTokens = asset.balanceTokens || 0;
       const effectiveCR = getEffectiveCR(asset.address);
 
-      // Try to allocate as much borrow amount as possible to this vault
-      // Start by checking what we can borrow with existing collateral
-      let borrowAllocation = 0;
+      // Try to allocate as much mint amount as possible to this vault
+      // Start by checking what we can mint with existing collateral
+      let mintAllocation = 0;
       let depositTokens = 0;
 
       if (existingCollateralUSD > 0) {
-        // Calculate max borrow with existing collateral at effective CR
-        const maxBorrowWithExisting = Math.max(0, (existingCollateralUSD * 100) / effectiveCR - existingDebtUSD);
-        borrowAllocation = Math.min(remainingBorrowAmount, maxBorrowWithExisting);
+        // Calculate max mint with existing collateral at effective CR
+        const maxMintWithExisting = Math.max(0, (existingCollateralUSD * 100) / effectiveCR - existingDebtUSD);
+        mintAllocation = Math.min(remainingMintAmount, maxMintWithExisting);
       }
 
-      // If we allocated some borrow amount, check if we need more collateral
+      // If we allocated some mint amount, check if we need more collateral
       // If we didn't allocate (or allocated less than remaining), try adding deposits
-      if (borrowAllocation < remainingBorrowAmount && balanceTokens > 0) {
-        // Calculate required collateral for remaining borrow amount
-        const totalDebtIfAllRemaining = existingDebtUSD + remainingBorrowAmount;
+      if (mintAllocation < remainingMintAmount && balanceTokens > 0) {
+        // Calculate required collateral for remaining mint amount
+        const totalDebtIfAllRemaining = existingDebtUSD + remainingMintAmount;
         const requiredCollateralForAllRemaining = (totalDebtIfAllRemaining * effectiveCR) / 100;
         const additionalCollateralNeeded = Math.max(0, requiredCollateralForAllRemaining - existingCollateralUSD);
 
@@ -539,21 +539,21 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
           depositTokens = depositUSD / priceUSD;
 
           if (depositTokens > 0) {
-            // Recalculate how much we can borrow with existing + new deposits
+            // Recalculate how much we can mint with existing + new deposits
             const totalCollateralAfter = existingCollateralUSD + depositUSD;
-            const maxBorrowWithDeposits = Math.max(0, (totalCollateralAfter * 100) / effectiveCR - existingDebtUSD);
-            borrowAllocation = Math.min(remainingBorrowAmount, maxBorrowWithDeposits);
+            const maxMintWithDeposits = Math.max(0, (totalCollateralAfter * 100) / effectiveCR - existingDebtUSD);
+            mintAllocation = Math.min(remainingMintAmount, maxMintWithDeposits);
           }
         }
       }
 
-      // If we can borrow something from this vault, use it
-      if (borrowAllocation > 0) {
+      // If we can mint something from this vault, use it
+      if (mintAllocation > 0) {
         autoSelected.add(asset.address);
-        remainingBorrowAmount -= borrowAllocation;
+        remainingMintAmount -= mintAllocation;
 
-        // Recalculate exact deposit needed for the final borrow allocation
-        const finalTotalDebt = existingDebtUSD + borrowAllocation;
+        // Recalculate exact deposit needed for the final mint allocation
+        const finalTotalDebt = existingDebtUSD + mintAllocation;
         const finalRequiredCollateral = (finalTotalDebt * effectiveCR) / 100;
         const finalAdditionalNeeded = Math.max(0, finalRequiredCollateral - existingCollateralUSD);
 
@@ -569,15 +569,15 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
     }
 
     return { selectedVaults: autoSelected, autoDeposits };
-  }, [borrowAmount, assetSummaries, getEffectiveCR]);
+  }, [mintAmount, assetSummaries, getEffectiveCR]);
 
-  // Apply quick borrow plan when in quick mode
+  // Apply quick mint plan when in quick mode
   useEffect(() => {
-    if (!showAdvanced && borrowAmount > 0) {
-      setSelectedVaults(quickBorrowPlan.selectedVaults);
-      setDepositInputs(quickBorrowPlan.autoDeposits);
+    if (!showAdvanced && mintAmount > 0) {
+      setSelectedVaults(quickMintPlan.selectedVaults);
+      setDepositInputs(quickMintPlan.autoDeposits);
     }
-  }, [showAdvanced, borrowAmount, quickBorrowPlan]);
+  }, [showAdvanced, mintAmount, quickMintPlan]);
 
   const toggleVaultSelection = (address: string) => {
     setSelectedVaults((prev) => {
@@ -591,13 +591,13 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
     });
   };
 
-  // Handle Quick Borrow confirmation - execute deposits and mints
-  const handleQuickBorrow = useCallback(async () => {
-    if (borrowAmount <= 0 || selectedVaults.size === 0) return;
+  // Handle Quick Mint confirmation - execute deposits and mints
+  const handleQuickMint = useCallback(async () => {
+    if (mintAmount <= 0 || selectedVaults.size === 0) return;
 
     setTransactionLoading(true);
     try {
-      // Calculate borrow allocations per vault (same logic as display)
+      // Calculate mint allocations per vault (same logic as display)
       const vaultCollaterals = assetSummaries
         .filter((a) => selectedVaults.has(a.address))
         .map((asset) => {
@@ -626,18 +626,18 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
           });
         }
 
-        // Calculate borrow allocation for this vault (proportional to collateral)
-        const borrowAllocation =
+        // Calculate mint allocation for this vault (proportional to collateral)
+        const mintAllocation =
           totalCollateralAllVaults > 0
-            ? (totalCollateralUSD / totalCollateralAllVaults) * borrowAmount
+            ? (totalCollateralUSD / totalCollateralAllVaults) * mintAmount
             : 0;
 
-        // Add mint transaction if there's a borrow allocation
-        if (borrowAllocation > 0) {
+        // Add mint transaction if there's a mint allocation
+        if (mintAllocation > 0) {
           transactions.push({
             type: "mint",
             asset: asset.address,
-            amount: borrowAllocation.toString(),
+            amount: mintAllocation.toString(),
             symbol: asset.symbol,
           });
         }
@@ -660,14 +660,14 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
           if (result.status.toLowerCase() !== "success") {
             throw new Error(`Mint failed for ${tx.symbol}: ${result.status}`);
           }
-          results.push(`Borrowed ${formatUSD(parseFloat(tx.amount), 2)} USDST from ${tx.symbol}`);
+          results.push(`Minted ${formatUSD(parseFloat(tx.amount), 2)} USDST from ${tx.symbol}`);
           lastTxHash = result.hash;
         }
       }
 
       // Show success toast
       toast({
-        title: "Quick Borrow Successful",
+        title: "Quick Mint Successful",
         description: `${results.join(". ")}. Tx: ${lastTxHash}`,
       });
 
@@ -676,11 +676,11 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
       await fetchAllPrices();
 
       // Reset form
-      setBorrowAmountInput("");
+      setMintAmountInput("");
       setDepositInputs({});
       setSelectedVaults(new Set());
     } catch (error) {
-      console.error("Quick Borrow failed:", error);
+      console.error("Quick Mint failed:", error);
       const errorMessage = error instanceof Error ? error.message : "Transaction failed. Please try again.";
       toast({
         title: "Transaction Failed",
@@ -690,7 +690,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
     } finally {
       setTransactionLoading(false);
     }
-  }, [borrowAmount, selectedVaults, assetSummaries, depositInputs, toast, refreshVaults, fetchAllPrices]);
+  }, [mintAmount, selectedVaults, assetSummaries, depositInputs, toast, refreshVaults, fetchAllPrices]);
 
   return (
     <div className="space-y-6">
@@ -701,12 +701,12 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      {/* Quick Borrow Section - hidden when Advanced is shown */}
+      {/* Quick Mint Section - hidden when Advanced is shown */}
       {!showAdvanced && (
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>Quick Borrow</CardTitle>
+              <CardTitle>Quick Mint</CardTitle>
               <Button
                 variant="outline"
                 size="sm"
@@ -717,13 +717,13 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Borrow Amount Input */}
+            {/* Mint Amount Input */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Borrow Amount (USDST)</label>
+              <label className="text-sm font-medium">Mint Amount (USDST)</label>
               <div className="relative">
                 <Input
-                  value={borrowAmountInput}
-                  onChange={(e) => setBorrowAmountInput(e.target.value)}
+                  value={mintAmountInput}
+                  onChange={(e) => setMintAmountInput(e.target.value)}
                   placeholder="0"
                   inputMode="decimal"
                   className="pr-12"
@@ -764,18 +764,18 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
               </div>
               <div className="text-sm text-gray-600">
                 <span>
-                  {riskLevel === "high" && "Borrow up to each vault's minCR"}
-                  {riskLevel === "medium" && "Borrow up to each vault's minCR + 20%"}
-                  {riskLevel === "low" && "Borrow up to each vault's minCR + 40%"}
+                  {riskLevel === "high" && "Mint up to each vault's minCR"}
+                  {riskLevel === "medium" && "Mint up to each vault's minCR + 20%"}
+                  {riskLevel === "low" && "Mint up to each vault's minCR + 40%"}
                 </span>
               </div>
             </div>
 
             <Separator />
 
-            {borrowAmount <= 0 ? (
+            {mintAmount <= 0 ? (
               <div className="p-3 rounded-md bg-gray-50 border border-gray-200 text-center">
-                <p className="text-sm text-gray-600">Enter a borrow amount and select risk level to see the automated plan</p>
+                <p className="text-sm text-gray-600">Enter a mint amount and select risk level to see the automated plan</p>
               </div>
             ) : selectedVaults.size > 0 ? (
               <div className="space-y-3">
@@ -803,11 +803,11 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
                       0
                     );
 
-                    // Allocate borrow amount proportionally based on collateral
+                    // Allocate mint amount proportionally based on collateral
                     return vaultCollaterals.map(({ asset, totalCollateralUSD, depositAmount, depositUSD }) => {
-                      const borrowAllocation =
+                      const mintAllocation =
                         totalCollateralAllVaults > 0
-                          ? (totalCollateralUSD / totalCollateralAllVaults) * borrowAmount
+                          ? (totalCollateralUSD / totalCollateralAllVaults) * mintAmount
                           : 0;
 
                       return (
@@ -830,7 +830,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
                               <p>• Use existing collateral: ${formatUSD(asset.existingCollateralUSD)}</p>
                             ) : null}
                             <p className="font-semibold text-gray-900">
-                              • Borrow against: {formatUSD(borrowAllocation, 2)} USDST
+                              • Mint: {formatUSD(mintAllocation, 2)} USDST
                             </p>
                           </div>
                         </div>
@@ -845,7 +845,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
               </div>
             )}
 
-            {borrowAmount > 0 && weightedAverageAPR > 0 && (
+            {mintAmount > 0 && weightedAverageAPR > 0 && (
               <Collapsible open={showProjectedCosts} onOpenChange={setShowProjectedCosts}>
                 <CollapsibleTrigger asChild>
                   <Button
@@ -891,19 +891,19 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
             )}
 
             <Button 
-              disabled={borrowAmount <= 0 || collateralGapUSD > 0 || selectedVaults.size === 0 || transactionLoading} 
-              onClick={handleQuickBorrow}
+              disabled={mintAmount <= 0 || collateralGapUSD > 0 || selectedVaults.size === 0 || transactionLoading} 
+              onClick={handleQuickMint}
               className="w-full"
             >
               {transactionLoading
                 ? "Processing..."
-                : borrowAmount <= 0 
-                ? "Enter borrow amount"
+                : mintAmount <= 0 
+                ? "Enter mint amount"
                 : collateralGapUSD > 0
                 ? `Need +$${formatUSD(collateralGapUSD)} more collateral`
                 : selectedVaults.size === 0
                 ? "No vaults available"
-                : "Confirm Quick Borrow"}
+                : "Confirm Quick Mint"}
             </Button>
           </CardContent>
         </Card>
@@ -915,21 +915,21 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle>1) Borrow amount</CardTitle>
+                <CardTitle>1) Mint amount</CardTitle>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setShowAdvanced(false)}
                 >
-                  Quick Borrow
+                  Quick Mint
                 </Button>
               </div>
             </CardHeader>
         <CardContent className="space-y-3">
           <div className="relative">
             <Input
-              value={borrowAmountInput}
-              onChange={(e) => setBorrowAmountInput(e.target.value)}
+              value={mintAmountInput}
+              onChange={(e) => setMintAmountInput(e.target.value)}
               placeholder="150"
               inputMode="decimal"
               className="pr-12"
@@ -938,7 +938,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
           </div>
           <div className="flex gap-2">
             {[150, 250, 500].map((preset) => (
-              <Button key={preset} variant="outline" size="sm" onClick={() => setBorrowAmountInput(String(preset))}>
+              <Button key={preset} variant="outline" size="sm" onClick={() => setMintAmountInput(String(preset))}>
                 {preset} USDST
               </Button>
             ))}
@@ -953,7 +953,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
         <CardContent className="space-y-3">
           <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
             <span>Risk Level</span>
-            {borrowAmount > 0 && (
+            {mintAmount > 0 && (
               <span className="font-semibold text-blue-600">
                 ${formatUSD(requiredCollateralUSD)} collateral needed
               </span>
@@ -986,9 +986,9 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
             </Button>
           </div>
           <div className="text-xs text-gray-500">
-            {riskLevel === "high" && "Borrow up to each vault's minCR"}
-            {riskLevel === "medium" && "Borrow up to each vault's minCR + 20%"}
-            {riskLevel === "low" && "Borrow up to each vault's minCR + 40%"}
+            {riskLevel === "high" && "Mint up to each vault's minCR"}
+            {riskLevel === "medium" && "Mint up to each vault's minCR + 20%"}
+            {riskLevel === "low" && "Mint up to each vault's minCR + 40%"}
           </div>
         </CardContent>
       </Card>
@@ -1019,7 +1019,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
             </div>
           </div>
 
-          {borrowAmount > 0 && weightedAverageAPR > 0 && (
+          {mintAmount > 0 && weightedAverageAPR > 0 && (
             <Collapsible open={showProjectedCosts} onOpenChange={setShowProjectedCosts}>
               <CollapsibleTrigger asChild>
                 <Button
