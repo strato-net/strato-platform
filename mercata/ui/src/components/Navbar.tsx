@@ -43,7 +43,7 @@ const Navbar = () => {
             </Link>
           </div>
           <div className="hidden md:flex items-center space-x-4">
-            {isLoggedIn && <ModeToggle />}
+            <ModeToggle />
             {isLoggedIn && (
             <Link 
               to="/dashboard"
@@ -59,8 +59,8 @@ const Navbar = () => {
                 loading 
                   ? 'opacity-75 cursor-not-allowed text-muted-foreground border border-border'
                   : isLoggedIn 
-                    ? 'text-red-600 border border-red-300 hover:bg-red-50' 
-                    : 'text-strato-blue border border-strato-blue/30 hover:bg-strato-blue/5'
+                    ? 'text-red-600 dark:text-red-400 border border-red-300 dark:border-red-400 hover:bg-red-50 dark:hover:bg-red-400/10' 
+                    : 'text-strato-blue dark:text-strato-lightblue border border-strato-blue/30 dark:border-strato-lightblue/50 hover:bg-strato-blue/5 dark:hover:bg-strato-lightblue/10'
               }`}
             >
               {loading ? <Spinner /> : isLoggedIn ? 'Log Out' : 'Login'}
@@ -107,8 +107,8 @@ const Navbar = () => {
                   loading 
                     ? 'opacity-75 cursor-not-allowed text-muted-foreground border border-border'
                     : isLoggedIn 
-                      ? 'text-red-600 border border-red-300 hover:bg-red-50' 
-                      : 'text-strato-blue border border-strato-blue hover:bg-strato-blue/5'
+                      ? 'text-red-600 dark:text-red-400 border border-red-300 dark:border-red-400 hover:bg-red-50 dark:hover:bg-red-400/10' 
+                      : 'text-strato-blue dark:text-strato-lightblue border border-strato-blue dark:border-strato-lightblue hover:bg-strato-blue/5 dark:hover:bg-strato-lightblue/10'
                 }`}
               >
                 {loading ? <Spinner /> : isLoggedIn ? 'Log Out' : 'Login'}
