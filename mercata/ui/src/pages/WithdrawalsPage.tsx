@@ -172,7 +172,14 @@ const WithdrawalsPage = () => {
                       <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                     ) : (
                       <span className="text-sm font-semibold">
-                        {withdrawalSummary?.pendingWithdrawals || 0}
+                        {formatBalance(
+                          withdrawalSummary?.pendingWithdrawals || "0",
+                          undefined,
+                          18,
+                          2,
+                          2,
+                          true
+                        )}
                       </span>
                     )}
                   </div>
