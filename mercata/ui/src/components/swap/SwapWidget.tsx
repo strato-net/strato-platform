@@ -906,6 +906,28 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
         amountError={toAmountError}
         loading={poolLoading}
       />
+      {(() => {
+        // Activity name is based on pair type, so check either token
+        const activityName =
+          getSwapActivityName(fromAsset) || getSwapActivityName(toAsset);
+        if (!activityName) return null;
+
+        // Swap rewards are tracked in USDST terms, so use the USDST side of the swap
+        // - If swapping FROM USDST, use fromAmount
+        // - If swapping TO USDST, use toAmount
+        const isFromUsdst =
+          fromAsset?.address?.toLowerCase() === usdstAddress.toLowerCase();
+        const inputAmount = isFromUsdst ? fromAmount : toAmount;
+
+        return (
+          <CompactRewardsDisplay
+            userRewards={userRewards}
+            activityName={activityName}
+            inputAmount={inputAmount}
+            actionLabel="Swap"
+          />
+        );
+      })()}
 
       <div className="flex flex-col gap-2 bg-muted/50 p-4 rounded-lg border border-border">
         <div className="flex flex-col gap-1 text-sm">
