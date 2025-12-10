@@ -7,12 +7,27 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useCDP } from "@/context/CDPContext";
 import { useOracleContext } from "@/context/OracleContext";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { cdpService, AssetConfig, VaultData } from "@/services/cdpService";
 import { formatUnits, parseUnits } from "ethers";
 import { useToast } from "@/hooks/use-toast";
+import {
+  USE_DUMMY_DATA,
+  dummyVaults,
+  dummyAssets,
+  dummyPrices,
+  dummyActiveTokens,
+} from "./dummyData";
 
 type Allocation = {
   vault: AssetConfig & { address: string; symbol: string };
@@ -109,7 +124,7 @@ const getCompoundInterest = (
 const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
   title = "Borrow against collateral (CDP)",
 }) => {
-  const [borrowAmountInput, setBorrowAmountInput] = useState<string>("150");
+  const [borrowAmountInput, setBorrowAmountInput] = useState<string>("");
   const [targetCR, setTargetCR] = useState<number>(215);
   const [assets, setAssets] = useState<AssetConfig[]>([]);
   const [loading, setLoading] = useState(false);
@@ -123,140 +138,6 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
   const { prices: realPrices, fetchAllPrices } = useOracleContext();
   const { activeTokens: realActiveTokens } = useUserTokens();
   const { toast } = useToast();
-
-  // Dummy data for testing - 3 vaults with different characteristics
-  const USE_DUMMY_DATA = true; // Set to false to use real data
-  const DUMMY_VAULT_ADDRESSES = {
-    ETHST: "0x1111111111111111111111111111111111111111",
-    WBTCST: "0x2222222222222222222222222222222222222222",
-    USDCST: "0x3333333333333333333333333333333333333333",
-  };
-
-  const dummyVaults: VaultData[] = [
-    {
-      asset: DUMMY_VAULT_ADDRESSES.ETHST,
-      symbol: "ETHST",
-      collateralAmount: parseUnits("2.5", 18).toString(), // 2.5 ETH
-      collateralAmountDecimals: 18,
-      collateralValueUSD: parseUnits("6250", 18).toString(), // $2,500 per ETH = $6,250
-      debtValueUSD: parseUnits("2000", 18).toString(), // $2,000 debt
-      debtAmount: parseUnits("2000", 18).toString(),
-      collateralizationRatio: 312.5, // (6250 / 2000) * 100
-      liquidationRatio: 150,
-      healthFactor: 2.08,
-      stabilityFeeRate: 2.5,
-      health: "healthy",
-      scaledDebt: parseUnits("2000", 18).toString(),
-      rateAccumulator: parseUnits("1", 27).toString(),
-    },
-    {
-      asset: DUMMY_VAULT_ADDRESSES.WBTCST,
-      symbol: "WBTCST",
-      collateralAmount: parseUnits("0.15", 8).toString(), // 0.15 WBTC
-      collateralAmountDecimals: 8,
-      collateralValueUSD: parseUnits("9000", 18).toString(), // $60,000 per WBTC = $9,000
-      debtValueUSD: parseUnits("3000", 18).toString(), // $3,000 debt
-      debtAmount: parseUnits("3000", 18).toString(),
-      collateralizationRatio: 300, // (9000 / 3000) * 100
-      liquidationRatio: 150,
-      healthFactor: 2.0,
-      stabilityFeeRate: 3.2,
-      health: "healthy",
-      scaledDebt: parseUnits("3000", 18).toString(),
-      rateAccumulator: parseUnits("1", 27).toString(),
-    },
-    {
-      asset: DUMMY_VAULT_ADDRESSES.USDCST,
-      symbol: "USDCST",
-      collateralAmount: parseUnits("5000", 6).toString(), // 5,000 USDC
-      collateralAmountDecimals: 6,
-      collateralValueUSD: parseUnits("5000", 18).toString(), // $1 per USDC = $5,000
-      debtValueUSD: parseUnits("0", 18).toString(), // No debt yet
-      debtAmount: parseUnits("0", 18).toString(),
-      collateralizationRatio: 0,
-      liquidationRatio: 150,
-      healthFactor: 0,
-      stabilityFeeRate: 1.8,
-      health: "healthy",
-      scaledDebt: parseUnits("0", 18).toString(),
-      rateAccumulator: parseUnits("1", 27).toString(),
-    },
-  ];
-
-  const dummyAssets: AssetConfig[] = [
-    {
-      asset: DUMMY_VAULT_ADDRESSES.ETHST,
-      symbol: "ETHST",
-      stabilityFeeRate: 2.5, // 2.5% APR
-      liquidationRatio: 150,
-      minCR: 200,
-      liquidationPenaltyBps: 500,
-      closeFactorBps: 5000,
-      debtFloor: parseUnits("100", 18).toString(),
-      debtCeiling: parseUnits("10000000", 18).toString(),
-      unitScale: parseUnits("1", 18).toString(),
-      isPaused: false,
-      isSupported: true,
-    },
-    {
-      asset: DUMMY_VAULT_ADDRESSES.WBTCST,
-      symbol: "WBTCST",
-      stabilityFeeRate: 3.2, // 3.2% APR
-      liquidationRatio: 150,
-      minCR: 200,
-      liquidationPenaltyBps: 500,
-      closeFactorBps: 5000,
-      debtFloor: parseUnits("100", 18).toString(),
-      debtCeiling: parseUnits("10000000", 18).toString(),
-      unitScale: parseUnits("1", 18).toString(),
-      isPaused: false,
-      isSupported: true,
-    },
-    {
-      asset: DUMMY_VAULT_ADDRESSES.USDCST,
-      symbol: "USDCST",
-      stabilityFeeRate: 1.8, // 1.8% APR (lowest)
-      liquidationRatio: 150,
-      minCR: 200,
-      liquidationPenaltyBps: 500,
-      closeFactorBps: 5000,
-      debtFloor: parseUnits("100", 18).toString(),
-      debtCeiling: parseUnits("10000000", 18).toString(),
-      unitScale: parseUnits("1", 18).toString(),
-      isPaused: false,
-      isSupported: true,
-    },
-  ];
-
-  const dummyPrices: Record<string, string> = {
-    [DUMMY_VAULT_ADDRESSES.ETHST.toLowerCase()]: parseUnits("2500", 18).toString(), // $2,500 per ETH
-    [DUMMY_VAULT_ADDRESSES.WBTCST.toLowerCase()]: parseUnits("60000", 18).toString(), // $60,000 per WBTC
-    [DUMMY_VAULT_ADDRESSES.USDCST.toLowerCase()]: parseUnits("1", 18).toString(), // $1 per USDC
-  };
-
-  const dummyActiveTokens = [
-    {
-      address: DUMMY_VAULT_ADDRESSES.ETHST,
-      symbol: "ETHST",
-      name: "Ethereum",
-      balance: parseUnits("1.5", 18).toString(), // 1.5 ETH available
-      decimals: 18,
-    },
-    {
-      address: DUMMY_VAULT_ADDRESSES.WBTCST,
-      symbol: "WBTCST",
-      name: "Wrapped Bitcoin",
-      balance: parseUnits("0.05", 8).toString(), // 0.05 WBTC available
-      decimals: 8,
-    },
-    {
-      address: DUMMY_VAULT_ADDRESSES.USDCST,
-      symbol: "USDCST",
-      name: "USD Coin",
-      balance: parseUnits("2000", 6).toString(), // 2,000 USDC available
-      decimals: 6,
-    },
-  ];
 
   // Use dummy data if enabled, otherwise use real data
   const vaults = USE_DUMMY_DATA ? dummyVaults : realVaults;
@@ -285,7 +166,6 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
       }
     };
     loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchAllPrices]);
 
   const priceForAsset = useCallback((assetAddress: string, fallbackVault?: VaultData) => {
@@ -770,9 +650,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold">{title}</h2>
-          <p className="text-sm text-gray-600">Live plan using current vaults, prices, and asset configs</p>
         </div>
-        <Badge variant="outline">Prototype</Badge>
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
 
@@ -799,7 +677,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
                 <Input
                   value={borrowAmountInput}
                   onChange={(e) => setBorrowAmountInput(e.target.value)}
-                  placeholder="150"
+                  placeholder="0"
                   inputMode="decimal"
                   className="pr-12"
                 />
@@ -1108,51 +986,53 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
 
           <Separator />
 
-          <div className="text-sm text-gray-600 mb-2">
-            Click on vaults to select them. Only selected vaults will be included in the collateral calculations.
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {assetSummaries.map((asset) => {
-              const currentInput = depositInputs[asset.address] || "";
-              const balanceDisplay = formatUSD(asset.balanceTokens, 4);
-              const existingDisplay = formatUSD(asset.existingCollateralTokens, 4);
-              const maxDeposit = asset.balanceTokens;
-              const isSelected = selectedVaults.has(asset.address);
-              const depositUSD = (parseFloat(currentInput || "0") || 0) * (asset.priceUSD || 0);
-              return (
-                <Card
-                  key={asset.address}
-                  className={`border cursor-pointer transition-all ${
-                    isSelected
-                      ? "border-blue-500 bg-blue-50 shadow-md"
-                      : "border-gray-200 bg-gray-50 opacity-60"
-                  }`}
-                  onClick={() => toggleVaultSelection(asset.address)}
-                >
-                  <CardContent className="pt-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className={`font-semibold ${isSelected ? "text-gray-900" : "text-gray-500"}`}>
-                          {asset.symbol}
-                        </p>
-                        <p className={`text-xs ${isSelected ? "text-gray-600" : "text-gray-400"}`}>
-                          Price ${formatUSD(asset.priceUSD || 0)}
-                        </p>
-                      </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Asset</TableHead>
+                <TableHead>Stability Fee</TableHead>
+                <TableHead className="text-right">Balance</TableHead>
+                <TableHead className="text-right">Collateral</TableHead>
+                <TableHead className="text-right">Deposit</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {assetSummaries.map((asset) => {
+                const currentInput = depositInputs[asset.address] || "";
+                const balanceDisplay = formatUSD(asset.balanceTokens, 4);
+                const existingDisplay = formatUSD(asset.existingCollateralTokens, 4);
+                const maxDeposit = asset.balanceTokens;
+                const isSelected = selectedVaults.has(asset.address);
+                const depositUSD = (parseFloat(currentInput || "0") || 0) * (asset.priceUSD || 0);
+                
+                return (
+                  <TableRow
+                    key={asset.address}
+                    className={`cursor-pointer ${isSelected ? "bg-blue-50" : "opacity-60"}`}
+                    onClick={() => toggleVaultSelection(asset.address)}
+                  >
+                    <TableCell>
+                      <div className="font-medium">{asset.symbol}</div>
+                    </TableCell>
+                    <TableCell>
                       <Badge variant={isSelected ? "default" : "outline"}>
-                        {asset.stabilityFee ? formatPercentage(asset.stabilityFee) : "CDP asset"}
+                        {asset.stabilityFee ? formatPercentage(asset.stabilityFee) : "N/A"}
                       </Badge>
-                    </div>
-                    <div className={`space-y-1 text-sm ${isSelected ? "text-gray-600" : "text-gray-400"}`}>
-                      <p>Balance: {balanceDisplay} {asset.symbol}</p>
-                      <p>Collateral in vault: {existingDisplay} {asset.symbol}</p>
-                    </div>
-                    <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
-                      <label className={`text-sm font-medium ${isSelected ? "text-gray-700" : "text-gray-400"}`}>
-                        Deposit amount ({asset.symbol})
-                      </label>
-                      <div className="flex gap-2">
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="font-medium">{balanceDisplay}</div>
+                      <div className="text-xs text-gray-500">
+                        ${formatUSD(asset.balanceTokens * (asset.priceUSD || 0))}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="font-medium">{existingDisplay}</div>
+                      <div className="text-xs text-gray-500">
+                        ${formatUSD(asset.existingCollateralUSD)}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-end gap-2">
                         <Input
                           value={currentInput}
                           onChange={(e) => {
@@ -1162,29 +1042,28 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
                           placeholder="0.00"
                           inputMode="decimal"
                           disabled={!isSelected}
-                          className={!isSelected ? "bg-gray-100" : ""}
+                          className={`w-24 h-8 text-right ${!isSelected ? "bg-gray-100" : ""}`}
                         />
                         <Button
                           variant="outline"
+                          size="sm"
                           onClick={() => setDepositInputs((prev) => ({ ...prev, [asset.address]: maxDeposit.toString() }))}
                           disabled={maxDeposit <= 0 || !isSelected}
                         >
                           Max
                         </Button>
                       </div>
-                      {isSelected && (
-                        <div className="pt-2 border-t border-gray-200">
-                          <p className="text-sm font-semibold text-gray-700">
-                            Collateral allocated: ${formatUSD(depositUSD)}
-                          </p>
+                      {isSelected && depositUSD > 0 && (
+                        <div className="text-xs text-gray-500 mt-1">
+                          ${formatUSD(depositUSD)}
                         </div>
                       )}
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
         </>
