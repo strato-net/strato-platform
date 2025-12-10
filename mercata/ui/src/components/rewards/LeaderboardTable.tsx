@@ -103,50 +103,52 @@ export const LeaderboardTable = ({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <div>
-          <CardTitle>Top Reward Earners</CardTitle>
-          <CardDescription>Leaderboard ranked by highest total rewards</CardDescription>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="rounded-md border overflow-hidden">
-          <Table
-            columns={columns}
-            dataSource={entries}
-            rowKey="address"
-            loading={loading}
-            pagination={{
-              current: currentPage,
-              pageSize: limit,
-              total: total,
-              showSizeChanger: false,
-              showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} entries`,
-              onChange: (page) => {
-                if (onPageChange && !loading) {
-                  onPageChange(page);
-                }
-              },
-              className: "mt-4",
-            }}
-            locale={{
-              emptyText: (
-                <div className="text-center text-muted-foreground py-8">
-                  No leaderboard data available
-                </div>
-              ),
-            }}
-            className="[&_.ant-table-thead>tr>th]:bg-gray-50 [&_.ant-table-thead>tr>th]:font-semibold [&_.ant-table-tbody>tr:hover>td]:bg-gray-50 [&_.ant-table-tbody>tr.highlight-row>td]:bg-blue-100 [&_.ant-table-tbody>tr.highlight-row:hover>td]:bg-blue-200"
-            rowClassName={(record: LeaderboardEntry) => 
-              userAddress && record.address.toLowerCase() === userAddress.toLowerCase() 
-                ? "highlight-row" 
-                : ""
-            }
-          />
-        </div>
-      </CardContent>
-    </Card>
+    <div className="ant-table-themed">
+      <Card>
+        <CardHeader>
+          <div>
+            <CardTitle>Top Reward Earners</CardTitle>
+            <CardDescription>Leaderboard ranked by highest total rewards</CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-md border border-border overflow-hidden">
+            <Table
+              columns={columns}
+              dataSource={entries}
+              rowKey="address"
+              loading={loading}
+              pagination={{
+                current: currentPage,
+                pageSize: limit,
+                total: total,
+                showSizeChanger: false,
+                showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} entries`,
+                onChange: (page) => {
+                  if (onPageChange && !loading) {
+                    onPageChange(page);
+                  }
+                },
+                className: "mt-4",
+              }}
+              locale={{
+                emptyText: (
+                  <div className="text-center text-muted-foreground py-8">
+                    No leaderboard data available
+                  </div>
+                ),
+              }}
+              className="[&_.ant-table-thead>tr>th]:font-semibold"
+              rowClassName={(record: LeaderboardEntry) => 
+                userAddress && record.address.toLowerCase() === userAddress.toLowerCase() 
+                  ? "highlight-row" 
+                  : ""
+              }
+            />
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 

@@ -549,10 +549,10 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
   return (
     <div className="space-y-6">
       <div className="space-y-2 text-center">
-        <h3 className="text-lg font-semibold text-gray-900">
+        <h3 className="text-lg font-semibold text-foreground">
           {modeLabels.title}
         </h3>
-        <p className="text-sm text-gray-600">{modeLabels.description}</p>
+        <p className="text-sm text-muted-foreground">{modeLabels.description}</p>
       </div>
 
       <div className="w-full">
@@ -571,7 +571,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
         <Label>Amount</Label>
           {maxAmount && (
             <div className="flex items-center gap-3">
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-muted-foreground">
                 Max: {formatBalance(
                   maxAmount,
                   undefined,
@@ -581,7 +581,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
                 )}
               </p>
               {selectedToken && currentNetwork && (
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted-foreground">
                   Min: {minDepositInfo.amount || "0"}
                 </p>
               )}
@@ -626,7 +626,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
       />
 
       {isConvert && (
-        <label className="flex items-center gap-2 text-sm text-gray-700">
+        <label className="flex items-center gap-2 text-sm text-muted-foreground">
           <input 
             type="checkbox" 
             className="accent-blue-600" 

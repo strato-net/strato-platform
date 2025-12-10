@@ -120,8 +120,8 @@ const CastVoteModal: React.FC<CastVoteModalProps> = ({
         <div className="space-y-4 py-4 overflow-y-auto flex-1">
           {/* Issue ID */}
           <div className="space-y-2">
-            <div className="text-sm font-semibold text-gray-700">Issue ID</div>
-            <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg border">
+            <div className="text-sm font-semibold text-foreground">Issue ID</div>
+            <div className="flex items-center space-x-2 p-3 bg-muted/50 rounded-lg border border-border">
               <code className="text-sm font-mono break-all">{issue.issueId}</code>
               <CopyButton address={issue.issueId} />
             </div>
@@ -129,8 +129,8 @@ const CastVoteModal: React.FC<CastVoteModalProps> = ({
 
           {/* Contract Address */}
           <div className="space-y-2">
-            <div className="text-sm font-semibold text-gray-700">Contract Address</div>
-            <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg border">
+            <div className="text-sm font-semibold text-foreground">Contract Address</div>
+            <div className="flex items-center space-x-2 p-3 bg-muted/50 rounded-lg border border-border">
               <code className="text-sm font-mono break-all">{issue.target}</code>
               <CopyButton address={issue.target} />
             </div>
@@ -138,21 +138,21 @@ const CastVoteModal: React.FC<CastVoteModalProps> = ({
 
           {/* Function Name */}
           <div className="space-y-2">
-            <div className="text-sm font-semibold text-gray-700">Function Name</div>
-            <div className="p-3 bg-gray-50 rounded-lg border">
+            <div className="text-sm font-semibold text-foreground">Function Name</div>
+            <div className="p-3 bg-muted/50 rounded-lg border border-border">
               <code className="text-sm font-mono">{issue.func}</code>
             </div>
           </div>
 
           {/* Arguments */}
           <div className="space-y-2">
-            <div className="text-sm font-semibold text-gray-700">Arguments</div>
-            <div className="p-3 bg-gray-50 rounded-lg border max-h-[120px] overflow-y-auto">
+            <div className="text-sm font-semibold text-foreground">Arguments</div>
+            <div className="p-3 bg-muted/50 rounded-lg border border-border max-h-[120px] overflow-y-auto">
               {issue.args.length > 0 ? (
                 <div className="space-y-2">
                   {issue.args.map((arg, index) => (
                     <div key={index} className="flex items-start space-x-2">
-                      <span className="text-sm font-semibold text-gray-500 min-w-[60px]">
+                      <span className="text-sm font-semibold text-muted-foreground min-w-[60px]">
                         Arg {index + 1}:
                       </span>
                       <code className="text-sm font-mono break-all flex-1">{String(arg)}</code>
@@ -160,7 +160,7 @@ const CastVoteModal: React.FC<CastVoteModalProps> = ({
                   ))}
                 </div>
               ) : (
-                <span className="text-sm text-gray-500">No arguments</span>
+                <span className="text-sm text-muted-foreground">No arguments</span>
               )}
             </div>
           </div>
@@ -168,15 +168,15 @@ const CastVoteModal: React.FC<CastVoteModalProps> = ({
           {/* Voting Status */}
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-1">
-              <div className="text-xs font-semibold text-gray-500">Votes Cast</div>
+              <div className="text-xs font-semibold text-muted-foreground">Votes Cast</div>
               <div className="text-2xl font-bold text-strato-blue">{issue.votesCast}</div>
             </div>
             <div className="space-y-1">
-              <div className="text-xs font-semibold text-gray-500">Votes Needed</div>
+              <div className="text-xs font-semibold text-muted-foreground">Votes Needed</div>
               <div className="text-2xl font-bold text-strato-blue">{issue.votesNeeded}</div>
             </div>
             <div className="space-y-1">
-              <div className="text-xs font-semibold text-gray-500">Threshold</div>
+              <div className="text-xs font-semibold text-muted-foreground">Threshold</div>
               <div className="text-2xl font-bold text-strato-blue">{issue.threshold}%</div>
             </div>
           </div>

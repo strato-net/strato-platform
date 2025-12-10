@@ -433,9 +433,9 @@ const LiquidityDepositModal = ({
             <div className={`rounded-lg border p-2 transition-colors ${
               depositMode === 'A' ? 'border-blue-400 ' : 
               depositMode === 'A&B' ? 'border-blue-400 ' :
-              'border-gray-200 bg-gray-50'
+              'border-border bg-muted/50'
             }`}>
-              <span className="text-sm text-gray-500">Amount</span>
+              <span className="text-sm text-muted-foreground">Amount</span>
               <div className="flex items-center gap-2">
                 <Input
                   disabled={balanceLoading || isInputDisabled('A')}
@@ -455,7 +455,7 @@ const LiquidityDepositModal = ({
                     }
                   }}
                 />
-                <div className="flex items-center space-x-2 bg-gray-100 rounded-md px-2 py-1 flex-shrink-0">
+                <div className="flex items-center space-x-2 bg-muted rounded-md px-2 py-1 flex-shrink-0">
                   {selectedPool && (
                     <>
                       {selectedPool.tokenA?.images?.[0]?.value ? (
@@ -478,7 +478,7 @@ const LiquidityDepositModal = ({
                 </div>
               </div>
               <div className='flex items-center'>
-                <span className="text-sm text-gray-500 flex gap-1">
+                <span className="text-sm text-muted-foreground flex gap-1">
                   Balance: {balanceLoading ?
                       <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
                     : formatUnits(tokenABalance || "0", 18)}
@@ -535,7 +535,7 @@ const LiquidityDepositModal = ({
                 type="button"
                 variant="outline"
                 size="sm"
-                className="px-4 py-2 text-sm font-medium rounded-md border-blue-200 bg-blue-50 text-blue-700 transition-colors"
+                className="px-4 py-2 text-sm font-medium rounded-md border-blue-500/30 bg-blue-500/10 text-blue-500 transition-colors"
                 onClick={toggleDepositMode} 
               >
                 Deposit Mode ({depositMode === 'A' ? 'A' : depositMode === 'B' ? 'B' : 'A&B'})
@@ -546,10 +546,10 @@ const LiquidityDepositModal = ({
             <div className={`rounded-lg border p-3 transition-colors ${
               depositMode === 'B' ? 'border-blue-400 ' : 
               depositMode === 'A&B' ? 'border-blue-400 ' :
-              'border-gray-200 '
+              'border-border '
             }`}>
               <div className="flex justify-between mb-2">
-                <span className="text-sm text-gray-500">Amount</span>
+                <span className="text-sm text-muted-foreground">Amount</span>
               </div>
               <div className="flex items-center gap-2">
                 <Input
@@ -570,7 +570,7 @@ const LiquidityDepositModal = ({
                     }
                   }}
                 />
-                <div className="flex items-center space-x-2 bg-gray-100 rounded-md px-2 py-1 flex-shrink-0">
+                <div className="flex items-center space-x-2 bg-muted rounded-md px-2 py-1 flex-shrink-0">
                   {selectedPool && (
                     <>
                       {selectedPool.tokenB?.images?.[0]?.value ? (
@@ -593,7 +593,7 @@ const LiquidityDepositModal = ({
                 </div>
               </div>
               <div className='flex items-center'>
-                <span className="text-sm text-gray-500 flex gap-1">
+                <span className="text-sm text-muted-foreground flex gap-1">
                   Balance: {balanceLoading ?
                     <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
                     : formatUnits(tokenBBalance || "0", 18)}
@@ -645,6 +645,7 @@ const LiquidityDepositModal = ({
             </div>
           </div>
 
+
           {/* Estimated Rewards Display - Always visible */}
           {(() => {
             const activityName = getPoolActivityName(selectedPool?.poolName);
@@ -682,29 +683,30 @@ const LiquidityDepositModal = ({
             }
           })()}
 
-          <div className="rounded-lg bg-gray-50 p-3">
-            <div className="flex justify-between items-center text-sm text-gray-500">
+          <div className="rounded-lg bg-muted/50 p-3">
+            <div className="flex justify-between items-center text-sm text-muted-foreground">
+
               <span>APY</span>
               <span className="font-medium">{selectedPool?.apy ? `${selectedPool.apy}%` : "N/A"}</span>
             </div>
-            <div className="flex justify-between items-center text-sm mt-2 text-gray-500">
+            <div className="flex justify-between items-center text-sm mt-2 text-muted-foreground">
               <span>Current pool ratio</span>
               <span className="font-medium">
                 {selectedPool && `1 ${selectedPool.tokenA._symbol} = ${formatNumber(selectedPool.aToBRatio)} ${selectedPool.tokenB._symbol}`}
               </span>
             </div>
-            <div className="flex justify-between items-center text-sm mt-2 text-gray-500">
+            <div className="flex justify-between items-center text-sm mt-2 text-muted-foreground">
               <span>Transaction fee</span>
               <span>{DEPOSIT_FEE} USDST ({parseFloat(DEPOSIT_FEE) * 100} voucher)</span>
             </div>
             {selectedPool && BigInt(selectedPool.lpToken._totalSupply) === BigInt(0) && (
-              <div className="flex justify-between items-center mt-2 text-sm text-gray-500">
+              <div className="flex justify-between items-center mt-2 text-sm text-muted-foreground">
                 <span>Initial liquidity provider:</span>
                 <span>You set the initial price ratio</span>
               </div>
             )}
             {selectedPool && BigInt(selectedPool.lpToken._totalSupply) > BigInt(0) && (
-              <div className="flex justify-between items-center mt-2 text-sm text-gray-500">
+              <div className="flex justify-between items-center mt-2 text-sm text-muted-foreground">
                 <span>Subsequent liquidity:</span>
                 <span className="text-right">Token A amount is calculated based on current pool ratio</span>
               </div>
@@ -727,7 +729,7 @@ const LiquidityDepositModal = ({
               </label>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                  <HelpCircle className="h-4 w-4 text-muted-foreground hover:text-foreground cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent>
                   <p className="max-w-xs text-sm">
