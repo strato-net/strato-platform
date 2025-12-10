@@ -72,8 +72,8 @@ const AdvancedOptionsDropdown: React.FC<AdvancedOptionsDropdownProps> = ({
           <Button
             type="button"
             variant="ghost"
-            className={`w-full flex items-center justify-between bg-transparent hover:bg-gray-100 ${
-              isAdvancedOpen ? "border border-b-0 border-gray-200 rounded-b-none" : "border-0"
+            className={`w-full flex items-center justify-between bg-transparent hover:bg-accent ${
+              isAdvancedOpen ? "border border-b-0 border-border rounded-b-none" : "border-0"
             }`}
             disabled={disabled}
           >
@@ -89,7 +89,7 @@ const AdvancedOptionsDropdown: React.FC<AdvancedOptionsDropdownProps> = ({
       {isAdvancedOpen && (
         <div
           ref={dropdownRef}
-          className="fixed bg-white border border-t-0 border-gray-200 rounded-t-none rounded-lg shadow-lg p-4 space-y-4 z-50"
+          className="fixed bg-card border border-t-0 border-border rounded-t-none rounded-lg shadow-lg p-4 space-y-4 z-50"
           style={{
             top: advancedOptionsRef.current ? `${advancedOptionsRef.current.getBoundingClientRect().bottom - 1}px` : '0',
             left: advancedOptionsRef.current ? `${advancedOptionsRef.current.getBoundingClientRect().left}px` : '0',

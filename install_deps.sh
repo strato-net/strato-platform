@@ -7,7 +7,7 @@
 # This is an "infrastucture-as-code" alternative to the manual build
 # instructions pages which we previously maintained at the public website:
 #
-# https://docs.stratomercata.com/
+# https://old-docs.strato.nexus/
 #
 # ... and for instructions within the strato-platform repository while it was
 # still a private repository, and the public strato-getting-started repository

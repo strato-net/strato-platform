@@ -148,14 +148,14 @@ const AllTokensTable = () => {
               <SelectItem value="unknown">UNKNOWN</SelectItem>
             </SelectContent>
           </Select>
-          <span className="text-sm text-gray-500">
+          <span className="text-sm text-muted-foreground">
             Showing {filteredTokens.length} of {tokens.length} tokens
           </span>
         </div>
         
         {filteredTokens.length === 0 ? (
           <div className="text-center py-8">
-            <p className="text-gray-500">
+            <p className="text-muted-foreground">
               {tokens.length === 0 ? "No tokens found" : `No tokens with ${statusFilter === 'all' ? 'any' : getStatusLabel(statusFilter).label} status`}
             </p>
           </div>

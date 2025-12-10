@@ -40,7 +40,7 @@ const InfoTooltip = ({ children, content }: { children: React.ReactNode; content
           onClick={handleToggle}
         >
           {children}
-          <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+          <HelpCircle className="h-4 w-4 text-muted-foreground hover:text-foreground" />
         </div>
         {showTooltip && (
           <div className="absolute top-full left-0 mt-2 z-50 bg-popover border rounded-md px-3 py-1.5 text-sm text-popover-foreground shadow-md max-w-xs">
@@ -56,7 +56,7 @@ const InfoTooltip = ({ children, content }: { children: React.ReactNode; content
       <TooltipTrigger asChild>
         <div className="inline-flex items-center gap-1 cursor-help">
           {children}
-          <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+          <HelpCircle className="h-4 w-4 text-muted-foreground hover:text-foreground" />
         </div>
       </TooltipTrigger>
       <TooltipContent className="max-w-xs">
@@ -136,7 +136,7 @@ const CollateralManagementTable = ({
                         )}
                         <div>
                           <div className="font-medium">{asset?._name}</div>
-                          <div className="text-xs text-gray-500">{asset?._symbol}</div>
+                          <div className="text-xs text-muted-foreground">{asset?._symbol}</div>
                         </div>
                       </div>
                     </TableCell>
@@ -150,7 +150,7 @@ const CollateralManagementTable = ({
                       <div className="flex items-center justify-end gap-4">
                         <div className="text-right">
                           <div className="font-medium">{(() => { try { const v = BigInt(asset?.userBalance || 0); return formatBalance(v <= 1n ? 0n : v, undefined, asset?.customDecimals ?? 18, 2); } catch { return formatBalance(0n, undefined, asset?.customDecimals ?? 18, 2); } })()}</div>
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs text-muted-foreground">
                             ${(() => { try { const v = BigInt(asset?.userBalanceValue || 0); return formatBalance(v <= 1n ? 0n : v, undefined, 18, 1, 2); } catch { return formatBalance(0n, undefined, 18, 1, 2); } })()}
                           </div>
                         </div>
@@ -177,7 +177,7 @@ const CollateralManagementTable = ({
                           <div className="font-medium">
                             {(() => { try { const v = BigInt(asset?.collateralizedAmount || 0); return formatBalance(v <= 1n ? 0n : v, undefined, asset?.customDecimals ?? 18, 2); } catch { return formatBalance(0n, undefined, asset?.customDecimals ?? 18, 2); } })()}
                           </div>
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs text-muted-foreground">
                             {(() => { try { const v = BigInt(asset?.collateralizedAmountValue || 0); return formatBalance(v <= 1n ? 0n : v, undefined, 18, 1, 2, true); } catch { return formatBalance(0n, undefined, 18, 1, 2, true); } })()}
                           </div>
                         </div>

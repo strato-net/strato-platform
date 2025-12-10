@@ -102,14 +102,14 @@ export default function MyPoolParticipationSection({
   return (
     <Card className="rounded-2xl shadow-sm w-full mb-6">
       <CardHeader>
-        <CardTitle className="text-lg font-semibold text-gray-800">
+        <CardTitle className="text-lg font-semibold text-foreground">
           My Pool Participation
         </CardTitle>
       </CardHeader>
 
       <CardContent className="space-y-4">
         {/* Header Row */}
-        <div className="grid grid-cols-4 px-4 text-sm text-gray-500 font-medium">
+        <div className="grid grid-cols-4 px-4 text-sm text-muted-foreground font-medium">
           <div>Token</div>
           <div className="text-center">Balance</div>
           <div className="text-center">APY</div>
@@ -119,10 +119,10 @@ export default function MyPoolParticipationSection({
         {shouldShowLoading ? (
           <div className="flex items-center justify-center gap-2">
             <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary" />
-            <span className="text-sm text-gray-600">Loading...</span>
+            <span className="text-sm text-muted-foreground">Loading...</span>
           </div>
         ) : !hasData ? (
-          <div className="p-2 flex justify-center text-gray-500">
+          <div className="p-2 flex justify-center text-muted-foreground">
             No pool tokens found
           </div>
         ) : (
@@ -135,12 +135,12 @@ export default function MyPoolParticipationSection({
                 return (
                   <div key={token.address} className="space-y-0">
                     <div
-                      className={`grid grid-cols-4 items-center bg-gray-50 px-4 py-3 rounded-md ${
-                        canExpand ? "cursor-pointer hover:bg-gray-100" : ""
+                      className={`grid grid-cols-4 items-center bg-muted/30 px-4 py-3 rounded-md ${
+                        canExpand ? "cursor-pointer hover:bg-muted/50" : ""
                       }`}
                       onClick={() => canExpand && toggleExpanded(token.address)}
                     >
-                      <div className="flex items-center gap-2 font-semibold text-gray-700">
+                      <div className="flex items-center gap-2 font-semibold text-foreground/80">
                         {token._name || token._symbol}
                         {canExpand &&
                           (isExpanded ? (
@@ -150,11 +150,11 @@ export default function MyPoolParticipationSection({
                           ))}
                       </div>
 
-                      <div className="text-center font-semibold text-gray-900">
+                      <div className="text-center font-semibold text-foreground">
                         {formattedBalance}
                       </div>
 
-                      <div className="text-center font-semibold text-gray-900">
+                      <div className="text-center font-semibold text-foreground">
                         {anyLoading ? (
                           <div className="flex items-center justify-center">
                             <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-primary" />
@@ -166,7 +166,7 @@ export default function MyPoolParticipationSection({
                         )}
                       </div>
 
-                      <div className="text-right font-medium text-gray-900">
+                      <div className="text-right font-medium text-foreground">
                         {value}
                       </div>
                     </div>

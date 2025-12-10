@@ -741,13 +741,13 @@ const MintWidget: React.FC<MintWidgetProps> = ({ onSuccess, title = "Mint Agains
           -moz-appearance: textfield;
         }
       `}</style>
-      <h2 className="text-2xl font-bold text-gray-900">{title}</h2>
+      <h2 className="text-2xl font-bold text-foreground">{title}</h2>
       {/* Deposit / Borrow Panels */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Deposit */}
         <div className="p-4 space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold">Deposit <span className="text-sm text-gray-500 font-normal"></span></h3>
+            <h3 className="text-base font-bold">Deposit <span className="text-sm text-muted-foreground font-normal"></span></h3>
           </div>
 
           <Select 
@@ -769,7 +769,7 @@ const MintWidget: React.FC<MintWidgetProps> = ({ onSuccess, title = "Mint Agains
 
           {/* Balance display under asset selector */}
           {depositAsset && (
-            <div className="text-sm text-gray-500 text-left">
+            <div className="text-sm text-muted-foreground text-left">
               Available: {userDepositBalance && parseFloat(userDepositBalance) > 0 
                 ? formatBalanceUtil(userDepositBalance, undefined, 18, 1, 4) 
                 : "0"
@@ -802,7 +802,7 @@ const MintWidget: React.FC<MintWidgetProps> = ({ onSuccess, title = "Mint Agains
               MAX
             </Button>
           </div>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-muted-foreground">
             {getAssetPrice() > 0 
               ? `Collateral: $${formatNumber(getTotalCollateralValue())} total ${parseFloat(existingVaultCollateral) > 0 ? `(+$${formatNumber(parseFloat(depositAmount || "0") * getAssetPrice())} new)` : ""}`
               : "Price unavailable"
@@ -815,7 +815,7 @@ const MintWidget: React.FC<MintWidgetProps> = ({ onSuccess, title = "Mint Agains
           <div className="flex items-center justify-between">
             <h3 className="text-base font-bold">Borrow</h3>
             {depositAsset && (
-              <span className="text-sm text-gray-500">
+              <span className="text-sm text-muted-foreground">
                 {maxBorrowLoading ? (
                   "Loading..."
                 ) : (
@@ -825,12 +825,12 @@ const MintWidget: React.FC<MintWidgetProps> = ({ onSuccess, title = "Mint Agains
             )}
           </div>
 
-          <div className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg text-center">
-            <span className="text-sm font-medium text-gray-700">USDST</span>
+          <div className="w-full p-3 bg-muted/50 border border-border rounded-lg text-center">
+            <span className="text-sm font-medium text-foreground">USDST</span>
           </div>
 
           {/* Spacer to align with deposit side's balance display */}
-          <div className="text-xs text-gray-500 text-left" style={{ height: "5px" }}>
+          <div className="text-xs text-muted-foreground text-left" style={{ height: "5px" }}>
             {/* Empty spacer for vertical alignment */}
           </div>
 
@@ -841,7 +841,7 @@ const MintWidget: React.FC<MintWidgetProps> = ({ onSuccess, title = "Mint Agains
                   isBorrowMaxEnabled 
                     ? 'text-blue-600 bg-blue-50 border-blue-300' 
                     : isAtMinCRThreshold 
-                      ? 'bg-gray-100 text-gray-400 border-gray-300' 
+                      ? 'bg-muted text-muted-foreground border-border' 
                       : isBorrowAmountAboveMax()
                         ? 'text-red-600 bg-red-50 border-red-300'
                         : ''
@@ -867,14 +867,14 @@ const MintWidget: React.FC<MintWidgetProps> = ({ onSuccess, title = "Mint Agains
             
             {/* Overlay when at min collateral ratio threshold */}
             {isAtMinCRThreshold && (
-              <div className="absolute inset-0 flex items-center justify-center bg-gray-200 bg-opacity-90 rounded pointer-events-none">
-                <span className="text-gray-600 font-medium text-sm text-center px-2">
+              <div className="absolute inset-0 flex items-center justify-center bg-muted/90 rounded pointer-events-none">
+                <span className="text-muted-foreground font-medium text-sm text-center px-2">
                   Min Collateral Ratio reached — Add more collateral to borrow.
                 </span>
               </div>
             )}
           </div>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-muted-foreground">
             ${formatNumber(parseFloat(borrowAmount || "0"))}
           </p>
           {borrowAmount && parseFloat(borrowAmount) > 0 && (
@@ -914,7 +914,7 @@ const MintWidget: React.FC<MintWidgetProps> = ({ onSuccess, title = "Mint Agains
       {/* Transaction Fee Display */}
       {depositAsset && (parseFloat(depositAmount || "0") > 0 || parseFloat(borrowAmount || "0") > 0) && (
         <div className="text-center">
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-muted-foreground">
             Transaction Fee: {(() => {
               const hasDeposit = parseFloat(depositAmount || "0") > 0;
               const hasBorrow = parseFloat(borrowAmount || "0") > 0;

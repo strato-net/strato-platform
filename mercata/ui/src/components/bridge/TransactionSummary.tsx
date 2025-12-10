@@ -23,7 +23,7 @@ const TransactionSummary: React.FC<TransactionSummaryProps> = ({
   formatBalanceDisplay,
 }) => {
   return (
-    <div className="rounded-xl border bg-gray-50 p-4 space-y-3 text-sm text-gray-600">
+    <div className="rounded-xl border border-border bg-muted/50 p-4 space-y-3 text-sm text-muted-foreground">
       <div className="flex items-center justify-between">
         <span>
           Amount will be rounded down to{" "}
@@ -32,7 +32,7 @@ const TransactionSummary: React.FC<TransactionSummaryProps> = ({
       </div>
       <div className="flex items-center justify-between">
         <span>Transaction Fee</span>
-        <span className="font-medium">
+        <span className="font-medium text-foreground">
           {BRIDGE_OUT_FEE} USDST ({FEE_VOUCHER} voucher)
         </span>
       </div>
@@ -40,14 +40,14 @@ const TransactionSummary: React.FC<TransactionSummaryProps> = ({
         BigInt(selectedToken.maxPerWithdrawal) > 0n && (
           <div className="flex items-center justify-between">
             <span>Max Per Withdrawal</span>
-            <span className="font-medium">
+            <span className="font-medium text-foreground">
               {formatUnits(selectedToken.maxPerWithdrawal, DECIMAL).toString()}
             </span>
           </div>
         )}
       <div className="flex items-center justify-between">
         <span>{selectedToken?.stratoTokenSymbol || ""} Balance</span>
-        <span className="font-medium">
+        <span className="font-medium text-foreground">
           {formatBalanceDisplay(balanceImpact.before)}
           {amountError
             ? ""
@@ -56,7 +56,7 @@ const TransactionSummary: React.FC<TransactionSummaryProps> = ({
       </div>
       <div className="flex items-center justify-between">
         <span>Outcome</span>
-        <span className="font-medium">
+        <span className="font-medium text-foreground">
           {amount || "0.00"} {selectedToken?.externalSymbol || ""} to{" "}
           {selectedNetwork || "external network"}
         </span>

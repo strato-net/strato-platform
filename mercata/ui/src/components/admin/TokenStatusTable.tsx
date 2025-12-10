@@ -80,17 +80,17 @@ const TokenStatusTable = () => {
 
   if (loading) {
     return (
-      <Card>
+      <Card className="dark:bg-card">
         <CardHeader>
-          <CardTitle>Token Status</CardTitle>
-          <CardDescription>
+          <CardTitle className="dark:text-foreground">Token Status</CardTitle>
+          <CardDescription className="dark:text-muted-foreground">
             Manage token status and configurations for all tokens
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin" />
-            <span className="ml-2">Loading tokens...</span>
+            <Loader2 className="h-6 w-6 animate-spin dark:text-primary" />
+            <span className="ml-2 dark:text-muted-foreground">Loading tokens...</span>
           </div>
         </CardContent>
       </Card>
@@ -99,20 +99,20 @@ const TokenStatusTable = () => {
 
   if (error) {
     return (
-      <Card>
+      <Card className="dark:bg-card">
         <CardHeader>
-          <CardTitle>Token Status</CardTitle>
-          <CardDescription>
+          <CardTitle className="dark:text-foreground">Token Status</CardTitle>
+          <CardDescription className="dark:text-muted-foreground">
             Manage token status and configurations for all tokens
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="text-center py-8">
-            <p className="text-red-600">Error loading tokens: {error}</p>
+            <p className="text-red-600 dark:text-red-400">Error loading tokens: {error}</p>
             <Button 
               variant="outline" 
               onClick={refreshAllData}
-              className="mt-4"
+              className="mt-4 dark:border-border dark:text-foreground dark:hover:bg-accent"
             >
               <RefreshCw className="h-4 w-4 mr-2" />
               Retry
@@ -124,10 +124,10 @@ const TokenStatusTable = () => {
   }
 
   return (
-    <Card>
+    <Card className="dark:bg-card">
       <CardHeader>
-        <CardTitle>Token Status</CardTitle>
-        <CardDescription>
+        <CardTitle className="dark:text-foreground">Token Status</CardTitle>
+        <CardDescription className="dark:text-muted-foreground">
           Manage token status and configurations for all tokens
         </CardDescription>
       </CardHeader>
@@ -135,35 +135,35 @@ const TokenStatusTable = () => {
         <div className="mb-6 space-y-4">
           <div className="flex items-center gap-4">
             <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search by name, symbol, or address..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
+                className="pl-10 dark:bg-background dark:text-foreground dark:border-input"
               />
             </div>
             <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4" />
+              <Filter className="h-4 w-4 dark:text-muted-foreground" />
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-[180px] dark:bg-background dark:text-foreground dark:border-input">
                   <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="1">PENDING</SelectItem>
-                  <SelectItem value="2">ACTIVE</SelectItem>
-                  <SelectItem value="3">LEGACY</SelectItem>
-                  <SelectItem value="unknown">UNKNOWN</SelectItem>
+                <SelectContent className="dark:bg-card dark:border-border">
+                  <SelectItem value="all" className="dark:text-foreground dark:focus:bg-accent">All Statuses</SelectItem>
+                  <SelectItem value="1" className="dark:text-foreground dark:focus:bg-accent">PENDING</SelectItem>
+                  <SelectItem value="2" className="dark:text-foreground dark:focus:bg-accent">ACTIVE</SelectItem>
+                  <SelectItem value="3" className="dark:text-foreground dark:focus:bg-accent">LEGACY</SelectItem>
+                  <SelectItem value="unknown" className="dark:text-foreground dark:focus:bg-accent">UNKNOWN</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <Button variant="outline" onClick={refreshAllData}>
+            <Button variant="outline" onClick={refreshAllData} className="dark:border-border dark:text-foreground dark:hover:bg-accent">
               <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
             </Button>
           </div>
-          <div className="text-sm text-gray-500">
+          <div className="text-sm text-muted-foreground">
             Showing {filteredTokens.length} of {tokens.length} tokens
             {searchQuery && ` matching "${searchQuery}"`}
             {statusFilter !== 'all' && ` with ${getStatusLabel(statusFilter).label} status`}
@@ -172,7 +172,7 @@ const TokenStatusTable = () => {
         
         {filteredTokens.length === 0 ? (
           <div className="text-center py-8">
-            <p className="text-gray-500">
+            <p className="text-muted-foreground">
               {tokens.length === 0 
                 ? "No tokens found" 
                 : searchQuery 
@@ -187,7 +187,7 @@ const TokenStatusTable = () => {
                   setSearchQuery('');
                   setStatusFilter('all');
                 }}
-                className="mt-2"
+                className="mt-2 dark:text-primary dark:hover:bg-accent/50"
               >
                 Clear filters
               </Button>
@@ -197,12 +197,12 @@ const TokenStatusTable = () => {
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[100px]">Symbol</TableHead>
-                  <TableHead className="w-[200px]">Name</TableHead>
-                  <TableHead className="w-[140px]">Address</TableHead>
-                  <TableHead className="w-[80px]">Status</TableHead>
-                  <TableHead className="w-[60px]">Actions</TableHead>
+                <TableRow className="dark:border-border dark:hover:bg-transparent">
+                  <TableHead className="w-[100px] dark:text-muted-foreground">Symbol</TableHead>
+                  <TableHead className="w-[200px] dark:text-muted-foreground">Name</TableHead>
+                  <TableHead className="w-[140px] dark:text-muted-foreground">Address</TableHead>
+                  <TableHead className="w-[80px] dark:text-muted-foreground">Status</TableHead>
+                  <TableHead className="w-[60px] dark:text-muted-foreground">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -214,10 +214,10 @@ const TokenStatusTable = () => {
                   const status = getStatusLabel(tokenData.status);
 
                   return (
-                    <TableRow key={`${address}-${index}`}>
-                      <TableCell className="font-medium text-sm max-w-[100px] truncate">{symbol}</TableCell>
-                      <TableCell className="text-sm max-w-[200px] truncate" title={name}>{name}</TableCell>
-                      <TableCell className="font-mono text-xs max-w-[140px]">
+                    <TableRow key={`${address}-${index}`} className="dark:border-border dark:hover:bg-muted/50">
+                      <TableCell className="font-medium text-sm max-w-[100px] truncate dark:text-foreground">{symbol}</TableCell>
+                      <TableCell className="text-sm max-w-[200px] truncate dark:text-foreground" title={name}>{name}</TableCell>
+                      <TableCell className="font-mono text-xs max-w-[140px] dark:text-foreground">
                         <div className="flex items-center space-x-2">
                           <span>
                             {address && address !== 'Unknown' 
@@ -239,7 +239,7 @@ const TokenStatusTable = () => {
                         <Button 
                           size="sm" 
                           onClick={() => handleSetTokenStatus({address, symbol, name})}
-                          className="bg-strato-blue hover:bg-strato-blue/90 text-xs"
+                          className="bg-strato-blue hover:bg-strato-blue/90 text-xs dark:text-white"
                         >
                           Set Status
                         </Button>

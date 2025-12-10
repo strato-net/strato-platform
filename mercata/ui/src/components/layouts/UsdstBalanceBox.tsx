@@ -102,10 +102,10 @@ const UsdstBalanceBox: React.FC = () => {
   }
 
   const getCardClasses = () => {
-    if (loadingUsdstBalance) return "border-blue-200 bg-white/95";
+    if (loadingUsdstBalance) return "border-blue-200 bg-card/95";
     if (isCriticalBalance) return "border-red-300 bg-red-200/95";
     if (isLowBalance) return "border-orange-300 bg-orange-200/95";
-    return "border-blue-200 bg-white/95";
+    return "border-blue-200 bg-card/95";
   };
 
   // Render the appropriate icon based on state and token image availability
@@ -186,19 +186,20 @@ const UsdstBalanceBox: React.FC = () => {
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1">
-              <p className="text-xs font-medium text-gray-600">USDST Balance</p>
+              <p className="text-xs font-medium text-muted-foreground">USDST Balance</p>
               <InfoTooltip content="USDST is used to pay for gas fees on the STRATO network">
-                <HelpCircle className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
+                <HelpCircle className="h-3 w-3 text-muted-foreground hover:text-foreground cursor-help" />
+
               </InfoTooltip>
             </div>
-            <p className="text-sm font-semibold text-gray-900 truncate">
+            <p className="text-sm font-semibold text-foreground truncate">
               {loadingUsdstBalance ? (
                 <span className="animate-pulse">Loading...</span>
               ) : (
                 `${formatCurrency(formatWeiAmount(usdstBalance))} USDST`
               )}
             </p>
-            <p className="text-xs text-gray-500 truncate">
+            <p className="text-xs text-muted-foreground truncate">
               {loadingUsdstBalance
                 ? "Calculating voucher credits…"
                 : `${Math.floor(parseFloat(formatWeiAmount(voucherBalance,20))).toLocaleString()} vouchers`}
@@ -207,15 +208,15 @@ const UsdstBalanceBox: React.FC = () => {
           <Button
             variant="ghost"
             size="sm"
-            className="h-6 w-6 p-0 hover:bg-gray-100"
+            className="h-6 w-6 p-0 hover:bg-secondary"
             onClick={() => setIsMinimized(true)}
           >
-            <Minus className="h-3 w-3 text-gray-500" />
+            <Minus className="h-3 w-3 text-muted-foreground" />
           </Button>
         </div>
 
         {(isLowBalance || isCriticalBalance) && !loadingUsdstBalance && (
-          <div className="mt-2 pt-2 border-t border-gray-200">
+          <div className="mt-2 pt-2 border-t border-border">
             <div
               className={`flex items-start space-x-1 ${
                 isCriticalBalance ? "text-red-600" : "text-orange-600"

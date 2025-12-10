@@ -1,4 +1,4 @@
-[![STRATO Mercata logo](https://www.stratomercata.com/images/stratomercata.com/2025.10.11/strato-mercata-logo.png)](https://stratomercata.com)
+[![STRATO Mercata logo](https://strato.nexus/images/strato.nexus/2025.10.11/strato-logo.png)](https://strato.nexus)
 
 > NOTE: bootstrap-docker is temporary a duplicate of [strato-getting-started repository](https://github.com/blockapps/strato-getting-started), until the strato-platform is open-sourced
 
