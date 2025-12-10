@@ -18,7 +18,6 @@ import BorrowForm from "@/components/borrow/BorrowForm";
 import RepayForm from "@/components/borrow/RepayForm";
 import CollateralManagementTable from "@/components/borrow/CollateralManagementTable";
 import { useSmartPolling } from "@/hooks/useSmartPolling";
-import { CompactRewardsDisplay } from '@/components/rewards/CompactRewardsDisplay';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 
 const Borrow = () => {
@@ -227,7 +226,7 @@ const Borrow = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <DashboardSidebar />
       <MobileSidebar 
         isOpen={isMobileSidebarOpen} 
@@ -243,12 +242,6 @@ const Borrow = () => {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle>Borrow & Repay</CardTitle>
-                  {/* <CompactRewardsDisplay
-                    userRewards={userRewards}
-                    loading={rewardsLoading}
-                    activityIds={[2]}
-                    variant="button"
-                  /> */}
                 </div>
               </CardHeader>
               <CardContent>

@@ -40,22 +40,22 @@ const TransferConfirmationModal = ({
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <p className="text-sm text-gray-600">Token</p>
+            <p className="text-sm text-muted-foreground">Token</p>
             <p className="font-medium">
               {fromAsset?.token?._symbol || fromAsset?.token?._name}
             </p>
           </div>
           <div className="space-y-2">
-            <p className="text-sm text-gray-600">Amount</p>
+            <p className="text-sm text-muted-foreground">Amount</p>
             <p className="font-medium">{fromAmount}</p>
           </div>
           <div className="space-y-2">
-            <p className="text-sm text-gray-600">Recipient</p>
+            <p className="text-sm text-muted-foreground">Recipient</p>
             <p className="font-medium text-xs break-all">{recipient}</p>
           </div>
           <div className="border-t pt-4 space-y-2">
             <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Transaction Fee</span>
+              <span className="text-muted-foreground">Transaction Fee</span>
               <span className="font-medium">
                 {TRANSFER_FEE} USDST ({parseFloat(TRANSFER_FEE) * 100} voucher)
               </span>

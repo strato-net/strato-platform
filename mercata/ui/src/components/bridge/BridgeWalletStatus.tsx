@@ -29,11 +29,11 @@ const BridgeWalletStatus = () => {
             onClick={() => disconnect()}
             className="relative group cursor-pointer flex-1"
           >
-            <div className="px-4 py-2 bg-green-50 text-green-600 rounded-xl font-semibold group-hover:opacity-0 transition-opacity w-full text-center h-[42px] flex items-center justify-center">
+            <div className="px-4 py-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 rounded-xl font-semibold group-hover:opacity-0 transition-opacity w-full text-center h-[42px] flex items-center justify-center">
               Wallet Connected
             </div>
-            <div className="absolute inset-0 bg-red-50 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-              <span className="text-red-600 font-semibold">
+            <div className="absolute inset-0 bg-destructive/10 border border-destructive/20 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+              <span className="text-destructive font-semibold">
                 Disconnect
               </span>
             </div>
@@ -41,14 +41,14 @@ const BridgeWalletStatus = () => {
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="flex items-center justify-center gap-2 text-xs bg-green-100/50 px-2 py-2 rounded-md font-mono text-green-700 cursor-pointer flex-1 h-[42px]">
+                <div className="flex items-center justify-center gap-2 text-xs bg-emerald-500/10 border border-emerald-500/20 px-2 py-2 rounded-xl font-mono text-emerald-600 dark:text-emerald-400 cursor-pointer flex-1 h-[42px]">
                   {address?.slice(0, 6)}...{address?.slice(-4)}
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       copyToClipboard();
                     }}
-                    className="hover:text-green-900 transition-colors cursor-pointer"
+                    className="hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors cursor-pointer"
                   >
                     <Copy size={12} />
                   </button>

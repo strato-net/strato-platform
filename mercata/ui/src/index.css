@@ -49,10 +49,10 @@
     --background: 224 71% 4%;
     --foreground: 213 31% 91%;
 
-    --card: 224 71% 4%;
+    --card: 224 71% 6%;
     --card-foreground: 213 31% 91%;
 
-    --popover: 224 71% 4%;
+    --popover: 224 71% 6%;
     --popover-foreground: 213 31% 91%;
 
     --primary: 223 75% 40%;
@@ -67,7 +67,7 @@
     --accent: 216 34% 17%;
     --accent-foreground: 210 40% 98%;
 
-    --destructive: 0 62.8% 30.6%;
+    --destructive: 0 60% 25%;
     --destructive-foreground: 210 40% 98%;
 
     --border: 217.2 32.6% 17.5%;
@@ -108,7 +108,7 @@
 }
 
 .asset-card {
-  @apply bg-white border border-gray-100 rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-6;
+  @apply bg-card border border-border rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-6;
 }
 
 .asset-circle {
@@ -125,7 +125,7 @@
 }
 
 .strato-card {
-  @apply bg-white bg-opacity-70 backdrop-blur-md rounded-2xl shadow-lg border border-white/20;
+  @apply bg-card/70 backdrop-blur-md rounded-2xl shadow-lg border border-border/20;
 }
 
 @keyframes float {
@@ -159,4 +159,89 @@
 .animate-gradient-flow {
   animation: gradient-flow 15s ease infinite;
   background-size: 200% 200%;
+}
+
+/* Ant Design Table - Theme-aware styles */
+.ant-table-themed .ant-table {
+  background: transparent !important;
+}
+.ant-table-themed .ant-table-thead > tr > th {
+  background: hsl(var(--muted) / 0.5) !important;
+  color: hsl(var(--muted-foreground)) !important;
+  border-bottom: 1px solid hsl(var(--border)) !important;
+}
+.ant-table-themed .ant-table-tbody > tr > td {
+  border-bottom: 1px solid hsl(var(--border)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+.ant-table-themed .ant-table-tbody > tr:hover > td {
+  background: hsl(var(--muted) / 0.5) !important;
+}
+.ant-table-themed .ant-table-tbody > tr.highlight-row > td {
+  background: hsl(var(--primary) / 0.15) !important;
+}
+.ant-table-themed .ant-table-tbody > tr.highlight-row:hover > td {
+  background: hsl(var(--primary) / 0.25) !important;
+}
+.ant-table-themed .ant-pagination {
+  color: hsl(var(--foreground)) !important;
+  display: flex !important;
+  justify-content: center !important;
+}
+.ant-table-themed .ant-pagination-item {
+  background: transparent !important;
+}
+.ant-table-themed .ant-pagination-item:hover {
+  background: transparent !important;
+}
+.ant-table-themed .ant-pagination-item a {
+  color: hsl(var(--foreground)) !important;
+}
+.ant-table-themed .ant-pagination-item-active {
+  background: transparent !important;
+  border-color: hsl(var(--primary)) !important;
+}
+.ant-table-themed .ant-pagination-item-active a {
+  color: hsl(var(--primary)) !important;
+}
+.ant-table-themed .ant-pagination-prev .ant-pagination-item-link,
+.ant-table-themed .ant-pagination-next .ant-pagination-item-link {
+  color: hsl(var(--foreground)) !important;
+  background: transparent !important;
+}
+.ant-table-themed .ant-pagination-total-text {
+  color: hsl(var(--muted-foreground)) !important;
+}
+.ant-table-themed .ant-select-selector {
+  background-color: hsl(var(--background)) !important;
+  border-color: hsl(var(--border)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+.ant-table-themed .ant-select-selection-item {
+  color: hsl(var(--foreground)) !important;
+}
+.ant-table-themed .ant-select-arrow {
+  color: hsl(var(--muted-foreground)) !important;
+}
+.ant-table-themed .ant-table-placeholder {
+  background: transparent !important;
+}
+.ant-table-themed .ant-table-placeholder .ant-empty-description {
+  color: hsl(var(--muted-foreground)) !important;
+}
+
+/* Ant Design Select dropdown - global override (renders in portal) */
+.ant-select-dropdown {
+  background-color: hsl(var(--popover)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+}
+.ant-select-item {
+  color: hsl(var(--foreground)) !important;
+}
+.ant-select-item-option-selected {
+  background-color: hsl(var(--accent)) !important;
+  color: hsl(var(--accent-foreground)) !important;
+}
+.ant-select-item-option-active {
+  background-color: hsl(var(--accent) / 0.5) !important;
 }

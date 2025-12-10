@@ -26,7 +26,7 @@ const DashboardFAQ = () => {
   ];
   
   return (
-    <div className="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
+    <div className="bg-card text-card-foreground rounded-xl border border-border p-5 shadow-sm">
       <h2 className="font-bold text-lg mb-4">Frequently Asked Questions</h2>
       
       <Accordion type="single" collapsible className="w-full">
@@ -34,7 +34,7 @@ const DashboardFAQ = () => {
           <AccordionItem key={index} value={`item-${index}`}>
             <AccordionTrigger className="text-left font-medium">{item.question}</AccordionTrigger>
             <AccordionContent>
-              <p className="text-gray-600">{item.answer}</p>
+              <p className="text-muted-foreground">{item.answer}</p>
             </AccordionContent>
           </AccordionItem>
         ))}

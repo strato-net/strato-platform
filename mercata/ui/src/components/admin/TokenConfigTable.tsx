@@ -229,14 +229,14 @@ const TokenConfigTable = () => {
       </CardHeader>
       <CardContent>
         <div className="mb-4">
-          <span className="text-sm text-gray-500">
+          <span className="text-sm text-muted-foreground">
             Showing {activeTokens?.length || 0} active tokens
           </span>
         </div>
         
         {(activeTokens?.length || 0) === 0 ? (
           <div className="text-center py-8">
-            <p className="text-gray-500">No active tokens found</p>
+            <p className="text-muted-foreground">No active tokens found</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
