@@ -49,7 +49,7 @@ import Borrow from "./pages/Borrow";
 import { getConfig } from "./lib/config";
 import { useState, useEffect } from "react";
 import { ThemeProvider } from "@/components/theme-provider";
-import { initializeCsrfToken, getCsrfFetchOptions } from "./lib/csrf";
+import { initializeCsrfToken, csrfOnRequest } from "./lib/csrf";
 
 
 const queryClient = new QueryClient();
@@ -84,7 +84,7 @@ const App = () => {
       const appName = "Mercata";
       const chains = [mainnet, polygon, sepolia] as const;
       const transports: Record<number, Transport> = Object.fromEntries(
-        chains.map((chain) => [chain.id, http(`/api/rpc/${chain.id}`, {fetchOptions: getCsrfFetchOptions()})])
+        chains.map((chain) => [chain.id, http(`/api/rpc/${chain.id}`, {onFetchRequest: csrfOnRequest})])
       );
 
       const connectors = connectorsForWallets(
