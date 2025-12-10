@@ -16,11 +16,11 @@ import {
   Permit2Domain,
   Permit2Types
 } from './types';
-import { getCsrfFetchOptions } from "../csrf";
+import { csrfOnRequest } from "../csrf";
 
 async function getClient(chainId: string) {
   const id = Number(chainId);
-  const transport = http(`/api/rpc/${id}`, {fetchOptions: getCsrfFetchOptions()});
+  const transport = http(`/api/rpc/${id}`, {onFetchRequest: csrfOnRequest});
 
   return createPublicClient({
     chain: await resolveViemChain(chainId),

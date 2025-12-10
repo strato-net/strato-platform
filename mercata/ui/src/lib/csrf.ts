@@ -25,8 +25,30 @@ export async function initializeCsrfToken(): Promise<void> {
 }
 
 /**
- * Get fetch options for Transport that includes CSRF token
+ * onFetchRequest callback for viem Transport that dynamically adds CSRF token on every request
+ * This ensures the token is always fresh from the cookie, preventing expiration issues
  */
-export function getCsrfFetchOptions(): RequestInit {
-  return {headers: {"X-CSRF-TOKEN": getCsrfToken()}}
+export function csrfOnRequest(request: Request, init: RequestInit): RequestInit {
+  const csrfToken = getCsrfToken();
+  if (csrfToken) {
+    // Handle headers - can be Headers object, plain object, or array
+    let headers: HeadersInit;
+    if (init.headers instanceof Headers) {
+      headers = new Headers(init.headers);
+      headers.set("X-CSRF-TOKEN", csrfToken);
+    } else if (Array.isArray(init.headers)) {
+      headers = [...init.headers, ["X-CSRF-TOKEN", csrfToken]];
+    } else {
+      headers = {
+        ...(init.headers as Record<string, string>),
+        "X-CSRF-TOKEN": csrfToken,
+      };
+    }
+    
+    return {
+      ...init,
+      headers,
+    };
+  }
+  return init;
 }
