@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -125,7 +124,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
   title = "Borrow against collateral (CDP)",
 }) => {
   const [borrowAmountInput, setBorrowAmountInput] = useState<string>("");
-  const [targetCR, setTargetCR] = useState<number>(215);
+  const [riskLevel, setRiskLevel] = useState<"low" | "medium" | "high">("medium");
   const [assets, setAssets] = useState<AssetConfig[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -262,8 +261,25 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
       .filter((a) => a.priceUSD > 0 && (a.balanceTokens > 0 || a.existingCollateralTokens > 0));
   }, [activeTokens, assets, priceForAsset, vaults]);
 
+  // Helper function to get effective CR for a vault based on risk level
+  const getEffectiveCR = useCallback((assetAddress: string): number => {
+    const config = assets.find((a) => a.asset.toLowerCase() === assetAddress.toLowerCase());
+    const minCR = config?.minCR || 200; // Fallback to 200 if not found
+    
+    switch (riskLevel) {
+      case "high":
+        return minCR;
+      case "medium":
+        return minCR + 20;
+      case "low":
+        return minCR + 40;
+      default:
+        return minCR + 20;
+    }
+  }, [riskLevel, assets]);
+
   const plan = useMemo(() => {
-    if (borrowAmount <= 0 || targetCR <= 0 || assets.length === 0) {
+    if (borrowAmount <= 0 || assets.length === 0) {
       return { allocations: [] as Allocation[], newVault: null as Allocation | null, projectedCR: 0, remaining: borrowAmount };
     }
 
@@ -293,13 +309,14 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
     sortableVaults.forEach(({ vault, config }) => {
       const collateralUSD = parseFloat(formatUnits(BigInt(vault.collateralValueUSD || "0"), 18));
       const debtUSD = parseFloat(formatUnits(BigInt(vault.debtValueUSD || "0"), 18));
-      const maxBorrowAtTarget = Math.max(0, (collateralUSD * 100) / targetCR - debtUSD);
+      const effectiveCR = getEffectiveCR(vault.asset);
+      const maxBorrowAtTarget = Math.max(0, (collateralUSD * 100) / effectiveCR - debtUSD);
       if (maxBorrowAtTarget <= 0 || remaining <= 0) return;
 
       const borrowHere = Math.min(maxBorrowAtTarget, remaining);
       if (borrowHere > 0) {
         const totalDebt = debtUSD + borrowHere;
-        const crAfter = totalDebt > 0 ? (collateralUSD / totalDebt) * 100 : targetCR;
+        const crAfter = totalDebt > 0 ? (collateralUSD / totalDebt) * 100 : effectiveCR;
         const collateralTokens = parseFloat(formatUnits(BigInt(vault.collateralAmount || "0"), vault.collateralAmountDecimals || 18));
         const priceUSD = priceForAsset(vault.asset, vault);
         allocations.push({
@@ -344,12 +361,13 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
       const choice = scoredAssets[0];
       if (choice?.config) {
         const priceUSD = choice.priceUSD || 0;
-        const requiredCollateralUSD = (remaining * targetCR) / 100;
+        const effectiveCR = getEffectiveCR(choice.config.asset);
+        const requiredCollateralUSD = (remaining * effectiveCR) / 100;
         const requiredCollateralTokens = priceUSD > 0 ? requiredCollateralUSD / priceUSD : 0;
         newVault = {
           vault: { ...choice.config, address: choice.config.asset || "", symbol: choice.config.symbol || "Asset" },
           borrowAmount: remaining,
-          crAfter: targetCR,
+          crAfter: effectiveCR,
           type: "new",
           requiredCollateralUSD,
           requiredCollateralTokens,
@@ -365,12 +383,40 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
     const projectedCR = totalDebt > 0 ? (totalCollateralUSD / totalDebt) * 100 : 0;
 
     return { allocations, newVault, projectedCR, remaining };
-  }, [assets, borrowAmount, targetCR, vaults, activeTokens, priceForAsset]);
+  }, [assets, borrowAmount, vaults, activeTokens, priceForAsset, getEffectiveCR]);
 
+  // Calculate required collateral USD based on per-vault CR and borrow allocation
   const requiredCollateralUSD = useMemo(() => {
-    if (borrowAmount <= 0) return 0;
-    return (borrowAmount * targetCR) / 100;
-  }, [borrowAmount, targetCR]);
+    if (borrowAmount <= 0 || selectedVaults.size === 0) return 0;
+    
+    // Calculate borrow allocation per vault (proportional to collateral)
+    const vaultCollaterals = assetSummaries
+      .filter((a) => selectedVaults.has(a.address))
+      .map((asset) => {
+        const depositAmount = parseFloat(depositInputs[asset.address] || "0");
+        const depositUSD = depositAmount * (asset.priceUSD || 0);
+        const totalCollateralUSD = (asset.existingCollateralUSD || 0) + depositUSD;
+        return { asset, totalCollateralUSD };
+      });
+
+    const totalCollateralAllVaults = vaultCollaterals.reduce(
+      (sum, v) => sum + v.totalCollateralUSD,
+      0
+    );
+
+    if (totalCollateralAllVaults === 0) return 0;
+
+    // Calculate required collateral for each vault based on its effective CR
+    let totalRequired = 0;
+    for (const { asset, totalCollateralUSD } of vaultCollaterals) {
+      const borrowAllocation = (totalCollateralUSD / totalCollateralAllVaults) * borrowAmount;
+      const effectiveCR = getEffectiveCR(asset.address);
+      const requiredForVault = (borrowAllocation * effectiveCR) / 100;
+      totalRequired += requiredForVault;
+    }
+
+    return totalRequired;
+  }, [borrowAmount, selectedVaults, assetSummaries, depositInputs, getEffectiveCR]);
 
   const existingCollateralUSD = useMemo(() => {
     return assetSummaries
@@ -438,9 +484,9 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
 
   // Auto-select optimal vaults and calculate deposits for Quick Borrow
   // Algorithm: Prioritize lowest stability fee rate, allocate borrow amount per vault,
-  // add deposits until target CR is reached, then move to next vault
+  // add deposits until vault's effective CR is reached, then move to next vault
   const quickBorrowPlan = useMemo(() => {
-    if (borrowAmount <= 0 || targetCR <= 0 || assetSummaries.length === 0) {
+    if (borrowAmount <= 0 || assetSummaries.length === 0) {
       return { selectedVaults: new Set<string>(), autoDeposits: {} };
     }
 
@@ -465,6 +511,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
       const existingCollateralUSD = asset.existingCollateralUSD || 0;
       const existingDebtUSD = asset.debtUSD || 0;
       const balanceTokens = asset.balanceTokens || 0;
+      const effectiveCR = getEffectiveCR(asset.address);
 
       // Try to allocate as much borrow amount as possible to this vault
       // Start by checking what we can borrow with existing collateral
@@ -472,8 +519,8 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
       let depositTokens = 0;
 
       if (existingCollateralUSD > 0) {
-        // Calculate max borrow with existing collateral at target CR
-        const maxBorrowWithExisting = Math.max(0, (existingCollateralUSD * 100) / targetCR - existingDebtUSD);
+        // Calculate max borrow with existing collateral at effective CR
+        const maxBorrowWithExisting = Math.max(0, (existingCollateralUSD * 100) / effectiveCR - existingDebtUSD);
         borrowAllocation = Math.min(remainingBorrowAmount, maxBorrowWithExisting);
       }
 
@@ -482,7 +529,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
       if (borrowAllocation < remainingBorrowAmount && balanceTokens > 0) {
         // Calculate required collateral for remaining borrow amount
         const totalDebtIfAllRemaining = existingDebtUSD + remainingBorrowAmount;
-        const requiredCollateralForAllRemaining = (totalDebtIfAllRemaining * targetCR) / 100;
+        const requiredCollateralForAllRemaining = (totalDebtIfAllRemaining * effectiveCR) / 100;
         const additionalCollateralNeeded = Math.max(0, requiredCollateralForAllRemaining - existingCollateralUSD);
 
         // Try to add deposits to meet the requirement
@@ -494,7 +541,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
           if (depositTokens > 0) {
             // Recalculate how much we can borrow with existing + new deposits
             const totalCollateralAfter = existingCollateralUSD + depositUSD;
-            const maxBorrowWithDeposits = Math.max(0, (totalCollateralAfter * 100) / targetCR - existingDebtUSD);
+            const maxBorrowWithDeposits = Math.max(0, (totalCollateralAfter * 100) / effectiveCR - existingDebtUSD);
             borrowAllocation = Math.min(remainingBorrowAmount, maxBorrowWithDeposits);
           }
         }
@@ -507,7 +554,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
 
         // Recalculate exact deposit needed for the final borrow allocation
         const finalTotalDebt = existingDebtUSD + borrowAllocation;
-        const finalRequiredCollateral = (finalTotalDebt * targetCR) / 100;
+        const finalRequiredCollateral = (finalTotalDebt * effectiveCR) / 100;
         const finalAdditionalNeeded = Math.max(0, finalRequiredCollateral - existingCollateralUSD);
 
         if (finalAdditionalNeeded > 0 && balanceTokens > 0) {
@@ -522,15 +569,15 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
     }
 
     return { selectedVaults: autoSelected, autoDeposits };
-  }, [borrowAmount, targetCR, assetSummaries]);
+  }, [borrowAmount, assetSummaries, getEffectiveCR]);
 
   // Apply quick borrow plan when in quick mode
   useEffect(() => {
-    if (!showAdvanced && borrowAmount > 0 && targetCR > 0) {
+    if (!showAdvanced && borrowAmount > 0) {
       setSelectedVaults(quickBorrowPlan.selectedVaults);
       setDepositInputs(quickBorrowPlan.autoDeposits);
     }
-  }, [showAdvanced, borrowAmount, targetCR, quickBorrowPlan]);
+  }, [showAdvanced, borrowAmount, quickBorrowPlan]);
 
   const toggleVaultSelection = (address: string) => {
     setSelectedVaults((prev) => {
@@ -686,24 +733,41 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
               <div className="h-2"></div>
             </div>
 
-            {/* Target CR Input */}
+            {/* Risk Level Selection */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Target Risk (CR)</label>
-              <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
-                <span>Higher CR → safer, needs more collateral</span>
-                <span className="font-semibold">{targetCR}% CR</span>
+              <label className="text-sm font-medium">Risk Level</label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={riskLevel === "high" ? "default" : "outline"}
+                  className="flex-1"
+                  onClick={() => setRiskLevel("high")}
+                >
+                  High Risk
+                </Button>
+                <Button
+                  type="button"
+                  variant={riskLevel === "medium" ? "default" : "outline"}
+                  className="flex-1"
+                  onClick={() => setRiskLevel("medium")}
+                >
+                  Medium Risk
+                </Button>
+                <Button
+                  type="button"
+                  variant={riskLevel === "low" ? "default" : "outline"}
+                  className="flex-1"
+                  onClick={() => setRiskLevel("low")}
+                >
+                  Low Risk
+                </Button>
               </div>
-              <Slider
-                value={[targetCR]}
-                min={150}
-                max={400}
-                step={5}
-                onValueChange={([v]) => setTargetCR(v)}
-              />
-              <div className="flex justify-between text-xs text-gray-500">
-                <span>150%</span>
-                <span>215% (example)</span>
-                <span>400%</span>
+              <div className="text-sm text-gray-600">
+                <span>
+                  {riskLevel === "high" && "Borrow up to each vault's minCR"}
+                  {riskLevel === "medium" && "Borrow up to each vault's minCR + 20%"}
+                  {riskLevel === "low" && "Borrow up to each vault's minCR + 40%"}
+                </span>
               </div>
             </div>
 
@@ -711,7 +775,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
 
             {borrowAmount <= 0 ? (
               <div className="p-3 rounded-md bg-gray-50 border border-gray-200 text-center">
-                <p className="text-sm text-gray-600">Enter a borrow amount and select target CR to see the automated plan</p>
+                <p className="text-sm text-gray-600">Enter a borrow amount and select risk level to see the automated plan</p>
               </div>
             ) : selectedVaults.size > 0 ? (
               <div className="space-y-3">
@@ -887,28 +951,44 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
           <CardTitle>2) Choose target risk (CR)</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="flex items-center justify-between text-sm text-gray-600">
-            <span>Higher CR → safer, needs more collateral</span>
-            <div className="flex items-center gap-3">
-              <span className="font-semibold">{targetCR}% CR</span>
-              {borrowAmount > 0 && (
-                <span className="font-semibold text-blue-600">
-                  ${formatUSD(requiredCollateralUSD)} collateral needed
-                </span>
-              )}
-            </div>
+          <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
+            <span>Risk Level</span>
+            {borrowAmount > 0 && (
+              <span className="font-semibold text-blue-600">
+                ${formatUSD(requiredCollateralUSD)} collateral needed
+              </span>
+            )}
           </div>
-          <Slider
-            value={[targetCR]}
-            min={150}
-            max={400}
-            step={5}
-            onValueChange={([v]) => setTargetCR(v)}
-          />
-          <div className="flex justify-between text-xs text-gray-500">
-            <span>150%</span>
-            <span>215% (example)</span>
-            <span>400%</span>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant={riskLevel === "high" ? "default" : "outline"}
+              className="flex-1"
+              onClick={() => setRiskLevel("high")}
+            >
+              High Risk
+            </Button>
+            <Button
+              type="button"
+              variant={riskLevel === "medium" ? "default" : "outline"}
+              className="flex-1"
+              onClick={() => setRiskLevel("medium")}
+            >
+              Medium Risk
+            </Button>
+            <Button
+              type="button"
+              variant={riskLevel === "low" ? "default" : "outline"}
+              className="flex-1"
+              onClick={() => setRiskLevel("low")}
+            >
+              Low Risk
+            </Button>
+          </div>
+          <div className="text-xs text-gray-500">
+            {riskLevel === "high" && "Borrow up to each vault's minCR"}
+            {riskLevel === "medium" && "Borrow up to each vault's minCR + 20%"}
+            {riskLevel === "low" && "Borrow up to each vault's minCR + 40%"}
           </div>
         </CardContent>
       </Card>
