@@ -436,28 +436,23 @@ sendMessages' ::
 sendMessages' wms = do
   -- It may be somewhat confusing, but there are actually 2 StateTs with BlockstanbulContext
   -- Every run of the conduit has one, but the outer monad preserves the context between runs.
-  mCtx <- getBlockstanbulContext
-  case mCtx of
-    Nothing -> do
-      $logErrorS "blockstanbul" "cannot send messages without a BlockstanbulContext"
-      return []
-    Just ctx -> do
-      let base =
-            yieldMany wms
-              .| iterMC recordInEvent
-              .| iterMC (inShortLog "blockstanbul/InShortLog")
-              .| iterMC ($logDebugS "blockstanbul/InEvent" . T.pack . format)
-              .| eventLoop ctx
-              `fuseUpstream` ( iterMC recordOutEvent
-                                 .| iterMC (outShortLog "blockstanbul/OutShortLog")
-                                 .| iterMC ($logDebugS "blockstanbul/OutEvent" . T.pack . format . fromE)
-                             )
-      (ctx', evs) <- runConduit $ fuseBoth base sinkList
-      putBlockstanbulContext ctx'
+  ctx <- getBlockstanbulContext
+  let base =
+        yieldMany wms
+          .| iterMC recordInEvent
+          .| iterMC (inShortLog "blockstanbul/InShortLog")
+          .| iterMC ($logDebugS "blockstanbul/InEvent" . T.pack . format)
+          .| eventLoop ctx
+          `fuseUpstream` ( iterMC recordOutEvent
+                             .| iterMC (outShortLog "blockstanbul/OutShortLog")
+                             .| iterMC ($logDebugS "blockstanbul/OutEvent" . T.pack . format . fromE)
+                         )
+  (ctx', evs) <- runConduit $ fuseBoth base sinkList
+  putBlockstanbulContext ctx'
 
-      recordValidator (_isValidator ctx') (_validatorBehavior ctx')
+  recordValidator (_isValidator ctx') (_validatorBehavior ctx')
 
-      return evs
+  return evs
 
 sendMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m, HasVault m) => [InEvent] -> m [OutEvent]
 sendMessages = fmap (map fromE) . sendMessages'
@@ -472,10 +467,11 @@ sendAllMessages wms = do
     wms' -> (out ++) <$> sendAllMessages wms'
 
 currentView :: (HasBlockstanbulContext m) => m View
-currentView = maybe (View (-1) (-1)) _view <$> getBlockstanbulContext
+currentView = _view <$> getBlockstanbulContext
 
+-- TODO remove
 blockstanbulRunning :: HasBlockstanbulContext m => m Bool
-blockstanbulRunning = isJust <$> getBlockstanbulContext
+blockstanbulRunning = pure True
 
 recordInEvent :: (MonadIO m) => InEvent -> m ()
 recordInEvent ev =

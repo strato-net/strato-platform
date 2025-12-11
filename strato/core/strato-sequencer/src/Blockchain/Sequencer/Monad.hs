@@ -159,7 +159,7 @@ instance Monad m => (Keccak256 `A.Alters` ()) (StateT SequencerContext m) where
   delete _ = genericDeleteSeenTransactionDB
 
 instance Monad m => HasBlockstanbulContext (StateT SequencerContext m) where
-  getBlockstanbulContext = Just <$> use blockstanbulContext
+  getBlockstanbulContext = use blockstanbulContext
   putBlockstanbulContext = modify' . (.~) blockstanbulContext
 
 instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestSequencedBlock (ReaderT SequencerConfig m) where

@@ -325,7 +325,7 @@ instance {-# OVERLAPPING #-} MonadIO m => (Keccak256 `A.Alters` ()) (CoreT m) wh
 instance {-# OVERLAPPING #-} MonadIO m => HasBlockstanbulContext (CoreT m) where
   getBlockstanbulContext = do
     i <- asks $ _sequencerContext . _corePeerContext
-    liftIO $ Just . _blockstanbulContext <$> readTVarIO i
+    liftIO $ _blockstanbulContext <$> readTVarIO i
   putBlockstanbulContext s = do
     i <- asks $ _sequencerContext . _corePeerContext
     liftIO $ atomically $ modifyTVar' i (blockstanbulContext .~ s)
@@ -791,8 +791,9 @@ corePeerSetup = do
   if bestSequencedBlockNumber bsb' > 0
     then do
       bCtx <- getBlockstanbulContext
-      for_ bCtx $ putBlockstanbulContext . (view . sequence .~ fromIntegral (bestSequencedBlockNumber bsb'))
-                                         . (validators .~ (Set.fromList $ bestSequencedBlockValidators bsb'))
+      putBlockstanbulContext $ (view . sequence .~ fromIntegral (bestSequencedBlockNumber bsb'))
+                             . (validators .~ (Set.fromList $ bestSequencedBlockValidators bsb'))
+                             $ bCtx
       let bh = bestSequencedBlockHash bsb'
       mOB <- A.lookup (A.Proxy @OutputBlock) bh
       case mOB of

@@ -168,7 +168,7 @@ feedBackOutputsToInput = map rebox
 
 mkBlk :: Keccak256 -> Integer -> SequencerM Block
 mkBlk parent num = do
-  ctx <- fromMaybe (error "context required for PBFT") <$> getBlockstanbulContext
+  ctx <- getBlockstanbulContext
   let blk0 = makeBlock 2 1
       blk1 = Block (blockBlockData blk0){parentHash = parent} (blockReceiptTransactions blk0) (blockBlockUncles blk0)
       blk2 = addValidators (_validators ctx) blk1{
@@ -332,7 +332,7 @@ spec = do
         _toVm `shouldContain` [VmCreateBlockCommand]
 
       it "should replay old blocks in blockstanbul" . runTestMWithGenesis $ \h -> do
-        ctx <- fromMaybe (error "context required for PBFT") <$> getBlockstanbulContext
+        ctx <- getBlockstanbulContext
         let blk0 = makeBlock 2 1
             blk1 = Block (blockBlockData blk0){parentHash = h} (blockReceiptTransactions blk0) (blockBlockUncles blk0)
             blk2 = addValidators (_validators ctx) blk1{
@@ -348,11 +348,11 @@ spec = do
         _toVm `shouldContain` [VmCreateBlockCommand]
         map outputBlockToBlock [oblk | P2pBlock oblk <- _toP2p] `shouldMatchList` [blk4]
         map outputBlockToBlock [oblk | VmBlock oblk <- _toVm] `shouldMatchList` [blk4]
-        ctx' <- fromMaybe (error "context required for pbft") <$> getBlockstanbulContext
+        ctx' <- getBlockstanbulContext
         _view ctx' `shouldBe` View 0 1
 
       it "should sequence blocks out of order in blockstanbul" . runTestMWithGenesis $ \h -> do
-        ctx <- fromMaybe (error "context required for PBFT") <$> getBlockstanbulContext
+        ctx <- getBlockstanbulContext
         let ieBlk = IEBlock . blockToIngestBlock TO.Morphism
             mkBlkChn :: Int -> Keccak256 -> Integer -> SequencerM [Block]
             mkBlkChn 0 _ _ = return []
@@ -367,7 +367,7 @@ spec = do
         _toVm `shouldContain` [VmCreateBlockCommand]
         map outputBlockToBlock [oblk | P2pBlock oblk <- _toP2p] `shouldMatchList` blkChn
         map outputBlockToBlock [oblk | VmBlock oblk <- _toVm] `shouldMatchList` blkChn
-        ctx' <- fromMaybe (error "context required for pbft") <$> getBlockstanbulContext
+        ctx' <- getBlockstanbulContext
         _view ctx' `shouldBe` View 0 5
 
       it "should be able to fetch if the write is after the read begins" . runTestM $ do
