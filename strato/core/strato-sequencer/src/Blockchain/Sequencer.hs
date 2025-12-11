@@ -347,21 +347,14 @@ runConsensus ::
   ) =>
   SequencedBlock -> ConduitT i SeqOutEvent m ()
 runConsensus sb = do
-  hasPBFT <- lift blockstanbulRunning
-  if not hasPBFT
-    then do
-      obs <- lift $ expandBlock sb
-      for_ obs $ \ob -> yieldToP2p [P2pBlock ob]
-      yieldToVm $ map VmBlock obs
-    else do
-      let blk = sequencedBlockToBlock sb
-      routed <-
-        if isHistoricBlock blk
-          then lift $ map (PreviousBlock . outputBlockToBlock) <$> expandBlock sb
-          else pure [UnannouncedBlock blk]
-      -- Blockstanbul will check that the seals and validators match up before
-      -- announcing it to the network or forwarding to the EVM.
-      traverse_ blockstanbulSend' routed
+  let blk = sequencedBlockToBlock sb
+  routed <-
+    if isHistoricBlock blk
+      then lift $ map (PreviousBlock . outputBlockToBlock) <$> expandBlock sb
+      else pure [UnannouncedBlock blk]
+  -- Blockstanbul will check that the seals and validators match up before
+  -- announcing it to the network or forwarding to the EVM.
+  traverse_ blockstanbulSend' routed
 
 transformBlocks ::
   ( MonadLogger m,

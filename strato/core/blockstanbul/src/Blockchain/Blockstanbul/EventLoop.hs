@@ -469,10 +469,6 @@ sendAllMessages wms = do
 currentView :: (HasBlockstanbulContext m) => m View
 currentView = _view <$> getBlockstanbulContext
 
--- TODO remove
-blockstanbulRunning :: HasBlockstanbulContext m => m Bool
-blockstanbulRunning = pure True
-
 recordInEvent :: (MonadIO m) => InEvent -> m ()
 recordInEvent ev =
   let inc txt = liftIO $ withLabel inEventMetric txt incCounter
