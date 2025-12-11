@@ -536,8 +536,8 @@ instance {-# OVERLAPPING #-} MonadBase m => (Keccak256 `A.Alters` BlockSummary) 
   insert p k v = lift $ A.insert p k v
   delete p k   = lift $ A.delete p k
 
-instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible IsBlockstanbul (CoreT m) where
-  access _ = IsBlockstanbul <$> contextGets _hasBlockstanbul
+instance {-# OVERLAPPING #-} Monad m => Mod.Accessible IsBlockstanbul (CoreT m) where
+  access _ = pure $ IsBlockstanbul True
 
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Modifiable BaggerState (CoreT m) where
   get _ = contextGets _baggerState
