@@ -107,22 +107,17 @@ myPriv = fromMaybe (error "could not import private key") (importPrivateKey (Lab
 runTestM :: SequencerM a -> IO ()
 runTestM m = do
   gb <- makeGenesisBlock
-  void $ withTemporaryDepBlockDB False gb m
+  void $ withTemporaryDepBlockDB gb m
 
-runPBFTTestM :: SequencerM a -> IO ()
-runPBFTTestM m = do
-  gb <- makeGenesisBlock
-  void $ withTemporaryDepBlockDB True gb m
-
-runPBFTTestMWithGenesis :: (Keccak256 -> SequencerM a) -> IO ()
-runPBFTTestMWithGenesis m = do
+runTestMWithGenesis :: (Keccak256 -> SequencerM a) -> IO ()
+runTestMWithGenesis m = do
   gb <- makeGenesisBlock
   let hsh = blockHash . ingestBlockToBlock $ gb
-  void $ withTemporaryDepBlockDB True gb (m hsh)
+  void $ withTemporaryDepBlockDB gb (m hsh)
 
 
-withTemporaryDepBlockDB :: Bool -> IngestBlock -> SequencerM a -> IO a
-withTemporaryDepBlockDB pbft genesisBlock m = do
+withTemporaryDepBlockDB :: IngestBlock -> SequencerM a -> IO a
+withTemporaryDepBlockDB genesisBlock m = do
     cwd          <- getCurrentDirectory
     randomSuffix <- generate $ (arbitrary :: Gen Integer) `suchThat` (>1000)
     timestamp    <- round <$> getPOSIXTime  :: IO Integer
@@ -151,7 +146,6 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
         myCM = CommonName "BlockApps" "Engineering" "Admin" True
         vals = [chainMemberParsedSetToValidator myCM]
         ctx = newContext (Checkpoint (View 0 0) vals) Nothing True (Just myCM)
-        mCtx = if pbft then Just ctx else Nothing
         hsh = blockHash . ingestBlockToBlock $ genesisBlock
         difficulty = blockHeaderDifficulty . ibBlockData $ genesisBlock
         cmpsToXcis a (CommonName o u n True) = X509CertInfoState a rootCert True [] (T.unpack o) (Just $ T.unpack u) (T.unpack n)
@@ -160,7 +154,7 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
           bootstrapGenesisBlock hsh difficulty
           A.insert (A.Proxy @X509CertInfoState) myAddr $ cmpsToXcis myAddr myCM
           A.insert (A.Proxy @EmittedBlock) hsh alreadyEmittedBlock
-    runNoLoggingT (runSequencerM cfg mCtx (boot >> m))
+    runNoLoggingT (runSequencerM cfg ctx (boot >> m))
       `finally`
       (removeDirectoryRecursive fullPath >> setCurrentDirectory cwd)-- always clean up
 
@@ -174,7 +168,7 @@ feedBackOutputsToInput = map rebox
 
 mkBlk :: Keccak256 -> Integer -> SequencerM Block
 mkBlk parent num = do
-  ctx <- fromMaybe (error "context required for PBFT") <$> getBlockstanbulContext
+  ctx <- getBlockstanbulContext
   let blk0 = makeBlock 2 1
       blk1 = Block (blockBlockData blk0){parentHash = parent} (blockReceiptTransactions blk0) (blockBlockUncles blk0)
       blk2 = addValidators (_validators ctx) blk1{
@@ -203,7 +197,7 @@ spec = do
         it "transformEvents should output blocks in partial order based on parent hash when input is in order" $ do
             gb <- makeGenesisBlock
             inChain <- buildIngestChain gb 8 2
-            outBlocks <- withTemporaryDepBlockDB False gb $ do
+            outBlocks <- withTemporaryDepBlockDB gb $ do
               BatchSeqEvent{..} <- runBatch $ splitEvents (IEBlock <$> inChain)
               return [block | VmBlock block <- _toVm ]
             ret <- validateOrder gb outBlocks
@@ -213,7 +207,7 @@ spec = do
             gb <- makeGenesisBlock
             inChain <- buildIngestChain gb 8 2
             shuffled <- generate $ shuffle inChain
-            outBlocks <- withTemporaryDepBlockDB False gb $ do
+            outBlocks <- withTemporaryDepBlockDB gb $ do
               BatchSeqEvent{..} <- runBatch $ splitEvents (IEBlock <$> shuffled)
               return [block | VmBlock block <- _toVm ]
             ret <- validateOrder gb outBlocks
@@ -224,12 +218,12 @@ spec = do
             ts <- generate arbitrary
             inTxSize <- generate $ choose (10, dedupWindow - 1)
             inTxs  <- generate $ vectorOf inTxSize arbitrary
-            outTxs <- withTemporaryDepBlockDB False gb $ do
+            outTxs <- withTemporaryDepBlockDB gb $ do
               BatchSeqEvent{..} <- runBatch $ splitEvents (IETx ts <$> inTxs)
               return [t | t@VmTx{} <- _toVm]
             -- ^^ in case any arbitrary Txs weren't unique
             let dedupedIn = feedBackOutputsToInput outTxs
-            dedupedOut <- withTemporaryDepBlockDB False gb $ do
+            dedupedOut <- withTemporaryDepBlockDB gb $ do
               _toVm <$> runBatch (splitEvents dedupedIn)
             length dedupedOut `shouldBe` length dedupedIn
 
@@ -238,14 +232,14 @@ spec = do
             ts <- generate arbitrary
             inTxSize <- generate $ choose (2 * dedupWindow, (3 * dedupWindow) - 1)
             inTxs  <- generate . vectorOf inTxSize $ suchThat arbitrary (isNothing . txChainId . itTransaction)
-            outTxs <- withTemporaryDepBlockDB False gb $ do
+            outTxs <- withTemporaryDepBlockDB gb $ do
               BatchSeqEvent{..} <- runBatch $ splitEvents (IETx ts <$> inTxs)
               return [t | t@VmTx{} <- _toVm]
             -- ^^ in case any arbitrary Txs weren't unique
             let dedupedIn          = feedBackOutputsToInput outTxs
                 replicationsNeeded = (dedupWindow `quot` length dedupedIn) + 1
                 replicatedIn       = concat $ replicate replicationsNeeded dedupedIn
-            dedupedOut <- withTemporaryDepBlockDB False gb $ do
+            dedupedOut <- withTemporaryDepBlockDB gb $ do
               BatchSeqEvent{..} <- runBatch $ splitEvents replicatedIn
               return [o | o@(VmTx _ _) <- _toVm]
             length dedupedOut `shouldBe` length dedupedOut
@@ -324,7 +318,7 @@ spec = do
         (_, evs) <- readEventsInBufferedWindow src
         evs `shouldMatchList` map TimerFire [10..19]
 
-      it "should forward new blocks to blockstanbul" . runPBFTTestMWithGenesis $ \h -> do
+      it "should forward new blocks to blockstanbul" . runTestMWithGenesis $ \h -> do
         let b' = makeBlock 1 1
             b = Block (blockBlockData b'){ parentHash = h
                                          , number = 1
@@ -337,8 +331,8 @@ spec = do
         map categorize pbftEvs `shouldMatchList` [PreprepareK, PrepareK, PrepareK, CommitK, CommitK]
         _toVm `shouldContain` [VmCreateBlockCommand]
 
-      it "should replay old blocks in blockstanbul" . runPBFTTestMWithGenesis $ \h -> do
-        ctx <- fromMaybe (error "context required for PBFT") <$> getBlockstanbulContext
+      it "should replay old blocks in blockstanbul" . runTestMWithGenesis $ \h -> do
+        ctx <- getBlockstanbulContext
         let blk0 = makeBlock 2 1
             blk1 = Block (blockBlockData blk0){parentHash = h} (blockReceiptTransactions blk0) (blockBlockUncles blk0)
             blk2 = addValidators (_validators ctx) blk1{
@@ -354,11 +348,11 @@ spec = do
         _toVm `shouldContain` [VmCreateBlockCommand]
         map outputBlockToBlock [oblk | P2pBlock oblk <- _toP2p] `shouldMatchList` [blk4]
         map outputBlockToBlock [oblk | VmBlock oblk <- _toVm] `shouldMatchList` [blk4]
-        ctx' <- fromMaybe (error "context required for pbft") <$> getBlockstanbulContext
+        ctx' <- getBlockstanbulContext
         _view ctx' `shouldBe` View 0 1
 
-      it "should sequence blocks out of order in blockstanbul" . runPBFTTestMWithGenesis $ \h -> do
-        ctx <- fromMaybe (error "context required for PBFT") <$> getBlockstanbulContext
+      it "should sequence blocks out of order in blockstanbul" . runTestMWithGenesis $ \h -> do
+        ctx <- getBlockstanbulContext
         let ieBlk = IEBlock . blockToIngestBlock TO.Morphism
             mkBlkChn :: Int -> Keccak256 -> Integer -> SequencerM [Block]
             mkBlkChn 0 _ _ = return []
@@ -373,7 +367,7 @@ spec = do
         _toVm `shouldContain` [VmCreateBlockCommand]
         map outputBlockToBlock [oblk | P2pBlock oblk <- _toP2p] `shouldMatchList` blkChn
         map outputBlockToBlock [oblk | VmBlock oblk <- _toVm] `shouldMatchList` blkChn
-        ctx' <- fromMaybe (error "context required for pbft") <$> getBlockstanbulContext
+        ctx' <- getBlockstanbulContext
         _view ctx' `shouldBe` View 0 5
 
       it "should be able to fetch if the write is after the read begins" . runTestM $ do
@@ -478,7 +472,7 @@ spec = do
         map txType txs' `shouldBe` [Message, PrivateHash]
         map (isJust . otPrivatePayload) txs' `shouldBe` [False, False]
 
-      it "should run Blockstanbul with private transactions" . runPBFTTestMWithGenesis $ \h -> do
+      it "should run Blockstanbul with private transactions" . runTestMWithGenesis $ \h -> do
         let iev = iev1' h
         BatchSeqEvent{..} <- runBatch $ do
           checkForUnseq [chainDetails1]
@@ -489,7 +483,7 @@ spec = do
         let obs = [b | VmBlock b <- _toVm]
         map (map (fmap txType . otPrivatePayload) . obReceiptTransactions) obs `shouldBe` [[Just Message]]
 
-      it "should run Blockstanbul with delayed private transactions" . runPBFTTestMWithGenesis $ \h -> do
+      it "should run Blockstanbul with delayed private transactions" . runTestMWithGenesis $ \h -> do
         let iev = iev1' h
         b1 <- runBatch $ do
           checkForUnseq [chainDetails1]
@@ -502,7 +496,7 @@ spec = do
         let obs' = [b | VmBlock b <- _toVm b2]
         map (map (fmap txType . otPrivatePayload) . obReceiptTransactions) obs' `shouldBe` [[Just Message]]
 
-      it "should not split up block when all chains are known" . runPBFTTestMWithGenesis $ \h -> do
+      it "should not split up block when all chains are known" . runTestMWithGenesis $ \h -> do
         let iev = iev2' h
             ietx = IETx 0 . IngestTx TO.Morphism
         BatchSeqEvent{..} <- runBatch $ do
@@ -515,7 +509,7 @@ spec = do
         map (map (fmap txType . otPrivatePayload) . obReceiptTransactions) obs `shouldBe`
           [[Just Message, Just Message]]
 
-      it "should split up block when chain infos are delayed" . runPBFTTestMWithGenesis $ \h -> do
+      it "should split up block when chain infos are delayed" . runTestMWithGenesis $ \h -> do
         let iev = iev2' h
             ietx = IETx 0 . IngestTx TO.Morphism
         b1 <- runBatch $ do
@@ -531,7 +525,7 @@ spec = do
         map (map (fmap txType . otPrivatePayload) . obReceiptTransactions) obs' `shouldBe`
           [[Just Message, Nothing], [Just Message, Just Message]]
 
-      it "should split up block when chain infos are staggered" . runPBFTTestMWithGenesis $ \h -> do
+      it "should split up block when chain infos are staggered" . runTestMWithGenesis $ \h -> do
         let iev = iev2' h
             ietx = IETx 0 . IngestTx TO.Morphism
         b1 <- runBatch $ checkForUnseq [ietx tx1, ietx tx2, iev]
@@ -550,7 +544,7 @@ spec = do
         map (map (fmap txType . otPrivatePayload) . obReceiptTransactions) obs'' `shouldBe`
           [[Just Message, Just Message]]
 
-      it "should hydrate child chain transaction when parent chain is known" . runPBFTTestMWithGenesis $ \h -> do
+      it "should hydrate child chain transaction when parent chain is known" . runTestMWithGenesis $ \h -> do
         let iev = iev4' h
             ietx = IETx 0 . IngestTx TO.Morphism
         b1 <- runBatch $ checkForUnseq [chainDetails1, chainDetails3, ietx tx3, iev]
@@ -561,7 +555,7 @@ spec = do
         map (map (fmap txType . otPrivatePayload) . obReceiptTransactions) obs `shouldBe`
           [[Just Message]]
 
-      it "should withhold child chain transactions when parent chain is missing" . runPBFTTestMWithGenesis $ \h -> do
+      it "should withhold child chain transactions when parent chain is missing" . runTestMWithGenesis $ \h -> do
         let iev = iev3' h
             ietx = IETx 0 . IngestTx TO.Morphism
         b1 <- runBatch $ checkForUnseq [ietx tx1, ietx tx3, iev]
@@ -578,7 +572,7 @@ spec = do
         map (map (fmap txType . otPrivatePayload) . obReceiptTransactions) obs'' `shouldBe`
           [[Just Message, Nothing], [Just Message, Just Message]]
 
-      it "should withhold child chain transactions when parent chain is missing even when there are no transactions on the parent chain" . runPBFTTestMWithGenesis $ \h -> do
+      it "should withhold child chain transactions when parent chain is missing even when there are no transactions on the parent chain" . runTestMWithGenesis $ \h -> do
         let iev = iev4' h
             ietx = IETx 0 . IngestTx TO.Morphism
         b1 <- runBatch $ checkForUnseq [ietx tx3, iev]
@@ -595,7 +589,7 @@ spec = do
         map (map (fmap txType . otPrivatePayload) . obReceiptTransactions) obs'' `shouldBe`
           [[Just Message]]
 
-      it "should withhold child chain transactions when parent chain parent chain transactions are missing" . runPBFTTestMWithGenesis $ \h -> do
+      it "should withhold child chain transactions when parent chain parent chain transactions are missing" . runTestMWithGenesis $ \h -> do
         let b5' = makeBlockWithTransactions [hashTx1]
             blk5' = Block (blockBlockData b5'){ parentHash = h
                                               , number = 1
@@ -630,7 +624,7 @@ spec = do
         map (map (fmap txType . otPrivatePayload) . obReceiptTransactions) obs'' `shouldBe`
           [[Just Message], [Just Message]]
 
-      it "should withhold child chain transactions when parent chain parent chain info is missing" . runPBFTTestMWithGenesis $ \h -> do
+      it "should withhold child chain transactions when parent chain parent chain info is missing" . runTestMWithGenesis $ \h -> do
         let b5' = makeBlockWithTransactions [hashTx1]
             blk5' = Block (blockBlockData b5'){ parentHash = h
                                               , number = 1
@@ -665,7 +659,7 @@ spec = do
         map (map (fmap txType . otPrivatePayload) . obReceiptTransactions) obs'' `shouldBe`
           [[Just Message], [Just Message]]
 
-      it "should re-run blocks when chain info is delayed" . runPBFTTestMWithGenesis $ \h -> do
+      it "should re-run blocks when chain info is delayed" . runTestMWithGenesis $ \h -> do
         let iev = iev1' h
             ietx = IETx 0 . IngestTx TO.Morphism
         b1 <- runBatch $ checkForUnseq [iev]
@@ -684,7 +678,7 @@ spec = do
         map (map (fmap txType . otPrivatePayload) . obReceiptTransactions) obs'' `shouldBe`
           [[Just Message]]
 
-      it "should emit chain info when creation block has already been emitted" . runPBFTTestMWithGenesis $ \h -> do
+      it "should emit chain info when creation block has already been emitted" . runTestMWithGenesis $ \h -> do
         let cInfo' = getChainInfo "emittable"
             ucInfo = chainInfo cInfo'
             cInfo = cInfo'{chainInfo = ucInfo{creationBlock = h}}
@@ -696,7 +690,7 @@ spec = do
         let ogs = [og' | VmGenesis og' <- _toVm b1]
         ogs `shouldBe` [og]
 
-      it "should withhold emitting chain info when creation block has not been emitted" . runPBFTTestMWithGenesis $ \_ -> do
+      it "should withhold emitting chain info when creation block has not been emitted" . runTestMWithGenesis $ \_ -> do
         let cInfo' = getChainInfo "unemittable"
             ucInfo = chainInfo cInfo'
             cInfo = cInfo'{chainInfo = ucInfo{creationBlock = unsafeCreateKeccak256FromWord256 0xdeadbeef}}
@@ -706,7 +700,7 @@ spec = do
         let ogs = [og' | VmGenesis og' <- _toVm b1]
         ogs `shouldBe` []
 
-      it "should withhold chain info until creation block has been emitted" . runPBFTTestMWithGenesis $ \h -> do
+      it "should withhold chain info until creation block has been emitted" . runTestMWithGenesis $ \h -> do
         blk <- mkBlk h 1
         let iblk = blockToIngestBlock TO.Morphism blk
             ieblk = IEBlock iblk
