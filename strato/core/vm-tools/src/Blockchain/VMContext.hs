@@ -473,7 +473,6 @@ initContext dSettings = do
       def
         & txRunResultsCache .~ cache
         & debugSettings .~ dSettings
-        & hasBlockstanbul .~ flags_blockstanbul
   que <- newTQueueIO
   pure
     Context
