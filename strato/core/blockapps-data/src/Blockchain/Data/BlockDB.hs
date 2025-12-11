@@ -91,7 +91,7 @@ putBlocks blockList makeHashOne = do
   let blocksWithHashes = (\b -> (b, blockHash b)) <$> blockList
   sqlQuery $
     forM blocksWithHashes $ \(b, hash') -> do
-      insertTXIfNew' (BlockHash $ blockHash b) (Just $ number $ blockBlockData b) (blockReceiptTransactions b)
+      insertTXIfNew' (BlockHash $ blockHash b) (Just $ number $ blockBlockData b) (timestamp $ blockBlockData b) (blockReceiptTransactions b)
 
       existingBlockData <- SQL.selectList [BlockDataRefHash SQL.==. blockHash b] []
 
