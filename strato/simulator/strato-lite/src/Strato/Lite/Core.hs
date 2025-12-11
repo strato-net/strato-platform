@@ -325,10 +325,10 @@ instance {-# OVERLAPPING #-} MonadIO m => (Keccak256 `A.Alters` ()) (CoreT m) wh
 instance {-# OVERLAPPING #-} MonadIO m => HasBlockstanbulContext (CoreT m) where
   getBlockstanbulContext = do
     i <- asks $ _sequencerContext . _corePeerContext
-    liftIO $ _blockstanbulContext <$> readTVarIO i
+    liftIO $ Just . _blockstanbulContext <$> readTVarIO i
   putBlockstanbulContext s = do
     i <- asks $ _sequencerContext . _corePeerContext
-    liftIO $ atomically $ modifyTVar' i (blockstanbulContext ?~ s)
+    liftIO $ atomically $ modifyTVar' i (blockstanbulContext .~ s)
 
 instance {-# OVERLAPPING #-} HasVault m => HasVault (CoreT m) where
   sign bs = lift $ sign bs
@@ -636,7 +636,7 @@ newSequencerContext bc = do
   pure $
     SequencerContext
       { _seenTransactionDB = mkSeenTxDB 1024,
-        _blockstanbulContext = Just bc,
+        _blockstanbulContext = bc,
         _latestRoundNumber = latestRound
       }
 
