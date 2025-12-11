@@ -79,9 +79,6 @@ main = do
   putStrLn $ "strato-sequencer nodeAddress: " ++ format selfAddress
 
   ctx <- do
-    -- we require this for backward compatibility, this will be removed shortly
-    unless flags_blockstanbul . ioError . userError $
-      "--blockstanbul=true is required"
     unless (flags_blockstanbul_block_period_ms >= 0) . ioError . userError $
       "--blockstanbul_block_period_ms must be nonnegative"
     unless (flags_blockstanbul_round_period_s > 0) . ioError . userError $
