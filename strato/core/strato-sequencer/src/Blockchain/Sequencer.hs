@@ -105,11 +105,9 @@ initSequencer :: (
   ConduitT () SeqOutEvent m ()
 initSequencer = do
   let logF = logFF "sequencer"
-  lift getBlockstanbulContext >>= \case
-    Nothing -> pure ()
-    Just ctx -> do
-      let selfAddr = fromJust $ _selfAddr ctx
-      yieldToVm [VmSelfAddress selfAddr]
+  ctx <- lift getBlockstanbulContext
+  let selfAddr = fromJust $ _selfAddr ctx
+  yieldToVm [VmSelfAddress selfAddr]
   logF "Sequencer startup"
   logF "Sequencer initialized"
   bootstrapBlockstanbul
@@ -263,7 +261,7 @@ blockstanbulSend' msg = do
         now <- liftIO getCurrentTime
         when (now < tNext) $
           liftIO . threadDelay . round $ 1e6 * diffUTCTime tNext now
-        ctx <- fmap (fromMaybe $ error "BlockstanbulContext missing") $ getBlockstanbulContext
+        ctx <- getBlockstanbulContext
         Mod.put (Mod.Proxy @BestSequencedBlock) $
           BestSequencedBlock
               (BDB.blockHeaderHash bh)
@@ -349,21 +347,14 @@ runConsensus ::
   ) =>
   SequencedBlock -> ConduitT i SeqOutEvent m ()
 runConsensus sb = do
-  hasPBFT <- lift blockstanbulRunning
-  if not hasPBFT
-    then do
-      obs <- lift $ expandBlock sb
-      for_ obs $ \ob -> yieldToP2p [P2pBlock ob]
-      yieldToVm $ map VmBlock obs
-    else do
-      let blk = sequencedBlockToBlock sb
-      routed <-
-        if isHistoricBlock blk
-          then lift $ map (PreviousBlock . outputBlockToBlock) <$> expandBlock sb
-          else pure [UnannouncedBlock blk]
-      -- Blockstanbul will check that the seals and validators match up before
-      -- announcing it to the network or forwarding to the EVM.
-      traverse_ blockstanbulSend' routed
+  let blk = sequencedBlockToBlock sb
+  routed <-
+    if isHistoricBlock blk
+      then lift $ map (PreviousBlock . outputBlockToBlock) <$> expandBlock sb
+      else pure [UnannouncedBlock blk]
+  -- Blockstanbul will check that the seals and validators match up before
+  -- announcing it to the network or forwarding to the EVM.
+  traverse_ blockstanbulSend' routed
 
 transformBlocks ::
   ( MonadLogger m,
