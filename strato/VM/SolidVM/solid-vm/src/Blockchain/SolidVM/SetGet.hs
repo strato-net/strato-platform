@@ -307,4 +307,4 @@ jsonSM = go False
     go b (SContract _ address) = return . bool id show b $ show address
     go _ (SVariadic xs) = ('[' :) . (++ "]") . intercalate ", " <$> traverse (go True) xs
     go _ (SDecimal v) = return $ show v
-    go _ _ = return "undefined"
+    go _ _ = return "0"

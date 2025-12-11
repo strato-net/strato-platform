@@ -98,14 +98,15 @@ const PaginationInfo = ({ currentPage, itemsPerPage, swapHistoryCount, swapHisto
   swapHistoryCount: number;
   swapHistoryLength: number;
 }) => {
-  const totalPages = Math.ceil(swapHistoryCount / itemsPerPage);
+  const start = (currentPage - 1) * itemsPerPage + 1;
+  const end = Math.min(currentPage * itemsPerPage, swapHistoryCount);
   
   return (
     <div className="text-sm text-muted-foreground">
-      {totalPages > 1 ? (
-        `Showing ${currentPage * itemsPerPage + 1} to ${Math.min((currentPage + 1) * itemsPerPage, swapHistoryCount)} of ${swapHistoryCount} swaps`
-      ) : (
+      {start === 1 && end === swapHistoryCount ? (
         `Showing ${swapHistoryLength} swap${swapHistoryLength !== 1 ? 's' : ''}`
+      ) : (
+        `Showing ${start} to ${end} of ${swapHistoryCount} swaps`
       )}
     </div>
   );
@@ -129,20 +130,20 @@ const PaginationControls = ({
       <Button
         variant="outline"
         size="sm"
-        onClick={() => onPageChange(Math.max(0, currentPage - 1))}
-        disabled={currentPage === 0 || swapHistoryLoading}
+        onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+        disabled={currentPage === 1 || swapHistoryLoading}
       >
         Previous
       </Button>
       <span className="text-sm text-muted-foreground">
-        Page {currentPage + 1} of {totalPages}
+        Page {currentPage} of {totalPages}
         {swapHistoryLoading && <span className="ml-2 text-blue-500">Loading...</span>}
       </span>
       <Button
         variant="outline"
         size="sm"
-        onClick={() => onPageChange(Math.min(totalPages - 1, currentPage + 1))}
-        disabled={currentPage === totalPages - 1 || swapHistoryLoading}
+        onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+        disabled={currentPage === totalPages || swapHistoryLoading}
       >
         Next
       </Button>
@@ -163,7 +164,7 @@ const SwapHistory: React.FC = () => {
   // ========================================================================
   // STATE
   // ========================================================================
-  const [currentPage, setCurrentPage] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
 
   // ========================================================================
@@ -176,11 +177,11 @@ const SwapHistory: React.FC = () => {
   // EFFECTS
   // ========================================================================
   useEffect(() => {
-    setCurrentPage(0);
+    setCurrentPage(1);
     if (pool?.address) {
       refreshSwapHistory({
         limit: ITEMS_PER_PAGE.toString(),
-        offset: "0",
+        page: "1",
       });
     }
   }, [pool?.address, refreshSwapHistory]);
@@ -204,7 +205,7 @@ const SwapHistory: React.FC = () => {
     setCurrentPage(newPage);
     refreshSwapHistory({
       limit: ITEMS_PER_PAGE.toString(),
-      offset: (newPage * ITEMS_PER_PAGE).toString(),
+      page: newPage.toString(),
     });
   };
 
