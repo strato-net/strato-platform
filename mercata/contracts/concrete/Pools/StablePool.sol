@@ -95,7 +95,7 @@ contract record StablePool is Ownable {
 
     uint maLastTime;
 
-    uint constant ORACLE_BIT_MASK = (2^32 - 1) * (256^28);
+    uint constant ORACLE_BIT_MASK = ((1<<32) - 1) * (256**28);
 
     Token public lpToken;
 
@@ -459,7 +459,7 @@ contract record StablePool is Ownable {
 
         uint[2] maLastTimeUnpacked = unpack2(maLastTime);
         uint lastDPackedCurrent = lastDPacked;
-        uint oldD = lastDPackedCurrent & ((2^128) - 1);
+        uint oldD = lastDPackedCurrent & ((1<<128) - 1);
         lastDPacked = pack2(
             oldD - (oldD * _burnAmount / totalSupply),
             _calcMovingAverage(
@@ -630,7 +630,7 @@ contract record StablePool is Ownable {
             for (uint y = 0; y < _xp.length; y++) {
                 d_p = (d_p * d) / _xp[y];
             }
-            d_p /= (coins.length ^ coins.length);
+            d_p /= (coins.length ** coins.length);
             uint dPrev = d;
 
             d = (
@@ -785,7 +785,7 @@ contract record StablePool is Ownable {
     }
 
     function unpack2(uint p) internal pure returns (uint[2]) {
-        return [p & ((2^128) - 1), p >> 128];
+        return [p & ((1<<128) - 1), p >> 128];
     }
 
     function _getP(uint[] xp, uint amp, uint d) internal view returns (uint[]) {
@@ -887,7 +887,7 @@ contract record StablePool is Ownable {
         if (x <= -41446531673892822313) return 0;
         require(x < 135305999368893231589, "wad_exp overflow");
 
-        value = (x << 78) / (5 ^ 18);
+        value = (x << 78) / (5 ** 18);
 
         int k = (((value << 96) / 54916777467707473351141471128) + (1 << 95)) >> 96;
         value = value - (k * 54916777467707473351141471128);

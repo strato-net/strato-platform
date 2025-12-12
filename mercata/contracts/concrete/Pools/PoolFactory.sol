@@ -14,6 +14,7 @@
  */
 
 import "Pool.sol";
+import "StablePool.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 import "../Proxy/Proxy.sol";
 import "../Tokens/TokenFactory.sol";
@@ -232,6 +233,56 @@ contract record PoolFactory is Ownable {
         pool = address(new Proxy(address(new Pool(address(thisOwner))), address(this)));
         Pool(pool).initialize(tokenA, tokenB, lpTokenAddress);
         Pool(pool).transferOwnership(thisOwner);
+        Ownable(lpTokenAddress).transferOwnership(thisOwner);
+
+        // update pool registry
+        pools[tokenA][tokenB] = pool;
+        pools[tokenB][tokenA] = pool; // support both directions
+        allPools.push(pool);
+
+        emit NewPool(tokenA, tokenB, pool);
+
+        return pool;
+    }
+
+    /// @notice Create a new pool for tokenA/tokenB
+    /// @dev After pool creation, the pool should be whitelisted for mint and burn of the LP tokenby the admin registry
+    function createStablePool(address tokenA, address tokenB) external tokensActive(tokenA, tokenB) onlyOwner returns (address pool) {
+        require(tokenA != address(0) && tokenB != address(0), "Zero address");
+        require(tokenA != tokenB, "Identical addresses");
+        require(pools[tokenA][tokenB] == address(0) && pools[tokenB][tokenA] == address(0), "Pool exists");
+
+        // deploy new lp token
+        string lpName = ERC20(tokenA).name() + "-" + ERC20(tokenB).name() + " LP Token";
+        string lpSymbol = ERC20(tokenA).symbol() + "-" + ERC20(tokenB).symbol() + "-LP";
+
+        address lpTokenAddress = TokenFactory(tokenFactory).createTokenWithInitialOwner(
+            lpName,
+            "Liquidity Provider Token",
+            [],
+            [],
+            [],
+            lpSymbol,
+            0,
+            18,
+            this
+        );
+
+        // deploy new pool first
+        address thisOwner = owner();
+        pool = address(new Proxy(address(new StablePool(address(thisOwner))), address(this)));
+        StablePool(pool).initialize(
+            100,
+            3e7, // 0.3% * FEE_DENOMINATOR
+            1e10,
+            block.timestamp,
+            [address(tokenA), address(tokenB)],
+            [1e18, 1e18],
+            [1, 1],
+            [address(0), address(0)],
+            lpTokenAddress
+        );
+        Ownable(pool).transferOwnership(thisOwner);
         Ownable(lpTokenAddress).transferOwnership(thisOwner);
 
         // update pool registry
