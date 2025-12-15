@@ -175,7 +175,7 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
                 `${currentValue.toLocaleString('en-US', { 
                   minimumFractionDigits: 2, 
                   maximumFractionDigits: 2 
-                })} Points`
+                })} Reward Points`
               ) : tabType === 'borrowed' ? (
                 `${currentValue.toLocaleString('en-US', { 
                   minimumFractionDigits: 2, 
@@ -238,7 +238,7 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
                         const formatted = scaledValue >= 1 ? scaledValue.toFixed(1) : scaledValue.toFixed(2);
                         
                         if (tabType === 'rewards') {
-                          return `Reward Points ${formatted}${scale.suffix}`;
+                          return `Points ${formatted}${scale.suffix}`;
                         } else if (tabType === 'borrowed') {
                           return `USDST ${formatted}${scale.suffix}`;
                         } else {
