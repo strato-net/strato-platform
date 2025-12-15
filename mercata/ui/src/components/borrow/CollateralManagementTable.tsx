@@ -149,7 +149,7 @@ const CollateralManagementTable = ({
                     <TableCell>
                       <div className="flex items-center justify-end gap-4">
                         <div className="text-right">
-                          <div className="font-medium">{(() => { try { const v = BigInt(asset?.userBalance || 0); return formatBalance(v <= 1n ? 0n : v, undefined, asset?.customDecimals ?? 18, 2); } catch { return formatBalance(0n, undefined, asset?.customDecimals ?? 18, 2); } })()}</div>
+                          <div className="font-medium">{(() => { try { const v = BigInt(asset?.userBalance || 0); return formatBalance(v <= 1n ? 0n : v, undefined, asset?.customDecimals ?? 18, 2, 5); } catch { return formatBalance(0n, undefined, asset?.customDecimals ?? 18, 2, 5); } })()}</div>
                           <div className="text-xs text-muted-foreground">
                             ${(() => { try { const v = BigInt(asset?.userBalanceValue || 0); return formatBalance(v <= 1n ? 0n : v, undefined, 18, 1, 2); } catch { return formatBalance(0n, undefined, 18, 1, 2); } })()}
                           </div>
@@ -175,7 +175,7 @@ const CollateralManagementTable = ({
                       <div className="flex items-center justify-end gap-4">
                         <div className="text-right">
                           <div className="font-medium">
-                            {(() => { try { const v = BigInt(asset?.collateralizedAmount || 0); return formatBalance(v <= 1n ? 0n : v, undefined, asset?.customDecimals ?? 18, 2); } catch { return formatBalance(0n, undefined, asset?.customDecimals ?? 18, 2); } })()}
+                            {(() => { try { const v = BigInt(asset?.collateralizedAmount || 0); return formatBalance(v <= 1n ? 0n : v, undefined, asset?.customDecimals ?? 18, 2, 5); } catch { return formatBalance(0n, undefined, asset?.customDecimals ?? 18, 2, 5); } })()}
                           </div>
                           <div className="text-xs text-muted-foreground">
                             {(() => { try { const v = BigInt(asset?.collateralizedAmountValue || 0); return formatBalance(v <= 1n ? 0n : v, undefined, 18, 1, 2, true); } catch { return formatBalance(0n, undefined, 18, 1, 2, true); } })()}
