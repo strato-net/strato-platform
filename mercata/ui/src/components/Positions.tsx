@@ -28,7 +28,7 @@ const InfoTooltip = ({ children, content }: { children: React.ReactNode; content
           onClick={handleToggle}
         >
           {children}
-          <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+          <HelpCircle className="h-4 w-4 text-muted-foreground hover:text-foreground" />
         </div>
         {showTooltip && (
           <div className="absolute top-full left-0 mt-2 z-50 bg-popover border rounded-md px-3 py-1.5 text-sm text-popover-foreground shadow-md max-w-xs">
@@ -44,7 +44,7 @@ const InfoTooltip = ({ children, content }: { children: React.ReactNode; content
       <TooltipTrigger asChild>
         <div className="inline-flex items-center gap-1 cursor-help">
           {children}
-          <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+          <HelpCircle className="h-4 w-4 text-muted-foreground hover:text-foreground" />
         </div>
       </TooltipTrigger>
       <TooltipContent className="max-w-xs">
@@ -83,7 +83,7 @@ const PositionSection = ({ loanData }: BorrowingSectionProps) => {
 
 
   return (
-    <Card className="border border-gray-100 shadow-sm">
+    <Card className="border border-border shadow-sm">
       <CardHeader className="pb-4">
         <div>
           <CardTitle className="text-2xl font-bold">Your Position</CardTitle>
@@ -93,8 +93,8 @@ const PositionSection = ({ loanData }: BorrowingSectionProps) => {
         <div className="py-6">
           <div className="space-y-8">
             <div className="flex flex-col gap-4">
-              <div className="flex flex-col space-y-3 p-4 bg-gray-50 rounded-lg">
-                <span className="text-gray-600 text-sm font-medium">Total Amount Owed</span>
+              <div className="flex flex-col space-y-3 p-4 bg-muted/50 rounded-lg">
+                <span className="text-muted-foreground text-sm font-medium">Total Amount Owed</span>
                 <span className="font-semibold text-lg">
                   {(() => {
                     try {
@@ -107,9 +107,9 @@ const PositionSection = ({ loanData }: BorrowingSectionProps) => {
                   })()}
                 </span>
               </div>
-              <div className="flex flex-col space-y-3 p-4 bg-gray-50 rounded-lg">
+              <div className="flex flex-col space-y-3 p-4 bg-muted/50 rounded-lg">
                 <InfoTooltip content="Measures your position's safety. Higher is better. Close to 1.0 means high risk of liquidation. Below 1.0 means your position can be liquidated. No loan means you have no outstanding debt.">
-                  <span className="text-gray-600 text-sm font-medium">Health Factor</span>
+                  <span className="text-muted-foreground text-sm font-medium">Health Factor</span>
                 </InfoTooltip>
                 <div className="flex flex-row gap-3 ">
                 <span className="font-semibold text-lg mt-3" style={{ color: getTextColor((loanData?.healthFactor)) }}>
@@ -135,23 +135,23 @@ const PositionSection = ({ loanData }: BorrowingSectionProps) => {
                 )}
               </div>
               </div>
-              <div className="flex flex-col space-y-3 p-4 bg-gray-50 rounded-lg">
+              <div className="flex flex-col space-y-3 p-4 bg-muted/50 rounded-lg">
                 <InfoTooltip content="You need to supply tokens as collateral before you can borrow. Click 'Supply' in the Eligible Collateral table below to get started.">
-                  <span className="text-gray-600 text-sm font-medium">Available Borrowing Power</span>
+                  <span className="text-muted-foreground text-sm font-medium">Available Borrowing Power</span>
                 </InfoTooltip>
                 <span className="font-semibold text-lg">
                   {formatBalance(loanData?.maxAvailableToBorrowUSD || 0n, "USDST", 18, 2, 2)}
                 </span>
               </div>
-              <div className="flex flex-col space-y-3 p-4 bg-gray-50 rounded-lg">
+              <div className="flex flex-col space-y-3 p-4 bg-muted/50 rounded-lg">
                 <InfoTooltip content="Global borrow index for the lending pool.">
-                  <span className="text-gray-600 text-sm font-medium">Borrow Index</span>
+                  <span className="text-muted-foreground text-sm font-medium">Borrow Index</span>
                 </InfoTooltip>
                 <span className="font-semibold text-lg">{borrowIndexDisplay}</span>
               </div>
-              <div className="flex flex-col space-y-3 p-4 bg-gray-50 rounded-lg">
+              <div className="flex flex-col space-y-3 p-4 bg-muted/50 rounded-lg">
                 <InfoTooltip content="Annual percentage rate you pay on borrowed amounts. This rate applies to your total borrowed amount.">
-                  <span className="text-gray-600 text-sm font-medium">Interest Rate</span>
+                  <span className="text-muted-foreground text-sm font-medium">Interest Rate</span>
                 </InfoTooltip>
                 <span className="font-semibold text-lg">{((Number(loanData?.interestRate) || 0) / 100).toFixed(2)}%</span>
               </div>

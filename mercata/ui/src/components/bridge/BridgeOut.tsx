@@ -295,10 +295,10 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isConvert = false }) => {
   return (
     <div className="space-y-6">
       <div className="space-y-2 text-center">
-        <h3 className="text-lg font-semibold text-gray-900">
+        <h3 className="text-lg font-semibold text-foreground">
           {modeLabels.title}
         </h3>
-        <p className="text-sm text-gray-600">{modeLabels.description}</p>
+        <p className="text-sm text-muted-foreground">{modeLabels.description}</p>
       </div>
 
       <div className="w-full">
@@ -318,11 +318,11 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isConvert = false }) => {
           {!maxAmount && isBalanceLoading ? (
             <div className="flex items-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-              <p className="text-sm text-gray-500">Fetching balance...</p>
+              <p className="text-sm text-muted-foreground">Fetching balance...</p>
             </div>
           ) : (
             maxAmount && (
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-muted-foreground">
                 Max: {formatBalance(
                   maxAmount,
                   undefined,

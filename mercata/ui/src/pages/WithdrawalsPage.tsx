@@ -53,7 +53,7 @@ const WithdrawalsPage = () => {
   }, [fetchWithdrawalSummary]);
 
   return (
-    <div className="h-screen bg-gray-50 overflow-hidden">
+    <div className="h-screen bg-background overflow-hidden">
       <style>{`
         .custom-tabs .ant-tabs-tab {
           justify-content: center !important;
@@ -62,6 +62,14 @@ const WithdrawalsPage = () => {
           justify-content: center !important;
           text-align: center !important;
           width: 100% !important;
+          color: hsl(var(--muted-foreground)) !important;
+        }
+        .custom-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
+          color: hsl(var(--primary)) !important;
+          text-shadow: none !important;
+        }
+        .custom-tabs .ant-tabs-ink-bar {
+          background: hsl(var(--primary)) !important;
         }
       `}</style>
 
@@ -99,7 +107,7 @@ const WithdrawalsPage = () => {
                   </div>
                 </CardHeader>
                 <CardContent className="flex-1 flex flex-col min-h-0">
-                  <div className="w-full bg-white/90 p-1.5 rounded-xl border border-gray-200 shadow-sm flex-1 flex flex-col min-h-0">
+                  <div className="w-full flex-1 flex flex-col min-h-0">
                     <AntdTabs
                       activeKey={activeTab}
                       items={[
@@ -118,12 +126,12 @@ const WithdrawalsPage = () => {
                       className="custom-tabs"
                       style={
                         {
-                          "--ant-primary-color": "#3b82f6",
-                          "--ant-primary-color-hover": "#2563eb",
+                          "--ant-primary-color": "hsl(var(--primary))",
+                          "--ant-primary-color-hover": "hsl(var(--primary))",
                         } as React.CSSProperties
                       }
                     />
-                    <div className="bg-white rounded-xl p-4 shadow-sm mt-4 flex-1 min-h-0 overflow-auto">
+                    <div className="mt-4 flex-1 min-h-0 overflow-auto">
                       <BridgeOut isConvert={activeTab === "from-savings"} />
                     </div>
                   </div>
@@ -138,11 +146,11 @@ const WithdrawalsPage = () => {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">
+                    <span className="text-sm text-muted-foreground">
                       Total Withdrawn (30d)
                     </span>
                     {loadingWithdrawalSummary ? (
-                      <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                     ) : (
                       <span className="text-sm font-semibold">
                         {formatBalance(
@@ -157,27 +165,15 @@ const WithdrawalsPage = () => {
                     )}
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">
+                    <span className="text-sm text-muted-foreground">
                       Pending Withdrawals
                     </span>
                     {loadingWithdrawalSummary ? (
-                      <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                     ) : (
                       <span className="text-sm font-semibold">
-                        {withdrawalSummary?.pendingWithdrawals || 0}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">
-                      Available to Withdraw
-                    </span>
-                    {loadingWithdrawalSummary ? (
-                      <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
-                    ) : (
-                      <span className="text-sm font-semibold text-green-600">
                         {formatBalance(
-                          withdrawalSummary?.availableToWithdraw || "0",
+                          withdrawalSummary?.pendingWithdrawals || "0",
                           undefined,
                           18,
                           2,
@@ -187,6 +183,7 @@ const WithdrawalsPage = () => {
                       </span>
                     )}
                   </div>
+                  
                 </CardContent>
               </Card>
 
@@ -195,7 +192,7 @@ const WithdrawalsPage = () => {
                   <CardTitle>Important Notes</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ul className="space-y-2 text-sm text-gray-600 list-disc pl-5">
+                  <ul className="space-y-2 text-sm text-muted-foreground list-disc pl-5">
                     <li>Withdrawals are processed within 1-3 business days</li>
                     <li>Double-check withdrawal address before confirming</li>
                   </ul>

@@ -111,13 +111,13 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
       {/* Loan Details */}
       <div className="space-y-3">
         <div className="flex justify-between">
-          <span className="text-sm text-gray-500">Available to borrow</span>
+          <span className="text-sm text-muted-foreground">Available to borrow</span>
           <span className="font-medium">
             USDST {safeParseFloat(formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18)) === 0 ? '-' : formatWeiAmount(loans?.maxAvailableToBorrowUSD || '0')}
           </span>
         </div>
         <div className="flex justify-between">
-          <span className="text-sm text-gray-500">Total Amount Owed</span>
+          <span className="text-sm text-muted-foreground">Total Amount Owed</span>
           <span className="font-medium">
             {(() => {
               const owed = (() => { try { return BigInt(loans?.totalAmountOwed || 0); } catch { return 0n; } })();
@@ -127,7 +127,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
           </span>
         </div>
         <div className="flex justify-between">
-          <span className="text-sm text-gray-500">Interest Rate</span>
+          <span className="text-sm text-muted-foreground">Interest Rate</span>
           <span className="font-medium">
             {interestRateDisplay}
           </span>
@@ -137,7 +137,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
       {/* Borrow Amount Input */}
       <div className="space-y-3">
         <label className="text-sm font-medium">Borrow Amount (USDST)</label>
-        <div className="flex justify-between items-center text-xs text-gray-500">
+        <div className="flex justify-between items-center text-xs text-muted-foreground">
           <span>Min: 0.01 USDST</span>
           <div>
             <button
@@ -149,7 +149,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
                 } catch {}
               }}
               disabled={safeParseFloat(formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18)) === 0}
-              className="px-2 py-1 mr-1 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-700 text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100"
+              className="px-2 py-1 mr-1 bg-muted hover:bg-muted/80 rounded-full text-muted-foreground hover:text-foreground text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-muted"
               title={safeParseFloat(formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18)) === 0 ? "No amount available to borrow" : "Set to safe maximum available amount"}
             >
               Max :
@@ -167,7 +167,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
               handleAmountInputChange(value, setBorrowAmount, setBorrowAmountError, maxAmount);
             }}
           />
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">USDST</span>
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">USDST</span>
         </div>
         {borrowAmountError && (
           <p className="text-red-600 text-sm">{borrowAmountError}</p>
@@ -193,10 +193,10 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
       <RiskLevelProgress riskLevel={riskLevel} />
 
       {/* Transaction Fee */}
-      <div className="px-4 py-3 bg-gray-50 rounded-md">
+      <div className="px-4 py-3 bg-muted/50 rounded-md">
         <HealthImpactDisplay healthImpact={healthImpact} showWarning={false} className="mb-4" />
         <div className="flex justify-between text-sm mb-2">
-          <span className="text-gray-600">Transaction Fee</span>
+          <span className="text-muted-foreground">Transaction Fee</span>
           <span className="font-medium">{BORROW_FEE} USDST ({parseFloat(BORROW_FEE) * 100} voucher)</span>
         </div>
         {feeError && (
@@ -232,7 +232,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
         const eligibleCollateralTokens = collateralInfo || [];
 
         const borrowInfoMessage = (
-          <p className="text-gray-600 mt-2">
+          <p className="text-muted-foreground mt-2">
             Borrowing against your assets allows you to access liquidity
             without selling your holdings. Be mindful of the risk level, as
             high borrowing increases liquidation risk during market
@@ -243,7 +243,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
         if (isZeroAvailable) {
           return (
             <div className="mt-2">
-              <p className="text-gray-600">
+              <p className="text-muted-foreground">
                 You currently have no available borrowing power. Supply collateral to enable borrowing.
               </p>
               {borrowInfoMessage}
@@ -254,7 +254,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
         if (eligibleCollateralTokens.length === 0) {
           return (
             <div className="mt-2">
-              <p className="text-gray-600">
+              <p className="text-muted-foreground">
                 You have no eligible collateral. Supply assets to enable borrowing.
               </p>
               {borrowInfoMessage}

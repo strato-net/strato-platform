@@ -163,7 +163,6 @@ function newnode {
 
   echo "Starting strato-sequencer"
   runBackgroundProcess strato-sequencer \
-    --blockstanbul=true \
     --blockstanbul_block_period_ms=${blockstanbulBlockPeriodMs:-1000} \
     --blockstanbul_round_period_s=${blockstanbulRoundPeriodS:-120} \
     --minLogLevel=$seqMinLogLevel \

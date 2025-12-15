@@ -60,7 +60,7 @@ const Borrow = () => {
   });
 
   useEffect(() => {
-    document.title = "Borrow Assets | STRATO Mercata";
+    document.title = "Borrow Assets | STRATO";
   }, []);
 
 
@@ -226,7 +226,7 @@ const Borrow = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <DashboardSidebar />
       <MobileSidebar 
         isOpen={isMobileSidebarOpen} 

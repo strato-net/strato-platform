@@ -328,7 +328,7 @@ instance {-# OVERLAPPING #-} MonadIO m => HasBlockstanbulContext (CoreT m) where
     liftIO $ _blockstanbulContext <$> readTVarIO i
   putBlockstanbulContext s = do
     i <- asks $ _sequencerContext . _corePeerContext
-    liftIO $ atomically $ modifyTVar' i (blockstanbulContext ?~ s)
+    liftIO $ atomically $ modifyTVar' i (blockstanbulContext .~ s)
 
 instance {-# OVERLAPPING #-} HasVault m => HasVault (CoreT m) where
   sign bs = lift $ sign bs
@@ -636,7 +636,7 @@ newSequencerContext bc = do
   pure $
     SequencerContext
       { _seenTransactionDB = mkSeenTxDB 1024,
-        _blockstanbulContext = Just bc,
+        _blockstanbulContext = bc,
         _latestRoundNumber = latestRound
       }
 
@@ -791,8 +791,9 @@ corePeerSetup = do
   if bestSequencedBlockNumber bsb' > 0
     then do
       bCtx <- getBlockstanbulContext
-      for_ bCtx $ putBlockstanbulContext . (view . sequence .~ fromIntegral (bestSequencedBlockNumber bsb'))
-                                         . (validators .~ (Set.fromList $ bestSequencedBlockValidators bsb'))
+      putBlockstanbulContext $ (view . sequence .~ fromIntegral (bestSequencedBlockNumber bsb'))
+                             . (validators .~ (Set.fromList $ bestSequencedBlockValidators bsb'))
+                             $ bCtx
       let bh = bestSequencedBlockHash bsb'
       mOB <- A.lookup (A.Proxy @OutputBlock) bh
       case mOB of

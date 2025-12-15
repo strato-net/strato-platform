@@ -18,13 +18,13 @@ const HealthImpactDisplay = ({
     healthImpact.newHealthFactor < healthImpact.currentHealthFactor;
   const shouldWarn = showWarning && !healthImpact.isHealthy && gettingWorse;
   return (
-    <div className={`space-y-3 p-4 bg-gray-50 rounded-lg ${className}`}>
-      <h4 className="text-sm font-medium text-gray-700">
+    <div className={`space-y-3 p-4 bg-muted/50 rounded-lg ${className}`}>
+      <h4 className="text-sm font-medium text-foreground">
         Health Impact
       </h4>
       <div className="space-y-2">
         <div className="flex justify-between text-sm">
-          <span className="text-gray-600">Current Health Factor:</span>
+          <span className="text-muted-foreground">Current Health Factor:</span>
           <span
             className={`font-medium ${getHealthFactorColor(
               healthImpact.currentHealthFactor
@@ -36,7 +36,7 @@ const HealthImpactDisplay = ({
           </span>
         </div>
         <div className="flex justify-between text-sm">
-          <span className="text-gray-600">New Health Factor:</span>
+          <span className="text-muted-foreground">New Health Factor:</span>
           <span
             className={`font-medium ${getHealthFactorColor(
               healthImpact.newHealthFactor
@@ -48,12 +48,12 @@ const HealthImpactDisplay = ({
           </span>
         </div>
         <div className="flex justify-between text-sm">
-          <span className="text-gray-600">Change:</span>
+          <span className="text-muted-foreground">Change:</span>
           <span
             className={`font-medium ${
               healthImpact.healthImpact >= 0
-                ? "text-green-600"
-                : "text-red-600"
+                ? "text-green-600 dark:text-green-400"
+                : "text-red-600 dark:text-red-400"
             }`}
           >
             {healthImpact.healthImpact >= 0 ? "+" : ""}
@@ -61,7 +61,7 @@ const HealthImpactDisplay = ({
           </span>
         </div>
         {shouldWarn && (
-          <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+          <div className="mt-2 p-2 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded text-xs text-red-700 dark:text-red-400">
             ⚠️ Warning: This action would make your position
             unhealthy and vulnerable to liquidation.
           </div>
