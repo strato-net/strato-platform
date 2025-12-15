@@ -5,10 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { MoreVertical } from "lucide-react";
+import { MoreVertical, Loader2 } from "lucide-react";
 import { cdpService, VaultData, TransactionResponse } from "@/services/cdpService";
 import { useToast } from "@/hooks/use-toast";
 import { useUserTokens } from "@/context/UserTokensContext";
+import { useTokenContext } from "@/context/TokenContext";
 import { useOracleContext } from "@/context/OracleContext";
 import { formatWeiToDecimalHP, formatNumber, formatDecimalToWeiHP } from "@/utils/numberUtils";
 import { usdstAddress } from "@/lib/constants";
@@ -45,7 +46,8 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
   const [positions, setPositions] = useState<VaultData[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-  const { activeTokens } = useUserTokens();
+  const { activeTokens, fetchTokens } = useUserTokens();
+  const { fetchUsdstBalance } = useTokenContext();
   const { getPrice } = useOracleContext();
   
   // State for active action and input amounts for each position
@@ -53,6 +55,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
   const [inputAmounts, setInputAmounts] = useState<Record<string, string>>({});
   const [maxStates, setMaxStates] = useState<Record<string, boolean>>({});
   const [maxValues, setMaxValues] = useState<Record<string, number>>({});  // Store max values for comparison
+  const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});  // Track loading state per asset
   const [isGlobalPaused, setIsGlobalPaused] = useState<boolean>(false);
   const [assetPauseStates, setAssetPauseStates] = useState<Record<string, boolean>>({});
   const [assetSupportedStates, setAssetSupportedStates] = useState<Record<string, boolean>>({});
@@ -448,6 +451,9 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
       }
     }
 
+    // Set loading state for this asset
+    setActionLoading(prev => ({ ...prev, [asset]: true }));
+
     try {
       let result;
       
@@ -510,8 +516,12 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
         setMaxStates(prev => ({ ...prev, [asset]: false }));
         setActiveActions(prev => ({ ...prev, [asset]: null }));
         
-        // Refresh positions data
-        const updatedPositions = await cdpService.getVaults();
+        // Refresh positions data and balances
+        const [updatedPositions] = await Promise.all([
+          cdpService.getVaults(),
+          fetchUsdstBalance(),
+          fetchTokens()
+        ]);
         setPositions(updatedPositions);
         
         // Call the callback to refresh other components (like deposits)
@@ -555,6 +565,9 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
         description: errorMessage,
         variant: "destructive",
       });
+    } finally {
+      // Reset loading state for this asset
+      setActionLoading(prev => ({ ...prev, [asset]: false }));
     }
   };
 
@@ -816,9 +829,14 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                         size="sm" 
                         className="min-w-[80px]"
                         onClick={() => handleAction(position.asset, activeActions[position.asset]!, inputAmounts[position.asset] || "")}
-                        disabled={isAmountAboveMax(position.asset, inputAmounts[position.asset] || "")}
+                        disabled={isAmountAboveMax(position.asset, inputAmounts[position.asset] || "") || actionLoading[position.asset]}
                       >
-                        {isAmountAboveMax(position.asset, inputAmounts[position.asset] || "") 
+                        {actionLoading[position.asset] ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                            Processing...
+                          </>
+                        ) : isAmountAboveMax(position.asset, inputAmounts[position.asset] || "") 
                           ? "Amount exceeds maximum"
                           : activeActions[position.asset]!.charAt(0).toUpperCase() + activeActions[position.asset]!.slice(1)
                         }
