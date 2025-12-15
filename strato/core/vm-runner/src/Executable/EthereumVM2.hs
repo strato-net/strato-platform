@@ -148,16 +148,11 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
     -- todo: perhaps we shouldnt even add TXs to the mempool, it might make for a VERY large checkpoint
     -- todo: which may fail
     bState <- Bagger.getBaggerState
-    pbft <- _hasBlockstanbul <$> Mod.get (Mod.Proxy @ContextState)
     reqd <- _blockRequested <$> Mod.get (Mod.Proxy @ContextState)
-    let makeLazyBlocks = False --lazyBlocks $ quarryConfig ethConf -- TODO?: Remove reference to ethConf
-        pending = B.pending bState
+    let pending = B.pending bState
         priv = toList . B.privateHashes $ B.miningCache bState
         hasTxs = (numPoolable > 0) || not (M.null pending) || not (null priv)
-        shouldOutputBlocks =
-          if pbft
-            then reqd && hasTxs
-            else not makeLazyBlocks || hasTxs
+        shouldOutputBlocks = reqd && hasTxs
     $logInfoS "evm/loop/newBlock" . T.pack $
       printf
         "Num poolable: %d, num pending: %d"
@@ -166,13 +161,11 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
     multilineLog "evm/loop/newBlock" $
       boringBox
         [ CL.yellow "Decision making for block creation:",
-          "pbft: " ++ formatBool pbft,
           "reqd: " ++ formatBool reqd,
           "hasTxs: " ++ formatBool hasTxs,
-          "makeLazyBlocks: " ++ formatBool makeLazyBlocks,
           "shouldOutputBlocks: " ++ formatBool shouldOutputBlocks
         ]
-    when (pbft && shouldOutputBlocks) $
+    when shouldOutputBlocks $
       Mod.modify_ (Mod.Proxy @ContextState) $ pure . (blockRequested .~ False)
     $logDebugS "evm/loop/newBlock" $ T.pack $ "Queued: " ++ show numPoolable
     $logDebugS "evm/loop/newBlock" $ T.pack $ "Pending: " ++ show (length pending)
