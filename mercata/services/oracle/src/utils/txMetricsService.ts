@@ -48,10 +48,6 @@ class TxMetricsService {
                     Value: metric.duration / 1000,  // Convert ms to seconds
                     Unit: 'Seconds',
                     Timestamp: new Date(),
-                    Dimensions: [
-                        { Name: 'TxHash', Value: metric.txHash },
-                        { Name: 'Status', Value: metric.status },
-                    ],
                 }],
             }));
 
