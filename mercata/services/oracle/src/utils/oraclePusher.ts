@@ -39,16 +39,10 @@ async function callListAndWait(callListArgs: CallListArg[]): Promise<Transaction
     const result = await waitForTransaction(txHash);
     
     // Record metrics (errors are handled inside txMetricsService)
-    const confirmTime = Date.now();
-    const assetCount = callListArgs?.[0]?.args?.assets?.length || 0;
     await txMetricsService.recordTxMetric({
-        timestamp: new Date().toISOString(),
         txHash,
-        submitTime,
-        confirmTime,
-        duration: confirmTime - submitTime,
+        duration: Date.now() - submitTime,
         status: result.status,
-        assetCount,
     });
     
     return result;

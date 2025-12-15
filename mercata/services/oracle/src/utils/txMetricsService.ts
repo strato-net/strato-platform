@@ -1,56 +1,59 @@
 /**
  * Transaction Metrics Service
  * 
- * Records oracle transaction timing data to PostgreSQL database.
- * Captures submit time, confirmation time, and duration for each price update transaction.
+ * Records oracle transaction timing data to AWS CloudWatch.
+ * Captures transaction duration for each price update transaction.
  */
 
-import { Pool } from 'pg';
+import dotenv from 'dotenv';
+import { CloudWatchClient, PutMetricDataCommand } from '@aws-sdk/client-cloudwatch';
 import { TxMetric } from '../types';
 import { logError, logInfo } from './logger';
 
+dotenv.config();
+
 /**
- * PostgreSQL connection pool
- * Maintains up to 5 reusable database connections
+ * CloudWatch client
+ * Uses AWS credentials from environment or IAM role
  */
-const pool = new Pool({
-    host: process.env.PGHOST,
-    port: Number(process.env.PGPORT || 5432),
-    database: process.env.PGDATABASE,
-    user: process.env.PGUSER,
-    password: process.env.PGPASSWORD,
-    max: 5,
+const client = new CloudWatchClient({
+    region: process.env.AWS_REGION || 'us-east-1',
 });
+
+const NAMESPACE = process.env.CLOUDWATCH_NAMESPACE;
 
 /**
  * Transaction Metrics Service
- * Handles recording of transaction timing data to the database
+ * Sends transaction timing metrics to CloudWatch (only if CLOUDWATCH_NAMESPACE is configured)
  */
 class TxMetricsService {
     /**
-     * Records a transaction metric to the database
+     * Records a transaction metric to CloudWatch
      * 
      * @param metric - Transaction timing data including hash, timestamps, duration, and status
      * 
+     * Skips recording if CLOUDWATCH_NAMESPACE is not set.
      * Errors are caught and logged but do not affect oracle operation.
      */
     async recordTxMetric(metric: TxMetric): Promise<void> {
+        if (!NAMESPACE) {
+            return;
+        }
+
         try {
-            await pool.query(
-                `INSERT INTO tx_metrics 
-                    (ts, tx_hash, submit_time_ms, confirm_time_ms, duration_ms, status, asset_count)
-                 VALUES 
-                    ($1, $2, $3, $4, $5, $6, $7)`,
-                [
-                    metric.timestamp,
-                    metric.txHash,
-                    metric.submitTime,
-                    metric.confirmTime,
-                    metric.duration,
-                    metric.status,
-                    metric.assetCount ?? 0,
-                ]
-            );
+            await client.send(new PutMetricDataCommand({
+                Namespace: NAMESPACE,
+                MetricData: [{
+                    MetricName: 'TransactionDuration',
+                    Value: metric.duration / 1000,  // Convert ms to seconds
+                    Unit: 'Seconds',
+                    Timestamp: new Date(),
+                    Dimensions: [
+                        { Name: 'TxHash', Value: metric.txHash },
+                        { Name: 'Status', Value: metric.status },
+                    ],
+                }],
+            }));
 
             logInfo(
                 'TxMetricsService',
@@ -63,13 +66,3 @@ class TxMetricsService {
 }
 
 export const txMetricsService = new TxMetricsService();
-
-/**
- * Tests database connectivity
- * Called at service startup to ensure database is reachable
- * 
- * @throws Error if database connection fails
- */
-export async function testDatabaseConnection(): Promise<void> {
-    await pool.query('SELECT 1');
-}

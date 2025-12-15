@@ -10,7 +10,7 @@ Fetches asset prices from multiple sources and pushes them to the STRATO blockch
 - **Automatic Retry**: All API calls retry twice on failure
 - **Health Monitoring**: Service marks itself unhealthy on persistent failures
 - **Balance Checks**: Validates USDST balance before transactions
-- **Transaction Metrics**: Records transaction timing data to PostgreSQL database
+- **Transaction Metrics**: Records transaction timing data to AWS CloudWatch (optional)
 
 ## Environment Variables
 
@@ -37,12 +37,10 @@ CRON_SCHEDULE="0 */15 * * * *"
 USDST_ADDRESS=86a5ae535ded415203c3e27d654f9a1d454c553b  # USDST contract address
 GAS_FEE_USDST=1  # Gas fee in USDST (0.01 = 1, default: 1)
 
-# Database Configuration (for Transaction Metrics)
-PGHOST=localhost
-PGPORT=5432
-PGDATABASE=oracle_metrics
-PGUSER=oracle
-PGPASSWORD=oracle
+# AWS Configuration (for CloudWatch Metrics - Optional)
+# Leave CLOUDWATCH_NAMESPACE empty to disable metrics
+AWS_REGION=us-east-1
+CLOUDWATCH_NAMESPACE=Testnet/Oracle/Transactions
 ```
 
 ## Development
