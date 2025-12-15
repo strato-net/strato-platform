@@ -22,15 +22,16 @@ class TokensV2Controller {
       const { accessToken, query, address: userAddress } = req;
       validateQueryParams(query);
 
+      const { priorityToken, ...restQuery } = query as Record<string, string>;
       const queryParams: Record<string, string | undefined> = {
-        ...query,
+        ...restQuery,
         "balances.key": `eq.${userAddress}`,
         select: buildTokenSelectFields({ images: true, attributes: true, balanceInner: true }).join(","),
         limit: Math.min(parseInt(query.limit as string) || 10, 50).toString(),
         offset: (parseInt(query.offset as string) || 0).toString(),
       };
 
-      const result = await getTokens(accessToken, queryParams);
+      const result = await getTokens(accessToken, userAddress, queryParams, priorityToken);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
