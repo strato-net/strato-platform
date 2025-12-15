@@ -144,9 +144,6 @@ instance HasContext m => Mod.Modifiable MemDBs m where
   get _ = gets $ view memDBs
   put _ md = modify $ memDBs .~ md
 
-instance {-# OVERLAPPING #-} Monad m => Mod.Accessible IsBlockstanbul (ReaderT Context m) where
-  access _ = pure $ IsBlockstanbul True
-
 instance HasContext m => Mod.Modifiable BaggerState m where
   get _ = contextGets _baggerState
   put _ s = contextModify $ baggerState .~ s

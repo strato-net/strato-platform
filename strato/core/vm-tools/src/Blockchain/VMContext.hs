@@ -11,7 +11,6 @@
 
 module Blockchain.VMContext
   ( CurrentBlockHash (..),
-    IsBlockstanbul (..),
     withCurrentBlockHash,
     VMBase,
     ContextDBs (..),
@@ -202,9 +201,6 @@ knownExpensiveTxs =
 
 newtype CurrentBlockHash = CurrentBlockHash {unCurrentBlockHash :: Keccak256}
   deriving (Generic, NFData, Show)
-
-newtype IsBlockstanbul = IsBlockstanbul {unIsBlockstanbul :: Bool}
-  deriving (Generic, NFData, Show, Eq)
 
 newtype GasCap = GasCap {unVmGasCap :: Gas}
   deriving (Generic, NFData, Show, Eq)

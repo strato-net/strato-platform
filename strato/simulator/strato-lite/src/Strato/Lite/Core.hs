@@ -70,7 +70,7 @@ import Blockchain.Strato.Model.Validator
 import Blockchain.Stream.VMEvent
 import Blockchain.SyncDB
 import qualified Blockchain.TxRunResultCache as TRC
-import Blockchain.VMContext (ContextBestBlockInfo (..), GasCap (..), IsBlockstanbul (..), baggerState, putContextBestBlockInfo, vmGasCap, withCurrentBlockHash)
+import Blockchain.VMContext (ContextBestBlockInfo (..), GasCap (..), baggerState, putContextBestBlockInfo, vmGasCap, withCurrentBlockHash)
 import Conduit
 import Control.Concurrent.STM.TMChan
 import Control.Lens hiding (Context, view)
@@ -535,9 +535,6 @@ instance {-# OVERLAPPING #-} MonadBase m => (Keccak256 `A.Alters` BlockSummary) 
   lookup p k   = lift $ A.lookup p k
   insert p k v = lift $ A.insert p k v
   delete p k   = lift $ A.delete p k
-
-instance {-# OVERLAPPING #-} Monad m => Mod.Accessible IsBlockstanbul (CoreT m) where
-  access _ = pure $ IsBlockstanbul True
 
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Modifiable BaggerState (CoreT m) where
   get _ = contextGets _baggerState
