@@ -112,6 +112,6 @@ export interface AutoSaveRequestParams {
  */
 export interface WithdrawalSummaryResponse {
   totalWithdrawn30d: string;      // Total withdrawn in last 30 days in wei (string format)
-  pendingWithdrawals: number;      // Count of pending withdrawals
+  pendingWithdrawals: string;      // Pending withdrawals in wei (string format)
   availableToWithdraw: string;     // Available balance to withdraw in wei (string format)
 }

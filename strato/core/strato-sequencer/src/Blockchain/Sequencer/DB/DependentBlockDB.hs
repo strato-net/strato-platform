@@ -1,6 +1,8 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -17,7 +19,8 @@ module Blockchain.Sequencer.DB.DependentBlockDB (
   deleteDependentBlockDB,
   insertEmitted,
   enqueueIfParentNotEmitted,
-  buildEmissionChain
+  buildEmissionChain,
+  runWithDependentBlockDB
   ) where
 
 import BlockApps.Logging
@@ -28,6 +31,8 @@ import Control.Monad (join)
 import Control.Monad.Change.Alter
 import Control.Monad.Change.Modify
 import Control.Monad.IO.Class
+import Control.Monad.Trans.Reader (ReaderT, runReaderT)
+import Control.Monad.Trans.Resource (runResourceT)
 import Data.Binary
 import qualified Data.ByteString.Lazy as B
 import qualified Data.Text as T
@@ -128,3 +133,21 @@ buildEmissionChain b =
       return []
   where
     theBlock = sequencedBlockToOutputBlock b
+
+instance (MonadIO m, Accessible DependentBlockDB m) => (Keccak256 `Alters` DependentBlockEntry) m where
+  lookup _ k = lookupDependentBlockDB k
+  insert _ k v = insertDependentBlockDB k v
+  delete _ k = deleteDependentBlockDB k
+
+-- | Run an action that only needs 'DependentBlockDB' access.
+--
+-- This opens a LevelDB database at the given path and provides the minimal
+-- monad needed to run operations like 'bootstrapGenesisBlock'.
+runWithDependentBlockDB ::
+  FilePath ->  -- ^ Path to the LevelDB database
+  Int ->       -- ^ Cache size (0 = 8MB default)
+  ReaderT DependentBlockDB IO a ->
+  IO a
+runWithDependentBlockDB dbPath cacheSize action = runResourceT $ do
+  db <- LDB.open dbPath LDB.defaultOptions {LDB.createIfMissing = True, LDB.cacheSize = cacheSize}
+  liftIO $ runReaderT action (DependentBlockDB db)

@@ -172,20 +172,8 @@ const WithdrawalsPage = () => {
                       <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                     ) : (
                       <span className="text-sm font-semibold">
-                        {withdrawalSummary?.pendingWithdrawals || 0}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">
-                      Available to Withdraw
-                    </span>
-                    {loadingWithdrawalSummary ? (
-                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                    ) : (
-                      <span className="text-sm font-semibold text-green-600">
                         {formatBalance(
-                          withdrawalSummary?.availableToWithdraw || "0",
+                          withdrawalSummary?.pendingWithdrawals || "0",
                           undefined,
                           18,
                           2,
@@ -195,6 +183,7 @@ const WithdrawalsPage = () => {
                       </span>
                     )}
                   </div>
+                  
                 </CardContent>
               </Card>
 

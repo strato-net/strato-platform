@@ -193,7 +193,7 @@ export const getWithdrawalSummary = async (
     getCompletePriceMap(accessToken),
     cirrus.get(accessToken, `/${MercataBridge}-withdrawals`, {
       params: {
-        select: "count()",
+        select: "value->>stratoToken,value->>stratoTokenAmount",
         address: `eq.${mercataBridge}`,
         "value->>stratoSender": `eq.${userAddress}`,
         "value->>bridgeStatus": "in.(1,2)"
@@ -215,7 +215,17 @@ export const getWithdrawalSummary = async (
     const balance = BigInt(b.balance || "0");
     const price = BigInt(prices.get(b.address) || "0");
     if (balance > 0n && price > 0n) {
-      availableUSD += (balance * price) / DECIMALS;
+      availableUSD += (balance * price) / DECIMALS / DECIMALS;
+    }
+  }
+
+  let pendingUSD = 0n;
+  for (const p of pending.data || []) {
+    if (!p.stratoToken || !p.stratoTokenAmount) continue;
+    const amount = BigInt(p.stratoTokenAmount || "0");
+    const price = BigInt(prices.get(p.stratoToken) || "0");
+    if (amount > 0n && price > 0n) {
+      pendingUSD += (amount * price) / DECIMALS;
     }
   }
 
@@ -231,7 +241,7 @@ export const getWithdrawalSummary = async (
   
   return {
     totalWithdrawn30d: withdrawnUSD.toString(),
-    pendingWithdrawals: pending.data?.[0]?.count || 0,
+    pendingWithdrawals: pendingUSD.toString(),
     availableToWithdraw: availableUSD.toString()
   };
 };

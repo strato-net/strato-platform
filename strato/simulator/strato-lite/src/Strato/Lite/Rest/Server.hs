@@ -57,11 +57,11 @@ getNodes mgr = liftIO . atomically $ do
       Nothing -> pure $ NodeStatus "0.0.0.0" 0 0 False mExp
       Just (s,c) -> do
         let coreCtx = c ^. corePeerContext
-        mBCtx <- _blockstanbulContext <$> readTVar (coreCtx ^. sequencerContext)
-        let mView = _view <$> mBCtx
-            rNum = maybe 0 (fromIntegral . _round) mView
-            sNum = maybe 0 (fromIntegral . _sequence) mView
-            isVal = maybe False _isValidator mBCtx
+        bCtx <- _blockstanbulContext <$> readTVar (coreCtx ^. sequencerContext)
+        let v = _view bCtx
+            rNum = fromIntegral $ _round v
+            sNum = fromIntegral $ _sequence v
+            isVal = _isValidator bCtx
             Host ip = s ^. simulatorPeerIPAddress
         pure $ NodeStatus ip rNum sNum isVal mExp
 

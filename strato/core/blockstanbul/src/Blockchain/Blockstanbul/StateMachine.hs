@@ -28,7 +28,7 @@ import Text.Format
 import Prelude hiding (round, sequence)
 
 class Monad m => HasBlockstanbulContext m where
-  getBlockstanbulContext :: m (Maybe BlockstanbulContext)
+  getBlockstanbulContext :: m BlockstanbulContext
   putBlockstanbulContext :: BlockstanbulContext -> m ()
 
 type StateMachineM m =

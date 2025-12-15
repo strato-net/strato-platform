@@ -55,6 +55,7 @@ import Data.Conduit
 import Data.Conduit.Combinators (yieldMany)
 import Data.List
 import Data.Maybe
+import Data.Time.Clock (UTCTime)
 import qualified Data.Text as T
 import qualified Database.Esqueleto.Internal.Internal as E
 import qualified Database.Esqueleto.Legacy as E
@@ -84,6 +85,8 @@ type API =
     :> QueryParam "blocknumber" Natural
     :> QueryParam "minblocknumber" Natural
     :> QueryParam "maxblocknumber" Natural
+    :> QueryParam "mintimestamp" UTCTime
+    :> QueryParam "maxtimestamp" UTCTime
     :> QueryParam "limit" Natural
     :> QueryParam "offset" Natural
     :> QueryParam "search" T.Text
@@ -110,6 +113,8 @@ data TxsFilterParams = TxsFilterParams
     qtBlockNumber :: Maybe Natural,
     qtMinBlockNumber :: Maybe Natural,
     qtMaxBlockNumber :: Maybe Natural,
+    qtMinTimestamp :: Maybe UTCTime,
+    qtMaxTimestamp :: Maybe UTCTime,
     qtLimit :: Maybe Natural,
     qtOffset :: Maybe Natural,
     qtSearch :: Maybe T.Text,
@@ -120,6 +125,8 @@ data TxsFilterParams = TxsFilterParams
 txsFilterParams :: TxsFilterParams
 txsFilterParams =
   TxsFilterParams
+    Nothing
+    Nothing
     Nothing
     Nothing
     Nothing
@@ -170,6 +177,8 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable TxsFilterParams [RawT
                       fmap (\v -> rawTx E.^. RawTransactionBlockNumber E.==. E.val v) (fromIntegral <$> qtBlockNumber),
                       fmap (\v -> rawTx E.^. RawTransactionBlockNumber E.>=. E.val v) (fromIntegral <$> qtMinBlockNumber),
                       fmap (\v -> rawTx E.^. RawTransactionBlockNumber E.<=. E.val v) (fromIntegral <$> qtMaxBlockNumber),
+                      fmap (\v -> rawTx E.^. RawTransactionTimestamp E.>=. E.val v) qtMinTimestamp,
+                      fmap (\v -> rawTx E.^. RawTransactionTimestamp E.<=. E.val v) qtMaxTimestamp,
                       fmap (\search ->
                           let isWhiteSpace c = c `elem` [' ', '\n', '\t']
                               searches = filter (not . T.null) $ T.dropAround isWhiteSpace <$> T.split (==',') search
@@ -298,13 +307,15 @@ getTransaction ::
   Maybe Natural ->
   Maybe Natural ->
   Maybe Natural ->
+  Maybe UTCTime ->
+  Maybe UTCTime ->
   Maybe Natural ->
   Maybe Natural ->
   Maybe T.Text ->
   Maybe Sortby ->
   m [RawTransaction']
-getTransaction a b c d e f g h i j k l m n o p q r s t =
-  getTransaction' (TxsFilterParams a b c d e f g h i j k l m n o p q r s t)
+getTransaction a b c d e f g h i j k l m n o p q r s t u v =
+  getTransaction' (TxsFilterParams a b c d e f g h i j k l m n o p q r s t u v)
 
 getTransaction' ::
   Selectable TxsFilterParams [RawTransaction] m =>
@@ -330,6 +341,8 @@ transactionQueryParams =
     "blocknumber",
     "minblocknumber",
     "maxblocknumber",
+    "mintimestamp",
+    "maxtimestamp",
     -- "index",
     --"rejected",
     "limit",
