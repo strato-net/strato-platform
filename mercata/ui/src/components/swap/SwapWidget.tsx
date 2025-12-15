@@ -495,7 +495,7 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
   // ========================================================================
   // CONTEXT & HOOKS
   // ========================================================================
-  const { swappableTokens, pairableTokens, fetchPairableTokens, swap, getPoolByTokenPair, fromAsset, toAsset, pool, poolLoading, loading: swapLoading, setFromAsset, setToAsset, refreshSwapHistory } = useSwapContext();
+  const { swappableTokens, pairableTokens, pairablesLoading, fetchPairableTokens, swap, getPoolByTokenPair, fromAsset, toAsset, pool, poolLoading, loading: swapLoading, setFromAsset, setToAsset, refreshSwapHistory } = useSwapContext();
 
   // ========================================================================
   // DERIVED STATE
@@ -635,9 +635,11 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
   // Safe auto-select after pairables change
   useEffect(() => {
     if (!fromAsset?.address) return;
+    // Don't auto-select while pairables are loading - data may be stale
+    if (pairablesLoading) return;
     if (toAsset && toOptions.some(t => t.address === toAsset.address)) return;
     if (toOptions.length) setToAsset(toOptions[0]);
-  }, [fromAsset?.address, toOptions, toAsset?.address]);
+  }, [fromAsset?.address, toOptions, toAsset?.address, pairablesLoading]);
 
   // Fetch pool immediately when both assets are selected
   useEffect(() => {
@@ -769,8 +771,11 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
     if (!newFrom?.address) return;
 
     const nextPairables = await fetchPairableTokens(newFrom.address); // <-- fresh list
-    if (nextPairables.length > 0 && !nextPairables.some(t => t.address === newTo?.address)) {
-      setToAsset(nextPairables[0]); // or undefined
+    // Always re-set toAsset after fetch to override any stale effect that ran during the await
+    if (nextPairables.length > 0) {
+      const newToAddress = newTo?.address?.toLowerCase();
+      const validNewTo = nextPairables.find(t => t.address?.toLowerCase() === newToAddress);
+      setToAsset(validNewTo || nextPairables[0]);
     }
   };
 
