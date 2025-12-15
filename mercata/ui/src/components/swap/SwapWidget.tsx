@@ -259,24 +259,6 @@ const TokenInput = ({
     <div className="bg-muted/50 p-4 rounded-lg border border-border">
       <div className="flex flex-col sm:flex-row sm:justify-between mb-2">
         <label className="text-sm text-muted-foreground font-semibold">{label}</label>
-        {isFromInput && (
-          <span className={`text-sm mt-1 sm:mt-0 flex gap-1 ${
-            toWei(maxAmountWei) === 0n ? "text-red-600" : "text-muted-foreground"
-          }`}>
-            Available for swap: <AnimatedNumber 
-              value={maxAmountWei !== "0" ? formatBalance(maxAmountWei, asset?._symbol || "", undefined, 2, 6) : "0"} 
-              isLoading={loading} 
-            />
-            <button
-              type="button"
-              className={`text-blue-600 text-xs ml-2 underline ${toWei(maxAmountWei) === 0n ? "opacity-50 cursor-not-allowed" : ""}`}
-              onClick={onMaxClick}
-              disabled={toWei(maxAmountWei) === 0n}
-            >
-              Max
-            </button>
-          </span>
-        )}
       </div>
       <div className="flex items-center gap-2">
         <div className="flex-1 min-w-0 flex flex-col">
@@ -308,12 +290,31 @@ const TokenInput = ({
       </div>
       {asset && (
         <div className="mt-2 flex justify-between">
-          <span className="text-sm text-muted-foreground">
-            User Balance: <AnimatedNumber 
-              value={userBalanceWei !== "0" ? formatBalance(userBalanceWei, asset._symbol || "", undefined, 2, 6) : "0"} 
-              isLoading={loading} 
-            />
-          </span>
+          {isFromInput ? (
+            <span className={`text-sm flex items-center gap-1 ${
+              toWei(maxAmountWei) === 0n ? "text-red-600" : "text-muted-foreground"
+            }`}>
+              Your Balance: <AnimatedNumber 
+                value={maxAmountWei !== "0" ? formatBalance(maxAmountWei, asset._symbol || "", undefined, 2, 6) : "0"} 
+                isLoading={loading} 
+              />
+              <button
+                type="button"
+                className={`text-blue-600 text-xs ml-2 underline ${toWei(maxAmountWei) === 0n ? "opacity-50 cursor-not-allowed" : ""}`}
+                onClick={onMaxClick}
+                disabled={toWei(maxAmountWei) === 0n}
+              >
+                Max
+              </button>
+            </span>
+          ) : (
+            <span className="text-sm text-muted-foreground">
+              Your Balance: <AnimatedNumber 
+                value={userBalanceWei !== "0" ? formatBalance(userBalanceWei, asset._symbol || "", undefined, 2, 6) : "0"} 
+                isLoading={loading} 
+              />
+            </span>
+          )}
           <span className="text-sm text-muted-foreground">
             Pool Balance: <AnimatedNumber 
               value={poolBalanceWei !== "0" ? formatBalance(poolBalanceWei, asset._symbol || "", undefined, 2, 6) : "0"} 
