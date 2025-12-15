@@ -238,7 +238,7 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
                         const formatted = scaledValue >= 1 ? scaledValue.toFixed(1) : scaledValue.toFixed(2);
                         
                         if (tabType === 'rewards') {
-                          return `CATA ${formatted}${scale.suffix}`;
+                          return `Points ${formatted}${scale.suffix}`;
                         } else if (tabType === 'borrowed') {
                           return `USDST ${formatted}${scale.suffix}`;
                         } else {
