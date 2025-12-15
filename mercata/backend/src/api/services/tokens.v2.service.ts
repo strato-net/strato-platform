@@ -10,35 +10,30 @@ const { Token, CollateralVault, CDPEngine, DECIMALS } = constants;
 
 export const getTokens = async (
   accessToken: string,
-  rawParams: Record<string, string | undefined> = {}
+  userAddress: string,
+  rawParams: Record<string, string | undefined> = {},
+  priorityToken?: string
 ): Promise<{ tokens: Token[]; totalCount: number }> => {
   const params = Object.fromEntries(
-    Object.entries(rawParams).filter(([key, v]) => v !== undefined)
+    Object.entries(rawParams).filter(([_, v]) => v !== undefined)
   ) as Record<string, string>;
 
   const { limit, offset, select, ...countParams } = params;
-  const countQuery = {
-    ...countParams,
-    select: select ? `count(),${select}` : "count()",
-  };
+  const lim = parseInt(limit) || 10;
 
-  const [response, countResponse, rawPrices] = await Promise.all([
-    cirrus.get(accessToken, "/" + Token, { params }),
-    cirrus.get(accessToken, "/" + Token, { params: countQuery }),
+  const [priorityRes, remainingRes, countRes, prices] = await Promise.all([
+    priorityToken ? cirrus.get(accessToken, "/" + Token, { params: { ...params, address: `eq.${priorityToken}`, limit: "1", offset: "0" } }) : null,
+    cirrus.get(accessToken, "/" + Token, { params: { ...params, ...(priorityToken && { address: `neq.${priorityToken}`, limit: String(lim - 1) }) } }),
+    cirrus.get(accessToken, "/" + Token, { params: { ...countParams, select: select ? `count(),${select}` : "count()" } }),
     getCompletePriceMap(accessToken),
   ]);
 
-  if (response.status !== 200 || !response.data) {
-    throw new Error(`Error fetching tokens: ${response.statusText}`);
-  }
+  if (remainingRes.status !== 200) throw new Error(`Error fetching tokens: ${remainingRes.statusText}`);
 
+  const map = (t: any) => ({ ...t, balance: t.balances?.[0]?.balance || "0", price: prices.get(t.address) || "0" });
   return {
-    tokens: (response.data as any[]).map((token) => ({
-      ...token,
-      balance: token.balances?.[0]?.balance || "0",
-      price: rawPrices.get(token.address) || "0",
-    })) as Token[],
-    totalCount: countResponse.data?.[0]?.count || 0,
+    tokens: [...(priorityRes?.data || []), ...(remainingRes.data || [])].map(map) as Token[],
+    totalCount: countRes.data?.[0]?.count || 0,
   };
 };
 

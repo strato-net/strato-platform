@@ -125,7 +125,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
       const res = await api.get<{ tokens: TokenType[]; totalCount: number }>(
         `/tokens/v2`,
         { 
-          params: { status: 'neq.2' },
+          params: { status: 'neq.2', priorityToken: cataAddress },
           signal: inactiveTokensAbortControllerRef.current.signal
         }
       );
