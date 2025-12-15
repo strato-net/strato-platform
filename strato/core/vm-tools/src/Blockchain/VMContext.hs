@@ -11,7 +11,6 @@
 
 module Blockchain.VMContext
   ( CurrentBlockHash (..),
-    IsBlockstanbul (..),
     withCurrentBlockHash,
     VMBase,
     ContextDBs (..),
@@ -38,7 +37,6 @@ module Blockchain.VMContext
     baggerState,
     bestBlockInfo,
     vmGasCap,
-    hasBlockstanbul,
     selfAddress,
     blockRequested,
     runningTests,
@@ -204,9 +202,6 @@ knownExpensiveTxs =
 newtype CurrentBlockHash = CurrentBlockHash {unCurrentBlockHash :: Keccak256}
   deriving (Generic, NFData, Show)
 
-newtype IsBlockstanbul = IsBlockstanbul {unIsBlockstanbul :: Bool}
-  deriving (Generic, NFData, Show, Eq)
-
 newtype GasCap = GasCap {unVmGasCap :: Gas}
   deriving (Generic, NFData, Show, Eq)
 
@@ -258,7 +253,6 @@ data ContextState = ContextState
     _baggerState :: !BaggerState,
     _bestBlockInfo :: !ContextBestBlockInfo,
     _vmGasCap :: !Gas,
-    _hasBlockstanbul :: !Bool,
     _blockRequested :: !Bool,
     _runningTests :: !Bool,
     _txRunResultsCache :: TRC.Cache,
@@ -276,7 +270,6 @@ instance Default ContextState where
         _baggerState = defaultBaggerState,
         _bestBlockInfo = Unspecified,
         _vmGasCap = Gas flags_gasLimit,
-        _hasBlockstanbul = True,
         _blockRequested = False,
         _runningTests = False,
         _txRunResultsCache = error "Default ContextState: accessing uninitialized txRunResultsCache",
@@ -416,7 +409,6 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
             { _memDBs = cmemDBs,
               _baggerState = defaultBaggerState,
               _bestBlockInfo = Unspecified,
-              _hasBlockstanbul = False,
               _vmGasCap = 100000,
               _blockRequested = False,
               _runningTests = True,
@@ -473,7 +465,6 @@ initContext dSettings = do
       def
         & txRunResultsCache .~ cache
         & debugSettings .~ dSettings
-        & hasBlockstanbul .~ flags_blockstanbul
   que <- newTQueueIO
   pure
     Context
