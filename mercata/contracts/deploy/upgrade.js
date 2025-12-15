@@ -4,12 +4,29 @@
 require('dotenv').config();
 const config = require('./config');
 const auth = require('./auth');
-const { rest, importer } = require('blockapps-rest');
+const { rest, importer, util } = require('blockapps-rest');
 const fs = require('fs-extra');
 const path = require('path');
 
 // The owner of the implementation address is ignored in favor of the proxy owner
 const DEFAULT_CONSTRUCTOR_ARGS = {"initialOwner": "deadbeef"};
+
+/**
+ * Polls transaction results until they are no longer Pending.
+ * Returns the final tx result wrapper.
+ */
+async function waitForTxResult(tokenObj, hashes, options) {
+  const responseArray = Array.isArray(hashes) ? hashes : [hashes];
+  const predicate = (results) => results.filter((r) => r.status === 'Pending').length === 0;
+  const action = async (opts) => rest.getBlocResults(tokenObj, responseArray, opts);
+  const [final] = await util.until(
+    predicate,
+    action,
+    { config, isAsync: true, query: (options && options.query) || undefined },
+    3600000
+  );
+  return final;
+}
 
 /**
  * Print usage information
@@ -24,6 +41,7 @@ function printUsage() {
   console.error('');
   console.error('Optional arguments:');
   console.error('  --constructor-args <json>    JSON string of constructor arguments (default: ' + JSON.stringify(DEFAULT_CONSTRUCTOR_ARGS) + ')');
+  console.error('  --user-contract <username>   Deploy contract from User contract with this username');
   console.error('  +OVERRIDE-CHECKS             Override the contract name check');
   console.error('');
   console.error('Required environment variables (.env):');
@@ -31,7 +49,7 @@ function printUsage() {
   console.error('');
   console.error('Example:');
   console.error('  node upgrade.js --proxy-address abc123 --contract-name PoolFactory --contract-file Pools/PoolFactory.sol');
-  console.error('  node upgrade.js --proxy-address abc123 --contract-name LendingPool --contract-file Lending/LendingPool.sol --constructor-args \'{"param":"value"}\'');
+  console.error('  node upgrade.js --proxy-address abc123 --contract-name LendingPool --contract-file Lending/LendingPool.sol --constructor-args \'{"param":"value"}\' --user-contract myuse');
 }
 
 /**
@@ -176,6 +194,9 @@ async function main() {
     console.log(`Contract Name: ${contractName}`);
     console.log(`Contract File: ${contractFile}`);
     console.log(`Constructor Args: ${JSON.stringify(constructorArgs)}`);
+    if (args['user-contract']) {
+      console.log(`User Contract Username: ${args['user-contract']}`);
+    }
     console.log('');
     
     // Authenticate
@@ -204,6 +225,7 @@ async function main() {
     
     // Strip comments (same logic as deploy.js uses)
     const stripComments = (str) => {
+      return str; // Disabled due to it eliminating comments within strings
       let out = str.replace(/\/\*[\s\S]*?\*\//g, '');
       out = out.split('\n').map((ln) => {
         const t = ln.trim();
@@ -253,17 +275,44 @@ async function main() {
       cacheNonce: true,
     };
     
-    const implementation = await rest.createContract(tokenObj, contractArgs, deployOptions);
-    console.log(`Implementation deployed at: ${implementation.address}\n`);
+    // If --user-contract is provided, add username to query parameters
+    // This will cause the API to call the User contract's createContract method
+    // The username corresponds to the User contract in the UserRegistry
+    if (args['user-contract']) {
+      const userContractUsername = args['user-contract'];
+      deployOptions.query = {
+        username: userContractUsername
+      };
+      console.log(`Deploying from User contract with username: ${userContractUsername}`);
+    }
+
+    // Deploy the implementation.
+    // Uses async because response.data.contents will not incliude address if User contract is used
+    let implementationAddress;
+    const pending = await rest.createContract(tokenObj, contractArgs, { ...deployOptions, isAsync: true });
+    const pendingHash = pending && pending.hash;
+    if (!pendingHash) throw new Error('Contract deploy did not return a transaction hash');
+    const final = await waitForTxResult(tokenObj, pendingHash, deployOptions);
+    console.log(`Final: ${JSON.stringify(final)}`);
+    implementationAddress =
+      (final && final.data && final.data.contents && final.data.contents.address) || // works for EOA deployments
+      (final && final.txResult && Array.isArray(final.txResult.contractsCreated) && final.txResult.contractsCreated.length == 1 ? final.txResult.contractsCreated[0] : null); // works for User contract deployments
+
+
+    if (!implementationAddress) {
+      throw new Error('Could not extract contract address from deployment response');
+    }
+
+    console.log(`Implementation deployed at: ${implementationAddress}\n`);
     
     // Step 2: Upgrade the proxy
     console.log(`Upgrading proxy at ${proxyAddress}...`);
-    console.log(`New implementation: ${implementation.address}`);
+    console.log(`New implementation: ${implementationAddress}`);
     
     const callArgs = {
       contract: { address: proxyAddress, name: 'Proxy' },
       method: 'setLogicContract',
-      args: { _logicContract: implementation.address },
+      args: { _logicContract: implementationAddress },
       txParams: {
         gasPrice: config.gasPrice,
         gasLimit: config.gasLimit,
@@ -287,13 +336,13 @@ async function main() {
     }
 
     console.log(`Proxy Address: ${proxyAddress}`);
-    console.log(`New Implementation: ${implementation.address}`);
+    console.log(`New Implementation: ${implementationAddress}`);
     console.log('================================\n');
     
     // Save upgrade information
     const upgradeInfo = {
       proxyAddress,
-      newImplementation: implementation.address,
+      newImplementation: implementationAddress,
       contractName,
       contractFile,
       upgradeTime: new Date().toISOString(),

@@ -18,9 +18,12 @@ contract record AdminRegistry is Ownable {
     event IssueCreated(address sender, address creator, string issueId, address target, string func, variadic args);
     event IssueVoted(address sender, address voter, string issueId, address target, string func, variadic args);
     event IssueExecuted(address sender, address executor, string issueId, address target, string func, variadic args);
+    event IssueBatchExecuted(address sender, address executor, string issueId, address target, string func, variadic args);
     event IssueDismissed(address sender, string issueId);
 
     bool public initialized = false;
+
+    address public batchTxController;
 
     modifier onlyOnce() {
         require(!initialized, "AdminRegistry is already initialized");
@@ -71,6 +74,17 @@ contract record AdminRegistry is Ownable {
     }
 
     function castVoteOnIssue(address _target, string _func, variadic _args) public returns (bool, variadic) {
+        if (batchTxController != address(0)) {
+            address sender = msg.sender;
+            if (_target == batchTxController) {
+                sender = _target;
+                _target = msg.sender;
+            }
+            require(sender == batchTxController, "Only batch tx controller can vote during batch tx");
+            string issueId = _getIssueId(_target, _func, _args);
+            variadic ret = _executeIssue(sender, issueId, _target, _func, _args);
+            return (true, ret);
+        }
         if (adminMap[msg.sender] != 0 || adminMap[_target] != 0) {
             address sender = msg.sender;
             if (adminMap[msg.sender] == 0) {
@@ -116,6 +130,8 @@ contract record AdminRegistry is Ownable {
             variadic ret = _executeIssue(sender, issueId, target, _func, _args);
             return (true, ret);
         }
+        // Unreachable fallback to satisfy compiler return analysis
+        return (false, _args);
     }
 
     function _shouldExecute(string _issueId, address _target, string _func, variadic _args) internal returns (bool) {
@@ -227,5 +243,12 @@ contract record AdminRegistry is Ownable {
 
     function createSaltedContract(string _salt, string _contractName, string _contractSrc, variadic _args) external onlyOwner returns (address) {
         return create2(_salt, _contractName, _contractSrc, _args);
+    }
+
+    function executeBatchTx(address controllerContract, string entrypoint, variadic _args) external onlyOwner
+    {
+        batchTxController = controllerContract;
+        controllerContract.call(entrypoint, _args);
+        delete batchTxController;
     }
 }
