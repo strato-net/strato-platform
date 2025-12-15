@@ -59,14 +59,14 @@ const calculateChange = (data: PortfolioDataPoint[]): { percentage: number; amou
   
   const first = data[0].balance;
   const last = data[data.length - 1].balance;
-  if (first === 0) return { percentage: 0, amount: 0, isPositive: true };
-  const changePercentage = ((last - first) / first) * 100;
   const changeAmount = last - first;
+  if (first === 0) return { percentage: 0, amount: changeAmount, isPositive: true };
+  const changePercentage = (changeAmount / first) * 100;
   
   return {
     percentage: Math.abs(changePercentage),
     amount: Math.abs(changeAmount),
-    isPositive: changePercentage >= 0
+    isPositive: changeAmount >= 0
   };
 };
 
@@ -192,7 +192,33 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
             </div>
             <div className={`flex items-center gap-1 text-sm ${tabType === 'rewards' ? 'text-purple-500' : tabType === 'borrowed' ? 'text-orange-500' : change.isPositive ? 'text-green-500' : 'text-red-500'}`}>
               {change.isPositive ? <TrendingUp size={16} color={getColorScheme(tabType).positive} /> : <TrendingDown size={16} color={getColorScheme(tabType).negative}/>}
-              <span>{hasData ? `$${change.amount.toFixed(2)} (${change.percentage.toFixed(2)}%)` : '—'}</span>
+              <span>{hasData ? (
+                tabType === 'rewards' ? (
+                  `${change.amount.toLocaleString('en-US', { 
+                    minimumFractionDigits: 2, 
+                    maximumFractionDigits: 2 
+                  })} Reward Points (${change.percentage.toLocaleString('en-US', { 
+                    minimumFractionDigits: 2, 
+                    maximumFractionDigits: 2 
+                  })}%)`
+                ) : tabType === 'borrowed' ? (
+                  `${change.amount.toLocaleString('en-US', { 
+                    minimumFractionDigits: 2, 
+                    maximumFractionDigits: 2 
+                  })} USDST (${change.percentage.toLocaleString('en-US', { 
+                    minimumFractionDigits: 2, 
+                    maximumFractionDigits: 2 
+                  })}%)`
+                ) : (
+                  `$${change.amount.toLocaleString('en-US', { 
+                    minimumFractionDigits: 2, 
+                    maximumFractionDigits: 2 
+                  })} (${change.percentage.toLocaleString('en-US', { 
+                    minimumFractionDigits: 2, 
+                    maximumFractionDigits: 2 
+                  })}%)`
+                )
+              ) : '—'}</span>
             </div>
           </div>
         </div>
