@@ -52,4 +52,15 @@ export interface CallListArg {
 export interface RetryConfig {
     maxAttempts: number;
     logPrefix: string;
+}
+
+export interface TxMetric {
+    timestamp: string;      // ISO string when the record was created
+    txHash: string;         // Transaction hash
+    submitTime: number;     // Epoch ms when tx was posted
+    confirmTime: number;    // Epoch ms when tx was confirmed
+    duration: number;       // Time from submit to confirm (ms)
+    status: string;         // "Success" or "Failure"
+    error?: string;         // Error message if failed
+    assetCount: number;     // Number of assets updated
 } 
