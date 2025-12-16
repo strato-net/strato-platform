@@ -31,6 +31,8 @@ export interface RewardsState {
   activityCount: number;
   totalStake: string;
   totalDistributed: string; // Sum of all users' (unclaimed + pending + claimed) rewards
+  currentSeason: number;
+  seasonName: string;
 }
 
 export interface UserRewardsData {
@@ -55,6 +57,8 @@ export interface LeaderboardResponse {
   total: number;
   offset: number;
   limit: number;
+  currentSeason: number;
+  seasonName: string;
 }
 
 
@@ -551,13 +555,15 @@ export const claimRewards = async (userAddress: string, activityIds: number[]): 
 export const fetchLeaderboard = async (
   forceRefresh: boolean = false,
   limit: number = 10,
-  offset: number = 0
+  offset: number = 0,
+  season: boolean = false
 ): Promise<LeaderboardResponse> => {
   const params = Object.fromEntries(
     [
       forceRefresh && ["refresh", "true"],
       limit !== 10 && ["limit", limit.toString()],
       offset !== 0 && ["offset", offset.toString()],
+      season && ["season", "true"],
     ].filter(Boolean) as [string, string][]
   );
 

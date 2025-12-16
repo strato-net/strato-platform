@@ -223,42 +223,42 @@ export const UserRewardsSection = ({
     <div className="space-y-6">
       {/* Total Claimable and Total Earned Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Total Claimable Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Total Claimable Rewards</CardTitle>
-            <CardDescription>Rewards ready to claim now</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="flex items-center space-x-2 mb-2">
-                  <Coins className="h-5 w-5 text-yellow-500" />
-                  <p className="text-3xl font-bold">{totalClaimableFormatted}</p>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Amount you will receive if you click "Claim All"
-                </p>
+      {/* Total Claimable Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Total Claimable Rewards</CardTitle>
+          <CardDescription>Rewards ready to claim now</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center space-x-2 mb-2">
+                <Coins className="h-5 w-5 text-yellow-500" />
+                <p className="text-3xl font-bold">{totalClaimableFormatted}</p>
               </div>
-              <Button
-                onClick={handleClaimAll}
-                disabled={!hasClaimable || isClaimingAll || !userAddress}
-                size="lg"
-              >
-                {isClaimingAll ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Claiming...
-                  </>
-                ) : !userAddress ? (
-                  "Log In to Claim"
-                ) : (
-                  "Claim All"
-                )}
-              </Button>
+              <p className="text-sm text-muted-foreground">
+                Amount you will receive if you click "Claim All"
+              </p>
             </div>
-          </CardContent>
-        </Card>
+            <Button
+              onClick={handleClaimAll}
+              disabled={!hasClaimable || isClaimingAll || !userAddress}
+              size="lg"
+            >
+              {isClaimingAll ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Claiming...
+                </>
+              ) : !userAddress ? (
+                "Log In to Claim"
+              ) : (
+                "Claim All"
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
         {/* Total Earned Card */}
         <Card>

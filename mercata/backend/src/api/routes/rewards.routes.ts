@@ -269,6 +269,14 @@ router.get("/state", authHandler.authorizeRequest(), RewardsChefController.getSt
  *                   type: string
  *                   description: Sum of all users' total earned rewards (unclaimed + pending + claimed)
  *                   example: "5000000000000000000000"
+ *                 currentSeason:
+ *                   type: integer
+ *                   description: Current season number
+ *                   example: 1
+ *                 seasonName:
+ *                   type: string
+ *                   description: Current season name from SeasonAnnouncement event
+ *                   example: "Season 1"
  *       401:
  *         description: Unauthorized
  */
@@ -456,6 +464,12 @@ router.post("/claim/:activityId", authHandler.authorizeRequest(), RewardsControl
  *           default: 0
  *           minimum: 0
  *         description: Number of entries to skip
+ *       - in: query
+ *         name: season
+ *         schema:
+ *           type: boolean
+ *           default: false
+ *         description: If true, returns season leaderboard data (dummy data for now)
  *     responses:
  *       200:
  *         description: Leaderboard response with entries and pagination info
@@ -485,6 +499,12 @@ router.post("/claim/:activityId", authHandler.authorizeRequest(), RewardsControl
  *                 limit:
  *                   type: integer
  *                   description: Current limit
+ *                 currentSeason:
+ *                   type: integer
+ *                   description: Current season number
+ *                 seasonName:
+ *                   type: string
+ *                   description: Current season name
  *       401:
  *         description: Unauthorized
  */

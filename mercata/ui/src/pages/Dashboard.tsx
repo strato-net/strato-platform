@@ -73,8 +73,8 @@ const Dashboard = () => {
 
   const { pendingRewards, refetch: refetchPendingRewards } = usePendingRewards(rewardsEnabled, 30000);
   const [isClaiming, setIsClaiming] = useState(false);
-  const { rank: userRank, totalEarned, loading: rankLoading } = useUserLeaderboardRank();
   const [leaderboardTimeFilter, setLeaderboardTimeFilter] = useState<"season" | "all-time">("all-time");
+  const { rank: userRank, totalEarned, seasonName, loading: rankLoading } = useUserLeaderboardRank(leaderboardTimeFilter === "season");
 
   // Extract CATA token from inactive tokens by address
   const cataToken = useMemo(() => 
@@ -326,21 +326,49 @@ const Dashboard = () => {
                 const totalEarnedNum = parseFloat(totalEarned) / 1e18;
                 return `${totalEarnedNum.toLocaleString("en-US", { maximumFractionDigits: 2 })} Reward Points`;
               })()}
-              icon={<Coins className="text-white" size={18} />}
-              color="bg-purple-500"
+              icon={
+                <div className="inline-flex items-center rounded-full bg-muted p-0.5 -mt-1">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setLeaderboardTimeFilter("all-time");
+                    }}
+                    className={`px-2.5 py-0.5 text-xs font-medium rounded-full transition-all duration-200 ${
+                      leaderboardTimeFilter === "all-time"
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    All Time
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setLeaderboardTimeFilter("season");
+                    }}
+                    className={`px-2.5 py-0.5 text-xs font-medium rounded-full transition-all duration-200 ${
+                      leaderboardTimeFilter === "season"
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Season
+                  </button>
+                </div>
+              }
+              color="bg-transparent"
               onClick={() => setActiveTab('rewards')}
               isActive={activeTab === 'rewards'}
               isLoading={rankLoading}
               additionalContent={
-                <div className="mt-2 flex items-center justify-between gap-2 flex-wrap">
-                  {/* Leaderboard Button */}
+                <div className="mt-2">
                   <Button
                     variant="outline"
                     size="sm"
                     className="h-7 text-xs border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900 hover:border-blue-300 dark:hover:border-blue-700 text-blue-700 dark:text-blue-300 font-medium"
                     onClick={(e) => {
                       e.stopPropagation();
-                      navigate("/dashboard/rewards?tab=leaderboard");
+                      navigate(`/dashboard/rewards?tab=leaderboard&timeFilter=${leaderboardTimeFilter}`);
                     }}
                   >
                     {rankLoading ? (
@@ -351,37 +379,12 @@ const Dashboard = () => {
                     ) : userRank !== null ? (
                       <>
                         <Trophy className="h-3.5 w-3.5 mr-1.5 text-yellow-500" />
-                        Rank #{userRank} - Leaderboard
+                        {leaderboardTimeFilter === "season" ? `${seasonName} - Rank #${userRank} - Leaderboard` : `Rank #${userRank} - Leaderboard`}
                       </>
                     ) : (
-                      "View Leaderboard"
+                      leaderboardTimeFilter === "season" ? `${seasonName} Leaderboard` : "View Leaderboard"
                     )}
                   </Button>
-                  {/* Season/All Time Toggle */}
-                  <div className="flex items-center rounded-md border border-border p-0.5 bg-muted/50">
-                    <Button
-                      variant={leaderboardTimeFilter === "season" ? "default" : "ghost"}
-                      size="sm"
-                      className="h-5 px-2 text-xs"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setLeaderboardTimeFilter("season");
-                      }}
-                    >
-                      Season
-                    </Button>
-                    <Button
-                      variant={leaderboardTimeFilter === "all-time" ? "default" : "ghost"}
-                      size="sm"
-                      className="h-5 px-2 text-xs"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setLeaderboardTimeFilter("all-time");
-                      }}
-                    >
-                      All Time
-                    </Button>
-                  </div>
                 </div>
               }
             />

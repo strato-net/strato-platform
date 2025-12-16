@@ -166,8 +166,9 @@ class RewardsController {
       const forceRefresh = req.query.refresh === "true";
       const limit = Math.max(1, Math.min(100, parseInt(req.query.limit as string, 10) || 10));
       const offset = Math.max(0, parseInt(req.query.offset as string, 10) || 0);
+      const season = req.query.season === "true";
 
-      const leaderboard = await fetchLeaderboard(accessToken, forceRefresh, limit, offset);
+      const leaderboard = await fetchLeaderboard(accessToken, forceRefresh, limit, offset, season);
       res.status(RestStatus.OK).json(leaderboard);
     } catch (error) {
       next(error);

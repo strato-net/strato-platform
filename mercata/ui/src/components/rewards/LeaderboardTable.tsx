@@ -7,7 +7,6 @@ import { LeaderboardEntry, formatRoundedWithCommas, roundByMagnitude } from "@/s
 import { formatBalance } from "@/utils/numberUtils";
 import CopyButton from "@/components/ui/copy";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { useMemo, useState } from "react";
 import { useUser } from "@/context/UserContext";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -19,6 +18,8 @@ interface LeaderboardTableProps {
   currentPage?: number;
   loading?: boolean;
   onPageChange?: (page: number) => void;
+  timeFilter?: "season" | "all-time";
+  onTimeFilterChange?: (filter: "season" | "all-time") => void;
 }
 
 const RANK_ICONS: Record<number, { Icon: typeof Trophy; className: string }> = {
@@ -38,11 +39,17 @@ export const LeaderboardTable = ({
   limit = 10, 
   currentPage = 1, 
   loading = false, 
-  onPageChange 
+  onPageChange,
+  timeFilter: externalTimeFilter,
+  onTimeFilterChange
 }: LeaderboardTableProps) => {
   const { userAddress } = useUser();
   const isMobile = useIsMobile();
-  const [timeFilter, setTimeFilter] = useState<"season" | "all-time">("all-time");
+  const [internalTimeFilter, setInternalTimeFilter] = useState<"season" | "all-time">("all-time");
+  
+  // Use external filter if provided, otherwise use internal state
+  const timeFilter = externalTimeFilter ?? internalTimeFilter;
+  const setTimeFilter = onTimeFilterChange ?? setInternalTimeFilter;
   
   const columns: ColumnsType<LeaderboardEntry> = useMemo(() => [
     {
@@ -111,27 +118,31 @@ export const LeaderboardTable = ({
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between flex-wrap gap-4">
-            <div>
-              <CardTitle>Top Reward Earners</CardTitle>
-              <CardDescription>Leaderboard ranked by highest total rewards</CardDescription>
+          <div>
+            <CardTitle>Top Reward Earners</CardTitle>
+            <CardDescription>Leaderboard ranked by highest total rewards</CardDescription>
             </div>
-            <div className="flex items-center rounded-lg border border-border p-1 bg-muted/50">
-              <Button
-                variant={timeFilter === "season" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setTimeFilter("season")}
-                className="h-8 px-3"
-              >
-                Season
-              </Button>
-              <Button
-                variant={timeFilter === "all-time" ? "default" : "ghost"}
-                size="sm"
+            <div className="inline-flex items-center rounded-full bg-muted p-1">
+              <button
                 onClick={() => setTimeFilter("all-time")}
-                className="h-8 px-3"
+                className={`px-4 py-1.5 text-sm font-medium rounded-full transition-all duration-200 ${
+                  timeFilter === "all-time"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
               >
                 All Time
-              </Button>
+              </button>
+              <button
+                onClick={() => setTimeFilter("season")}
+                className={`px-4 py-1.5 text-sm font-medium rounded-full transition-all duration-200 ${
+                  timeFilter === "season"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Season
+              </button>
             </div>
           </div>
         </CardHeader>
