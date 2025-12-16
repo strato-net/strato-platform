@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
+import { safeParseUnits } from "@/utils/numberUtils";
 import { formatUnits } from "ethers";
 import { useToast } from "@/hooks/use-toast";
 import { useLendingContext } from "@/context/LendingContext";
@@ -10,9 +10,6 @@ import DashboardHeader from "../components/dashboard/DashboardHeader";
 import MobileSidebar from "../components/dashboard/MobileSidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
 import { CollateralData } from "@/interface";
 import PositionSection from "@/components/Positions";
 import CollateralModal from "@/components/borrow/CollateralModal";
@@ -36,10 +33,6 @@ const Borrow = () => {
   const [modalLoading, setModalLoading] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [repayLoading, setRepayLoading] = useState(false);
-  const [eligibleCollateral, setEligibleCollateral] = useState<CollateralData[]>([]);
-  const [depositCollateralAddress, setDepositCollateralAddress] = useState<string>("");
-  const [depositCollateralAmount, setDepositCollateralAmount] = useState<string>("");
-  const [depositCollateralAmountError, setDepositCollateralAmountError] = useState<string>("");
   const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
   const { toast } = useToast();
@@ -87,79 +80,6 @@ const Borrow = () => {
     refreshData();
   }, [userAddress, refreshLoans, refreshCollateral, fetchUsdstBalance]);
 
-    useEffect(() => {
-    if (collateralInfo && Array.isArray(collateralInfo)) {
-      // Only show assets that have a balance > 0
-      const eligibleWithBalance = collateralInfo.filter((item) => 
-        BigInt(item.userBalance || 0) > 0n
-      );
-      setEligibleCollateral(eligibleWithBalance);
-    }
-  }, [collateralInfo])
-
-  useEffect(() => {
-    // Default dropdown selection to the first available collateral with wallet balance
-    if (!depositCollateralAddress && eligibleCollateral.length > 0) {
-      setDepositCollateralAddress(eligibleCollateral[0].address);
-    }
-  }, [depositCollateralAddress, eligibleCollateral]);
-
-  const selectedDepositCollateral = useMemo(() => {
-    if (!eligibleCollateral.length) return null;
-    return (
-      eligibleCollateral.find((a) => a.address === depositCollateralAddress) ??
-      eligibleCollateral[0]
-    );
-  }, [eligibleCollateral, depositCollateralAddress]);
-
-  const depositMaxWei = useMemo(() => {
-    try {
-      if (!selectedDepositCollateral) return 0n;
-      return BigInt(selectedDepositCollateral.userBalance || 0);
-    } catch {
-      return 0n;
-    }
-  }, [selectedDepositCollateral]);
-
-  const depositDecimals = selectedDepositCollateral?.customDecimals ?? 18;
-  const depositMaxDisplay = useMemo(() => {
-    if (!selectedDepositCollateral) return "-";
-    return formatBalance(depositMaxWei, selectedDepositCollateral?._symbol, depositDecimals, 0, 8);
-  }, [depositMaxWei, depositDecimals, selectedDepositCollateral]);
-
-  const handleDepositAmountChange = (rawValue: string) => {
-    // Allow 0 (and empty) for planned deposit; we only submit supply if amount > 0.
-    const input = rawValue.replace(/,/g, "").trim();
-    const basicPattern = /^\d*\.?\d*$/;
-    if (!basicPattern.test(input)) {
-      setDepositCollateralAmountError("Invalid input format");
-      return;
-    }
-
-    setDepositCollateralAmount(input);
-
-    if (!input) {
-      setDepositCollateralAmountError("");
-      return;
-    }
-
-    if (input.includes(".")) {
-      const decimalPart = input.split(".")[1];
-      if (decimalPart && decimalPart.length > depositDecimals) {
-        setDepositCollateralAmountError(`Maximum ${depositDecimals} decimal places allowed`);
-        return;
-      }
-    }
-
-    // Only enforce upper bound; 0 is allowed.
-    const amountWei = safeParseUnits(input || "0", depositDecimals);
-    if (amountWei > depositMaxWei) {
-      setDepositCollateralAmountError("Maximum amount exceeded");
-      return;
-    }
-
-    setDepositCollateralAmountError("");
-  };
 
   const handleSupply = (asset) => {
     setSelectedAsset(asset);
@@ -235,38 +155,47 @@ const Borrow = () => {
   };
 
 
-  const executeEmbeddedBorrow = async (amount: string): Promise<boolean> => {
+  const executeEmbeddedBorrow = async (amount: string, requiredCollateral?: Array<{ asset: CollateralData; amount: string }>): Promise<boolean> => {
     try {
       setBorrowLoading(true);
-      // If user specified a deposit amount, submit supply first (same submit as borrow).
-      if (selectedDepositCollateral) {
-        const supplyWei = safeParseUnits(depositCollateralAmount || "0", depositDecimals);
-        if (supplyWei > 0n) {
-          const feeWei = safeParseUnits(SUPPLY_COLLATERAL_FEE);
-          const usdstWei = BigInt(usdstBalance || "0");
-          const voucherWei = BigInt(voucherBalance || "0");
-          if ((usdstWei + voucherWei) < feeWei) {
-            toast({
-              title: "Insufficient balance for deposit fee",
-              description: "You don't have enough USDST + vouchers to pay the collateral deposit transaction fee.",
-              variant: "destructive",
-            });
-            setBorrowLoading(false);
-            return false;
-          }
-
-          await supplyCollateral({
-            asset: selectedDepositCollateral.address,
-            amount: supplyWei.toString(),
+      
+      // Deposit required collateral first if specified
+      if (requiredCollateral && requiredCollateral.length > 0) {
+        const feeWei = safeParseUnits(SUPPLY_COLLATERAL_FEE);
+        const usdstWei = BigInt(usdstBalance || "0");
+        const voucherWei = BigInt(voucherBalance || "0");
+        const totalFeeNeeded = feeWei * BigInt(requiredCollateral.length);
+        
+        if ((usdstWei + voucherWei) < totalFeeNeeded) {
+          toast({
+            title: "Insufficient balance for deposit fees",
+            description: `You need ${formatUnits(totalFeeNeeded, 18)} USDST + vouchers to pay for ${requiredCollateral.length} collateral deposit transaction${requiredCollateral.length > 1 ? 's' : ''}.`,
+            variant: "destructive",
           });
-          await Promise.all([
-            refreshLoans(),
-            refreshCollateral(),
-            fetchUsdstBalance(),
-          ]);
+          setBorrowLoading(false);
+          return false;
         }
+
+        // Deposit each required collateral asset
+        for (const item of requiredCollateral) {
+          const supplyWei = safeParseUnits(item.amount, item.asset.customDecimals ?? 18);
+          if (supplyWei > 0n) {
+            await supplyCollateral({
+              asset: item.asset.address,
+              amount: supplyWei.toString(),
+            });
+          }
+        }
+        
+        // Refresh data after deposits
+        await Promise.all([
+          refreshLoans(),
+          refreshCollateral(),
+          fetchUsdstBalance(),
+        ]);
       }
 
+      // Now execute the borrow
       if (amount === 'ALL') {
         await borrowMax();
         toast({
@@ -282,14 +211,13 @@ const Borrow = () => {
           variant: "success",
         });
       }
+      
       setBorrowLoading(false);
       await Promise.all([
         refreshLoans(),
         refreshCollateral(),
         fetchUsdstBalance(),
       ]);
-      setDepositCollateralAmount("");
-      setDepositCollateralAmountError("");
       return true;
     } catch (error) {
       setBorrowLoading(false);
@@ -355,113 +283,13 @@ const Borrow = () => {
                     <TabsTrigger value="repay">Repay</TabsTrigger>
                   </TabsList>
                   <TabsContent value="borrow">
-                    <div className="mb-4 rounded-lg border bg-muted/30 p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="font-medium">Deposit Collateral</div>
-                      </div>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        Select a collateral asset and amount. It will be submitted together with your borrow.
-                      </p>
-
-                      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                        <Select
-                          value={depositCollateralAddress}
-                          onValueChange={setDepositCollateralAddress}
-                          disabled={loadingCollateral || eligibleCollateral.length === 0}
-                        >
-                          <SelectTrigger>
-                            {selectedDepositCollateral ? (
-                              <div className="flex items-center gap-2 min-w-0">
-                                {selectedDepositCollateral?.images?.[0]?.value ? (
-                                  <img
-                                    src={selectedDepositCollateral.images[0].value}
-                                    alt={selectedDepositCollateral._name}
-                                    className="w-5 h-5 rounded-full object-cover"
-                                  />
-                                ) : (
-                                  <div className="w-5 h-5 rounded-full bg-muted-foreground" />
-                                )}
-                                <span className="truncate">{selectedDepositCollateral?._symbol ?? selectedDepositCollateral?._name}</span>
-                              </div>
-                            ) : (
-                              <SelectValue placeholder="Select collateral" />
-                            )}
-                          </SelectTrigger>
-                          <SelectContent>
-                            {eligibleCollateral.map((asset) => (
-                              <SelectItem key={asset.address} value={asset.address}>
-                                <div className="flex items-center gap-2 min-w-0">
-                                  {asset?.images?.[0]?.value ? (
-                                    <img
-                                      src={asset.images[0].value}
-                                      alt={asset._name}
-                                      className="w-5 h-5 rounded-full object-cover"
-                                    />
-                                  ) : (
-                                    <div className="w-5 h-5 rounded-full bg-muted-foreground" />
-                                  )}
-                                  <span className="truncate">{asset?._symbol ?? asset?._name ?? asset.address}</span>
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-
-                        <div className="relative">
-                          <Input
-                            placeholder="0.00"
-                            value={depositCollateralAmount}
-                            onChange={(e) => {
-                              handleDepositAmountChange(e.target.value);
-                            }}
-                            disabled={loadingCollateral || !selectedDepositCollateral}
-                            className={`pr-20 ${depositCollateralAmountError ? "text-red-600" : ""}`}
-                          />
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">
-                            {selectedDepositCollateral?._symbol ?? ""}
-                          </span>
-                        </div>
-
-                        <Button
-                          type="button"
-                          variant="outline"
-                          disabled={loadingCollateral || !selectedDepositCollateral || depositMaxWei <= 0n}
-                          onClick={() => {
-                            try {
-                              setDepositCollateralAmount(formatUnits(depositMaxWei, depositDecimals));
-                              setDepositCollateralAmountError("");
-                            } catch {}
-                          }}
-                        >
-                          Max
-                        </Button>
-                      </div>
-
-                      {depositCollateralAmountError && (
-                        <div className="mt-2 text-sm text-red-600">{depositCollateralAmountError}</div>
-                      )}
-                      {!loadingCollateral && selectedDepositCollateral && (
-                        <div className="mt-2 text-xs text-muted-foreground">
-                          Max available: {depositMaxDisplay}
-                        </div>
-                      )}
-
-                      {!loadingCollateral && eligibleCollateral.length === 0 && (
-                        <div className="mt-3 text-sm text-muted-foreground">
-                          No collateral assets available in your wallet to deposit.
-                        </div>
-                      )}
-                    </div>
                     <BorrowForm
                       loans={loans}
                       borrowLoading={borrowLoading}
                       onBorrow={executeEmbeddedBorrow}
                       usdstBalance={usdstBalance}
                       voucherBalance={voucherBalance}
-                      collateralInfo={eligibleCollateral}
-                      disableBorrow={!!depositCollateralAmountError}
-                      plannedDepositAsset={selectedDepositCollateral}
-                      plannedDepositAmount={depositCollateralAmount}
+                      collateralInfo={collateralInfo}
                       startPolling={startPolling}
                       stopPolling={stopPolling}
                       userRewards={userRewards}

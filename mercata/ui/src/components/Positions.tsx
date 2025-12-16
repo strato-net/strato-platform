@@ -5,11 +5,8 @@ import { CollateralData, NewLoanData } from "@/interface";
 import { formatUnits } from "ethers";
 import { formatBalance } from "@/utils/numberUtils";
 import { useMobileTooltip } from "@/hooks/use-mobile-tooltip";
-import { useLendingContext } from "@/context/LendingContext";
 import { useLiquidationContext } from "@/context/LiquidationContext";
 import { useUser } from "@/context/UserContext";
-import { Link } from "react-router-dom";
-import { Button } from "@/components/ui/button";
 
 interface BorrowingSectionProps {
   userCollaterals: CollateralData[];
@@ -68,18 +65,6 @@ const PositionSection = ({ loanData }: BorrowingSectionProps) => {
 
   return `rgb(${red}, ${green}, 0)`;
 }
-  const { liquidityInfo } = useLendingContext();
-  const borrowIndexDisplay = (() => {
-    try {
-      const idx = liquidityInfo?.borrowIndex;
-      if (!idx) return "0";
-      const s = formatUnits(BigInt(idx), 27);
-      const [w, f = ""] = s.split(".");
-      return f ? `${w}.${f.slice(0, 5)}` : w;
-    } catch {
-      return "0";
-    }
-  })();
 
 
   return (
@@ -108,6 +93,12 @@ const PositionSection = ({ loanData }: BorrowingSectionProps) => {
                 </span>
               </div>
               <div className="flex flex-col space-y-3 p-4 bg-muted/50 rounded-lg">
+                <InfoTooltip content="Annual percentage rate you pay on borrowed amounts. This rate applies to your total borrowed amount.">
+                  <span className="text-muted-foreground text-sm font-medium">Interest Rate</span>
+                </InfoTooltip>
+                <span className="font-semibold text-lg">{((Number(loanData?.interestRate) || 0) / 100).toFixed(2)}%</span>
+              </div>
+              <div className="flex flex-col space-y-3 p-4 bg-muted/50 rounded-lg">
                 <InfoTooltip content="Measures your position's safety. Higher is better. Close to 1.0 means high risk of liquidation. Below 1.0 means your position can be liquidated. No loan means you have no outstanding debt.">
                   <span className="text-muted-foreground text-sm font-medium">Health Factor</span>
                 </InfoTooltip>
@@ -134,26 +125,6 @@ const PositionSection = ({ loanData }: BorrowingSectionProps) => {
                   </div>
                 )}
               </div>
-              </div>
-              <div className="flex flex-col space-y-3 p-4 bg-muted/50 rounded-lg">
-                <InfoTooltip content="You need to supply tokens as collateral before you can borrow. Click 'Supply' in the Eligible Collateral table below to get started.">
-                  <span className="text-muted-foreground text-sm font-medium">Available Borrowing Power</span>
-                </InfoTooltip>
-                <span className="font-semibold text-lg">
-                  {formatBalance(loanData?.maxAvailableToBorrowUSD || 0n, "USDST", 18, 2, 2)}
-                </span>
-              </div>
-              <div className="flex flex-col space-y-3 p-4 bg-muted/50 rounded-lg">
-                <InfoTooltip content="Global borrow index for the lending pool.">
-                  <span className="text-muted-foreground text-sm font-medium">Borrow Index</span>
-                </InfoTooltip>
-                <span className="font-semibold text-lg">{borrowIndexDisplay}</span>
-              </div>
-              <div className="flex flex-col space-y-3 p-4 bg-muted/50 rounded-lg">
-                <InfoTooltip content="Annual percentage rate you pay on borrowed amounts. This rate applies to your total borrowed amount.">
-                  <span className="text-muted-foreground text-sm font-medium">Interest Rate</span>
-                </InfoTooltip>
-                <span className="font-semibold text-lg">{((Number(loanData?.interestRate) || 0) / 100).toFixed(2)}%</span>
               </div>
             </div>
           </div>

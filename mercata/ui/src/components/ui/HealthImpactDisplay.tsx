@@ -38,17 +38,20 @@ const HealthImpactDisplay = ({
           <span className={`font-medium ${getHealthFactorColor(healthImpact.newHealthFactor)}`}>
             {newLabel}
           </span>
-          <span
-            className={`font-medium ${
-              healthImpact.healthImpact >= 0
-                ? "text-green-600 dark:text-green-400"
-                : "text-red-600 dark:text-red-400"
-            }`}
-            title="Change"
-          >
-            ({healthImpact.healthImpact >= 0 ? "+" : ""}
-            {healthImpact.healthImpact.toFixed(2)})
-          </span>
+          {/* Don't show health impact change when transitioning to "No Loan" */}
+          {healthImpact.newHealthFactor !== Infinity && (
+            <span
+              className={`font-medium ${
+                healthImpact.healthImpact >= 0
+                  ? "text-green-600 dark:text-green-400"
+                  : "text-red-600 dark:text-red-400"
+              }`}
+              title="Change"
+            >
+              ({healthImpact.healthImpact >= 0 ? "+" : ""}
+              {healthImpact.healthImpact.toFixed(2)})
+            </span>
+          )}
         </div>
       </div>
       <div className="space-y-2">

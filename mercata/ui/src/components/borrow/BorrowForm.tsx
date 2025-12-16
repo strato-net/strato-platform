@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BORROW_FEE } from "@/lib/constants";
@@ -11,24 +11,40 @@ import { computeMaxTransferable, handleAmountInputChange } from "@/utils/transfe
 import { UserRewardsData } from "@/services/rewardsService";
 import { CompactRewardsDisplay } from "../rewards/CompactRewardsDisplay";
 import { Slider } from "@/components/ui/slider";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface BorrowFormProps {
   loans: NewLoanData | null;
   borrowLoading: boolean;
-  onBorrow: (amount: string) => Promise<boolean> | boolean;
+  onBorrow: (amount: string, requiredCollateral?: Array<{ asset: CollateralData; amount: string }>) => Promise<boolean> | boolean;
   usdstBalance: string;
   voucherBalance: string;
   collateralInfo: CollateralData[] | null;
-  disableBorrow?: boolean;
-  plannedDepositAsset?: CollateralData | null;
-  plannedDepositAmount?: string;
   startPolling?: () => void;
   stopPolling?: () => void;
   userRewards?: UserRewardsData | null;
   rewardsLoading?: boolean;
 }
 
-const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalance, collateralInfo, disableBorrow, plannedDepositAsset, plannedDepositAmount, startPolling, stopPolling, userRewards, rewardsLoading }: BorrowFormProps) => {
+// Component to display USD amounts with 2 decimals and tooltip showing precise amount
+const FormattedUSDAmount = ({ weiAmount, symbol = "USDST", preciseAmount }: { weiAmount: string | bigint; symbol?: string; preciseAmount?: string }) => {
+  const amountStr = typeof weiAmount === 'bigint' ? weiAmount.toString() : weiAmount;
+  const precise = preciseAmount || formatWeiAmount(amountStr, 18);
+  const display = parseFloat(precise).toFixed(2);
+  
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="cursor-help">{symbol} {display}</span>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>{symbol} {precise}</p>
+      </TooltipContent>
+    </Tooltip>
+  );
+};
+
+const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalance, collateralInfo, startPolling, stopPolling, userRewards, rewardsLoading }: BorrowFormProps) => {
   const [borrowAmount, setBorrowAmount] = useState<string>("");
   const [borrowAmountError, setBorrowAmountError] = useState<string>("");
   const [feeError, setFeeError] = useState<string>("");
@@ -41,92 +57,302 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
   });
   const { borrowMax } = useLendingContext();
 
-  const HF_MIN = 1.05;
   const HF_MAX = 10;
+  
+  // Calculate minimum health factor dynamically based on collateral assets
+  // Formula: At max borrow (using LTV), HF = (collateral × liquidation_threshold) / (collateral × LTV) = liquidation_threshold / LTV
+  // We use the minimum ratio across all assets to ensure the slider allows all possible borrow scenarios
+  const HF_MIN = useMemo(() => {
+    if (!collateralInfo || collateralInfo.length === 0) {
+      // If no collateral info, use a conservative default that's definitely achievable
+      // This is only used as a fallback - the form should ideally wait for collateral info
+      return 1.5;
+    }
+    
+    let minHF = Infinity;
+    
+    for (const asset of collateralInfo) {
+      try {
+        const liquidationThresholdBP = BigInt(asset.liquidationThreshold || "0"); // basis points
+        const ltvBP = BigInt(asset.ltv || "0"); // basis points
+        
+        // Skip if either value is missing or zero
+        if (liquidationThresholdBP === 0n || ltvBP === 0n) continue;
+        
+        // Calculate HF at max borrow: liquidation_threshold / LTV
+        // Both are in basis points, so: (liquidationThresholdBP / 10000) / (ltvBP / 10000) = liquidationThresholdBP / ltvBP
+        const hfAtMaxBorrow = Number(liquidationThresholdBP) / Number(ltvBP);
+        
+        if (hfAtMaxBorrow > 0 && hfAtMaxBorrow < minHF) {
+          minHF = hfAtMaxBorrow;
+        }
+      } catch (error) {
+        // Skip this asset if calculation fails
+        continue;
+      }
+    }
+    
+    // If we found valid assets, return the minimum
+    // If no valid assets found, use conservative default that's definitely achievable
+    return isFinite(minHF) && minHF > 0 ? minHF : 1.5;
+  }, [collateralInfo]);
+  
+  // Initialize target health factor - will be updated when borrow amount is entered
   const [targetHealthFactor, setTargetHealthFactor] = useState<number>(HF_MAX);
 
-  const plannedDepositWei = useMemo(() => {
-    if (!plannedDepositAsset) return 0n;
-    return safeParseUnits(plannedDepositAmount || "0", plannedDepositAsset.customDecimals ?? 18);
-  }, [plannedDepositAsset, plannedDepositAmount]);
+  // State for collateral deposit section
+  const [selectedCollateralDeposits, setSelectedCollateralDeposits] = useState<Record<string, string>>({});
 
+  // Calculate borrow amount in wei - needs to be defined early since it's used in other useMemos
+  const borrowAmountWei = useMemo(() => {
+    try {
+      return safeParseUnits(borrowAmount || "0", 18);
+    } catch {
+      return 0n;
+    }
+  }, [borrowAmount]);
+
+  // Create preview loan that includes selected collateral deposits
+  // This is used for health factor calculations to show what the HF would be after deposits + borrow
   const loanForPreview = useMemo<NewLoanData | null>(() => {
     if (!loans) return null;
-    if (!plannedDepositAsset || plannedDepositWei <= 0n) return loans;
-
-    try {
-      const currentCollUSD = BigInt(loans.totalCollateralValueUSD || "0"); // USD 1e18, threshold-adjusted
-      const hfRaw = BigInt(loans.healthFactorRaw || "0"); // 1e18
-
-      const assetPrice = BigInt(plannedDepositAsset.assetPrice || "0"); // USD 1e18 per token
-      const liqThreshold = BigInt(plannedDepositAsset.liquidationThreshold || "0"); // bps
-      const tokenDecimals = 10n ** BigInt(plannedDepositAsset.customDecimals ?? 18);
-
-      const amountValueUSD = (plannedDepositWei * assetPrice) / tokenDecimals;
-      const amountValueWithThreshold = (amountValueUSD * liqThreshold) / 10000n;
-      const newCollUSD = currentCollUSD + amountValueWithThreshold;
-
-      // Preserve current debt by updating HF raw consistently when there is debt.
-      if (hfRaw > 0n && currentCollUSD > 0n) {
-        const currentBorrowUSD = (currentCollUSD * 10n ** 18n) / hfRaw;
-        const newHFRaw = currentBorrowUSD === 0n ? 0n : (newCollUSD * 10n ** 18n) / currentBorrowUSD;
-        return {
-          ...loans,
-          totalCollateralValueUSD: newCollUSD.toString(),
-          healthFactorRaw: newHFRaw.toString(),
-        };
+    
+    // Start with current collateral value
+    let totalCollateralValueUSD = BigInt(loans.totalCollateralValueUSD || "0"); // USD 1e18 (threshold-adjusted)
+    
+    // Add selected collateral deposits
+    if (collateralInfo && Array.isArray(collateralInfo) && Object.keys(selectedCollateralDeposits).length > 0) {
+      for (const asset of collateralInfo) {
+        const selectedAmount = selectedCollateralDeposits[asset.address];
+        if (selectedAmount && parseFloat(selectedAmount) > 0) {
+          try {
+            const depositWei = safeParseUnits(selectedAmount, asset.customDecimals ?? 18);
+            const assetPrice = BigInt(asset.assetPrice || "0"); // USD 1e18
+            const liqThreshold = BigInt(asset.liquidationThreshold || "0"); // bps
+            const tokenDecimals = 10n ** BigInt(asset.customDecimals ?? 18);
+            
+            if (depositWei > 0n && liqThreshold > 0n && assetPrice > 0n) {
+              // Calculate USD value of deposit
+              const depositValueUSD = (depositWei * assetPrice) / tokenDecimals;
+              // Apply liquidation threshold (same as deposited collateral)
+              const depositValueWithThreshold = (depositValueUSD * liqThreshold) / 10000n;
+              totalCollateralValueUSD += depositValueWithThreshold;
+            }
+          } catch (error) {
+            // Skip this asset if calculation fails
+            continue;
+          }
+        }
       }
-
-      return {
-        ...loans,
-        totalCollateralValueUSD: newCollUSD.toString(),
-      };
-    } catch {
-      return loans;
     }
-  }, [loans, plannedDepositAsset, plannedDepositWei]);
+    
+    // Return updated loan data with selected deposits included
+    return {
+      ...loans,
+      totalCollateralValueUSD: totalCollateralValueUSD.toString(),
+      // Recalculate health factor raw with new collateral value
+      healthFactorRaw: (() => {
+        const currentDebtUSD = BigInt(loans.totalAmountOwed || "0");
+        if (currentDebtUSD === 0n) return "0"; // Infinite HF when no debt
+        // HF = (collateral * 1e18) / debt
+        return ((totalCollateralValueUSD * (10n ** 18n)) / currentDebtUSD).toString();
+      })(),
+      healthFactor: (() => {
+        const currentDebtUSD = BigInt(loans.totalAmountOwed || "0");
+        if (currentDebtUSD === 0n) return Infinity;
+        return Number(totalCollateralValueUSD) / Number(currentDebtUSD);
+      })(),
+    };
+  }, [loans, collateralInfo, selectedCollateralDeposits]);
 
-  // Max achievable HF for this action is the HF when borrowing 0 USDST (can't borrow negative).
-  // If the calculator returns 0/invalid for the no-debt case (effectively ∞), fall back to HF_MAX.
-  const hfAtZeroBorrow = useMemo(() => {
-    if (!loanForPreview) return HF_MAX;
-    try {
-      const hf0 = Number(calculateBorrowHealthImpact(0n, loanForPreview).newHealthFactor);
-      if (!isFinite(hf0) || hf0 <= 0) return HF_MAX;
-      return hf0;
-    } catch {
-      return HF_MAX;
+  // Calculate maximum achievable HF with current borrow amount + all available collateral
+  const maxAchievableHF = useMemo(() => {
+    if (!loans || !borrowAmount || borrowAmountWei <= 0n) {
+      // If no borrow amount, use HF at zero borrow
+      if (!loanForPreview) return HF_MAX;
+      try {
+        const hf0 = Number(calculateBorrowHealthImpact(0n, loanForPreview).newHealthFactor);
+        if (!isFinite(hf0) || hf0 <= 0) return HF_MAX;
+        return hf0;
+      } catch {
+        return HF_MAX;
+      }
     }
-  }, [loanForPreview]);
+    
+    // Calculate max HF with borrow amount + all available collateral
+    let maxCollateralValueUSD = BigInt(loans.totalCollateralValueUSD || "0"); // Current deposited
+    
+    // Add all available undeposited collateral
+    if (collateralInfo && Array.isArray(collateralInfo)) {
+      for (const asset of collateralInfo) {
+        try {
+          const userBalanceWei = BigInt(asset.userBalance || "0");
+          const collateralizedWei = BigInt(asset.collateralizedAmount || "0");
+          const undepositedWei = userBalanceWei > collateralizedWei ? userBalanceWei - collateralizedWei : 0n;
+          
+          if (undepositedWei > 0n) {
+            const assetPrice = BigInt(asset.assetPrice || "0"); // USD 1e18
+            const liqThreshold = BigInt(asset.liquidationThreshold || "0"); // bps
+            const tokenDecimals = 10n ** BigInt(asset.customDecimals ?? 18);
+            
+            if (liqThreshold > 0n && assetPrice > 0n) {
+              const depositValueUSD = (undepositedWei * assetPrice) / tokenDecimals;
+              const depositValueWithThreshold = (depositValueUSD * liqThreshold) / 10000n;
+              maxCollateralValueUSD += depositValueWithThreshold;
+            }
+          }
+        } catch {
+          continue;
+        }
+      }
+    }
+    
+    // Calculate HF with max collateral and borrow amount
+    const currentDebtUSD = BigInt(loans.totalAmountOwed || "0");
+    const newDebtUSD = currentDebtUSD + borrowAmountWei;
+    
+    if (newDebtUSD === 0n) return HF_MAX;
+    const maxHF = Number(maxCollateralValueUSD) / Number(newDebtUSD);
+    
+    return isFinite(maxHF) && maxHF > 0 ? maxHF : HF_MAX;
+  }, [loans, borrowAmount, borrowAmountWei, collateralInfo, loanForPreview]);
+
+  // Calculate minimum achievable HF for current borrow amount (with current collateral only, no additional deposits)
+  const minAchievableHF = useMemo(() => {
+    if (!loans || !borrowAmount || borrowAmountWei <= 0n) {
+      // If no borrow amount, use HF_MIN (theoretical minimum)
+      return HF_MIN;
+    }
+    
+    // Minimum HF = what you'd have with current collateral + borrow amount (no additional deposits)
+    const currentCollateralValueUSD = BigInt(loans.totalCollateralValueUSD || "0"); // USD 1e18 (threshold-adjusted)
+    const currentDebtUSD = BigInt(loans.totalAmountOwed || "0"); // USD 1e18
+    const newDebtUSD = currentDebtUSD + borrowAmountWei; // USD 1e18
+    
+    if (newDebtUSD === 0n) return HF_MAX; // No debt = infinite HF
+    
+    const minHF = Number(currentCollateralValueUSD) / Number(newDebtUSD);
+    return isFinite(minHF) && minHF > 0 ? minHF : HF_MIN;
+  }, [loans, borrowAmount, borrowAmountWei, HF_MIN]);
 
   const hfSliderMax = useMemo(() => {
-    // Ensure the slider range is always valid.
-    return Math.max(HF_MIN, Math.min(HF_MAX, hfAtZeroBorrow));
-  }, [hfAtZeroBorrow]);
+    // Ensure the slider range is always valid
+    // Allow slider max to exceed HF_MAX when achievable HF is higher (e.g., small borrow amounts)
+    // But ensure it's at least HF_MIN
+    return Math.max(HF_MIN, maxAchievableHF);
+  }, [HF_MIN, maxAchievableHF]);
 
+  const hfSliderMin = useMemo(() => {
+    // Minimum is the higher of: theoretical minimum (HF_MIN) or minimum achievable with current borrow amount
+    return Math.max(HF_MIN, minAchievableHF);
+  }, [HF_MIN, minAchievableHF]);
+  
+  // Ensure target health factor doesn't exceed slider max when slider max changes
+  // This prevents flip-flopping when current HF > 10
+  useEffect(() => {
+    // Only clamp if we're above the max
+    if (targetHealthFactor > hfSliderMax) {
+      setTargetHealthFactor(hfSliderMax);
+    }
+  }, [hfSliderMax]); // Only depend on hfSliderMax to avoid loops
+
+  // Calculate "Available to Borrow" including all user balances (not just deposited collateral)
+  // This shows what you COULD borrow if you deposited all your available collateral
+  // Formula: (LTV × deposited collateral value) + (LTV × undeposited collateral value) - current debt
   const maxAvailableToBorrowForPreviewWei = useMemo(() => {
     if (!loans) return 0n;
-    const current = (() => {
+    
+    // Start with borrowing power from already deposited collateral (LTV × deposited)
+    // This is loans.totalBorrowingPowerUSD which is the sum of (deposited collateral × LTV)
+    const depositedBorrowingPower = (() => {
       try {
-        return BigInt(loans.maxAvailableToBorrowUSD || "0");
+        return BigInt(loans.totalBorrowingPowerUSD || "0");
       } catch {
         return 0n;
       }
     })();
 
-    if (!plannedDepositAsset || plannedDepositWei <= 0n) return current;
-
-    try {
-      const assetPrice = BigInt(plannedDepositAsset.assetPrice || "0"); // USD 1e18
-      const ltvBP = BigInt(plannedDepositAsset.ltv || "0"); // bps
-      const tokenDecimals = 10n ** BigInt(plannedDepositAsset.customDecimals ?? 18);
-      const amountValueUSD = (plannedDepositWei * assetPrice) / tokenDecimals;
-      const addedBorrowCapUSD = (amountValueUSD * ltvBP) / 10000n;
-      return current + addedBorrowCapUSD;
-    } catch {
-      return current;
+    // Calculate total borrowing power from ALL collateral (deposited + undeposited)
+    // Formula: (LTV × deposited) + (LTV × undeposited) = (LTV × total wallet balance)
+    // We need to calculate: (deposited amount × LTV) + (undeposited amount × LTV)
+    // Since userBalance might not include deposited amounts, we use:
+    // totalAmount = userBalance (wallet) + collateralizedAmount (deposited)
+    let totalWalletBorrowingPower = 0n;
+    const assetBreakdown: Array<{symbol: string; userBalance: string; collateralized: string; totalAmount: string; totalUsdValue: string; totalBorrowPower: string}> = [];
+    
+    if (collateralInfo && Array.isArray(collateralInfo)) {
+      for (const asset of collateralInfo) {
+        try {
+          const userBalanceWei = BigInt(asset.userBalance || "0"); // Wallet balance (undeposited)
+          const collateralizedWei = BigInt(asset.collateralizedAmount || "0"); // Already deposited
+          
+          // Total amount = wallet balance + deposited amount
+          // This gives us the complete picture of all collateral (deposited + undeposited)
+          const totalAmountWei = userBalanceWei + collateralizedWei;
+          
+          if (totalAmountWei > 0n) {
+            const assetPrice = BigInt(asset.assetPrice || "0"); // USD 1e18
+            const ltvBP = BigInt(asset.ltv || "0"); // bps
+            const tokenDecimals = 10n ** BigInt(asset.customDecimals ?? 18);
+            
+            if (ltvBP > 0n && assetPrice > 0n) {
+              // Calculate USD value of total amount (deposited + undeposited)
+              const totalValueUSD = (totalAmountWei * assetPrice) / tokenDecimals;
+              // Calculate borrowing power: USD value * LTV (in basis points)
+              const borrowPowerUSD = (totalValueUSD * ltvBP) / 10000n;
+              totalWalletBorrowingPower += borrowPowerUSD;
+              
+              // Track breakdown for debugging
+              assetBreakdown.push({
+                symbol: asset._symbol || 'Unknown',
+                userBalance: formatUnits(userBalanceWei, asset.customDecimals ?? 18),
+                collateralized: formatUnits(collateralizedWei, asset.customDecimals ?? 18),
+                totalAmount: formatUnits(totalAmountWei, asset.customDecimals ?? 18),
+                totalUsdValue: formatUnits(totalValueUSD, 18),
+                totalBorrowPower: formatUnits(borrowPowerUSD, 18),
+              });
+            }
+          }
+        } catch (error) {
+          // Skip this asset if calculation fails
+          console.error(`Error calculating borrowing power for ${asset._symbol}:`, error);
+          continue;
+        }
+      }
     }
-  }, [loans, plannedDepositAsset, plannedDepositWei]);
+
+    // Total borrowing power = sum of (LTV × total amount) for all assets
+    // This equals: (LTV × deposited) + (LTV × undeposited)
+    const totalBorrowingPower = totalWalletBorrowingPower;
+    
+    // Current debt
+    const currentDebt = (() => {
+      try {
+        return BigInt(loans.totalAmountOwed || "0");
+      } catch {
+        return 0n;
+      }
+    })();
+    
+    // Available to borrow = Total borrowing power - current debt
+    const total = totalBorrowingPower > currentDebt ? totalBorrowingPower - currentDebt : 0n;
+    
+    // Debug logging (remove in production)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Available to Borrow Calculation:', {
+        depositedBorrowingPower_fromBackend: formatUnits(depositedBorrowingPower, 18),
+        totalWalletBorrowingPower: formatUnits(totalWalletBorrowingPower, 18),
+        totalBorrowingPower: formatUnits(totalBorrowingPower, 18),
+        currentDebt: formatUnits(currentDebt, 18),
+        availableToBorrow: formatUnits(total, 18),
+        assetBreakdown,
+        // For comparison with backend value
+        backend_maxAvailableToBorrowUSD: formatUnits(BigInt(loans.maxAvailableToBorrowUSD || "0"), 18),
+      });
+    }
+
+    return total;
+  }, [loans, collateralInfo]);
 
   const hasPreviewBorrowPower = useMemo(() => {
     try {
@@ -176,27 +402,111 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
     }
   };
 
+  // Calculate required collateral to achieve target health factor
+  const calculateRequiredCollateral = useMemo(() => {
+    if (!loans || !borrowAmount || borrowAmountWei <= 0n) return [];
+    
+    const targetHFScaled = BigInt(Math.round(targetHealthFactor * 1e18));
+    const currentDebtUSD = BigInt(loans.totalAmountOwed || "0"); // USD 1e18
+    const newDebtUSD = currentDebtUSD + borrowAmountWei; // USD 1e18
+    
+    // Calculate required collateral value: debt * targetHF
+    const requiredCollateralValueUSD = (newDebtUSD * targetHFScaled) / (10n ** 18n);
+    const currentCollateralValueUSD = BigInt(loans.totalCollateralValueUSD || "0"); // USD 1e18 (threshold-adjusted)
+    const shortfallUSD = requiredCollateralValueUSD > currentCollateralValueUSD 
+      ? requiredCollateralValueUSD - currentCollateralValueUSD 
+      : 0n;
+    
+    if (shortfallUSD <= 0n) return []; // No collateral needed
+    
+    // Calculate how much of each asset is needed
+    const required: Array<{ asset: CollateralData; amount: string }> = [];
+    
+    if (collateralInfo && Array.isArray(collateralInfo)) {
+      let remainingShortfall = shortfallUSD;
+      
+      for (const asset of collateralInfo) {
+        if (remainingShortfall <= 0n) break;
+        
+        try {
+          const userBalanceWei = BigInt(asset.userBalance || "0");
+          const collateralizedWei = BigInt(asset.collateralizedAmount || "0");
+          const undepositedWei = userBalanceWei > collateralizedWei ? userBalanceWei - collateralizedWei : 0n;
+          
+          if (undepositedWei > 0n) {
+            const assetPrice = BigInt(asset.assetPrice || "0"); // USD 1e18
+            const liqThreshold = BigInt(asset.liquidationThreshold || "0"); // bps
+            const tokenDecimals = 10n ** BigInt(asset.customDecimals ?? 18);
+            
+            if (liqThreshold > 0n && assetPrice > 0n) {
+              // Calculate collateral value this asset can provide (with threshold)
+              const maxValueUSD = (undepositedWei * assetPrice) / tokenDecimals;
+              const maxValueWithThreshold = (maxValueUSD * liqThreshold) / 10000n;
+              
+              if (maxValueWithThreshold > 0n) {
+                const neededValue = remainingShortfall > maxValueWithThreshold ? maxValueWithThreshold : remainingShortfall;
+                // Convert back to token amount: (neededValue * decimals * 10000) / (price * threshold)
+                const neededWei = (neededValue * tokenDecimals * 10000n) / (assetPrice * liqThreshold);
+                const depositWei = neededWei > undepositedWei ? undepositedWei : neededWei;
+                
+                if (depositWei > 0n) {
+                  required.push({
+                    asset,
+                    amount: formatUnits(depositWei, asset.customDecimals ?? 18),
+                  });
+                  remainingShortfall -= (depositWei * assetPrice * liqThreshold) / (tokenDecimals * 10000n);
+                }
+              }
+            }
+          }
+        } catch {
+          continue;
+        }
+      }
+    }
+    
+    return required;
+  }, [loans, borrowAmount, borrowAmountWei, targetHealthFactor, collateralInfo]);
+
   const handleBorrow = async () => {
+    if (!borrowAmount || borrowAmountWei <= 0n) return;
+    
+    // Build required collateral array from selected deposits
+    const required: Array<{ asset: CollateralData; amount: string }> = [];
+    if (calculateRequiredCollateral.length > 0) {
+      for (const item of calculateRequiredCollateral) {
+        const selectedAmount = selectedCollateralDeposits[item.asset.address];
+        if (selectedAmount && parseFloat(selectedAmount) > 0) {
+          required.push({
+            asset: item.asset,
+            amount: selectedAmount,
+          });
+        }
+      }
+    }
+    
     const maxWei = BigInt(loans?.maxAvailableToBorrowUSD || 0);
     const wei = safeParseUnits(borrowAmount || "0", 18);
 
     // If at or within 1 wei of the max available, route via parent as 'ALL' to use on-chain borrowMax and parent UX
     if (maxWei > 0n && (wei >= maxWei || (maxWei > 0n && wei >= (maxWei - 1n)))) {
-      const ok = await onBorrow('ALL');
+      const ok = await onBorrow('ALL', required.length > 0 ? required : undefined);
       if (ok !== false) {
         setBorrowAmount("");
         setBorrowAmountError("");
         setFeeError("");
+        setSelectedCollateralDeposits({});
         handlePollingUpdate("");
       }
       return;
     }
 
-    const ok = await onBorrow(borrowAmount);
+    const ok = await onBorrow(borrowAmount, required.length > 0 ? required : undefined);
     if (ok !== false) {
       setBorrowAmount("");
       setBorrowAmountError("");
       setFeeError("");
+      setSelectedCollateralDeposits({});
       handlePollingUpdate("");
     }
   };
@@ -212,6 +522,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
     // Before: exclude planned deposit by using the real loan snapshot.
     const before = calculateBorrowHealthImpact(0n, loans);
     // After: include planned deposit by using preview loan + entered borrow.
+    // loanForPreview already includes selectedCollateralDeposits
     const after = calculateBorrowHealthImpact(borrowAmountWei, loanForPreview);
 
     setHealthImpact({
@@ -222,103 +533,97 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
     });
   }, [borrowAmount, loans, loanForPreview]);
 
+  // Track previous borrow amount to detect when it changes
+  const prevBorrowAmountRef = useRef<string>("");
+  
   useEffect(() => {
-    // When user types a borrow amount, reflect the resulting HF on the slider.
-    const hf = Number(healthImpact?.newHealthFactor);
-    if (!isFinite(hf) || hf <= 0) return;
-    setTargetHealthFactor(Math.min(hfSliderMax, Math.max(HF_MIN, hf)));
-  }, [healthImpact?.newHealthFactor, hfSliderMax]);
+    // When borrow amount changes (entered or modified), set slider to minimum achievable
+    // This ensures user starts at the HF they can achieve without additional collateral
+    if (borrowAmount && borrowAmountWei > 0n && borrowAmount !== prevBorrowAmountRef.current) {
+      setTargetHealthFactor(hfSliderMin);
+      prevBorrowAmountRef.current = borrowAmount;
+      return;
+    }
+    
+    // When borrow amount is cleared, reset to max (but don't exceed slider max)
+    // Don't update if we're already at a valid value to prevent flip-flopping
+    if (!borrowAmount || borrowAmountWei <= 0n) {
+      if (targetHealthFactor > hfSliderMax) {
+        setTargetHealthFactor(hfSliderMax);
+      }
+      // Only reset prevBorrowAmountRef if it was set (to avoid unnecessary updates)
+      if (prevBorrowAmountRef.current !== "") {
+        prevBorrowAmountRef.current = "";
+      }
+      return;
+    }
+    
+    // Otherwise, clamp if out of bounds (user manually adjusted slider)
+    // Only clamp if actually out of bounds to prevent unnecessary updates
+    const currentTarget = targetHealthFactor;
+    if (currentTarget > hfSliderMax) {
+      setTargetHealthFactor(hfSliderMax);
+    } else if (currentTarget < hfSliderMin) {
+      setTargetHealthFactor(hfSliderMin);
+    }
+  }, [borrowAmount, borrowAmountWei, hfSliderMin, hfSliderMax]);
 
+  // Health factor slider just sets the target - doesn't auto-calculate borrow amount
   const handleHealthFactorSliderChange = (values: number[]) => {
     const targetHf = values?.[0];
     if (!isFinite(targetHf)) return;
-    if (!loanForPreview) return;
-    const clampedTarget = Math.min(hfSliderMax, Math.max(HF_MIN, targetHf));
+    
+    // Prevent dragging below achievable minimum, but allow slider to show theoretical minimum
+    // Clamp the actual target to achievable range
+    const clampedTarget = Math.min(hfSliderMax, Math.max(hfSliderMin, targetHf));
     setTargetHealthFactor(clampedTarget);
-
-    const maxWei = (() => {
-      try {
-        return BigInt(maxAmount || "0");
-      } catch {
-        return 0n;
-      }
-    })();
-
-    if (maxWei <= 0n) {
-      return;
+    
+    // If user tried to drag below achievable, reset slider position visually
+    if (targetHf < hfSliderMin) {
+      // The slider component will handle the visual reset via the value prop
     }
-
-    const hasExistingDebt = (() => {
-      try {
-        return BigInt(loanForPreview.totalAmountOwed || "0") > 0n;
-      } catch {
-        return false;
-      }
-    })();
-
-    // If there is no existing debt, HF = collateral / borrow -> borrow = collateral / HF (clamped to borrow cap).
-    if (!hasExistingDebt) {
-      try {
-        const collUSD = BigInt(loanForPreview.totalCollateralValueUSD || "0"); // USD 1e18 (threshold-adjusted)
-        if (collUSD <= 0n) return;
-
-        // targetHFScaled is HF * 1e18
-        const targetHFScaled = BigInt(Math.round(clampedTarget * 1e18));
-        if (targetHFScaled <= 0n) return;
-
-        // borrowWei (USD 1e18) = collUSD * 1e18 / targetHFScaled
-        const borrowWei = (collUSD * 10n ** 18n) / targetHFScaled;
-        const clamped = borrowWei > maxWei ? maxWei : borrowWei;
-
-        const amt = formatUnits(clamped, 18);
-        setBorrowAmount(amt);
-        setBorrowAmountError("");
-        handlePollingUpdate(amt);
-      } catch {
-        // noop
-      }
-      return;
-    }
-
-    const hfForBorrow = (borrowWei: bigint): number => {
-      // With no debt, 0 borrow should imply ∞ health factor (calculator returns 0).
-      if (!hasExistingDebt && borrowWei === 0n) return Infinity;
-      const hf = calculateBorrowHealthImpact(borrowWei, loanForPreview).newHealthFactor;
-      // Guard against 0 for the no-debt case.
-      if (!hasExistingDebt && (!isFinite(hf) || hf === 0)) return Infinity;
-      return hf;
-    };
-
-    // If target is at or above the health factor with 0 additional borrow, borrow amount should be 0.
-    const hfAtZero = hasExistingDebt ? hfForBorrow(0n) : Infinity;
-    if (!isFinite(hfAtZero) || clampedTarget >= hfAtZero) {
-      setBorrowAmount("");
-      setBorrowAmountError("");
-      handlePollingUpdate("");
-      return;
-    }
-
-    // Health factor generally decreases as borrow increases -> binary search for amount that approaches target.
-    let lo = 0n;
-    let hi = maxWei;
-    for (let i = 0; i < 40; i++) {
-      const mid = (lo + hi) / 2n;
-      const midHf = hfForBorrow(mid);
-      if (!isFinite(midHf)) break;
-
-      if (midHf > clampedTarget) {
-        // Still safer than target -> can borrow more
-        lo = mid + 1n;
-      } else {
-        hi = mid;
-      }
-    }
-
-    const amt = formatUnits(hi, 18);
-    setBorrowAmount(amt);
-    setBorrowAmountError("");
-    handlePollingUpdate(amt);
   };
+  
+  // Auto-populate collateral deposits when target health factor changes
+  useEffect(() => {
+    if (!borrowAmount || borrowAmountWei <= 0n) {
+      // No borrow amount - clear deposits
+      setSelectedCollateralDeposits({});
+      return;
+    }
+    
+    // If at or near max achievable, use all available collateral
+    if (targetHealthFactor >= hfSliderMax * 0.99) {
+      if (collateralInfo && Array.isArray(collateralInfo)) {
+        const newSelected: Record<string, string> = {};
+        for (const asset of collateralInfo) {
+          const userBalanceWei = BigInt(asset.userBalance || "0");
+          const collateralizedWei = BigInt(asset.collateralizedAmount || "0");
+          const undepositedWei = userBalanceWei > collateralizedWei ? userBalanceWei - collateralizedWei : 0n;
+          
+          if (undepositedWei > 0n) {
+            const maxDisplay = formatUnits(undepositedWei, asset.customDecimals ?? 18);
+            newSelected[asset.address] = maxDisplay;
+          }
+        }
+        setSelectedCollateralDeposits(newSelected);
+      } else {
+        setSelectedCollateralDeposits({});
+      }
+    } else {
+      // For achievable targets, use calculateRequiredCollateral
+      if (calculateRequiredCollateral.length > 0) {
+        const newSelected: Record<string, string> = {};
+        for (const item of calculateRequiredCollateral) {
+          newSelected[item.asset.address] = item.amount;
+        }
+        setSelectedCollateralDeposits(newSelected);
+      } else {
+        // No collateral needed - clear selections
+        setSelectedCollateralDeposits({});
+      }
+    }
+  }, [targetHealthFactor, borrowAmount, borrowAmountWei, hfSliderMax, calculateRequiredCollateral, collateralInfo]);
 
   const interestRateDisplay = (() => {
     type LoanWithInterestRate = NewLoanData & { interestRate?: unknown };
@@ -327,6 +632,66 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
     if (!isFinite(num)) return "-";
     return `${(num / 100).toFixed(2)}%`;
   })();
+
+  // Calculate if borrow amount exceeds available borrowing power and suggest collateral options
+  const needsMoreCollateral = useMemo(() => {
+    if (borrowAmountWei <= 0n) return false;
+    return borrowAmountWei > maxAvailableToBorrowForPreviewWei;
+  }, [borrowAmountWei, maxAvailableToBorrowForPreviewWei]);
+
+  const collateralShortfallUSD = useMemo(() => {
+    if (!needsMoreCollateral) return 0n;
+    return borrowAmountWei - maxAvailableToBorrowForPreviewWei;
+  }, [needsMoreCollateral, borrowAmountWei, maxAvailableToBorrowForPreviewWei]);
+
+  // Calculate suggested collateral deposits to cover the shortfall
+  const suggestedCollateralDeposits = useMemo(() => {
+    if (!needsMoreCollateral || !collateralInfo || collateralInfo.length === 0) return [];
+    
+    const suggestions: Array<{ asset: CollateralData; amountWei: bigint; amountDisplay: string; borrowPowerUSD: bigint }> = [];
+    
+    for (const asset of collateralInfo) {
+      try {
+        const userBalanceWei = BigInt(asset.userBalance || "0");
+        const collateralizedWei = BigInt(asset.collateralizedAmount || "0");
+        const undepositedWei = userBalanceWei > collateralizedWei ? userBalanceWei - collateralizedWei : 0n;
+        
+        if (undepositedWei > 0n) {
+          const assetPrice = BigInt(asset.assetPrice || "0"); // USD 1e18
+          const ltvBP = BigInt(asset.ltv || "0"); // bps
+          const tokenDecimals = 10n ** BigInt(asset.customDecimals ?? 18);
+          
+          if (ltvBP > 0n && assetPrice > 0n) {
+            // Calculate how much of this asset would be needed to cover the shortfall
+            // shortfallUSD = (amountWei * price * ltv) / (decimals * 10000)
+            // amountWei = (shortfallUSD * decimals * 10000) / (price * ltv)
+            const neededWei = (collateralShortfallUSD * tokenDecimals * 10000n) / (assetPrice * ltvBP);
+            const depositWei = neededWei > undepositedWei ? undepositedWei : neededWei;
+            
+            if (depositWei > 0n) {
+              const borrowPowerUSD = (depositWei * assetPrice * ltvBP) / (tokenDecimals * 10000n);
+              suggestions.push({
+                asset,
+                amountWei: depositWei,
+                amountDisplay: formatUnits(depositWei, asset.customDecimals ?? 18),
+                borrowPowerUSD,
+              });
+            }
+          }
+        }
+      } catch {
+        // Skip this asset if calculation fails
+        continue;
+      }
+    }
+    
+    // Sort by borrow power (descending) to show best options first
+    return suggestions.sort((a, b) => {
+      if (a.borrowPowerUSD > b.borrowPowerUSD) return -1;
+      if (a.borrowPowerUSD < b.borrowPowerUSD) return 1;
+      return 0;
+    });
+  }, [needsMoreCollateral, collateralInfo, collateralShortfallUSD]);
 
   return (
     <div className="space-y-4 pt-4">
@@ -337,19 +702,16 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
         {/* Loan Details */}
         <div className="space-y-3">
           <div className="flex justify-between">
-            <span className="text-sm text-muted-foreground">Available to borrow</span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="text-sm text-muted-foreground cursor-help">Available to borrow</span>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Maximum you could borrow if you deposited all available collateral from your wallet</p>
+              </TooltipContent>
+            </Tooltip>
             <span className="font-medium">
-              USDST {hasPreviewBorrowPower ? formatWeiAmount(maxAvailableToBorrowForPreviewWei.toString(), 18) : '-'}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-sm text-muted-foreground">Total Amount Owed</span>
-            <span className="font-medium">
-              {(() => {
-                const owed = (() => { try { return BigInt(loans?.totalAmountOwed || 0); } catch { return 0n; } })();
-                const display = owed <= 1n ? 0n : owed;
-                return `USDST ${formatUnits(display, 18)}`;
-              })()}
+              {hasPreviewBorrowPower ? <FormattedUSDAmount weiAmount={maxAvailableToBorrowForPreviewWei} /> : '-'}
             </span>
           </div>
           <div className="flex justify-between">
@@ -433,7 +795,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
             max={hfSliderMax}
             step={0.05}
             onValueChange={handleHealthFactorSliderChange}
-            disabled={!loanForPreview || !hasPreviewBorrowPower}
+            disabled={!loanForPreview || !hasPreviewBorrowPower || !borrowAmount || borrowAmountWei <= 0n}
             trackClassName="h-3"
             thumbClassName="h-6 w-6"
             className="py-2"
@@ -454,25 +816,6 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
             <p className="text-yellow-600 text-sm mt-1">{feeError}</p>
           )}
         </div>
-
-        <Button
-          onClick={handleBorrow}
-          disabled={
-            !!disableBorrow ||
-            !borrowAmount ||
-            !!borrowAmountError ||
-            !!feeError ||
-            safeParseUnits(borrowAmount || "0") <= 0n ||
-            borrowLoading ||
-            safeParseUnits(borrowAmount || "0") > BigInt(maxAmount)
-          }
-          className="w-full"
-        >
-          {borrowLoading ? (
-            <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-2"></div>
-          ) : null}
-          Borrow
-        </Button>
 
         {/* Conditional Warning Messages */}
         {(() => {
@@ -513,6 +856,122 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
           return null;
         })()}
       </div>
+
+      {/* Additional Collateral Needed Section - Only show when required */}
+      {calculateRequiredCollateral.length > 0 && (
+        <div className="rounded-lg border bg-muted/30 p-4 space-y-4">
+          <div className="font-medium">Additional Collateral Needed</div>
+          <p className="text-sm text-muted-foreground">
+            To borrow {borrowAmount || "0"} USDST with a health factor of {targetHealthFactor.toFixed(2)}, you need to deposit additional collateral.
+          </p>
+          
+          <div className="space-y-3">
+            {calculateRequiredCollateral.map((item) => {
+              const asset = item.asset;
+              const recommendedAmount = item.amount;
+              const selectedAmount = selectedCollateralDeposits[asset.address] || "";
+              const userBalanceWei = BigInt(asset.userBalance || "0");
+              const userBalanceDisplay = formatWeiAmount(userBalanceWei.toString(), asset.customDecimals ?? 18);
+              const maxWei = userBalanceWei;
+              
+              return (
+                <div key={asset.address} className="p-3 border rounded-lg space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      {asset?.images?.[0]?.value ? (
+                        <img
+                          src={asset.images[0].value}
+                          alt={asset._name}
+                          className="w-8 h-8 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-muted-foreground" />
+                      )}
+                      <div>
+                        <div className="font-medium">{asset._symbol}</div>
+                        <div className="text-sm text-muted-foreground">
+                          Available: {userBalanceDisplay} {asset._symbol}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Recommended: {recommendedAmount} {asset._symbol}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Deposit Amount</label>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="0.00"
+                        value={addCommasToInput(selectedAmount)}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          handleAmountInputChange(
+                            value,
+                            (val: string) => {
+                              setSelectedCollateralDeposits(prev => {
+                                const updated = { ...prev };
+                                updated[asset.address] = val;
+                                return updated;
+                              });
+                            },
+                            () => {}, // No error handling for now
+                            maxWei.toString(),
+                            asset.customDecimals ?? 18
+                          );
+                        }}
+                        className="flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const maxDisplay = formatUnits(maxWei, asset.customDecimals ?? 18);
+                          setSelectedCollateralDeposits(prev => ({ ...prev, [asset.address]: maxDisplay }));
+                        }}
+                        disabled={maxWei <= 0n}
+                      >
+                        Max
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedCollateralDeposits(prev => ({ ...prev, [asset.address]: recommendedAmount }));
+                        }}
+                      >
+                        Use Recommended
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Borrow Button - Outside Health Factor box, below Additional Collateral if present */}
+      <Button
+        onClick={handleBorrow}
+        disabled={
+          !borrowAmount ||
+          !!borrowAmountError ||
+          !!feeError ||
+          safeParseUnits(borrowAmount || "0") <= 0n ||
+          borrowLoading ||
+          safeParseUnits(borrowAmount || "0") > BigInt(maxAmount)
+        }
+        className="w-full"
+      >
+        {borrowLoading ? (
+          <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-2"></div>
+        ) : null}
+        Borrow
+      </Button>
     </div>
   );
 };

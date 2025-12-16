@@ -173,8 +173,9 @@ export const calculateBorrowOperationHealthImpact = (
     : currentTotalBorrowValueUSD - amountWei;
 
   // Calculate new health factor (raw, scaled to 1e18)
+  // If debt is fully repaid (newBorrowValueUSD === 0n), health factor is Infinity (no loan)
   const newHealthFactorRaw = newBorrowValueUSD === 0n
-    ? 0n
+    ? 2n ** 256n - 1n // Use max uint256 to represent Infinity
     : (currentCollateralValueUSD * 10n ** 18n) / newBorrowValueUSD;
 
   // Calculate health impact and isHealthy using raw values
@@ -183,9 +184,14 @@ export const calculateBorrowOperationHealthImpact = (
     : Number(newHealthFactorRaw - currentHealthFactorRaw) / 1e18;
   const isHealthy = newBorrowValueUSD === 0n || newHealthFactorRaw >= 10n ** 18n;
 
+  // Convert to number, handling Infinity case
+  const newHealthFactorNumber = newBorrowValueUSD === 0n
+    ? Infinity
+    : Number(newHealthFactorRaw) / 1e18;
+
   return {
     currentHealthFactor: Number(currentHealthFactorRaw) / 1e18,
-    newHealthFactor: Number(newHealthFactorRaw) / 1e18,
+    newHealthFactor: newHealthFactorNumber,
     healthImpact,
     isHealthy,
   };
