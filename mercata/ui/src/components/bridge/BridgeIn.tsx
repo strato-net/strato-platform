@@ -73,6 +73,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
     selectedToken,
     setSelectedToken,
     requestAutoSave,
+    triggerDepositRefresh,
   } = useBridgeContext();
 
   // State
@@ -560,13 +561,31 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
         throw new Error("Transaction reverted");
       }
 
-      const pendingTxKey = `pending_deposit_${txHash}_${activeChainId}`;
-      const pendingTxData = {
-        txHash,
-        chainId: activeChainId.toString(),
-        timestamp: Date.now(),
-      };
-      localStorage.setItem(pendingTxKey, JSON.stringify(pendingTxData));
+      const externalDecimals = parseInt(selectedToken.externalDecimals || "18");
+      const decimalDiff = 18 - externalDecimals;
+      const amount18Decimals = decimalDiff >= 0 
+        ? (depositAmount * BigInt(10 ** decimalDiff)).toString()
+        : depositAmount.toString();
+
+      const existing = JSON.parse(localStorage.getItem('pendingDeposits') || '[]');
+      existing.push({
+        externalChainId: parseInt(activeChainId),
+        externalTxHash: txHash,
+        type: isConvert ? 'convert' : 'bridge',
+        DepositInfo: {
+          externalSender: address,
+          stratoRecipient: userAddress,
+          stratoToken: selectedToken.stratoToken,
+          stratoTokenAmount: amount18Decimals,
+          bridgeStatus: "1",
+        },
+        block_timestamp: new Date().toISOString(),
+        stratoTokenSymbol: selectedToken.stratoTokenSymbol,
+        externalName: selectedToken.externalName,
+        externalSymbol: selectedToken.externalSymbol,
+      });
+      localStorage.setItem('pendingDeposits', JSON.stringify(existing));
+      triggerDepositRefresh();
 
       // Step: Waiting for Autosave (if Easy Savings) or Complete
       if (autoDeposit) {
@@ -716,7 +735,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
         currentStep={currentStep}
         txHash={progressTxHash}
         chainId={currentNetwork?.chainId ? parseInt(currentNetwork.chainId) : undefined}
-        isEasySavings={isConvert}
+        isEasySavings={isConvert && autoDeposit}
         isNative={progressIsNative}
         error={progressError}
         onClose={() => {

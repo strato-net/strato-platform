@@ -84,25 +84,25 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
     
     // If current step not found in steps array, treat all as pending
     if (currentStepIndex === -1) {
-      return <Clock className="w-5 h-5 text-gray-400" />;
+      return <Clock className="w-5 h-5 text-muted-foreground" />;
     }
     if (stepIndex < currentStepIndex) {
       // For completed steps before current, use green checkmark unless it's the complete step
       if (isCompleteStep) {
-        return <Clock className="w-5 h-5 text-yellow-600" />;
+        return <Clock className="w-5 h-5 text-yellow-500" />;
       }
-      return <CheckCircle2 className="w-5 h-5 text-green-600" />;
+      return <CheckCircle2 className="w-5 h-5 text-green-500" />;
     }
     if (stepIndex === currentStepIndex) {
       if (currentStep === "error") {
-        return <AlertCircle className="w-5 h-5 text-red-600" />;
+        return <AlertCircle className="w-5 h-5 text-red-500" />;
       }
       if (currentStep === "complete") {
-        return <Clock className="w-5 h-5 text-yellow-600" />;
+        return <Clock className="w-5 h-5 text-yellow-500" />;
       }
-      return <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />;
+      return <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />;
     }
-    return <Clock className="w-5 h-5 text-gray-400" />;
+    return <Clock className="w-5 h-5 text-muted-foreground" />;
   };
 
   const getStepStatus = (stepIndex: number) => {
@@ -131,16 +131,16 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
     <Modal
       title={
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center">
             {currentStep === "error" ? (
-              <AlertCircle className="w-5 h-5 text-red-600" />
+              <AlertCircle className="w-5 h-5 text-red-500" />
             ) : currentStep === "complete" ? (
-              <CheckCircle2 className="w-5 h-5 text-green-600" />
+              <CheckCircle2 className="w-5 h-5 text-green-500" />
             ) : (
-              <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+              <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
             )}
           </div>
-          <span className="text-lg font-semibold">
+          <span className="text-lg font-semibold text-foreground">
             {currentStep === "error" 
               ? "Deposit Failed" 
               : currentStep === "complete" 
@@ -162,12 +162,12 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
       closable={canClose}
       maskClosable={canClose}
       width={550}
-      className="[&_.ant-modal-content]:rounded-xl [&_.ant-modal-header]:border-b [&_.ant-modal-header]:border-gray-100 [&_.ant-modal-body]:p-6"
+      className="[&_.ant-modal-content]:rounded-xl [&_.ant-modal-content]:bg-card [&_.ant-modal-content]:text-foreground [&_.ant-modal-header]:border-b [&_.ant-modal-header]:border-border [&_.ant-modal-header]:bg-card [&_.ant-modal-body]:p-6 [&_.ant-modal-body]:text-foreground [&_.ant-modal-title]:text-foreground [&_.ant-modal-footer]:bg-card [&_.ant-modal-footer]:border-border [&_.ant-modal-close]:text-muted-foreground"
     >
       <div className="space-y-6">
         {error && (
-          <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-sm text-red-800">{error}</p>
+          <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
+            <p className="text-sm text-red-500">{error}</p>
           </div>
         )}
 
@@ -186,20 +186,20 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
                 key={step.key}
                 className={`rounded-lg transition-all ${
                   isActive
-                    ? "bg-blue-50 border-2 border-blue-200"
+                    ? "bg-blue-500/10 border-2 border-blue-500/30"
                     : isCompleted && isCompleteStep
-                    ? "bg-yellow-50 border border-yellow-300"
+                    ? "bg-yellow-500/10 border border-yellow-500/30"
                     : isCompleted
-                    ? "bg-green-50 border border-green-200"
+                    ? "bg-green-500/10 border border-green-500/30"
                     : isError
-                    ? "bg-red-50 border border-red-200"
-                    : "bg-gray-50 border border-gray-200"
+                    ? "bg-red-500/10 border border-red-500/30"
+                    : "bg-muted/30 border border-border"
                 }`}
               >
                 {isCollapsed ? (
                   <div 
                     className={`flex items-center gap-3 px-4 py-2 transition-colors cursor-pointer ${
-                      isCompleteStep ? "hover:bg-yellow-100/50" : isCompleted ? "hover:bg-green-100/50" : "hover:bg-gray-100/50"
+                      isCompleteStep ? "hover:bg-yellow-500/20" : isCompleted ? "hover:bg-green-500/20" : "hover:bg-muted/50"
                     }`}
                     onClick={() => setCollapsedSteps(prev => {
                       const next = new Set(prev);
@@ -210,11 +210,11 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
                     <div className="flex-shrink-0">{getStepIcon(index)}</div>
                     <div className="flex-1 min-w-0">
                       <h4 className={`font-medium text-sm ${
-                        isCompleteStep ? "text-yellow-900" : isCompleted ? "text-green-900" : "text-gray-600"
+                        isCompleteStep ? "text-yellow-500" : isCompleted ? "text-green-500" : "text-muted-foreground"
                       }`}>{step.label}</h4>
                     </div>
                     <span className={`text-xs ${
-                      isCompleteStep ? "text-yellow-600" : isCompleted ? "text-green-600" : "text-gray-500"
+                      isCompleteStep ? "text-yellow-500" : isCompleted ? "text-green-500" : "text-muted-foreground"
                     }`}>Click to expand</span>
                   </div>
                 ) : (
@@ -225,31 +225,31 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
                         <h4
                           className={`font-medium ${
                             isActive
-                              ? "text-blue-900"
+                              ? "text-blue-500"
                               : isCompleted && isCompleteStep
-                              ? "text-yellow-900"
+                              ? "text-yellow-500"
                               : isCompleted
-                              ? "text-green-900"
+                              ? "text-green-500"
                               : isError
-                              ? "text-red-900"
-                              : "text-gray-600"
+                              ? "text-red-500"
+                              : "text-muted-foreground"
                           }`}
                         >
                           {step.label}
                         </h4>
                         <div className="flex items-center gap-2">
                           {isActive && (
-                            <span className="text-xs text-blue-600 font-medium">In Progress</span>
+                            <span className="text-xs text-blue-500 font-medium">In Progress</span>
                           )}
                           {(isCompleted || isCurrentStep) && (
                             <button
                               onClick={() => setCollapsedSteps(prev => new Set(prev).add(index))}
                               className={`text-xs underline ${
                                 isCompleteStep 
-                                  ? "text-yellow-600 hover:text-yellow-800" 
+                                  ? "text-yellow-500 hover:text-yellow-600" 
                                   : isCompleted
-                                  ? "text-green-600 hover:text-green-800"
-                                  : "text-gray-600 hover:text-gray-800"
+                                  ? "text-green-500 hover:text-green-600"
+                                  : "text-muted-foreground hover:text-foreground"
                               }`}
                             >
                               Collapse
@@ -260,14 +260,14 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
                       <p
                         className={`text-sm mt-1 ${
                           isActive
-                            ? "text-blue-700"
+                            ? "text-blue-500/80"
                             : isCompleted && isCompleteStep
-                            ? "text-yellow-800"
+                            ? "text-yellow-500/80"
                             : isCompleted
-                            ? "text-green-700"
+                            ? "text-green-500/80"
                             : isError
-                            ? "text-red-700"
-                            : "text-gray-500"
+                            ? "text-red-500/80"
+                            : "text-muted-foreground"
                         }`}
                       >
                         {step.description}

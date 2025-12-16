@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/card";
 import { Tabs as AntdTabs } from "antd";
 import AssetSummary from '@/components/dashboard/AssetSummary';
-import AssetsGrid from '@/components/dashboard/AssetsGrid';
 import { Wallet, ArrowRight } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { useTokenContext } from '@/context/TokenContext';
@@ -175,16 +174,6 @@ const DepositsPage = () => {
               </Card>
             </div>
           </div>
-          {/* Assets List */}
-          <Card className="shadow-sm">
-            <CardHeader>
-              <CardTitle>Available Assets</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <AssetsGrid loading={loadingEarningAssets} assets={sortedEarningAssets} />
-            </CardContent>
-          </Card>
-
           <Card className="shadow-sm">
             <CardHeader>
               <CardTitle>Deposit History</CardTitle>

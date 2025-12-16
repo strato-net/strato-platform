@@ -26,6 +26,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
     loading: isLoading,
     fetchDepositTransactions,
     availableNetworks,
+    depositRefreshKey,
   } = useBridgeContext();
 
   useEffect(() => {
@@ -52,8 +53,26 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
         }
         
         const result = await fetchDepositTransactions(params, context);
-        setTransactions(result.data);
-        setTotalCount(result.totalCount);
+        const apiTransactions = result.data;
+        
+        const pendingDeposits = JSON.parse(localStorage.getItem('pendingDeposits') || '[]');
+        const apiTxHashes = new Set(apiTransactions.map((tx: any) => tx?.externalTxHash));
+        const remainingPending = pendingDeposits.filter((p: any) => 
+          !apiTxHashes.has(p?.externalTxHash)
+        );
+        
+        const filteredPending = remainingPending.filter((p: any) => {
+          if (selectedType && p?.type !== selectedType) return false;
+          if (depositStatus !== 0 && parseInt(p?.DepositInfo?.bridgeStatus || '0') !== depositStatus) return false;
+          if (selectedChainId !== 0 && p?.externalChainId !== selectedChainId) return false;
+          return true;
+        });
+        
+        localStorage.setItem('pendingDeposits', JSON.stringify(remainingPending));
+        
+        const merged = currentPage === 1 ? [...filteredPending, ...apiTransactions] : apiTransactions;
+        setTransactions(merged);
+        setTotalCount(result.totalCount + filteredPending.length);
       } catch (error) {
         console.error("Error loading transactions:", error);
         setTransactions([]);
@@ -62,7 +81,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
     };
 
     loadTransactions();
-  }, [currentPage, depositStatus, selectedChainId, fetchDepositTransactions, context, selectedType]);
+  }, [currentPage, depositStatus, selectedChainId, fetchDepositTransactions, context, selectedType, depositRefreshKey]);
 
   
 
