@@ -97,7 +97,23 @@ contract record StablePool is Ownable {
 
     uint constant ORACLE_BIT_MASK = ((1<<32) - 1) * (256**28);
 
+    Token public tokenA; // Only here for cirrus indexing
+
+    Token public tokenB; // Only here for cirrus indexing
+
     Token public lpToken;
+
+    /// @notice Current exchange rate from tokenA to tokenB
+    decimal public aToBRatio;
+
+    /// @notice Current exchange rate from tokenB to tokenA
+    decimal public bToARatio;
+
+    /// @notice Current balance of tokenA in the pool
+    uint public tokenABalance;
+
+    /// @notice Current balance of tokenB in the pool
+    uint public tokenBBalance;
 
     // ============ STATE VARIABLES ============
     /// @notice Reentrancy guard to prevent recursive calls
@@ -155,9 +171,10 @@ contract record StablePool is Ownable {
         address _lpTokenAddr
     ) internal {
         require(_lpTokenAddr != address(0), "Zero lpToken address");
+        require(_coins.length >= 2, "Pool must have at least 2 tokens");
 
         for (uint i = 0; i < _coins.length; i++) {
-            require(_coins[i] != address(0), "Zero tokenA address");
+            require(_coins[i] != address(0), "Zero token address");
             coins.push(Token(_coins[i]));
             assetTypes.push(_assetTypes[i]);
             poolContainsRebasingTokens = poolContainsRebasingTokens || (_assetTypes[i] == 2);
@@ -165,6 +182,12 @@ contract record StablePool is Ownable {
             adminBalances[_coins[i]] = 0;
             rateMultipliers[_coins[i]] = _rateMultipliers[i];
         }
+        tokenA = Token(_coins[0]);
+        tokenB = Token(_coins[1]);
+        tokenABalance = 0;
+        tokenBBalance = 0;
+        aToBRatio = 0.0;
+        bToARatio = 0.0;
         lpToken = Token(_lpTokenAddr);
 
         poolFactory = PoolFactory(msg.sender);
@@ -207,6 +230,13 @@ contract record StablePool is Ownable {
         }
 
         tokenBalances[tokenAddr] += _dx;
+        if (coinIndex == 0) {
+            tokenABalance += _dx;
+        } else if (coinIndex == 1) {
+            tokenBBalance += _dx;
+        }
+        aToBRatio = decimal(tokenABalance).truncate(18) / decimal(tokenBBalance + 1).truncate(18);
+        bToARatio = decimal(tokenBBalance).truncate(18) / decimal(tokenABalance + 1).truncate(18);
         
         return _dx;
     }
@@ -223,6 +253,13 @@ contract record StablePool is Ownable {
             ERC20(tokenAddr).transfer(receiver, amount);
             tokenBalances[tokenAddr] = coinBalance - amount;
         }
+        if (coinIndex == 0) {
+            tokenABalance = tokenBalances[tokenAddr];
+        } else if (coinIndex == 1) {
+            tokenBBalance = tokenBalances[tokenAddr];
+        }
+        aToBRatio = decimal(tokenABalance).truncate(18) / decimal(tokenBBalance + 1).truncate(18);
+        bToARatio = decimal(tokenBBalance).truncate(18) / decimal(tokenABalance + 1).truncate(18);
     }
 
     function _storedRates() internal view returns (uint[]) {
@@ -256,6 +293,19 @@ contract record StablePool is Ownable {
         return _exchange(msg.sender, i, j, _dx, _minDy, receiver, false);
     }
 
+    function swap(
+        bool isAToB,
+        uint256 amountIn,
+        uint256 minAmountOut,
+        uint256 deadline
+    ) external nonReentrant returns (uint) {
+        require(amountIn > 0 && minAmountOut > 0, "Invalid input");
+        require(block.timestamp <= deadline, "EXPIRED");
+        uint i = isAToB ? 0 : 1;
+        uint j = isAToB ? 1 : 0;
+        return _exchange(msg.sender, i, j, amountIn, minAmountOut, msg.sender, false);
+    }
+
     function exchangeReceived(uint i, uint j, uint _dx, uint _minDy, address _receiver) external nonReentrant returns (uint) {
         require(!poolContainsRebasingTokens, "Cannot call exchangeReceived when the pool contains rebasing tokens");
         address receiver = _receiver == address(0) ? msg.sender : _receiver;
@@ -263,6 +313,10 @@ contract record StablePool is Ownable {
     }
 
     function addLiquidity(uint[] _amounts, uint _minMintAmount, address _receiver) external nonReentrant returns (uint) {
+        return _addLiquidity(_amounts, _minMintAmount, _receiver);
+    }
+
+    function _addLiquidity(uint[] _amounts, uint _minMintAmount, address _receiver) internal returns (uint) {
         address receiver = _receiver == address(0) ? msg.sender : _receiver;
         uint amp = _A();
 
@@ -344,6 +398,27 @@ contract record StablePool is Ownable {
         emit AddLiquidity(msg.sender, _amounts, fees, d1, totalSupply);
 
         return mintAmount;
+    }
+
+    function addLiquiditySingleToken(
+        bool isAToB,
+        uint256 amountIn,
+        uint256 deadline
+    ) external returns (uint256 liquidityMinted) {
+        require(amountIn > 0, "Invalid input");
+        require(block.timestamp <= deadline, "EXPIRED");
+        require(lpToken.totalSupply() > 0, "POOL_EMPTY");
+        uint[] amounts;
+        for (uint i = 0; i < coins.length; i++) {
+            amounts.push(0);
+        }
+        if (isAToB) {
+            amounts[0] = amountIn;
+        } else {
+            amounts[1] = amountIn;
+        }
+
+        return _addLiquidity(amounts, 1, msg.sender);
     }
 
     function removeliquidityOneCoin(uint _burnAmount, uint i, uint _minReceived, address _receiver) external nonReentrant returns (uint) {
@@ -438,7 +513,31 @@ contract record StablePool is Ownable {
         return burnAmount;
     }
 
-    function removeLiquidity(uint _burnAmount, uint[] _minAmounts, address _receiver, bool _claimAdminFees) external nonReentrant returns (uint[]) {
+    function removeLiquidity(
+        uint256 lpTokenAmount,
+        uint256 minTokenBAmount,
+        uint256 minTokenAAmount,
+        uint256 deadline
+    ) external returns (uint256, uint256) {
+        require(lpTokenAmount > 0 && minTokenBAmount > 0 && minTokenAAmount > 0, "Invalid inputs");
+        require(block.timestamp <= deadline, "EXPIRED");
+        uint256 totalLiquidity = lpToken.totalSupply();
+        require(totalLiquidity > 0, "No liquidity");
+        uint[] minAmounts;
+        for (uint i = 0; i < coins.length; i++) {
+            minAmounts.push(0);
+        }
+        minAmounts[0] = minTokenAAmount;
+        minAmounts[1] = minTokenBAmount;
+        uint[] rets = _removeLiquidityGeneral(lpTokenAmount, minAmounts, msg.sender, true);
+        return (rets[1], rets[0]);
+    }
+
+    function removeLiquidityGeneral(uint _burnAmount, uint[] _minAmounts, address _receiver, bool _claimAdminFees) external nonReentrant returns (uint[]) {
+        return _removeLiquidityGeneral(_burnAmount, _minAmounts, _receiver, _claimAdminFees);
+    }
+
+    function _removeLiquidityGeneral(uint _burnAmount, uint[] _minAmounts, address _receiver, bool _claimAdminFees) internal returns (uint[]) {
         address receiver = _receiver == address(0) ? msg.sender : _receiver;
         uint totalSupply = lpToken.totalSupply();
         require(_burnAmount > 0, "Invalid burn amount");

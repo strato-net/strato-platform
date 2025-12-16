@@ -120,10 +120,10 @@ contract Describe_StablePool is Authorizable {
 
         // Remove liquidity: removeLiquidity(lpTokenAmount, minTokenBAmount, minTokenAAmount, deadline)
         require(ERC20(pool.lpToken()).approve(address(pool), liquidity), "LP token approval failed");
-        uint256[] tokensReceived = pool.removeLiquidity(liquidity, [1, 1], address(0), true);
+        (uint tokenBReceived, uint tokenAReceived) = pool.removeLiquidity(liquidity, 1, 1, block.timestamp + 1);
 
-        require(tokensReceived[0] > 0, "Should receive token A");
-        require(tokensReceived[1] > 0, "Should receive token B");
+        require(tokenAReceived > 0, "Should receive token A");
+        require(tokenBReceived > 0, "Should receive token B");
         require(ERC20(pool.lpToken()).totalSupply() == 0, "Total supply should be zero after removal");
     }
 
@@ -181,7 +181,7 @@ contract Describe_StablePool is Authorizable {
             uint256 output = pool.exchange(0, 1, swapAmount, 1, address(0));
             uint tokenAPost = ERC20(tokenAAddress).balanceOf(address(pool));
             uint tokenBPost = ERC20(tokenBAddress).balanceOf(address(pool));
-            log("Point " + string(i) + "::" + string(tokenAPre/1e14) + "::" + string(tokenBPre/1e14) + "::" + string(output/1e14) + "::" + string(output/1e14) + "::10::A::1::0::0::0::0;");
+            // log("Point " + string(i) + "::" + string(tokenAPre/1e14) + "::" + string(tokenBPre/1e14) + "::" + string(output/1e14) + "::" + string(output/1e14) + "::10::A::1::0::0::0::0;");
             // log("After round " + string(i) + ": ");
             // log("Token A pre: " + string(tokenAPre));
             // log("Token B pre: " + string(tokenBPre));
@@ -211,7 +211,7 @@ contract Describe_StablePool is Authorizable {
             uint256 output = pool.exchange(1, 0, swapAmount, 1, address(0));
             uint tokenAPost = ERC20(tokenAAddress).balanceOf(address(pool));
             uint tokenBPost = ERC20(tokenBAddress).balanceOf(address(pool));
-            log("Point " + string(i+80) + "::" + string(tokenAPre/1e14) + "::" + string(tokenBPre/1e14) + "::" + string(output/1e14) + "::" + string(output/1e14) + "::10::A::1::0::0::0::0;");
+            // log("Point " + string(i+80) + "::" + string(tokenAPre/1e14) + "::" + string(tokenBPre/1e14) + "::" + string(output/1e14) + "::" + string(output/1e14) + "::10::A::1::0::0::0::0;");
             // log("After round " + string(i) + ": ");
             // log("Token A pre: " + string(tokenAPre));
             // log("Token B pre: " + string(tokenBPre));
