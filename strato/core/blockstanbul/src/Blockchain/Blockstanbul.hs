@@ -20,7 +20,6 @@ module Blockchain.Blockstanbul
     currentView,
     view,
     sequence,
-    blockstanbulRunning,
     isHistoricBlock,
     blockstanbulSender,
     shortFormat,

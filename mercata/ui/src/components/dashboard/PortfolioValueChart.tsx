@@ -167,7 +167,7 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-2xl font-bold">{title}</h3>
-            <p className="text-sm text-gray-600 mt-1">{subtitle}</p>
+            <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>
           </div>
           <div className="text-right">
             <div className="text-2xl font-bold">
@@ -218,7 +218,7 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
                     <CartesianGrid 
                       strokeDasharray="3 3" 
                       vertical={false}
-                      stroke="#e5e7eb"
+                      stroke="hsl(var(--border))"
                     />
                     <XAxis
                       dataKey="date"
@@ -230,7 +230,7 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
                     <YAxis
                       axisLine={false}
                       tickLine={false}
-                      tick={{ fontSize: 11, fill: '#6b7280' }}
+                      tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
                       domain={yAxisDomain}
                       width={80}
                       tickFormatter={(value) => {
@@ -238,7 +238,7 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
                         const formatted = scaledValue >= 1 ? scaledValue.toFixed(1) : scaledValue.toFixed(2);
                         
                         if (tabType === 'rewards') {
-                          return `CATA ${formatted}${scale.suffix}`;
+                          return `Points ${formatted}${scale.suffix}`;
                         } else if (tabType === 'borrowed') {
                           return `USDST ${formatted}${scale.suffix}`;
                         } else {
@@ -252,11 +252,11 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
                         
                         const dataPoint = payload[0].payload as typeof chartData[0];
                         return (
-                          <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3">
-                            <p className="text-xs text-gray-500 mb-1">
+                          <div className="bg-popover border border-border rounded-lg shadow-lg p-3">
+                            <p className="text-xs text-muted-foreground mb-1">
                               {formatFullDate(dataPoint.timestamp)}
                             </p>
-                            <p className="text-sm font-semibold">
+                            <p className="text-sm font-semibold text-popover-foreground">
                               {tabType === 'rewards' ? (
                                 `${dataPoint.value.toLocaleString('en-US', { 
                                   minimumFractionDigits: 2, 
@@ -298,8 +298,8 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
                 </ResponsiveContainer>
               </ChartContainer>
               {isLoading && (
-                <div className="absolute inset-0 flex items-center justify-center bg-white/60 backdrop-blur-sm">
-                  <div className="flex items-center gap-2 text-gray-600 text-sm">
+                <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-sm">
+                  <div className="flex items-center gap-2 text-muted-foreground text-sm">
                     <Loader2 className="animate-spin" size={18} />
                     <span>Updating chart...</span>
                   </div>
@@ -307,7 +307,7 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
               )}
             </>
           ) : (
-            <div className="flex h-full items-center justify-center text-gray-500 bg-gray-50 rounded-md">
+            <div className="flex h-full items-center justify-center text-muted-foreground bg-muted/50 rounded-md">
               {isLoading ? (
                 <div className="flex items-center gap-2">
                   <Loader2 className="animate-spin" size={18} />
@@ -322,7 +322,7 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
         
         {/* Time Range Selector */}
         {onTimeRangeChange && (
-          <div className="flex flex-wrap items-center justify-center gap-2 mt-4 pt-4 border-t border-gray-200">
+          <div className="flex flex-wrap items-center justify-center gap-2 mt-4 pt-4 border-t border-border">
             {[
               { label: '1 Day', value: '1d' },
               { label: '1 Week', value: '7d' },
@@ -337,8 +337,8 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
                 onClick={() => onTimeRangeChange(value)}
                 className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                   selectedTimeRange === value
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground'
                 }`}
               >
                 {label}

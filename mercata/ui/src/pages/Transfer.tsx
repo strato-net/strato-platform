@@ -29,7 +29,7 @@ const Transfer = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   
   useEffect(() => {
-    document.title = "Transfer Assets | STRATO Mercata";
+    document.title = "Transfer Assets | STRATO";
   }, []);
   const [tokens, setTokens] = useState<Token[]>([]);
   const [recipient, setRecipient] = useState<string>("");
@@ -121,7 +121,7 @@ const Transfer = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <DashboardSidebar />
       <MobileSidebar 
         isOpen={isMobileSidebarOpen} 
@@ -130,12 +130,12 @@ const Transfer = () => {
       <div className="transition-all duration-300 md:pl-64" style={{ paddingLeft: 'var(--sidebar-width, 0rem)' }}>
         <DashboardHeader title="Transfer Assets" onMenuClick={() => setIsMobileSidebarOpen(true)} />
         <main className="p-6">
-          <div className="max-w-2xl mx-auto bg-white shadow-md rounded-lg p-6 space-y-6">
+          <div className="max-w-2xl mx-auto bg-card shadow-md rounded-lg p-6 space-y-6 border border-border">
             <h2 className="text-xl font-semibold">Transfer your tokens</h2>
 
             {/* Token selector */}
             <div className="space-y-2">
-              <label className="text-sm text-gray-600">Token</label>
+              <label className="text-sm text-muted-foreground">Token</label>
               <Popover
                 open={tokenPopoverOpen}
                 onOpenChange={(open) => {
@@ -182,7 +182,7 @@ const Transfer = () => {
                         {inactiveTokens.length > 0 && !showInactiveTokens && (
                           <Button
                             variant="ghost"
-                            className="justify-center text-gray-500 hover:text-gray-700 border-t"
+                            className="justify-center text-muted-foreground hover:text-foreground border-t"
                             onClick={() => setShowInactiveTokens(true)}
                           >
                             Show More ({inactiveTokens.length})
@@ -194,7 +194,7 @@ const Transfer = () => {
                           <Button
                             key={token.address}
                             variant="ghost"
-                            className="justify-start text-gray-400"
+                            className="justify-start text-muted-foreground"
                             onClick={() => {
                               setFromAsset(token);
                               setFromAmount("");
@@ -210,7 +210,7 @@ const Transfer = () => {
                         {showInactiveTokens && inactiveTokens.length > 0 && (
                           <Button
                             variant="ghost"
-                            className="justify-center text-gray-500 hover:text-gray-700 border-t"
+                            className="justify-center text-muted-foreground hover:text-foreground border-t"
                             onClick={() => setShowInactiveTokens(false)}
                           >
                             Show Less
@@ -218,7 +218,7 @@ const Transfer = () => {
                         )}
                       </>
                     ) : (
-                      <span className="p-2 text-sm text-gray-500">
+                      <span className="p-2 text-sm text-muted-foreground">
                         No tokens available
                       </span>
                     )}
@@ -229,7 +229,7 @@ const Transfer = () => {
 
             {/* Recipient Address */}
             <div className="space-y-2">
-              <label className="text-sm text-gray-600">Recipient Address</label>
+              <label className="text-sm text-muted-foreground">Recipient Address</label>
               <Input
                 type="text"
                 value={recipient}
@@ -242,7 +242,7 @@ const Transfer = () => {
 
             {/* Amount */}
             <div className="space-y-2">
-              <label className="text-sm text-gray-600">
+              <label className="text-sm text-muted-foreground">
                 Amount
                 {fromAsset && (
                   <>{" ("}
@@ -288,9 +288,9 @@ const Transfer = () => {
             </div>
 
             {/* Transaction Fee Display */}
-            <div className="bg-gray-50 p-4 rounded-lg">
+            <div className="bg-muted/50 p-4 rounded-lg">
               <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Transaction Fee</span>
+                <span className="text-muted-foreground">Transaction Fee</span>
                 <span className="font-medium">
                   {TRANSFER_FEE} USDST ({parseFloat(TRANSFER_FEE) * 100} voucher)
                 </span>

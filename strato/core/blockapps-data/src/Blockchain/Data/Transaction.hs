@@ -149,19 +149,20 @@ insertTXIfNew' ::
   MonadUnliftIO m =>
   TXOrigin ->
   Maybe Integer ->
+  UTCTime ->
   [Transaction] ->
   ReaderT SQL.SqlBackend m ()
-insertTXIfNew' = insertTX' Fail
+insertTXIfNew' origin blockNum time = insertTX' Fail origin blockNum time
 
 insertTX' ::
   MonadUnliftIO m =>
   DebugMode ->
   TXOrigin ->
   Maybe Integer ->
+  UTCTime ->
   [Transaction] ->
   ReaderT SQL.SqlBackend m ()
-insertTX' mode origin blockNum txs = do
-  time <- liftIO getCurrentTime
+insertTX' mode origin blockNum time txs = do
   let rawTXs =
         map (\tx -> txAndTime2RawTX origin tx (fromMaybe (-1) blockNum) time) txs
   insertRawTX' mode rawTXs

@@ -21,9 +21,9 @@ const Admin = () => {
   const [activeTab, setActiveTab] = useState('tokens');
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200">
+      <div className="bg-card border-b border-border">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-4">
@@ -48,8 +48,8 @@ const Admin = () => {
       {/* Main Content */}
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <h2 className="text-3xl font-bold mb-2">Platform Administration</h2>
-          <p className="text-gray-600">Manage tokens, pools, liquidity, and asset pricing</p>
+          <h2 className="text-3xl font-bold mb-2 text-foreground">Platform Administration</h2>
+          <p className="text-muted-foreground">Manage tokens, pools, liquidity, and asset pricing</p>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 ">
@@ -65,8 +65,8 @@ const Admin = () => {
                   <button
                     className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-xs md:text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 space-x-1 md:space-x-2 ${
                       ['lending', 'configs'].includes(activeTab)
-                        ? 'bg-background text-foreground shadow-sm'
-                        : 'hover:bg-muted hover:text-accent-foreground'
+                        ? 'bg-background text-foreground shadow-sm dark:bg-muted dark:text-primary-foreground'
+                        : 'hover:bg-muted hover:text-accent-foreground dark:hover:bg-muted/50 dark:hover:text-primary-foreground'
                     }`}
                   >
                     <TrendingUp className="h-3 w-3 md:h-4 md:w-4" />
@@ -91,8 +91,8 @@ const Admin = () => {
                   <button
                     className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-xs md:text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 space-x-1 md:space-x-2 ${
                       ['tokens', 'pricing', 'status'].includes(activeTab)
-                        ? 'bg-background text-foreground shadow-sm'
-                        : 'hover:bg-muted hover:text-accent-foreground'
+                        ? 'bg-background text-foreground shadow-sm dark:bg-muted dark:text-primary-foreground'
+                        : 'hover:bg-muted hover:text-accent-foreground dark:hover:bg-muted/50 dark:hover:text-primary-foreground'
                     }`}
                   >
                     <Settings className="h-3 w-3 md:h-4 md:w-4" />

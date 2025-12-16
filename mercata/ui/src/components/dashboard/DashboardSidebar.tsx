@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useTheme } from 'next-themes';
 import { LayoutDashboard, Wallet, ArrowLeft, ArrowRight, Book, ArrowRightLeft, Send, Shield, Activity, BarChart3, Coins ,Droplets, Download} from 'lucide-react';
 import { useUser } from '@/context/UserContext';
-import MERCATALOGO from '@/assets/mercata.png';
+import STRATOLOGO from '@/assets/strato.png';
+import STRATOLOGODARK from '@/assets/strato-dark.png';
 import MERCATAICON from '@/assets/icon.png';
 import {
   Tooltip,
@@ -15,6 +17,8 @@ const DashboardSidebar = () => {
   const [collapsed, setCollapsed] = useState(false);
   const { logout, isAdmin } = useUser();
   const location = useLocation();
+  const { resolvedTheme } = useTheme();
+  const logo = resolvedTheme === 'dark' ? STRATOLOGODARK : STRATOLOGO;
 
   useEffect(() => {
     // Update CSS variable when collapsed state changes - only on desktop
@@ -59,11 +63,11 @@ const DashboardSidebar = () => {
   };
 
   const baseLinkClasses = "flex items-center px-4 py-2.5 rounded-md mx-2 transition-colors duration-200";
-  const activeLinkClasses = "bg-muted text-black font-semibold border-l-4 border-primary";
+  const activeLinkClasses = "bg-muted text-primary font-semibold border-l-4 border-primary";
   const inactiveLinkClasses = "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground";
 
   const NavIcon = ({ icon, active }: { icon: React.ReactNode; active: boolean }) => (
-    <span className={`flex-shrink-0 ${active ? 'text-black' : ''}`}>
+    <span className={`flex-shrink-0 ${active ? 'text-primary' : ''}`}>
       {icon}
     </span>
   );
@@ -78,8 +82,8 @@ const DashboardSidebar = () => {
         {!collapsed && (
           <div className="p-4 flex items-center justify-between">
             <img
-              src={MERCATALOGO}
-              alt="STRATO mercata"
+              src={logo}
+              alt="STRATO"
               className="h-12"
             />
             <button
@@ -101,7 +105,7 @@ const DashboardSidebar = () => {
             </button>
             <img
               src={MERCATAICON}
-              alt="STRATO mercata"
+              alt="STRATO"
               className="h-8"
             />
           </div>

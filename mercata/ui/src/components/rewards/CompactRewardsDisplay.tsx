@@ -1,237 +1,338 @@
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { UserRewardsData } from "@/services/rewardsService";
 import {
-  calculateRealTimePendingRewards,
   calculateEstimatedRewardsPerDay,
   formatRoundedWithCommas,
   roundByMagnitude,
 } from "@/services/rewardsService";
 import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
-import { Coins } from "lucide-react";
-import { Link } from "react-router-dom";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { TrendingUp, TrendingDown, Sparkles, Star, Coins } from "lucide-react";
+import { Pool } from "@/interface";
+
+// ============================================================================
+// TYPES
+// ============================================================================
 
 interface CompactRewardsDisplayProps {
   userRewards: UserRewardsData | null;
-  loading: boolean;
-  activityIds: number[];
-  variant?: "button" | "inline";
-  inputAmount?: string; // Input amount for calculating 1% estimated rewards
+  activityName: string;
+  // For most activities: direct input amount
+  inputAmount?: string;
+  // For withdrawals
+  isWithdrawal?: boolean;
+  // For LP deposits: pool data to calculate expected LP tokens
+  poolData?: Pool | null;
+  tokenAAmount?: string;
+  tokenBAmount?: string;
+  // For LP withdrawals: percentage and available balance
+  withdrawPercent?: string;
+  availableLPBalance?: string;
+  // Action label for display (e.g., "Deposit", "Withdraw", "Swap")
+  actionLabel?: string;
 }
 
-const truncateActivityName = (name: string, maxLength: number = 30): string => {
-  if (!name || name.length <= maxLength) return name;
-  return name.substring(0, maxLength) + "...";
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * Calculate expected LP tokens for a dual-token deposit.
+ * Formula: min(amountA * totalSupply / reserveA, amountB * totalSupply / reserveB)
+ * For initial liquidity (totalSupply = 0): sqrt(amountA * amountB)
+ */
+const calculateExpectedLPTokens = (
+  tokenAAmount: string,
+  tokenBAmount: string,
+  pool: Pool
+): bigint => {
+  try {
+    const amountA = safeParseUnits(tokenAAmount || "0", 18);
+    const amountB = safeParseUnits(tokenBAmount || "0", 18);
+    const reserveA = BigInt(pool.tokenA.poolBalance || "0");
+    const reserveB = BigInt(pool.tokenB.poolBalance || "0");
+    const totalSupply = BigInt(pool.lpToken._totalSupply || "0");
+
+    if (amountA === 0n && amountB === 0n) return 0n;
+
+    // Initial liquidity - use geometric mean (sqrt)
+    if (totalSupply === 0n || reserveA === 0n || reserveB === 0n) {
+      const product = amountA * amountB;
+      if (product === 0n) return 0n;
+      // Integer square root using Newton's method
+      let x = product;
+      let y = (x + 1n) / 2n;
+      while (y < x) {
+        x = y;
+        y = (x + product / x) / 2n;
+      }
+      return x;
+    }
+
+    // Subsequent liquidity - min of both ratios
+    const lpFromA = (amountA * totalSupply) / reserveA;
+    const lpFromB = (amountB * totalSupply) / reserveB;
+    return lpFromA < lpFromB ? lpFromA : lpFromB;
+  } catch {
+    return 0n;
+  }
 };
+
+/**
+ * Calculate the stake change amount based on activity type and input.
+ */
+const calculateStakeChange = (
+  activityName: string,
+  isWithdrawal: boolean,
+  inputAmount: string | undefined,
+  poolData: Pool | null | undefined,
+  tokenAAmount: string | undefined,
+  tokenBAmount: string | undefined,
+  withdrawPercent: string | undefined,
+  availableLPBalance: string | undefined
+): bigint => {
+  const isLPActivity = activityName.toLowerCase().includes("swap lp");
+
+  // LP Withdrawal: calculate from percentage of available balance
+  if (isWithdrawal && withdrawPercent && availableLPBalance) {
+    const lpBalance = BigInt(availableLPBalance);
+    const percent = parseFloat(withdrawPercent);
+    const percentScaled = BigInt(Math.floor(percent * 100));
+    return (lpBalance * percentScaled) / 10000n;
+  }
+
+  // LP Deposit: calculate expected LP tokens from token amounts
+  if (isLPActivity && poolData && !isWithdrawal) {
+    const tokenA = tokenAAmount || inputAmount || "0";
+    const tokenB = tokenBAmount || "0";
+    return calculateExpectedLPTokens(tokenA, tokenB, poolData);
+  }
+
+  // Other activities (swaps, CDP, lending): use input amount directly
+  return safeParseUnits(inputAmount || "0", 18);
+};
+
+/**
+ * Calculate new stake values after the action.
+ */
+const calculateNewStakes = (
+  oldStake: bigint,
+  oldTotalStake: bigint,
+  stakeChange: bigint,
+  isWithdrawal: boolean
+): { newStake: bigint; newTotalStake: bigint } => {
+  if (isWithdrawal) {
+    return {
+      newStake: oldStake > stakeChange ? oldStake - stakeChange : 0n,
+      newTotalStake: oldTotalStake > stakeChange ? oldTotalStake - stakeChange : 0n,
+    };
+  }
+  return {
+    newStake: oldStake + stakeChange,
+    newTotalStake: oldTotalStake + stakeChange,
+  };
+};
+
+/**
+ * Format a BigInt rate value to display string.
+ */
+const formatRate = (rate: bigint): string => {
+  const decimal = formatBalance(rate.toString(), "points", 18, 18, 18);
+  const numeric = decimal.replace(/\s*points?\s*$/i, "").trim();
+  return numeric ? formatRoundedWithCommas(roundByMagnitude(numeric)) : "0";
+};
+
+/**
+ * Calculate percentage change between two rates.
+ */
+const calculatePercentageChange = (
+  oldRate: bigint,
+  newRate: bigint
+): number => {
+  if (oldRate > 0n) {
+    const oldFloat = Number(oldRate) / 1e18;
+    const newFloat = Number(newRate) / 1e18;
+    return ((newFloat - oldFloat) / oldFloat) * 100;
+  }
+  return newRate > 0n ? 100 : 0;
+};
+
+// ============================================================================
+// COMPONENT
+// ============================================================================
 
 export const CompactRewardsDisplay = ({
   userRewards,
-  loading,
-  activityIds,
-  variant = "button",
+  activityName,
   inputAmount,
+  isWithdrawal = false,
+  poolData,
+  tokenAAmount,
+  tokenBAmount,
+  withdrawPercent,
+  availableLPBalance,
+  actionLabel = isWithdrawal ? "Withdraw" : "Deposit",
 }: CompactRewardsDisplayProps) => {
-  const filteredActivities = userRewards?.activities.filter((item) =>
-    activityIds.includes(item.activityId)
-  ) || [];
+  // ─────────────────────────────────────────────────────────────────────────
+  // FILTER MATCHING ACTIVITIES
+  // ─────────────────────────────────────────────────────────────────────────
+  const filteredActivities =
+    userRewards?.activities.filter(
+      (item) => item.activity.name.toLowerCase() === activityName.toLowerCase()
+    ) || [];
 
-  const activitiesWithStake = filteredActivities.filter(
-    (a) => BigInt(a.userInfo.stake) > 0n
-  );
-
-  let totalPending = 0n;
-  let totalEstimatedPerDay = 0n;
-  const currentTime = Math.floor(Date.now() / 1000); // Current Unix timestamp in seconds
-
-  activitiesWithStake.forEach(({ activity, userInfo }) => {
-    // Check all required fields are present for real-time calculation
-    if (
-      userInfo?.stake &&
-      activity?.accRewardPerStake !== undefined &&
-      userInfo?.userIndex !== undefined &&
-      activity?.emissionRate !== undefined &&
-      activity?.totalStake !== undefined &&
-      activity?.lastUpdateTime !== undefined
-    ) {
-      const pending = calculateRealTimePendingRewards(
-        userInfo.stake,
-        activity.accRewardPerStake,
-        userInfo.userIndex,
-        activity.emissionRate,
-        activity.totalStake,
-        activity.lastUpdateTime,
-        currentTime
-      );
-      totalPending += BigInt(pending);
+  // ─────────────────────────────────────────────────────────────────────────
+  // CALCULATE CURRENT RATE (using backend's personalEmissionRate for accuracy)
+  // ─────────────────────────────────────────────────────────────────────────
+  let currentRate = 0n;
+  
+  // Store derived totalStake for use in new rate calculation
+  const derivedTotalStakes: Map<number, bigint> = new Map();
+  
+  filteredActivities.forEach(({ activity, userInfo, personalEmissionRate }) => {
+    if (activity?.emissionRate) {
+      // Use backend's personalEmissionRate if available (more accurate than cached totalStake)
+      if (personalEmissionRate && BigInt(personalEmissionRate) > 0n) {
+        // Backend rate is per second, convert to per day
+        const backendRatePerDay = BigInt(personalEmissionRate) * 86400n;
+        currentRate += backendRatePerDay;
+        
+        // Derive actual totalStake from personalEmissionRate for use in estimates
+        // Formula: personalEmissionRate = (userStake * emissionRate) / totalStake
+        // So: totalStake = (userStake * emissionRate) / personalEmissionRate
+        const userStakeBig = BigInt(userInfo?.stake || "0");
+        const emissionRateBig = BigInt(activity.emissionRate);
+        const personalRateBig = BigInt(personalEmissionRate);
+        
+        if (personalRateBig > 0n) {
+          const derivedTotalStake = (userStakeBig * emissionRateBig) / personalRateBig;
+          derivedTotalStakes.set(activity.activityId, derivedTotalStake);
+        }
+      } else if (activity?.totalStake) {
+        // Fallback to calculated rate if no personalEmissionRate
+        const rate = calculateEstimatedRewardsPerDay(
+          userInfo?.stake || "0",
+          activity.totalStake,
+          activity.emissionRate
+        );
+        currentRate += BigInt(rate);
+      }
     }
-
-    const estimatedPerDay = calculateEstimatedRewardsPerDay(
-      userInfo.stake,
-      activity.totalStake,
-      activity.emissionRate
-    );
-    totalEstimatedPerDay += BigInt(estimatedPerDay);
   });
 
-  const totalPendingDecimal = formatBalance(
-    totalPending.toString(),
-    "points",
-    18,
-    18,
-    18
-  );
-  const totalPendingNumeric = totalPendingDecimal.replace(/\s*points?\s*$/i, '').trim();
-  const totalPendingFormatted = totalPendingNumeric 
-    ? formatRoundedWithCommas(roundByMagnitude(totalPendingNumeric)) + " points"
-    : "0 points";
-  // Calculate 1% of input amount for estimated rewards
-  let inputAmountReward = 0n;
-  if (inputAmount && variant === "inline") {
+  // ─────────────────────────────────────────────────────────────────────────
+  // CALCULATE NEW RATE WITH INPUT (using derived totalStake for accuracy)
+  // ─────────────────────────────────────────────────────────────────────────
+  const hasInput = inputAmount || (isWithdrawal && withdrawPercent && availableLPBalance);
+  let newRate = 0n;
+
+  if (hasInput) {
     try {
-      const inputWei = safeParseUnits(inputAmount || "0", 18);
-      // 1% of input amount
-      inputAmountReward = (inputWei * 1n) / 100n;
+      filteredActivities.forEach(({ activity, userInfo }) => {
+        if (activity?.emissionRate) {
+          const stakeChange = calculateStakeChange(
+            activityName,
+            isWithdrawal,
+            inputAmount,
+            poolData,
+            tokenAAmount,
+            tokenBAmount,
+            withdrawPercent,
+            availableLPBalance
+          );
+
+          // Use derived totalStake if available, otherwise fall back to cached
+          const actualTotalStake = derivedTotalStakes.get(activity.activityId) 
+            || BigInt(activity.totalStake || "0");
+
+          const { newStake, newTotalStake } = calculateNewStakes(
+            BigInt(userInfo?.stake || "0"),
+            actualTotalStake,
+            stakeChange,
+            isWithdrawal
+          );
+
+          if (newTotalStake > 0n) {
+            const rate = calculateEstimatedRewardsPerDay(
+              newStake.toString(),
+              newTotalStake.toString(),
+              activity.emissionRate
+            );
+            newRate += BigInt(rate);
+          }
+        }
+      });
     } catch {
-      inputAmountReward = 0n;
+      newRate = 0n;
     }
   }
 
-  // Add input amount reward (1%) to total estimated per day
-  const totalEstimatedWithInput = totalEstimatedPerDay + inputAmountReward;
+  // ─────────────────────────────────────────────────────────────────────────
+  // CHECK INPUT STATE
+  // ─────────────────────────────────────────────────────────────────────────
+  const hasValidInput = isWithdrawal && withdrawPercent && availableLPBalance
+    ? parseFloat(withdrawPercent) > 0
+    : inputAmount && parseFloat(inputAmount) > 0;
 
-  const totalEstimatedPerDayDecimal = formatBalance(
-    totalEstimatedPerDay.toString(),
-    "points",
-    18,
-    18,
-    18
-  );
-  const totalEstimatedPerDayNumeric = totalEstimatedPerDayDecimal.replace(/\s*points?\s*$/i, '').trim();
-  const totalEstimatedPerDayFormatted = totalEstimatedPerDayNumeric
-    ? formatRoundedWithCommas(roundByMagnitude(totalEstimatedPerDayNumeric)) + " points"
-    : "0 points";
+  // Don't show if no activities found
+  if (filteredActivities.length === 0) return null;
+  if (isWithdrawal && newRate === 0n && currentRate === 0n) return null;
 
-  const totalEstimatedWithInputDecimal = formatBalance(
-    totalEstimatedWithInput.toString(),
-    "points",
-    18,
-    18,
-    18
-  );
-  const totalEstimatedWithInputNumeric = totalEstimatedWithInputDecimal.replace(/\s*points?\s*$/i, '').trim();
-  const totalEstimatedWithInputFormatted = totalEstimatedWithInputNumeric
-    ? formatRoundedWithCommas(roundByMagnitude(totalEstimatedWithInputNumeric)) + " points"
-    : "0 points";
+  // ─────────────────────────────────────────────────────────────────────────
+  // CALCULATE DISPLAY VALUES
+  // ─────────────────────────────────────────────────────────────────────────
+  const isIncrease = hasValidInput && newRate > currentRate;
+  const isDecrease = hasValidInput && newRate < currentRate;
+  const percentageChange = hasValidInput ? calculatePercentageChange(currentRate, newRate) : 0;
+  const formattedCurrentRate = formatRate(currentRate);
+  const formattedNewRate = formatRate(newRate);
+  const formattedPercentage = Math.abs(percentageChange).toFixed(1);
 
-  const hasRewards = totalPending > 0n || totalEstimatedPerDay > 0n || inputAmountReward > 0n;
-
-  // Button variant - for header
-  if (variant === "button") {
-    if (loading || !hasRewards) return null;
-
-    return (
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button variant="outline" size="sm" className="gap-2">
-            <Coins className="h-4 w-4" />
-            <span className="hidden sm:inline">Rewards</span>
-            {totalPending > 0n && (
-              <Badge variant="secondary" className="ml-1">
-                {totalPendingFormatted}
-              </Badge>
-            )}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-80" align="end">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h4 className="font-semibold text-sm">Your Rewards</h4>
-              <Link to="/dashboard/rewards">
-                <Button variant="ghost" size="sm" className="h-7 text-xs">
-                  View All
-                </Button>
-              </Link>
-            </div>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Est. per Day</span>
-                <span className="font-medium">{totalEstimatedPerDayFormatted}</span>
-              </div>
-            </div>
-            {activitiesWithStake.map(({ activity }) => (
-              <div key={activity.activityId} className="pt-2 border-t text-xs">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">{truncateActivityName(activity.name)}</span>
-                  <Badge variant="outline" className="text-xs">
-                    {activity.activityType === 1 ? "One-Time" : "Position"}
-                  </Badge>
-                </div>
-              </div>
-            ))}
-          </div>
-        </PopoverContent>
-      </Popover>
-    );
-  }
-
-  // Inline variant - for below input fields
-  if (variant === "inline") {
-    if (loading) {
-      return (
-        <div className="text-sm text-muted-foreground mt-2">
-          Loading rewards...
+  // ─────────────────────────────────────────────────────────────────────────
+  // RENDER
+  // ─────────────────────────────────────────────────────────────────────────
+  return (
+    <div className="mt-3 p-3 bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 dark:from-amber-950 dark:via-yellow-950 dark:to-orange-950 border border-amber-200 dark:border-amber-800 rounded-lg shadow-sm max-w-sm">
+      {/* Current Rate - Always visible */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <Coins className="h-4 w-4 text-amber-500 flex-shrink-0" />
+          <span className="text-sm font-medium text-amber-800 dark:text-amber-200">Earning Now</span>
+          <span className="text-sm font-semibold text-amber-700 dark:text-amber-300">{formattedCurrentRate}</span>
+          <span className="text-sm text-amber-600 dark:text-amber-400">pts/day</span>
         </div>
-      );
-    }
-
-    // Show existing rewards even if input is empty
-    if (!hasRewards && inputAmountReward === 0n) return null;
-
-    const inputAmountRewardDecimal = formatBalance(
-      inputAmountReward.toString(),
-      "points",
-      18,
-      18,
-      18
-    );
-    const inputAmountRewardNumeric = inputAmountRewardDecimal.replace(/\s*points?\s*$/i, '').trim();
-    const inputAmountRewardFormatted = inputAmountRewardNumeric
-      ? formatRoundedWithCommas(roundByMagnitude(inputAmountRewardNumeric)) + " points"
-      : "0 points";
-
-    // If input is empty, show only existing estimated rewards
-    if (inputAmountReward === 0n) {
-      return (
-        <div className="mt-2 flex items-center gap-2 text-sm">
-          <Coins className="h-4 w-4 text-yellow-600" />
-          <span className="text-muted-foreground">Estimated Rewards:</span>
-          <span className="font-medium">{totalEstimatedPerDayFormatted}</span>
-        </div>
-      );
-    }
-
-    // If input has value, show total with 1% breakdown
-    return (
-      <div className="mt-2 space-y-1">
-        <div className="flex items-center gap-2 text-sm">
-          <Coins className="h-4 w-4 text-yellow-600" />
-          <span className="text-muted-foreground">Estimated Rewards:</span>
-          <span className="font-medium">{totalEstimatedWithInputFormatted} </span>
-        </div>
-        {inputAmountReward > 0n && (
-          <div className="text-xs text-muted-foreground pl-6">
-            + {inputAmountRewardFormatted} points (1% of input)
-          </div>
-        )}
+        <Sparkles className="h-3.5 w-3.5 text-amber-400 flex-shrink-0" />
       </div>
-    );
-  }
 
-  return null;
+      {/* New Rate - Shows when user types input */}
+      {hasValidInput && (
+        <div className={`mt-2 pt-2 border-t ${isIncrease ? 'border-green-200 dark:border-green-800' : isDecrease ? 'border-red-200 dark:border-red-800' : 'border-amber-200 dark:border-amber-800'}`}>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <div className={`flex-shrink-0 ${isIncrease ? 'text-green-500' : isDecrease ? 'text-red-500' : 'text-gray-500 dark:text-gray-400'}`}>
+                {isIncrease ? <Star className="h-4 w-4 fill-current" /> : isDecrease ? <TrendingDown className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
+              </div>
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">After {actionLabel}</span>
+              <span className={`text-sm font-semibold ${isIncrease ? 'text-green-600 dark:text-green-400' : isDecrease ? 'text-red-600 dark:text-red-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                {formattedNewRate}
+              </span>
+              <span className="text-sm text-gray-500 dark:text-gray-400">pts/day</span>
+            </div>
+
+            {/* Percentage Badge */}
+            {(isIncrease || isDecrease) && percentageChange !== 0 && (
+              <div className={`flex items-center gap-1 px-2 py-0.5 ${isIncrease ? 'bg-green-500' : 'bg-red-500'} rounded-full flex-shrink-0`}>
+                {isIncrease ? (
+                  <TrendingUp className="h-3 w-3 text-white" />
+                ) : (
+                  <TrendingDown className="h-3 w-3 text-white" />
+                )}
+                <span className="text-xs font-semibold text-white">
+                  {isIncrease ? "+" : "-"}{formattedPercentage}%
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 };
-

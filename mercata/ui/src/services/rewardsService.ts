@@ -42,6 +42,19 @@ export interface UserRewardsData {
   }>;
 }
 
+export interface LeaderboardEntry {
+  rank: number;
+  address: string;
+  totalRewardsEarned: string;
+}
+
+export interface LeaderboardResponse {
+  entries: LeaderboardEntry[];
+  total: number;
+  offset: number;
+  limit: number;
+}
+
 
 /**
  * Fetch global Rewards contract state
@@ -271,6 +284,65 @@ export const calculateEstimatedRewardsPerDay = (
 };
 
 /**
+ * Calculate effective emission rate (scaled) for a user based on input amount
+ * This shows the emission rate the user will receive after depositing the input amount
+ * Formula: (inputAmount / (totalStake + inputAmount)) * emissionRate * secondsPerDay
+ */
+export const calculateEffectiveEmissionRate = (
+  inputAmount: string,
+  totalStake: string,
+  emissionRate: string
+): string => {
+  const inputWei = safeBigInt(inputAmount);
+  const totalStakeBig = safeBigInt(totalStake);
+  const emissionRateBig = safeBigInt(emissionRate);
+  
+  // Calculate new total stake after deposit
+  const newTotalStake = totalStakeBig + inputWei;
+  
+  if (newTotalStake === 0n || emissionRateBig === 0n) return "0";
+  
+  const secondsPerDay = 86400n;
+  
+  // Effective emission rate = (inputAmount / newTotalStake) * emissionRate * secondsPerDay
+  const effectiveEmissionRate = (inputWei * emissionRateBig * secondsPerDay) / newTotalStake;
+  
+  return effectiveEmissionRate.toString();
+};
+
+/**
+ * Calculate new personal emission rate (per second) after adding input amount
+ * This shows the user's total share of the activity's emission rate after deposit
+ * Formula: ((oldStake + inputAmount) / (oldTotalStake + inputAmount)) * activityEmissionRate
+ * @param oldStake User's current stake
+ * @param inputAmount Amount being added
+ * @param oldTotalStake Current total stake in the activity
+ * @param activityEmissionRate Activity's emission rate (per second)
+ * @returns New personal emission rate in CATA per second
+ */
+export const calculateNewPersonalEmissionRate = (
+  oldStake: string,
+  inputAmount: string,
+  oldTotalStake: string,
+  activityEmissionRate: string
+): string => {
+  const oldStakeBig = safeBigInt(oldStake);
+  const inputWei = safeBigInt(inputAmount);
+  const oldTotalStakeBig = safeBigInt(oldTotalStake);
+  const emissionRateBig = safeBigInt(activityEmissionRate);
+  
+  const newStake = oldStakeBig + inputWei;
+  const newTotalStake = oldTotalStakeBig + inputWei;
+  
+  if (newTotalStake === 0n || emissionRateBig === 0n) return "0";
+  
+  // Personal emission rate = (newStake / newTotalStake) * activityEmissionRate
+  const newPersonalEmissionRate = (newStake * emissionRateBig) / newTotalStake;
+  
+  return newPersonalEmissionRate.toString();
+};
+
+/**
  * Remove trailing zeros from a decimal string
  */
 const removeTrailingZeros = (value: string): string => {
@@ -464,6 +536,29 @@ export const claimRewards = async (userAddress: string, activityIds: number[]): 
       || "Failed to claim rewards";
     throw new Error(errorMessage);
   }
+};
+
+/**
+ * Fetch leaderboard data
+ * @param forceRefresh - If true, bypasses cache and fetches fresh data from blockchain
+ * @param limit - Maximum number of entries to return (default: 10)
+ * @param offset - Number of entries to skip (default: 0)
+ */
+export const fetchLeaderboard = async (
+  forceRefresh: boolean = false,
+  limit: number = 10,
+  offset: number = 0
+): Promise<LeaderboardResponse> => {
+  const params = Object.fromEntries(
+    [
+      forceRefresh && ["refresh", "true"],
+      limit !== 10 && ["limit", limit.toString()],
+      offset !== 0 && ["offset", offset.toString()],
+    ].filter(Boolean) as [string, string][]
+  );
+
+  const response = await api.get<LeaderboardResponse>("/rewards/leaderboard", { params });
+  return response.data;
 };
 
 

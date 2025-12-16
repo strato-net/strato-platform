@@ -426,4 +426,60 @@ router.post("/claim-all", authHandler.authorizeRequest(), RewardsController.clai
  */
 router.post("/claim/:activityId", authHandler.authorizeRequest(), RewardsController.claimActivityRewards);
 
+/**
+ * @openapi
+ * /rewards/leaderboard:
+ *   get:
+ *     summary: Get leaderboard of top reward earners
+ *     tags: [Rewards]
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *           minimum: 1
+ *           maximum: 100
+ *         description: Maximum number of entries to return
+ *       - in: query
+ *         name: offset
+ *         schema:
+ *           type: integer
+ *           default: 0
+ *           minimum: 0
+ *         description: Number of entries to skip
+ *     responses:
+ *       200:
+ *         description: Leaderboard response with entries and pagination info
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 entries:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       rank:
+ *                         type: integer
+ *                       address:
+ *                         type: string
+ *                       totalRewardsEarned:
+ *                         type: string
+ *                         description: Total rewards earned (unclaimed + pending rewards)
+ *                 total:
+ *                   type: integer
+ *                   description: Total number of entries available
+ *                 offset:
+ *                   type: integer
+ *                   description: Current offset
+ *                 limit:
+ *                   type: integer
+ *                   description: Current limit
+ *       401:
+ *         description: Unauthorized
+ */
+router.get("/leaderboard", authHandler.authorizeRequest(), RewardsController.getLeaderboard);
+
 export default router;

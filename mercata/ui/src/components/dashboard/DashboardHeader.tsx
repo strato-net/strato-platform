@@ -12,6 +12,7 @@ import { useAccount, useDisconnect } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
+import { ModeToggle } from '../mode-toggle';
 
 interface DashboardHeaderProps {
   title: string;
@@ -43,7 +44,7 @@ const DashboardHeader = ({ title, onMenuClick }: DashboardHeaderProps) => {
     }
   };
 
-  const AddressRow = ({ address, onCopy, showTooltip = false, textColor = "text-gray-700" }: { 
+  const AddressRow = ({ address, onCopy, showTooltip = false, textColor = "text-foreground" }: { 
     address: string | null; 
     onCopy: () => void;
     showTooltip?: boolean;
@@ -57,7 +58,7 @@ const DashboardHeader = ({ title, onMenuClick }: DashboardHeaderProps) => {
             e.stopPropagation();
             onCopy();
           }}
-          className="hover:text-gray-900 transition-colors flex-shrink-0"
+          className="hover:text-foreground transition-colors flex-shrink-0"
         >
           <Copy size={12} />
         </button>
@@ -81,11 +82,11 @@ const DashboardHeader = ({ title, onMenuClick }: DashboardHeaderProps) => {
   };
 
   return (
-    <header className="bg-white border-b border-gray-100 py-4 px-6 flex items-center justify-between">
+    <header className="bg-background border-b border-border py-4 px-6 flex items-center justify-between">
       <div className="flex items-center">
         <button
           onClick={onMenuClick}
-          className="md:hidden mr-4 p-2 hover:bg-gray-100 rounded-md"
+          className="md:hidden mr-4 p-2 hover:bg-muted rounded-md"
         >
           <Menu size={20} />
         </button>
@@ -93,11 +94,12 @@ const DashboardHeader = ({ title, onMenuClick }: DashboardHeaderProps) => {
       </div>
 
       <div className="flex items-center space-x-4">
+        <ModeToggle />
         <div className="flex items-center">
           <div className="flex flex-col items-end mr-3">
             <span className="text-sm font-medium">{userName || "N/A"}</span>
             <div className="flex items-center">
-              <span className="text-xs text-gray-500">{truncateAddress(userAddress)}</span>
+              <span className="text-xs text-muted-foreground">{truncateAddress(userAddress)}</span>
               <CopyButton address={userAddress}/>
             </div>
           </div>
@@ -123,16 +125,16 @@ const DashboardHeader = ({ title, onMenuClick }: DashboardHeaderProps) => {
                   <AddressRow 
                     address={userAddress} 
                     onCopy={() => copyAddress(userAddress, 'User')}
-                    textColor="text-gray-600"
+                    textColor="text-muted-foreground"
                   />
                 </div>
 
-                <div className="border-t border-gray-200 pt-3">
+                <div className="border-t border-border pt-3">
                   <div className="flex items-center justify-between gap-2 mb-2">
-                    <div className="text-xs font-medium text-gray-500">External Wallet</div>
+                    <div className="text-xs font-medium text-muted-foreground">External Wallet</div>
                     <div
                       className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
-                        isConnected ? "bg-green-50 text-green-600" : "bg-red-50 text-red-600"
+                        isConnected ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
                       }`}
                     >
                       {isConnected ? "Connected" : "Disconnected"}
@@ -165,7 +167,7 @@ const DashboardHeader = ({ title, onMenuClick }: DashboardHeaderProps) => {
                   )}
                 </div>
 
-                <div className="border-t border-gray-200 pt-3">
+                <div className="border-t border-border pt-3">
                   <Button
                     variant="destructive"
                     size="sm"

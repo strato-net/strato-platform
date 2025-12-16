@@ -105,7 +105,7 @@ const CRSlider: React.FC<CRSliderProps> = ({
                       ? 'text-yellow-600'
                       : isPositionDangerous 
                         ? 'text-red-600' 
-                        : 'text-gray-900'
+                        : 'text-foreground'
                 }`
               }>
                 {projectedCR >= 999999 ? '∞' : projectedCR > 0 ? formatPercentage(projectedCR, 0) : '0%'}
@@ -138,13 +138,13 @@ const CRSlider: React.FC<CRSliderProps> = ({
         {/* Custom track styling when out of bounds */}
         {isOutOfBounds && !isSliderDisabled && (
           <div className="absolute inset-0 pointer-events-none">
-            <div className="w-full h-2 bg-gray-200 rounded-full mt-2"></div>
+            <div className="w-full h-2 bg-muted rounded-full mt-2"></div>
           </div>
         )}
       </div>
       
       {/* Slider Labels */}
-      <div className="flex justify-between text-sm text-gray-500 mt-2">
+      <div className="flex justify-between text-sm text-muted-foreground mt-2">
         <span>{formatPercentage(minCR)}</span>
         <span>{formatPercentage(sliderMax)}</span>
       </div>
@@ -162,7 +162,7 @@ const CRSlider: React.FC<CRSliderProps> = ({
       )}
       
       {isSliderDisabled && (
-        <div className="text-center text-base text-gray-500">
+        <div className="text-center text-base text-muted-foreground">
           {isInfinite 
             ? "No debt - CR is infinite"
             : "Slider disabled"

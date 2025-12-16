@@ -9,7 +9,6 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE UndecidableInstances #-}
 
 {-# OPTIONS -fno-warn-orphans #-}
 
@@ -79,7 +78,7 @@ data Modification a = Modification a | Deletion deriving (Show)
 
 data SequencerContext = SequencerContext
   { _seenTransactionDB :: !SeenTransactionDB,
-    _blockstanbulContext :: Maybe BlockstanbulContext,
+    _blockstanbulContext :: BlockstanbulContext,
     _latestRoundNumber :: IORef RoundNumber
   }
 
@@ -132,11 +131,6 @@ instance HasNamespace Checkpoint where
   type NSKey Checkpoint = ()
   namespace _ = "chkpt"
 -}
-instance (MonadIO m, Mod.Accessible DependentBlockDB m) => (Keccak256 `A.Alters` DependentBlockEntry) m where
-  lookup _ k = lookupDependentBlockDB k
-  insert _ k v = insertDependentBlockDB k v
-  delete _ k = deleteDependentBlockDB k
-
 instance Monad m => Mod.Modifiable SeenTransactionDB (StateT SequencerContext m) where
   get _ = use seenTransactionDB
   put _ = modify' . (.~) seenTransactionDB
@@ -166,7 +160,7 @@ instance Monad m => (Keccak256 `A.Alters` ()) (StateT SequencerContext m) where
 
 instance Monad m => HasBlockstanbulContext (StateT SequencerContext m) where
   getBlockstanbulContext = use blockstanbulContext
-  putBlockstanbulContext = modify' . (.~) (blockstanbulContext . _Just)
+  putBlockstanbulContext = modify' . (.~) blockstanbulContext
 
 instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestSequencedBlock (ReaderT SequencerConfig m) where
   get _ =
@@ -216,8 +210,8 @@ waitOnVault action = do
       $logInfoS "HasVault" "Got a signature from vault"
       return val
 
-runSequencerM :: SequencerConfig -> Maybe BlockstanbulContext -> SequencerM a -> (LoggingT IO) a
-runSequencerM c mbc m = do
+runSequencerM :: SequencerConfig -> BlockstanbulContext -> SequencerM a -> (LoggingT IO) a
+runSequencerM c bc m = do
   liftIO $ createDirectoryIfMissing False $ dbDir "h"
   a <- runResourceT . runKafkaMConfigured (kafkaClientId c) $ do
     let dbCS = depBlockDBCacheSize c
@@ -228,7 +222,7 @@ runSequencerM c mbc m = do
     flip runReaderT c{dependentBlockDB = depBlock} $ runStateT m
       SequencerContext
         { _seenTransactionDB = mkSeenTxDB stxSize,
-          _blockstanbulContext = mbc,
+          _blockstanbulContext = bc,
           _latestRoundNumber = latestRound
         }
 

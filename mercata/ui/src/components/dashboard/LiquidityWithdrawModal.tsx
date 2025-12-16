@@ -15,8 +15,21 @@ import { useToast } from '@/hooks/use-toast';
 import { useSwapContext } from '@/context/SwapContext';
 import { WITHDRAW_FEE, rewardsEnabled } from "@/lib/constants";
 import { Pool } from '@/interface';
-import { safeParseUnits, formatWeiAmount } from '@/utils/numberUtils';
+import { safeParseUnits, formatWeiAmount, formatUnits } from '@/utils/numberUtils';
 import { handleAmountInputChange, computeMaxTransferable } from '@/utils/transferValidation';
+import { CompactRewardsDisplay } from '@/components/rewards/CompactRewardsDisplay';
+import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
+
+// Helper function to map pool names to activity names
+const getPoolActivityName = (poolName: string | undefined): string | null => {
+  if (!poolName) return null;
+  const name = poolName.toLowerCase();
+  if (name.includes('ethst') && name.includes('usdst')) return "ETHST-USDST Swap LP";
+  if (name.includes('wbtcst') && name.includes('usdst')) return "WBTCST-USDST Swap LP";
+  if (name.includes('goldst') && name.includes('usdst')) return "GOLDST-USDST Swap LP";
+  if (name.includes('silvst') && name.includes('usdst')) return "SILVST-USDST Swap LP";
+  return null;
+};
 
 interface WithdrawFormValues {
   percent: string;
@@ -92,6 +105,7 @@ const LiquidityWithdrawModal = ({
     includeStakedLPToken?: boolean;
   }) => Promise<void>;
   const { toast } = useToast();
+  const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
   const form = useForm<WithdrawFormValues>({
     defaultValues: {
@@ -174,7 +188,7 @@ const LiquidityWithdrawModal = ({
           <div className="grid grid-cols-1 gap-4">
             <div className="rounded-lg border p-3">
               <div className="flex justify-between mb-2">
-                <span className="text-sm text-gray-500">Percent</span>
+                <span className="text-sm text-muted-foreground">Percent</span>
               </div>
               <div className="flex items-center">
                 <Input
@@ -186,7 +200,7 @@ const LiquidityWithdrawModal = ({
                     handleAmountInputChange(value, setWithdrawPercent, setWithdrawPercentError, "100", 0);
                   }}
                 />
-                <div className="flex items-center space-x-2 bg-gray-100 rounded-md px-2 py-1">
+                <div className="flex items-center space-x-2 bg-muted rounded-md px-2 py-1">
                   {selectedPool && (
                     <>
                       <div className="flex items-center">
@@ -248,9 +262,9 @@ const LiquidityWithdrawModal = ({
             </div>
           </div>
 
-          <div className="rounded-lg bg-gray-50 p-3">
+          <div className="rounded-lg bg-muted/50 p-3">
             <div className="flex justify-between items-center text-sm">
-              <span className="text-gray-500">{tokenALabel} position</span>
+              <span className="text-muted-foreground">{tokenALabel} position</span>
               <span className="font-medium">
                 {selectedPool?.lpToken?._totalSupply === "0" ? "0" :
                   (Number(BigInt(totalLiquidityBalance || "0") * BigInt(selectedPool?.tokenA.poolBalance || "0") / BigInt(selectedPool?.lpToken?._totalSupply || "1")) / 1e18).toFixed(10)}
@@ -258,14 +272,14 @@ const LiquidityWithdrawModal = ({
             </div>
             {selectedPool && withdrawPercent && selectedPool.lpToken._totalSupply !== "0" && (
               <div className="flex justify-between items-center text-sm mt-1">
-                <span className="text-gray-500">New {tokenALabel} position</span>
+                <span className="text-muted-foreground">New {tokenALabel} position</span>
                 <span className="font-medium text-blue-600">
                   {(Number(BigInt(availableLPBalance || "0") * BigInt(selectedPool.tokenA.poolBalance || "0") * (BigInt(10000) - BigInt(Math.floor(Number(withdrawPercent) * 100 || 0))) / (BigInt(selectedPool.lpToken._totalSupply || "1") * BigInt(10000))) / 1e18).toFixed(10)}
                 </span>
               </div>
             )}
             <div className="flex justify-between items-center text-sm mt-1">
-              <span className="text-gray-500">{tokenBLabel} position</span>
+              <span className="text-muted-foreground">{tokenBLabel} position</span>
               <span className="font-medium">
                 {selectedPool?.lpToken?._totalSupply === "0" ? "0" :
                   (Number(BigInt(totalLiquidityBalance || "0") * BigInt(selectedPool?.tokenB.poolBalance || "0") / BigInt(selectedPool?.lpToken?._totalSupply || "1")) / 1e18).toFixed(10)}
@@ -273,13 +287,13 @@ const LiquidityWithdrawModal = ({
             </div>
             {selectedPool && withdrawPercent && selectedPool.lpToken._totalSupply !== "0" && (
               <div className="flex justify-between items-center text-sm mt-1">
-                <span className="text-gray-500">New {tokenBLabel} position</span>
+                <span className="text-muted-foreground">New {tokenBLabel} position</span>
                 <span className="font-medium text-blue-600">
                   {(Number(BigInt(availableLPBalance || "0") * BigInt(selectedPool.tokenB.poolBalance || "0") * (BigInt(10000) - BigInt(Math.floor(Number(withdrawPercent) * 100))) / (BigInt(selectedPool.lpToken._totalSupply || "1") * BigInt(10000))) / 1e18).toFixed(10)}
                 </span>
               </div>
             )}
-            <div className="flex justify-between items-center text-sm mt-5 text-gray-500">
+            <div className="flex justify-between items-center text-sm mt-5 text-muted-foreground">
               <span>Transaction fee</span>
               <span>{WITHDRAW_FEE} USDST ({parseFloat(WITHDRAW_FEE) * 100} voucher)</span>
             </div>
@@ -301,6 +315,25 @@ const LiquidityWithdrawModal = ({
             })()}
           </div>
 
+          {/* Estimated Rewards Display - Always visible */}
+          {(() => {
+            const activityName = getPoolActivityName(selectedPool?.poolName);
+            if (!activityName) return null;
+            
+            // Pass withdrawPercent and availableLPBalance for accurate stake calculation
+            // The component will calculate: stakeChange = availableLPBalance × withdrawPercent
+            return (
+              <CompactRewardsDisplay
+                userRewards={userRewards}
+                activityName={activityName}
+                isWithdrawal={true}
+                withdrawPercent={withdrawPercent || ""}
+                availableLPBalance={availableLPBalance || "0"}
+                actionLabel="Withdraw"
+              />
+            );
+          })()}
+
           {/* Include Staked LP Token Checkbox - only show if pool has rewards program AND rewards are enabled */}
           {rewardsEnabled && selectedPool?.lpToken?.stakedBalance !== undefined && (
             <div className="flex items-center space-x-2">
@@ -317,7 +350,7 @@ const LiquidityWithdrawModal = ({
               </label>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                  <HelpCircle className="h-4 w-4 text-muted-foreground hover:text-foreground cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent>
                   <p className="max-w-xs text-sm">

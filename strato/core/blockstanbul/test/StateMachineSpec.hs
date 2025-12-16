@@ -61,7 +61,7 @@ runAuthTest = runNoLoggingT . flip evalStateT testContext
 
 instance (Monad m) => HasBlockstanbulContext (StateT BlockstanbulContext m) where
   putBlockstanbulContext = put
-  getBlockstanbulContext = Just <$> get
+  getBlockstanbulContext = get
 
 instance (Monad m) => HasVault (StateT BlockstanbulContext m) where
   sign bs = return $ signMsg myPriv bs

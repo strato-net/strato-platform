@@ -13,20 +13,27 @@ import VaultsList from '@/components/cdp/VaultsList';
 import LiquidationsView from '@/components/cdp/LiquidationsView';
 import BadDebtView from '@/components/cdp/BadDebtView';
 import { useCDP } from '@/context/CDPContext';
+import { CompactRewardsDisplay } from '@/components/rewards/CompactRewardsDisplay';
+import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 
 const Advanced = () => {
   const [activeTab, setActiveTab] = useState<"lending" | "swap" | "liquidations" | "safety" | "mint">("mint");
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [borrowActiveTab, setBorrowActiveTab] = useState('vaults');
   const { refreshVaults } = useCDP();
-  const vaultsRefreshTrigger = 0;
+  const [vaultsRefreshTrigger, setVaultsRefreshTrigger] = useState(0);
+  const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
+
+  const handleBorrowSuccess = () => {
+    setVaultsRefreshTrigger(prev => prev + 1);
+  };
 
   const handleVaultActionSuccess = () => {
     refreshVaults();
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <DashboardSidebar />
       <MobileSidebar 
         isOpen={isMobileSidebarOpen} 

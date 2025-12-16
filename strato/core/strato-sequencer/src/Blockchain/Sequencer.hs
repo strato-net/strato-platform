@@ -53,6 +53,14 @@ import Text.Printf
 
 type SeqOutEvent = Either [P2pEvent] [VmEvent]
 
+-- | Yield events to the P2P layer (via @seq_p2p_events@ topic).
+yieldToP2p :: Monad m => [P2pEvent] -> ConduitT i SeqOutEvent m ()
+yieldToP2p = yield . Left
+
+-- | Yield events to the VM (via @seq_vm_events@ topic).
+yieldToVm :: Monad m => [VmEvent] -> ConduitT i SeqOutEvent m ()
+yieldToVm = yield . Right
+
 instance MonadMonitor m => MonadMonitor (ConduitT i o m) where
   doIO = lift . doIO
 
@@ -70,6 +78,22 @@ type MonadSequencer m =
     (Keccak256 `A.Alters` ()) m
   )
 
+-- | Main sequencer pipeline.
+--
+-- The sequencer is a simple pipeline that:
+-- 1. Fetches events from two sources (Kafka 'unseqevents' topic and Blockstanbul timers),
+--    unified via the coproduct 'SeqLoopEvent' (either 'TimerFire' or 'UnseqEvents')
+-- 2. Transforms 'SeqLoopEvent' to 'SeqOutEvent' via 'eventHandler'
+-- 3. Writes 'SeqOutEvent' back to Kafka ('seq_vm_events' and 'seq_p2p_events' topics)
+--
+-- @
+-- [fuseChannels]        →        [eventHandler]        →        [writeToKafka]
+--      ↓                              ↓                              ↓
+-- SeqLoopEvent                 SeqLoopEvent → SeqOutEvent        SeqOutEvent
+-- (TimerFire | UnseqEvents)    (transformation)                  (to Kafka)
+-- @
+--
+-- Note: 'initSequencer' runs before the main loop to yield initial events (e.g., 'VmSelfAddress').
 sequencer :: SequencerM ()
 sequencer = fuseChannels >>= \source -> runConduit $ (initSequencer >> (source .| eventHandler)) .| writeToKafka
 
@@ -81,11 +105,9 @@ initSequencer :: (
   ConduitT () SeqOutEvent m ()
 initSequencer = do
   let logF = logFF "sequencer"
-  lift getBlockstanbulContext >>= \case
-    Nothing -> pure ()
-    Just ctx -> do
-      let selfAddr = fromJust $ _selfAddr ctx
-      yield $ Right [VmSelfAddress selfAddr]
+  ctx <- lift getBlockstanbulContext
+  let selfAddr = fromJust $ _selfAddr ctx
+  yieldToVm [VmSelfAddress selfAddr]
   logF "Sequencer startup"
   logF "Sequencer initialized"
   bootstrapBlockstanbul
@@ -118,6 +140,15 @@ eventHandler = forever $ timeAction seqLoopTiming $ do
       withLabel seqLoopEvents "unseq" (flip unsafeAddCounter . fromIntegral . length $ unseqEvents)
       timeAction seqSplitEventsTiming $ unseqEventHandler unseqEvents
 
+-- | Handles a batch of 'IngestEvent's from the @unseqevents@ Kafka topic.
+--
+-- Processing happens in two phases:
+--
+-- 1. __Bulk processing__: 'IEBlock' and 'IETx' events are extracted and processed
+--    in bulk via 'transformBlocks' and 'transformFullTransactions' for efficiency.
+--
+-- 2. __Individual handling__: Remaining event types are processed one by one,
+--    with 'IEBlock' and 'IETx' skipped (already handled in phase 1).
 unseqEventHandler ::
   ( MonadSequencer m
   ) =>
@@ -156,32 +187,27 @@ unseqEventHandler events = do
           lift $ A.delete (A.Proxy @DependentBlockEntry) k
         (IEGetMPNodes srs) -> do
           record "inevent_type_get_mp_nodes" "GetMPNodes" 1
-          yield $ Left [P2pGetMPNodes srs]
-          return ()
+          yieldToP2p [P2pGetMPNodes srs]
         (IEGetMPNodesRequest o srs) -> do
           record "inevent_type_get_mp_nodes_request" "GetMPNodesRequest" 1
-          yield $ Right [VmGetMPNodesRequest o srs]
-          return ()
+          yieldToVm [VmGetMPNodesRequest o srs]
         (IEMPNodesResponse o nds)-> do
           record "inevent_type_mp_nodes_response" "MPNodesResponse" 1
-          yield $ Left [P2pMPNodesResponse o nds]
-          return ()
+          yieldToP2p [P2pMPNodesResponse o nds]
         (IEMPNodesReceived nds) -> do
           record "inevent_type_mp_nodes_received" "MPNodesReceived" 1
-          yield $ Right [VmMPNodesReceived nds]
-          return ()
+          yieldToVm [VmMPNodesReceived nds]
         (IEPreprepareResponse decis) -> do
           record "inevent_type_preprepare_response" "PreprepareResponse" 1
           blockstanbulSend [PreprepareResponse decis]
         (IEFlushMempool req) -> do
           record "inevent_type_flush_mempool" "FlushMempool" 1
-          yield $ Right [VmFlushMempool req]
-          return ()
+          yieldToVm [VmFlushMempool req]
 
 bootstrapBlockstanbul :: (MonadBlockstanbul m, Mod.Accessible View m) =>
                          ConduitT i SeqOutEvent m ()
 bootstrapBlockstanbul = do
-  yield $ Right [VmCreateBlockCommand]
+  yieldToVm [VmCreateBlockCommand]
   lift createFirstTimer
 
 blockstanbulSend ::
@@ -235,7 +261,7 @@ blockstanbulSend' msg = do
         now <- liftIO getCurrentTime
         when (now < tNext) $
           liftIO . threadDelay . round $ 1e6 * diffUTCTime tNext now
-        ctx <- fmap (fromMaybe $ error "BlockstanbulContext missing") $ getBlockstanbulContext
+        ctx <- getBlockstanbulContext
         Mod.put (Mod.Proxy @BestSequencedBlock) $
           BestSequencedBlock
               (BDB.blockHeaderHash bh)
@@ -244,9 +270,9 @@ blockstanbulSend' msg = do
     pure (p2pevs, vmevs)
 
   $logDebugS "seq/pbft/send_p2p" . T.pack $ format p2pevs
-  yield $ Left p2pevs
+  yieldToP2p p2pevs
   $logDebugS "seq/pbft/send_vm" . T.pack $ format vmevs
-  yield $ Right vmevs
+  yieldToVm vmevs
   where
     vmEvenP2pCheckptFilterHelper :: [OutEvent] -> ([VmEvent], [P2pEvent])
     vmEvenP2pCheckptFilterHelper (x : xs) = do
@@ -286,9 +312,8 @@ transformFullTransactions pairs = do
 
   let txs = catMaybes mOtxs
   lift . logF $ "Sending " ++ show (length txs) ++ " public transactions to P2P and the VM"
-  yield . Right $ map pairToVmTx txs
-  yield . Left $ map (P2pTx . snd) txs
-  return ()
+  yieldToVm $ map pairToVmTx txs
+  yieldToP2p $ map (P2pTx . snd) txs
 
 expandBlock ::
   ( MonadLogger m,
@@ -322,21 +347,14 @@ runConsensus ::
   ) =>
   SequencedBlock -> ConduitT i SeqOutEvent m ()
 runConsensus sb = do
-  hasPBFT <- lift blockstanbulRunning
-  if not hasPBFT
-    then do
-      obs <- lift $ expandBlock sb
-      for_ obs $ \ob -> yield $ Left [P2pBlock ob]
-      yield . Right $ map VmBlock obs
-    else do
-      let blk = sequencedBlockToBlock sb
-      routed <-
-        if isHistoricBlock blk
-          then lift $ map (PreviousBlock . outputBlockToBlock) <$> expandBlock sb
-          else pure [UnannouncedBlock blk]
-      -- Blockstanbul will check that the seals and validators match up before
-      -- announcing it to the network or forwarding to the EVM.
-      traverse_ blockstanbulSend' routed
+  let blk = sequencedBlockToBlock sb
+  routed <-
+    if isHistoricBlock blk
+      then lift $ map (PreviousBlock . outputBlockToBlock) <$> expandBlock sb
+      else pure [UnannouncedBlock blk]
+  -- Blockstanbul will check that the seals and validators match up before
+  -- announcing it to the network or forwarding to the EVM.
+  traverse_ blockstanbulSend' routed
 
 transformBlocks ::
   ( MonadLogger m,
