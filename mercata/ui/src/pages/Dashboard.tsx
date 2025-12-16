@@ -73,7 +73,8 @@ const Dashboard = () => {
 
   const { pendingRewards, refetch: refetchPendingRewards } = usePendingRewards(rewardsEnabled, 30000);
   const [isClaiming, setIsClaiming] = useState(false);
-  const { rank: userRank, loading: rankLoading } = useUserLeaderboardRank();
+  const { rank: userRank, totalEarned, loading: rankLoading } = useUserLeaderboardRank();
+  const [leaderboardTimeFilter, setLeaderboardTimeFilter] = useState<"season" | "all-time">("all-time");
 
   // Extract CATA token from inactive tokens by address
   const cataToken = useMemo(() => 
@@ -319,17 +320,24 @@ const Dashboard = () => {
 
             <AssetSummary
               title="Rewards"
-              value={`${cataBalance.toLocaleString("en-US", { maximumFractionDigits: 2 })} Reward Points`}
+              value={(() => {
+                if (rankLoading) return "Loading...";
+                if (!totalEarned) return "0 Reward Points";
+                const totalEarnedNum = parseFloat(totalEarned) / 1e18;
+                return `${totalEarnedNum.toLocaleString("en-US", { maximumFractionDigits: 2 })} Reward Points`;
+              })()}
               icon={<Coins className="text-white" size={18} />}
               color="bg-purple-500"
               onClick={() => setActiveTab('rewards')}
               isActive={activeTab === 'rewards'}
+              isLoading={rankLoading}
               additionalContent={
-                <div className="mt-2">
+                <div className="mt-2 flex items-center justify-between gap-2 flex-wrap">
+                  {/* Leaderboard Button */}
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-8 text-xs border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900 hover:border-blue-300 dark:hover:border-blue-700 text-blue-700 dark:text-blue-300 font-medium"
+                    className="h-7 text-xs border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900 hover:border-blue-300 dark:hover:border-blue-700 text-blue-700 dark:text-blue-300 font-medium"
                     onClick={(e) => {
                       e.stopPropagation();
                       navigate("/dashboard/rewards?tab=leaderboard");
@@ -343,12 +351,37 @@ const Dashboard = () => {
                     ) : userRank !== null ? (
                       <>
                         <Trophy className="h-3.5 w-3.5 mr-1.5 text-yellow-500" />
-                        Rank #{userRank} - View Leaderboard
+                        Rank #{userRank} - Leaderboard
                       </>
                     ) : (
                       "View Leaderboard"
                     )}
                   </Button>
+                  {/* Season/All Time Toggle */}
+                  <div className="flex items-center rounded-md border border-border p-0.5 bg-muted/50">
+                    <Button
+                      variant={leaderboardTimeFilter === "season" ? "default" : "ghost"}
+                      size="sm"
+                      className="h-5 px-2 text-xs"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setLeaderboardTimeFilter("season");
+                      }}
+                    >
+                      Season
+                    </Button>
+                    <Button
+                      variant={leaderboardTimeFilter === "all-time" ? "default" : "ghost"}
+                      size="sm"
+                      className="h-5 px-2 text-xs"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setLeaderboardTimeFilter("all-time");
+                      }}
+                    >
+                      All Time
+                    </Button>
+                  </div>
                 </div>
               }
             />

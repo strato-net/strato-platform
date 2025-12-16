@@ -7,7 +7,8 @@ import { LeaderboardEntry, formatRoundedWithCommas, roundByMagnitude } from "@/s
 import { formatBalance } from "@/utils/numberUtils";
 import CopyButton from "@/components/ui/copy";
 import { Badge } from "@/components/ui/badge";
-import { useMemo } from "react";
+import { Button } from "@/components/ui/button";
+import { useMemo, useState } from "react";
 import { useUser } from "@/context/UserContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -41,6 +42,7 @@ export const LeaderboardTable = ({
 }: LeaderboardTableProps) => {
   const { userAddress } = useUser();
   const isMobile = useIsMobile();
+  const [timeFilter, setTimeFilter] = useState<"season" | "all-time">("all-time");
   
   const columns: ColumnsType<LeaderboardEntry> = useMemo(() => [
     {
@@ -108,9 +110,29 @@ export const LeaderboardTable = ({
     <div className="ant-table-themed">
       <Card>
         <CardHeader>
-          <div>
-            <CardTitle>Top Reward Earners</CardTitle>
-            <CardDescription>Leaderboard ranked by highest total rewards</CardDescription>
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div>
+              <CardTitle>Top Reward Earners</CardTitle>
+              <CardDescription>Leaderboard ranked by highest total rewards</CardDescription>
+            </div>
+            <div className="flex items-center rounded-lg border border-border p-1 bg-muted/50">
+              <Button
+                variant={timeFilter === "season" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setTimeFilter("season")}
+                className="h-8 px-3"
+              >
+                Season
+              </Button>
+              <Button
+                variant={timeFilter === "all-time" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setTimeFilter("all-time")}
+                className="h-8 px-3"
+              >
+                All Time
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>

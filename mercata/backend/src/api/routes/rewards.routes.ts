@@ -265,6 +265,10 @@ router.get("/state", authHandler.authorizeRequest(), RewardsChefController.getSt
  *                     type: integer
  *                   description: Array of all activity IDs
  *                   example: [1, 2, 3]
+ *                 totalDistributed:
+ *                   type: string
+ *                   description: Sum of all users' total earned rewards (unclaimed + pending + claimed)
+ *                   example: "5000000000000000000000"
  *       401:
  *         description: Unauthorized
  */
@@ -323,7 +327,7 @@ router.get("/activities", authHandler.authorizeRequest(), RewardsController.getA
  *         example: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0"
  *     responses:
  *       200:
- *         description: Activities with user-specific data
+ *         description: Activities with user-specific data and rewards breakdown
  *         content:
  *           application/json:
  *             schema:
@@ -331,8 +335,12 @@ router.get("/activities", authHandler.authorizeRequest(), RewardsController.getA
  *               properties:
  *                 unclaimedRewards:
  *                   type: string
- *                   description: Total unclaimed rewards in wei
+ *                   description: Total unclaimed rewards in wei (claimable now)
  *                   example: "5000000000000000000"
+ *                 claimedRewards:
+ *                   type: string
+ *                   description: Total claimed rewards in wei (from RewardsClaimed events)
+ *                   example: "10000000000000000000"
  *                 activities:
  *                   type: array
  *                   items:

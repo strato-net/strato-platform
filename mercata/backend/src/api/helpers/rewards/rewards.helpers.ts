@@ -10,12 +10,26 @@ let pendingRequest: Promise<any> | null = null;
 const CACHE_TTL = 5000; // 5 seconds cache
 
 /**
+ * Cache for claimed rewards to avoid multiple cirrus event queries
+ */
+let claimedRewardsCache: { address: string; data: Map<string, bigint>; timestamp: number } | null = null;
+let claimedRewardsPendingRequest: Promise<Map<string, bigint>> | null = null;
+
+/**
  * Clear the contract state cache
  * Useful for forcing fresh data from the blockchain
  */
 export const clearContractStateCache = (): void => {
   contractStateCache = null;
   pendingRequest = null;
+};
+
+/**
+ * Clear the claimed rewards cache
+ */
+export const clearClaimedRewardsCache = (): void => {
+  claimedRewardsCache = null;
+  claimedRewardsPendingRequest = null;
 };
 
 /**
@@ -271,39 +285,79 @@ export const fetchUnclaimedRewards = async (
 
 /**
  * Fetch total claimed rewards per user from RewardsClaimed events
+ * Uses caching to avoid duplicate cirrus calls within CACHE_TTL
+ * @param forceRefresh - If true, bypasses cache and fetches fresh data
  */
 export const fetchClaimedRewards = async (
   accessToken: string,
-  rewardsAddress: string
+  rewardsAddress: string,
+  forceRefresh: boolean = false
 ): Promise<Map<string, bigint>> => {
-  try {
-    const { data: events = [] } = await cirrus.get(accessToken, "/event", {
-      params: {
-        address: `eq.${rewardsAddress}`,
-        event_name: `eq.RewardsClaimed`,
-        select: "attributes",
-      },
-    });
-
-    return events.reduce((map: Map<string, bigint>, event: any) => {
-      try {
-        const attrs = typeof event.attributes === 'string' 
-          ? JSON.parse(event.attributes) 
-          : event.attributes || {};
-        
-        if (attrs.user && attrs.amount) {
-          const user = attrs.user.toLowerCase();
-          map.set(user, (map.get(user) || 0n) + BigInt(attrs.amount));
-        }
-      } catch {
-        // Skip invalid event attributes
-      }
-      return map;
-    }, new Map<string, bigint>());
-  } catch (error) {
-    console.error("Failed to fetch claimed rewards:", error);
-    return new Map<string, bigint>();
+  const now = Date.now();
+  
+  // Return cached data if valid and not forcing refresh
+  if (!forceRefresh && claimedRewardsCache && 
+      claimedRewardsCache.address === rewardsAddress &&
+      (now - claimedRewardsCache.timestamp) < CACHE_TTL) {
+    return claimedRewardsCache.data;
   }
+
+  // Handle concurrent requests
+  if (forceRefresh) {
+    claimedRewardsCache = null;
+    if (claimedRewardsPendingRequest) {
+      return claimedRewardsPendingRequest;
+    }
+  } else {
+    if (claimedRewardsPendingRequest) {
+      return claimedRewardsPendingRequest;
+    }
+  }
+
+  // Create new request and cache the promise
+  claimedRewardsPendingRequest = (async () => {
+    try {
+      const { data: events = [] } = await cirrus.get(accessToken, "/event", {
+        params: {
+          address: `eq.${rewardsAddress}`,
+          event_name: `eq.RewardsClaimed`,
+          select: "attributes",
+        },
+      });
+
+      const result = events.reduce((map: Map<string, bigint>, event: any) => {
+        try {
+          const attrs = typeof event.attributes === 'string' 
+            ? JSON.parse(event.attributes) 
+            : event.attributes || {};
+          
+          if (attrs.user && attrs.amount) {
+            const user = attrs.user.toLowerCase();
+            map.set(user, (map.get(user) || 0n) + BigInt(attrs.amount));
+          }
+        } catch {
+          // Skip invalid event attributes
+        }
+        return map;
+      }, new Map<string, bigint>());
+
+      // Cache the result
+      claimedRewardsCache = {
+        address: rewardsAddress,
+        data: result,
+        timestamp: Date.now()
+      };
+
+      return result;
+    } catch (error) {
+      console.error("Failed to fetch claimed rewards:", error);
+      return new Map<string, bigint>();
+    } finally {
+      claimedRewardsPendingRequest = null;
+    }
+  })();
+
+  return claimedRewardsPendingRequest;
 };
 
 /**
@@ -356,7 +410,7 @@ export const fetchAllUsersLeaderboard = async (
 ): Promise<Array<{ address: string; totalRewardsEarned: string }>> => {
   const state = await fetchContractState(accessToken, rewardsAddress, forceRefresh);
   const { userInfo = {}, unclaimedRewards = {}, activities = {}, activityStates = {} } = state || {};
-  const claimedRewardsMap = await fetchClaimedRewards(accessToken, rewardsAddress);
+  const claimedRewardsMap = await fetchClaimedRewards(accessToken, rewardsAddress, forceRefresh);
   const currentTime = Math.floor(Date.now() / 1000);
   const userSet = new Set<string>();
 
