@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Slider } from "@/components/ui/slider";
 import { ChevronDown } from "lucide-react";
 import {
   Table,
@@ -14,12 +15,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useCDP } from "@/context/CDPContext";
 import { useOracleContext } from "@/context/OracleContext";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { cdpService, AssetConfig, VaultData } from "@/services/cdpService";
+import { getOptimalAllocations } from "@/services/mintPlanService";
 import { formatUnits, parseUnits } from "ethers";
 import { useToast } from "@/hooks/use-toast";
+import { CompactRewardsDisplay } from "@/components/rewards/CompactRewardsDisplay";
+import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 import {
   USE_DUMMY_DATA,
   dummyVaults,
@@ -69,6 +72,8 @@ const rpow = (x: bigint, n: bigint, ray: bigint = RAY): bigint => {
   }
   return z;
 };
+
+// Helper functions for mint planning algorithm have been moved to @/services/mintPlanService
 
 // Convert annual percentage (e.g., 2.8 for 2.8% APR) to per-second RAY rate
 const convertAnnualPercentageToPerSecondRate = (annualPercentage: number): bigint => {
@@ -120,11 +125,13 @@ const getCompoundInterest = (
   return parseFloat(formatUnits(interestWei, 18));
 };
 
+// buildMintPlan has been moved to @/services/mintPlanService - imported above
+
 const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
   title = "Mint against collateral (CDP)",
 }) => {
   const [mintAmountInput, setMintAmountInput] = useState<string>("");
-  const [riskLevel, setRiskLevel] = useState<"low" | "medium" | "high">("medium");
+  const [riskBufferPercent, setRiskBufferPercent] = useState<number>(20);
   const [assets, setAssets] = useState<AssetConfig[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -132,16 +139,37 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
   const [selectedVaults, setSelectedVaults] = useState<Set<string>>(new Set());
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showProjectedCosts, setShowProjectedCosts] = useState(false);
+  const [showVaultBreakdown, setShowVaultBreakdown] = useState(false);
   const [transactionLoading, setTransactionLoading] = useState(false);
-  const { vaults: realVaults, refreshVaults } = useCDP();
+  const [globalDebtInfo, setGlobalDebtInfo] = useState<Record<string, { currentTotalDebt: string }>>({});
+  const [vaults, setVaults] = useState<VaultData[]>([]);
   const { prices: realPrices, fetchAllPrices } = useOracleContext();
   const { activeTokens: realActiveTokens } = useUserTokens();
   const { toast } = useToast();
+  const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
   // Use dummy data if enabled, otherwise use real data
-  const vaults = USE_DUMMY_DATA ? dummyVaults : realVaults;
   const prices = USE_DUMMY_DATA ? dummyPrices : realPrices;
   const activeTokens = USE_DUMMY_DATA ? dummyActiveTokens : realActiveTokens;
+
+  // Fetch vaults directly like VaultsList.tsx
+  const fetchVaults = useCallback(async () => {
+    if (USE_DUMMY_DATA) {
+      setVaults(dummyVaults);
+      return;
+    }
+    try {
+      const fetchedVaults = await cdpService.getVaults();
+      setVaults(fetchedVaults);
+    } catch (error) {
+      console.error("Failed to fetch vaults:", error);
+      setVaults([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchVaults();
+  }, [fetchVaults]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -158,6 +186,21 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
           fetchAllPrices(),
         ]);
         setAssets(assetConfigs || []);
+        
+        // Fetch global debt info for all assets
+        const debtInfoMap: Record<string, { currentTotalDebt: string }> = {};
+        await Promise.all(
+          (assetConfigs || []).map(async (asset) => {
+            try {
+              const debtInfo = await cdpService.getAssetDebtInfo(asset.asset);
+              debtInfoMap[asset.asset.toLowerCase()] = debtInfo;
+            } catch (e) {
+              // If fetching fails, use 0 as fallback
+              debtInfoMap[asset.asset.toLowerCase()] = { currentTotalDebt: "0" };
+            }
+          })
+        );
+        setGlobalDebtInfo(debtInfoMap);
       } catch (e) {
         setError("Could not load CDP data");
       } finally {
@@ -265,18 +308,8 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
   const getEffectiveCR = useCallback((assetAddress: string): number => {
     const config = assets.find((a) => a.asset.toLowerCase() === assetAddress.toLowerCase());
     const minCR = config?.minCR || 200; // Fallback to 200 if not found
-    
-    switch (riskLevel) {
-      case "high":
-        return minCR;
-      case "medium":
-        return minCR + 20;
-      case "low":
-        return minCR + 40;
-      default:
-        return minCR + 20;
-    }
-  }, [riskLevel, assets]);
+    return minCR + riskBufferPercent;
+  }, [riskBufferPercent, assets]);
 
   const plan = useMemo(() => {
     if (mintAmount <= 0 || assets.length === 0) {
@@ -449,19 +482,46 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
 
   const collateralGapUSD = Math.max(0, requiredCollateralUSD - (existingCollateralUSD + depositTotals.depositUSD));
 
-  // Calculate weighted average APR based on selected vaults (matches MintWidget approach)
+  // Calculate total existing collateral from all vaults (for quick mint planning)
+  const totalExistingCollateralUSD = useMemo(() => {
+    return assetSummaries.reduce((sum, a) => sum + (a.existingCollateralUSD || 0), 0);
+  }, [assetSummaries]);
+
+  // Get optimal allocations using the service function
+  const allocations = useMemo(() => {
+    if (mintAmount <= 0 || assets.length === 0 || vaults.length === 0) {
+      return [];
+    }
+
+    const targetMintUSD = parseUnits(mintAmount.toFixed(18), 18);
+    return getOptimalAllocations(
+      targetMintUSD,
+      riskBufferPercent,
+      assets,
+      vaults,
+      activeTokens,
+      prices,
+      globalDebtInfo
+    );
+  }, [mintAmount, riskBufferPercent, assets, vaults, activeTokens, prices, globalDebtInfo]);
+
+  // Calculate weighted average APR based on actual mint allocations
   const weightedAverageAPR = useMemo(() => {
-    if (selectedVaults.size === 0) return 0;
+    if (allocations.length === 0) return 0;
     
-    // Get the first selected asset's stability fee rate (matching MintWidget's approach)
-    // MintWidget uses: depositAsset?.stabilityFeeRate || 5.54
-    const selectedAssets = assetSummaries.filter((a) => selectedVaults.has(a.address));
-    if (selectedAssets.length === 0) return 0;
+    let totalMintAmount = 0;
+    let weightedSum = 0;
     
-    // Use the first selected asset's stability fee rate, with fallback
-    const firstAsset = selectedAssets[0];
-    return firstAsset?.stabilityFee || 0;
-  }, [assetSummaries, selectedVaults]);
+    for (const allocation of allocations) {
+      const mintAmount = parseFloat(allocation.mintAmount);
+      if (mintAmount > 0) {
+        totalMintAmount += mintAmount;
+        weightedSum += mintAmount * allocation.stabilityFeeRate;
+      }
+    }
+    
+    return totalMintAmount > 0 ? weightedSum / totalMintAmount : 0;
+  }, [allocations]);
 
   // Calculate projected interest costs using exponential compounding
   const projectedInterestCosts = useMemo(() => {
@@ -477,107 +537,20 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
     };
   }, [mintAmount, weightedAverageAPR]);
 
-  // Calculate total existing collateral from all vaults (for quick mint planning)
-  const totalExistingCollateralUSD = useMemo(() => {
-    return assetSummaries.reduce((sum, a) => sum + (a.existingCollateralUSD || 0), 0);
-  }, [assetSummaries]);
-
-  // Auto-select optimal vaults and calculate deposits for Quick Mint
-  // Algorithm: Prioritize lowest stability fee rate, allocate mint amount per vault,
-  // add deposits until vault's effective CR is reached, then move to next vault
-  const quickMintPlan = useMemo(() => {
-    if (mintAmount <= 0 || assetSummaries.length === 0) {
-      return { selectedVaults: new Set<string>(), autoDeposits: {} };
-    }
-
-    // Sort assets by lowest stability fee rate first
-    const sortedAssets = [...assetSummaries].sort((a, b) => {
-      const feeA = a.stabilityFee || 999;
-      const feeB = b.stabilityFee || 999;
-      return feeA - feeB;
-    });
-
-    const autoSelected = new Set<string>();
-    const autoDeposits: Record<string, string> = {};
-    let remainingMintAmount = mintAmount;
-
-    // Allocate mint amount across vaults, prioritizing lowest fee
-    for (const asset of sortedAssets) {
-      if (remainingMintAmount <= 0) break;
-
-      const priceUSD = asset.priceUSD || 0;
-      if (priceUSD <= 0) continue;
-
-      const existingCollateralUSD = asset.existingCollateralUSD || 0;
-      const existingDebtUSD = asset.debtUSD || 0;
-      const balanceTokens = asset.balanceTokens || 0;
-      const effectiveCR = getEffectiveCR(asset.address);
-
-      // Try to allocate as much mint amount as possible to this vault
-      // Start by checking what we can mint with existing collateral
-      let mintAllocation = 0;
-      let depositTokens = 0;
-
-      if (existingCollateralUSD > 0) {
-        // Calculate max mint with existing collateral at effective CR
-        const maxMintWithExisting = Math.max(0, (existingCollateralUSD * 100) / effectiveCR - existingDebtUSD);
-        mintAllocation = Math.min(remainingMintAmount, maxMintWithExisting);
-      }
-
-      // If we allocated some mint amount, check if we need more collateral
-      // If we didn't allocate (or allocated less than remaining), try adding deposits
-      if (mintAllocation < remainingMintAmount && balanceTokens > 0) {
-        // Calculate required collateral for remaining mint amount
-        const totalDebtIfAllRemaining = existingDebtUSD + remainingMintAmount;
-        const requiredCollateralForAllRemaining = (totalDebtIfAllRemaining * effectiveCR) / 100;
-        const additionalCollateralNeeded = Math.max(0, requiredCollateralForAllRemaining - existingCollateralUSD);
-
-        // Try to add deposits to meet the requirement
-        if (additionalCollateralNeeded > 0) {
-          const maxDepositUSD = balanceTokens * priceUSD;
-          const depositUSD = Math.min(maxDepositUSD, additionalCollateralNeeded);
-          depositTokens = depositUSD / priceUSD;
-
-          if (depositTokens > 0) {
-            // Recalculate how much we can mint with existing + new deposits
-            const totalCollateralAfter = existingCollateralUSD + depositUSD;
-            const maxMintWithDeposits = Math.max(0, (totalCollateralAfter * 100) / effectiveCR - existingDebtUSD);
-            mintAllocation = Math.min(remainingMintAmount, maxMintWithDeposits);
-          }
-        }
-      }
-
-      // If we can mint something from this vault, use it
-      if (mintAllocation > 0) {
-        autoSelected.add(asset.address);
-        remainingMintAmount -= mintAllocation;
-
-        // Recalculate exact deposit needed for the final mint allocation
-        const finalTotalDebt = existingDebtUSD + mintAllocation;
-        const finalRequiredCollateral = (finalTotalDebt * effectiveCR) / 100;
-        const finalAdditionalNeeded = Math.max(0, finalRequiredCollateral - existingCollateralUSD);
-
-        if (finalAdditionalNeeded > 0 && balanceTokens > 0) {
-          const finalDepositUSD = Math.min(balanceTokens * priceUSD, finalAdditionalNeeded);
-          const finalDepositTokens = finalDepositUSD / priceUSD;
-          if (finalDepositTokens > 0) {
-            autoDeposits[asset.address] = finalDepositTokens.toFixed(6);
-          }
-        }
-        // If no additional collateral needed, vault is selected but no deposit
-      }
-    }
-
-    return { selectedVaults: autoSelected, autoDeposits };
-  }, [mintAmount, assetSummaries, getEffectiveCR]);
-
-  // Apply quick mint plan when in quick mode
+  // Apply allocations to selected vaults and deposits
   useEffect(() => {
-    if (!showAdvanced && mintAmount > 0) {
-      setSelectedVaults(quickMintPlan.selectedVaults);
-      setDepositInputs(quickMintPlan.autoDeposits);
+    if (!showAdvanced && allocations.length > 0) {
+      const selectedVaultsSet = new Set(allocations.map(a => a.assetAddress));
+      const depositsMap: Record<string, string> = {};
+      allocations.forEach(a => {
+        if (parseFloat(a.depositAmount) > 0) {
+          depositsMap[a.assetAddress] = a.depositAmount;
+        }
+      });
+      setSelectedVaults(selectedVaultsSet);
+      setDepositInputs(depositsMap);
     }
-  }, [showAdvanced, mintAmount, quickMintPlan]);
+  }, [showAdvanced, allocations]);
 
   const toggleVaultSelection = (address: string) => {
     setSelectedVaults((prev) => {
@@ -672,7 +645,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
       });
 
       // Refresh vault data
-      await refreshVaults();
+      await fetchVaults();
       await fetchAllPrices();
 
       // Reset form
@@ -690,7 +663,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
     } finally {
       setTransactionLoading(false);
     }
-  }, [mintAmount, selectedVaults, assetSummaries, depositInputs, toast, refreshVaults, fetchAllPrices]);
+  }, [mintAmount, selectedVaults, assetSummaries, depositInputs, toast, fetchVaults, fetchAllPrices]);
 
   return (
     <div className="space-y-6">
@@ -733,43 +706,54 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
               <div className="h-2"></div>
             </div>
 
-            {/* Risk Level Selection */}
+            {/* Risk Buffer Selection */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Risk Level</label>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant={riskLevel === "high" ? "default" : "outline"}
-                  className="flex-1"
-                  onClick={() => setRiskLevel("high")}
-                >
-                  High Risk
-                </Button>
-                <Button
-                  type="button"
-                  variant={riskLevel === "medium" ? "default" : "outline"}
-                  className="flex-1"
-                  onClick={() => setRiskLevel("medium")}
-                >
-                  Medium Risk
-                </Button>
-                <Button
-                  type="button"
-                  variant={riskLevel === "low" ? "default" : "outline"}
-                  className="flex-1"
-                  onClick={() => setRiskLevel("low")}
-                >
-                  Low Risk
-                </Button>
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Risk Buffer</label>
+                <span className="text-sm text-gray-600">{riskBufferPercent}%</span>
               </div>
+              <Slider
+                value={[riskBufferPercent]}
+                onValueChange={(value) => setRiskBufferPercent(value[0])}
+                min={0}
+                max={100}
+                step={1}
+                className="w-full"
+              />
               <div className="text-sm text-gray-600">
                 <span>
-                  {riskLevel === "high" && "Mint up to each vault's minCR"}
-                  {riskLevel === "medium" && "Mint up to each vault's minCR + 20%"}
-                  {riskLevel === "low" && "Mint up to each vault's minCR + 40%"}
+                  Mint up to each vault's minCR + {riskBufferPercent}%
                 </span>
               </div>
             </div>
+
+            <Button 
+              disabled={mintAmount <= 0 || collateralGapUSD > 0 || selectedVaults.size === 0 || transactionLoading} 
+              onClick={handleQuickMint}
+              className="w-full"
+            >
+              {transactionLoading
+                ? "Processing..."
+                : mintAmount <= 0 
+                ? "Enter mint amount"
+                : collateralGapUSD > 0
+                ? `Need +$${formatUSD(collateralGapUSD)} more collateral`
+                : selectedVaults.size === 0
+                ? "No vaults available"
+                : "Confirm Quick Mint"}
+            </Button>
+
+            {userRewards && userRewards.activities.length > 0 && (
+              <CompactRewardsDisplay
+                userRewards={userRewards}
+                loading={rewardsLoading}
+                activityIds={userRewards.activities
+                  .filter(a => BigInt(a.userInfo.stake || "0") > 0n)
+                  .map(a => a.activityId)}
+                variant="inline"
+                inputAmount={mintAmount > 0 ? mintAmount.toString() : undefined}
+              />
+            )}
 
             <Separator />
 
@@ -777,68 +761,58 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
               <div className="p-3 rounded-md bg-gray-50 border border-gray-200 text-center">
                 <p className="text-sm text-gray-600">Enter a mint amount and select risk level to see the automated plan</p>
               </div>
-            ) : selectedVaults.size > 0 ? (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-gray-700">
-                    Vault Breakdown
-                    {weightedAverageAPR > 0 && ` • APR: ${formatPercentage(weightedAverageAPR)}`}
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  {(() => {
-                    // Calculate total collateral per vault (existing + new deposits)
-                    const vaultCollaterals = assetSummaries
-                      .filter((a) => selectedVaults.has(a.address))
-                      .map((asset) => {
-                        const depositAmount = parseFloat(depositInputs[asset.address] || "0");
-                        const depositUSD = depositAmount * (asset.priceUSD || 0);
-                        const totalCollateralUSD = (asset.existingCollateralUSD || 0) + depositUSD;
-                        return { asset, totalCollateralUSD, depositAmount, depositUSD };
-                      });
-
-                    // Calculate total collateral across all selected vaults
-                    const totalCollateralAllVaults = vaultCollaterals.reduce(
-                      (sum, v) => sum + v.totalCollateralUSD,
-                      0
-                    );
-
-                    // Allocate mint amount proportionally based on collateral
-                    return vaultCollaterals.map(({ asset, totalCollateralUSD, depositAmount, depositUSD }) => {
-                      const mintAllocation =
-                        totalCollateralAllVaults > 0
-                          ? (totalCollateralUSD / totalCollateralAllVaults) * mintAmount
-                          : 0;
-
+            ) : allocations.length > 0 ? (
+              <Collapsible open={showVaultBreakdown} onOpenChange={setShowVaultBreakdown}>
+                <CollapsibleTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="w-full flex items-center justify-between p-3 rounded-md bg-gray-50 border border-gray-200 hover:bg-gray-100"
+                  >
+                    <span className="text-sm font-semibold text-gray-700">
+                      Vault Breakdown
+                    </span>
+                    <ChevronDown
+                      className={`h-4 w-4 transition-transform duration-200 ${
+                        showVaultBreakdown ? "rotate-180" : ""
+                      }`}
+                    />
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="space-y-2 pt-2">
+                    {allocations.map((allocation) => {
+                      const depositAmount = parseFloat(allocation.depositAmount);
+                      const existingCollateralUSD = parseFloat(allocation.existingCollateralUSD);
+                      
                       return (
                         <div
-                          key={asset.address}
+                          key={allocation.assetAddress}
                           className="p-3 rounded-md border border-gray-200 bg-white"
                         >
                           <div className="flex items-center justify-between mb-2">
-                            <p className="font-semibold text-gray-900">{asset.symbol}</p>
+                            <p className="font-semibold text-gray-900">{allocation.symbol}</p>
                             <Badge variant="outline">
-                              {asset.stabilityFee ? formatPercentage(asset.stabilityFee) : "CDP asset"}
+                              {formatPercentage(allocation.stabilityFeeRate)}
                             </Badge>
                           </div>
                           <div className="space-y-1 text-sm text-gray-600">
                             {depositAmount > 0 ? (
                               <p>
-                                • Add collateral: {formatUSD(depositAmount, 4)} {asset.symbol} (${formatUSD(depositUSD)})
+                                • Add collateral: {formatUSD(depositAmount, 4)} {allocation.symbol} (${formatUSD(parseFloat(allocation.depositAmountUSD))})
                               </p>
-                            ) : asset.existingCollateralUSD > 0 ? (
-                              <p>• Use existing collateral: ${formatUSD(asset.existingCollateralUSD)}</p>
+                            ) : existingCollateralUSD > 0 ? (
+                              <p>• Use existing collateral: ${formatUSD(existingCollateralUSD)}</p>
                             ) : null}
                             <p className="font-semibold text-gray-900">
-                              • Mint: {formatUSD(mintAllocation, 2)} USDST
+                              • Mint: {formatUSD(parseFloat(allocation.mintAmount), 2)} USDST
                             </p>
                           </div>
                         </div>
                       );
-                    });
-                  })()}
-                </div>
-              </div>
+                    })}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
             ) : (
               <div className="p-3 rounded-md bg-yellow-50 border border-yellow-200">
                 <p className="text-sm text-gray-700">No suitable vaults found. Check that you have balances in supported assets.</p>
@@ -889,22 +863,6 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
                 </CollapsibleContent>
               </Collapsible>
             )}
-
-            <Button 
-              disabled={mintAmount <= 0 || collateralGapUSD > 0 || selectedVaults.size === 0 || transactionLoading} 
-              onClick={handleQuickMint}
-              className="w-full"
-            >
-              {transactionLoading
-                ? "Processing..."
-                : mintAmount <= 0 
-                ? "Enter mint amount"
-                : collateralGapUSD > 0
-                ? `Need +$${formatUSD(collateralGapUSD)} more collateral`
-                : selectedVaults.size === 0
-                ? "No vaults available"
-                : "Confirm Quick Mint"}
-            </Button>
           </CardContent>
         </Card>
       )}
@@ -959,36 +917,22 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
               </span>
             )}
           </div>
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant={riskLevel === "high" ? "default" : "outline"}
-              className="flex-1"
-              onClick={() => setRiskLevel("high")}
-            >
-              High Risk
-            </Button>
-            <Button
-              type="button"
-              variant={riskLevel === "medium" ? "default" : "outline"}
-              className="flex-1"
-              onClick={() => setRiskLevel("medium")}
-            >
-              Medium Risk
-            </Button>
-            <Button
-              type="button"
-              variant={riskLevel === "low" ? "default" : "outline"}
-              className="flex-1"
-              onClick={() => setRiskLevel("low")}
-            >
-              Low Risk
-            </Button>
-          </div>
-          <div className="text-xs text-gray-500">
-            {riskLevel === "high" && "Mint up to each vault's minCR"}
-            {riskLevel === "medium" && "Mint up to each vault's minCR + 20%"}
-            {riskLevel === "low" && "Mint up to each vault's minCR + 40%"}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">Risk Buffer</label>
+              <span className="text-sm text-gray-600">{riskBufferPercent}%</span>
+            </div>
+            <Slider
+              value={[riskBufferPercent]}
+              onValueChange={(value) => setRiskBufferPercent(value[0])}
+              min={0}
+              max={100}
+              step={1}
+              className="w-full"
+            />
+            <div className="text-xs text-gray-500">
+              Mint up to each vault's minCR + {riskBufferPercent}%
+            </div>
           </div>
         </CardContent>
       </Card>
