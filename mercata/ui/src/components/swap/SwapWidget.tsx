@@ -87,17 +87,16 @@ const calculateExchangeRates = (pool: Pool | null, fromAsset: SwapToken | null) 
  * Get activity name for swap rewards based on asset symbol/name
  * Maps to activityType 1 (OneTime) swap activities
  */
-const getSwapActivityName = (asset: SwapToken | null | undefined): string | null => {
+const getSwapActivityName = (asset: SwapToken | null | undefined, toAsset: SwapToken | null | undefined): string | null => {
   if (!asset) return null;
   
-  const symbol = asset._symbol?.toUpperCase() || "";
-  const name = asset._name?.toUpperCase() || "";
-  
+  const fromSymbol = asset._symbol?.toUpperCase() || "";
+  const toSymbol = toAsset?._symbol?.toUpperCase() || "";
   // Check by symbol or name
-  if (symbol.includes("ETHST") || name.includes("ETHST")) return "ETHST-USDST Swap";
-  if (symbol.includes("WBTCST") || name.includes("WBTCST")) return "WBTCST-USDST Swap";
-  if (symbol.includes("GOLDST") || name.includes("GOLDST")) return "GOLDST-USDST Swap";
-  if (symbol.includes("SILVST") || name.includes("SILVST")) return "SILVST-USDST Swap";
+  if (fromSymbol.includes("ETHST") && toSymbol.includes("USDST")) return "ETHST-USDST Swap";
+  if (fromSymbol.includes("WBTCST") && toSymbol.includes("USDST")) return "WBTCST-USDST Swap";
+  if (fromSymbol.includes("GOLDST") && toSymbol.includes("USDST")) return "GOLDST-USDST Swap";
+  if (fromSymbol.includes("SILVST") && toSymbol.includes("USDST")) return "SILVST-USDST Swap";
   
   return null;
 };
@@ -915,7 +914,7 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
       {(() => {
         // Activity name is based on pair type, so check either token
         const activityName =
-          getSwapActivityName(fromAsset) || getSwapActivityName(toAsset);
+          getSwapActivityName(fromAsset, toAsset) || getSwapActivityName(toAsset, fromAsset);
         if (!activityName) return null;
 
         // Swap rewards are tracked in USDST terms, so use the USDST side of the swap
