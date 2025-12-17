@@ -2,6 +2,9 @@
 
 The STRATO API provides low-level blockchain operations including transaction submission, contract management, and block/state queries.
 
+## Swagger Interactive Docs
+For full swagger documentation of the STRATO API, with an interactive Try it Out interface, please visit https://app.testnet.strato.nexus/docs/ or `/docs` on your preferred node.
+
 ## Base URL
 
 ```
