@@ -12,6 +12,7 @@ import { UserRewardsData } from "@/services/rewardsService";
 import { CompactRewardsDisplay } from "../rewards/CompactRewardsDisplay";
 import { Slider } from "@/components/ui/slider";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import PercentageButtons from "@/components/ui/PercentageButtons";
 
 interface BorrowFormProps {
   loans: NewLoanData | null;
@@ -102,6 +103,8 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
 
   // State for collateral deposit section
   const [selectedCollateralDeposits, setSelectedCollateralDeposits] = useState<Record<string, string>>({});
+  const [collateralDepositErrors, setCollateralDepositErrors] = useState<Record<string, string>>({});
+  const [isCustomMode, setIsCustomMode] = useState<boolean>(false);
 
   // Calculate borrow amount in wei - needs to be defined early since it's used in other useMemos
   const borrowAmountWei = useMemo(() => {
@@ -491,7 +494,8 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
     if (borrowAmountWei === 0n || !borrowAmount || parseFloat(borrowAmount) === 0) {
       afterHF = before.currentHealthFactor;
     } else if (calculateRequiredCollateral.length > 0) {
-      afterHF = targetHealthFactor;
+      // Use projectedHF instead of targetHealthFactor to reflect actual selected collateral
+      afterHF = projectedHF !== null ? projectedHF : targetHealthFactor;
     } else {
       const after = calculateBorrowHealthImpact(borrowAmountWei, loanForPreview);
       afterHF = after.newHealthFactor;
@@ -503,7 +507,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
       healthImpact: afterHF - before.currentHealthFactor,
       isHealthy: afterHF >= 1.0,
     });
-  }, [borrowAmount, loans, loanForPreview, calculateRequiredCollateral.length, targetHealthFactor]);
+  }, [borrowAmount, loans, loanForPreview, calculateRequiredCollateral.length, targetHealthFactor, projectedHF]);
 
   const prevBorrowAmountRef = useRef<string>("");
   
@@ -545,13 +549,22 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
     setTargetHealthFactor(clampedTarget);
   };
   
-  // Auto-populate collateral deposits when target health factor changes
+  // Auto-populate collateral deposits when target health factor changes (only in recommended mode)
   useEffect(() => {
     if (!borrowAmount || borrowAmountWei <= 0n) {
-      // No borrow amount - clear deposits
+      // No borrow amount - clear deposits and reset custom mode
       setSelectedCollateralDeposits({});
+      setIsCustomMode(false);
       return;
     }
+    
+    // If no collateral needed, reset custom mode
+    if (calculateRequiredCollateral.length === 0) {
+      setIsCustomMode(false);
+    }
+    
+    // Don't auto-populate if user is in custom mode
+    if (isCustomMode) return;
     
     // If at or near max achievable, use all available collateral
     // Use a more lenient threshold to account for floating point precision
@@ -587,7 +600,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
         setSelectedCollateralDeposits({});
       }
     }
-  }, [targetHealthFactor, borrowAmount, borrowAmountWei, hfSliderMax, calculateRequiredCollateral, collateralInfo]);
+  }, [targetHealthFactor, borrowAmount, borrowAmountWei, hfSliderMax, calculateRequiredCollateral, collateralInfo, isCustomMode]);
 
   const interestRateDisplay = (() => {
     type LoanWithInterestRate = NewLoanData & { interestRate?: unknown };
@@ -728,26 +741,6 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
         {/* Borrow Amount Input */}
         <div className="space-y-3">
           <label className="text-sm font-medium">Borrow Amount (USDST)</label>
-          <div className="flex justify-between items-center text-xs text-muted-foreground">
-            <span>Min: 0.01 USDST</span>
-            <div>
-              <button
-                type="button"
-                onClick={() => {
-                  try {
-                    setBorrowAmount(formatUnits(BigInt(maxAmount)));
-                    setBorrowAmountError("");
-                  } catch {}
-                }}
-                disabled={!hasPreviewBorrowPower}
-                className="px-2 py-1 mr-1 bg-muted hover:bg-muted/80 rounded-full text-muted-foreground hover:text-foreground text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-muted"
-                title={!hasPreviewBorrowPower ? "No amount available to borrow" : "Set to safe maximum available amount"}
-              >
-                Max :
-              </button>
-              <span>{hasPreviewBorrowPower ? formatWeiAmount(maxAvailableToBorrowForPreviewWei.toString(), 18) : '-'} USDST</span>
-            </div>
-          </div>
           <div className="relative">
             <Input
               placeholder="0.00"
@@ -763,11 +756,15 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
           {borrowAmountError && (
             <p className="text-red-600 text-sm">{borrowAmountError}</p>
           )}
-          <CompactRewardsDisplay
-            userRewards={userRewards}
-            activityName="Lending Pool Borrow"
-            inputAmount={borrowAmount}
-            actionLabel="Borrow"
+          <PercentageButtons
+            value={borrowAmount}
+            maxValue={hasPreviewBorrowPower ? maxAvailableToBorrowForPreviewWei.toString() : "0"}
+            onChange={(value) => {
+              setBorrowAmount(value);
+              setBorrowAmountError("");
+            }}
+            decimals={18}
+            disabled={borrowLoading || !hasPreviewBorrowPower}
           />
         </div>
       </div>
@@ -778,7 +775,24 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Health Factor</span>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">{targetHealthFactor.toFixed(2)}</span>
+              <span className="text-sm text-muted-foreground">
+                {(() => {
+                  // When borrow amount is zero, show current health factor
+                  // Otherwise show projected health factor (or target if no collateral selected)
+                  if (!borrowAmount || borrowAmountWei <= 0n) {
+                    const currentHF = loans?.healthFactor;
+                    if (currentHF === undefined || currentHF === null) return "-";
+                    if (!isFinite(currentHF)) return "No Loan";
+                    return currentHF.toFixed(2);
+                  }
+                  // Use projectedHF if available (reflects selected collateral), otherwise fall back to target
+                  if (projectedHF !== null) {
+                    if (!isFinite(projectedHF)) return "No Loan";
+                    return projectedHF.toFixed(2);
+                  }
+                  return targetHealthFactor.toFixed(2);
+                })()}
+              </span>
               <span
                 className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
                   riskLevel < 30
@@ -810,17 +824,9 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
           </div>
         </div>
 
-        <div className="px-4 py-3 bg-muted/50 rounded-md">
-          <HealthImpactDisplay healthImpact={healthImpact} showWarning={false} className="mb-4" />
-          <div className="flex justify-between text-sm mb-2">
-            <span className="text-muted-foreground">Transaction Fee</span>
-            <span className="font-medium">{BORROW_FEE} USDST ({parseFloat(BORROW_FEE) * 100} voucher)</span>
-          </div>
-          {feeError && (
-            <p className="text-yellow-600 text-sm mt-1">{feeError}</p>
-          )}
+        <div className="px-4 py-2 bg-muted/50 rounded-md">
+          <HealthImpactDisplay healthImpact={healthImpact} showWarning={false} />
         </div>
-
         {/* Conditional Warning Messages */}
         {(() => {
           const isZeroAvailable = !hasPreviewBorrowPower;
@@ -866,151 +872,267 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
         <div className="rounded-lg border bg-muted/30 p-4 space-y-4">
           <div className="flex items-center justify-between">
             <div className="font-medium">Additional Collateral Needed</div>
-            {projectedHF !== null && (
-              <div className="text-sm">
-                <span className="text-muted-foreground">Projected Health Factor: </span>
-                <span className={`font-medium ${getHealthFactorColor(projectedHF)}`}>
-                  {projectedHF === Infinity ? "No Loan" : projectedHF.toFixed(2)}
-                </span>
-                {projectedHF !== null && Math.abs(projectedHF - targetHealthFactor) > 0.01 && projectedHF < targetHealthFactor && (
-                  <span className="text-xs text-yellow-600 dark:text-yellow-500 ml-2">
-                    (Target: {targetHealthFactor.toFixed(2)})
+            <div className="flex items-center gap-3">
+              {isCustomMode && projectedHF !== null && (
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Projected Health Factor: </span>
+                  <span className={`font-medium ${getHealthFactorColor(projectedHF)}`}>
+                    {projectedHF === Infinity ? "No Loan" : projectedHF.toFixed(2)}
                   </span>
-                )}
-              </div>
-            )}
+                  {projectedHF !== null && Math.abs(projectedHF - targetHealthFactor) > 0.01 && projectedHF < targetHealthFactor && (
+                    <span className="text-xs text-yellow-600 dark:text-yellow-500 ml-2">
+                      (Target: {targetHealthFactor.toFixed(2)})
+                    </span>
+                  )}
+                </div>
+              )}
+              <Button
+                type="button"
+                variant={isCustomMode ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  setIsCustomMode(!isCustomMode);
+                  if (!isCustomMode) {
+                    // Switching to custom mode - keep current selections
+                  } else {
+                    // Switching back to recommended mode - reset to recommended amounts
+                    const newSelected: Record<string, string> = {};
+                    for (const item of calculateRequiredCollateral) {
+                      newSelected[item.asset.address] = item.amount;
+                    }
+                    setSelectedCollateralDeposits(newSelected);
+                  }
+                }}
+              >
+                {isCustomMode ? "Use Recommended" : "Customize"}
+              </Button>
+            </div>
           </div>
           <p className="text-sm text-muted-foreground">
-            To borrow {borrowAmount || "0"} USDST with a health factor of {targetHealthFactor.toFixed(2)}, you need to deposit additional collateral.
-            {calculateSelectedCollateralValue > 0n && (
-              <span className="block mt-1">
-                Total collateral value being added: <FormattedUSDAmount weiAmount={calculateSelectedCollateralValue} />
-              </span>
-            )}
+            To borrow {borrowAmount ? parseFloat(borrowAmount).toFixed(2) : "0.00"} USDST with a health factor of {targetHealthFactor.toFixed(2)}, you need to deposit additional collateral.
           </p>
           
-          <div className="space-y-3">
-            {calculateRequiredCollateral.map((item, index) => {
-              const asset = item.asset;
-              const recommendedAmount = item.amount;
-              const selectedAmount = selectedCollateralDeposits[asset.address] || "";
-              const userBalanceWei = BigInt(asset.userBalance || "0");
-              const userBalanceDisplay = formatWeiAmount(userBalanceWei.toString(), asset.customDecimals ?? 18);
-              const maxWei = userBalanceWei;
-              const ltv = asset.ltv ? (Number(asset.ltv) / 100).toFixed(0) : "N/A";
-              const liqThreshold = asset.liquidationThreshold ? (Number(asset.liquidationThreshold) / 100).toFixed(0) : "N/A";
-              
-              // Calculate collateral value for selected amount
-              let selectedCollateralValue = 0n;
-              if (selectedAmount && parseFloat(selectedAmount) > 0) {
-                try {
-                  const depositWei = safeParseUnits(selectedAmount, asset.customDecimals ?? 18);
-                  const assetPrice = BigInt(asset.assetPrice || "0");
-                  const liqThresholdBP = BigInt(asset.liquidationThreshold || "0");
-                  const tokenDecimals = 10n ** BigInt(asset.customDecimals ?? 18);
+          {!isCustomMode ? (
+            /* Compact Recommended Summary */
+            <div className="p-3 border rounded-lg bg-muted/50">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium">Recommended Collateral</span>
+                <span className="text-sm text-muted-foreground">
+                  Total: <FormattedUSDAmount weiAmount={calculateSelectedCollateralValue} />
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {calculateRequiredCollateral.map((item) => {
+                  const asset = item.asset;
+                  const recommendedAmount = item.amount;
+                  const recommendedWei = safeParseUnits(recommendedAmount, asset.customDecimals ?? 18);
                   
-                  if (depositWei > 0n && liqThresholdBP > 0n && assetPrice > 0n) {
-                    const depositValueUSD = (depositWei * assetPrice) / tokenDecimals;
-                    const depositValueWithThreshold = (depositValueUSD * liqThresholdBP) / 10000n;
-                    selectedCollateralValue = depositValueWithThreshold;
+                  // Calculate collateral value for recommended amount
+                  let recommendedCollateralValue = 0n;
+                  try {
+                    const assetPrice = BigInt(asset.assetPrice || "0");
+                    const liqThresholdBP = BigInt(asset.liquidationThreshold || "0");
+                    const tokenDecimals = 10n ** BigInt(asset.customDecimals ?? 18);
+                    
+                    if (recommendedWei > 0n && liqThresholdBP > 0n && assetPrice > 0n) {
+                      const depositValueUSD = (recommendedWei * assetPrice) / tokenDecimals;
+                      const depositValueWithThreshold = (depositValueUSD * liqThresholdBP) / 10000n;
+                      recommendedCollateralValue = depositValueWithThreshold;
+                    }
+                  } catch {
+                    // Ignore errors
                   }
-                } catch {
-                  // Ignore errors
-                }
-              }
-              
-              return (
-                <div key={asset.address} className="p-3 border rounded-lg space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
+                  
+                  return (
+                    <div key={asset.address} className="flex items-center gap-2 px-2 py-1 bg-background rounded">
                       {asset?.images?.[0]?.value ? (
                         <img
                           src={asset.images[0].value}
                           alt={asset._name}
-                          className="w-8 h-8 rounded-full object-cover"
+                          className="w-5 h-5 rounded-full object-cover"
                         />
                       ) : (
-                        <div className="w-8 h-8 rounded-full bg-muted-foreground" />
+                        <div className="w-5 h-5 rounded-full bg-muted-foreground" />
                       )}
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{asset._symbol}</span>
-                          {index === 0 && (
-                            <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded">
-                              Highest LTV
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          LTV: {ltv}% • Liquidation: {liqThreshold}%
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          Available: {userBalanceDisplay} {asset._symbol}
-                        </div>
-                      </div>
+                      <span className="text-sm font-medium">{asset._symbol}</span>
+                      <span className="text-xs text-muted-foreground">{recommendedAmount}</span>
+                      {recommendedCollateralValue > 0n && (
+                        <span className="text-xs text-muted-foreground">
+                          (<FormattedUSDAmount weiAmount={recommendedCollateralValue} />)
+                        </span>
+                      )}
                     </div>
-                    {selectedCollateralValue > 0n && (
-                      <div className="text-right">
-                        <div className="text-xs text-muted-foreground">Collateral Value</div>
-                        <div className="text-sm font-medium">
-                          <FormattedUSDAmount weiAmount={selectedCollateralValue} />
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            /* Custom Mode - Show All Available Collateral */
+            <div className="space-y-3">
+              {collateralInfo && Array.isArray(collateralInfo) && collateralInfo
+                .filter((asset) => {
+                  const userBalanceWei = BigInt(asset.userBalance || "0");
+                  return userBalanceWei > 0n;
+                })
+                .map((asset) => {
+                  const selectedAmount = selectedCollateralDeposits[asset.address] || "";
+                  const userBalanceWei = BigInt(asset.userBalance || "0");
+                  const userBalanceDisplay = formatWeiAmount(userBalanceWei.toString(), asset.customDecimals ?? 18);
+                  const maxWei = userBalanceWei;
+                  const ltv = asset.ltv ? (Number(asset.ltv) / 100).toFixed(0) : "N/A";
+                  const liqThreshold = asset.liquidationThreshold ? (Number(asset.liquidationThreshold) / 100).toFixed(0) : "N/A";
                   
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Deposit Amount</label>
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder="0.00"
-                        value={addCommasToInput(selectedAmount)}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          handleAmountInputChange(
-                            value,
-                            (val: string) => {
+                  // Calculate collateral value for selected amount
+                  let selectedCollateralValue = 0n;
+                  if (selectedAmount && parseFloat(selectedAmount) > 0) {
+                    try {
+                      const depositWei = safeParseUnits(selectedAmount, asset.customDecimals ?? 18);
+                      const assetPrice = BigInt(asset.assetPrice || "0");
+                      const liqThresholdBP = BigInt(asset.liquidationThreshold || "0");
+                      const tokenDecimals = 10n ** BigInt(asset.customDecimals ?? 18);
+                      
+                      if (depositWei > 0n && liqThresholdBP > 0n && assetPrice > 0n) {
+                        const depositValueUSD = (depositWei * assetPrice) / tokenDecimals;
+                        const depositValueWithThreshold = (depositValueUSD * liqThresholdBP) / 10000n;
+                        selectedCollateralValue = depositValueWithThreshold;
+                      }
+                    } catch {
+                      // Ignore errors
+                    }
+                  }
+                  
+                  return (
+                    <div key={asset.address} className="p-3 border rounded-lg space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          {asset?.images?.[0]?.value ? (
+                            <img
+                              src={asset.images[0].value}
+                              alt={asset._name}
+                              className="w-8 h-8 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-muted-foreground" />
+                          )}
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{asset._symbol}</span>
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              LTV: {ltv}% • Liquidation: {liqThreshold}%
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              Available: {userBalanceDisplay} {asset._symbol}
+                            </div>
+                          </div>
+                        </div>
+                        {selectedCollateralValue > 0n && (
+                          <div className="text-right">
+                            <div className="text-xs text-muted-foreground">Collateral Value</div>
+                            <div className="text-sm font-medium">
+                              <FormattedUSDAmount weiAmount={selectedCollateralValue} />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Deposit Amount</label>
+                        <div className="flex flex-col gap-2">
+                          <div className="flex gap-2">
+                          <Input
+                            placeholder="0.00"
+                            value={addCommasToInput(selectedAmount)}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              const input = value.replace(/,/g, "").trim();
+                              
+                              // Always set the value first so user can see what they typed
                               setSelectedCollateralDeposits(prev => {
                                 const updated = { ...prev };
-                                updated[asset.address] = val;
+                                updated[asset.address] = input;
                                 return updated;
                               });
-                            },
-                            () => {}, // No error handling for now
-                            maxWei.toString(),
-                            asset.customDecimals ?? 18
-                          );
-                        }}
-                        className="flex-1"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          const maxDisplay = formatUnits(maxWei, asset.customDecimals ?? 18);
-                          setSelectedCollateralDeposits(prev => ({ ...prev, [asset.address]: maxDisplay }));
-                        }}
-                        disabled={maxWei <= 0n}
-                      >
-                        Max
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedCollateralDeposits(prev => ({ ...prev, [asset.address]: recommendedAmount }));
-                        }}
-                      >
-                        Use Recommended
-                      </Button>
+                              
+                              // Allow empty or zero for collateral deposits
+                              if (!input || input === "0" || input === "0." || input === "0.0") {
+                                setCollateralDepositErrors(prev => {
+                                  const updated = { ...prev };
+                                  delete updated[asset.address];
+                                  return updated;
+                                });
+                                return;
+                              }
+                              
+                              // Validate format
+                              const basicPattern = /^\d*\.?\d*$/;
+                              if (!basicPattern.test(input)) {
+                                setCollateralDepositErrors(prev => ({
+                                  ...prev,
+                                  [asset.address]: "Invalid input format"
+                                }));
+                                return;
+                              }
+                              
+                              // Check decimal places
+                              if (input.includes('.')) {
+                                const decimalPart = input.split('.')[1];
+                                if (decimalPart && decimalPart.length > (asset.customDecimals ?? 18)) {
+                                  setCollateralDepositErrors(prev => ({
+                                    ...prev,
+                                    [asset.address]: `Maximum ${asset.customDecimals ?? 18} decimal places allowed`
+                                  }));
+                                  return;
+                                }
+                              }
+                              
+                              // Check if exceeds max
+                              const inputWei = safeParseUnits(input, asset.customDecimals ?? 18);
+                              if (inputWei > maxWei) {
+                                setCollateralDepositErrors(prev => ({
+                                  ...prev,
+                                  [asset.address]: "Maximum amount exceeded"
+                                }));
+                                return;
+                              }
+                              
+                              // Valid input - clear any errors
+                              setCollateralDepositErrors(prev => {
+                                const updated = { ...prev };
+                                delete updated[asset.address];
+                                return updated;
+                              });
+                            }}
+                            className="flex-1"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const maxDisplay = formatUnits(maxWei, asset.customDecimals ?? 18);
+                              setSelectedCollateralDeposits(prev => ({ ...prev, [asset.address]: maxDisplay }));
+                              setCollateralDepositErrors(prev => {
+                                const updated = { ...prev };
+                                delete updated[asset.address];
+                                return updated;
+                              });
+                            }}
+                            disabled={maxWei <= 0n}
+                          >
+                            Max
+                          </Button>
+                          </div>
+                          {collateralDepositErrors[asset.address] && (
+                            <p className="text-red-600 text-xs">{collateralDepositErrors[asset.address]}</p>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                  );
+                })}
+            </div>
+          )}
         </div>
       )}
 
@@ -1024,7 +1146,10 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
           safeParseUnits(borrowAmount || "0") <= 0n ||
           borrowLoading ||
           safeParseUnits(borrowAmount || "0") > BigInt(maxAmount) ||
-          (projectedHF !== null && projectedHF < targetHealthFactor)
+          // Only check projected HF vs target in custom mode (in recommended mode, they should match)
+          (isCustomMode && projectedHF !== null && projectedHF < targetHealthFactor - 0.01) ||
+          // Disable if there are any collateral deposit errors
+          Object.keys(collateralDepositErrors).length > 0
         }
         className="w-full"
       >
@@ -1033,6 +1158,23 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
         ) : null}
         Borrow
       </Button>
+
+      {/* Transaction Fee */}
+      <div className="flex justify-between text-sm">
+        <span className="text-muted-foreground">Transaction Fee</span>
+        <span className="font-medium">{BORROW_FEE} USDST ({parseFloat(BORROW_FEE) * 100} voucher)</span>
+      </div>
+      {feeError && (
+        <p className="text-yellow-600 text-sm">{feeError}</p>
+      )}
+
+      {/* Rewards Display */}
+      <CompactRewardsDisplay
+        userRewards={userRewards}
+        activityName="Lending Pool Borrow"
+        inputAmount={borrowAmount}
+        actionLabel="Borrow"
+      />
     </div>
   );
 };

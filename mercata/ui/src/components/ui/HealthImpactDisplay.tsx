@@ -27,7 +27,7 @@ const HealthImpactDisplay = ({
     healthImpact.newHealthFactor === Infinity ? "No Loan" : healthImpact.newHealthFactor.toFixed(2);
 
   return (
-    <div className={`space-y-3 p-4 bg-muted/50 rounded-lg ${className}`}>
+    <div className={`p-0 bg-transparent ${className}`}>
       <div className="flex items-center justify-between text-sm">
         <span className="font-medium text-foreground">Health Impact</span>
         <div className="flex items-center gap-2">
@@ -54,14 +54,12 @@ const HealthImpactDisplay = ({
           )}
         </div>
       </div>
-      <div className="space-y-2">
-        {shouldWarn && (
-          <div className="mt-2 p-2 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded text-xs text-red-700 dark:text-red-400">
-            ⚠️ Warning: This action would make your position
-            unhealthy and vulnerable to liquidation.
-          </div>
-        )}
-      </div>
+      {shouldWarn && (
+        <div className="mt-2 p-2 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded text-xs text-red-700 dark:text-red-400">
+          ⚠️ Warning: This action would make your position
+          unhealthy and vulnerable to liquidation.
+        </div>
+      )}
     </div>
   );
 };
