@@ -46,6 +46,21 @@ Install Nix from: https://nix.dev/install-nix.html
 
 The project includes predefined Nix packages, so no manual library installation is needed.
 
+## Download
+
+The strato platform currently lives in a monorepo at:
+```bash
+git clone git@github.com:blockapps/strato-platform.git
+```
+
+*Note: Prior to the open sourcing of the strato platform, the following alternative repo should be used to access published builds:*
+
+Download [strato-getting-started](https://github.com/blockapps/strato-getting-started)
+
+```bash
+git clone https://github.com/blockapps/strato-getting-started.git
+```
+
 ## Build
 
 ### Build Everything
@@ -75,6 +90,9 @@ To generate docker-compose YAMLs (overwrites existing):
 ```
 
 ## Run
+
+### OAUTH Client Credentials
+In order to obtain `OAUTH_DISCOVERY_URL`, `OAUTH_CLIENT_ID`, and `OAUTH_CLIENT_SECRET`, you must request a keycloak client at [http://support.blockapps.net/](http://support.blockapps.net/); after signing in, see section Request Client Credentials.
 
 ### Local Development
 

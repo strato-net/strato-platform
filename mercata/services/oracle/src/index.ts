@@ -4,7 +4,6 @@ import { logInfo, logError } from './utils/logger';
 import { validateConfig } from './utils/validateConfig';
 import { healthMonitor } from './utils/healthMonitor';
 import express from 'express';
-import * as packageJson from '../package.json';
 
 dotenv.config();
 

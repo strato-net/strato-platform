@@ -88,7 +88,7 @@ strato-p2p --averageTxsPerBlock=40 --connectionTimeout=3600 --debugFail=true --m
 
 strato-sequencer --blockstanbul_block_period_ms=1000 --blockstanbul_round_period_s=120 --minLogLevel=LevelInfo --seq_max_events_per_iter=500 --seq_max_us_per_iter=50000 --validatorBehavior=true --test_mode_bypass_blockstanbul=false --network=helium +RTS -T -RTS +RTS -N1
 
-vm-runner --blockstanbul=true --debug=false --debugEnabled=false --debugPort=8051 --debugWSHost=strato --debugWSPort=8052 --diffPublish=true --maxTxsPerBlock=500 --minLogLevel=LevelInfo --networkID=-1 --seqEventsBatchSize=-1 --seqEventsCostHeuristic=20000 --sqlDiff=true --svmDev=false --svmTrace=false --network=helium +RTS -T -RTS +RTS -I2 -N1
+vm-runner --debug=false --debugEnabled=false --debugPort=8051 --debugWSHost=strato --debugWSPort=8052 --diffPublish=true --maxTxsPerBlock=500 --minLogLevel=LevelInfo --networkID=-1 --seqEventsBatchSize=-1 --seqEventsCostHeuristic=20000 --sqlDiff=true --svmDev=false --svmTrace=false --network=helium +RTS -T -RTS +RTS -I2 -N1
 
 strato-p2p-indexer
 

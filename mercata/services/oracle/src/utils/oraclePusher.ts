@@ -4,10 +4,12 @@ import { logError, logInfo } from './logger';
 import { TransactionResult, CallListArg } from '../types';
 import { checkBalances } from './balanceChecker';
 import { GAS_PARAMS, TIMEOUTS, RETRY_DELAYS } from './constants';
+import { txMetricsService } from './txMetricsService';
 
 
 async function callListAndWait(callListArgs: CallListArg[]): Promise<TransactionResult> {
     const accessToken = await oauthClient().getAccessToken();
+    const submitTime = Date.now();
     
     const response = await apiPost(
         `${process.env.STRATO_NODE_URL}/bloc/v2.2/transaction/parallel`,
@@ -34,7 +36,16 @@ async function callListAndWait(callListArgs: CallListArg[]): Promise<Transaction
     );
 
     const txHash = extractTransactionHash(response.data);
-    return await waitForTransaction(txHash);
+    const result = await waitForTransaction(txHash);
+    
+    // Record metrics (errors are handled inside txMetricsService)
+    await txMetricsService.recordTxMetric({
+        txHash,
+        duration: Date.now() - submitTime,
+        status: result.status,
+    });
+    
+    return result;
 }
 
 function extractTransactionHash(data: any): string {

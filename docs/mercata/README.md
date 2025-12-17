@@ -16,6 +16,9 @@ All endpoints require OAuth 2.0 Bearer token authentication unless marked as pub
 Authorization: Bearer <access_token>
 ```
 
+## Swagger Interactive Docs
+For full swagger documentation of the backend API, with an interactive Try it Out interface, please visit [https://app.testnet.strato.nexus/api/docs/](https://app.testnet.strato.nexus/api/docs/) or visit `/api/docs` on your preferred node.
+
 ## API Reference
 
 ### Overview
