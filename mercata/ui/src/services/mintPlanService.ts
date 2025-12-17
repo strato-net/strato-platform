@@ -99,6 +99,8 @@ export interface MintPlanResult {
   };
 }
 
+const USDST_ADDRESS = "937efa7e3a77e20bbdbd7c0d32b6514f368c1010";
+
 function isDummyAddress(address: string): boolean {
   const addr = address.toLowerCase().replace(/^0x/, "");
   if (addr.length !== 40) return false;
@@ -187,6 +189,9 @@ export function buildMintPlanWithBuffer(
 
   console.log("=== buildMintPlan: Filtering VaultInputs ===");
   console.log(`Total vaultInputs received: ${vaultInputs.length}`);
+  vaultInputs.forEach((v, idx) => {
+    console.log(`  Input ${idx + 1}: ${v.assetAddress}, collateral=${v.userVaultCollateral}, balance=${v.userAssetBalance}, supported=${v.isSupportedAsset}, paused=${v.isPaused}, price=${v.oraclePrice}, unitScale=${v.unitScale}`);
+  });
   
   const usableVaults: VaultInput[] = vaultInputs.filter((v) => {
     if (isDummyAddress(v.assetAddress)) {
@@ -200,7 +205,7 @@ export function buildMintPlanWithBuffer(
     const hasCollateralOrBalance =
       v.userVaultCollateral > 0n || v.userAssetBalance > 0n;
     if (!hasCollateralOrBalance) {
-      console.log(`Filtered out ${v.assetAddress}: no collateral or balance`);
+      console.log(`Filtered out ${v.assetAddress}: no collateral or balance (collateral=${v.userVaultCollateral}, balance=${v.userAssetBalance})`);
       return false;
     }
     if (!v.isSupportedAsset) {
@@ -279,10 +284,11 @@ export function buildMintPlanWithBuffer(
     };
   });
 
-  // Sort by stability fee rate (lowest first) for proportional allocation
+  // Sort by stability fee rate (lowest first) for greedy allocation
+  // Use annual percentage for more reliable sorting (RAY values are too close)
   workingVaults.sort((a, b) => {
-    if (a.stabilityFeeRateRay < b.stabilityFeeRateRay) return -1;
-    if (a.stabilityFeeRateRay > b.stabilityFeeRateRay) return 1;
+    if (a.stabilityFeeRateAnnual < b.stabilityFeeRateAnnual) return -1;
+    if (a.stabilityFeeRateAnnual > b.stabilityFeeRateAnnual) return 1;
     return 0;
   });
 
@@ -299,25 +305,20 @@ export function buildMintPlanWithBuffer(
     };
   }
 
-  // First pass: Calculate max capacity for each vault and proportional allocation
-  type VaultCapacity = {
-    vault: WorkingVaultState;
-    maxMintCapacity: bigint;
-    weight: bigint; // Inverse of stability fee rate (higher weight = lower fee = preferred)
-    plannedMint: bigint; // Calculated proportional allocation
-  };
-
-  const vaultCapacities: VaultCapacity[] = [];
-
-  // Calculate capacities and weights
+  // Greedy algorithm: fill cheapest vaults first until they hit limits
   for (const w of workingVaults) {
-    const vaultCollateral = w.currentVaultCollateral;
-    const vaultDebtUSD = w.currentVaultDebtUSD;
-    const assetBalance = w.currentAssetBalance;
-    const globalDebtUSD = w.currentGlobalDebtUSD;
+    if (remainingMintUSD <= 0n) {
+      break;
+    }
+
+    let vaultCollateral = w.currentVaultCollateral;
+    let vaultDebtUSD = w.currentVaultDebtUSD;
+    let assetBalance = w.currentAssetBalance;
+    let globalDebtUSD = w.currentGlobalDebtUSD;
 
     const price = w.oraclePrice;
     const targetCR = w.targetCRWad;
+    const debtFloor = w.debtFloorUSD;
     const debtCeiling = w.debtCeilingUSD;
     const unitScale = w.unitScale;
 
@@ -328,6 +329,7 @@ export function buildMintPlanWithBuffer(
       continue;
     }
 
+    // Calculate max mint capacity for this vault
     const maxCollateralIfAllDeposited = vaultCollateral + assetBalance;
     const collUSDIfAllDeposited = computeCollateralUSD(
       maxCollateralIfAllDeposited,
@@ -350,7 +352,7 @@ export function buildMintPlanWithBuffer(
       headroomFromCeiling = debtCeiling - globalDebtUSD;
     }
 
-    const maxExtraMintUSD = headroomFromCollateral < headroomFromCeiling
+    let maxExtraMintUSD = headroomFromCollateral < headroomFromCeiling
       ? headroomFromCollateral
       : headroomFromCeiling;
 
@@ -358,76 +360,29 @@ export function buildMintPlanWithBuffer(
       continue;
     }
 
-    // Weight by inverse of annual stability fee rate (lower fee = higher weight)
-    // Use 10000 as base for precision: weight = 10000 / annualFee
-    // This ensures ETHST (1.5%) gets weight ~6667 vs WBTCST (1.75%) gets weight ~5714
-    const weight = w.stabilityFeeRateAnnual > 0
-      ? BigInt(Math.floor((10000 / w.stabilityFeeRateAnnual) * 1000)) // Scale by 1000 for precision
-      : 0n;
-
-    vaultCapacities.push({
-      vault: w,
-      maxMintCapacity: maxExtraMintUSD,
-      weight,
-      plannedMint: 0n, // Will be calculated below
-    });
-  }
-
-  // Calculate total weighted capacity and proportional allocations
-  let totalWeightedCapacity = 0n;
-  for (const vc of vaultCapacities) {
-    totalWeightedCapacity += vc.maxMintCapacity * vc.weight;
-  }
-
-  // Calculate proportional allocations
-  if (totalWeightedCapacity > 0n) {
-    for (const vc of vaultCapacities) {
-      // Allocate proportionally: (capacity * weight / totalWeightedCapacity) * targetMintUSD
-      const weightedShare = (vc.maxMintCapacity * vc.weight * targetMintUSD) / totalWeightedCapacity;
-      vc.plannedMint = weightedShare < vc.maxMintCapacity 
-        ? weightedShare 
-        : vc.maxMintCapacity;
-    }
-  }
-
-  // Second pass: Execute allocations
-  for (const vc of vaultCapacities) {
-    if (remainingMintUSD <= 0n) {
-      break;
-    }
-
-    const w = vc.vault;
-    let vaultCollateral = w.currentVaultCollateral;
-    let vaultDebtUSD = w.currentVaultDebtUSD;
-    let assetBalance = w.currentAssetBalance;
-    let globalDebtUSD = w.currentGlobalDebtUSD;
-
-    const price = w.oraclePrice;
-    const targetCR = w.targetCRWad;
-    const debtFloor = w.debtFloorUSD;
-    const unitScale = w.unitScale;
-
-    // Use proportional allocation, but don't exceed remaining amount
-    let plannedMintHereUSD = vc.plannedMint < remainingMintUSD
-      ? vc.plannedMint
-      : remainingMintUSD;
-
     // Respect debt floor
     const hasExistingDebt = vaultDebtUSD > 0n;
     if (!hasExistingDebt && debtFloor > 0n) {
-      if (plannedMintHereUSD > 0n && plannedMintHereUSD < debtFloor) {
+      if (maxExtraMintUSD < debtFloor) {
         if (remainingMintUSD >= debtFloor) {
-          plannedMintHereUSD = debtFloor;
+          maxExtraMintUSD = debtFloor;
         } else {
           continue;
         }
       }
     }
 
+    // Greedy: mint as much as possible from this vault (up to its max or remaining amount)
+    let plannedMintHereUSD =
+      maxExtraMintUSD < remainingMintUSD
+        ? maxExtraMintUSD
+        : remainingMintUSD;
+
     if (plannedMintHereUSD <= 0n) {
       continue;
     }
 
+    // Calculate required collateral for this mint amount
     const newDebtUSD = vaultDebtUSD + plannedMintHereUSD;
     const requiredCollateralRaw = computeRequiredCollateralForCR(
       newDebtUSD,
@@ -441,6 +396,7 @@ export function buildMintPlanWithBuffer(
       extraCollateralNeeded = requiredCollateralRaw - vaultCollateral;
     }
 
+    // If we don't have enough balance, clamp mint to what's possible
     if (extraCollateralNeeded > assetBalance) {
       const effectiveTotalCollateral = vaultCollateral + assetBalance;
       const collUSDEffective = computeCollateralUSD(
@@ -455,6 +411,7 @@ export function buildMintPlanWithBuffer(
         effectiveHeadroomUSD = maxDebtEffective - vaultDebtUSD;
       }
 
+      // Clamp to effective headroom and remaining amount
       plannedMintHereUSD =
         effectiveHeadroomUSD < remainingMintUSD
           ? effectiveHeadroomUSD
@@ -464,6 +421,7 @@ export function buildMintPlanWithBuffer(
         continue;
       }
 
+      // Recalculate required collateral with clamped amount
       const newDebtUSD2 = vaultDebtUSD + plannedMintHereUSD;
       const requiredCollateralRaw2 = computeRequiredCollateralForCR(
         newDebtUSD2,
@@ -483,6 +441,7 @@ export function buildMintPlanWithBuffer(
       }
     }
 
+    // Add deposit transaction if needed
     if (extraCollateralNeeded > 0n) {
       transactions.push({
         type: "DEPOSIT",
@@ -492,6 +451,7 @@ export function buildMintPlanWithBuffer(
       perAssetSummary[w.assetAddress].plannedDeposit += extraCollateralNeeded;
     }
 
+    // Add mint transaction
     transactions.push({
       type: "MINT",
       assetAddress: w.assetAddress,
@@ -499,6 +459,7 @@ export function buildMintPlanWithBuffer(
     });
     perAssetSummary[w.assetAddress].plannedMint += plannedMintHereUSD;
 
+    // Update state for next iteration
     vaultCollateral += extraCollateralNeeded;
     assetBalance -= extraCollateralNeeded;
     vaultDebtUSD += plannedMintHereUSD;
@@ -561,8 +522,6 @@ export interface ConversionGlobalDebtInfo {
     currentTotalDebt: string;
   };
 }
-
-const USDST_ADDRESS = "937efa7e3a77e20bbdbd7c0d32b6514f368c1010";
 
 export function convertToVaultInputs(
   assets: ConversionAssetConfig[],
@@ -785,6 +744,30 @@ export function convertToVaultInputs(
   console.log(`Total vaultInputs created: ${vaultInputs.length}`);
   vaultInputs.forEach((v, idx) => {
     console.log(`${idx + 1}. Asset: ${v.assetAddress}, Collateral: ${v.userVaultCollateral}, Balance: ${v.userAssetBalance}, Supported: ${v.isSupportedAsset}, Paused: ${v.isPaused}`);
+  });
+
+  console.log("=== User Balances of Supported Assets ===");
+  const supportedAssetsWithBalance: Array<{ asset: ConversionAssetConfig; tokenInfo: ConversionTokenInfo; balance: bigint }> = [];
+  for (const asset of assets) {
+    if (isDummyAddress(asset.asset)) {
+      continue;
+    }
+    if (!supportedUnpausedAssets.has(asset.asset.toLowerCase())) {
+      continue;
+    }
+    const tokenInfo = tokensByAddress[asset.asset.toLowerCase()];
+    if (tokenInfo) {
+      const balance = BigInt(tokenInfo.balance || "0");
+      if (balance > 0n) {
+        supportedAssetsWithBalance.push({ asset, tokenInfo, balance });
+      }
+    }
+  }
+  console.log(`Total supported assets with balance: ${supportedAssetsWithBalance.length}`);
+  supportedAssetsWithBalance.forEach((item, idx) => {
+    const decimals = item.tokenInfo.decimals || 18;
+    const balanceFormatted = formatUnits(item.balance, decimals);
+    console.log(`${idx + 1}. ${item.asset.symbol || 'N/A'} (${item.asset.asset}): ${balanceFormatted} tokens, Balance: ${item.balance.toString()}`);
   });
 
   return vaultInputs;

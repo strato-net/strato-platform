@@ -134,6 +134,32 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
 }) => {
   const [mintAmountInput, setMintAmountInput] = useState<string>("");
   const [riskBufferPercent, setRiskBufferPercent] = useState<number>(20);
+
+  // Calculate color based on risk buffer percentage
+  const getRiskColor = useCallback((percent: number): string => {
+    if (percent <= 20) {
+      // Green to light green (0-20%)
+      const ratio = percent / 20;
+      const r = Math.round(16 + (52 - 16) * ratio);
+      const g = Math.round(185 + (211 - 185) * ratio);
+      const b = Math.round(129 + (153 - 129) * ratio);
+      return `rgb(${r}, ${g}, ${b})`;
+    } else if (percent <= 50) {
+      // Light green to amber (20-50%)
+      const ratio = (percent - 20) / 30;
+      const r = Math.round(52 + (245 - 52) * ratio);
+      const g = Math.round(211 + (158 - 211) * ratio);
+      const b = Math.round(153 + (11 - 153) * ratio);
+      return `rgb(${r}, ${g}, ${b})`;
+    } else {
+      // Amber to red (50-100%)
+      const ratio = (percent - 50) / 50;
+      const r = Math.round(245 + (239 - 245) * ratio);
+      const g = Math.round(158 + (68 - 158) * ratio);
+      const b = Math.round(11 + (68 - 11) * ratio);
+      return `rgb(${r}, ${g}, ${b})`;
+    }
+  }, []);
   const [assets, setAssets] = useState<AssetConfig[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -211,6 +237,76 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
     };
     loadData();
   }, [fetchAllPrices]);
+
+  // Log user balances of supported assets when data is available
+  useEffect(() => {
+    if (assets.length === 0 || activeTokens.length === 0) {
+      return;
+    }
+
+    console.log("=== MintPlanner: User Balances of Supported Assets ===");
+    console.log(`Total supported assets: ${assets.length}`);
+    console.log(`Total active tokens: ${activeTokens.length}`);
+
+    const supportedAssetsByAddress = new Map<string, AssetConfig>();
+    assets.forEach((asset) => {
+      if (asset.isSupported && !asset.isPaused) {
+        supportedAssetsByAddress.set(asset.asset.toLowerCase(), asset);
+      }
+    });
+
+    console.log(`Total supported/unpaused assets: ${supportedAssetsByAddress.size}`);
+
+    const supportedAssetsWithBalance: Array<{
+      asset: AssetConfig;
+      token: typeof activeTokens[0];
+      balance: bigint;
+      balanceFormatted: string;
+    }> = [];
+
+    activeTokens.forEach((token) => {
+      if (!token.address) return;
+      
+      const assetLower = token.address.toLowerCase();
+      const asset = supportedAssetsByAddress.get(assetLower);
+      
+      if (asset) {
+        const balance = BigInt(token.balance || "0");
+        if (balance > 0n) {
+          const decimals = (token as any).decimals || 18;
+          const balanceFormatted = formatUnits(balance, decimals);
+          supportedAssetsWithBalance.push({
+            asset,
+            token,
+            balance,
+            balanceFormatted,
+          });
+        }
+      }
+    });
+
+    console.log(`Total supported assets with balance: ${supportedAssetsWithBalance.length}`);
+    if (supportedAssetsWithBalance.length === 0) {
+      console.warn("⚠️ No supported assets with balance found!");
+      console.log("Supported assets:", Array.from(supportedAssetsByAddress.values()).map(a => `${a.symbol} (${a.asset})`));
+      console.log("User tokens:", activeTokens.map(t => `${(t as any).symbol || 'N/A'} (${t.address}) - Balance: ${t.balance || "0"}`));
+    } else {
+      supportedAssetsWithBalance.forEach((item, idx) => {
+        const price = prices[item.asset.asset.toLowerCase()];
+        const priceFormatted = price ? parseFloat(formatUnits(BigInt(price), 18)).toFixed(2) : "N/A";
+        const balanceUSD = price && item.balanceFormatted !== "0"
+          ? (parseFloat(item.balanceFormatted) * parseFloat(formatUnits(BigInt(price), 18))).toFixed(2)
+          : "N/A";
+        console.log(
+          `${idx + 1}. ${item.asset.symbol} (${item.asset.asset}): ` +
+          `${item.balanceFormatted} tokens, ` +
+          `Balance: ${item.balance.toString()}, ` +
+          `Price: $${priceFormatted}, ` +
+          `Value: $${balanceUSD}`
+        );
+      });
+    }
+  }, [assets, activeTokens, prices]);
 
   const priceForAsset = useCallback((assetAddress: string, fallbackVault?: VaultData) => {
     const oraclePrice = prices[assetAddress?.toLowerCase() || ""];
@@ -491,12 +587,15 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
 
   // Get optimal allocations using the service function
   const allocations = useMemo(() => {
-    if (mintAmount <= 0 || assets.length === 0 || vaults.length === 0) {
+    if (mintAmount <= 0 || assets.length === 0) {
       return [];
     }
 
+    console.log("=== MintPlanner: Calling getOptimalAllocations ===");
+    console.log(`  mintAmount: ${mintAmount}, assets: ${assets.length}, vaults: ${vaults.length}, activeTokens: ${activeTokens.length}`);
+
     const targetMintUSD = parseUnits(mintAmount.toFixed(18), 18);
-    return getOptimalAllocations(
+    const result = getOptimalAllocations(
       targetMintUSD,
       riskBufferPercent,
       assets,
@@ -505,6 +604,9 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
       prices,
       globalDebtInfo
     );
+    
+    console.log(`=== MintPlanner: getOptimalAllocations returned ${result.length} allocations ===`);
+    return result;
   }, [mintAmount, riskBufferPercent, assets, vaults, activeTokens, prices, globalDebtInfo]);
 
   // Calculate weighted average APR based on actual mint allocations
@@ -714,19 +816,28 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
       }
 
       // Execute transactions sequentially with validation
-      const results: string[] = [];
-      let lastTxHash = "";
       const SAFETY_BUFFER_PERCENT = 0.001; // 0.1% buffer to account for strict < comparison and rounding
+      let allSuccessful = true;
       
       for (const tx of transactions) {
         let result;
         if (tx.type === "deposit") {
           result = await cdpService.deposit(tx.asset, tx.amount);
           if (result.status.toLowerCase() !== "success") {
+            allSuccessful = false;
+            toast({
+              title: `Deposit Failed: ${tx.symbol}`,
+              description: `Failed to deposit ${formatUSD(parseFloat(tx.amount), 4)} ${tx.symbol}. Status: ${result.status}`,
+              variant: "destructive",
+            });
             throw new Error(`Deposit failed for ${tx.symbol}: ${result.status}`);
           }
-          results.push(`Deposited ${formatUSD(parseFloat(tx.amount), 4)} ${tx.symbol}`);
-          lastTxHash = result.hash;
+          
+          // Show individual success toast for deposit
+          toast({
+            title: `Deposit Successful: ${tx.symbol}`,
+            description: `Deposited ${formatUSD(parseFloat(tx.amount), 4)} ${tx.symbol}. Tx: ${result.hash}`,
+          });
           
           // Refresh vault state and prices after deposit to get updated max mintable
           await Promise.all([
@@ -758,7 +869,11 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
               
               if (clampedMintUSD <= 0) {
                 // Skip this mint - insufficient collateral
-                results.push(`Skipped mint for ${tx.symbol}: insufficient collateral after deposits`);
+                toast({
+                  title: `Mint Skipped: ${tx.symbol}`,
+                  description: `Insufficient collateral after deposits. Planned: ${formatUSD(plannedMintUSD, 2)} USDST`,
+                  variant: "default",
+                });
                 continue;
               }
               
@@ -772,18 +887,30 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
           
           result = await cdpService.mint(tx.asset, tx.amount);
           if (result.status.toLowerCase() !== "success") {
+            allSuccessful = false;
+            toast({
+              title: `Mint Failed: ${tx.symbol}`,
+              description: `Failed to mint ${formatUSD(parseFloat(tx.amount), 2)} USDST from ${tx.symbol}. Status: ${result.status}`,
+              variant: "destructive",
+            });
             throw new Error(`Mint failed for ${tx.symbol}: ${result.status}`);
           }
-          results.push(`Minted ${formatUSD(parseFloat(tx.amount), 2)} USDST from ${tx.symbol}`);
-          lastTxHash = result.hash;
+          
+          // Show individual success toast for mint
+          toast({
+            title: `Mint Successful: ${tx.symbol}`,
+            description: `Minted ${formatUSD(parseFloat(tx.amount), 2)} USDST from ${tx.symbol}. Tx: ${result.hash}`,
+          });
         }
       }
 
-      // Show success toast
-      toast({
-        title: "Quick Mint Successful",
-        description: `${results.join(". ")}. Tx: ${lastTxHash}`,
-      });
+      // Show final summary toast if all transactions succeeded
+      if (allSuccessful) {
+        toast({
+          title: "Quick Mint Complete",
+          description: "All transactions completed successfully",
+        });
+      }
 
       // Refresh vault data
       await fetchVaults();
@@ -812,7 +939,17 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
   }, [mintAmount, selectedVaults, depositInputs, toast, fetchVaults, fetchAllPrices, onSuccess, assets, realActiveTokens]);
 
   return (
-    <div className="space-y-6">
+    <>
+      <style>{`
+        .risk-slider-track {
+          background-color: hsl(var(--secondary)) !important;
+        }
+        .risk-slider-range {
+          background-color: var(--risk-slider-color, #10b981) !important;
+          transition: background-color 0.2s ease;
+        }
+      `}</style>
+      <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold">{title}</h2>
@@ -856,16 +993,29 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium">Risk Buffer</label>
-                <span className="text-sm text-gray-600">{riskBufferPercent}%</span>
+                <span 
+                  className="text-sm font-semibold"
+                  style={{
+                    color: getRiskColor(riskBufferPercent)
+                  }}
+                >
+                  {riskBufferPercent}%
+                </span>
               </div>
-              <Slider
-                value={[riskBufferPercent]}
-                onValueChange={(value) => setRiskBufferPercent(value[0])}
-                min={0}
-                max={100}
-                step={1}
-                className="w-full"
-              />
+              <div className="relative w-full">
+                <div style={{ '--risk-slider-color': getRiskColor(riskBufferPercent) } as React.CSSProperties}>
+                  <Slider
+                    value={[riskBufferPercent]}
+                    onValueChange={(value) => setRiskBufferPercent(value[0])}
+                    min={0}
+                    max={100}
+                    step={1}
+                    className="w-full risk-slider"
+                    trackClassName="risk-slider-track"
+                    rangeClassName="risk-slider-range"
+                  />
+                </div>
+              </div>
               <div className="text-sm text-gray-600">
                 <span>
                   Mint up to each vault's minCR + {riskBufferPercent}%
@@ -1080,16 +1230,29 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="text-sm font-medium">Risk Buffer</label>
-              <span className="text-sm text-gray-600">{riskBufferPercent}%</span>
+              <span 
+                className="text-sm font-semibold"
+                style={{
+                  color: getRiskColor(riskBufferPercent)
+                }}
+              >
+                {riskBufferPercent}%
+              </span>
             </div>
-            <Slider
-              value={[riskBufferPercent]}
-              onValueChange={(value) => setRiskBufferPercent(value[0])}
-              min={0}
-              max={100}
-              step={1}
-              className="w-full"
-            />
+            <div className="relative w-full">
+              <div style={{ '--risk-slider-color': getRiskColor(riskBufferPercent) } as React.CSSProperties}>
+                <Slider
+                  value={[riskBufferPercent]}
+                  onValueChange={(value) => setRiskBufferPercent(value[0])}
+                  min={0}
+                  max={100}
+                  step={1}
+                  className="w-full risk-slider"
+                  trackClassName="risk-slider-track"
+                  rangeClassName="risk-slider-range"
+                />
+              </div>
+            </div>
             <div className="text-xs text-gray-500">
               Mint up to each vault's minCR + {riskBufferPercent}%
             </div>
@@ -1253,6 +1416,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
         </>
       )}
     </div>
+    </>
   );
 };
 
