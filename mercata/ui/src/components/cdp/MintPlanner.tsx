@@ -25,13 +25,6 @@ import { useToast } from "@/hooks/use-toast";
 import { CompactRewardsDisplay } from "@/components/rewards/CompactRewardsDisplay";
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 import MintWidget from "./MintWidget";
-import {
-  USE_DUMMY_DATA,
-  dummyVaults,
-  dummyAssets,
-  dummyPrices,
-  dummyActiveTokens,
-} from "./dummyData";
 
 type Allocation = {
   vault: AssetConfig & { address: string; symbol: string };
@@ -173,16 +166,12 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
   const { toast } = useToast();
   const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
-  // Use dummy data if enabled, otherwise use real data
-  const prices = USE_DUMMY_DATA ? dummyPrices : realPrices;
-  const activeTokens = USE_DUMMY_DATA ? dummyActiveTokens : realActiveTokens;
+  // Use real data
+  const prices = realPrices;
+  const activeTokens = realActiveTokens;
 
   // Fetch vaults directly like VaultsList.tsx
   const fetchVaults = useCallback(async () => {
-    if (USE_DUMMY_DATA) {
-      setVaults(dummyVaults);
-      return;
-    }
     try {
       const fetchedVaults = await cdpService.getVaults();
       setVaults(fetchedVaults);
@@ -198,11 +187,6 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
 
   useEffect(() => {
     const loadData = async () => {
-      if (USE_DUMMY_DATA) {
-        setAssets(dummyAssets);
-        setLoading(false);
-        return;
-      }
       setLoading(true);
       setError(null);
       try {
@@ -679,9 +663,9 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
 
       // Re-fetch fresh data directly for calculations (state may not have updated yet)
       const [freshVaults, freshActiveTokens, freshPricesResponse] = await Promise.all([
-        USE_DUMMY_DATA ? Promise.resolve(dummyVaults) : cdpService.getVaults(),
-        USE_DUMMY_DATA ? Promise.resolve(dummyActiveTokens) : Promise.resolve(realActiveTokens), // activeTokens should be relatively fresh
-        USE_DUMMY_DATA ? Promise.resolve(dummyPrices) : (async () => {
+        cdpService.getVaults(),
+        Promise.resolve(realActiveTokens), // activeTokens should be relatively fresh
+        (async () => {
           // Fetch prices directly from API to ensure we have the latest
           const response = await api.get('/oracle/price');
           const allPrices = response.data || [];
