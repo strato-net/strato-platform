@@ -6,6 +6,7 @@ import CRSlider from "./CRSlider";
 import { cdpService, AssetConfig, TransactionResponse } from "@/services/cdpService";
 import { useToast } from "@/hooks/use-toast";
 import { useUserTokens } from "@/context/UserTokensContext";
+import { useTokenContext } from "@/context/TokenContext";
 import { formatBalance as formatBalanceUtil, formatWeiToDecimalHP, formatNumber, formatDecimalToWeiHP } from "@/utils/numberUtils";
 import { api } from "@/lib/axios";
 import { CompactRewardsDisplay } from "@/components/rewards/CompactRewardsDisplay";
@@ -32,7 +33,8 @@ const MintWidget: React.FC<MintWidgetProps> = ({ onSuccess, title = "Mint Agains
   const [maxBorrowableUSD, setMaxBorrowableUSD] = useState<number>(0);
   const [maxBorrowLoading, setMaxBorrowLoading] = useState<boolean>(false);
   const { toast } = useToast();
-  const { activeTokens } = useUserTokens();
+  const { activeTokens, fetchTokens } = useUserTokens();
+  const { fetchUsdstBalance } = useTokenContext();
   const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
   const borrowRate = depositAsset?.stabilityFeeRate || 5.54;
@@ -681,8 +683,12 @@ const MintWidget: React.FC<MintWidgetProps> = ({ onSuccess, title = "Mint Agains
         onSuccess();
       }
 
-      // Refresh widget data after successful transaction
-      await refreshWidgetData();
+      // Refresh widget data and balances after successful transaction
+      await Promise.all([
+        refreshWidgetData(),
+        fetchUsdstBalance(),
+        fetchTokens()
+      ]);
 
       // Reset form
       setDepositAmount("");
