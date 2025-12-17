@@ -318,7 +318,7 @@ const Dashboard = () => {
             />
 
             <AssetSummary
-              title="Reward Balance"
+              title="Reward"
               value={(() => {
                 if (rankLoading) return "Loading...";
                 if (!totalEarned) return "0 Reward Points";
