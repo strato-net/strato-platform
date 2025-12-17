@@ -5,12 +5,7 @@ import { formatUnits } from "viem";
 import { Coins, Zap, Clock, RefreshCw, Star } from "lucide-react";
 import CopyButton from "@/components/ui/copy";
 import { Button } from "@/components/ui/button";
-import { useState, useMemo } from "react";
-import { useTokenContext } from "@/context/TokenContext";
-import { useNetBalance } from "@/hooks/useNetBalance";
-import { useLendingContext } from "@/context/LendingContext";
-import { useCDP } from "@/context/CDPContext";
-import { cataAddress } from "@/lib/constants";
+import { useState } from "react";
 
 interface RewardsOverviewProps {
   state: RewardsState | null;
@@ -27,23 +22,6 @@ const truncateTokenAddress = (address: string, front: number = 6, back: number =
 
 export const RewardsOverview = ({ state, loading, onRefresh }: RewardsOverviewProps) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const { earningAssets, inactiveTokens } = useTokenContext();
-  const { loans } = useLendingContext();
-  const { totalCDPDebt } = useCDP();
-
-  // Get CATA token from inactive tokens
-  const cataToken = useMemo(() => 
-    inactiveTokens?.find(token => token.address === cataAddress),
-    [inactiveTokens]
-  );
-
-  // Get cataBalance from useNetBalance hook
-  const { cataBalance } = useNetBalance({
-    tokens: earningAssets,
-    cataToken,
-    loans,
-    totalCDPDebt
-  });
 
   const handleRefresh = async () => {
     if (!onRefresh || isRefreshing) return;
@@ -54,11 +32,14 @@ export const RewardsOverview = ({ state, loading, onRefresh }: RewardsOverviewPr
       setIsRefreshing(false);
     }
   };
+  // Get season name from state or use default
+  const seasonName = state?.seasonName || "Season";
+
   if (loading) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Rewards Overview</CardTitle>
+          <CardTitle>{seasonName} Reward Overview</CardTitle>
           <CardDescription>Global rewards system statistics</CardDescription>
         </CardHeader>
         <CardContent>
@@ -77,7 +58,7 @@ export const RewardsOverview = ({ state, loading, onRefresh }: RewardsOverviewPr
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Rewards Overview</CardTitle>
+          <CardTitle>Reward Overview</CardTitle>
           <CardDescription>Global rewards system statistics</CardDescription>
         </CardHeader>
         <CardContent>
@@ -114,7 +95,7 @@ export const RewardsOverview = ({ state, loading, onRefresh }: RewardsOverviewPr
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle>Rewards Overview</CardTitle>
+            <CardTitle>{seasonName} Reward Overview</CardTitle>
             <CardDescription>Global rewards system statistics</CardDescription>
           </div>
           {onRefresh && (
@@ -158,7 +139,9 @@ export const RewardsOverview = ({ state, loading, onRefresh }: RewardsOverviewPr
             <div className="flex-1">
               <p className="text-sm text-muted-foreground">Total Earned</p>
               <p className="text-2xl font-semibold">
-                {cataBalance.toLocaleString("en-US", { maximumFractionDigits: 2 })}
+                {state.totalDistributed ? 
+                  formatRoundedWithCommas(roundByMagnitude(String(parseFloat(state.totalDistributed) / 1e18))) 
+                  : "0"}
               </p>
               <p className="text-xs text-muted-foreground mt-1">Reward Points</p>
             </div>

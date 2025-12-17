@@ -10,12 +10,26 @@ let pendingRequest: Promise<any> | null = null;
 const CACHE_TTL = 5000; // 5 seconds cache
 
 /**
+ * Cache for claimed rewards to avoid multiple cirrus event queries
+ */
+let claimedRewardsCache: { address: string; data: Map<string, bigint>; timestamp: number } | null = null;
+let claimedRewardsPendingRequest: Promise<Map<string, bigint>> | null = null;
+
+/**
  * Clear the contract state cache
  * Useful for forcing fresh data from the blockchain
  */
 export const clearContractStateCache = (): void => {
   contractStateCache = null;
   pendingRequest = null;
+};
+
+/**
+ * Clear the claimed rewards cache
+ */
+export const clearClaimedRewardsCache = (): void => {
+  claimedRewardsCache = null;
+  claimedRewardsPendingRequest = null;
 };
 
 /**
@@ -270,12 +284,113 @@ export const fetchUnclaimedRewards = async (
 };
 
 /**
+ * Season info interface
+ */
+export interface SeasonInfo {
+  currentSeason: number;
+  seasonName: string;
+  seasonTimestamp: number | null;
+}
+
+/**
+ * Fetch current season info from contract state and SeasonAnnouncement events
+ * 
+ * Contract state: currentSeason (uint256) - starts at 1
+ * Event: SeasonAnnouncement(uint256 indexed seasonId, string seasonName, uint256 timestamp)
+ * Note: seasonName is NOT stored in state, only emitted in events.
+ */
+export const fetchSeasonInfo = async (
+  accessToken: string,
+  rewardsAddress: string,
+  forceRefresh: boolean = false
+): Promise<SeasonInfo> => {
+  const state = await fetchContractState(accessToken, rewardsAddress, forceRefresh);
+  
+  // currentSeason is a public state variable in the contract (initialized to 1)
+  const currentSeason = parseInt(state?.currentSeason || "1", 10);
+
+  // Default season info (used if no SeasonAnnouncement event exists for this season)
+  let seasonName = `Season ${currentSeason}`;
+  let seasonTimestamp: number | null = null;
+
+  try {
+    // Fetch SeasonAnnouncement events to get season names
+    // seasonName is only emitted in events, not stored in contract state
+    const { data: events = [] } = await cirrus.get(accessToken, "/event", {
+      params: {
+        address: `eq.${rewardsAddress}`,
+        event_name: `eq.SeasonAnnouncement`,
+        select: "attributes,block_timestamp",
+        order: "block_timestamp.desc",
+        limit: 10,
+      },
+    });
+
+    // Find the current season's announcement
+    for (const event of events) {
+      try {
+        const attrs = typeof event.attributes === 'string' 
+          ? JSON.parse(event.attributes) 
+          : event.attributes || {};
+        
+        // Handle different attribute key formats (Cirrus may use _prefix for indexed params)
+        const eventSeasonId = parseInt(
+          attrs.seasonId || attrs._seasonId || attrs["0"] || "0", 
+          10
+        );
+        const eventSeasonName = attrs.seasonName || attrs._seasonName || attrs["1"];
+        const eventTimestamp = attrs.timestamp || attrs._timestamp || attrs["2"];
+        
+        if (eventSeasonId === currentSeason && eventSeasonName) {
+          seasonName = eventSeasonName;
+          seasonTimestamp = parseInt(eventTimestamp || "0", 10) || null;
+          break;
+        }
+      } catch {
+        // Skip invalid event
+      }
+    }
+  } catch (error) {
+    console.error("Failed to fetch SeasonAnnouncement events:", error);
+    // Continue with default season name
+  }
+
+  return { currentSeason, seasonName, seasonTimestamp };
+};
+
+/**
  * Fetch total claimed rewards per user from RewardsClaimed events
+ * Uses caching to avoid duplicate cirrus calls within CACHE_TTL
+ * @param forceRefresh - If true, bypasses cache and fetches fresh data
  */
 export const fetchClaimedRewards = async (
   accessToken: string,
-  rewardsAddress: string
+  rewardsAddress: string,
+  forceRefresh: boolean = false
 ): Promise<Map<string, bigint>> => {
+  const now = Date.now();
+  
+  // Return cached data if valid and not forcing refresh
+  if (!forceRefresh && claimedRewardsCache && 
+      claimedRewardsCache.address === rewardsAddress &&
+      (now - claimedRewardsCache.timestamp) < CACHE_TTL) {
+    return claimedRewardsCache.data;
+  }
+
+  // Handle concurrent requests
+  if (forceRefresh) {
+    claimedRewardsCache = null;
+    if (claimedRewardsPendingRequest) {
+      return claimedRewardsPendingRequest;
+    }
+  } else {
+    if (claimedRewardsPendingRequest) {
+      return claimedRewardsPendingRequest;
+    }
+  }
+
+  // Create new request and cache the promise
+  claimedRewardsPendingRequest = (async () => {
   try {
     const { data: events = [] } = await cirrus.get(accessToken, "/event", {
       params: {
@@ -285,7 +400,7 @@ export const fetchClaimedRewards = async (
       },
     });
 
-    return events.reduce((map: Map<string, bigint>, event: any) => {
+      const result = events.reduce((map: Map<string, bigint>, event: any) => {
       try {
         const attrs = typeof event.attributes === 'string' 
           ? JSON.parse(event.attributes) 
@@ -300,10 +415,24 @@ export const fetchClaimedRewards = async (
       }
       return map;
     }, new Map<string, bigint>());
+
+      // Cache the result
+      claimedRewardsCache = {
+        address: rewardsAddress,
+        data: result,
+        timestamp: Date.now()
+      };
+
+      return result;
   } catch (error) {
     console.error("Failed to fetch claimed rewards:", error);
     return new Map<string, bigint>();
+    } finally {
+      claimedRewardsPendingRequest = null;
   }
+  })();
+
+  return claimedRewardsPendingRequest;
 };
 
 /**
@@ -356,7 +485,7 @@ export const fetchAllUsersLeaderboard = async (
 ): Promise<Array<{ address: string; totalRewardsEarned: string }>> => {
   const state = await fetchContractState(accessToken, rewardsAddress, forceRefresh);
   const { userInfo = {}, unclaimedRewards = {}, activities = {}, activityStates = {} } = state || {};
-  const claimedRewardsMap = await fetchClaimedRewards(accessToken, rewardsAddress);
+  const claimedRewardsMap = await fetchClaimedRewards(accessToken, rewardsAddress, forceRefresh);
   const currentTime = Math.floor(Date.now() / 1000);
   const userSet = new Set<string>();
 
