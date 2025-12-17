@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import MobileSidebar from '../components/dashboard/MobileSidebar';
@@ -15,6 +15,7 @@ import BadDebtView from '@/components/cdp/BadDebtView';
 import { useCDP } from '@/context/CDPContext';
 import { CompactRewardsDisplay } from '@/components/rewards/CompactRewardsDisplay';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
+import { useUserTokens } from '@/context/UserTokensContext';
 
 const Advanced = () => {
   const [activeTab, setActiveTab] = useState<"lending" | "swap" | "liquidations" | "safety" | "mint">("mint");
@@ -22,7 +23,8 @@ const Advanced = () => {
   const [borrowActiveTab, setBorrowActiveTab] = useState('vaults');
   const { refreshVaults } = useCDP();
   const [vaultsRefreshTrigger, setVaultsRefreshTrigger] = useState(0);
-  const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
+  const { userRewards, loading: rewardsLoading, refetch: refetchRewards } = useRewardsUserInfo();
+  const { fetchTokens } = useUserTokens();
 
   const handleBorrowSuccess = () => {
     setVaultsRefreshTrigger(prev => prev + 1);
@@ -31,6 +33,15 @@ const Advanced = () => {
   const handleVaultActionSuccess = () => {
     refreshVaults();
   };
+
+  const handleQuickMintSuccess = useCallback(async () => {
+    refreshVaults();
+    setVaultsRefreshTrigger(prev => prev + 1);
+    await Promise.all([
+      refetchRewards(),
+      fetchTokens(), // Refresh user token balances for VaultsList
+    ]);
+  }, [refreshVaults, refetchRewards, fetchTokens]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -83,7 +94,7 @@ const Advanced = () => {
                     <TabsContent value="vaults">
                       <div className="space-y-6">
                         <div className="border border-gray-200  bg-white rounded-xl p-4  flex flex-col space-y-6">
-                          <MintPlanner />
+                          <MintPlanner onSuccess={handleQuickMintSuccess} />
                         </div>
                         <VaultsList 
                           refreshTrigger={vaultsRefreshTrigger} 
