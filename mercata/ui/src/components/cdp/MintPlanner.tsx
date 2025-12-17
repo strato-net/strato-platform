@@ -945,16 +945,14 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
         }
       `}</style>
       <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold">{title}</h2>
-        </div>
+      <div className="flex items-center justify-between px-6 pb-4">
+        <h1 className="text-2xl font-bold">{title}</h1>
         <Button
           variant="outline"
           size="sm"
           onClick={() => setShowAdvanced(!showAdvanced)}
         >
-          {showAdvanced ? "Quick Mint" : "Advanced"}
+          {showAdvanced ? "Show Quick Mint" : "Show Advanced"}
         </Button>
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
