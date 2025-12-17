@@ -464,12 +464,6 @@ router.post("/claim/:activityId", authHandler.authorizeRequest(), RewardsControl
  *           default: 0
  *           minimum: 0
  *         description: Number of entries to skip
- *       - in: query
- *         name: season
- *         schema:
- *           type: boolean
- *           default: false
- *         description: If true, returns season leaderboard data (dummy data for now)
  *     responses:
  *       200:
  *         description: Leaderboard response with entries and pagination info
@@ -499,12 +493,6 @@ router.post("/claim/:activityId", authHandler.authorizeRequest(), RewardsControl
  *                 limit:
  *                   type: integer
  *                   description: Current limit
- *                 currentSeason:
- *                   type: integer
- *                   description: Current season number
- *                 seasonName:
- *                   type: string
- *                   description: Current season name
  *       401:
  *         description: Unauthorized
  */

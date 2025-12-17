@@ -24,13 +24,6 @@ const Rewards = () => {
     }
     return "my-rewards";
   });
-  const [leaderboardTimeFilter, setLeaderboardTimeFilter] = useState<"season" | "all-time">(() => {
-    const timeFilterParam = searchParams.get("timeFilter");
-    if (timeFilterParam === "season" || timeFilterParam === "all-time") {
-      return timeFilterParam;
-    }
-    return "all-time";
-  });
 
   const { state, loading: stateLoading, refetch: refetchState } = useRewards();
   const { activities, loading: activitiesLoading, refetch: refetchActivities } = useRewardsActivities();
@@ -39,7 +32,7 @@ const Rewards = () => {
   const [leaderboardLimit] = useState(10);
   const [leaderboardPage, setLeaderboardPage] = useState(1);
   const leaderboardOffset = (leaderboardPage - 1) * leaderboardLimit;
-  const { entries: leaderboardEntries, total: leaderboardTotal, loading: leaderboardLoading, refetch: refetchLeaderboard } = useRewardsLeaderboard(leaderboardLimit, leaderboardOffset, leaderboardTimeFilter === "season");
+  const { entries: leaderboardEntries, total: leaderboardTotal, loading: leaderboardLoading, refetch: refetchLeaderboard } = useRewardsLeaderboard(leaderboardLimit, leaderboardOffset);
 
   useEffect(() => {
     document.title = "Rewards";
@@ -53,10 +46,6 @@ const Rewards = () => {
     const tabParam = searchParams.get("tab");
     if (tabParam === "leaderboard" || tabParam === "activities" || tabParam === "my-rewards") {
       setActiveTab(tabParam);
-    }
-    const timeFilterParam = searchParams.get("timeFilter");
-    if (timeFilterParam === "season" || timeFilterParam === "all-time") {
-      setLeaderboardTimeFilter(timeFilterParam);
     }
   }, [searchParams]);
 
@@ -123,8 +112,6 @@ const Rewards = () => {
                 currentPage={leaderboardPage}
                 loading={leaderboardLoading}
                 onPageChange={setLeaderboardPage}
-                timeFilter={leaderboardTimeFilter}
-                onTimeFilterChange={setLeaderboardTimeFilter}
               />
             </TabsContent>
             <TabsContent value="activities">

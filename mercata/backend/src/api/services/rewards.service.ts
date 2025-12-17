@@ -312,55 +312,15 @@ export interface LeaderboardResponse {
   total: number;
   offset: number;
   limit: number;
-  currentSeason: number;
-  seasonName: string;
 }
-
-/**
- * Dummy season leaderboard data (until season contracts are ready)
- */
-const DUMMY_SEASON_LEADERBOARD = [
-  { address: "a1b2c3d4e5f6789012345678901234567890abcd", totalRewardsEarned: "5000000000000000000000" },
-  { address: "b2c3d4e5f67890123456789012345678901abcde", totalRewardsEarned: "4500000000000000000000" },
-  { address: "1b7dc206ef2fe3aab27404b88c36470ccf16c0ce", totalRewardsEarned: "4200000000000000000000" }, // User's address - Rank #3
-  { address: "c3d4e5f678901234567890123456789012abcdef", totalRewardsEarned: "4000000000000000000000" },
-  { address: "d4e5f6789012345678901234567890123abcdef0", totalRewardsEarned: "3500000000000000000000" },
-  { address: "e5f67890123456789012345678901234abcdef01", totalRewardsEarned: "3000000000000000000000" },
-  { address: "f678901234567890123456789012345abcdef012", totalRewardsEarned: "2500000000000000000000" },
-  { address: "6789012345678901234567890123456abcdef012", totalRewardsEarned: "2000000000000000000000" },
-  { address: "7890123456789012345678901234567abcdef012", totalRewardsEarned: "1500000000000000000000" },
-  { address: "8901234567890123456789012345678abcdef012", totalRewardsEarned: "1000000000000000000000" },
-];
 
 export const fetchLeaderboard = async (
   accessToken: string,
   forceRefresh: boolean = false,
   limit: number = 10,
-  offset: number = 0,
-  season: boolean = false
+  offset: number = 0
 ): Promise<LeaderboardResponse> => {
   const rewardsAddress = getRewardsAddress();
-  
-  // Fetch season info for both season and all-time leaderboards
-  const seasonInfo = await fetchSeasonInfo(accessToken, rewardsAddress, forceRefresh);
-
-  // Return dummy data for season (until season contracts are ready)
-  if (season) {
-    const total = DUMMY_SEASON_LEADERBOARD.length;
-    const paginated = DUMMY_SEASON_LEADERBOARD.slice(offset, offset + limit);
-    const entries = paginated.map((entry, index) => ({
-      rank: offset + index + 1,
-      ...entry,
-    }));
-    return { 
-      entries, 
-      total, 
-      offset, 
-      limit,
-      currentSeason: seasonInfo.currentSeason,
-      seasonName: seasonInfo.seasonName
-    };
-  }
 
   try {
     const users = await fetchAllUsersLeaderboard(accessToken, rewardsAddress, forceRefresh);
@@ -379,14 +339,7 @@ export const fetchLeaderboard = async (
       ...entry,
     }));
 
-    return { 
-      entries, 
-      total, 
-      offset, 
-      limit,
-      currentSeason: seasonInfo.currentSeason,
-      seasonName: seasonInfo.seasonName
-    };
+    return { entries, total, offset, limit };
   } catch (error) {
     console.error("Failed to fetch leaderboard:", error);
     throw error;

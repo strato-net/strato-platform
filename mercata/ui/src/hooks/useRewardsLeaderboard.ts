@@ -3,8 +3,7 @@ import { fetchLeaderboard, LeaderboardEntry } from "@/services/rewardsService";
 
 export const useRewardsLeaderboard = (
   limit: number = 10,
-  offset: number = 0,
-  season: boolean = false
+  offset: number = 0
 ) => {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [total, setTotal] = useState(0);
@@ -14,7 +13,7 @@ export const useRewardsLeaderboard = (
   const fetchData = useCallback(async (forceRefresh: boolean = false) => {
     try {
       setLoading(true);
-      const data = await fetchLeaderboard(forceRefresh, limit, offset, season);
+      const data = await fetchLeaderboard(forceRefresh, limit, offset);
       setEntries(data.entries);
       setTotal(data.total);
       setError(null);
@@ -23,7 +22,7 @@ export const useRewardsLeaderboard = (
     } finally {
       setLoading(false);
     }
-  }, [limit, offset, season]);
+  }, [limit, offset]);
 
   useEffect(() => {
     fetchData(false);
