@@ -43,7 +43,6 @@ The DeFi and token management REST API:
 Technical specifications and architecture decisions:
 
 - **[Rewards System](design/rewards.md)** - Core rewards design
-- **[Rewards Chef](design/rewards-chef.md)** - MasterChef-style distribution
 
 ## Features
 
@@ -60,7 +59,7 @@ Technical specifications and architecture decisions:
 - **Lending Pools** - Collateralized borrowing and lending
 - **AMM Pools** - Automated market making and swaps
 - **CDP Engine** - Collateralized debt positions
-- **Rewards Chef** - Multi-pool incentive distribution
+- **Rewards** - Multi-pool incentive distribution
 - **Bridge** - Cross-chain asset transfers
 
 ### Enterprise
@@ -81,3 +80,6 @@ Technical specifications and architecture decisions:
 
 - Website: [strato.nexus](https://strato.nexus)
 - GitHub: [blockapps/strato-platform](https://github.com/blockapps/strato-platform)
+
+## LLMs / AI Agents
+- **[Instructions for LLMs](llm-instructions.md)** - For agents reading these docs.

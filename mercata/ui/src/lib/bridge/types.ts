@@ -48,6 +48,9 @@ export type BridgeContextType = {
   withdrawalSummary: WithdrawalSummaryResponse | null;
   loadingWithdrawalSummary: boolean;
   fetchWithdrawalSummary: (showLoading?: boolean) => Promise<void>;
+  // Deposit refresh trigger
+  depositRefreshKey: number;
+  triggerDepositRefresh: () => void;
 };
 
 export interface ContractValidationResult {
