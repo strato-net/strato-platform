@@ -175,7 +175,7 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
                 `${currentValue.toLocaleString('en-US', { 
                   minimumFractionDigits: 2, 
                   maximumFractionDigits: 2 
-                })} Reward Points`
+                })} Claimed Reward Points`
               ) : tabType === 'borrowed' ? (
                 `${currentValue.toLocaleString('en-US', { 
                   minimumFractionDigits: 2, 
