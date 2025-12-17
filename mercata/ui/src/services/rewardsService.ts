@@ -30,10 +30,13 @@ export interface RewardsState {
   lastBlockHandled: string;
   activityCount: number;
   totalStake: string;
+  totalDistributed: string; // Sum of all users' (unclaimed + pending + claimed) rewards
+  currentSeason: number;
 }
 
 export interface UserRewardsData {
   unclaimedRewards: string;
+  claimedRewards: string;  // Total claimed rewards from RewardsClaimed events
   activities: Array<{
     activityId: number;
     userInfo: RewardsUserInfo;
@@ -150,13 +153,15 @@ export const fetchUserRewards = async (userAddress: string, forceRefresh: boolea
   const response = await api.get(`/rewards/activities/${userAddress}`, { params });
   const data = response.data;
   
-  // Backend now returns { unclaimedRewards: string, activities: UserActivity[] }
+  // Backend now returns { unclaimedRewards: string, claimedRewards: string, activities: UserActivity[] }
   const unclaimedRewards = data.unclaimedRewards || "0";
+  const claimedRewards = data.claimedRewards || "0";
   const activities = data.activities || [];
   
   // Transform the response to match UserRewardsData format
   return {
     unclaimedRewards,
+    claimedRewards,
     activities: activities.map((activity: {
       activityId: number;
       name: string;

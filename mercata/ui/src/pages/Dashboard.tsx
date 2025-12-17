@@ -335,10 +335,10 @@ const Dashboard = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-8 text-xs border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900 hover:border-blue-300 dark:hover:border-blue-700 text-blue-700 dark:text-blue-300 font-medium"
+                    className="h-7 text-xs border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900 hover:border-blue-300 dark:hover:border-blue-700 text-blue-700 dark:text-blue-300 font-medium"
                     onClick={(e) => {
                       e.stopPropagation();
-                      navigate("/dashboard/rewards?tab=leaderboard");
+                      navigate(`/dashboard/rewards?tab=leaderboard`);
                     }}
                   >
                     {rankLoading ? (
@@ -349,7 +349,7 @@ const Dashboard = () => {
                     ) : userRank !== null ? (
                       <>
                         <Trophy className="h-3.5 w-3.5 mr-1.5 text-yellow-500" />
-                        Rank #{userRank} - View Leaderboard
+                        Rank #{userRank} - Leaderboard
                       </>
                     ) : (
                       "View Leaderboard"
