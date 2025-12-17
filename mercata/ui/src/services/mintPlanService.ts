@@ -126,9 +126,9 @@ function computeTargetCRWad(minCRWad: bigint, riskBand: RiskBand): bigint {
   return (minCRWad * (WAD + premiumWad)) / WAD;
 }
 
-function computeTargetCRWadFromBuffer(minCRWad: bigint, bufferPercent: number): bigint {
-  const bufferWad = (BigInt(Math.floor(bufferPercent * 100)) * WAD) / 10000n;
-  return (minCRWad * (WAD + bufferWad)) / WAD;
+function computeTargetCRWadFromMultiplier(minCRWad: bigint, multiplier: number): bigint {
+  const multiplierWad = BigInt(Math.floor(multiplier * 1000));
+  return (minCRWad * multiplierWad) / 1000n;
 }
 
 function computeCurrentDebtUSD(
@@ -169,13 +169,13 @@ export function buildMintPlan(
   riskBand: RiskBand,
   vaultInputs: VaultInput[]
 ): MintPlanResult {
-  const bufferPercent = riskBand === RiskBand.LOW ? 0 : riskBand === RiskBand.MEDIUM ? 20 : 40;
-  return buildMintPlanWithBuffer(targetMintUSD, bufferPercent, vaultInputs);
+  const multiplier = riskBand === RiskBand.LOW ? 1.0 : riskBand === RiskBand.MEDIUM ? 1.2 : 1.4;
+  return buildMintPlanWithBuffer(targetMintUSD, multiplier, vaultInputs);
 }
 
 export function buildMintPlanWithBuffer(
   targetMintUSD: bigint,
-  bufferPercent: number,
+  multiplier: number,
   vaultInputs: VaultInput[]
 ): MintPlanResult {
   if (targetMintUSD <= 0n) {
@@ -258,7 +258,7 @@ export function buildMintPlanWithBuffer(
   };
 
   const workingVaults: WorkingVaultState[] = usableVaults.map((v) => {
-    const targetCR = computeTargetCRWadFromBuffer(v.minCRWad, bufferPercent);
+    const targetCR = computeTargetCRWadFromMultiplier(v.minCRWad, multiplier);
     const currentDebtUSD = computeCurrentDebtUSD(
       v.userVaultScaledDebt,
       v.rateAccumulatorRay
@@ -787,7 +787,7 @@ export interface Allocation {
 
 export function getOptimalAllocations(
   targetMintUSD: bigint,
-  bufferPercent: number,
+  multiplier: number,
   assets: ConversionAssetConfig[],
   vaults: ConversionVaultData[],
   activeTokens: ConversionTokenInfo[],
@@ -795,7 +795,7 @@ export function getOptimalAllocations(
   globalDebtInfo: ConversionGlobalDebtInfo
 ): Allocation[] {
   const vaultInputs = convertToVaultInputs(assets, vaults, activeTokens, prices, globalDebtInfo);
-  const plan = buildMintPlanWithBuffer(targetMintUSD, bufferPercent, vaultInputs);
+  const plan = buildMintPlanWithBuffer(targetMintUSD, multiplier, vaultInputs);
 
   const allocations: Allocation[] = [];
   const assetByAddress = assets.reduce<Record<string, ConversionAssetConfig>>((acc, a) => {

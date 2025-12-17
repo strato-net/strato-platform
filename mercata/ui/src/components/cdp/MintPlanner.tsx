@@ -24,6 +24,7 @@ import { formatUnits, parseUnits } from "ethers";
 import { useToast } from "@/hooks/use-toast";
 import { CompactRewardsDisplay } from "@/components/rewards/CompactRewardsDisplay";
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
+import MintWidget from "./MintWidget";
 import {
   USE_DUMMY_DATA,
   dummyVaults,
@@ -128,35 +129,31 @@ const getCompoundInterest = (
 
 // buildMintPlan has been moved to @/services/mintPlanService - imported above
 
-const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
+const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTrigger?: number }> = ({
   title = "Mint against collateral (CDP)",
   onSuccess,
+  refreshTrigger,
 }) => {
   const [mintAmountInput, setMintAmountInput] = useState<string>("");
-  const [riskBufferPercent, setRiskBufferPercent] = useState<number>(20);
+  const [riskFactor, setRiskFactor] = useState<number>(1.5);
 
-  // Calculate color based on risk buffer percentage
-  const getRiskColor = useCallback((percent: number): string => {
-    if (percent <= 20) {
-      // Green to light green (0-20%)
-      const ratio = percent / 20;
-      const r = Math.round(16 + (52 - 16) * ratio);
-      const g = Math.round(185 + (211 - 185) * ratio);
-      const b = Math.round(129 + (153 - 129) * ratio);
-      return `rgb(${r}, ${g}, ${b})`;
-    } else if (percent <= 50) {
-      // Light green to amber (20-50%)
-      const ratio = (percent - 20) / 30;
-      const r = Math.round(52 + (245 - 52) * ratio);
-      const g = Math.round(211 + (158 - 211) * ratio);
-      const b = Math.round(153 + (11 - 153) * ratio);
+  // Calculate color based on risk factor (1-2.5)
+  // Green at 1.5 (default), redder as it goes lower, faint green as it goes higher
+  const getRiskColor = useCallback((factor: number): string => {
+    if (factor <= 1.5) {
+      // Red to green (1.0 -> 1.5): Lower factor = more risky = redder
+      const ratio = (factor - 1.0) / 0.5; // 0 at 1.0, 1 at 1.5
+      const r = Math.round(239 + (16 - 239) * ratio); // Red (239) -> Green (16)
+      const g = Math.round(68 + (185 - 68) * ratio);  // Red (68) -> Green (185)
+      const b = Math.round(68 + (129 - 68) * ratio); // Red (68) -> Green (129)
       return `rgb(${r}, ${g}, ${b})`;
     } else {
-      // Amber to red (50-100%)
-      const ratio = (percent - 50) / 50;
-      const r = Math.round(245 + (239 - 245) * ratio);
-      const g = Math.round(158 + (68 - 158) * ratio);
-      const b = Math.round(11 + (68 - 11) * ratio);
+      // Green to faint green (1.5 -> 2.5): Higher factor = more conservative = faint green
+      const ratio = (factor - 1.5) / 1.0; // 0 at 1.5, 1 at 2.5
+      // Start with green (16, 185, 129) and fade to less faint green (180, 220, 180)
+      const r = Math.round(16 + (180 - 16) * ratio);
+      const g = Math.round(185 + (220 - 185) * ratio);
+      const b = Math.round(129 + (180 - 129) * ratio);
       return `rgb(${r}, ${g}, ${b})`;
     }
   }, []);
@@ -197,7 +194,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
 
   useEffect(() => {
     fetchVaults();
-  }, [fetchVaults]);
+  }, [fetchVaults, refreshTrigger]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -236,7 +233,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
       }
     };
     loadData();
-  }, [fetchAllPrices]);
+  }, [fetchAllPrices, refreshTrigger]);
 
   // Log user balances of supported assets when data is available
   useEffect(() => {
@@ -402,12 +399,12 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
       .filter((a) => a.priceUSD > 0 && (a.balanceTokens > 0 || a.existingCollateralTokens > 0));
   }, [activeTokens, assets, priceForAsset, vaults]);
 
-  // Helper function to get effective CR for a vault based on risk level
+  // Helper function to get effective CR for a vault based on risk factor
   const getEffectiveCR = useCallback((assetAddress: string): number => {
     const config = assets.find((a) => a.asset.toLowerCase() === assetAddress.toLowerCase());
     const minCR = config?.minCR || 200; // Fallback to 200 if not found
-    return minCR + riskBufferPercent;
-  }, [riskBufferPercent, assets]);
+    return minCR * riskFactor;
+  }, [riskFactor, assets]);
 
   const plan = useMemo(() => {
     if (mintAmount <= 0 || assets.length === 0) {
@@ -597,7 +594,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
     const targetMintUSD = parseUnits(mintAmount.toFixed(18), 18);
     const result = getOptimalAllocations(
       targetMintUSD,
-      riskBufferPercent,
+      riskFactor,
       assets,
       vaults,
       activeTokens,
@@ -607,7 +604,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
     
     console.log(`=== MintPlanner: getOptimalAllocations returned ${result.length} allocations ===`);
     return result;
-  }, [mintAmount, riskBufferPercent, assets, vaults, activeTokens, prices, globalDebtInfo]);
+  }, [mintAmount, riskFactor, assets, vaults, activeTokens, prices, globalDebtInfo]);
 
   // Calculate weighted average APR based on actual mint allocations
   const weightedAverageAPR = useMemo(() => {
@@ -954,6 +951,13 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
         <div>
           <h2 className="text-lg font-semibold">{title}</h2>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowAdvanced(!showAdvanced)}
+        >
+          {showAdvanced ? "Quick Mint" : "Advanced"}
+        </Button>
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
 
@@ -961,16 +965,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
       {!showAdvanced && (
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Quick Mint</CardTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowAdvanced(!showAdvanced)}
-              >
-                Advanced
-              </Button>
-            </div>
+            <CardTitle>Quick Mint</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Mint Amount Input */}
@@ -992,24 +987,24 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
             {/* Risk Buffer Selection */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-medium">Risk Buffer</label>
+                <label className="text-sm font-medium">Risk Factor</label>
                 <span 
                   className="text-sm font-semibold"
                   style={{
-                    color: getRiskColor(riskBufferPercent)
+                    color: getRiskColor(riskFactor)
                   }}
                 >
-                  {riskBufferPercent}%
+                  {riskFactor.toFixed(2)}x
                 </span>
               </div>
               <div className="relative w-full">
-                <div style={{ '--risk-slider-color': getRiskColor(riskBufferPercent) } as React.CSSProperties}>
+                <div style={{ '--risk-slider-color': getRiskColor(riskFactor) } as React.CSSProperties}>
                   <Slider
-                    value={[riskBufferPercent]}
-                    onValueChange={(value) => setRiskBufferPercent(value[0])}
-                    min={0}
-                    max={100}
-                    step={1}
+                    value={[3.5 - riskFactor]}
+                    onValueChange={(value) => setRiskFactor(3.5 - value[0])}
+                    min={1}
+                    max={2.5}
+                    step={0.1}
                     className="w-full risk-slider"
                     trackClassName="risk-slider-track"
                     rangeClassName="risk-slider-range"
@@ -1018,7 +1013,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
               </div>
               <div className="text-sm text-gray-600">
                 <span>
-                  Mint up to each vault's minCR + {riskBufferPercent}%
+                  Mint up to each vault's minCR × {riskFactor.toFixed(2)}
                 </span>
               </div>
             </div>
@@ -1179,241 +1174,9 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
 
       {/* Advanced Section - shown when showAdvanced is true */}
       {showAdvanced && (
-        <>
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>1) Mint amount</CardTitle>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowAdvanced(false)}
-                >
-                  Quick Mint
-                </Button>
-              </div>
-            </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="relative">
-            <Input
-              value={mintAmountInput}
-              onChange={(e) => setMintAmountInput(e.target.value)}
-              placeholder="150"
-              inputMode="decimal"
-              className="pr-12"
-            />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">USDST</span>
-          </div>
-          <div className="flex gap-2">
-            {[150, 250, 500].map((preset) => (
-              <Button key={preset} variant="outline" size="sm" onClick={() => setMintAmountInput(String(preset))}>
-                {preset} USDST
-              </Button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>2) Choose target risk (CR)</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
-            <span>Risk Level</span>
-            {mintAmount > 0 && (
-              <span className="font-semibold text-blue-600">
-                ${formatUSD(requiredCollateralUSD)} collateral needed
-              </span>
-            )}
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium">Risk Buffer</label>
-              <span 
-                className="text-sm font-semibold"
-                style={{
-                  color: getRiskColor(riskBufferPercent)
-                }}
-              >
-                {riskBufferPercent}%
-              </span>
-            </div>
-            <div className="relative w-full">
-              <div style={{ '--risk-slider-color': getRiskColor(riskBufferPercent) } as React.CSSProperties}>
-                <Slider
-                  value={[riskBufferPercent]}
-                  onValueChange={(value) => setRiskBufferPercent(value[0])}
-                  min={0}
-                  max={100}
-                  step={1}
-                  className="w-full risk-slider"
-                  trackClassName="risk-slider-track"
-                  rangeClassName="risk-slider-range"
-                />
-              </div>
-            </div>
-            <div className="text-xs text-gray-500">
-              Mint up to each vault's minCR + {riskBufferPercent}%
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>3) Allocate collateral across vaults</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-            <div className="p-3 rounded-md bg-gray-50">
-              <p className="text-gray-600">Target collateral (USD)</p>
-              <p className="text-lg font-semibold">${formatUSD(requiredCollateralUSD)}</p>
-            </div>
-            <div className="p-3 rounded-md bg-gray-50">
-              <p className="text-gray-600">Planned collateral (existing + deposits)</p>
-              <p className="text-lg font-semibold">${formatUSD(existingCollateralUSD + depositTotals.depositUSD)}</p>
-              <p className="text-xs text-gray-500">Existing: ${formatUSD(existingCollateralUSD)} • Deposits: ${formatUSD(depositTotals.depositUSD)}</p>
-            </div>
-            <div className="p-3 rounded-md bg-gray-50">
-              <p className="text-gray-600">Projected CR</p>
-              <p className="text-lg font-semibold">{formatUSD(projectedCR)}%</p>
-              {collateralGapUSD > 0 ? (
-                <p className="text-xs text-red-600">Need +${formatUSD(collateralGapUSD)} collateral to hit target</p>
-              ) : (
-                <p className="text-xs text-green-700">Target met or exceeded</p>
-              )}
-            </div>
-          </div>
-
-          {mintAmount > 0 && weightedAverageAPR > 0 && (
-            <Collapsible open={showProjectedCosts} onOpenChange={setShowProjectedCosts}>
-              <CollapsibleTrigger asChild>
-                <Button
-                  variant="ghost"
-                  className="w-full flex items-center justify-between p-3 rounded-md bg-gray-50 border border-gray-200 hover:bg-gray-100"
-                >
-                  <span className="text-sm font-semibold text-gray-700">
-                    Projected Interest Costs (Weighted APR: {formatPercentage(weightedAverageAPR)})
-                  </span>
-                  <ChevronDown
-                    className={`h-4 w-4 transition-transform duration-200 ${
-                      showProjectedCosts ? "rotate-180" : ""
-                    }`}
-                  />
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className="p-3 pt-0 rounded-md bg-gray-50 border border-gray-200 border-t-0 rounded-t-none">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs pt-2">
-                    <div>
-                      <p className="text-gray-600">Daily</p>
-                      <p className="font-semibold">${formatUSD(projectedInterestCosts.daily, 4)}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600">Weekly</p>
-                      <p className="font-semibold">${formatUSD(projectedInterestCosts.weekly, 4)}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600">Monthly</p>
-                      <p className="font-semibold">${formatUSD(projectedInterestCosts.monthly, 2)}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600">Yearly</p>
-                      <p className="font-semibold">${formatUSD(projectedInterestCosts.yearly, 2)}</p>
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    Interest calculated using exponential compounding (per-second) matching contract behavior
-                  </p>
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-          )}
-
-          <Separator />
-
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Asset</TableHead>
-                <TableHead>Stability Fee</TableHead>
-                <TableHead className="text-right">Balance</TableHead>
-                <TableHead className="text-right">Collateral</TableHead>
-                <TableHead className="text-right">Deposit</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {assetSummaries.map((asset) => {
-                const currentInput = depositInputs[asset.address] || "";
-                const balanceDisplay = formatUSD(asset.balanceTokens, 4);
-                const existingDisplay = formatUSD(asset.existingCollateralTokens, 4);
-                const maxDeposit = asset.balanceTokens;
-                const isSelected = selectedVaults.has(asset.address);
-                const depositUSD = (parseFloat(currentInput || "0") || 0) * (asset.priceUSD || 0);
-                
-                return (
-                  <TableRow
-                    key={asset.address}
-                    className={`cursor-pointer ${isSelected ? "bg-blue-50" : "opacity-60"}`}
-                    onClick={() => toggleVaultSelection(asset.address)}
-                  >
-                    <TableCell>
-                      <div className="font-medium">{asset.symbol}</div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={isSelected ? "default" : "outline"}>
-                        {asset.stabilityFee ? formatPercentage(asset.stabilityFee) : "N/A"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="font-medium">{balanceDisplay}</div>
-                      <div className="text-xs text-gray-500">
-                        ${formatUSD(asset.balanceTokens * (asset.priceUSD || 0))}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="font-medium">{existingDisplay}</div>
-                      <div className="text-xs text-gray-500">
-                        ${formatUSD(asset.existingCollateralUSD)}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-end gap-2">
-                        <Input
-                          value={currentInput}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setDepositInputs((prev) => ({ ...prev, [asset.address]: val }));
-                          }}
-                          placeholder="0.00"
-                          inputMode="decimal"
-                          disabled={!isSelected}
-                          className={`w-24 h-8 text-right ${!isSelected ? "bg-gray-100" : ""}`}
-                        />
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setDepositInputs((prev) => ({ ...prev, [asset.address]: maxDeposit.toString() }))}
-                          disabled={maxDeposit <= 0 || !isSelected}
-                        >
-                          Max
-                        </Button>
-                      </div>
-                      {isSelected && depositUSD > 0 && (
-                        <div className="text-xs text-gray-500 mt-1">
-                          ${formatUSD(depositUSD)}
-                        </div>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-        </>
+        <div className="border border-gray-200 bg-white rounded-xl p-4">
+          <MintWidget onSuccess={onSuccess} title={title} />
+        </div>
       )}
     </div>
     </>

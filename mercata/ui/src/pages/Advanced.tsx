@@ -23,6 +23,7 @@ const Advanced = () => {
   const [borrowActiveTab, setBorrowActiveTab] = useState('vaults');
   const { refreshVaults } = useCDP();
   const [vaultsRefreshTrigger, setVaultsRefreshTrigger] = useState(0);
+  const [mintPlannerRefreshTrigger, setMintPlannerRefreshTrigger] = useState(0);
   const { userRewards, loading: rewardsLoading, refetch: refetchRewards } = useRewardsUserInfo();
   const { fetchTokens } = useUserTokens();
 
@@ -30,9 +31,12 @@ const Advanced = () => {
     setVaultsRefreshTrigger(prev => prev + 1);
   };
 
-  const handleVaultActionSuccess = () => {
+  const handleVaultActionSuccess = useCallback(async () => {
     refreshVaults();
-  };
+    setMintPlannerRefreshTrigger(prev => prev + 1);
+    // Refresh user token balances since MintPlanner uses them for allocations
+    await fetchTokens();
+  }, [refreshVaults, fetchTokens]);
 
   const handleQuickMintSuccess = useCallback(async () => {
     refreshVaults();
@@ -94,7 +98,7 @@ const Advanced = () => {
                     <TabsContent value="vaults">
                       <div className="space-y-6">
                         <div className="border border-gray-200  bg-white rounded-xl p-4  flex flex-col space-y-6">
-                          <MintPlanner onSuccess={handleQuickMintSuccess} />
+                          <MintPlanner onSuccess={handleQuickMintSuccess} refreshTrigger={mintPlannerRefreshTrigger} />
                         </div>
                         <VaultsList 
                           refreshTrigger={vaultsRefreshTrigger} 
