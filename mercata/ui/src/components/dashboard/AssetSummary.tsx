@@ -56,7 +56,7 @@ const AssetSummary = ({
               <span className="text-muted-foreground text-sm">Loading...</span>
             </div>
           ) : (
-            <h3 className="text-2xl font-bold mt-1">{value}</h3>
+            <h3 className="text-2xl font-bold mt-1 whitespace-nowrap">{value}</h3>
           )}
           {additionalContent && (
             <div className="mt-2" onClick={(e) => e.stopPropagation()}>
@@ -66,7 +66,7 @@ const AssetSummary = ({
         </div>
 
         <div
-          className={`w-10 h-10 rounded-full flex items-center justify-center ${color} transition-opacity flex-shrink-0`}
+          className={`${color === 'bg-transparent' ? '' : 'w-10 h-10 rounded-full'} flex items-center justify-center ${color} transition-opacity flex-shrink-0`}
         >
           {icon}
         </div>

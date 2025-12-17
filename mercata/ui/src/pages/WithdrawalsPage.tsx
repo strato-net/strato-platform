@@ -132,7 +132,7 @@ const WithdrawalsPage = () => {
                       }
                     />
                     <div className="mt-4 flex-1 min-h-0 overflow-auto">
-                      <BridgeOut isConvert={activeTab === "from-savings"} />
+                      <BridgeOut isSaving={activeTab === "from-savings"} />
                     </div>
                   </div>
                 </CardContent>
