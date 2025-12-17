@@ -722,8 +722,8 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
 
               {/* Warning for disabled/unsupported assets */}
               {assetSupportedStates[position.asset] === false && (
-                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-sm text-red-700 font-medium text-center">
+                <div className="mb-4 p-3 bg-destructive/10 border border-destructive/50 rounded-lg">
+                  <p className="text-sm text-destructive font-medium text-center">
                     ⚠️ Admin has disabled {position.symbol} at this time. All operations are disabled.
                   </p>
                 </div>
@@ -731,24 +731,24 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
 
               {/* Preview Values */}
               {previewValues && (
-                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <h5 className="text-sm font-medium text-blue-900 mb-2">New Values After {activeAction}:</h5>
+                <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <h5 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">New Values After {activeAction}:</h5>
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     <div>
-                      <p className="text-xs text-blue-600 mb-1">Collateral</p>
-                      <p className="font-semibold text-blue-900">{previewValues.collateralAmount} {position.symbol}</p>
-                      <p className="text-xs text-blue-500">${previewValues.collateralValueUSD}</p>
+                      <p className="text-xs text-blue-600 dark:text-blue-400 mb-1">Collateral</p>
+                      <p className="font-semibold text-blue-900 dark:text-blue-100">{previewValues.collateralAmount} {position.symbol}</p>
+                      <p className="text-xs text-blue-500 dark:text-blue-400">${previewValues.collateralValueUSD}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-blue-600 mb-1">Debt</p>
-                      <p className="font-semibold text-blue-900">{previewValues.debtAmount} USDST</p>
-                      <p className="text-xs text-blue-500">${previewValues.debtValueUSD}</p>
+                      <p className="text-xs text-blue-600 dark:text-blue-400 mb-1">Debt</p>
+                      <p className="font-semibold text-blue-900 dark:text-blue-100">{previewValues.debtAmount} USDST</p>
+                      <p className="text-xs text-blue-500 dark:text-blue-400">${previewValues.debtValueUSD}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-blue-600 mb-1">Health Factor</p>
+                      <p className="text-xs text-blue-600 dark:text-blue-400 mb-1">Health Factor</p>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <p className={`font-semibold cursor-help ${previewValues.healthFactor === Infinity ? 'text-green-600' : getHealthFactorColor(previewValues.healthFactor)}`}>
+                          <p className={`font-semibold cursor-help ${previewValues.healthFactor === Infinity ? 'text-green-600 dark:text-green-400' : getHealthFactorColor(previewValues.healthFactor)}`}>
                             {previewValues.healthFactor === Infinity ? '∞' : formatNumber(previewValues.healthFactor)}
                           </p>
                         </TooltipTrigger>
@@ -763,8 +763,8 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                       </Tooltip>
                     </div>
                     <div>
-                      <p className="text-xs text-blue-600 mb-1">Stability Fee</p>
-                      <p className="font-semibold text-blue-900">{formatPercentage(position.stabilityFeeRate)}</p>
+                      <p className="text-xs text-blue-600 dark:text-blue-400 mb-1">Stability Fee</p>
+                      <p className="font-semibold text-blue-900 dark:text-blue-100">{formatPercentage(position.stabilityFeeRate)}</p>
                     </div>
                   </div>
                 </div>
@@ -775,14 +775,14 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                 <div className="mt-4">
                   {/* Show unsupported message for all actions when asset is unsupported */}
                   {assetSupportedStates[position.asset] === false ? (
-                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-center">
-                      <p className="text-sm text-red-700 font-medium">
+                    <div className="p-3 bg-destructive/10 border border-destructive/50 rounded-lg text-center">
+                      <p className="text-sm text-destructive font-medium">
                         {activeActions[position.asset]!.charAt(0).toUpperCase() + activeActions[position.asset]!.slice(1)} disabled - {position.symbol} is not supported
                       </p>
                     </div>
                   ) : (isGlobalPaused || assetPauseStates[position.asset]) && (activeActions[position.asset] === 'mint' || activeActions[position.asset] === 'withdraw') ? (
-                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-center">
-                      <p className="text-sm text-yellow-700 font-medium">
+                    <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg text-center">
+                      <p className="text-sm text-yellow-800 dark:text-yellow-200 font-medium">
                         {isGlobalPaused 
                           ? `${activeActions[position.asset] === 'mint' ? 'Mint' : 'Withdraw'} paused by admin at this time`
                           : `${activeActions[position.asset] === 'mint' ? 'Mint' : 'Withdraw'} for ${position.symbol} paused by admin at this time`
@@ -803,9 +803,9 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                           onChange={(e) => handleInputChange(position.asset, e.target.value, e)}
                           className={`flex-1 ${
                             maxStates[position.asset] 
-                              ? 'text-blue-600 bg-blue-50 border-blue-300' 
+                              ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 border-blue-300 dark:border-blue-800' 
                               : isAmountAboveMax(position.asset, inputAmounts[position.asset] || "")
-                                ? 'text-red-600 bg-red-50 border-red-300'
+                                ? 'text-destructive bg-destructive/10 border-destructive/50'
                                 : ''
                           }`}
                           type="number"
@@ -814,7 +814,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                       <Button 
                         variant={maxStates[position.asset] ? "default" : "outline"}
                         size="sm" 
-                        className={`min-w-[50px] ${maxStates[position.asset] ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}`}
+                        className={`min-w-[50px] ${maxStates[position.asset] ? 'bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600 text-white' : ''}`}
                         onClick={() => handleMaxClick(position.asset, activeActions[position.asset]!)}
                       >
                         MAX

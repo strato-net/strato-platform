@@ -780,9 +780,9 @@ const MintWidget: React.FC<MintWidgetProps> = ({ onSuccess, title = "Mint Agains
             <Input
                 className={`flex-1 text-right ${
                   isDepositMaxEnabled 
-                    ? 'text-blue-600 bg-blue-50 border-blue-300' 
+                    ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 border-blue-300 dark:border-blue-800' 
                     : isDepositAmountAboveMax() 
-                      ? 'text-red-600 bg-red-50 border-red-300' 
+                      ? 'text-destructive bg-destructive/10 border-destructive/50' 
                       : ''
                 }`}
               value={depositAmount}
@@ -794,7 +794,7 @@ const MintWidget: React.FC<MintWidgetProps> = ({ onSuccess, title = "Mint Agains
             <Button 
               variant={isDepositMaxEnabled ? "default" : "outline"}
               size="sm" 
-              className={`min-w-[50px] ${isDepositMaxEnabled ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}`}
+              className={`min-w-[50px] ${isDepositMaxEnabled ? 'bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600 text-white' : ''}`}
               onClick={handleDepositMaxClick}
               disabled={!userDepositBalance || parseFloat(userDepositBalance) <= 0}
             >
@@ -838,11 +838,11 @@ const MintWidget: React.FC<MintWidgetProps> = ({ onSuccess, title = "Mint Agains
             <Input
                 className={`flex-1 text-right ${
                   isMintMaxEnabled 
-                    ? 'text-blue-600 bg-blue-50 border-blue-300' 
+                    ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 border-blue-300 dark:border-blue-800' 
                     : isAtMinCRThreshold 
                       ? 'bg-muted text-muted-foreground border-border' 
                       : isMintAmountAboveMax()
-                        ? 'text-red-600 bg-red-50 border-red-300'
+                        ? 'text-destructive bg-destructive/10 border-destructive/50'
                         : ''
                 }`}
               value={mintAmount}
@@ -856,7 +856,7 @@ const MintWidget: React.FC<MintWidgetProps> = ({ onSuccess, title = "Mint Agains
             <Button 
               variant={isMintMaxEnabled ? "default" : "outline"}
               size="sm" 
-              className={`min-w-[50px] ${isMintMaxEnabled ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}`}
+              className={`min-w-[50px] ${isMintMaxEnabled ? 'bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600 text-white' : ''}`}
               onClick={handleMintMaxClick}
               disabled={maxMintLoading || maxMintableAmount <= 0}
             >

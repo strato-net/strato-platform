@@ -97,7 +97,7 @@ const Advanced = () => {
                     </TabsList>
                     <TabsContent value="vaults">
                       <div className="space-y-6">
-                        <div className="border border-gray-200  bg-white rounded-xl p-4  flex flex-col space-y-6">
+                        <div className="border border-border bg-card rounded-xl p-4 flex flex-col space-y-6">
                           <MintPlanner onSuccess={handleQuickMintSuccess} refreshTrigger={mintPlannerRefreshTrigger} />
                         </div>
                         <VaultsList 

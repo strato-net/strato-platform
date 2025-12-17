@@ -955,7 +955,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
           {showAdvanced ? "Show Quick Mint" : "Show Advanced"}
         </Button>
       </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
 
       {/* Quick Mint Section - hidden when Advanced is shown */}
       {!showAdvanced && (
@@ -975,7 +975,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
                   inputMode="decimal"
                   className="pr-12"
                 />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">USDST</span>
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">USDST</span>
               </div>
               <div className="h-2"></div>
             </div>
@@ -1007,7 +1007,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
                   />
                 </div>
               </div>
-              <div className="text-sm text-gray-600">
+              <div className="text-sm text-muted-foreground">
                 <span>
                   Mint up to each vault's minCR × {riskFactor.toFixed(1)}
                 </span>
@@ -1033,17 +1033,17 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
             <Separator />
 
             {mintAmount <= 0 ? (
-              <div className="p-3 rounded-md bg-gray-50 border border-gray-200 text-center">
-                <p className="text-sm text-gray-600">Enter a mint amount and select risk level to see the automated plan</p>
+              <div className="p-3 rounded-md bg-muted border border-border text-center">
+                <p className="text-sm text-muted-foreground">Enter a mint amount and select risk level to see the automated plan</p>
               </div>
             ) : allocations.length > 0 ? (
               <Collapsible open={showVaultBreakdown} onOpenChange={setShowVaultBreakdown}>
                 <CollapsibleTrigger asChild>
                   <Button
                     variant="ghost"
-                    className="w-full flex items-center justify-between p-3 rounded-md bg-gray-50 border border-gray-200 hover:bg-gray-100"
+                    className="w-full flex items-center justify-between p-3 rounded-md bg-muted border border-border hover:bg-muted/80"
                   >
-                    <span className="text-sm font-semibold text-gray-700">
+                    <span className="text-sm font-semibold text-foreground">
                       Vault Breakdown
                     </span>
                     <ChevronDown
@@ -1064,16 +1064,16 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
                       return (
                         <div
                           key={allocation.assetAddress}
-                          className="p-3 rounded-md border border-gray-200 bg-white"
+                          className="p-3 rounded-md border border-border bg-card"
                         >
                           <div className="flex items-center justify-between mb-2">
-                            <p className="font-semibold text-gray-900">{allocation.symbol}</p>
+                            <p className="font-semibold text-foreground">{allocation.symbol}</p>
                             <Badge variant="outline">
                               {formatPercentage(allocation.stabilityFeeRate)}
                             </Badge>
                           </div>
-                          <div className="space-y-1 text-sm text-gray-600">
-                            <p className="text-xs text-gray-500">
+                          <div className="space-y-1 text-sm text-muted-foreground">
+                            <p className="text-xs text-muted-foreground/80">
                               • Non-collateral balance: {formatUSD(userBalance, 4)} {allocation.symbol} (${formatUSD(userBalanceUSD, 2)})
                             </p>
                             {depositAmount > 0 ? (
@@ -1083,7 +1083,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
                             ) : existingCollateralUSD > 0 ? (
                               <p>• Use existing collateral: ${formatUSD(existingCollateralUSD)}</p>
                             ) : null}
-                            <p className="font-semibold text-gray-900">
+                            <p className="font-semibold text-foreground">
                               • Mint: {formatUSD(parseFloat(allocation.mintAmount), 2)} USDST
                             </p>
                           </div>
@@ -1094,8 +1094,8 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
                 </CollapsibleContent>
               </Collapsible>
             ) : (
-              <div className="p-3 rounded-md bg-yellow-50 border border-yellow-200">
-                <p className="text-sm text-gray-700">No suitable vaults found. Check that you have balances in supported assets.</p>
+              <div className="p-3 rounded-md bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
+                <p className="text-sm text-yellow-800 dark:text-yellow-200">No suitable vaults found. Check that you have balances in supported assets.</p>
               </div>
             )}
 
@@ -1104,9 +1104,9 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
                 <CollapsibleTrigger asChild>
                   <Button
                     variant="ghost"
-                    className="w-full flex items-center justify-between p-3 rounded-md bg-gray-50 border border-gray-200 hover:bg-gray-100"
+                    className="w-full flex items-center justify-between p-3 rounded-md bg-muted border border-border hover:bg-muted/80"
                   >
-                    <span className="text-sm font-semibold text-gray-700">
+                    <span className="text-sm font-semibold text-foreground">
                       Projected Interest Costs (APR: {formatPercentage(weightedAverageAPR)})
                     </span>
                     <ChevronDown
@@ -1117,26 +1117,26 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
                   </Button>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
-                  <div className="p-3 pt-0 rounded-md bg-gray-50 border border-gray-200 border-t-0 rounded-t-none">
+                  <div className="p-3 pt-0 rounded-md bg-muted border border-border border-t-0 rounded-t-none">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs pt-2">
                       <div>
-                        <p className="text-gray-600">Daily</p>
-                        <p className="font-semibold">${formatUSD(projectedInterestCosts.daily, 4)}</p>
+                        <p className="text-muted-foreground">Daily</p>
+                        <p className="font-semibold text-foreground">${formatUSD(projectedInterestCosts.daily, 4)}</p>
                       </div>
                       <div>
-                        <p className="text-gray-600">Weekly</p>
-                        <p className="font-semibold">${formatUSD(projectedInterestCosts.weekly, 4)}</p>
+                        <p className="text-muted-foreground">Weekly</p>
+                        <p className="font-semibold text-foreground">${formatUSD(projectedInterestCosts.weekly, 4)}</p>
                       </div>
                       <div>
-                        <p className="text-gray-600">Monthly</p>
-                        <p className="font-semibold">${formatUSD(projectedInterestCosts.monthly, 2)}</p>
+                        <p className="text-muted-foreground">Monthly</p>
+                        <p className="font-semibold text-foreground">${formatUSD(projectedInterestCosts.monthly, 2)}</p>
                       </div>
                       <div>
-                        <p className="text-gray-600">Yearly</p>
-                        <p className="font-semibold">${formatUSD(projectedInterestCosts.yearly, 2)}</p>
+                        <p className="text-muted-foreground">Yearly</p>
+                        <p className="font-semibold text-foreground">${formatUSD(projectedInterestCosts.yearly, 2)}</p>
                       </div>
                     </div>
-                    <p className="text-xs text-gray-500 mt-2">
+                    <p className="text-xs text-muted-foreground mt-2">
                       Interest calculated using exponential compounding (per-second) matching contract behavior
                     </p>
                   </div>
@@ -1170,7 +1170,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
 
       {/* Advanced Section - shown when showAdvanced is true */}
       {showAdvanced && (
-        <div className="border border-gray-200 bg-white rounded-xl p-4">
+        <div className="border border-border bg-card rounded-xl p-4">
           <MintWidget onSuccess={onSuccess} title={title} />
         </div>
       )}
