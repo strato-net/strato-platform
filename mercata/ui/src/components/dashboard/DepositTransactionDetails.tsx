@@ -18,7 +18,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
   const [totalCount, setTotalCount] = useState(0);
   const [depositStatus, setDepositStatus] = useState<number>(0);
   const [selectedChainId, setSelectedChainId] = useState<number>(0);
-  const [selectedType, setSelectedType] = useState<'bridge' | 'convert' | ''>('');
+  const [selectedType, setSelectedType] = useState<'bridge' | 'saving' | ''>('');
   const [transactions, setTransactions] = useState<DepositTransaction[]>([]);
   const DEPOSIT_STATUS_OPTIONS = BRIDGE_STATUS_OPTIONS.filter((o) => o.value !== 4);
 
@@ -26,6 +26,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
     loading: isLoading,
     fetchDepositTransactions,
     availableNetworks,
+    depositRefreshKey,
   } = useBridgeContext();
 
   useEffect(() => {
@@ -37,7 +38,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
           order: 'block_timestamp.desc',
         };
         
-        if (selectedType === 'convert') {
+        if (selectedType === 'saving') {
           (params as any)["value->>stratoToken"] = `eq.${usdstAddress}`;
         } else if (selectedType === 'bridge') {
           (params as any)["value->>stratoToken"] = `neq.${usdstAddress}`;
@@ -52,8 +53,26 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
         }
         
         const result = await fetchDepositTransactions(params, context);
-        setTransactions(result.data);
-        setTotalCount(result.totalCount);
+        const apiTransactions = result.data;
+        
+        const pendingDeposits = JSON.parse(localStorage.getItem('pendingDeposits') || '[]');
+        const apiTxHashes = new Set(apiTransactions.map((tx: any) => tx?.externalTxHash));
+        const remainingPending = pendingDeposits.filter((p: any) => 
+          !apiTxHashes.has(p?.externalTxHash)
+        );
+        
+        const filteredPending = remainingPending.filter((p: any) => {
+          if (selectedType && p?.type !== selectedType) return false;
+          if (depositStatus !== 0 && parseInt(p?.DepositInfo?.bridgeStatus || '0') !== depositStatus) return false;
+          if (selectedChainId !== 0 && p?.externalChainId !== selectedChainId) return false;
+          return true;
+        });
+        
+        localStorage.setItem('pendingDeposits', JSON.stringify(remainingPending));
+        
+        const merged = currentPage === 1 ? [...filteredPending, ...apiTransactions] : apiTransactions;
+        setTransactions(merged);
+        setTotalCount(result.totalCount + filteredPending.length);
       } catch (error) {
         console.error("Error loading transactions:", error);
         setTransactions([]);
@@ -62,7 +81,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
     };
 
     loadTransactions();
-  }, [currentPage, depositStatus, selectedChainId, fetchDepositTransactions, context, selectedType]);
+  }, [currentPage, depositStatus, selectedChainId, fetchDepositTransactions, context, selectedType, depositRefreshKey]);
 
   
 
@@ -204,14 +223,14 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
             <Select
               value={selectedType || ''}
               onChange={(v) => {
-                setSelectedType(v === '' ? '' : v as 'bridge' | 'convert');
+                setSelectedType(v === '' ? '' : v as 'bridge' | 'saving');
                 setCurrentPage(1);
               }}
               style={{ width: isMobile ? '100%' : 150 }}
               options={[
                 { value: '', label: 'All Types' },
                 { value: 'bridge', label: 'Bridge' },
-                { value: 'convert', label: 'Convert' },
+                { value: 'saving', label: 'Saving' },
               ]}
             />
           </div>

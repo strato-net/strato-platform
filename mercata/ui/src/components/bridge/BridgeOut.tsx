@@ -30,10 +30,10 @@ import AdvancedOptionsDropdown from "./AdvancedOptionsDropdown";
 const FEE_WEI = safeParseUnits(BRIDGE_OUT_FEE).toString();
 
 interface BridgeOutProps {
-  isConvert?: boolean; // true for convert mode, false (default) for bridge mode
+  isSaving?: boolean; // true for saving mode, false (default) for bridge mode
 }
 
-const BridgeOut: React.FC<BridgeOutProps> = ({ isConvert = false }) => {
+const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false }) => {
   // Hooks & Context
   const { address, isConnected } = useAccount();
   const { toast } = useToast();
@@ -60,13 +60,13 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isConvert = false }) => {
   const [feeError, setFeeError] = useState("");
 
   // Computed values
-  const modeLabels = BRIDGE_MODE_LABELS[isConvert ? "convert" : "bridge"];
+  const modeLabels = BRIDGE_MODE_LABELS[isSaving ? "convert" : "bridge"];
 
   const currentTokens = useMemo(() => {
     return bridgeableTokens.filter((token) =>
-      isConvert ? !token.bridgeable : token.bridgeable
+      isSaving ? !token.bridgeable : token.bridgeable
     );
-  }, [bridgeableTokens, isConvert]);
+  }, [bridgeableTokens, isSaving]);
 
   const currentNetwork = useMemo(() => {
     return (
@@ -251,7 +251,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isConvert = false }) => {
 
     setIsLoading(true);
 
-    if (!isConvert) {
+    if (!isSaving) {
     toast({
       title: "Preparing transaction...",
       description: "Please wait while we prepare your transaction",
