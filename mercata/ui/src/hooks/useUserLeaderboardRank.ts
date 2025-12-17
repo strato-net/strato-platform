@@ -15,56 +15,56 @@ export const useUserLeaderboardRank = () => {
       return;
     }
 
-    try {
-      setLoading(true);
-      // Fetch all leaderboard entries to find user's rank
-      // Backend max limit is 100, so we paginate
-      let offset = 0;
-      const limit = 100;
-      let found = false;
-      let userRank: number | null = null;
+      try {
+        setLoading(true);
+        // Fetch all leaderboard entries to find user's rank
+        // Backend max limit is 100, so we paginate
+        let offset = 0;
+        const limit = 100;
+        let found = false;
+        let userRank: number | null = null;
       let userTotalEarned: string | null = null;
 
-      while (!found) {
+        while (!found) {
         const response = await fetchLeaderboard(forceRefresh, limit, offset);
-        
-        if (response.entries.length === 0) {
-          break; // No more entries
-        }
+          
+          if (response.entries.length === 0) {
+            break; // No more entries
+          }
 
-        const userEntry = response.entries.find(
-          (entry) => entry.address.toLowerCase() === userAddress.toLowerCase()
-        );
+          const userEntry = response.entries.find(
+            (entry) => entry.address.toLowerCase() === userAddress.toLowerCase()
+          );
 
-        if (userEntry) {
-          userRank = userEntry.rank;
+          if (userEntry) {
+            userRank = userEntry.rank;
           userTotalEarned = userEntry.totalRewardsEarned;
-          found = true;
-          break;
+            found = true;
+            break;
+          }
+
+          // If we got less than limit entries or reached total, we've reached the end
+          if (response.entries.length < limit || offset + limit >= response.total) {
+            break;
+          }
+
+          offset += limit;
+          
+          // Safety check: don't fetch more than total entries
+          if (offset >= response.total) {
+            break;
+          }
         }
 
-        // If we got less than limit entries or reached total, we've reached the end
-        if (response.entries.length < limit || offset + limit >= response.total) {
-          break;
-        }
-
-        offset += limit;
-        
-        // Safety check: don't fetch more than total entries
-        if (offset >= response.total) {
-          break;
-        }
-      }
-
-      setRank(userRank);
+        setRank(userRank);
       setTotalEarned(userTotalEarned);
-    } catch (error) {
-      console.error("Failed to fetch user rank:", error);
-      setRank(null);
+      } catch (error) {
+        console.error("Failed to fetch user rank:", error);
+        setRank(null);
       setTotalEarned(null);
-    } finally {
-      setLoading(false);
-    }
+      } finally {
+        setLoading(false);
+      }
   }, [userAddress, isLoggedIn]);
 
   useEffect(() => {
