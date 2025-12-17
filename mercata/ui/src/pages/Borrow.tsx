@@ -17,6 +17,7 @@ import { WITHDRAW_COLLATERAL_FEE, SUPPLY_COLLATERAL_FEE } from "@/lib/constants"
 import BorrowForm from "@/components/borrow/BorrowForm";
 import RepayForm from "@/components/borrow/RepayForm";
 import CollateralManagementTable from "@/components/borrow/CollateralManagementTable";
+import BorrowProgressModal, { StepStatus } from "@/components/borrow/BorrowProgressModal";
 import { useSmartPolling } from "@/hooks/useSmartPolling";
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 // NOTE: deposit amount validation is handled locally to allow 0/empty planned deposits
@@ -33,6 +34,8 @@ const Borrow = () => {
   const [modalLoading, setModalLoading] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [repayLoading, setRepayLoading] = useState(false);
+  const [borrowSteps, setBorrowSteps] = useState<Array<{ id: string; label: string; status: StepStatus; asset?: CollateralData; amount?: string; error?: string }>>([]);
+  const [showBorrowProgress, setShowBorrowProgress] = useState(false);
   const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
   const { toast } = useToast();
@@ -159,6 +162,32 @@ const Borrow = () => {
     try {
       setBorrowLoading(true);
       
+      // Initialize steps for progress modal
+      const steps: Array<{ id: string; label: string; status: StepStatus; asset?: CollateralData; amount?: string; error?: string }> = [];
+      
+      // Add collateral supply steps
+      if (requiredCollateral && requiredCollateral.length > 0) {
+        requiredCollateral.forEach((item, index) => {
+          steps.push({
+            id: `supply-${index}`,
+            label: `Supply ${item.asset._symbol}`,
+            status: "pending",
+            asset: item.asset,
+            amount: item.amount,
+          });
+        });
+      }
+      
+      // Add borrow step
+      steps.push({
+        id: "borrow",
+        label: `Borrow ${amount === 'ALL' ? 'Max' : amount} USDST`,
+        status: "pending",
+      });
+      
+      setBorrowSteps(steps);
+      setShowBorrowProgress(true);
+      
       // Deposit required collateral first if specified
       if (requiredCollateral && requiredCollateral.length > 0) {
         const feeWei = safeParseUnits(SUPPLY_COLLATERAL_FEE);
@@ -173,17 +202,44 @@ const Borrow = () => {
             variant: "destructive",
           });
           setBorrowLoading(false);
+          setShowBorrowProgress(false);
           return false;
         }
 
         // Deposit each required collateral asset
-        for (const item of requiredCollateral) {
-          const supplyWei = safeParseUnits(item.amount, item.asset.customDecimals ?? 18);
-          if (supplyWei > 0n) {
-            await supplyCollateral({
-              asset: item.asset.address,
-              amount: supplyWei.toString(),
-            });
+        for (let i = 0; i < requiredCollateral.length; i++) {
+          const item = requiredCollateral[i];
+          const stepId = `supply-${i}`;
+          
+          // Update step to processing
+          setBorrowSteps(prev => prev.map(step => 
+            step.id === stepId ? { ...step, status: "processing" } : step
+          ));
+          
+          try {
+            const supplyWei = safeParseUnits(item.amount, item.asset.customDecimals ?? 18);
+            if (supplyWei > 0n) {
+              await supplyCollateral({
+                asset: item.asset.address,
+                amount: supplyWei.toString(),
+              });
+              
+              // Update step to completed
+              setBorrowSteps(prev => prev.map(step => 
+                step.id === stepId ? { ...step, status: "completed" } : step
+              ));
+            }
+          } catch (error) {
+            // Update step to error
+            setBorrowSteps(prev => prev.map(step => 
+              step.id === stepId ? { 
+                ...step, 
+                status: "error",
+                error: error instanceof Error ? error.message : "Failed to supply collateral"
+              } : step
+            ));
+            setBorrowLoading(false);
+            return false;
           }
         }
         
@@ -195,21 +251,44 @@ const Borrow = () => {
         ]);
       }
 
+      // Update borrow step to processing
+      setBorrowSteps(prev => prev.map(step => 
+        step.id === "borrow" ? { ...step, status: "processing" } : step
+      ));
+
       // Now execute the borrow
-      if (amount === 'ALL') {
-        await borrowMax();
-        toast({
-          title: "Borrow Initiated",
-          description: `Borrowed max available USDST`,
-          variant: "success",
-        });
-      } else {
-        await borrowAssetFn({ amount: safeParseUnits(amount).toString() });
-        toast({
-          title: "Borrow Initiated",
-          description: `You borrowed ${amount} USDST`,
-          variant: "success",
-        });
+      try {
+        if (amount === 'ALL') {
+          await borrowMax();
+          toast({
+            title: "Borrow Initiated",
+            description: `Borrowed max available USDST`,
+            variant: "success",
+          });
+        } else {
+          await borrowAssetFn({ amount: safeParseUnits(amount).toString() });
+          toast({
+            title: "Borrow Initiated",
+            description: `You borrowed ${amount} USDST`,
+            variant: "success",
+          });
+        }
+        
+        // Update borrow step to completed
+        setBorrowSteps(prev => prev.map(step => 
+          step.id === "borrow" ? { ...step, status: "completed" } : step
+        ));
+      } catch (error) {
+        // Update borrow step to error
+        setBorrowSteps(prev => prev.map(step => 
+          step.id === "borrow" ? { 
+            ...step, 
+            status: "error",
+            error: error instanceof Error ? error.message : "Failed to borrow"
+          } : step
+        ));
+        setBorrowLoading(false);
+        return false;
       }
       
       setBorrowLoading(false);
@@ -218,9 +297,17 @@ const Borrow = () => {
         refreshCollateral(),
         fetchUsdstBalance(),
       ]);
+      
+      // Keep modal open for a moment to show completion, then auto-close
+      setTimeout(() => {
+        setShowBorrowProgress(false);
+        setBorrowSteps([]);
+      }, 2000);
+      
       return true;
     } catch (error) {
       setBorrowLoading(false);
+      setShowBorrowProgress(false);
       return false;
     }
   };
@@ -345,6 +432,15 @@ const Borrow = () => {
             transactionFee={modalState.type === "supply" ? SUPPLY_COLLATERAL_FEE : WITHDRAW_COLLATERAL_FEE}
         />
       )}
+
+      <BorrowProgressModal
+        open={showBorrowProgress}
+        steps={borrowSteps}
+        onClose={() => {
+          setShowBorrowProgress(false);
+          setBorrowSteps([]);
+        }}
+      />
 
     </div>
   );
