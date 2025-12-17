@@ -53,3 +53,9 @@ export interface RetryConfig {
     maxAttempts: number;
     logPrefix: string;
 } 
+
+export interface TxMetric {
+    txHash: string;         // Transaction hash (for logging)
+    duration: number;       // Time from submit to confirm (ms)
+    status: string;         // "Success" or "Failure"
+} 
