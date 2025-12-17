@@ -18,7 +18,6 @@ export const clearContractStateCache = (): void => {
   pendingRequest = null;
 };
 
-
 /**
  * Fetch contract state once and cache it
  * Uses promise caching to prevent concurrent duplicate requests
@@ -269,9 +268,9 @@ export const fetchUnclaimedRewards = async (
   
   return unclaimedRewards[userAddress.toLowerCase()] || "0";
 };
-
-
-
+/**
+ * Fetch total claimed rewards per user from RewardsClaimed events
+ */
 export const fetchClaimedRewards = async (
   accessToken: string,
   rewardsAddress: string
@@ -285,7 +284,7 @@ export const fetchClaimedRewards = async (
       },
     });
 
-    const result = events.reduce((map: Map<string, bigint>, event: any) => {
+return events.reduce((map: Map<string, bigint>, event: any) => {
       try {
         const attrs = typeof event.attributes === 'string' 
           ? JSON.parse(event.attributes) 
@@ -301,7 +300,6 @@ export const fetchClaimedRewards = async (
       return map;
     }, new Map<string, bigint>());
 
-    return result;
   } catch (error) {
     console.error("Failed to fetch claimed rewards:", error);
     return new Map<string, bigint>();
