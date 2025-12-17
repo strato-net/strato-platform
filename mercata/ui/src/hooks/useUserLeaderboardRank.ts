@@ -1,19 +1,20 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { fetchLeaderboard } from "@/services/rewardsService";
 import { useUser } from "@/context/UserContext";
 
 export const useUserLeaderboardRank = () => {
   const { userAddress, isLoggedIn } = useUser();
   const [rank, setRank] = useState<number | null>(null);
+  const [totalEarned, setTotalEarned] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
+  const fetchUserRank = useCallback(async (forceRefresh: boolean = false) => {
     if (!userAddress || !isLoggedIn) {
       setRank(null);
+      setTotalEarned(null);
       return;
     }
 
-    const fetchUserRank = async () => {
       try {
         setLoading(true);
         // Fetch all leaderboard entries to find user's rank
@@ -22,9 +23,10 @@ export const useUserLeaderboardRank = () => {
         const limit = 100;
         let found = false;
         let userRank: number | null = null;
+      let userTotalEarned: string | null = null;
 
         while (!found) {
-          const response = await fetchLeaderboard(false, limit, offset);
+        const response = await fetchLeaderboard(forceRefresh, limit, offset);
           
           if (response.entries.length === 0) {
             break; // No more entries
@@ -36,6 +38,7 @@ export const useUserLeaderboardRank = () => {
 
           if (userEntry) {
             userRank = userEntry.rank;
+          userTotalEarned = userEntry.totalRewardsEarned;
             found = true;
             break;
           }
@@ -54,17 +57,22 @@ export const useUserLeaderboardRank = () => {
         }
 
         setRank(userRank);
+      setTotalEarned(userTotalEarned);
       } catch (error) {
         console.error("Failed to fetch user rank:", error);
         setRank(null);
+      setTotalEarned(null);
       } finally {
         setLoading(false);
       }
-    };
-
-    fetchUserRank();
   }, [userAddress, isLoggedIn]);
 
-  return { rank, loading };
+  useEffect(() => {
+    fetchUserRank(false);
+  }, [fetchUserRank]);
+
+  const refetch = useCallback(() => fetchUserRank(true), [fetchUserRank]);
+
+  return { rank, totalEarned, loading, refetch };
 };
 

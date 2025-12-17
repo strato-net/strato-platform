@@ -73,7 +73,7 @@ const Dashboard = () => {
 
   const { pendingRewards, refetch: refetchPendingRewards } = usePendingRewards(rewardsEnabled, 30000);
   const [isClaiming, setIsClaiming] = useState(false);
-  const { rank: userRank, loading: rankLoading } = useUserLeaderboardRank();
+  const { rank: userRank, totalEarned, loading: rankLoading } = useUserLeaderboardRank();
 
   // Extract CATA token from inactive tokens by address
   const cataToken = useMemo(() => 
@@ -318,12 +318,18 @@ const Dashboard = () => {
             />
 
             <AssetSummary
-              title="Rewards"
-              value={`${cataBalance.toLocaleString("en-US", { maximumFractionDigits: 2 })} Reward Points`}
+              title="Reward Balance"
+              value={(() => {
+                if (rankLoading) return "Loading...";
+                if (!totalEarned) return "0 Reward Points";
+                const totalEarnedNum = parseFloat(totalEarned) / 1e18;
+                return `${totalEarnedNum.toLocaleString("en-US", { maximumFractionDigits: 2 })} Reward Points`;
+              })()}
               icon={<Coins className="text-white" size={18} />}
               color="bg-purple-500"
               onClick={() => setActiveTab('rewards')}
               isActive={activeTab === 'rewards'}
+              isLoading={rankLoading}
               additionalContent={
                 <div className="mt-2">
                   <Button
