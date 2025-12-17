@@ -83,24 +83,6 @@ const calculateExchangeRates = (pool: Pool | null, fromAsset: SwapToken | null) 
   };
 };
 
-/**
- * Get activity name for swap rewards based on asset symbol/name
- * Maps to activityType 1 (OneTime) swap activities
- */
-const getSwapActivityName = (asset: SwapToken | null | undefined, toAsset: SwapToken | null | undefined): string | null => {
-  if (!asset) return null;
-  
-  const fromSymbol = asset._symbol?.toUpperCase() || "";
-  const toSymbol = toAsset?._symbol?.toUpperCase() || "";
-  // Check by symbol or name
-  if (fromSymbol.includes("ETHST") && toSymbol.includes("USDST")) return "ETHST-USDST Swap";
-  if (fromSymbol.includes("WBTCST") && toSymbol.includes("USDST")) return "WBTCST-USDST Swap";
-  if (fromSymbol.includes("GOLDST") && toSymbol.includes("USDST")) return "GOLDST-USDST Swap";
-  if (fromSymbol.includes("SILVST") && toSymbol.includes("USDST")) return "SILVST-USDST Swap";
-  
-  return null;
-};
-
 // ============================================================================
 // UI COMPONENTS
 // ============================================================================
@@ -912,22 +894,20 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
         loading={poolLoading}
       />
       {(() => {
-        // Activity name is based on pair type, so check either token
-        const activityName =
-          getSwapActivityName(fromAsset, toAsset) || getSwapActivityName(toAsset, fromAsset);
-        if (!activityName) return null;
+        // Find activity by pool address (OneTime swap rewards)
+        const activity = userRewards?.activities?.find(
+          (a) => a.activity.sourceContract?.toLowerCase() === pool?.address?.toLowerCase()
+        );
+        if (!activity) return null;
 
         // Swap rewards are tracked in USDST terms, so use the USDST side of the swap
-        // - If swapping FROM USDST, use fromAmount
-        // - If swapping TO USDST, use toAmount
-        const isFromUsdst =
-          fromAsset?.address?.toLowerCase() === usdstAddress.toLowerCase();
+        const isFromUsdst = fromAsset?.address?.toLowerCase() === usdstAddress.toLowerCase();
         const inputAmount = isFromUsdst ? fromAmount : toAmount;
 
         return (
           <CompactRewardsDisplay
             userRewards={userRewards}
-            activityName={activityName}
+            activityName={activity.activity.name}
             inputAmount={inputAmount}
             actionLabel="Swap"
           />
