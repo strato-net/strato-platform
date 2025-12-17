@@ -917,9 +917,6 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
             <div className="p-3 border rounded-lg bg-muted/50">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium">Recommended Collateral</span>
-                <span className="text-sm text-muted-foreground">
-                  Total: <FormattedUSDAmount weiAmount={calculateSelectedCollateralValue} />
-                </span>
               </div>
               <div className="flex flex-wrap gap-2">
                 {calculateRequiredCollateral.map((item) => {
@@ -956,11 +953,6 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
                       )}
                       <span className="text-sm font-medium">{asset._symbol}</span>
                       <span className="text-xs text-muted-foreground">{recommendedAmount}</span>
-                      {recommendedCollateralValue > 0n && (
-                        <span className="text-xs text-muted-foreground">
-                          (<FormattedUSDAmount weiAmount={recommendedCollateralValue} />)
-                        </span>
-                      )}
                     </div>
                   );
                 })}
@@ -1026,14 +1018,6 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
                             </div>
                           </div>
                         </div>
-                        {selectedCollateralValue > 0n && (
-                          <div className="text-right">
-                            <div className="text-xs text-muted-foreground">Collateral Value</div>
-                            <div className="text-sm font-medium">
-                              <FormattedUSDAmount weiAmount={selectedCollateralValue} />
-                            </div>
-                          </div>
-                        )}
                       </div>
                       
                       <div className="space-y-2">
