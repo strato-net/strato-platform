@@ -7,7 +7,6 @@ This section contains architecture and design specifications for the STRATO Merc
 ### Rewards System
 
 - **[Rewards](rewards.md)** - Core rewards system design and architecture
-- **[Rewards Chef](rewards-chef.md)** - MasterChef-style rewards distribution mechanism
 
 ## Overview
 
