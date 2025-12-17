@@ -6,13 +6,14 @@ import { cn } from "@/lib/utils"
 type SliderProps = React.ComponentPropsWithoutRef<typeof SliderPrimitive.Root> & {
   trackClassName?: string
   rangeClassName?: string
+  rangeStyle?: React.CSSProperties
   thumbClassName?: string
 }
 
 const Slider = React.forwardRef<
   React.ElementRef<typeof SliderPrimitive.Root>,
   SliderProps
->(({ className, trackClassName, rangeClassName, thumbClassName, ...props }, ref) => (
+>(({ className, trackClassName, rangeClassName, rangeStyle, thumbClassName, ...props }, ref) => (
   <SliderPrimitive.Root
     ref={ref}
     className={cn(
@@ -27,7 +28,10 @@ const Slider = React.forwardRef<
         trackClassName
       )}
     >
-      <SliderPrimitive.Range className={cn("absolute h-full bg-primary", rangeClassName)} />
+      <SliderPrimitive.Range 
+        className={cn("absolute h-full bg-primary", rangeClassName)} 
+        style={rangeStyle}
+      />
     </SliderPrimitive.Track>
     <SliderPrimitive.Thumb
       className={cn(

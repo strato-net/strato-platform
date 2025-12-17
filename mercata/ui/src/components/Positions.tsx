@@ -7,6 +7,7 @@ import { formatBalance } from "@/utils/numberUtils";
 import { useMobileTooltip } from "@/hooks/use-mobile-tooltip";
 import { useLiquidationContext } from "@/context/LiquidationContext";
 import { useUser } from "@/context/UserContext";
+import { getHealthFactorColor } from "@/utils/lendingUtils";
 
 interface BorrowingSectionProps {
   userCollaterals: CollateralData[];
@@ -56,16 +57,6 @@ const PositionSection = ({ loanData }: BorrowingSectionProps) => {
   const { userAddress } = useUser();
   const { liquidatable, watchlist, loading } = useLiquidationContext();
 
-  function getTextColor(value: number, maxValue = 10) {
-  const clamped = Math.min(Math.max(value, 1), maxValue);
-  const ratio = (clamped - 1) / (maxValue - 1);
-
-  const red = Math.round(255 * (1 - ratio));
-  const green = Math.round(255 * ratio);
-
-  return `rgb(${red}, ${green}, 0)`;
-}
-
 
   return (
     <Card className="border border-border shadow-sm">
@@ -103,7 +94,12 @@ const PositionSection = ({ loanData }: BorrowingSectionProps) => {
                   <span className="text-muted-foreground text-sm font-medium">Health Factor</span>
                 </InfoTooltip>
                 <div className="flex flex-row gap-3 ">
-                <span className="font-semibold text-lg mt-3" style={{ color: getTextColor((loanData?.healthFactor)) }}>
+                <span className={`font-semibold text-lg mt-3 ${(() => {
+                  const hf = loanData?.healthFactor;
+                  if (hf === undefined || hf === null) return "text-muted-foreground";
+                  if (!isFinite(hf)) return "text-green-600"; // Infinity = No Loan = Good
+                  return getHealthFactorColor(hf);
+                })()}`}>
                   {(() => {
                     // Check if there's no outstanding debt
                     const totalAmountOwed = loanData?.totalAmountOwed ? parseFloat(formatUnits(loanData.totalAmountOwed.toString(), 18)) : 0;
@@ -111,8 +107,8 @@ const PositionSection = ({ loanData }: BorrowingSectionProps) => {
                       return "No Loan";
                     }
                     // Check if health factor is valid
-                    if (loanData?.healthFactor !== undefined && !isNaN((loanData.healthFactor))) {
-                      return (loanData.healthFactor).toFixed(2);
+                    if (loanData?.healthFactor !== undefined && isFinite(loanData.healthFactor) && !isNaN(loanData.healthFactor)) {
+                      return loanData.healthFactor.toFixed(2);
                     }
                     return "N/A";
                   })()}
