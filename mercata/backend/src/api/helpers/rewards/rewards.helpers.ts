@@ -268,6 +268,7 @@ export const fetchUnclaimedRewards = async (
   
   return unclaimedRewards[userAddress.toLowerCase()] || "0";
 };
+
 /**
  * Fetch total claimed rewards per user from RewardsClaimed events
  */
@@ -284,7 +285,7 @@ export const fetchClaimedRewards = async (
       },
     });
 
-return events.reduce((map: Map<string, bigint>, event: any) => {
+ return events.reduce((map: Map<string, bigint>, event: any) => {
       try {
         const attrs = typeof event.attributes === 'string' 
           ? JSON.parse(event.attributes) 
@@ -299,7 +300,6 @@ return events.reduce((map: Map<string, bigint>, event: any) => {
       }
       return map;
     }, new Map<string, bigint>());
-
   } catch (error) {
     console.error("Failed to fetch claimed rewards:", error);
     return new Map<string, bigint>();
