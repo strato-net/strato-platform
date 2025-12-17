@@ -265,18 +265,6 @@ router.get("/state", authHandler.authorizeRequest(), RewardsChefController.getSt
  *                     type: integer
  *                   description: Array of all activity IDs
  *                   example: [1, 2, 3]
- *                 totalDistributed:
- *                   type: string
- *                   description: Sum of all users' total earned rewards (unclaimed + pending + claimed)
- *                   example: "5000000000000000000000"
- *                 currentSeason:
- *                   type: integer
- *                   description: Current season number
- *                   example: 1
- *                 seasonName:
- *                   type: string
- *                   description: Current season name from SeasonAnnouncement event
- *                   example: "Season 1"
  *       401:
  *         description: Unauthorized
  */

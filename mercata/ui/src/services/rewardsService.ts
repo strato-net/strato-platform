@@ -32,7 +32,6 @@ export interface RewardsState {
   totalStake: string;
   totalDistributed: string; // Sum of all users' (unclaimed + pending + claimed) rewards
   currentSeason: number;
-  seasonName: string;
 }
 
 export interface UserRewardsData {
