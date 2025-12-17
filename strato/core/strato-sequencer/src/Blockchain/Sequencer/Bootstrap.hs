@@ -3,29 +3,29 @@
 
 module Blockchain.Sequencer.Bootstrap (bootstrapSequencer) where
 
-import BlockApps.Logging
 import Blockchain.Constants
 import Blockchain.Data.Block
 import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Data.Transaction as TX
-import Blockchain.EthConf as EC
 import Blockchain.Model.WrappedBlock
+import Blockchain.EthConf (runKafkaMConfigured)
 import Blockchain.Sequencer.CablePackage
 import Blockchain.Sequencer.Constants
 import Blockchain.Sequencer.DB.DependentBlockDB
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka (writeSeqVmEvents, writeSeqP2pEvents, assertSequencerTopicsCreation)
-import Blockchain.Sequencer.Monad
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
-import ClassyPrelude (atomically, fromMaybe, newTMChan)
+import ClassyPrelude (atomically, fromMaybe)
 import Control.Monad.Composable.Kafka
 import qualified Data.ByteString.Char8 as C8
-import Network.HTTP.Client (defaultManagerSettings, newManager)
-import Servant.Client
 
--- bootstrap genesis block into leveldb if needed
+-- | Bootstrap genesis block into LevelDB and Kafka.
 --
+-- This is a one-time initialization that:
+-- 1. Marks the genesis block as 'Emitted' in the DependentBlockDB
+-- 2. Creates the sequencer Kafka topics
+-- 3. Writes the genesis block to the VM and P2P event topics
 bootstrapSequencer :: Block -> IO OutputBlock
 bootstrapSequencer
   Block
@@ -34,7 +34,7 @@ bootstrapSequencer
       blockBlockUncles = us
     } = do
     pkg <- atomically newCablePackage
-    initLevelDB pkg
+    initLevelDB
     initKafka pkg
     return shortCircuit
     where
@@ -56,32 +56,11 @@ bootstrapSequencer
                 otBaseTx = t,
                 otHash = TX.transactionHash t
               }
-      initLevelDB :: CablePackage -> IO ()
-      initLevelDB pkg = do
-        tch <- atomically newTMChan
-
-        -- initialize vault client, TODO: make this URL a cl arg
-        mgr <- newManager defaultManagerSettings
-        vaultWrapperUrl <- parseBaseUrl "http://localhost:8013/strato/v2.3"
-        let clientEnv = mkClientEnv mgr vaultWrapperUrl
-
-            dummySequencerCfg =
-              SequencerConfig
-                { dependentBlockDB = error "Dependent Block DB not initialized",
-                  depBlockDBCacheSize = 0,
-                  depBlockDBPath = dbDir "h" ++ sequencerDependentBlockDBPath,
-                  seenTransactionDBSize = 10,
-                  blockstanbulBlockPeriod = BlockPeriod 0,
-                  blockstanbulRoundPeriod = RoundPeriod 0,
-                  blockstanbulTimeouts = tch,
-                  cablePackage = pkg,
-                  maxEventsPerIter = 65,
-                  maxUsPerIter = 20000,
-                  vaultClient = Just clientEnv,
-                  kafkaClientId = KString $ C8.pack defaultKafkaClientId',
-                  redisConn = error "initLevelDB: redisConn"
-                }
-        runLoggingT . runSequencerM dummySequencerCfg Nothing $ do
+      initLevelDB :: IO ()
+      initLevelDB = do
+        let dbPath = dbDir "h" ++ sequencerDependentBlockDBPath
+            cacheSize = 0
+        runWithDependentBlockDB dbPath cacheSize $
           bootstrapGenesisBlock hash
       initKafka :: CablePackage -> IO ()
       initKafka _ = do

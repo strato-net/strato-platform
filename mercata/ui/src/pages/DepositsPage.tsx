@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/card";
 import { Tabs as AntdTabs } from "antd";
 import AssetSummary from '@/components/dashboard/AssetSummary';
-import AssetsGrid from '@/components/dashboard/AssetsGrid';
 import { Wallet, ArrowRight } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { useTokenContext } from '@/context/TokenContext';
@@ -21,6 +20,7 @@ import { useNetBalance } from '@/hooks/useNetBalance';
 import AssetsList from '@/components/dashboard/AssetsList';
 import BridgeIn from '@/components/bridge/BridgeIn';
 import { useBridgeContext } from '@/context/BridgeContext';
+import DepositTransactionDetails from '@/components/dashboard/DepositTransactionDetails';
 import { cataAddress } from '@/lib/constants';
 
 const DepositsPage = () => {
@@ -141,7 +141,7 @@ const DepositsPage = () => {
                     }
                   />
                     <div className="mt-4 flex-1 min-h-0 overflow-auto">
-                      <BridgeIn isConvert={activeTab === "easy-savings"} />
+                      <BridgeIn isSaving={activeTab === "easy-savings"} />
                     </div>
                   </div>
                 </CardContent>
@@ -174,13 +174,12 @@ const DepositsPage = () => {
               </Card>
             </div>
           </div>
-          {/* Assets List */}
           <Card className="shadow-sm">
             <CardHeader>
-              <CardTitle>Available Assets</CardTitle>
+              <CardTitle>Deposit History</CardTitle>
             </CardHeader>
             <CardContent>
-              <AssetsGrid loading={loadingEarningAssets} assets={sortedEarningAssets} />
+              <DepositTransactionDetails context="deposits" />
             </CardContent>
           </Card>
         </main>

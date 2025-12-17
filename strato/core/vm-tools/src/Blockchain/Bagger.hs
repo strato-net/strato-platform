@@ -66,7 +66,6 @@ baggerBlockHash = hash "This is the bagger block hash. It is a dummy value used 
 
 type MonadBagger m =
   ( VMBase m,
-    Mod.Accessible IsBlockstanbul m,
     Mod.Accessible TRC.Cache m,
     Mod.Modifiable B.BaggerState m,
     Mod.Yields m TransactionResult
@@ -82,9 +81,6 @@ data TxMiningResult = TxMiningResult
 
 type MineTransactions m = BlockHeader -> Integer -> [OutputTx] -> Address -> m TxMiningResult
 
-
-isBlockstanbul :: (Functor m, Mod.Accessible IsBlockstanbul m) => m Bool
-isBlockstanbul = unIsBlockstanbul <$> Mod.access (Mod.Proxy @IsBlockstanbul)
 
 getBaggerState :: Mod.Modifiable B.BaggerState m => m B.BaggerState
 getBaggerState = Mod.get (Mod.Proxy @B.BaggerState)
@@ -592,7 +588,6 @@ buildFromMiningCache :: MonadBagger m => m OutputBlock
 buildFromMiningCache = do
   $logInfoS "Bagger.buildFromMiningCache" "pulling from mempool"
   state <- getBaggerState
-  isPBFT <- isBlockstanbul
   let cache = B.miningCache state
   let uncles = []
   let parentHash = B.bestBlockSHA cache
@@ -604,8 +599,7 @@ buildFromMiningCache = do
   let nextBlockData = buildNextBlockHeader parentHeader parentHash stateRoot txs time vDelt
   recordMaxBlockNumber "bagger_build" . number $ nextBlockData
   rewardedBlockData <- buildRewardedBlockHeader nextBlockData
-  when isPBFT $
-    cacheRunResults rewardedBlockData (B.lastExecutedStateRoot cache, B.remainingGas cache, B.lastExecutedTxs cache)
+  cacheRunResults rewardedBlockData (B.lastExecutedStateRoot cache, B.remainingGas cache, B.lastExecutedTxs cache)
   return
     OutputBlock
       { obOrigin = TO.Quarry,
