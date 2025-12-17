@@ -102,10 +102,10 @@ const UsdstBalanceBox: React.FC = () => {
   }
 
   const getCardClasses = () => {
-    if (loadingUsdstBalance) return "border-blue-200 bg-card/95";
-    if (isCriticalBalance) return "border-red-300 bg-red-200/95";
-    if (isLowBalance) return "border-orange-300 bg-orange-200/95";
-    return "border-blue-200 bg-card/95";
+    if (loadingUsdstBalance) return "border-border bg-card/95";
+    if (isCriticalBalance) return "border-red-300 dark:border-red-700 bg-red-100/95 dark:bg-red-900/30";
+    if (isLowBalance) return "border-orange-300 dark:border-orange-700 bg-orange-100/95 dark:bg-orange-900/30";
+    return "border-border bg-card/95";
   };
 
   // Render the appropriate icon based on state and token image availability
@@ -174,12 +174,12 @@ const UsdstBalanceBox: React.FC = () => {
           <div
             className={`p-1.5 rounded-full ${
               loadingUsdstBalance
-                ? "bg-blue-100"
+                ? "bg-blue-100 dark:bg-blue-900/30"
                 : isCriticalBalance
-                ? "bg-red-100"
+                ? "bg-red-100 dark:bg-red-900/30"
                 : isLowBalance
-                ? "bg-orange-100"
-                : "bg-blue-100"
+                ? "bg-orange-100 dark:bg-orange-900/30"
+                : "bg-blue-100 dark:bg-blue-900/30"
             }`}
           >
             {renderIcon("lg")}

@@ -141,7 +141,7 @@ const DepositsPage = () => {
                     }
                   />
                     <div className="mt-4 flex-1 min-h-0 overflow-auto">
-                      <BridgeIn isConvert={activeTab === "easy-savings"} />
+                      <BridgeIn isSaving={activeTab === "easy-savings"} />
                     </div>
                   </div>
                 </CardContent>

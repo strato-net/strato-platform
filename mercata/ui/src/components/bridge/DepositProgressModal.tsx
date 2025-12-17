@@ -42,7 +42,7 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
         { key: "confirm_tx", label: "Confirm Transaction", description: "Confirm transaction in your wallet" },
         { key: "waiting_tx", label: "Waiting for Transaction", description: "Transaction is being processed on-chain" },
         { key: "waiting_autosave", label: "Waiting for Autosave", description: "Depositing to Easy Savings..." },
-        { key: "complete", label: "Processing Deposit", description: "All set! Strato is processing your deposit (1-2 min). You can close this modal anytime." },
+        { key: "complete", label: "Processing Deposit", description: "All set! STRATO is processing your deposit (1-2 min). You can close this modal anytime." },
       ];
     } else {
       // For Bridge In, include approve and sign_permit steps only if it's not native (ERC20 token)
@@ -56,7 +56,7 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
       steps.push(
         { key: "confirm_tx", label: "Confirm Transaction", description: "Confirm transaction in your wallet" },
         { key: "waiting_tx", label: "Waiting for Transaction", description: "Transaction is being processed on-chain" },
-        { key: "complete", label: "Processing Deposit", description: "All set! Strato is processing your deposit (1-2 min). You can close this modal anytime." }
+        { key: "complete", label: "Processing Deposit", description: "All set! STRATO is processing your deposit (1-2 min). You can close this modal anytime." }
       );
       return steps;
     }

@@ -51,10 +51,10 @@ import AdvancedOptionsDropdown from "./AdvancedOptionsDropdown";
 import DepositProgressModal, { DepositStep } from "./DepositProgressModal";
 
 interface BridgeInProps {
-  isConvert?: boolean;
+  isSaving?: boolean;
 }
 
-const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
+const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false }) => {
   // Hooks & Context
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
@@ -91,7 +91,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
     loading: false
   });
   const [isTokenPermitted, setIsTokenPermitted] = useState(true);
-  const [autoDeposit, setAutoDeposit] = useState(isConvert);
+  const [autoDeposit, setAutoDeposit] = useState(isSaving);
   const [progressModalOpen, setProgressModalOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState<DepositStep>("confirm_tx");
   const [progressTxHash, setProgressTxHash] = useState<string>();
@@ -99,13 +99,13 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
   const [progressIsNative, setProgressIsNative] = useState(true);
 
   // Computed values
-  const modeLabels = BRIDGE_IN_MODE_LABELS[isConvert ? "easy-savings" : "bridge"];
+  const modeLabels = BRIDGE_IN_MODE_LABELS[isSaving ? "easy-savings" : "bridge"];
 
   const currentTokens = useMemo(() => {
     return bridgeableTokens.filter((token) =>
-      isConvert ? !token.bridgeable : token.bridgeable
+      isSaving ? !token.bridgeable : token.bridgeable
     );
-  }, [bridgeableTokens, isConvert]);
+  }, [bridgeableTokens, isSaving]);
 
   const currentNetwork = useMemo(() => {
     return availableNetworks.find((n) => n.chainName === selectedNetwork) || null;
@@ -247,8 +247,8 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
       amountWei: 0n,
       loading: false
     });
-    setAutoDeposit(isConvert);
-  }, [isConvert]);
+    setAutoDeposit(isSaving);
+  }, [isSaving]);
 
   useEffect(() => {
     const handleNetworkSwitch = async () => {
@@ -571,7 +571,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
       existing.push({
         externalChainId: parseInt(activeChainId),
         externalTxHash: txHash,
-        type: isConvert ? 'convert' : 'bridge',
+        type: isSaving ? 'saving' : 'bridge',
         DepositInfo: {
           externalSender: address,
           stratoRecipient: userAddress,
@@ -694,11 +694,11 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
         balanceImpact={balanceImpact}
         formatBalanceDisplay={formatBalanceDisplay}
         savingRate={liquidityInfo?.supplyAPY}
-        isConvert={isConvert}
+        isSaving={isSaving}
         autoDeposit={autoDeposit}
       />
 
-      {isConvert && (
+      {isSaving && (
         <label className="flex items-center gap-2 text-sm text-muted-foreground">
           <input 
             type="checkbox" 
@@ -715,7 +715,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
         disabled={isButtonDisabled}
         className="w-full bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
         >
-        {isLoading ? "Processing..." : isConvert && autoDeposit ? "Deposit and Earn" : "Deposit"}
+        {isLoading ? "Processing..." : isSaving && autoDeposit ? "Deposit and Earn" : "Deposit"}
         </Button>
 
       <AdvancedOptionsDropdown
@@ -735,7 +735,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isConvert = false }) => {
         currentStep={currentStep}
         txHash={progressTxHash}
         chainId={currentNetwork?.chainId ? parseInt(currentNetwork.chainId) : undefined}
-        isEasySavings={isConvert && autoDeposit}
+        isEasySavings={isSaving && autoDeposit}
         isNative={progressIsNative}
         error={progressError}
         onClose={() => {
