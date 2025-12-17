@@ -766,48 +766,44 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
         .filter((a) => a.priceUSD > 0 && (a.balanceTokens > 0 || a.existingCollateralTokens > 0))
         .filter((a) => selectedVaults.has(a.address));
 
-      // Calculate mint allocations per vault using fresh data
-      const vaultCollaterals = freshAssetSummaries
-        .filter((a) => selectedVaults.has(a.address))
-        .map((asset) => {
-          const depositAmount = parseFloat(depositInputs[asset.address] || "0");
-          const depositUSD = depositAmount * (asset.priceUSD || 0);
-          const totalCollateralUSD = (asset.existingCollateralUSD || 0) + depositUSD;
-          return { asset, totalCollateralUSD, depositAmount, depositUSD };
-        });
-
-      const totalCollateralAllVaults = vaultCollaterals.reduce(
-        (sum, v) => sum + v.totalCollateralUSD,
-        0
+      // Use the allocations from getOptimalAllocations (same as displayed in UI)
+      // Recalculate allocations with fresh data to match what's displayed
+      const freshTargetMintUSD = parseUnits(mintAmount.toFixed(18), 18);
+      const freshAllocations = getOptimalAllocations(
+        freshTargetMintUSD,
+        riskFactor,
+        assets,
+        freshVaults,
+        freshActiveTokens,
+        freshPrices,
+        globalDebtInfo
       );
 
       const transactions: Array<{ type: "deposit" | "mint"; asset: string; amount: string; symbol: string }> = [];
 
-      // Prepare transactions: deposits first, then mints
-      for (const { asset, totalCollateralUSD, depositAmount } of vaultCollaterals) {
-        // Add deposit transaction if needed
+      // Prepare transactions based on allocations (matching what's displayed in UI)
+      for (const allocation of freshAllocations) {
+        const assetAddress = allocation.assetAddress.toLowerCase();
+        
+        // Add deposit transaction if allocation includes a deposit
+        const depositAmount = parseFloat(allocation.depositAmount || "0");
         if (depositAmount > 0) {
           transactions.push({
             type: "deposit",
-            asset: asset.address,
-            amount: depositAmount.toString(),
-            symbol: asset.symbol,
+            asset: allocation.assetAddress,
+            amount: allocation.depositAmount,
+            symbol: allocation.symbol,
           });
         }
 
-        // Calculate mint allocation for this vault (proportional to collateral)
-        const mintAllocation =
-          totalCollateralAllVaults > 0
-            ? (totalCollateralUSD / totalCollateralAllVaults) * mintAmount
-            : 0;
-
-        // Add mint transaction if there's a mint allocation
-        if (mintAllocation > 0) {
+        // Add mint transaction using the allocation amount (matching UI display)
+        const mintAmount = parseFloat(allocation.mintAmount || "0");
+        if (mintAmount > 0) {
           transactions.push({
             type: "mint",
-            asset: asset.address,
-            amount: mintAllocation.toString(),
-            symbol: asset.symbol,
+            asset: allocation.assetAddress,
+            amount: allocation.mintAmount,
+            symbol: allocation.symbol,
           });
         }
       }
@@ -902,7 +898,9 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
       }
 
       // Show final summary toast if all transactions succeeded
+      // Add a small delay to ensure the last individual transaction toast is visible first
       if (allSuccessful) {
+        await new Promise(resolve => setTimeout(resolve, 500)); // 500ms delay
         toast({
           title: "Quick Mint Complete",
           description: "All transactions completed successfully",
@@ -994,7 +992,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
                     color: getRiskColor(riskFactor)
                   }}
                 >
-                  {riskFactor.toFixed(2)}x
+                  {riskFactor.toFixed(1)}x
                 </span>
               </div>
               <div className="relative w-full">
@@ -1013,7 +1011,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
               </div>
               <div className="text-sm text-gray-600">
                 <span>
-                  Mint up to each vault's minCR × {riskFactor.toFixed(2)}
+                  Mint up to each vault's minCR × {riskFactor.toFixed(1)}
                 </span>
               </div>
             </div>
