@@ -11,7 +11,6 @@ import {
   fetchUserInfo,
   fetchUnclaimedRewards,
   fetchClaimedRewards,
-  fetchSeasonInfo,
   fetchAllUsersLeaderboard
 } from "../helpers/rewards/rewards.helpers";
 
@@ -77,7 +76,6 @@ export interface RewardsOverview {
   totalStake: string;
   totalDistributed: string; // Sum of all users' (unclaimed + pending + claimed) rewards
   currentSeason: number;
-  seasonName: string;
 }
 
 /**
@@ -95,13 +93,16 @@ export const fetchRewardsOverview = async (
   try {
     // All these functions now use the same cached contract state, so they're fast
     // fetchAllUsersLeaderboard also uses cached contract state + cached claimed rewards
-    const [contractData, activityIds, activityStatesMap, allUsersLeaderboard, seasonInfo] = await Promise.all([
+    const [contractData, activityIds, activityStatesMap, allUsersLeaderboard] = await Promise.all([
       fetchRewardsContractData(accessToken, rewardsAddress, forceRefresh),
       fetchActivityIds(accessToken, rewardsAddress, forceRefresh),
       fetchActivityStates(accessToken, rewardsAddress, forceRefresh),
-      fetchAllUsersLeaderboard(accessToken, rewardsAddress, forceRefresh),
-      fetchSeasonInfo(accessToken, rewardsAddress, forceRefresh)
+      fetchAllUsersLeaderboard(accessToken, rewardsAddress, forceRefresh)
     ]);
+
+    // Hardcoded season info for now
+    const currentSeason = 1;
+
 
     // Sum up total stake across all activities
     let totalStake = BigInt(0);
@@ -142,8 +143,7 @@ export const fetchRewardsOverview = async (
       activityCount: activityIds.length,
       totalStake: totalStake.toString(),
       totalDistributed: totalDistributed.toString(),
-      currentSeason: seasonInfo.currentSeason,
-      seasonName: seasonInfo.seasonName
+      currentSeason
     };
   } catch (error) {
     console.error("Failed to fetch Rewards overview:", error);
@@ -183,7 +183,7 @@ export const fetchUserActivities = async (
       // Fetch unclaimed and claimed rewards even with no activities
       const [unclaimedRewards, claimedRewardsMap] = await Promise.all([
         fetchUnclaimedRewards(accessToken, rewardsAddress, userAddress, forceRefresh),
-        fetchClaimedRewards(accessToken, rewardsAddress, forceRefresh)
+        fetchClaimedRewards(accessToken, rewardsAddress)
       ]);
       const claimedRewards = claimedRewardsMap.get(userAddress.toLowerCase()) || 0n;
       return {
@@ -200,7 +200,7 @@ export const fetchUserActivities = async (
       fetchActivityStates(accessToken, rewardsAddress, forceRefresh),
       fetchUserInfo(accessToken, rewardsAddress, userAddress, activityIds, forceRefresh),
       fetchUnclaimedRewards(accessToken, rewardsAddress, userAddress, forceRefresh),
-      fetchClaimedRewards(accessToken, rewardsAddress, forceRefresh)
+      fetchClaimedRewards(accessToken, rewardsAddress,)
     ]);
 
     // Combine all data

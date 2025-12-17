@@ -32,14 +32,15 @@ export const RewardsOverview = ({ state, loading, onRefresh }: RewardsOverviewPr
       setIsRefreshing(false);
     }
   };
-  // Get season name from state or use default
-  const seasonName = state?.seasonName || "Season";
+
+  // Build season display from currentSeason
+  const seasonDisplay = `Season ${state?.currentSeason || 1}`;
 
   if (loading) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>{seasonName} Reward Overview</CardTitle>
+          <CardTitle>{seasonDisplay} Reward Overview</CardTitle>
           <CardDescription>Global rewards system statistics</CardDescription>
         </CardHeader>
         <CardContent>
@@ -95,7 +96,7 @@ export const RewardsOverview = ({ state, loading, onRefresh }: RewardsOverviewPr
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle>{seasonName} Reward Overview</CardTitle>
+            <CardTitle>{seasonDisplay} Reward Overview</CardTitle>
             <CardDescription>Global rewards system statistics</CardDescription>
           </div>
           {onRefresh && (
