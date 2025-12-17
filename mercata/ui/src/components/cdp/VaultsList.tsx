@@ -49,13 +49,14 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
   const { getPrice } = useOracleContext();
   
   // State for active action and input amounts for each position
-  const [activeActions, setActiveActions] = useState<Record<string, 'deposit' | 'withdraw' | 'borrow' | 'repay' | null>>({});
+  const [activeActions, setActiveActions] = useState<Record<string, 'deposit' | 'withdraw' | 'mint' | 'repay' | null>>({});
   const [inputAmounts, setInputAmounts] = useState<Record<string, string>>({});
   const [maxStates, setMaxStates] = useState<Record<string, boolean>>({});
   const [maxValues, setMaxValues] = useState<Record<string, number>>({});  // Store max values for comparison
   const [isGlobalPaused, setIsGlobalPaused] = useState<boolean>(false);
   const [assetPauseStates, setAssetPauseStates] = useState<Record<string, boolean>>({});
   const [assetSupportedStates, setAssetSupportedStates] = useState<Record<string, boolean>>({});
+  const [processingActions, setProcessingActions] = useState<Record<string, boolean>>({});
 
   // Fetch positions from backend
   useEffect(() => {
@@ -119,7 +120,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
   }, [toast, refreshTrigger]);
 
   // Handle dropdown action selection
-  const handleActionSelect = (asset: string, action: 'deposit' | 'withdraw' | 'borrow' | 'repay') => {
+  const handleActionSelect = (asset: string, action: 'deposit' | 'withdraw' | 'mint' | 'repay') => {
     const currentAction = activeActions[asset];
     
     if (currentAction === action) {
@@ -196,7 +197,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
   };
 
   // Calculate maximum allowed value for each action
-  const calculateMaxValue = async (position: VaultData, action: 'deposit' | 'withdraw' | 'borrow' | 'repay'): Promise<string> => {
+  const calculateMaxValue = async (position: VaultData, action: 'deposit' | 'withdraw' | 'mint' | 'repay'): Promise<string> => {
     switch (action) {
       case 'deposit': {
         // Find the user's balance for this token
@@ -225,14 +226,14 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
         }
       }
       
-      case 'borrow': {
+      case 'mint': {
         try {
-          // Use the backend endpoint that calculates max borrowable amount (now without safety buffer)
+          // Use the backend endpoint that calculates max mintable amount (now without safety buffer)
           const result = await cdpService.getMaxMint(position.asset);
           // Convert from wei to decimal format (USDST is 18 decimals)
           return formatWeiToDecimalHP(result.maxAmount, 18);
         } catch (error) {
-          console.error("Failed to get max borrow amount:", error);
+          console.error("Failed to get max mint amount:", error);
           return "0";
         }
       }
@@ -254,7 +255,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
   };
 
   // Handle MAX button click
-  const handleMaxClick = async (asset: string, action: 'deposit' | 'withdraw' | 'borrow' | 'repay') => {
+  const handleMaxClick = async (asset: string, action: 'deposit' | 'withdraw' | 'mint' | 'repay') => {
     const position = positions.find(p => p.asset === asset);
     if (!position) return;
 
@@ -286,7 +287,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
   };
 
   // Calculate preview values based on input
-  const calculatePreviewValues = (position: VaultData, action: 'deposit' | 'withdraw' | 'borrow' | 'repay', inputAmount: string) => {
+  const calculatePreviewValues = (position: VaultData, action: 'deposit' | 'withdraw' | 'mint' | 'repay', inputAmount: string) => {
     const amount = parseFloat(inputAmount);
     if (isNaN(amount) || amount <= 0) return null;
 
@@ -324,7 +325,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
         newCollateral = Math.max(0, currentCollateral - amount);
         newCollateralUSD = newCollateral * pricePerUnit;
         break;
-      case 'borrow':
+      case 'mint':
         newDebt = currentDebt + amount;
         newDebtUSD = newDebt; // Assuming 1:1 USD peg for USDST
         break;
@@ -352,9 +353,9 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
     };
   };
 
-  // Validate debt floor and ceiling constraints for borrow actions
-  const validateDebtConstraints = async (asset: string, borrowAmountDecimal: number): Promise<boolean> => {
-    if (borrowAmountDecimal <= 0) return true;
+  // Validate debt floor and ceiling constraints for mint actions
+  const validateDebtConstraints = async (asset: string, mintAmountDecimal: number): Promise<boolean> => {
+    if (mintAmountDecimal <= 0) return true;
 
     try {
       // Get current asset debt info
@@ -365,12 +366,12 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
       const debtFloorWei = BigInt(debtInfo.debtFloor);
       const debtCeilingWei = BigInt(debtInfo.debtCeiling);
       
-      // Convert borrow amount to wei (18 decimals) with exact precision
-      const borrowAmountWei = BigInt(formatDecimalToWeiHP(borrowAmountDecimal.toString(), 18));
+      // Convert mint amount to wei (18 decimals) with exact precision
+      const mintAmountWei = BigInt(formatDecimalToWeiHP(mintAmountDecimal.toString(), 18));
 
       // Check debt ceiling constraint (total debt for this asset across all users)
       if (debtCeilingWei > 0n) {
-        const newAssetTotalDebtWei = currentAssetTotalDebtWei + borrowAmountWei;
+        const newAssetTotalDebtWei = currentAssetTotalDebtWei + mintAmountWei;
         if (newAssetTotalDebtWei > debtCeilingWei) {
           const availableRoomWei = debtCeilingWei > currentAssetTotalDebtWei ? debtCeilingWei - currentAssetTotalDebtWei : 0n;
           const availableRoom = parseFloat(formatWeiToDecimalHP(availableRoomWei.toString(), 18));
@@ -378,7 +379,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
           
           toast({
             title: "Debt Ceiling Exceeded",
-            description: `Cannot borrow ${borrowAmountDecimal.toFixed(2)} USDST. Maximum available: ${availableRoom.toFixed(2)} USDST (asset debt ceiling: ${debtCeilingDecimal.toFixed(2)} USDST)`,
+            description: `Cannot mint ${mintAmountDecimal.toFixed(2)} USDST. Maximum available: ${availableRoom.toFixed(2)} USDST (asset debt ceiling: ${debtCeilingDecimal.toFixed(2)} USDST)`,
             variant: "destructive",
           });
           return false;
@@ -391,7 +392,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
         const position = positions.find(p => p.asset === asset);
         if (position) {
           // Simulate the exact contract calculation:
-          // 1. Convert borrow amount to scaled debt: scaledAdd = (amountUSD * RAY) / rateAccumulator
+          // 1. Convert mint amount to scaled debt: scaledAdd = (amountUSD * RAY) / rateAccumulator
           // 2. Add to existing scaled debt: newScaledDebt = scaledDebt + scaledAdd  
           // 3. Convert back to debt: totalDebtAfter = (newScaledDebt * rateAccumulator) / RAY
           
@@ -399,8 +400,8 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
           const existingScaledDebtWei = BigInt(position.scaledDebt || "0");
           const rateAccumulatorWei = BigInt(position.rateAccumulator || "1000000000000000000000000000");
           
-          // Step 1: Convert borrow amount to scaled debt (same as contract)
-          const scaledAddWei = (borrowAmountWei * RAY + rateAccumulatorWei - 1n) / rateAccumulatorWei;
+          // Step 1: Convert mint amount to scaled debt (same as contract)
+          const scaledAddWei = (mintAmountWei * RAY + rateAccumulatorWei - 1n) / rateAccumulatorWei;
           
           // Step 2: Add to existing scaled debt (same as contract)
           const newScaledDebtWei = existingScaledDebtWei + scaledAddWei;
@@ -412,7 +413,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
           if (totalDebtAfterWei > 0n && totalDebtAfterWei < debtFloorWei) {
             toast({
               title: "Below Debt Floor",
-              description: `Borrow more USDST to reach the minimum debt floor`,
+              description: `Mint more USDST to reach the minimum debt floor`,
               variant: "destructive",
             });
             return false;
@@ -429,7 +430,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
   };
 
   // Handle action button clicks
-  const handleAction = async (asset: string, action: 'deposit' | 'withdraw' | 'borrow' | 'repay', amount: string) => {
+  const handleAction = async (asset: string, action: 'deposit' | 'withdraw' | 'mint' | 'repay', amount: string) => {
     if (!amount || parseFloat(amount) <= 0) {
       toast({
         title: "Invalid Amount",
@@ -439,14 +440,18 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
       return;
     }
 
-    // Validate debt constraints for borrow actions
-    if (action === 'borrow') {
-      const borrowAmountDecimal = parseFloat(amount);
-      const isValid = await validateDebtConstraints(asset, borrowAmountDecimal);
+    // Validate debt constraints for mint actions
+    if (action === 'mint') {
+      const mintAmountDecimal = parseFloat(amount);
+      const isValid = await validateDebtConstraints(asset, mintAmountDecimal);
       if (!isValid) {
         return; // Validation failed, error already shown
       }
     }
+
+    // Set processing state
+    const actionKey = `${asset}-${action}`;
+    setProcessingActions(prev => ({ ...prev, [actionKey]: true }));
 
     try {
       let result;
@@ -463,7 +468,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
             result = await cdpService.withdraw(asset, amount);
           }
           break;
-        case 'borrow':
+        case 'mint':
           // If user is in max state, use mintMax endpoint
           if (maxStates[asset]) {
             result = await cdpService.mintMax(asset);
@@ -555,6 +560,9 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
         description: errorMessage,
         variant: "destructive",
       });
+    } finally {
+      // Clear processing state
+      setProcessingActions(prev => ({ ...prev, [actionKey]: false }));
     }
   };
 
@@ -588,7 +596,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
         <CardContent>
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <div className="text-muted-foreground mb-4">No positions found</div>
-            <div className="text-sm text-muted-foreground/70">Create your first position by depositing collateral and borrowing USDST above</div>
+            <div className="text-sm text-muted-foreground/70">Create your first position by depositing collateral and minting USDST above</div>
           </div>
         </CardContent>
       </Card>
@@ -663,9 +671,9 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                         Withdraw
                       </DropdownMenuItem>
                       <DropdownMenuItem 
-                        onClick={() => handleActionSelect(position.asset, 'borrow')}
+                        onClick={() => handleActionSelect(position.asset, 'mint')}
                       >
-                        Borrow
+                        Mint
                       </DropdownMenuItem>
                       <DropdownMenuItem 
                         onClick={() => handleActionSelect(position.asset, 'repay')}
@@ -772,12 +780,12 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                         {activeActions[position.asset]!.charAt(0).toUpperCase() + activeActions[position.asset]!.slice(1)} disabled - {position.symbol} is not supported
                       </p>
                     </div>
-                  ) : (isGlobalPaused || assetPauseStates[position.asset]) && (activeActions[position.asset] === 'borrow' || activeActions[position.asset] === 'withdraw') ? (
+                  ) : (isGlobalPaused || assetPauseStates[position.asset]) && (activeActions[position.asset] === 'mint' || activeActions[position.asset] === 'withdraw') ? (
                     <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-center">
                       <p className="text-sm text-yellow-700 font-medium">
                         {isGlobalPaused 
-                          ? `${activeActions[position.asset] === 'borrow' ? 'Borrow' : 'Withdraw'} paused by admin at this time`
-                          : `${activeActions[position.asset] === 'borrow' ? 'Borrow' : 'Withdraw'} for ${position.symbol} paused by admin at this time`
+                          ? `${activeActions[position.asset] === 'mint' ? 'Mint' : 'Withdraw'} paused by admin at this time`
+                          : `${activeActions[position.asset] === 'mint' ? 'Mint' : 'Withdraw'} for ${position.symbol} paused by admin at this time`
                         }
                       </p>
                     </div>
@@ -816,11 +824,13 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                         size="sm" 
                         className="min-w-[80px]"
                         onClick={() => handleAction(position.asset, activeActions[position.asset]!, inputAmounts[position.asset] || "")}
-                        disabled={isAmountAboveMax(position.asset, inputAmounts[position.asset] || "")}
+                        disabled={isAmountAboveMax(position.asset, inputAmounts[position.asset] || "") || processingActions[`${position.asset}-${activeActions[position.asset]}`]}
                       >
-                        {isAmountAboveMax(position.asset, inputAmounts[position.asset] || "") 
-                          ? "Amount exceeds maximum"
-                          : activeActions[position.asset]!.charAt(0).toUpperCase() + activeActions[position.asset]!.slice(1)
+                        {processingActions[`${position.asset}-${activeActions[position.asset]}`]
+                          ? "Processing..."
+                          : isAmountAboveMax(position.asset, inputAmounts[position.asset] || "") 
+                            ? "Amount exceeds maximum"
+                            : activeActions[position.asset]!.charAt(0).toUpperCase() + activeActions[position.asset]!.slice(1)
                         }
                       </Button>
                       </div>
