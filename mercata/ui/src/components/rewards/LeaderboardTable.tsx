@@ -9,6 +9,7 @@ import CopyButton from "@/components/ui/copy";
 import { Badge } from "@/components/ui/badge";
 import { useMemo } from "react";
 import { useUser } from "@/context/UserContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface LeaderboardTableProps {
   entries?: LeaderboardEntry[];
@@ -39,6 +40,7 @@ export const LeaderboardTable = ({
   onPageChange 
 }: LeaderboardTableProps) => {
   const { userAddress } = useUser();
+  const isMobile = useIsMobile();
   
   const columns: ColumnsType<LeaderboardEntry> = useMemo(() => [
     {
@@ -118,18 +120,20 @@ export const LeaderboardTable = ({
               dataSource={entries}
               rowKey="address"
               loading={loading}
+              scroll={isMobile ? { x: 'max-content' } : undefined}
               pagination={{
                 current: currentPage,
                 pageSize: limit,
                 total: total,
                 showSizeChanger: false,
-                showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} entries`,
+                showTotal: isMobile ? undefined : (total, range) => `${range[0]}-${range[1]} of ${total} entries`,
                 onChange: (page) => {
                   if (onPageChange && !loading) {
                     onPageChange(page);
                   }
                 },
                 className: "mt-4",
+                simple: isMobile,
               }}
               locale={{
                 emptyText: (
