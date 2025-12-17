@@ -263,7 +263,7 @@ export const UserRewardsSection = ({
         {/* Total Earned Card */}
         <Card>
           <CardHeader>
-            <CardTitle>Total Claimed </CardTitle>
+            <CardTitle>Total Earned</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center space-x-2 mb-2">
