@@ -58,6 +58,7 @@ export interface VaultInput {
   liquidationRatioWad: bigint;
   minCRWad: bigint;
   stabilityFeeRateRay: bigint;
+  stabilityFeeRateAnnual: number; // Annual percentage for weighting (e.g., 1.5 for 1.5%)
   debtFloorUSD: bigint;
   debtCeilingUSD: bigint;
   unitScale: bigint;
@@ -240,6 +241,7 @@ export function buildMintPlanWithBuffer(
     assetAddress: string;
     targetCRWad: bigint;
     stabilityFeeRateRay: bigint;
+    stabilityFeeRateAnnual: number; // Annual percentage for weighting
     debtFloorUSD: bigint;
     debtCeilingUSD: bigint;
     unitScale: bigint;
@@ -265,6 +267,7 @@ export function buildMintPlanWithBuffer(
       assetAddress: v.assetAddress,
       targetCRWad: targetCR,
       stabilityFeeRateRay: v.stabilityFeeRateRay,
+      stabilityFeeRateAnnual: v.stabilityFeeRateAnnual,
       debtFloorUSD: v.debtFloorUSD,
       debtCeilingUSD: v.debtCeilingUSD,
       unitScale: v.unitScale,
@@ -276,6 +279,7 @@ export function buildMintPlanWithBuffer(
     };
   });
 
+  // Sort by stability fee rate (lowest first) for proportional allocation
   workingVaults.sort((a, b) => {
     if (a.stabilityFeeRateRay < b.stabilityFeeRateRay) return -1;
     if (a.stabilityFeeRateRay > b.stabilityFeeRateRay) return 1;
@@ -295,19 +299,25 @@ export function buildMintPlanWithBuffer(
     };
   }
 
-  for (const w of workingVaults) {
-    if (remainingMintUSD <= 0n) {
-      break;
-    }
+  // First pass: Calculate max capacity for each vault and proportional allocation
+  type VaultCapacity = {
+    vault: WorkingVaultState;
+    maxMintCapacity: bigint;
+    weight: bigint; // Inverse of stability fee rate (higher weight = lower fee = preferred)
+    plannedMint: bigint; // Calculated proportional allocation
+  };
 
-    let vaultCollateral = w.currentVaultCollateral;
-    let vaultDebtUSD = w.currentVaultDebtUSD;
-    let assetBalance = w.currentAssetBalance;
-    let globalDebtUSD = w.currentGlobalDebtUSD;
+  const vaultCapacities: VaultCapacity[] = [];
+
+  // Calculate capacities and weights
+  for (const w of workingVaults) {
+    const vaultCollateral = w.currentVaultCollateral;
+    const vaultDebtUSD = w.currentVaultDebtUSD;
+    const assetBalance = w.currentAssetBalance;
+    const globalDebtUSD = w.currentGlobalDebtUSD;
 
     const price = w.oraclePrice;
     const targetCR = w.targetCRWad;
-    const debtFloor = w.debtFloorUSD;
     const debtCeiling = w.debtCeilingUSD;
     const unitScale = w.unitScale;
 
@@ -340,7 +350,7 @@ export function buildMintPlanWithBuffer(
       headroomFromCeiling = debtCeiling - globalDebtUSD;
     }
 
-    let maxExtraMintUSD = headroomFromCollateral < headroomFromCeiling
+    const maxExtraMintUSD = headroomFromCollateral < headroomFromCeiling
       ? headroomFromCollateral
       : headroomFromCeiling;
 
@@ -348,21 +358,71 @@ export function buildMintPlanWithBuffer(
       continue;
     }
 
+    // Weight by inverse of annual stability fee rate (lower fee = higher weight)
+    // Use 10000 as base for precision: weight = 10000 / annualFee
+    // This ensures ETHST (1.5%) gets weight ~6667 vs WBTCST (1.75%) gets weight ~5714
+    const weight = w.stabilityFeeRateAnnual > 0
+      ? BigInt(Math.floor((10000 / w.stabilityFeeRateAnnual) * 1000)) // Scale by 1000 for precision
+      : 0n;
+
+    vaultCapacities.push({
+      vault: w,
+      maxMintCapacity: maxExtraMintUSD,
+      weight,
+      plannedMint: 0n, // Will be calculated below
+    });
+  }
+
+  // Calculate total weighted capacity and proportional allocations
+  let totalWeightedCapacity = 0n;
+  for (const vc of vaultCapacities) {
+    totalWeightedCapacity += vc.maxMintCapacity * vc.weight;
+  }
+
+  // Calculate proportional allocations
+  if (totalWeightedCapacity > 0n) {
+    for (const vc of vaultCapacities) {
+      // Allocate proportionally: (capacity * weight / totalWeightedCapacity) * targetMintUSD
+      const weightedShare = (vc.maxMintCapacity * vc.weight * targetMintUSD) / totalWeightedCapacity;
+      vc.plannedMint = weightedShare < vc.maxMintCapacity 
+        ? weightedShare 
+        : vc.maxMintCapacity;
+    }
+  }
+
+  // Second pass: Execute allocations
+  for (const vc of vaultCapacities) {
+    if (remainingMintUSD <= 0n) {
+      break;
+    }
+
+    const w = vc.vault;
+    let vaultCollateral = w.currentVaultCollateral;
+    let vaultDebtUSD = w.currentVaultDebtUSD;
+    let assetBalance = w.currentAssetBalance;
+    let globalDebtUSD = w.currentGlobalDebtUSD;
+
+    const price = w.oraclePrice;
+    const targetCR = w.targetCRWad;
+    const debtFloor = w.debtFloorUSD;
+    const unitScale = w.unitScale;
+
+    // Use proportional allocation, but don't exceed remaining amount
+    let plannedMintHereUSD = vc.plannedMint < remainingMintUSD
+      ? vc.plannedMint
+      : remainingMintUSD;
+
+    // Respect debt floor
     const hasExistingDebt = vaultDebtUSD > 0n;
     if (!hasExistingDebt && debtFloor > 0n) {
-      if (maxExtraMintUSD < debtFloor) {
+      if (plannedMintHereUSD > 0n && plannedMintHereUSD < debtFloor) {
         if (remainingMintUSD >= debtFloor) {
-          maxExtraMintUSD = debtFloor;
+          plannedMintHereUSD = debtFloor;
         } else {
           continue;
         }
       }
     }
-
-    let plannedMintHereUSD =
-      maxExtraMintUSD < remainingMintUSD
-        ? maxExtraMintUSD
-        : remainingMintUSD;
 
     if (plannedMintHereUSD <= 0n) {
       continue;
@@ -609,6 +669,7 @@ export function convertToVaultInputs(
     const stabilityFeeRateRay = asset.stabilityFeeRate
       ? convertAnnualPercentageToPerSecondRate(asset.stabilityFeeRate)
       : RAY;
+    const stabilityFeeRateAnnual = asset.stabilityFeeRate || 0;
     
     const debtFloorUSD = BigInt(asset.debtFloor || "0");
     const debtCeilingUSD = BigInt(asset.debtCeiling || "0");
@@ -619,6 +680,7 @@ export function convertToVaultInputs(
       liquidationRatioWad,
       minCRWad,
       stabilityFeeRateRay,
+      stabilityFeeRateAnnual,
       debtFloorUSD,
       debtCeilingUSD,
       unitScale,
@@ -692,6 +754,7 @@ export function convertToVaultInputs(
     const stabilityFeeRateRay = asset.stabilityFeeRate
       ? convertAnnualPercentageToPerSecondRate(asset.stabilityFeeRate)
       : RAY;
+    const stabilityFeeRateAnnual = asset.stabilityFeeRate || 0;
     
     const debtFloorUSD = BigInt(asset.debtFloor || "0");
     const debtCeilingUSD = BigInt(asset.debtCeiling || "0");
@@ -702,6 +765,7 @@ export function convertToVaultInputs(
       liquidationRatioWad,
       minCRWad,
       stabilityFeeRateRay,
+      stabilityFeeRateAnnual,
       debtFloorUSD,
       debtCeilingUSD,
       unitScale,
@@ -734,6 +798,8 @@ export interface Allocation {
   mintAmount: string;
   stabilityFeeRate: number;
   existingCollateralUSD: string;
+  userBalance: string;
+  userBalanceUSD: string;
 }
 
 export function getOptimalAllocations(
@@ -784,6 +850,24 @@ export function getOptimalAllocations(
       ? (parseFloat(formatUnits(BigInt(vault.collateralAmount || "0"), decimals)) * oraclePrice).toString()
       : "0";
 
+    // Calculate non-collateral balance (total balance minus what's already in vault)
+    const totalBalance = tokenInfo && tokenInfo.balance
+      ? BigInt(tokenInfo.balance)
+      : 0n;
+    const vaultCollateral = vault && vault.collateralAmount
+      ? BigInt(vault.collateralAmount)
+      : 0n;
+    const nonCollateralBalance = totalBalance > vaultCollateral
+      ? totalBalance - vaultCollateral
+      : 0n;
+    
+    const userBalance = nonCollateralBalance > 0n
+      ? formatUnits(nonCollateralBalance, decimals)
+      : "0";
+    const userBalanceUSD = userBalance !== "0" && oraclePrice > 0
+      ? (parseFloat(userBalance) * oraclePrice).toString()
+      : "0";
+
     allocations.push({
       assetAddress,
       symbol: asset.symbol,
@@ -792,6 +876,8 @@ export function getOptimalAllocations(
       mintAmount,
       stabilityFeeRate: asset.stabilityFeeRate || 0,
       existingCollateralUSD,
+      userBalance,
+      userBalanceUSD,
     });
   }
 

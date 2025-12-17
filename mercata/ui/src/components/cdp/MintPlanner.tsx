@@ -18,6 +18,7 @@ import {
 import { useOracleContext } from "@/context/OracleContext";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { cdpService, AssetConfig, VaultData } from "@/services/cdpService";
+import { api } from "@/lib/axios";
 import { getOptimalAllocations } from "@/services/mintPlanService";
 import { formatUnits, parseUnits } from "ethers";
 import { useToast } from "@/hooks/use-toast";
@@ -129,6 +130,7 @@ const getCompoundInterest = (
 
 const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
   title = "Mint against collateral (CDP)",
+  onSuccess,
 }) => {
   const [mintAmountInput, setMintAmountInput] = useState<string>("");
   const [riskBufferPercent, setRiskBufferPercent] = useState<number>(20);
@@ -570,8 +572,103 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
 
     setTransactionLoading(true);
     try {
-      // Calculate mint allocations per vault (same logic as display)
-      const vaultCollaterals = assetSummaries
+      // Refresh vaults and prices BEFORE calculating allocations to avoid stale data
+      await Promise.all([
+        fetchVaults(),
+        fetchAllPrices(),
+      ]);
+
+      // Re-fetch fresh data directly for calculations (state may not have updated yet)
+      const [freshVaults, freshActiveTokens, freshPricesResponse] = await Promise.all([
+        USE_DUMMY_DATA ? Promise.resolve(dummyVaults) : cdpService.getVaults(),
+        USE_DUMMY_DATA ? Promise.resolve(dummyActiveTokens) : Promise.resolve(realActiveTokens), // activeTokens should be relatively fresh
+        USE_DUMMY_DATA ? Promise.resolve(dummyPrices) : (async () => {
+          // Fetch prices directly from API to ensure we have the latest
+          const response = await api.get('/oracle/price');
+          const allPrices = response.data || [];
+          if (Array.isArray(allPrices)) {
+            return allPrices.reduce((acc: Record<string, string>, item: { asset?: string; price?: string }) => {
+              if (item.asset && item.price) {
+                acc[item.asset.toLowerCase()] = item.price;
+              }
+              return acc;
+            }, {});
+          }
+          return {};
+        })(),
+      ]);
+
+      const freshPrices = freshPricesResponse;
+
+      // Recalculate assetSummaries with fresh data (matching the useMemo logic)
+      const tokensByAddress = freshActiveTokens.reduce<
+        Record<string, { symbol: string; balance: string; decimals?: number }>
+      >((acc, t) => {
+        if (t.address)
+          acc[t.address.toLowerCase()] = {
+            symbol: t.symbol || t.name || "Asset",
+            balance: t.balance || "0",
+            decimals: (t as { decimals?: number })?.decimals,
+          };
+        return acc;
+      }, {});
+
+      const assetByAddress = assets.reduce<Record<string, AssetConfig>>((acc, a) => {
+        acc[a.asset.toLowerCase()] = a;
+        return acc;
+      }, {});
+
+      const freshAssetSummaries = freshVaults
+        .map((v) => {
+          const config = assetByAddress[v.asset.toLowerCase()];
+          const tokenInfo = tokensByAddress[v.asset.toLowerCase()];
+          const decimals = v.collateralAmountDecimals || tokenInfo?.decimals || 18;
+          const priceWei = freshPrices[v.asset] || "0";
+          const priceUSD = priceWei ? parseFloat(formatUnits(BigInt(priceWei), 18)) : 0;
+          const existingCollateralTokens = parseFloat(formatUnits(BigInt(v.collateralAmount || "0"), decimals));
+          const existingCollateralUSD = parseFloat(formatUnits(BigInt(v.collateralValueUSD || "0"), 18));
+          const debtUSD = parseFloat(formatUnits(BigInt(v.debtValueUSD || "0"), 18));
+          const balanceTokens = tokenInfo ? parseFloat(formatUnits(BigInt(tokenInfo.balance || "0"), decimals)) : 0;
+          return {
+            address: v.asset,
+            symbol: config?.symbol || v.symbol || tokenInfo?.symbol || "Asset",
+            stabilityFee: config?.stabilityFeeRate,
+            priceUSD,
+            existingCollateralTokens,
+            existingCollateralUSD,
+            debtUSD,
+            balanceTokens,
+            decimals,
+          };
+        })
+        // add supported assets user holds but no vault yet
+        .concat(
+          assets
+            .filter((a) => !freshVaults.find((v) => v.asset.toLowerCase() === a.asset.toLowerCase()))
+            .map((a) => {
+              const tokenInfo = tokensByAddress[a.asset.toLowerCase()];
+              const decimals = tokenInfo?.decimals || 18;
+              const priceWei = freshPrices[a.asset] || "0";
+              const priceUSD = priceWei ? parseFloat(formatUnits(BigInt(priceWei), 18)) : 0;
+              const balanceTokens = tokenInfo ? parseFloat(formatUnits(BigInt(tokenInfo.balance || "0"), decimals)) : 0;
+              return {
+                address: a.asset,
+                symbol: a.symbol || tokenInfo?.symbol || "Asset",
+                stabilityFee: a.stabilityFeeRate,
+                priceUSD,
+                existingCollateralTokens: 0,
+                existingCollateralUSD: 0,
+                debtUSD: 0,
+                balanceTokens,
+                decimals,
+              };
+            })
+        )
+        .filter((a) => a.priceUSD > 0 && (a.balanceTokens > 0 || a.existingCollateralTokens > 0))
+        .filter((a) => selectedVaults.has(a.address));
+
+      // Calculate mint allocations per vault using fresh data
+      const vaultCollaterals = freshAssetSummaries
         .filter((a) => selectedVaults.has(a.address))
         .map((asset) => {
           const depositAmount = parseFloat(depositInputs[asset.address] || "0");
@@ -616,9 +713,11 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
         }
       }
 
-      // Execute transactions sequentially
+      // Execute transactions sequentially with validation
       const results: string[] = [];
       let lastTxHash = "";
+      const SAFETY_BUFFER_PERCENT = 0.001; // 0.1% buffer to account for strict < comparison and rounding
+      
       for (const tx of transactions) {
         let result;
         if (tx.type === "deposit") {
@@ -628,7 +727,49 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
           }
           results.push(`Deposited ${formatUSD(parseFloat(tx.amount), 4)} ${tx.symbol}`);
           lastTxHash = result.hash;
+          
+          // Refresh vault state and prices after deposit to get updated max mintable
+          await Promise.all([
+            fetchVaults(),
+            fetchAllPrices(),
+          ]);
         } else {
+          // Before minting, validate against actual on-chain max mintable amount
+          try {
+            const maxMintResult = await cdpService.getMaxMint(tx.asset);
+            const maxMintableUSD = parseFloat(formatUnits(maxMintResult.maxAmount, 18));
+            const plannedMintUSD = parseFloat(tx.amount);
+            
+            // Apply safety buffer: use 99.9% of max to account for strict < comparison
+            const safeMaxMintableUSD = maxMintableUSD * (1 - SAFETY_BUFFER_PERCENT);
+            
+            if (plannedMintUSD > safeMaxMintableUSD) {
+              // Clamp to safe maximum
+              const clampedMintUSD = Math.max(0, safeMaxMintableUSD);
+              
+              if (clampedMintUSD < plannedMintUSD * 0.99) {
+                // Significant reduction - warn user
+                toast({
+                  title: "Mint Amount Adjusted",
+                  description: `Planned ${formatUSD(plannedMintUSD, 2)} USDST for ${tx.symbol}, but only ${formatUSD(clampedMintUSD, 2)} USDST is available. This may be due to price changes or debt accrual.`,
+                  variant: "default",
+                });
+              }
+              
+              if (clampedMintUSD <= 0) {
+                // Skip this mint - insufficient collateral
+                results.push(`Skipped mint for ${tx.symbol}: insufficient collateral after deposits`);
+                continue;
+              }
+              
+              // Update transaction amount to clamped value
+              tx.amount = clampedMintUSD.toString();
+            }
+          } catch (error) {
+            console.error(`Failed to get max mint for ${tx.symbol}:`, error);
+            // Continue with planned amount - backend validation will catch it
+          }
+          
           result = await cdpService.mint(tx.asset, tx.amount);
           if (result.status.toLowerCase() !== "success") {
             throw new Error(`Mint failed for ${tx.symbol}: ${result.status}`);
@@ -652,6 +793,11 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
       setMintAmountInput("");
       setDepositInputs({});
       setSelectedVaults(new Set());
+
+      // Call onSuccess callback to refresh parent components
+      if (onSuccess) {
+        onSuccess();
+      }
     } catch (error) {
       console.error("Quick Mint failed:", error);
       const errorMessage = error instanceof Error ? error.message : "Transaction failed. Please try again.";
@@ -663,7 +809,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
     } finally {
       setTransactionLoading(false);
     }
-  }, [mintAmount, selectedVaults, assetSummaries, depositInputs, toast, fetchVaults, fetchAllPrices]);
+  }, [mintAmount, selectedVaults, depositInputs, toast, fetchVaults, fetchAllPrices, onSuccess, assets, realActiveTokens]);
 
   return (
     <div className="space-y-6">
@@ -743,18 +889,6 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
                 : "Confirm Quick Mint"}
             </Button>
 
-            {userRewards && userRewards.activities.length > 0 && (
-              <CompactRewardsDisplay
-                userRewards={userRewards}
-                loading={rewardsLoading}
-                activityIds={userRewards.activities
-                  .filter(a => BigInt(a.userInfo.stake || "0") > 0n)
-                  .map(a => a.activityId)}
-                variant="inline"
-                inputAmount={mintAmount > 0 ? mintAmount.toString() : undefined}
-              />
-            )}
-
             <Separator />
 
             {mintAmount <= 0 ? (
@@ -783,6 +917,8 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
                     {allocations.map((allocation) => {
                       const depositAmount = parseFloat(allocation.depositAmount);
                       const existingCollateralUSD = parseFloat(allocation.existingCollateralUSD);
+                      const userBalance = parseFloat(allocation.userBalance);
+                      const userBalanceUSD = parseFloat(allocation.userBalanceUSD);
                       
                       return (
                         <div
@@ -796,6 +932,9 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
                             </Badge>
                           </div>
                           <div className="space-y-1 text-sm text-gray-600">
+                            <p className="text-xs text-gray-500">
+                              • Non-collateral balance: {formatUSD(userBalance, 4)} {allocation.symbol} (${formatUSD(userBalanceUSD, 2)})
+                            </p>
                             {depositAmount > 0 ? (
                               <p>
                                 • Add collateral: {formatUSD(depositAmount, 4)} {allocation.symbol} (${formatUSD(parseFloat(allocation.depositAmountUSD))})
@@ -863,6 +1002,27 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void }> = ({
                 </CollapsibleContent>
               </Collapsible>
             )}
+
+            {userRewards && (() => {
+              const cdpActivity = userRewards.activities.find(a => {
+                const nameLower = a.activity.name.toLowerCase();
+                return nameLower.includes("cdp") || 
+                       nameLower.includes("mint") ||
+                       (nameLower.includes("borrow") && !nameLower.includes("lending"));
+              });
+              
+              if (!cdpActivity) return null;
+              
+              return (
+                <CompactRewardsDisplay
+                  key={mintAmount}
+                  userRewards={userRewards}
+                  activityName={cdpActivity.activity.name}
+                  inputAmount={mintAmount > 0 ? mintAmount.toString() : undefined}
+                  actionLabel="Mint"
+                />
+              );
+            })()}
           </CardContent>
         </Card>
       )}
