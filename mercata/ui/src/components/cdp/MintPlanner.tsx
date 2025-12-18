@@ -9,16 +9,13 @@ import { Slider } from "@/components/ui/slider";
 import { ChevronDown } from "lucide-react";
 import { useOracleContext } from "@/context/OracleContext";
 import { cdpService, VaultCandidate } from "@/services/cdpService";
-import { getOptimalAllocations } from "@/services/mintPlanService";
+import { getOptimalAllocations, computeTotalHeadroom } from "@/services/mintPlanService";
 import {
-  WAD,
   SECONDS_PER_DAY,
   SECONDS_PER_WEEK,
   SECONDS_PER_MONTH,
   SECONDS_PER_YEAR,
   getCompoundInterest,
-  computeCollateralUSD,
-  computeTargetCRWadFromRiskFactor,
 } from "@/services/cdpUtils";
 import { formatUnits, parseUnits } from "ethers";
 import { useToast } from "@/hooks/use-toast";
@@ -183,31 +180,12 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
     }
   }, [mintAmountWei, riskFactor, vaultCandidates]);
 
-  const maxCollateralUSDWei = useMemo(() => {
+  const totalHeadroomWei = useMemo(() => {
     if (vaultCandidates.length === 0) return 0n;
-    let total = 0n;
-    for (const candidate of vaultCandidates) {
-      const existingCollateral = BigInt(candidate.collateralAmount || "0");
-      const userBalance = BigInt(candidate.userNonCollateralBalance || "0");
-      const totalCollateral = existingCollateral + userBalance;
-      const oraclePrice = BigInt(candidate.oraclePrice || "0");
-      const unitScale = BigInt(candidate.unitScale || "0");
-      if (oraclePrice > 0n && unitScale > 0n) {
-        total += computeCollateralUSD(totalCollateral, oraclePrice, unitScale);
-      }
-    }
-    return total;
-  }, [vaultCandidates]);
+    return computeTotalHeadroom(riskFactor, vaultCandidates);
+  }, [riskFactor, vaultCandidates]);
 
-  const requiredCollateralForMintWei = useMemo(() => {
-    if (mintAmountWei <= 0n || vaultCandidates.length === 0) return 0n;
-    const maxMinCR = vaultCandidates.reduce((max, c) => c.minCR > max ? c.minCR : max, 0);
-    if (maxMinCR === 0) return 0n;
-    const targetCRWad = computeTargetCRWadFromRiskFactor(BigInt(Math.floor(maxMinCR * 1e16)), riskFactor);
-    return (mintAmountWei * targetCRWad) / WAD;
-  }, [mintAmountWei, riskFactor, vaultCandidates]);
-
-  const exceedsMaxCollateral = mintAmountWei > 0n && requiredCollateralForMintWei > maxCollateralUSDWei;
+  const exceedsMaxCollateral = mintAmountWei > 0n && mintAmountWei > totalHeadroomWei;
 
   const supportedAssetsWithBalances = useMemo(() => {
     return vaultCandidates.map((c) => {
@@ -485,7 +463,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
               <div className="p-3 rounded-md bg-muted border border-border text-center">
                 <p className="text-sm text-muted-foreground">Enter a mint amount and select risk level to see the automated plan</p>
               </div>
-            ) : optimalAllocations.length > 0 ? (
+            ) : exceedsMaxCollateral ? null : optimalAllocations.length > 0 ? (
               <VaultBreakdown
                 allocations={optimalAllocations}
                 open={showVaultBreakdown}
