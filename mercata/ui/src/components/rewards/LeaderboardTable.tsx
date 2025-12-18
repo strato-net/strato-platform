@@ -37,7 +37,7 @@ export const LeaderboardTable = ({
   limit = 10, 
   currentPage = 1, 
   loading = false, 
-  onPageChange 
+  onPageChange
 }: LeaderboardTableProps) => {
   const { userAddress } = useUser();
   const isMobile = useIsMobile();
@@ -108,10 +108,8 @@ export const LeaderboardTable = ({
     <div className="ant-table-themed">
       <Card>
         <CardHeader>
-          <div>
-            <CardTitle>Top Reward Earners</CardTitle>
-            <CardDescription>Leaderboard ranked by highest total rewards</CardDescription>
-          </div>
+          <CardTitle>Top Reward Earners</CardTitle>
+          <CardDescription>Leaderboard ranked by highest total rewards</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="rounded-md border border-border overflow-hidden">

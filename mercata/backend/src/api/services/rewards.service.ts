@@ -10,6 +10,7 @@ import {
   fetchActivityStates,
   fetchUserInfo,
   fetchUnclaimedRewards,
+  fetchClaimedRewards,
   fetchAllUsersLeaderboard
 } from "../helpers/rewards/rewards.helpers";
 
@@ -73,6 +74,8 @@ export interface RewardsOverview {
   lastBlockHandled: string;
   activityCount: number;
   totalStake: string;
+  totalDistributed: string; // Sum of all users' (unclaimed + pending + claimed) rewards
+  currentSeason: number;
 }
 
 /**
@@ -89,17 +92,29 @@ export const fetchRewardsOverview = async (
 
   try {
     // All these functions now use the same cached contract state, so they're fast
-    const [contractData, activityIds, activityStatesMap] = await Promise.all([
+    // fetchAllUsersLeaderboard also uses cached contract state + cached claimed rewards
+    const [contractData, activityIds, activityStatesMap, allUsersLeaderboard] = await Promise.all([
       fetchRewardsContractData(accessToken, rewardsAddress, forceRefresh),
       fetchActivityIds(accessToken, rewardsAddress, forceRefresh),
-      fetchActivityStates(accessToken, rewardsAddress, forceRefresh)
+      fetchActivityStates(accessToken, rewardsAddress, forceRefresh),
+      fetchAllUsersLeaderboard(accessToken, rewardsAddress, forceRefresh)
     ]);
+
+    // Hardcoded season info for now
+    const currentSeason = 1;
+
 
     // Sum up total stake across all activities
     let totalStake = BigInt(0);
     activityStatesMap.forEach((state: any) => {
       const stake = BigInt(state?.totalStake || "0");
       totalStake += stake;
+    });
+
+    // Sum up total distributed (all users' unclaimed + pending + claimed rewards)
+    let totalDistributed = BigInt(0);
+    allUsersLeaderboard.forEach((user) => {
+      totalDistributed += BigInt(user.totalRewardsEarned);
     });
 
     // Fetch token symbol
@@ -126,7 +141,9 @@ export const fetchRewardsOverview = async (
       totalRewardsEmission: contractData.totalRewardsEmission,
       lastBlockHandled: contractData.highestBlockSeen,
       activityCount: activityIds.length,
-      totalStake: totalStake.toString()
+      totalStake: totalStake.toString(),
+      totalDistributed: totalDistributed.toString(),
+      currentSeason
     };
   } catch (error) {
     console.error("Failed to fetch Rewards overview:", error);
@@ -135,10 +152,11 @@ export const fetchRewardsOverview = async (
 };
 
 /**
- * User activities response with unclaimed rewards
+ * User activities response with unclaimed and claimed rewards
  */
 export interface UserActivitiesResponse {
   unclaimedRewards: string;
+  claimedRewards: string;  // Total claimed rewards from RewardsClaimed events
   activities: UserActivity[];
 }
 
@@ -157,25 +175,32 @@ export const fetchUserActivities = async (
   const rewardsAddress = getRewardsAddress();
 
   try {
-    // Fetch all activities and unclaimed rewards in parallel
+    // Fetch all activities
     const activitiesMap = await fetchActivities(accessToken, rewardsAddress, forceRefresh);
     const activities = Array.from(activitiesMap.values());
 
     if (activities.length === 0) {
-      const unclaimedRewards = await fetchUnclaimedRewards(accessToken, rewardsAddress, userAddress, forceRefresh);
+      // Fetch unclaimed and claimed rewards even with no activities
+      const [unclaimedRewards, claimedRewardsMap] = await Promise.all([
+        fetchUnclaimedRewards(accessToken, rewardsAddress, userAddress, forceRefresh),
+        fetchClaimedRewards(accessToken, rewardsAddress)
+      ]);
+      const claimedRewards = claimedRewardsMap.get(userAddress.toLowerCase()) || 0n;
       return {
         unclaimedRewards,
+        claimedRewards: claimedRewards.toString(),
         activities: []
       };
     }
 
     const activityIds = activities.map((a: any) => a.activityId);
 
-    // Batch fetch all activity states, user info, and unclaimed rewards in parallel
-    const [activityStatesMap, userInfoMap, unclaimedRewards] = await Promise.all([
+    // Batch fetch all data in parallel (including claimed rewards from cached source)
+    const [activityStatesMap, userInfoMap, unclaimedRewards, claimedRewardsMap] = await Promise.all([
       fetchActivityStates(accessToken, rewardsAddress, forceRefresh),
       fetchUserInfo(accessToken, rewardsAddress, userAddress, activityIds, forceRefresh),
-      fetchUnclaimedRewards(accessToken, rewardsAddress, userAddress, forceRefresh)
+      fetchUnclaimedRewards(accessToken, rewardsAddress, userAddress, forceRefresh),
+      fetchClaimedRewards(accessToken, rewardsAddress,)
     ]);
 
     // Combine all data
@@ -209,8 +234,12 @@ export const fetchUserActivities = async (
       };
     });
 
+    // Get claimed rewards for this user from the cached map (O(1) lookup)
+    const claimedRewards = claimedRewardsMap.get(userAddress.toLowerCase()) || 0n;
+
     return {
       unclaimedRewards,
+      claimedRewards: claimedRewards.toString(),
       activities: userActivities
     };
   } catch (error) {
