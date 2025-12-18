@@ -72,8 +72,8 @@ const VaultBreakdown: React.FC<{
                   <Badge variant="outline">{formatPercentage(allocation.stabilityFeeRate)}</Badge>
                 </div>
                 <div className="space-y-1 text-sm text-muted-foreground">
-                  <p className="text-xs text-muted-foreground/80">
-                    • Non-collateral balance: {formatUSD(userBalance, 4)} {allocation.symbol} (${formatUSD(userBalanceUSD, 2)})
+                  <p>
+                    • Balance: {formatUSD(userBalance, 4)} {allocation.symbol} (${formatUSD(userBalanceUSD, 2)})
                   </p>
                   {depositAmount > 0 ? (
                     <p>
@@ -548,9 +548,6 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
                         <p className="font-semibold text-foreground">${formatUSD(projectedInterestCosts.yearly, 2)}</p>
                       </div>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Interest calculated using exponential compounding (per-second) matching contract behavior
-                    </p>
                   </div>
                 </CollapsibleContent>
               </Collapsible>
