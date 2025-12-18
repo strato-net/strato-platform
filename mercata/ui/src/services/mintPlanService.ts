@@ -172,12 +172,48 @@ export function getOptimalAllocations(
   if (targetMintUSD <= 0n || candidates.length === 0) return [];
 
   const candidateByAddress = new Map(candidates.map((c) => [c.assetAddress.toLowerCase(), c]));
-  const vaults = candidates.map(toVaultState).sort((a, b) => a.stabilityFeeRateAnnual - b.stabilityFeeRateAnnual);
+  const vaults = candidates.map(toVaultState);
 
   const globalDebtByAsset = new Map<string, bigint>();
   for (const v of vaults) {
     globalDebtByAsset.set(v.assetAddress, computeGlobalDebtUSD(v.totalScaledDebt, v.rateAccumulatorRay));
   }
+
+  // Sort by stability fee, then by headroom (descending - more headroom first)
+  vaults.sort((a, b) => {
+    const feeDiff = a.stabilityFeeRateAnnual - b.stabilityFeeRateAnnual;
+    if (feeDiff !== 0) return feeDiff;
+
+    // Tie-breaker: sort by headroom (descending - more headroom first)
+    const targetCRa = computeTargetCRWadFromRiskFactor(a.minCRWad, riskFactor);
+    const targetCRb = computeTargetCRWadFromRiskFactor(b.minCRWad, riskFactor);
+    const vaultDebtUSDa = computeCurrentDebtUSD(a.userVaultScaledDebt, a.rateAccumulatorRay);
+    const vaultDebtUSDb = computeCurrentDebtUSD(b.userVaultScaledDebt, b.rateAccumulatorRay);
+    const globalDebtUSDa = globalDebtByAsset.get(a.assetAddress) || 0n;
+    const globalDebtUSDb = globalDebtByAsset.get(b.assetAddress) || 0n;
+
+    const headroomA = computeMintHeadroom(a, targetCRa, vaultDebtUSDa, globalDebtUSDa);
+    const headroomB = computeMintHeadroom(b, targetCRb, vaultDebtUSDb, globalDebtUSDb);
+
+    // Sort descending (more headroom first)
+    if (headroomA > headroomB) return -1;
+    if (headroomA < headroomB) return 1;
+    return 0;
+  });
+
+  console.log("Sorted vaults after getOptimalAllocations:", vaults.map(v => {
+    const targetCR = computeTargetCRWadFromRiskFactor(v.minCRWad, riskFactor);
+    const vaultDebtUSD = computeCurrentDebtUSD(v.userVaultScaledDebt, v.rateAccumulatorRay);
+    const globalDebtUSD = globalDebtByAsset.get(v.assetAddress) || 0n;
+    const headroom = computeMintHeadroom(v, targetCR, vaultDebtUSD, globalDebtUSD);
+    const candidate = candidateByAddress.get(v.assetAddress.toLowerCase());
+    return {
+      symbol: candidate?.symbol || "N/A",
+      assetAddress: v.assetAddress,
+      stabilityFeeRate: v.stabilityFeeRateAnnual,
+      headroomUSD: formatUnits(headroom, 18),
+    };
+  }));
 
   const results: { assetAddress: string; plannedMint: bigint; plannedDeposit: bigint }[] = [];
   let remainingMintUSD = targetMintUSD;
