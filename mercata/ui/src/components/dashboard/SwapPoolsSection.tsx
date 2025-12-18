@@ -117,6 +117,14 @@ const SwapPoolsSection = () => {
     pool.poolName?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const formatYourLiquidityValue = (pool: Pool): string => {
+    const totalBalance = BigInt(pool.lpToken.totalBalance || "0");
+    const price = BigInt(pool.lpToken.price || "0");
+    if (price === 0n || totalBalance === 0n) return "$0.00";
+    const valueInWei = (totalBalance * price) / BigInt(10**18);
+    return formatBalance(valueInWei, undefined, 18, 2, 2, true);
+  };
+
   useEffect(() => {
     return () => {
       if (poolPollIntervalRef.current) {
@@ -190,7 +198,7 @@ const SwapPoolsSection = () => {
                         <span>TVL: {formatBalance(pool.totalLiquidityUSD, undefined, 18, 0, 0, true)}</span>
                       </div>
                       <div className="flex items-center text-xs text-muted-foreground mt-1">
-                        <span>Your Liquidity (Total): {formatBalance(pool.lpToken.totalBalance || "0", undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
+                        <span>Your Liquidity: {formatYourLiquidityValue(pool)}</span>
                       </div>
                       {rewardsEnabled && pool.lpToken.stakedBalance !== undefined && (
                         <>
