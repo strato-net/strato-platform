@@ -69,6 +69,9 @@ contract record PoolFactory is Ownable {
     /// @notice LP share percentage in basis points (e.g., 7000 = 70%)
     uint256 public lpSharePercent;
 
+    address public poolImplementation;
+    address public stablePoolImplementation;
+
     // ============ CONSTRUCTOR ============
 
     /// @notice Constructor
@@ -229,9 +232,10 @@ contract record PoolFactory is Ownable {
         );
 
         // deploy new pool first
-        address thisOwner = owner();
-        pool = address(new Proxy(address(new Pool(address(thisOwner))), address(this)));
+        _updatePoolImplementation();
+        pool = address(new Proxy(poolImplementation, address(this)));
         Pool(pool).initialize(tokenA, tokenB, lpTokenAddress);
+        address thisOwner = owner();
         Pool(pool).transferOwnership(thisOwner);
         Ownable(lpTokenAddress).transferOwnership(thisOwner);
 
@@ -269,8 +273,8 @@ contract record PoolFactory is Ownable {
         );
 
         // deploy new pool first
-        address thisOwner = owner();
-        pool = address(new Proxy(address(new StablePool(address(thisOwner))), address(this)));
+        _updateStablePoolImplementation();
+        pool = address(new Proxy(stablePoolImplementation, address(this)));
         StablePool(pool).initialize(
             100,
             3e7, // 0.3% * FEE_DENOMINATOR
@@ -282,6 +286,7 @@ contract record PoolFactory is Ownable {
             [address(0), address(0)],
             lpTokenAddress
         );
+        address thisOwner = owner();
         Ownable(pool).transferOwnership(thisOwner);
         Ownable(lpTokenAddress).transferOwnership(thisOwner);
 
@@ -330,5 +335,23 @@ contract record PoolFactory is Ownable {
             }
         }
         emit PoolsMigrated(address(0), address(this), poolAddresses.length);
+    }
+
+    function updatePoolImplementation() external onlyOwner {
+        _updatePoolImplementation();
+    }
+
+    function _updatePoolImplementation() internal {
+        address thisOwner = owner();
+        poolImplementation = address(new Pool(address(thisOwner)));
+    }
+
+    function updateStablePoolImplementation() external onlyOwner {
+        _updateStablePoolImplementation();
+    }
+
+    function _updateStablePoolImplementation() internal {
+        address thisOwner = owner();
+        stablePoolImplementation = address(new StablePool(address(thisOwner)));
     }
 }

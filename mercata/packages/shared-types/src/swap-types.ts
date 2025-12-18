@@ -142,6 +142,7 @@ export interface Pool {
   apy: string;
   oracleAToBRatio: string;
   oracleBToARatio: string;
+  isStable: boolean;
 }
 
 /**
@@ -201,6 +202,7 @@ export interface RawGetPool {
   bToARatio: string;
   swapFeeRate: number;
   lpSharePercent: number;
+  isStable: boolean;
 }
 
 /**
@@ -277,5 +279,6 @@ export interface RawSwapEvent {
       address: string;
       symbol: string;
     };
+    isStable: boolean;
   };
 }

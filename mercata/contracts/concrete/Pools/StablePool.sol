@@ -113,6 +113,8 @@ contract record StablePool is Ownable {
     /// @notice Current balance of tokenB in the pool
     uint public tokenBBalance;
 
+    bool public isStable = true;
+
     // ============ STATE VARIABLES ============
     /// @notice Reentrancy guard to prevent recursive calls
     bool private locked;
@@ -131,6 +133,11 @@ contract record StablePool is Ownable {
             || msg.sender == owner(), // admin override would be useful here - ariya
             "Caller is not PoolFactory");
         _;
+    }
+
+    function checkIsStable() external returns (bool) {
+        isStable = true;
+        return isStable;
     }
 
     // ============ CONSTRUCTOR ============
@@ -187,6 +194,7 @@ contract record StablePool is Ownable {
         aToBRatio = 0.0;
         bToARatio = 0.0;
         lpToken = Token(_lpTokenAddr);
+        isStable = true;
 
         poolFactory = PoolFactory(msg.sender);
 
@@ -233,8 +241,10 @@ contract record StablePool is Ownable {
         } else if (coinIndex == 1) {
             tokenBBalance += _dx;
         }
-        aToBRatio = decimal(tokenABalance).truncate(18) / decimal(tokenBBalance + 1).truncate(18);
-        bToARatio = decimal(tokenBBalance).truncate(18) / decimal(tokenABalance + 1).truncate(18);
+        decimal priceA = decimal(getP(0)).truncate(18);
+        decimal priceB = decimal(getP(1)).truncate(18);
+        aToBRatio = priceA / priceB;
+        bToARatio = priceB / priceA;
         
         return _dx;
     }
@@ -256,8 +266,10 @@ contract record StablePool is Ownable {
         } else if (coinIndex == 1) {
             tokenBBalance = tokenBalances[tokenAddr];
         }
-        aToBRatio = decimal(tokenABalance).truncate(18) / decimal(tokenBBalance + 1).truncate(18);
-        bToARatio = decimal(tokenBBalance).truncate(18) / decimal(tokenABalance + 1).truncate(18);
+        decimal priceA = decimal(getP(0)).truncate(18);
+        decimal priceB = decimal(getP(1)).truncate(18);
+        aToBRatio = priceA / priceB;
+        bToARatio = priceB / priceA;
     }
 
     function _storedRates() internal view returns (uint[]) {
@@ -980,7 +992,7 @@ contract record StablePool is Ownable {
         return lastPricesPacked[i] >> 128;
     }
 
-    function getP(uint i) external view returns (uint) {
+    function getP(uint i) public view returns (uint) {
         uint amp = _A();
         uint[] xp = _xpMem(_storedRates(), _balances());
         uint d = getD(xp, amp);
