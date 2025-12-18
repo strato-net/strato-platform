@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Slider } from "@/components/ui/slider";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Info } from "lucide-react";
 import { useOracleContext } from "@/context/OracleContext";
 import { cdpService, VaultCandidate } from "@/services/cdpService";
 import { getOptimalAllocations, computeTotalHeadroom } from "@/services/mintPlanService";
@@ -22,6 +22,12 @@ import { useToast } from "@/hooks/use-toast";
 import { CompactRewardsDisplay } from "@/components/rewards/CompactRewardsDisplay";
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 import MintWidget from "./MintWidget";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type OptimalAllocation = ReturnType<typeof getOptimalAllocations>[number];
 
@@ -391,7 +397,27 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
       {!showAdvanced && (
         <Card>
           <CardHeader>
-            <CardTitle>Quick Mint</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              Quick Mint
+              <TooltipProvider delayDuration={0}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="How Quick Mint allocations are determined"
+                      className="text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <Info className="h-4 w-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="w-48 text-sm">
+                    Quick Mint finds an optimal collateral allocation by ranking vaults by stability
+                    fee and proposing deposit/mint amounts that satisfy your target risk factor,
+                    constrained by your asset balances.
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
