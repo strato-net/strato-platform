@@ -15,9 +15,7 @@ contract record StablePool is Ownable {
 
     event Approval(address indexed owner, address indexed spender, uint value);
 
-    event TokenExchange(address indexed buyer, uint soldId, uint tokensSold, uint boughtId, uint tokensBought);
-
-    event TokenExchangeUnderlying(address indexed buyer, uint soldId, uint tokensSold, uint boughtId, uint tokensBought);
+    event Swap(address indexed sender, address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOut);
 
     event AddLiquidity(address indexed provider, uint[] tokenAmounts, uint[] fees, uint invariant, uint tokenSupply);
 
@@ -312,11 +310,11 @@ contract record StablePool is Ownable {
         return _exchange(msg.sender, i, j, _dx, _minDy, receiver, true);
     }
 
-    function addLiquidity(uint[] _amounts, uint _minMintAmount, address _receiver) external nonReentrant returns (uint) {
-        return _addLiquidity(_amounts, _minMintAmount, _receiver);
+    function addLiquidityGeneral(uint[] _amounts, uint _minMintAmount, address _receiver) external nonReentrant returns (uint) {
+        return _addLiquidityGeneral(_amounts, _minMintAmount, _receiver);
     }
 
-    function _addLiquidity(uint[] _amounts, uint _minMintAmount, address _receiver) internal returns (uint) {
+    function _addLiquidityGeneral(uint[] _amounts, uint _minMintAmount, address _receiver) internal returns (uint) {
         address receiver = _receiver == address(0) ? msg.sender : _receiver;
         uint amp = _A();
 
@@ -400,11 +398,27 @@ contract record StablePool is Ownable {
         return mintAmount;
     }
 
+    function addLiquidity(
+        uint256 tokenBAmount,
+        uint256 maxTokenAAmount,
+        uint256 deadline
+    ) external nonReentrant returns (uint256) {
+        require(tokenBAmount > 0 && maxTokenAAmount > 0, "Invalid inputs");
+        require(block.timestamp <= deadline, "EXPIRED");
+        uint[] amounts;
+        for (uint i = 0; i < coins.length; i++) {
+            amounts.push(0);
+        }
+        amounts[0] = maxTokenAAmount;
+        amounts[1] = tokenBAmount;
+        return _addLiquidityGeneral(amounts, 1, msg.sender);
+    }
+
     function addLiquiditySingleToken(
         bool isAToB,
         uint256 amountIn,
         uint256 deadline
-    ) external returns (uint256 liquidityMinted) {
+    ) external nonReentrant returns (uint256 liquidityMinted) {
         require(amountIn > 0, "Invalid input");
         require(block.timestamp <= deadline, "EXPIRED");
         require(lpToken.totalSupply() > 0, "POOL_EMPTY");
@@ -418,7 +432,7 @@ contract record StablePool is Ownable {
             amounts[1] = amountIn;
         }
 
-        return _addLiquidity(amounts, 1, msg.sender);
+        return _addLiquidityGeneral(amounts, 1, msg.sender);
     }
 
     function removeliquidityOneCoin(uint _burnAmount, uint i, uint _minReceived, address _receiver) external nonReentrant returns (uint) {
@@ -641,7 +655,7 @@ contract record StablePool is Ownable {
 
         _transferOut(j, dy, _receiver);
 
-        emit TokenExchange(msg.sender, i, dx, j, dy);
+        emit Swap(msg.sender, address(coins[i]), address(coins[j]), dx, dy);
 
         return dy;
     }
