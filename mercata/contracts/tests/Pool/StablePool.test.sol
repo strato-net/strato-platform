@@ -68,7 +68,7 @@ contract Describe_StablePool is Authorizable {
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
 
         // Add dual liquidity: addLiquidity(tokenBAmount, maxTokenAAmount, deadline)
-        uint256 liquidity = pool.addLiquidity([amountA, amountB], amountB, address(0));
+        uint256 liquidity = pool.addLiquidityGeneral([amountA, amountB], amountB, address(0));
 
         require(liquidity > 0, "Liquidity should be greater than zero");
         require(ERC20(pool.lpToken()).totalSupply() == liquidity, "Total supply should equal liquidity");
@@ -82,12 +82,12 @@ contract Describe_StablePool is Authorizable {
         // Add initial dual liquidity first
         require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
-        pool.addLiquidity([amountA, amountB], amountB, address(0));
+        pool.addLiquidityGeneral([amountA, amountB], amountB, address(0));
 
         // Add liquidity with only token A: addLiquiditySingleToken(isAToB, amountIn, deadline)
         uint256 additionalAmountA = 500e18;
         require(ERC20(tokenAAddress).approve(address(pool), additionalAmountA), "Additional Token A approval failed");
-        uint256 liquidity = pool.addLiquidity([additionalAmountA, 0], additionalAmountA / 2, address(0));
+        uint256 liquidity = pool.addLiquidityGeneral([additionalAmountA, 0], additionalAmountA / 2, address(0));
 
         require(liquidity > 0, "Single token A liquidity should work");
     }
@@ -99,12 +99,12 @@ contract Describe_StablePool is Authorizable {
         // Add initial dual liquidity first
         require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
-        pool.addLiquidity([amountA, amountB], amountB, address(0));
+        pool.addLiquidityGeneral([amountA, amountB], amountB, address(0));
 
         // Add liquidity with only token B: addLiquiditySingleToken(isAToB, amountIn, deadline)
         uint256 additionalAmountB = 1000e18;
         require(ERC20(tokenBAddress).approve(address(pool), additionalAmountB), "Additional Token B approval failed");
-        uint256 liquidity = pool.addLiquidity([0, additionalAmountB], additionalAmountB / 2, address(0));
+        uint256 liquidity = pool.addLiquidityGeneral([0, additionalAmountB], additionalAmountB / 2, address(0));
 
         require(liquidity > 0, "Single token B liquidity should work");
     }
@@ -116,7 +116,7 @@ contract Describe_StablePool is Authorizable {
         // Add liquidity first
         require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
-        uint liquidity = pool.addLiquidity([amountA, amountB], amountB, address(0));
+        uint liquidity = pool.addLiquidityGeneral([amountA, amountB], amountB, address(0));
 
         // Remove liquidity: removeLiquidity(lpTokenAmount, minTokenBAmount, minTokenAAmount, deadline)
         require(ERC20(pool.lpToken()).approve(address(pool), liquidity), "LP token approval failed");
@@ -134,7 +134,7 @@ contract Describe_StablePool is Authorizable {
         // Add liquidity first
         require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
-        pool.addLiquidity([amountA, amountB], amountB, address(0));
+        pool.addLiquidityGeneral([amountA, amountB], amountB, address(0));
 
         // Test swap A to B
         uint256 swapAmount = 100e18;
@@ -152,7 +152,7 @@ contract Describe_StablePool is Authorizable {
         // Add liquidity first
         require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
-        pool.addLiquidity([amountA, amountB], amountB, address(0));
+        pool.addLiquidityGeneral([amountA, amountB], amountB, address(0));
 
         // Test swap B to A
         uint256 swapAmount = 200e18;
@@ -170,17 +170,19 @@ contract Describe_StablePool is Authorizable {
         // Add liquidity first
         require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
-        pool.addLiquidity([amountA, amountB], amountB, address(0));
+        pool.addLiquidityGeneral([amountA, amountB], amountB, address(0));
 
         // Test swap A to B
-        uint256 swapAmount = 25e18;
-        require(ERC20(tokenAAddress).approve(address(pool), 80*swapAmount), "Swap A approval failed");
-        for (uint i = 0; i < 80; i++) {
+        uint256 swapAmount = 100e18;
+        // log(string(ERC20(tokenAAddress).balanceOf(address(pool))/1e14) + "," + string(string(ERC20(tokenBAddress).balanceOf(address(pool))/1e14)));
+        require(ERC20(tokenAAddress).approve(address(pool), 50*swapAmount), "Swap A approval failed");
+        for (uint i = 0; i < 50; i++) {
             uint tokenAPre = ERC20(tokenAAddress).balanceOf(address(pool));
             uint tokenBPre = ERC20(tokenBAddress).balanceOf(address(pool));
             uint256 output = pool.exchange(0, 1, swapAmount, 1, address(0));
             uint tokenAPost = ERC20(tokenAAddress).balanceOf(address(pool));
             uint tokenBPost = ERC20(tokenBAddress).balanceOf(address(pool));
+            // log(string(tokenAPost/1e14) + "," + string(tokenBPost/1e14));
             // log("Point " + string(i) + "::" + string(tokenAPre/1e14) + "::" + string(tokenBPre/1e14) + "::" + string(output/1e14) + "::" + string(output/1e14) + "::10::A::1::0::0::0::0;");
             // log("After round " + string(i) + ": ");
             // log("Token A pre: " + string(tokenAPre));
@@ -200,17 +202,19 @@ contract Describe_StablePool is Authorizable {
         // Add liquidity first
         require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
-        pool.addLiquidity([amountA, amountB], amountB, address(0));
+        pool.addLiquidityGeneral([amountA, amountB], amountB, address(0));
 
         // Test swap A to B
-        uint256 swapAmount = 25e18;
-        require(ERC20(tokenBAddress).approve(address(pool), 80*swapAmount), "Swap A approval failed");
-        for (uint i = 0; i < 80; i++) {
+        uint256 swapAmount = 100e18;
+        require(ERC20(tokenBAddress).approve(address(pool), 50*swapAmount), "Swap A approval failed");
+        // log(string(ERC20(tokenAAddress).balanceOf(address(pool))/1e14) + "," + string(string(ERC20(tokenBAddress).balanceOf(address(pool))/1e14)));
+        for (uint i = 0; i < 50; i++) {
             uint tokenAPre = ERC20(tokenAAddress).balanceOf(address(pool));
             uint tokenBPre = ERC20(tokenBAddress).balanceOf(address(pool));
             uint256 output = pool.exchange(1, 0, swapAmount, 1, address(0));
             uint tokenAPost = ERC20(tokenAAddress).balanceOf(address(pool));
             uint tokenBPost = ERC20(tokenBAddress).balanceOf(address(pool));
+            // log(string(tokenAPost/1e14) + "," + string(tokenBPost/1e14));
             // log("Point " + string(i+80) + "::" + string(tokenAPre/1e14) + "::" + string(tokenBPre/1e14) + "::" + string(output/1e14) + "::" + string(output/1e14) + "::10::A::1::0::0::0::0;");
             // log("After round " + string(i) + ": ");
             // log("Token A pre: " + string(tokenAPre));

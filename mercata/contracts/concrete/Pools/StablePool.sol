@@ -243,8 +243,8 @@ contract record StablePool is Ownable {
         }
         decimal priceA = decimal(getP(0)).truncate(18);
         decimal priceB = decimal(getP(1)).truncate(18);
-        aToBRatio = priceA / priceB;
-        bToARatio = priceB / priceA;
+        aToBRatio = priceB == 0.0 ? 0.0 : priceA / priceB;
+        bToARatio = priceA == 0.0 ? 0.0 : priceB / priceA;
 
         return _dx;
     }
@@ -268,8 +268,8 @@ contract record StablePool is Ownable {
         }
         decimal priceA = decimal(getP(0)).truncate(18);
         decimal priceB = decimal(getP(1)).truncate(18);
-        aToBRatio = priceA / priceB;
-        bToARatio = priceB / priceA;
+        aToBRatio = priceB == 0.0 ? 0.0 : priceA / priceB;
+        bToARatio = priceA == 0.0 ? 0.0 : priceB / priceA;
     }
 
     function _storedRates() internal view returns (uint[]) {
@@ -741,6 +741,7 @@ contract record StablePool is Ownable {
     function getD(uint[] _xp, uint _amp) internal view returns (uint) {
         uint s = 0;
         for (uint x = 0; x < _xp.length; x++) {
+            if (_xp[x] == 0) return 0;
             s += _xp[x];
         }
         if (s == 0) {
@@ -914,6 +915,19 @@ contract record StablePool is Ownable {
     }
 
     function _getP(uint[] xp, uint amp, uint d) internal view returns (uint[]) {
+        uint[] p;
+        bool anyZero = false;
+        for (uint x = 0; x < coins.length; x++) {
+            p.push(0);
+            if (xp[x] == 0) {
+                anyZero = true;
+            }
+        }
+
+        if (anyZero) {
+            return p;
+        }
+
         uint ann = amp * coins.length;
         uint dr = d / (coins.length * coins.length);
 
@@ -921,11 +935,10 @@ contract record StablePool is Ownable {
             dr = (dr * d) / xp[i];
         }
 
-        uint[] p;
         uint xp0A = (ann * xp[0]) / A_PRECISION;
 
         for (uint j = 0; j < coins.length; j++) {
-            p.push(1e18 * (xp0A + (dr * xp[0] / xp[j])) / (xp0A + dr));
+            p[j] = 1e18 * (xp0A + (dr * xp[0] / xp[j])) / (xp0A + dr);
         }
 
         return p;
