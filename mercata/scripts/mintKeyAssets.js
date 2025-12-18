@@ -1,6 +1,6 @@
 /*
   Script: mintKeyAssets.js
-  Purpose: Mint ~$10k worth of each key asset (wBTCST, ETHST, GOLDST, SILVST)
+  Purpose: Mint ~$10k worth of each key asset (wBTCST, ETHST, GOLDST, SILVST, USDST)
            directly to a target wallet using an existing admin JWT – no OAuth dance.
 
   Usage example (bash):
@@ -13,15 +13,17 @@
     export ETHST=93fb7295859b2d70199e0a4883b7c320cf874e6c
     export GOLDST=491cdfe98470bfe69b662ab368826dca0fc2f24d
     export SILVST=2c59ef92d08efde71fe1a1cb5b45f4f6d48fcc94
+    export USDST=937efa7e3a77e20bbdbd7c0d32b6514f368c1010
 
     export AMT_WBTCST=91590000000000000        # 0.09159 WBTC (18-dec)
     export AMT_ETHST=3858150000000000000       # 3.85815 ETH  (18-dec)
     export AMT_GOLDST=2988870000000000000      # 2.98887 GOLD (18-dec)
     export AMT_SILVST=269235000000000000000    # 269.235 SILV (18-dec)
+    export AMT_USDST=1000000000000000000000    # 1,000 USDST (18-dec)
 
     node scripts/mintKeyAssets.js
 
-  The script will POST a single batch transaction containing four Token.mint
+  The script will POST a single batch transaction containing five Token.mint
   calls – one per asset. If any tx fails the script exits with code 1.
 */
 
@@ -51,6 +53,7 @@ require("dotenv").config();
     ETHST : (process.env.ETHST  || "93fb7295859b2d70199e0a4883b7c320cf874e6c").toLowerCase(),
     GOLDST: (process.env.GOLDST || "cdc93d30182125e05eec985b631c7c61b3f63ff0").toLowerCase(),
     SILVST: (process.env.SILVST || "2c59ef92d08efde71fe1a1cb5b45f4f6d48fcc94").toLowerCase(),
+    USDST : (process.env.USDST  || "937efa7e3a77e20bbdbd7c0d32b6514f368c1010").toLowerCase(),
   };
 
   // const amounts = {
@@ -65,6 +68,7 @@ require("dotenv").config();
     ETHST : process.env.AMT_ETHST  || "1000000000000000000000000",   // 1,000,000 ETHST
     GOLDST: process.env.AMT_GOLDST || "1000000000000000000000000",   // 1,000,000 GOLDST
     SILVST: process.env.AMT_SILVST || "1000000000000000000000000",   // 1,000,000 SILVST
+    USDST : process.env.AMT_USDST  || "1000000000000000000000000",   // 1,000,000 USDST
   };
 
   const headers = {
