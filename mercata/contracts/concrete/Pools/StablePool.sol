@@ -245,7 +245,7 @@ contract record StablePool is Ownable {
         decimal priceB = decimal(getP(1)).truncate(18);
         aToBRatio = priceA / priceB;
         bToARatio = priceB / priceA;
-        
+
         return _dx;
     }
 
