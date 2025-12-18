@@ -187,7 +187,7 @@ const SwapPoolsSection = () => {
                     <div>
                       <h3 className="font-medium">{pool.poolName}</h3>
                       <div className="flex items-center text-xs text-muted-foreground mt-1">
-                        <span>Liquidity: {formatBalance(pool.lpToken._totalSupply, undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
+                        <span>TVL: {formatBalance(pool.totalLiquidityUSD, undefined, 18, 0, 0, true)}</span>
                       </div>
                       <div className="flex items-center text-xs text-muted-foreground mt-1">
                         <span>Your Liquidity (Total): {formatBalance(pool.lpToken.totalBalance || "0", undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
