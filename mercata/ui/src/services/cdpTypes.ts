@@ -74,84 +74,13 @@ export interface VaultCandidate {
 
 /**
  * Vault candidate input for mint planning algorithm
- * Same structure as VaultCandidate, used as input to the planning algorithm
+ * Same structure as VaultCandidate
  */
-export interface VaultCandidateInput {
-  assetAddress: string;
-  symbol: string;
-  collateralAmount: string;
-  collateralAmountDecimals: number;
-  scaledDebt: string;
-  rateAccumulator: string;
-  userNonCollateralBalance: string;
-  oraclePrice: string;
-  currentTotalDebt: string;
-  liquidationRatio: number;
-  minCR: number;
-  stabilityFeeRate: number;
-  debtFloor: string;
-  debtCeiling: string;
-  unitScale: string;
-  isPaused: boolean;
-  isSupported: boolean;
-}
-
-/**
- * Vault input for mint planning algorithm
- * Internal representation used by the planning algorithm with BigInt values
- */
-export interface VaultInput {
-  assetAddress: string;
-  liquidationRatioWad: bigint;
-  minCRWad: bigint;
-  stabilityFeeRateRay: bigint;
-  stabilityFeeRateAnnual: number;
-  debtFloorUSD: bigint;
-  debtCeilingUSD: bigint;
-  unitScale: bigint;
-  rateAccumulatorRay: bigint;
-  totalScaledDebt: bigint;
-  userVaultCollateral: bigint;
-  userVaultScaledDebt: bigint;
-  userAssetBalance: bigint;
-  oraclePrice: bigint;
-}
+export type VaultCandidateInput = VaultCandidate;
 
 // ============================================================================
 // Mint Planning Types
 // ============================================================================
-
-/**
- * Planned transaction for mint operations
- */
-export type PlannedTransaction =
-  | {
-      type: "DEPOSIT";
-      assetAddress: string;
-      amountCollateral: bigint;
-    }
-  | {
-      type: "MINT";
-      assetAddress: string;
-      amountUSD: bigint;
-    };
-
-/**
- * Result of mint planning algorithm
- */
-export interface MintPlanResult {
-  transactions: PlannedTransaction[];
-  totalPlannedMintUSD: bigint;
-  targetMintUSD: bigint;
-  perAssetSummary: {
-    [assetAddress: string]: {
-      plannedDeposit: bigint;
-      plannedMint: bigint;
-      effectiveTargetCRWad: bigint;
-      stabilityFeeRateRay: bigint;
-    };
-  };
-}
 
 /**
  * Allocation result from optimal mint planning
