@@ -8,6 +8,7 @@ import { FunctionInput } from "../../types/types";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
+import { getBalance as getTokenBalances } from "./tokens.service";
 
 // Helper function for fixed-point exponentiation (matches contract's _rpow)
 const rpow = (x: bigint, n: bigint, ray: bigint): bigint => {
@@ -63,6 +64,7 @@ const {
 
 const RAY = BigInt(10) ** BigInt(27);
 const WAD = BigInt(10) ** BigInt(18);
+
 
 /**
  * Generic Cirrus fetch for the CDPRegistry row.
@@ -318,6 +320,26 @@ interface AssetConfig {
   isPaused: boolean;
   isSupported: boolean;
 }
+
+export interface VaultCandidate {
+  assetAddress: string;
+  symbol: string;
+  collateralAmount: string; // raw integer string
+  collateralAmountDecimals: number;
+  scaledDebt: string; // raw integer string
+  rateAccumulator: string; // RAY format
+  userNonCollateralBalance: string; // raw integer string
+  oraclePrice: string; // raw integer string (18 decimals)
+  currentTotalDebt: string; // raw integer string (18 decimals)
+  liquidationRatio: number; // percentage
+  minCR: number; // percentage
+  stabilityFeeRate: number; // annual percentage
+  debtFloor: string;
+  debtCeiling: string;
+  unitScale: string;
+  isPaused: boolean;
+  isSupported: boolean;
+}
 interface BadDebt {
   asset: string;
   badDebt: string;
@@ -416,6 +438,152 @@ export const getVaults = async (
 
   const vaults = await Promise.all(vaultPromises);
   return vaults.filter((v: VaultData | null): v is VaultData => v !== null);
+};
+
+/**
+ * Get vault candidates that are fully validated and ready for the greedy mint planning algorithm.
+ * 
+ * This endpoint performs all validation checks and returns only candidates that meet all criteria:
+ * - Not USDST (cannot be used as collateral)
+ * - isSupported: true
+ * - isPaused: false
+ * - oraclePrice > 0
+ * - unitScale > 0
+ * - Has collateral or balance (existing vaults) OR has non-collateral balance (potential vaults)
+ * 
+ * The frontend can trust that all returned candidates are valid and ready to be used directly
+ * in the greedy algorithm without additional filtering or validation.
+ */
+export const getVaultCandidates = async (
+  accessToken: string,
+  userAddress: string
+): Promise<{ existingVaults: VaultCandidate[]; potentialVaults: VaultCandidate[] }> => {
+  // Existing vaults (user already has a CDP vault entry for the asset)
+  const [existingVaults, supportedAssets, tokenBalances, registry] = await Promise.all([
+    getVaults(accessToken, userAddress),
+    getSupportedAssets(accessToken),
+    getTokenBalances(accessToken, userAddress),
+    getCDPRegistry(accessToken, userAddress, {}, "getVaultCandidates"),
+  ]);
+
+  const usdstAddress = (registry?.usdst || "").toLowerCase();
+
+  // Build quick lookup maps
+  const existingByAsset = new Map<string, VaultData>();
+  for (const v of existingVaults) {
+    existingByAsset.set(v.asset.toLowerCase(), v);
+  }
+
+  const balanceByAsset = new Map<string, any>();
+  for (const t of tokenBalances || []) {
+    if (t?.address) {
+      balanceByAsset.set(t.address.toLowerCase(), t);
+    }
+  }
+
+  const globalStateByAsset = new Map<string, any>();
+  for (const s of registry?.cdpEngine?.collateralGlobalStates || []) {
+    if (s?.asset) {
+      globalStateByAsset.set(s.asset.toLowerCase(), s.CollateralGlobalState);
+    }
+  }
+
+  const existingCandidates: VaultCandidate[] = [];
+  const potentialCandidates: VaultCandidate[] = [];
+
+  for (const asset of supportedAssets) {
+    const assetLower = asset.asset.toLowerCase();
+
+    // Filter out invalid assets
+    // 1. USDST cannot be used as collateral
+    if (usdstAddress && assetLower === usdstAddress) {
+      continue;
+    }
+
+    // 2. Unsupported assets
+    if (!asset.isSupported) {
+      continue;
+    }
+
+    // 3. Paused assets
+    if (asset.isPaused) {
+      continue;
+    }
+
+    const tokenEntry = balanceByAsset.get(assetLower);
+    const nonCollateral = BigInt(tokenEntry?.balance || "0");
+    const existing = existingByAsset.get(assetLower);
+    const collateralAmount = BigInt(existing?.collateralAmount || "0");
+
+    // 4. Must have collateral or balance (for existing vaults, include even if no balance)
+    //    For potential vaults, we already check nonCollateral > 0 below
+    const hasCollateralOrBalance = collateralAmount > 0n || nonCollateral > 0n;
+    if (!hasCollateralOrBalance) {
+      continue;
+    }
+
+    // 5. Only surface potential vaults if the user can actually open one (has non-collateral balance)
+    if (!existing && nonCollateral <= 0n) {
+      continue;
+    }
+
+    const oraclePrice = BigInt(tokenEntry?.price || "0");
+    const unitScale = BigInt(asset.unitScale || WAD.toString());
+
+    // 7. Must have valid oracle price
+    if (oraclePrice <= 0n) {
+      continue;
+    }
+
+    // 8. Must have valid unit scale
+    if (unitScale <= 0n) {
+      continue;
+    }
+
+    const globalState = globalStateByAsset.get(assetLower);
+    const rateAccumulatorRay = BigInt(globalState?.rateAccumulator || RAY);
+    const totalScaledDebt = BigInt(globalState?.totalScaledDebt || "0");
+    const currentTotalDebt = (totalScaledDebt * rateAccumulatorRay) / RAY;
+
+    const decimals =
+      existing?.collateralAmountDecimals ??
+      tokenEntry?.token?.customDecimals ??
+      18;
+
+    // All candidates returned from this endpoint have passed validation:
+    // - isSupported: true (filtered out unsupported assets)
+    // - isPaused: false (filtered out paused assets)
+    // - oraclePrice > 0 (validated)
+    // - unitScale > 0 (validated)
+    // - has collateral or balance (validated)
+    const candidate: VaultCandidate = {
+      assetAddress: asset.asset,
+      symbol: asset.symbol,
+      collateralAmount: existing?.collateralAmount ?? "0",
+      collateralAmountDecimals: decimals,
+      scaledDebt: existing?.scaledDebt ?? "0",
+      rateAccumulator: existing?.rateAccumulator ?? rateAccumulatorRay.toString(),
+      userNonCollateralBalance: nonCollateral.toString(),
+      oraclePrice: oraclePrice.toString(),
+      currentTotalDebt: currentTotalDebt.toString(),
+      liquidationRatio: asset.liquidationRatio,
+      minCR: asset.minCR,
+      stabilityFeeRate: asset.stabilityFeeRate,
+      debtFloor: asset.debtFloor,
+      debtCeiling: asset.debtCeiling,
+      unitScale: asset.unitScale,
+      isPaused: false, // All returned candidates are unpaused (filtered out paused assets)
+      isSupported: true, // All returned candidates are supported (filtered out unsupported assets)
+    };
+
+    if (existing) {
+      existingCandidates.push(candidate);
+    } else {
+      potentialCandidates.push(candidate);
+    }
+  }
+
+  return { existingVaults: existingCandidates, potentialVaults: potentialCandidates };
 };
 
 export const getVault = async (
