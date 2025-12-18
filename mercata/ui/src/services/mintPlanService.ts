@@ -179,12 +179,18 @@ export function getOptimalAllocations(
     globalDebtByAsset.set(v.assetAddress, computeGlobalDebtUSD(v.totalScaledDebt, v.rateAccumulatorRay));
   }
 
-  // Sort by stability fee, then by headroom (descending - more headroom first)
+  // Sort by stability fee, then by existing collateral, then by headroom (descending - more headroom first)
   vaults.sort((a, b) => {
     const feeDiff = a.stabilityFeeRateAnnual - b.stabilityFeeRateAnnual;
     if (feeDiff !== 0) return feeDiff;
 
-    // Tie-breaker: sort by headroom (descending - more headroom first)
+    // First tie-breaker: prioritize vaults with existing collateral
+    const hasCollateralA = a.userVaultCollateral > 0n;
+    const hasCollateralB = b.userVaultCollateral > 0n;
+    if (hasCollateralA && !hasCollateralB) return -1;
+    if (!hasCollateralA && hasCollateralB) return 1;
+
+    // Second tie-breaker: sort by headroom (descending - more headroom first)
     const targetCRa = computeTargetCRWadFromRiskFactor(a.minCRWad, riskFactor);
     const targetCRb = computeTargetCRWadFromRiskFactor(b.minCRWad, riskFactor);
     const vaultDebtUSDa = computeCurrentDebtUSD(a.userVaultScaledDebt, a.rateAccumulatorRay);
@@ -198,6 +204,7 @@ export function getOptimalAllocations(
     // Sort descending (more headroom first)
     if (headroomA > headroomB) return -1;
     if (headroomA < headroomB) return 1;
+
     return 0;
   });
 
@@ -207,11 +214,14 @@ export function getOptimalAllocations(
     const globalDebtUSD = globalDebtByAsset.get(v.assetAddress) || 0n;
     const headroom = computeMintHeadroom(v, targetCR, vaultDebtUSD, globalDebtUSD);
     const candidate = candidateByAddress.get(v.assetAddress.toLowerCase());
+    const decimals = candidate?.collateralAmountDecimals || 18;
     return {
       symbol: candidate?.symbol || "N/A",
       assetAddress: v.assetAddress,
       stabilityFeeRate: v.stabilityFeeRateAnnual,
       headroomUSD: formatUnits(headroom, 18),
+      hasExistingCollateral: v.userVaultCollateral > 0n,
+      existingCollateral: formatUnits(v.userVaultCollateral, decimals),
     };
   }));
 
