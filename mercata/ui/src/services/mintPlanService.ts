@@ -73,9 +73,7 @@ function tryAllocateToVault(
   globalDebtUSD: bigint,
   remainingMintUSD: bigint
 ): { plannedMint: bigint; plannedDeposit: bigint } | null {
-  if ((vault.userAssetBalance <= 0n && vault.userVaultCollateral <= 0n) || vault.oraclePrice <= 0n) {
-    return null;
-  }
+  if ((vault.userAssetBalance <= 0n && vault.userVaultCollateral <= 0n) || vault.oraclePrice <= 0n) return null;
 
   const maxMintUSD = computeMintHeadroom(vault, targetCR, vaultDebtUSD, globalDebtUSD);
   if (maxMintUSD <= 0n) return null;
@@ -141,6 +139,29 @@ function buildAllocation(
     userBalance,
     userBalanceUSD,
   };
+}
+
+export function computeTotalHeadroom(
+  riskFactor: number,
+  candidates: VaultCandidateInput[]
+): bigint {
+  if (candidates.length === 0) return 0n;
+
+  const vaults = candidates.map(toVaultState);
+  let totalHeadroom = 0n;
+
+  for (const vault of vaults) {
+    if ((vault.userAssetBalance <= 0n && vault.userVaultCollateral <= 0n) || vault.oraclePrice <= 0n) continue;
+
+    const targetCR = computeTargetCRWadFromRiskFactor(vault.minCRWad, riskFactor);
+    const vaultDebtUSD = computeCurrentDebtUSD(vault.userVaultScaledDebt, vault.rateAccumulatorRay);
+    const globalDebtUSD = computeGlobalDebtUSD(vault.totalScaledDebt, vault.rateAccumulatorRay);
+
+    const headroom = computeMintHeadroom(vault, targetCR, vaultDebtUSD, globalDebtUSD);
+    totalHeadroom += headroom;
+  }
+
+  return totalHeadroom;
 }
 
 export function getOptimalAllocations(
