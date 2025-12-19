@@ -63,6 +63,7 @@ export const defaultRewardsAddressFor: Record<string, string> = {
 
 export let bridgeUrl: string | undefined;
 export let rewards: string | undefined;
+export let networkId: string | undefined;
 
 export function setBridgeConfig(networkId: string) {
   if (process.env.BRIDGE_SERVICE_URL) {
@@ -85,7 +86,7 @@ export async function initNetworkConfig() {
   const { eth } = await import("../utils/mercataApiHelper");
   const accessToken = await getServiceToken();
   const { data } = await eth.get(accessToken, `/metadata`);
-  const networkId = data.networkID;
+  networkId = data.networkID;
   if (!networkId) {
     throw new Error("Network ID not found in metadata");
   }

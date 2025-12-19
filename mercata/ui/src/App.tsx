@@ -45,6 +45,7 @@ import { SafetyProvider } from "./context/SafetyContext";
 import { LendingProvider } from "@/context/LendingContext";
 import { CDPProvider } from "@/context/CDPContext";
 import { SwapProvider } from "@/context/SwapContext";
+import { NetworkProvider } from "@/context/NetworkContext";
 import Borrow from "./pages/Borrow";
 import { getConfig } from "./lib/config";
 import { useState, useEffect } from "react";
@@ -114,6 +115,7 @@ const App = () => {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <NetworkProvider>
       <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
       <WagmiProvider config={wagmiConfig}>
       <RainbowKitProvider>
@@ -262,6 +264,7 @@ const App = () => {
       </RainbowKitProvider>
       </WagmiProvider>
       </ThemeProvider>
+    </NetworkProvider>
     </QueryClientProvider>
   );
 };

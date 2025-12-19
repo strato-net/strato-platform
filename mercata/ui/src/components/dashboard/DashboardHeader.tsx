@@ -1,5 +1,6 @@
 import { Avatar, AvatarFallback } from "../ui/avatar";
 import { useUser } from '@/context/UserContext';
+import { useNetwork } from '@/context/NetworkContext';
 import CopyButton from '../ui/copy';
 import { LogOutIcon, Menu, Copy } from 'lucide-react';
 import {
@@ -23,6 +24,7 @@ const GRADIENT_BUTTON_CLASS = "w-full bg-gradient-to-r from-[#1f1f5f] via-[#293b
 
 const DashboardHeader = ({ title, onMenuClick }: DashboardHeaderProps) => {
   const { userAddress, userName, logout } = useUser();
+  const { isTestnet } = useNetwork();
   const { address: walletAddress, isConnected } = useAccount();
   const { disconnect } = useDisconnect();
   const { toast } = useToast();
@@ -83,7 +85,7 @@ const DashboardHeader = ({ title, onMenuClick }: DashboardHeaderProps) => {
 
   return (
     <header className="bg-background border-b border-border py-4 px-6 flex items-center justify-between">
-      <div className="flex items-center">
+      <div className="flex items-center gap-3">
         <button
           onClick={onMenuClick}
           className="md:hidden mr-4 p-2 hover:bg-muted rounded-md"
@@ -91,6 +93,11 @@ const DashboardHeader = ({ title, onMenuClick }: DashboardHeaderProps) => {
           <Menu size={20} />
         </button>
         <h1 className="text-xl font-bold">{title}</h1>
+        {isTestnet && (
+          <span className="bg-orange-500 text-white px-3 py-1.5 rounded-md text-sm font-bold uppercase tracking-wide shadow-md">
+            TESTNET
+          </span>
+        )}
       </div>
 
       <div className="flex items-center space-x-4">
