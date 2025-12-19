@@ -241,10 +241,6 @@ contract record StablePool is Ownable {
         } else if (coinIndex == 1) {
             tokenBBalance += _dx;
         }
-        decimal priceA = decimal(getP(0)).truncate(18);
-        decimal priceB = decimal(getP(1)).truncate(18);
-        aToBRatio = priceB == 0.0 ? 0.0 : priceA / priceB;
-        bToARatio = priceA == 0.0 ? 0.0 : priceB / priceA;
 
         return _dx;
     }
@@ -266,10 +262,6 @@ contract record StablePool is Ownable {
         } else if (coinIndex == 1) {
             tokenBBalance = tokenBalances[tokenAddr];
         }
-        decimal priceA = decimal(getP(0)).truncate(18);
-        decimal priceB = decimal(getP(1)).truncate(18);
-        aToBRatio = priceB == 0.0 ? 0.0 : priceA / priceB;
-        bToARatio = priceA == 0.0 ? 0.0 : priceB / priceA;
     }
 
     function _storedRates() internal view returns (uint[]) {
@@ -404,6 +396,9 @@ contract record StablePool is Ownable {
         totalSupply += mintAmount;
         lpToken.mint(receiver, mintAmount);
 
+        uint[] xpFinal = _xpMem(rates, newBalances);
+        _updateRatios(xpFinal, amp, d1);
+
         emit Transfer(address(0), receiver, mintAmount);
         emit AddLiquidity(msg.sender, _amounts, fees, d1, totalSupply);
 
@@ -470,6 +465,7 @@ contract record StablePool is Ownable {
         emit RemoveLiquidityOne(msg.sender, i, _burnAmount, dy, lpToken.totalSupply());
 
         upkeepOracles(xp, amp, d);
+        _updateRatios(xp, amp, d);
 
         return dy;
     }
@@ -528,6 +524,9 @@ contract record StablePool is Ownable {
 
         lpToken.burn(msg.sender, burnAmount);
 
+        uint[] xp = _xpMem(rates, _balances());
+        _updateRatios(xp, amp, d1);
+
         emit RemoveLiquidityImbalance(
             msg.sender,
             _amounts,
@@ -585,8 +584,9 @@ contract record StablePool is Ownable {
         uint[2] maLastTimeUnpacked = unpack2(maLastTime);
         uint lastDPackedCurrent = lastDPacked;
         uint oldD = lastDPackedCurrent & ((1<<128) - 1);
+        uint newD = oldD - (oldD * _burnAmount / totalSupply);
         lastDPacked = pack2(
-            oldD - (oldD * _burnAmount / totalSupply),
+            newD,
             _calcMovingAverage(
                 lastDPackedCurrent,
                 DMaTime,
@@ -610,6 +610,9 @@ contract record StablePool is Ownable {
             _withdrawAdminFees();
         }
 
+        uint[] xp = _xpMem(_storedRates(), _balances());
+        _updateRatios(xp, _A(), newD);
+
         return amounts;
     }
 
@@ -627,7 +630,7 @@ contract record StablePool is Ownable {
         return (_offpegFeeMultiplier * _fee) / ((((_offpegFeeMultiplier - FEE_DENOMINATOR) * 4 * xpi * xpj) / xps2) + FEE_DENOMINATOR);
     }
 
-    function __exchange(uint x, uint[] _xp, uint[] rates, uint i, uint j) internal returns (uint) {
+    function __exchange(uint x, uint[] _xp, uint[] rates, uint i, uint j) internal returns (uint, uint, uint) {
         uint amp = _A();
         uint d = getD(_xp, amp);
         uint y = getY(i, j, x, _xp, amp, d);
@@ -647,7 +650,7 @@ contract record StablePool is Ownable {
         xp[j] = y;
         upkeepOracles(xp, amp, d);
 
-        return dy;
+        return (dy, amp, d);
     }
 
     function _exchange(address sender, uint i, uint j, uint _dx, uint _minDy, address _receiver, bool expectOptimisticTransfer) internal returns (uint) {
@@ -662,10 +665,13 @@ contract record StablePool is Ownable {
         uint dx = _transferIn(i, _dx, sender, expectOptimisticTransfer);
 
         uint x = xp[i] + ((dx * rates[i]) / PRECISION);
-        uint dy = __exchange(x, xp, rates, i, j);
+        (uint dy, uint amp, uint d) = __exchange(x, xp, rates, i, j);
         require(dy >= _minDy, "Exchange resulted in fewer coins than expected");
 
         _transferOut(j, dy, _receiver);
+
+        xp = _xpMem(rates, _balances());
+        _updateRatios(xp, amp, d);
 
         emit Swap(msg.sender, address(coins[i]), address(coins[j]), dx, dy);
 
@@ -997,6 +1003,14 @@ contract record StablePool is Ownable {
         return lastEmaValue;
     }
 
+    function _updateRatios(uint[] xp, uint amp, uint d) internal {
+        uint[] ps = _getP(xp, amp, d);
+        decimal priceA = decimal(ps[0]).truncate(18);
+        decimal priceB = decimal(ps[1]).truncate(18);
+        aToBRatio = priceB == 0.0 ? 0.0 : priceA / priceB;
+        bToARatio = priceA == 0.0 ? 0.0 : priceB / priceA;
+    }
+
     function lastPrice(uint i) external view returns (uint) {
         return lastPricesPacked[i] & ((1 << 128) - 1);
     }
@@ -1005,7 +1019,7 @@ contract record StablePool is Ownable {
         return lastPricesPacked[i] >> 128;
     }
 
-    function getP(uint i) public view returns (uint) {
+    function getP(uint i) external view returns (uint) {
         uint amp = _A();
         uint[] xp = _xpMem(_storedRates(), _balances());
         uint d = getD(xp, amp);

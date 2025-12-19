@@ -163,6 +163,9 @@ contract Describe_StablePool is Authorizable {
         require(output < swapAmount, "Output should be less than input due to fees and slippage");
     }
 
+    uint N = 83;
+    uint256 swapAmount = 50e18;
+
     function it_pool_can_swap_a_to_b_multiple_times() {
         uint256 amountA = 2000e18;
         uint256 amountB = 2000e18;
@@ -173,16 +176,16 @@ contract Describe_StablePool is Authorizable {
         pool.addLiquidityGeneral([amountA, amountB], amountB, address(0));
 
         // Test swap A to B
-        uint256 swapAmount = 100e18;
-        // log(string(ERC20(tokenAAddress).balanceOf(address(pool))/1e14) + "," + string(string(ERC20(tokenBAddress).balanceOf(address(pool))/1e14)));
-        require(ERC20(tokenAAddress).approve(address(pool), 50*swapAmount), "Swap A approval failed");
-        for (uint i = 0; i < 50; i++) {
+        // log(string(ERC20(tokenAAddress).balanceOf(address(pool))/1e14) + "," + string(string(ERC20(tokenBAddress).balanceOf(address(pool))/1e14)) + "," + string(uint(pool.aToBRatio()*10000.0)));
+        require(ERC20(tokenAAddress).approve(address(pool), N*swapAmount), "Swap A approval failed");
+        for (uint i = 0; i < N; i++) {
             uint tokenAPre = ERC20(tokenAAddress).balanceOf(address(pool));
             uint tokenBPre = ERC20(tokenBAddress).balanceOf(address(pool));
             uint256 output = pool.exchange(0, 1, swapAmount, 1, address(0));
             uint tokenAPost = ERC20(tokenAAddress).balanceOf(address(pool));
             uint tokenBPost = ERC20(tokenBAddress).balanceOf(address(pool));
-            // log(string(tokenAPost/1e14) + "," + string(tokenBPost/1e14));
+            // log(string(tokenAPost/1e14) + "," + string(tokenBPost/1e14) + "," + string(uint(pool.aToBRatio()*10000.0)));
+            log("Point " + string(i) + "::" + string(tokenAPre/1e14) + "::" + string(tokenBPre/1e14) + "::" + string(uint(pool.aToBRatio()*10000.0)) + "::" + string(uint(pool.aToBRatio()*10000.0)) + "::10::A::1::0::0::0::0;");
             // log("Point " + string(i) + "::" + string(tokenAPre/1e14) + "::" + string(tokenBPre/1e14) + "::" + string(output/1e14) + "::" + string(output/1e14) + "::10::A::1::0::0::0::0;");
             // log("After round " + string(i) + ": ");
             // log("Token A pre: " + string(tokenAPre));
@@ -205,16 +208,16 @@ contract Describe_StablePool is Authorizable {
         pool.addLiquidityGeneral([amountA, amountB], amountB, address(0));
 
         // Test swap A to B
-        uint256 swapAmount = 100e18;
-        require(ERC20(tokenBAddress).approve(address(pool), 50*swapAmount), "Swap A approval failed");
-        // log(string(ERC20(tokenAAddress).balanceOf(address(pool))/1e14) + "," + string(string(ERC20(tokenBAddress).balanceOf(address(pool))/1e14)));
-        for (uint i = 0; i < 50; i++) {
+        require(ERC20(tokenBAddress).approve(address(pool), N*swapAmount), "Swap A approval failed");
+        // log(string(ERC20(tokenAAddress).balanceOf(address(pool))/1e14) + "," + string(string(ERC20(tokenBAddress).balanceOf(address(pool))/1e14)) + "," + string(uint(pool.aToBRatio()*10000.0)));
+        for (uint i = 0; i < N; i++) {
             uint tokenAPre = ERC20(tokenAAddress).balanceOf(address(pool));
             uint tokenBPre = ERC20(tokenBAddress).balanceOf(address(pool));
             uint256 output = pool.exchange(1, 0, swapAmount, 1, address(0));
             uint tokenAPost = ERC20(tokenAAddress).balanceOf(address(pool));
             uint tokenBPost = ERC20(tokenBAddress).balanceOf(address(pool));
-            // log(string(tokenAPost/1e14) + "," + string(tokenBPost/1e14));
+            // log(string(tokenAPost/1e14) + "," + string(tokenBPost/1e14) + "," + string(uint(pool.aToBRatio()*10000.0)));
+            log("Point " + string(i+80) + "::" + string(tokenAPre/1e14) + "::" + string(tokenBPre/1e14) + "::" + string(uint(pool.bToARatio()*10000.0)) + "::" + string(uint(pool.bToARatio()*10000.0)) + "::10::A::1::0::0::0::0;");
             // log("Point " + string(i+80) + "::" + string(tokenAPre/1e14) + "::" + string(tokenBPre/1e14) + "::" + string(output/1e14) + "::" + string(output/1e14) + "::10::A::1::0::0::0::0;");
             // log("After round " + string(i) + ": ");
             // log("Token A pre: " + string(tokenAPre));
