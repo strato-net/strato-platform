@@ -20,7 +20,8 @@ const Navbar = () => {
     if (isLoggedIn) {
       logout();
     } else {
-      window.location.href = '/login';
+      const theme = resolvedTheme || 'light';
+      window.location.href = `/login?theme=${theme}`;
     }
   };
 
