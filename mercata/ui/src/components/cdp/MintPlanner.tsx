@@ -443,7 +443,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
                     color: getRiskColor(riskFactor)
                   }}
                 >
-                  {riskFactor.toFixed(1)}x
+                  {riskFactor === 1.0 ? "No Buffer" : `${riskFactor.toFixed(1)}x`}
                 </span>
               </div>
               <div className="relative w-full">
@@ -462,7 +462,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
               </div>
               <div className="text-sm text-muted-foreground">
                 <span>
-                  Mint up to each vault's minCR × {riskFactor.toFixed(1)}
+                  This value will determine the size of the safety buffer between each vault's target CR and the protocol minimum.
                 </span>
               </div>
             </div>
