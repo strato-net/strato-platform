@@ -273,11 +273,14 @@ contract record PoolFactory is Ownable {
         );
 
         // deploy new pool first
+        _updatePoolImplementation();
         _updateStablePoolImplementation();
-        pool = address(new Proxy(stablePoolImplementation, address(this)));
+        pool = address(new Proxy(poolImplementation, address(this)));
+        Pool(pool).setFeeParameters(swapFeeRate, lpSharePercent); // Get StablePool to show up in Pool table
+        Proxy(pool).setLogicContract(stablePoolImplementation);
         StablePool(pool).initialize(
             100,
-            3e7, // 0.3% * FEE_DENOMINATOR
+            swapFeeRate * 1e6, // 0.3% * FEE_DENOMINATOR
             1e10,
             block.timestamp,
             [address(tokenA), address(tokenB)],

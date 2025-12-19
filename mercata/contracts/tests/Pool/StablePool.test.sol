@@ -185,7 +185,7 @@ contract Describe_StablePool is Authorizable {
             uint tokenAPost = ERC20(tokenAAddress).balanceOf(address(pool));
             uint tokenBPost = ERC20(tokenBAddress).balanceOf(address(pool));
             // log(string(tokenAPost/1e14) + "," + string(tokenBPost/1e14) + "," + string(uint(pool.aToBRatio()*10000.0)));
-            log("Point " + string(i) + "::" + string(tokenAPre/1e14) + "::" + string(tokenBPre/1e14) + "::" + string(uint(pool.aToBRatio()*10000.0)) + "::" + string(uint(pool.aToBRatio()*10000.0)) + "::10::A::1::0::0::0::0;");
+            // log("Point " + string(i) + "::" + string(tokenAPre/1e14) + "::" + string(tokenBPre/1e14) + "::" + string(uint(pool.aToBRatio()*10000.0)) + "::" + string(uint(pool.aToBRatio()*10000.0)) + "::10::A::1::0::0::0::0;");
             // log("Point " + string(i) + "::" + string(tokenAPre/1e14) + "::" + string(tokenBPre/1e14) + "::" + string(output/1e14) + "::" + string(output/1e14) + "::10::A::1::0::0::0::0;");
             // log("After round " + string(i) + ": ");
             // log("Token A pre: " + string(tokenAPre));
@@ -217,7 +217,7 @@ contract Describe_StablePool is Authorizable {
             uint tokenAPost = ERC20(tokenAAddress).balanceOf(address(pool));
             uint tokenBPost = ERC20(tokenBAddress).balanceOf(address(pool));
             // log(string(tokenAPost/1e14) + "," + string(tokenBPost/1e14) + "," + string(uint(pool.aToBRatio()*10000.0)));
-            log("Point " + string(i+80) + "::" + string(tokenAPre/1e14) + "::" + string(tokenBPre/1e14) + "::" + string(uint(pool.bToARatio()*10000.0)) + "::" + string(uint(pool.bToARatio()*10000.0)) + "::10::A::1::0::0::0::0;");
+            // log("Point " + string(i+80) + "::" + string(tokenAPre/1e14) + "::" + string(tokenBPre/1e14) + "::" + string(uint(pool.bToARatio()*10000.0)) + "::" + string(uint(pool.bToARatio()*10000.0)) + "::10::A::1::0::0::0::0;");
             // log("Point " + string(i+80) + "::" + string(tokenAPre/1e14) + "::" + string(tokenBPre/1e14) + "::" + string(output/1e14) + "::" + string(output/1e14) + "::10::A::1::0::0::0::0;");
             // log("After round " + string(i) + ": ");
             // log("Token A pre: " + string(tokenAPre));
