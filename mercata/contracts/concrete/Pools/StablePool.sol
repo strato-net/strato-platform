@@ -339,7 +339,7 @@ contract record StablePool is Ownable {
 
         uint d1 = getDMem(rates, newBalances, amp);
 
-        require(d1 > d0, "D decreased after depositing tokens. Me maths r bad");
+        require(d1 > d0, "D decreased after depositing tokens");
 
         uint[] fees;
         uint mintAmount = 0;
