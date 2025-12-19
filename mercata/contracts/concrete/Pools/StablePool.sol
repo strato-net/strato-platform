@@ -135,11 +135,6 @@ contract record StablePool is Ownable {
         _;
     }
 
-    function checkIsStable() external returns (bool) {
-        isStable = true;
-        return isStable;
-    }
-
     // ============ CONSTRUCTOR ============
 
     constructor(address initialOwner) Ownable(initialOwner) {}
