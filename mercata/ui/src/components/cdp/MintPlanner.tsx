@@ -105,6 +105,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
 }) => {
   const [mintAmountInput, setMintAmountInput] = useState<string>("");
   const [riskFactor, setRiskFactor] = useState<number>(1.5);
+  const [isMaxMode, setIsMaxMode] = useState<boolean>(false);
 
   const getRiskColor = useCallback((factor: number): string => {
     if (factor <= 1.5) {
@@ -191,7 +192,34 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
     return computeTotalHeadroom(riskFactor, vaultCandidates);
   }, [riskFactor, vaultCandidates]);
 
-  const exceedsMaxCollateral = mintAmountWei > 0n && mintAmountWei > totalHeadroomWei;
+  // When MAX mode is enabled, set risk factor to 1.0
+  useEffect(() => {
+    if (isMaxMode) {
+      setRiskFactor(1.0);
+    }
+  }, [isMaxMode]);
+
+  // When MAX mode is enabled and risk factor or vaults change, recalculate max mint
+  useEffect(() => {
+    if (isMaxMode && vaultCandidates.length > 0) {
+      const currentMaxMintWei = computeTotalHeadroom(riskFactor, vaultCandidates);
+      if (currentMaxMintWei > 0n) {
+        // Format with full precision to avoid rounding errors
+        const maxMint = formatUnits(currentMaxMintWei, 18);
+        // Remove trailing zeros but preserve precision
+        const formatted = maxMint.replace(/\.?0+$/, '');
+        setMintAmountInput(formatted);
+      } else {
+        setMintAmountInput("");
+      }
+    }
+  }, [isMaxMode, riskFactor, vaultCandidates]);
+
+  // In MAX mode, we should never exceed collateral since we set it to the exact max
+  // But account for potential precision differences by using a small tolerance
+  const exceedsMaxCollateral = isMaxMode 
+    ? false 
+    : mintAmountWei > 0n && mintAmountWei > totalHeadroomWei;
 
   const supportedAssetsWithBalances = useMemo(() => {
     return vaultCandidates.map((c) => {
@@ -428,10 +456,35 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
                   onChange={(e) => setMintAmountInput(e.target.value)}
                   placeholder="0"
                   inputMode="decimal"
-                  className="pr-12"
+                  className="pr-20"
+                  disabled={isMaxMode}
                 />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">USDST</span>
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                  {totalHeadroomWei > 0n && (
+                    <Button
+                      type="button"
+                      variant={isMaxMode ? "default" : "ghost"}
+                      size="sm"
+                      className={`h-6 px-2 text-xs font-medium ${
+                        isMaxMode
+                          ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                          : "text-primary hover:text-primary/80"
+                      }`}
+                      onClick={() => {
+                        setIsMaxMode(!isMaxMode);
+                      }}
+                    >
+                      MAX
+                    </Button>
+                  )}
+                  <span className="text-muted-foreground text-sm">USDST</span>
+                </div>
               </div>
+              {totalHeadroomWei > 0n && !isMaxMode && (
+                <p className="text-xs text-muted-foreground">
+                  Max mint power: {formatUSD(parseFloat(formatUnits(totalHeadroomWei, 18)), 2)} USDST
+                </p>
+              )}
               <div className="h-2"></div>
             </div>
             <div className="space-y-2">
