@@ -1,12 +1,11 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Slider } from "@/components/ui/slider";
-import { ChevronDown, Info } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { useOracleContext } from "@/context/OracleContext";
 import { cdpService, VaultCandidate } from "@/services/cdpService";
 import { getOptimalAllocations, computeTotalHeadroom } from "@/services/mintPlanService";
@@ -21,21 +20,6 @@ import { formatUnits, parseUnits } from "ethers";
 import { useToast } from "@/hooks/use-toast";
 import { CompactRewardsDisplay } from "@/components/rewards/CompactRewardsDisplay";
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
-import MintWidget from "./MintWidget";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import MintPlannerAlt from "./MintPlannerAlt";
 
 type OptimalAllocation = ReturnType<typeof getOptimalAllocations>[number];
 
@@ -45,7 +29,6 @@ const formatPercentage = (num: number, decimals: number = 2): string => {
   if (isNaN(num)) return '0.00%';
   return num.toFixed(decimals) + '%';
 };
-
 
 const VaultBreakdown: React.FC<{
   allocations: OptimalAllocation[];
@@ -106,14 +89,12 @@ const VaultBreakdown: React.FC<{
   );
 };
 
-const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTrigger?: number }> = ({
-  title = "Mint against collateral (CDP)",
+const MintPlannerAlt: React.FC<{ title?: string; onSuccess?: () => void; refreshTrigger?: number }> = ({
+  title = "Mint Maximum Amount",
   onSuccess,
   refreshTrigger,
 }) => {
-  const [mintAmountInput, setMintAmountInput] = useState<string>("");
   const [riskFactor, setRiskFactor] = useState<number>(1.5);
-  const [isMaxMode, setIsMaxMode] = useState<boolean>(false);
 
   const getRiskColor = useCallback((factor: number): string => {
     if (factor <= 1.5) {
@@ -133,7 +114,6 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"quick" | "advanced" | "alt">("quick");
   const [showProjectedCosts, setShowProjectedCosts] = useState(false);
   const [showVaultBreakdown, setShowVaultBreakdown] = useState(false);
   const [transactionLoading, setTransactionLoading] = useState(false);
@@ -170,70 +150,26 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
     loadData();
   }, [fetchAllPrices, refreshTrigger]);
 
-  const mintAmount = useMemo(() => {
-    const parsed = parseFloat((mintAmountInput || "").replace(/,/g, ""));
-    return isFinite(parsed) && parsed > 0 ? parsed : 0;
-  }, [mintAmountInput]);
-
-  const mintAmountWei = useMemo(() => {
-    const str = (mintAmountInput || "").replace(/,/g, "").trim();
-    if (!str || str === "0") return 0n;
-    try {
-      const [intPart = "", decPart = ""] = str.split(".");
-      return BigInt(intPart + decPart.padEnd(18, "0").substring(0, 18));
-    } catch {
-      return 0n;
-    }
-  }, [mintAmountInput]);
-
-  const optimalAllocations = useMemo<OptimalAllocation[]>(() => {
-    if (mintAmountWei <= 0n || vaultCandidates.length === 0) return [];
-    try {
-      return getOptimalAllocations(mintAmountWei, riskFactor, vaultCandidates);
-    } catch {
-      return [];
-    }
-  }, [mintAmountWei, riskFactor, vaultCandidates]);
-
-  const totalHeadroomWei = useMemo(() => {
+  // Calculate max mint amount for current risk factor
+  const maxMintWei = useMemo(() => {
     if (vaultCandidates.length === 0) return 0n;
     return computeTotalHeadroom(riskFactor, vaultCandidates);
   }, [riskFactor, vaultCandidates]);
 
-  // When MAX mode is enabled and risk factor or vaults change, recalculate max mint
-  useEffect(() => {
-    if (isMaxMode && vaultCandidates.length > 0) {
-      const currentMaxMintWei = computeTotalHeadroom(riskFactor, vaultCandidates);
-      if (currentMaxMintWei > 0n) {
-        // Format with full precision to avoid rounding errors
-        const maxMint = formatUnits(currentMaxMintWei, 18);
-        // Remove trailing zeros but preserve precision
-        const formatted = maxMint.replace(/\.?0+$/, '');
-        setMintAmountInput(formatted);
-      } else {
-        setMintAmountInput("");
-      }
+  const maxMintAmount = useMemo(() => {
+    if (maxMintWei <= 0n) return 0;
+    return parseFloat(formatUnits(maxMintWei, 18));
+  }, [maxMintWei]);
+
+  // Get optimal allocations for the max mint amount
+  const optimalAllocations = useMemo<OptimalAllocation[]>(() => {
+    if (maxMintWei <= 0n || vaultCandidates.length === 0) return [];
+    try {
+      return getOptimalAllocations(maxMintWei, riskFactor, vaultCandidates);
+    } catch {
+      return [];
     }
-  }, [isMaxMode, riskFactor, vaultCandidates]);
-
-  // In MAX mode, we should never exceed collateral since we set it to the exact max
-  // But account for potential precision differences by using a small tolerance
-  const exceedsMaxCollateral = isMaxMode 
-    ? false 
-    : mintAmountWei > 0n && mintAmountWei > totalHeadroomWei;
-
-  const supportedAssetsWithBalances = useMemo(() => {
-    return vaultCandidates.map((c) => {
-      const balance = parseFloat(formatUnits(BigInt(c.userNonCollateralBalance || "0"), c.collateralAmountDecimals));
-      const priceUSD = parseFloat(formatUnits(BigInt(c.oraclePrice || "0"), 18));
-      return {
-        assetAddress: c.assetAddress,
-        symbol: c.symbol,
-        balance,
-        balanceUSD: balance * priceUSD,
-      };
-    }).sort((a, b) => b.balanceUSD - a.balanceUSD);
-  }, [vaultCandidates]);
+  }, [maxMintWei, riskFactor, vaultCandidates]);
 
   const weightedAverageAPR = useMemo(() => {
     if (optimalAllocations.length === 0) return 0;
@@ -253,27 +189,27 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
   }, [optimalAllocations]);
 
   const projectedInterestCosts = useMemo(() => {
-    if (mintAmount <= 0 || weightedAverageAPR <= 0) {
+    if (maxMintAmount <= 0 || weightedAverageAPR <= 0) {
       return { daily: 0, weekly: 0, monthly: 0, yearly: 0 };
     }
     
     return {
-      daily: getCompoundInterest(mintAmount, weightedAverageAPR, SECONDS_PER_DAY),
-      weekly: getCompoundInterest(mintAmount, weightedAverageAPR, SECONDS_PER_WEEK),
-      monthly: getCompoundInterest(mintAmount, weightedAverageAPR, SECONDS_PER_MONTH),
-      yearly: getCompoundInterest(mintAmount, weightedAverageAPR, SECONDS_PER_YEAR),
+      daily: getCompoundInterest(maxMintAmount, weightedAverageAPR, SECONDS_PER_DAY),
+      weekly: getCompoundInterest(maxMintAmount, weightedAverageAPR, SECONDS_PER_WEEK),
+      monthly: getCompoundInterest(maxMintAmount, weightedAverageAPR, SECONDS_PER_MONTH),
+      yearly: getCompoundInterest(maxMintAmount, weightedAverageAPR, SECONDS_PER_YEAR),
     };
-  }, [mintAmount, weightedAverageAPR]);
+  }, [maxMintAmount, weightedAverageAPR]);
 
-  const handleQuickMint = useCallback(async () => {
-    if (mintAmount <= 0 || optimalAllocations.length === 0) return;
+  const handleMint = useCallback(async () => {
+    if (maxMintAmount <= 0 || optimalAllocations.length === 0) return;
 
     setTransactionLoading(true);
     try {
       await fetchAllPrices();
       const { existingVaults, potentialVaults } = await cdpService.getVaultCandidates();
       const freshCandidates = [...existingVaults, ...potentialVaults];
-      const freshTargetMintUSD = parseUnits(mintAmount.toFixed(18), 18);
+      const freshTargetMintUSD = parseUnits(maxMintAmount.toFixed(18), 18);
       const freshAllocations = getOptimalAllocations(
         freshTargetMintUSD,
         riskFactor,
@@ -382,12 +318,11 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
       if (allSuccessful) {
         await new Promise(resolve => setTimeout(resolve, 500));
         toast({
-          title: "Quick Mint Complete",
+          title: "Mint Complete",
           description: "All transactions completed successfully",
         });
       }
       await Promise.all([fetchVaultCandidates(), fetchAllPrices()]);
-      setMintAmountInput("");
       if (onSuccess) onSuccess();
     } catch (error) {
       toast({
@@ -398,7 +333,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
     } finally {
       setTransactionLoading(false);
     }
-  }, [mintAmount, optimalAllocations, toast, fetchVaultCandidates, fetchAllPrices, onSuccess, riskFactor]);
+  }, [maxMintAmount, optimalAllocations, toast, fetchVaultCandidates, fetchAllPrices, onSuccess, riskFactor]);
 
   return (
     <>
@@ -412,85 +347,18 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
         }
       `}</style>
       <div className="space-y-6">
-      <div className="flex items-center justify-between px-6 pb-4">
-        <h1 className="text-2xl font-bold">{title}</h1>
-        <Select value={viewMode} onValueChange={(value) => setViewMode(value as "quick" | "advanced" | "alt")}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="quick">Quick Mint</SelectItem>
-            <SelectItem value="alt">QM Alt</SelectItem>
-            <SelectItem value="advanced">Advanced</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      {error && <p className="text-sm text-destructive">{error}</p>}
-      {viewMode === "quick" && (
+        {error && <p className="text-sm text-destructive">{error}</p>}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              Quick Mint
-              <TooltipProvider delayDuration={0}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      aria-label="How Quick Mint allocations are determined"
-                      className="text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      <Info className="h-4 w-4" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="w-48 text-sm">
-                    Quick Mint finds an optimal collateral allocation by ranking vaults by stability
-                    fee and proposing deposit/mint amounts that satisfy your target risk factor,
-                    constrained by your asset balances.
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Mint Amount (USDST)</label>
-              <div className="relative">
-                <Input
-                  value={mintAmountInput}
-                  onChange={(e) => setMintAmountInput(e.target.value)}
-                  placeholder="0"
-                  inputMode="decimal"
-                  className="pr-20"
-                  disabled={isMaxMode}
-                />
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                  {totalHeadroomWei > 0n && (
-                    <Button
-                      type="button"
-                      variant={isMaxMode ? "default" : "ghost"}
-                      size="sm"
-                      className={`h-6 px-2 text-xs font-medium ${
-                        isMaxMode
-                          ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                          : "text-primary hover:text-primary/80"
-                      }`}
-                      onClick={() => {
-                        setIsMaxMode(!isMaxMode);
-                      }}
-                    >
-                      MAX
-                    </Button>
-                  )}
-                  <span className="text-muted-foreground text-sm">USDST</span>
-                </div>
-              </div>
-              {totalHeadroomWei > 0n && !isMaxMode && (
-                <p className="text-xs text-muted-foreground">
-                  Max mint power: {formatUSD(parseFloat(formatUnits(totalHeadroomWei, 18)), 2)} USDST
+          <CardContent className="space-y-4 pt-6">
+            {maxMintAmount > 0 && (
+              <div className="p-4 rounded-md bg-muted border border-border">
+                <p className="text-sm text-muted-foreground mb-1">Mint Amount</p>
+                <p className="text-2xl font-bold text-foreground">
+                  {formatUSD(maxMintAmount, 2)} USDST
                 </p>
-              )}
-              <div className="h-2"></div>
-            </div>
+              </div>
+            )}
+
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium">Risk Factor</label>
@@ -525,28 +393,26 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
             </div>
 
             <Button 
-              disabled={mintAmount <= 0 || optimalAllocations.length === 0 || transactionLoading || exceedsMaxCollateral} 
-              onClick={handleQuickMint}
+              disabled={maxMintAmount <= 0 || optimalAllocations.length === 0 || transactionLoading} 
+              onClick={handleMint}
               className="w-full"
             >
               {transactionLoading
                 ? "Processing..."
-                : mintAmount <= 0 
-                ? "Enter mint amount"
-                : exceedsMaxCollateral
-                ? "Insufficient Collateral: Decrease Mint Amount or Risk Factor"
+                : maxMintAmount <= 0 
+                ? "No Available Collateral"
                 : optimalAllocations.length === 0
                 ? "No vaults available"
-                : "Confirm Quick Mint"}
+                : "Confirm Mint"}
             </Button>
 
             <Separator />
 
-            {mintAmount <= 0 ? (
+            {maxMintAmount <= 0 ? (
               <div className="p-3 rounded-md bg-muted border border-border text-center">
-                <p className="text-sm text-muted-foreground">Enter a mint amount and select risk level to see the automated plan</p>
+                <p className="text-sm text-muted-foreground">Adjust the risk factor to see available mint capacity</p>
               </div>
-            ) : exceedsMaxCollateral ? null : optimalAllocations.length > 0 ? (
+            ) : optimalAllocations.length > 0 ? (
               <VaultBreakdown
                 allocations={optimalAllocations}
                 open={showVaultBreakdown}
@@ -555,24 +421,10 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
             ) : (
               <div className="p-3 rounded-md bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
                 <p className="text-sm font-semibold text-yellow-800 dark:text-yellow-200 mb-2">No suitable vaults found.</p>
-                <div className="space-y-1 text-xs text-yellow-800 dark:text-yellow-200">
-                  {supportedAssetsWithBalances.length > 0 ? (
-                    supportedAssetsWithBalances.map((asset) => (
-                      <div key={asset.assetAddress} className="flex justify-between">
-                        <span>{asset.symbol}:</span>
-                        <span className="font-medium">
-                          {formatUSD(asset.balance, 4)} {isFinite(asset.balanceUSD) ? `(${formatUSD(asset.balanceUSD, 2)})` : ""}
-                        </span>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-yellow-700 dark:text-yellow-300">No supported assets available</p>
-                  )}
-                </div>
               </div>
             )}
 
-            {mintAmount > 0 && weightedAverageAPR > 0 && (
+            {maxMintAmount > 0 && weightedAverageAPR > 0 && (
               <Collapsible open={showProjectedCosts} onOpenChange={setShowProjectedCosts}>
                 <CollapsibleTrigger asChild>
                   <Button
@@ -626,29 +478,19 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
               
               return (
                 <CompactRewardsDisplay
-                  key={mintAmount}
+                  key={maxMintAmount}
                   userRewards={userRewards}
                   activityName={cdpActivity.activity.name}
-                  inputAmount={mintAmount > 0 ? mintAmount.toString() : undefined}
+                  inputAmount={maxMintAmount > 0 ? maxMintAmount.toString() : undefined}
                   actionLabel="Mint"
                 />
               );
             })()}
           </CardContent>
         </Card>
-      )}
-
-      {viewMode === "advanced" && (
-        <div className="border border-border bg-card rounded-xl p-4">
-          <MintWidget onSuccess={onSuccess} title={title} />
-        </div>
-      )}
-      {viewMode === "alt" && (
-        <MintPlannerAlt onSuccess={onSuccess} title={title} refreshTrigger={refreshTrigger} />
-      )}
-    </div>
+      </div>
     </>
   );
 };
 
-export default MintPlanner;
+export default MintPlannerAlt;
