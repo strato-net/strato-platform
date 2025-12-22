@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { BORROW_FEE } from "@/lib/constants";
+import { BORROW_FEE, SUPPLY_COLLATERAL_FEE } from "@/lib/constants";
 import { safeParseUnits, addCommasToInput, formatWeiAmount, safeParseFloat, formatUnits } from "@/utils/numberUtils";
 import { NewLoanData, CollateralData, HealthImpactData } from "@/interface";
 import { calculateBorrowHealthImpact, getHealthFactorColor } from "@/utils/lendingUtils";
@@ -1302,19 +1302,20 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
         <span className="text-muted-foreground">Transaction Fee</span>
          <span className="font-medium">
            {(() => {
-             // Total fee = (unique collateral assets with amount > 0) + borrow
-             const uniqueCollateralTypes = new Set<string>();
-             for (const asset of collateralInfo || []) {
-               const amt = selectedCollateralDeposits[asset.address];
-               if (amt && safeParseFloat(amt) > 0) {
-                 uniqueCollateralTypes.add(asset.address);
-               }
-             }
-             const steps = uniqueCollateralTypes.size + 1; // +1 for the borrow
-             const feePerStep = safeParseFloat(BORROW_FEE);
-             const totalFee = (feePerStep * steps).toFixed(2);
-             const totalVouchers = (feePerStep * 100 * steps).toFixed(0);
-             return `${totalFee} USDST (${totalVouchers} voucher${steps === 1 ? "" : "s"})`;
+            // Total fee = borrow fee + one supply fee per collateral asset with amount > 0
+            const uniqueCollateralTypes = new Set<string>();
+            for (const asset of collateralInfo || []) {
+              const amt = selectedCollateralDeposits[asset.address];
+              if (amt && safeParseFloat(amt) > 0) {
+                uniqueCollateralTypes.add(asset.address);
+              }
+            }
+            const supplyCount = uniqueCollateralTypes.size;
+            const borrowFeeUsd = safeParseFloat(BORROW_FEE);
+            const supplyFeeUsd = safeParseFloat(SUPPLY_COLLATERAL_FEE);
+            const totalFee = (borrowFeeUsd + supplyFeeUsd * supplyCount).toFixed(2);
+            const totalVouchers = (borrowFeeUsd + supplyFeeUsd * supplyCount) * 100;
+            return `${totalFee} USDST (${totalVouchers.toFixed(0)} voucher${totalVouchers === 100 ? "" : "s"})`;
            })()}
          </span>
       </div>
