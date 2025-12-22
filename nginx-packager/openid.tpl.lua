@@ -12,6 +12,13 @@ local verify_opts = {
   accept_unsupported_alg = false
 }
 
+-- Capture theme param from URL to pass to Keycloak
+local theme_param = ngx.var.arg_theme
+local auth_params = nil
+if theme_param == "dark" or theme_param == "light" then
+  auth_params = { theme = theme_param }
+end
+
 local authenticate_opts = {
   redirect_uri = "/auth/openidc/return",
   discovery = "<OAUTH_DISCOVERY_URL_PLACEHOLDER>",
@@ -29,7 +36,8 @@ local authenticate_opts = {
   logout_path = "/auth/logout",
   post_logout_redirect_uri = node_host_with_protocol,
   -- redirect_after_logout_uri = "/", -- URI to redirect after app and oauth provider logouts, otherwise show "Logged Out" text message on logout_path URI
-  revoke_tokens_on_logout = true
+  revoke_tokens_on_logout = true,
+  authorization_params = auth_params
 }
 
 -- Clear any x-user-access-token header coming from the client, for security reasons
