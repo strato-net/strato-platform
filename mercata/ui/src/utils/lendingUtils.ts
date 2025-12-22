@@ -1,5 +1,9 @@
 import { CollateralData, NewLoanData } from "@/interface";
 
+// Constants to avoid tiny / massive numbers in UI
+const REPAY_DUST_TOLERANCE_USD = 1_000_000_000n; // 1e9 wei = 1e-9 USD in 1e18 scale
+const MAX_DISPLAY_HEALTH_FACTOR_RAW = 10n ** 24n; // HF > 1e6 treated as effectively "No Loan" for UI
+
 export const getMaxSafeWithdrawAmount = (
   asset: CollateralData,
   loanData: NewLoanData
@@ -115,6 +119,7 @@ export const calculateSupplyHealthImpact = (
 };
 
 // Calculate health impact of borrow operations (borrow/repay) using BigInt and healthFactorRaw
+
 export const calculateBorrowOperationHealthImpact = (
   amountWei: bigint,
   loanData: NewLoanData,
@@ -168,24 +173,32 @@ export const calculateBorrowOperationHealthImpact = (
   }
 
   // Calculate new borrow value after operation (assumes amountWei in USD 1e18 scale)
-  const newBorrowValueUSD = isBorrow
+  let newBorrowValueUSD = isBorrow
     ? currentTotalBorrowValueUSD + amountWei
     : currentTotalBorrowValueUSD - amountWei;
 
+  // If repaying and we're within a tiny dust tolerance, treat as fully repaid to avoid absurd HF
+  if (!isBorrow && newBorrowValueUSD <= REPAY_DUST_TOLERANCE_USD) {
+    newBorrowValueUSD = 0n;
+  }
+    
   // Calculate new health factor (raw, scaled to 1e18)
   // If debt is fully repaid (newBorrowValueUSD === 0n), health factor is Infinity (no loan)
   const newHealthFactorRaw = newBorrowValueUSD === 0n
     ? 2n ** 256n - 1n // Use max uint256 to represent Infinity
     : (currentCollateralValueUSD * 10n ** 18n) / newBorrowValueUSD;
 
+  // Treat extremely high HF as effectively "No Loan" to avoid absurd numbers in UI
+  const isEffectivelyNoLoan = newBorrowValueUSD === 0n || newHealthFactorRaw >= MAX_DISPLAY_HEALTH_FACTOR_RAW;
+
   // Calculate health impact and isHealthy using raw values
-  const healthImpact = newBorrowValueUSD === 0n
+  const healthImpact = isEffectivelyNoLoan
     ? Number(10n ** 20n - currentHealthFactorRaw) / 1e18
     : Number(newHealthFactorRaw - currentHealthFactorRaw) / 1e18;
-  const isHealthy = newBorrowValueUSD === 0n || newHealthFactorRaw >= 10n ** 18n;
+  const isHealthy = isEffectivelyNoLoan || newHealthFactorRaw >= 10n ** 18n;
 
   // Convert to number, handling Infinity case
-  const newHealthFactorNumber = newBorrowValueUSD === 0n
+  const newHealthFactorNumber = isEffectivelyNoLoan
     ? Infinity
     : Number(newHealthFactorRaw) / 1e18;
 

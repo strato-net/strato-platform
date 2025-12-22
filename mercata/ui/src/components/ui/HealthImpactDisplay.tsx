@@ -38,8 +38,9 @@ const HealthImpactDisplay = ({
           <span className={`font-medium ${getHealthFactorColor(healthImpact.newHealthFactor)}`}>
             {newLabel}
           </span>
-          {/* Don't show health impact change when transitioning to "No Loan" */}
-          {healthImpact.newHealthFactor !== Infinity && (
+          {/* Don't show health impact change when either side is "No Loan" */}
+          {healthImpact.currentHealthFactor !== Infinity &&
+            healthImpact.newHealthFactor !== Infinity && (
             <span
               className={`font-medium ${
                 healthImpact.healthImpact >= 0

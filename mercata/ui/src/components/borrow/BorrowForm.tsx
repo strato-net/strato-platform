@@ -59,6 +59,10 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
   const { borrowMax } = useLendingContext();
 
   const HF_MAX = 10;
+  const ceilDiv = (numerator: bigint, denominator: bigint) => {
+    if (denominator === 0n) return 0n;
+    return (numerator + (denominator - 1n)) / denominator;
+  };
   
   // Calculate minimum health factor dynamically based on collateral assets
   // Formula: At max borrow (using LTV), HF = (collateral × liquidation_threshold) / (collateral × LTV) = liquidation_threshold / LTV
@@ -114,6 +118,13 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
       return 0n;
     }
   }, [borrowAmount]);
+
+  // Helper to display health factor without absurd exponentials
+  const formatHealthFactorDisplay = (hf?: number | null) => {
+    if (hf === undefined || hf === null
+        || !isFinite(hf) || hf > 1_000_000) return "-";
+    return hf.toFixed(2);
+  };
 
   // Helper: Calculate collateral value from selected deposits
   const calculateSelectedCollateralValue = useMemo(() => {
@@ -408,7 +419,8 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
       // Greedy fill: use all available of this asset if needed, ensuring we exhaust it before moving to next
       // Calculate how much collateral value we need from this asset
       const neededValue = remainingShortfall > maxCollateralValueUSD ? maxCollateralValueUSD : remainingShortfall;
-      const neededWei = (neededValue * tokenDecimals * 10000n) / (assetPrice * liqThreshold);
+      // Use ceil division to avoid rounding down and leaving tiny shortfalls
+      const neededWei = ceilDiv(neededValue * tokenDecimals * 10000n, assetPrice * liqThreshold);
       
       // Use all available of this asset (up to what's needed)
       const depositWei = neededWei > undepositedWei ? undepositedWei : neededWei;
@@ -780,17 +792,13 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
                   // When borrow amount is zero, show current health factor
                   // Otherwise show projected health factor (or target if no collateral selected)
                   if (!borrowAmount || borrowAmountWei <= 0n) {
-                    const currentHF = loans?.healthFactor;
-                    if (currentHF === undefined || currentHF === null) return "-";
-                    if (!isFinite(currentHF)) return "No Loan";
-                    return currentHF.toFixed(2);
+                    return formatHealthFactorDisplay(loans?.healthFactor);
                   }
                   // Use projectedHF if available (reflects selected collateral), otherwise fall back to target
                   if (projectedHF !== null) {
-                    if (!isFinite(projectedHF)) return "No Loan";
-                    return projectedHF.toFixed(2);
+                    return formatHealthFactorDisplay(projectedHF);
                   }
-                  return targetHealthFactor.toFixed(2);
+                  return formatHealthFactorDisplay(targetHealthFactor);
                 })()}
               </span>
               <span
