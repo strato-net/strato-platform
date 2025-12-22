@@ -285,7 +285,7 @@ export const fetchClaimedRewards = async (
       },
     });
 
-    return events.reduce((map: Map<string, bigint>, event: any) => {
+ return events.reduce((map: Map<string, bigint>, event: any) => {
       try {
         const attrs = typeof event.attributes === 'string' 
           ? JSON.parse(event.attributes) 
