@@ -12,7 +12,6 @@ import { UserRewardsData } from "@/services/rewardsService";
 import { CompactRewardsDisplay } from "../rewards/CompactRewardsDisplay";
 import { Slider } from "@/components/ui/slider";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import PercentageButtons from "@/components/ui/PercentageButtons";
 
 interface BorrowFormProps {
   loans: NewLoanData | null;
@@ -59,6 +58,10 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
   const { borrowMax } = useLendingContext();
 
   const HF_MAX = 10;
+  const SAFE_DEFAULT_HEALTH_FACTOR = 2.5;
+  const WARNING_HEALTH_FACTOR = 2.0;
+  const WARNING_HEALTH_FACTOR_BPS = BigInt(Math.round(WARNING_HEALTH_FACTOR * 10000));
+  const CENT_WEI = 10n ** 16n; // 0.01 USDST in 1e18 wei
   const ceilDiv = (numerator: bigint, denominator: bigint) => {
     if (denominator === 0n) return 0n;
     return (numerator + (denominator - 1n)) / denominator;
@@ -124,6 +127,20 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
     if (hf === undefined || hf === null
         || !isFinite(hf) || hf > 1_000_000) return "-";
     return hf.toFixed(2);
+  };
+  
+  // Floor to cents so entering this value succeeds (no rounding up)
+  const formatWeiToUsdFloor2 = (wei?: string | bigint) => {
+    try {
+      const bi = typeof wei === "bigint" ? wei : BigInt(wei || "0");
+      if (bi <= 0n) return "0.00";
+      const cents = bi / 10n ** 16n; // 1 cent = 1e16 wei (USD 1e18)
+      const dollars = cents / 100n;
+      const remCents = cents % 100n;
+      return `${dollars.toString()}.${remCents.toString().padStart(2, "0")}`;
+    } catch {
+      return "0.00";
+    }
   };
 
   // Helper: Calculate collateral value from selected deposits
@@ -242,6 +259,54 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
   const hfSliderMin = useMemo(() => {
     return Math.max(HF_MIN, minAchievableHF);
   }, [HF_MIN, minAchievableHF]);
+
+  // Default HF choice when user enters a borrow amount:
+  // max( HF with no additional collateral, min( SAFE_DEFAULT, HF with all collateral ) )
+  const defaultRecommendedHF = useMemo(() => {
+    if (!borrowAmount || borrowAmountWei <= 0n) return null;
+    const noAdditional = hfSliderMin;
+    const withAllCollateral = hfSliderMax;
+    const cappedSafe = Math.min(SAFE_DEFAULT_HEALTH_FACTOR, withAllCollateral);
+    const chosen = Math.max(noAdditional, cappedSafe);
+    // Clamp within achievable slider bounds
+    return Math.min(hfSliderMax, Math.max(hfSliderMin, chosen));
+  }, [borrowAmount, borrowAmountWei, hfSliderMin, hfSliderMax]);
+  
+  const floorToCentsWei = (wei: bigint) => (wei / CENT_WEI) * CENT_WEI;
+
+  // Max borrow amount (wei) to keep recommended HF at or above the warning threshold using all collateral
+  const maxBorrowAtWarningWei = useMemo(() => {
+    if (!loans) return 0n;
+    try {
+      let totalCollateralWithThreshold = BigInt(loans.totalCollateralValueUSD || "0");
+      if (collateralInfo && Array.isArray(collateralInfo)) {
+        for (const asset of collateralInfo) {
+          const userBalanceWei = BigInt(asset.userBalance || "0");
+          if (userBalanceWei > 0n) {
+            const assetPrice = BigInt(asset.assetPrice || "0");
+            const liqThreshold = BigInt(asset.liquidationThreshold || "0");
+            const tokenDecimals = 10n ** BigInt(asset.customDecimals ?? 18);
+            if (assetPrice > 0n && liqThreshold > 0n) {
+              const valueUSD = (userBalanceWei * assetPrice) / tokenDecimals;
+              const valueWithThreshold = (valueUSD * liqThreshold) / 10000n;
+              totalCollateralWithThreshold += valueWithThreshold;
+            }
+          }
+        }
+      }
+
+      const currentDebtUSD = BigInt(loans.totalAmountOwed || "0");
+      if (WARNING_HEALTH_FACTOR_BPS === 0n) return 0n;
+
+      const maxDebtAtWarning = (totalCollateralWithThreshold * 10000n) / WARNING_HEALTH_FACTOR_BPS;
+      if (maxDebtAtWarning <= currentDebtUSD) return 0n;
+
+      const borrowableWei = maxDebtAtWarning - currentDebtUSD;
+      return floorToCentsWei(borrowableWei);
+    } catch {
+      return 0n;
+    }
+  }, [loans, collateralInfo, WARNING_HEALTH_FACTOR_BPS]);
   
   useEffect(() => {
     if (targetHealthFactor > hfSliderMax) {
@@ -525,7 +590,11 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
   
   useEffect(() => {
     if (borrowAmount && borrowAmountWei > 0n && borrowAmount !== prevBorrowAmountRef.current) {
-      setTargetHealthFactor(hfSliderMin);
+      if (defaultRecommendedHF !== null) {
+        setTargetHealthFactor(defaultRecommendedHF);
+      } else {
+        setTargetHealthFactor(hfSliderMin);
+      }
       prevBorrowAmountRef.current = borrowAmount;
       return;
     }
@@ -544,6 +613,50 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
     // Don't clamp here - let handleHealthFactorSliderChange handle clamping during user interaction
     // This prevents interference with slider dragging. The other useEffect handles clamping when hfSliderMax changes.
   }, [borrowAmount, borrowAmountWei, hfSliderMin, hfSliderMax]);
+
+  const isDefaultBelowWarning =
+    defaultRecommendedHF !== null &&
+    isFinite(defaultRecommendedHF) &&
+    defaultRecommendedHF < WARNING_HEALTH_FACTOR;
+
+  const canBorrowLessToMeetWarning =
+    maxBorrowAtWarningWei > 0n && borrowAmountWei > maxBorrowAtWarningWei;
+
+  const renderRiskWarning = () => {
+    if (!isDefaultBelowWarning) return null;
+    const borrowingLessButton = (
+      <button
+        type="button"
+        className="underline font-medium"
+        onClick={() => {
+          try {
+            const val = formatUnits(maxBorrowAtWarningWei, 18);
+            setBorrowAmount(val);
+            setBorrowAmountError("");
+          } catch {
+            // ignore parse errors
+          }
+        }}
+      >
+        borrowing less
+      </button>
+    );
+    return (
+      <div className="text-red-600 text-sm space-y-1">
+        <div>Risky Loan: A sharp fall in collateral price may lead to liquidation.</div>
+        <div>
+          Consider{" "}
+          {canBorrowLessToMeetWarning ? (
+            <>
+              {borrowingLessButton} or bridging in more collateral.
+            </>
+          ) : (
+            "bridging in more collateral."
+          )}
+        </div>
+      </div>
+    );
+  };
 
   // Health factor slider just sets the target - doesn't auto-calculate borrow amount
   // Slider is inverted: left = safer (higher HF), right = riskier (lower HF)
@@ -739,7 +852,20 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
               </TooltipContent>
             </Tooltip>
             <span className="font-medium">
-              {hasPreviewBorrowPower ? <FormattedUSDAmount weiAmount={maxAvailableToBorrowForPreviewWei} /> : '-'}
+              {hasPreviewBorrowPower ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="cursor-help">
+                      USDST {formatWeiToUsdFloor2(maxAvailableToBorrowForPreviewWei)}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Exact: {formatWeiAmount(maxAvailableToBorrowForPreviewWei.toString(), 18)} USDST</p>
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                "-"
+              )}
             </span>
           </div>
           <div className="flex justify-between">
@@ -768,17 +894,25 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
           {borrowAmountError && (
             <p className="text-red-600 text-sm">{borrowAmountError}</p>
           )}
-          <PercentageButtons
-            value={borrowAmount}
-            maxValue={hasPreviewBorrowPower ? maxAvailableToBorrowForPreviewWei.toString() : "0"}
-            onChange={(value) => {
-              setBorrowAmount(value);
-              setBorrowAmountError("");
-            }}
-            decimals={18}
-            disabled={borrowLoading || !hasPreviewBorrowPower}
-          />
         </div>
+        {/* Conditional Warning Messages (Borrow section) */}
+        {(() => {
+          // Compute max-exceeded directly from inputs to avoid brittle string checks
+          const hasMaxExceededError = (() => {
+            try {
+              if (!borrowAmount) return false;
+              return safeParseUnits(borrowAmount || "0", 18) > BigInt(maxAmount || "0");
+            } catch {
+              return false;
+            }
+          })();
+
+          // Only risk warning belongs in Borrow USDST section, suppressed if max exceeded error is present
+          if (isDefaultBelowWarning && !hasMaxExceededError) {
+            return <div className="text-red-600 text-sm">{renderRiskWarning()}</div>;
+          }
+          return null;
+        })()}
       </div>
 
       {/* Health Factor */}
@@ -835,11 +969,10 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
         <div className="px-4 py-2 bg-muted/50 rounded-md">
           <HealthImpactDisplay healthImpact={healthImpact} showWarning={false} />
         </div>
-        {/* Conditional Warning Messages */}
+        {/* Zero available / no collateral info (kept in Health Factor block) */}
         {(() => {
           const isZeroAvailable = !hasPreviewBorrowPower;
           const eligibleCollateralTokens = collateralInfo || [];
-
           const borrowInfoMessage = (
             <p className="text-muted-foreground mt-2">
               Borrowing against your assets allows you to access liquidity

@@ -119,7 +119,6 @@ export const calculateSupplyHealthImpact = (
 };
 
 // Calculate health impact of borrow operations (borrow/repay) using BigInt and healthFactorRaw
-
 export const calculateBorrowOperationHealthImpact = (
   amountWei: bigint,
   loanData: NewLoanData,
