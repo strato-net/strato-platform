@@ -13,7 +13,7 @@
     {
       "name": "metals-weekend",
       "sources": ["CoinMarketCap"],
-      "assets": ["PAXG_GOLDST", "KAG_SILVST"]
+      "assets": ["XAU-WEEKEND", "XAG-WEEKEND"]
     },
     {
       "name": "constant-price",
