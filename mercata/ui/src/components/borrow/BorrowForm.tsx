@@ -1094,7 +1094,19 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
                         <div className="w-5 h-5 rounded-full bg-muted-foreground" />
                       )}
                       <span className="text-sm font-medium">{asset._symbol}</span>
-                      <span className="text-xs text-muted-foreground">{recommendedAmount}</span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="text-xs text-muted-foreground cursor-help">
+                            {(() => {
+                              const val = safeParseFloat(recommendedAmount);
+                              return Number.isFinite(val) ? val.toFixed(6) : recommendedAmount;
+                            })()}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{recommendedAmount} {asset._symbol}</p>
+                        </TooltipContent>
+                      </Tooltip>
                     </div>
                   );
                 })}
