@@ -27,6 +27,15 @@
       "name": "USDST-USD",
       "targetAssetAddress": "937efa7e3a77e20bbdbd7c0d32b6514f368c1010",
       "constantPrice": 1000000000000000000
+    },
+    "XAU-WEEKEND": {
+      "name": "PAXG-USD-WEEKEND",
+      "tokenAddress": "0x45804880De22913dAFE09f4980848ECE6EcbAf78",
+      "targetAssetAddress": "cdc93d30182125e05eec985b631c7c61b3f63ff0"
+    },
+    "XAG-WEEKEND": {
+      "name": "KAG-USD-WEEKEND",
+      "targetAssetAddress": "2c59ef92d08efde71fe1a1cb5b45f4f6d48fcc94"
     }
   }
 } 
