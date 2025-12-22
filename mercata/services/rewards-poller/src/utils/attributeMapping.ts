@@ -163,12 +163,19 @@ export const extractAmountFromAttributes = async (
     return null;
   }
 
-  if (eventName === "Swap") {
-    const tokenIn = attributes.tokenIn;
-    if (!tokenIn) {
+  const priceConversionMap: Record<string, string> = {
+    Swap: "tokenIn",
+    DepositInitiated: "stratoToken",
+    WithdrawalRequested: "token",
+  };
+
+  const tokenAttributeName = priceConversionMap[eventName];
+  if (tokenAttributeName) {
+    const tokenAddress = attributes[tokenAttributeName];
+    if (!tokenAddress) {
       logError(
         "AttributeMapping",
-        new Error(`tokenIn not found in Swap event`),
+        new Error(`${tokenAttributeName} not found in ${eventName} event`),
         {
           operation: "extractAmountFromAttributes",
           contractAddress,
@@ -179,18 +186,18 @@ export const extractAmountFromAttributes = async (
       return null;
     }
 
-    const price = await getPriceAtTimestamp(tokenIn, blockTimestamp);
+    const price = await getPriceAtTimestamp(tokenAddress, blockTimestamp);
     if (!price) {
       logError(
         "AttributeMapping",
         new Error(
-          `Price not found for token ${tokenIn} at timestamp ${blockTimestamp}`
+          `Price not found for token ${tokenAddress} at timestamp ${blockTimestamp}`
         ),
         {
           operation: "extractAmountFromAttributes",
           contractAddress,
           eventName,
-          tokenIn,
+          tokenAddress,
           blockTimestamp,
         }
       );

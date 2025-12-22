@@ -10,6 +10,14 @@
       "amount": "amount"
     }
   },
+  "0000000000000000000000000000000000001008": {
+    "DepositInitiated": {
+      "amount": "stratoTokenAmount"
+    },
+    "WithdrawalRequested": {
+      "amount": "stratoTokenAmount"
+    }
+  },
   "0000000000000000000000000000000000001011": {
     "USDSTMinted": {
       "amount": "amountUSD"
