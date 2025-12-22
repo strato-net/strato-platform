@@ -969,44 +969,45 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
         <div className="px-4 py-2 bg-muted/50 rounded-md">
           <HealthImpactDisplay healthImpact={healthImpact} showWarning={false} />
         </div>
-        {/* Zero available / no collateral info (kept in Health Factor block) */}
-        {(() => {
-          const isZeroAvailable = !hasPreviewBorrowPower;
-          const eligibleCollateralTokens = collateralInfo || [];
-          const borrowInfoMessage = (
-            <p className="text-muted-foreground mt-2">
-              Borrowing against your assets allows you to access liquidity
-              without selling your holdings. Be mindful of the risk level, as
-              high borrowing increases liquidation risk during market
-              volatility.
-            </p>
-          );
-
-          if (isZeroAvailable) {
-            return (
-              <div className="mt-2">
-                <p className="text-muted-foreground">
-                  You currently have no available borrowing power. Supply collateral to enable borrowing.
-                </p>
-                {borrowInfoMessage}
-              </div>
-            );
-          }
-
-          if (eligibleCollateralTokens.length === 0) {
-            return (
-              <div className="mt-2">
-                <p className="text-muted-foreground">
-                  You have no eligible collateral. Supply assets to enable borrowing.
-                </p>
-                {borrowInfoMessage}
-              </div>
-            );
-          }
-
-          return null;
-        })()}
       </div>
+
+      {/* Borrow guidance (zero available / no collateral) at bottom of form */}
+      {(() => {
+        const isZeroAvailable = !hasPreviewBorrowPower;
+        const eligibleCollateralTokens = collateralInfo || [];
+        const borrowInfoMessage = (
+          <p className="text-muted-foreground mt-2">
+            Borrowing against your assets allows you to access liquidity
+            without selling your holdings. Be mindful of the risk level, as
+            high borrowing increases liquidation risk during market
+            volatility.
+          </p>
+        );
+
+        if (isZeroAvailable) {
+          return (
+            <div className="mt-2 rounded-lg border bg-muted/30 p-4">
+              <p className="text-muted-foreground">
+                You currently have no available borrowing power. Supply collateral to enable borrowing.
+              </p>
+              {borrowInfoMessage}
+            </div>
+          );
+        }
+
+        if (eligibleCollateralTokens.length === 0) {
+          return (
+            <div className="mt-2 rounded-lg border bg-muted/30 p-4">
+              <p className="text-muted-foreground">
+                You have no eligible collateral. Supply assets to enable borrowing.
+              </p>
+              {borrowInfoMessage}
+            </div>
+          );
+        }
+
+        return null;
+      })()}
 
       {/* Additional Collateral Needed Section - Only show when required */}
       {calculateRequiredCollateral.length > 0 && (
@@ -1287,7 +1288,23 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
       {/* Transaction Fee */}
       <div className="flex justify-between text-sm">
         <span className="text-muted-foreground">Transaction Fee</span>
-        <span className="font-medium">{BORROW_FEE} USDST ({parseFloat(BORROW_FEE) * 100} voucher)</span>
+         <span className="font-medium">
+           {(() => {
+             // Total fee = (unique collateral assets with amount > 0) + borrow
+             const uniqueCollateralTypes = new Set<string>();
+             for (const asset of collateralInfo || []) {
+               const amt = selectedCollateralDeposits[asset.address];
+               if (amt && safeParseFloat(amt) > 0) {
+                 uniqueCollateralTypes.add(asset.address);
+               }
+             }
+             const steps = uniqueCollateralTypes.size + 1; // +1 for the borrow
+             const feePerStep = safeParseFloat(BORROW_FEE);
+             const totalFee = (feePerStep * steps).toFixed(2);
+             const totalVouchers = (feePerStep * 100 * steps).toFixed(0);
+             return `${totalFee} USDST (${totalVouchers} voucher${steps === 1 ? "" : "s"})`;
+           })()}
+         </span>
       </div>
       {feeError && (
         <p className="text-yellow-600 text-sm">{feeError}</p>
