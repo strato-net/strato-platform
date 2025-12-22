@@ -54,20 +54,39 @@ const calculateTimeRangeHours = (data: PortfolioDataPoint[]): number => {
 };
 
 // Calculate percentage change
-const calculateChange = (data: PortfolioDataPoint[]): { percentage: number; amount: number; isPositive: boolean } => {
-  if (data.length < 2) return { percentage: 0, amount: 0, isPositive: true };
+const calculateChange = (data: PortfolioDataPoint[]): { percentage: number | null; amount: number; isPositive: boolean } => {
+  if (data.length < 2) return { percentage: null, amount: 0, isPositive: true };
   
   const first = data[0].balance;
   const last = data[data.length - 1].balance;
   const changeAmount = last - first;
-  if (first === 0) return { percentage: 0, amount: changeAmount, isPositive: true };
   const changePercentage = (changeAmount / first) * 100;
   
   return {
-    percentage: Math.abs(changePercentage),
+    percentage: first === 0 ? null : Math.abs(changePercentage),
     amount: Math.abs(changeAmount),
     isPositive: changeAmount >= 0
   };
+};
+
+const getChangeText = (hasData: boolean, tabType: TabType, change: { percentage: number | null; amount: number; isPositive: boolean }): string => {
+  if (!hasData) return '—';
+  let txt: string = '';
+  const twoDigits = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
+  const amt: string = change.amount.toLocaleString('en-US', twoDigits);
+  const pct: string = change.percentage?.toLocaleString('en-US', twoDigits);
+  switch (tabType) {
+    case 'rewards':
+      txt = `${amt} Reward Points`; break;
+    case 'borrowed':
+      txt = `${amt} USDST`; break;
+    case 'netBalance':
+      txt = `$${amt}`; break;
+    default:
+      txt = `${amt}`; break;
+  }
+  if (change.percentage !== null) txt += ` (${pct}%)`;
+  return txt;
 };
 
 const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({ 
@@ -192,33 +211,7 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
             </div>
             <div className={`flex items-center gap-1 text-sm ${tabType === 'rewards' ? 'text-purple-500' : tabType === 'borrowed' ? 'text-orange-500' : change.isPositive ? 'text-green-500' : 'text-red-500'}`}>
               {change.isPositive ? <TrendingUp size={16} color={getColorScheme(tabType).positive} /> : <TrendingDown size={16} color={getColorScheme(tabType).negative}/>}
-              <span>{hasData ? (
-                tabType === 'rewards' ? (
-                  `${change.amount.toLocaleString('en-US', { 
-                    minimumFractionDigits: 2, 
-                    maximumFractionDigits: 2 
-                  })} Reward Points (${change.percentage.toLocaleString('en-US', { 
-                    minimumFractionDigits: 2, 
-                    maximumFractionDigits: 2 
-                  })}%)`
-                ) : tabType === 'borrowed' ? (
-                  `${change.amount.toLocaleString('en-US', { 
-                    minimumFractionDigits: 2, 
-                    maximumFractionDigits: 2 
-                  })} USDST (${change.percentage.toLocaleString('en-US', { 
-                    minimumFractionDigits: 2, 
-                    maximumFractionDigits: 2 
-                  })}%)`
-                ) : (
-                  `$${change.amount.toLocaleString('en-US', { 
-                    minimumFractionDigits: 2, 
-                    maximumFractionDigits: 2 
-                  })} (${change.percentage.toLocaleString('en-US', { 
-                    minimumFractionDigits: 2, 
-                    maximumFractionDigits: 2 
-                  })}%)`
-                )
-              ) : '—'}</span>
+              <span>{getChangeText(hasData, tabType, change)}</span>
             </div>
           </div>
         </div>
