@@ -13,11 +13,8 @@ local verify_opts = {
 }
 
 -- Capture theme param from URL to pass to Keycloak
-local theme_param = ngx.var.arg_theme
-local auth_params = nil
-if theme_param == "dark" or theme_param == "light" then
-  auth_params = { theme = theme_param }
-end
+local theme = ngx.var.arg_theme
+local auth_params = (theme == "dark" or theme == "light") and { theme = theme } or nil
 
 local authenticate_opts = {
   redirect_uri = "/auth/openidc/return",
