@@ -26,6 +26,7 @@ import { CompactRewardsDisplay } from "@/components/rewards/CompactRewardsDispla
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 import { roundByMagnitude, formatRoundedWithCommas } from "@/services/rewardsService";
 import MintWidget from "./MintWidget";
+import MintProgressModal, { type MintStep } from "./MintProgressModal";
 import {
   Tooltip,
   TooltipContent,
@@ -211,6 +212,17 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
   const [showProjectedCosts, setShowProjectedCosts] = useState(false);
   const [showVaultBreakdown, setShowVaultBreakdown] = useState(false);
   const [transactionLoading, setTransactionLoading] = useState(false);
+  const [progressModalOpen, setProgressModalOpen] = useState<boolean>(false);
+  const [currentProgressStep, setCurrentProgressStep] = useState<MintStep>("depositing");
+  const [progressTransactions, setProgressTransactions] = useState<Array<{
+    symbol: string;
+    type: "deposit" | "mint";
+    amount: string;
+    status: "pending" | "processing" | "completed" | "error";
+    hash?: string;
+    error?: string;
+  }>>([]);
+  const [progressError, setProgressError] = useState<string | undefined>();
   const [vaultCandidates, setVaultCandidates] = useState<VaultCandidate[]>([]);
   const { fetchAllPrices } = useOracleContext();
   const { toast } = useToast();
@@ -432,6 +444,9 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
     if (mintAmount <= 0 || optimalAllocations.length === 0) return;
 
     setTransactionLoading(true);
+    setProgressModalOpen(true);
+    setProgressError(undefined);
+    
     try {
       await fetchAllPrices();
       const { existingVaults, potentialVaults } = await cdpService.getVaultCandidates();
@@ -453,8 +468,6 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
       const transactions: Array<{ type: "deposit" | "mint"; asset: string; amount: string; symbol: string }> = [];
 
       for (const allocation of freshAllocations) {
-        const assetAddress = allocation.assetAddress.toLowerCase();
-        
         // Add deposit transaction if allocation includes a deposit
         const depositAmount = parseFloat(allocation.depositAmount || "0");
         if (depositAmount > 0) {
@@ -465,8 +478,8 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
             symbol: allocation.symbol,
           });
         }
-        const mintAmount = parseFloat(allocation.mintAmount || "0");
-        if (mintAmount > 0) {
+        const mintAmountTx = parseFloat(allocation.mintAmount || "0");
+        if (mintAmountTx > 0) {
           transactions.push({
             type: "mint",
             asset: allocation.assetAddress,
@@ -476,85 +489,132 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
         }
       }
 
+      // Initialize progress transactions
+      const progressTxs = transactions.map(tx => ({
+        symbol: tx.symbol,
+        type: tx.type,
+        amount: formatUSD(parseFloat(tx.amount), tx.type === "deposit" ? 4 : 2),
+        status: "pending" as const,
+      }));
+      setProgressTransactions(progressTxs);
+
       const SAFETY_BUFFER_PERCENT = 0.001;
       let allSuccessful = true;
+      let currentTxIndex = 0;
 
-      for (const tx of transactions) {
-        let result;
+      // Process deposits first
+      setCurrentProgressStep("depositing");
+      for (let i = 0; i < transactions.length; i++) {
+        const tx = transactions[i];
+        if (tx.type !== "deposit") continue;
 
-        if (tx.type === "deposit") {
-          result = await cdpService.deposit(tx.asset, tx.amount);
+        // Mark as processing
+        setProgressTransactions(prev => {
+          const updated = [...prev];
+          updated[currentTxIndex] = { ...updated[currentTxIndex], status: "processing" };
+          return updated;
+        });
+
+        try {
+          const result = await cdpService.deposit(tx.asset, tx.amount);
           if (result.status.toLowerCase() !== "success") {
             allSuccessful = false;
-            toast({
-              title: `Deposit Failed: ${tx.symbol}`,
-              description: `Failed to deposit ${formatUSD(parseFloat(tx.amount), 4)} ${tx.symbol}. Status: ${result.status}`,
-              variant: "destructive",
+            setProgressTransactions(prev => {
+              const updated = [...prev];
+              updated[currentTxIndex] = { 
+                ...updated[currentTxIndex], 
+                status: "error",
+                error: `Deposit failed: ${result.status}` 
+              };
+              return updated;
             });
             throw new Error(`Deposit failed for ${tx.symbol}: ${result.status}`);
           }
-          toast({
-            title: `Deposit Successful: ${tx.symbol}`,
-            description: `Deposited ${formatUSD(parseFloat(tx.amount), 4)} ${tx.symbol}. Tx: ${result.hash}`,
+
+          setProgressTransactions(prev => {
+            const updated = [...prev];
+            updated[currentTxIndex] = { ...updated[currentTxIndex], status: "completed", hash: result.hash };
+            return updated;
           });
           
           await fetchAllPrices();
-        } else {
-          try {
-            const maxMintResult = await cdpService.getMaxMint(tx.asset);
-            const maxMintableUSD = parseFloat(formatUnits(maxMintResult.maxAmount, 18));
-            const plannedMintUSD = parseFloat(tx.amount);
-            const safeMaxMintableUSD = maxMintableUSD * (1 - SAFETY_BUFFER_PERCENT);
+        } catch (error) {
+          setProgressError(error instanceof Error ? error.message : "Deposit transaction failed");
+          setCurrentProgressStep("error");
+          throw error;
+        }
+        
+        currentTxIndex++;
+      }
 
-            if (plannedMintUSD > safeMaxMintableUSD) {
-              const clampedMintUSD = Math.max(0, safeMaxMintableUSD);
+      // Process mints
+      setCurrentProgressStep("minting");
+      for (let i = 0; i < transactions.length; i++) {
+        const tx = transactions[i];
+        if (tx.type !== "mint") continue;
 
-              if (clampedMintUSD < plannedMintUSD * 0.99) {
-                toast({
-                  title: "Mint Amount Adjusted",
-                  description: `Planned ${formatUSD(plannedMintUSD, 2)} USDST for ${tx.symbol}, but only ${formatUSD(clampedMintUSD, 2)} USDST is available. This may be due to price changes or debt accrual.`,
-                  variant: "default",
-                });
-              }
-              if (clampedMintUSD <= 0) {
-                toast({
-                  title: `Mint Skipped: ${tx.symbol}`,
-                  description: `Insufficient collateral after deposits. Planned: ${formatUSD(plannedMintUSD, 2)} USDST`,
-                  variant: "default",
-                });
-                continue;
-              }
+        // Mark as processing
+        setProgressTransactions(prev => {
+          const updated = [...prev];
+          updated[currentTxIndex] = { ...updated[currentTxIndex], status: "processing" };
+          return updated;
+        });
 
-              tx.amount = clampedMintUSD.toString();
+        try {
+          const maxMintResult = await cdpService.getMaxMint(tx.asset);
+          const maxMintableUSD = parseFloat(formatUnits(maxMintResult.maxAmount, 18));
+          const plannedMintUSD = parseFloat(tx.amount);
+          const safeMaxMintableUSD = maxMintableUSD * (1 - SAFETY_BUFFER_PERCENT);
+
+          if (plannedMintUSD > safeMaxMintableUSD) {
+            const clampedMintUSD = Math.max(0, safeMaxMintableUSD);
+            if (clampedMintUSD <= 0) {
+              setProgressTransactions(prev => {
+                const updated = [...prev];
+                updated[currentTxIndex] = { 
+                  ...updated[currentTxIndex], 
+                  status: "error",
+                  error: "Insufficient collateral after deposits" 
+                };
+                return updated;
+              });
+              currentTxIndex++;
+              continue;
             }
-          } catch {
-            // Continue with planned amount - backend validation will catch it
+            tx.amount = clampedMintUSD.toString();
           }
 
-          result = await cdpService.mint(tx.asset, tx.amount);
+          const result = await cdpService.mint(tx.asset, tx.amount);
           if (result.status.toLowerCase() !== "success") {
             allSuccessful = false;
-            toast({
-              title: `Mint Failed: ${tx.symbol}`,
-              description: `Failed to mint ${formatUSD(parseFloat(tx.amount), 2)} USDST from ${tx.symbol}. Status: ${result.status}`,
-              variant: "destructive",
+            setProgressTransactions(prev => {
+              const updated = [...prev];
+              updated[currentTxIndex] = { 
+                ...updated[currentTxIndex], 
+                status: "error",
+                error: `Mint failed: ${result.status}` 
+              };
+              return updated;
             });
             throw new Error(`Mint failed for ${tx.symbol}: ${result.status}`);
           }
 
-          toast({
-            title: `Mint Successful: ${tx.symbol}`,
-            description: `Minted ${formatUSD(parseFloat(tx.amount), 2)} USDST from ${tx.symbol}. Tx: ${result.hash}`,
+          setProgressTransactions(prev => {
+            const updated = [...prev];
+            updated[currentTxIndex] = { ...updated[currentTxIndex], status: "completed", hash: result.hash };
+            return updated;
           });
+        } catch (error) {
+          setProgressError(error instanceof Error ? error.message : "Mint transaction failed");
+          setCurrentProgressStep("error");
+          throw error;
         }
+        
+        currentTxIndex++;
       }
 
       if (allSuccessful) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        toast({
-          title: "Quick Mint Complete",
-          description: "All transactions completed successfully",
-        });
+        setCurrentProgressStep("complete");
       }
       
       // Refetch all state after successful transactions
@@ -570,18 +630,12 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
       try {
         await Promise.all([fetchVaultCandidates(), fetchAllPrices()]);
       } catch (refetchError) {
-        console.error("Failed to refetch state after error:", refetchError);
+        // Silent fail on refetch error
       }
-      
-      toast({
-        title: "Transaction Failed",
-        description: error instanceof Error ? error.message : "Transaction failed. Please try again.",
-        variant: "destructive",
-      });
     } finally {
       setTransactionLoading(false);
     }
-  }, [mintAmount, optimalAllocations, toast, fetchVaultCandidates, fetchAllPrices, onSuccess, riskBuffer]);
+  }, [mintAmount, optimalAllocations, fetchVaultCandidates, fetchAllPrices, onSuccess, riskBuffer]);
 
   return (
     <>
@@ -935,6 +989,19 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
           <MintWidget onSuccess={onSuccess} title={title} />
         </div>
       )}
+
+      <MintProgressModal
+        open={progressModalOpen}
+        currentStep={currentProgressStep}
+        transactions={progressTransactions}
+        error={progressError}
+        onClose={() => {
+          setProgressModalOpen(false);
+          setCurrentProgressStep("depositing");
+          setProgressTransactions([]);
+          setProgressError(undefined);
+        }}
+      />
     </div>
     </>
   );
