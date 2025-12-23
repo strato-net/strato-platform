@@ -73,10 +73,10 @@ const MintProgressModal: React.FC<MintProgressModalProps> = ({
       return "All transactions completed successfully. Your vaults have been updated.";
     }
     if (currentStep === "depositing") {
-      return "Depositing collateral to vaults...";
+      return "Deposit collateral to vaults...";
     }
     if (currentStep === "minting") {
-      return "Minting USDST from vaults...";
+      return "Mint USDST from vaults...";
     }
     return "Processing your mint request...";
   };
@@ -214,8 +214,8 @@ const MintProgressModal: React.FC<MintProgressModalProps> = ({
                         }`}
                       >
                         {tx.type === "deposit" 
-                          ? `Depositing ${tx.amount} ${tx.symbol}`
-                          : `Minting ${tx.amount} USDST from ${tx.symbol}`}
+                          ? `Deposit ${tx.amount} ${tx.symbol}`
+                          : `Mint ${tx.amount} USDST from ${tx.symbol}`}
                       </p>
                       {tx.hash && (
                         <div className="mt-2">
