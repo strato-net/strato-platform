@@ -99,7 +99,8 @@ api.interceptors.response.use(
         variant: "destructive",
       });
       setTimeout(() => {
-        window.location.href = "/login";
+        const theme = localStorage.getItem('theme') || 'light';
+        window.location.href = `/login?theme=${theme}`;
       }, 1500);
     }
     return Promise.reject(error);
