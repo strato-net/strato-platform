@@ -321,18 +321,6 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
     }, 0n);
   }, [maxAllocations]);
 
-  // Update mint amount input when MAX mode is enabled
-  useEffect(() => {
-    if (isMaxMode && totalMaxMintWei > 0n) {
-      const maxMint = formatUnits(totalMaxMintWei, 18);
-      // Remove trailing zeros but preserve precision
-      const cleaned = maxMint.replace(/\.?0+$/, '');
-      // Format with commas
-      const formatted = formatNumberWithCommas(cleaned);
-      setMintAmountInput(formatted);
-    }
-  }, [isMaxMode, totalMaxMintWei]);
-
   // Disable MAX mode if risk buffer changes and no allocations are possible
   useEffect(() => {
     if (isMaxMode && (maxAllocations.length === 0 || totalMaxMintWei === 0n)) {
@@ -342,24 +330,22 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
   }, [riskBuffer, maxAllocations.length, totalMaxMintWei, isMaxMode]);
 
   // Check if input should be locked (no max allocations possible)
-  const shouldLockInput = !isMaxMode && (maxAllocations.length === 0 || totalMaxMintWei === 0n);
+  const shouldLockInput = maxAllocations.length === 0 || totalMaxMintWei === 0n;
   
   const exceedsMaxCollateral = isMaxMode 
     ? false 
     : mintAmountWei > 0n && mintAmountWei > totalHeadroomWei;
 
   const handleMaxClick = useCallback(() => {
-    setIsMaxMode(!isMaxMode);
-    if (!isMaxMode && totalMaxMintWei > 0n) {
+    if (totalMaxMintWei > 0n) {
       const maxMint = formatUnits(totalMaxMintWei, 18);
       const cleaned = maxMint.replace(/\.?0+$/, '');
       // Format with commas
       const formatted = formatNumberWithCommas(cleaned);
       setMintAmountInput(formatted);
-    } else if (isMaxMode) {
-      setMintAmountInput("");
+      setIsMaxMode(true);
     }
-  }, [isMaxMode, totalMaxMintWei]);
+  }, [totalMaxMintWei]);
 
   const supportedAssetsWithBalances = useMemo(() => {
     return vaultCandidates.map((c) => {
@@ -665,7 +651,19 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
                       // Format with commas for display
                       const formatted = formatNumberWithCommas(parsed);
                       setMintAmountInput(formatted);
-                      setIsMaxMode(false); // Disable MAX mode when user types
+                      
+                      // Check if the input value matches the max mintable amount
+                      if (totalMaxMintWei > 0n) {
+                        const maxMint = formatUnits(totalMaxMintWei, 18);
+                        const cleanedMax = maxMint.replace(/\.?0+$/, '');
+                        // Normalize both values by removing trailing zeros for comparison
+                        const normalizedInput = parsed.replace(/\.?0+$/, '');
+                        const normalizedMax = cleanedMax.replace(/\.?0+$/, '');
+                        const inputMatches = normalizedInput === normalizedMax;
+                        setIsMaxMode(inputMatches);
+                      } else {
+                        setIsMaxMode(false);
+                      }
                       
                       // Adjust cursor position to maintain correct position after comma insertion
                       setTimeout(() => {
@@ -690,8 +688,11 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
                   }}
                   placeholder="0"
                   inputMode="decimal"
-                  className="pr-20"
-                  disabled={isMaxMode || shouldLockInput}
+                  className={`pr-20 ${
+                    isMaxMode
+                      ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 border-blue-300 dark:border-blue-800'
+                      : ''
+                  }`}
                 />
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
                   {totalMaxMintWei > 0n && (
