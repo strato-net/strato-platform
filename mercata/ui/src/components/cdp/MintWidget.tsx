@@ -291,7 +291,6 @@ const MintWidget: React.FC<MintWidgetProps> = ({ onSuccess, title = "Mint Agains
         // Fetch max mintable amount from backend
         await getMaxMintable();
       } catch (error) {
-        console.log("No existing vault found for asset:", depositAsset.symbol);
         setExistingVaultCollateral("?");
         setExistingVaultDebt("?");
         setIsAssetPaused(false);

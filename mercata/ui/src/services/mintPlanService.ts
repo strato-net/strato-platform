@@ -208,29 +208,17 @@ export function getOptimalAllocations(
     const result = allocate(candidate, remainingMint, targetCR, currentGlobalDebt);
     
     if (result === 'DEBT_FLOOR_HIT') {
-      const totalDebtAfterMint = candidate.currentDebt + remainingMint;
-      const isBelowFloor = totalDebtAfterMint > 0n && totalDebtAfterMint < candidate.debtFloor;
-      console.log(
-        `Vault hit debt floor: ${candidate.symbol} (${candidate.assetAddress})\n` +
-        `  Attempted mint: ${remainingMint.toString()} wei\n` +
-        `  Current debt: ${candidate.currentDebt.toString()} wei\n` +
-        `  Total debt after mint: ${totalDebtAfterMint.toString()} wei\n` +
-        `  Debt floor: ${candidate.debtFloor.toString()} wei\n` +
-        `  Is below floor: ${isBelowFloor}`
-      );
       debtFloorHit = true;
       continue;
     }
     
     if (result === 'DEBT_CEILING_HIT') {
-      console.log(`Vault hit debt ceiling: ${candidate.symbol} (${candidate.assetAddress}), attempted mint: ${remainingMint.toString()} wei`);
       debtCeilingHit = true;
       continue;
     }
     
     if (result === 'NO_HEADROOM') {
       // No mintable headroom at target CR - vault is at or above capacity for the current risk buffer
-      console.log(`Vault has no headroom: ${candidate.symbol} (${candidate.assetAddress}) - already at max debt for target CR`);
       continue;
     }
     

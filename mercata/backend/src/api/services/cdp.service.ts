@@ -1625,7 +1625,6 @@ export const getBadDebt = async (
 
 
     if (!data || data.length === 0) {
-      console.log('No bad debt entries found on-chain');
       return [];
     }
 
@@ -1633,7 +1632,6 @@ export const getBadDebt = async (
     const nonZeroBadDebtEntries = data.filter((entry: any) => entry.value && entry.value !== "0");
     
     if (nonZeroBadDebtEntries.length === 0) {
-      console.log('No non-zero bad debt entries found');
       return [];
     }
 
@@ -1662,8 +1660,6 @@ export const getBadDebt = async (
         let symbol = "UNKNOWN";
         if (symbolResponse.data && symbolResponse.data.length > 0 && symbolResponse.data[0]._symbol) {
           symbol = symbolResponse.data[0]._symbol;
-        } else {
-          console.log(`No symbol found for ${assetAddress}, using UNKNOWN`);
         }
 
         badDebtEntries.push({
