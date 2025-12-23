@@ -281,11 +281,11 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
     }
   }, [riskBuffer, vaultCandidates]);
 
-  const { optimalAllocations, debtFloorHit } = useMemo<{ optimalAllocations: OptimalAllocation[]; debtFloorHit: boolean }>(() => {
+  const { optimalAllocations, debtFloorHit, debtCeilingHit } = useMemo<{ optimalAllocations: OptimalAllocation[]; debtFloorHit: boolean; debtCeilingHit: boolean }>(() => {
     // In MAX mode, use max allocations instead
-    if (isMaxMode) return { optimalAllocations: maxAllocations, debtFloorHit: false };
+    if (isMaxMode) return { optimalAllocations: maxAllocations, debtFloorHit: false, debtCeilingHit: false };
     
-    if (mintAmountWei <= 0n || vaultCandidates.length === 0) return { optimalAllocations: [], debtFloorHit: false };
+    if (mintAmountWei <= 0n || vaultCandidates.length === 0) return { optimalAllocations: [], debtFloorHit: false, debtCeilingHit: false };
     try {
       // Use allocation function directly with VaultCandidate[]
       const result = getOptimalAllocations(mintAmountWei, riskBuffer, vaultCandidates);
@@ -302,10 +302,11 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
       // Sort by lowest stabilityFeeRate first
       return {
         optimalAllocations: planItems.sort((a, b) => a.stabilityFeeRate - b.stabilityFeeRate),
-        debtFloorHit: result.debtFloorHit
+        debtFloorHit: result.debtFloorHit,
+        debtCeilingHit: result.debtCeilingHit
       };
     } catch {
-      return { optimalAllocations: [], debtFloorHit: false };
+      return { optimalAllocations: [], debtFloorHit: false, debtCeilingHit: false };
     }
   }, [mintAmountWei, riskBuffer, vaultCandidates, isMaxMode, maxAllocations]);
 
@@ -790,11 +791,20 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
                 <p className="text-sm text-muted-foreground">Enter a mint amount and select risk buffer to see your optimal mint plan</p>
               </div>
             ) : exceedsMaxCollateral ? null : optimalAllocations.length > 0 ? (
-              <VaultBreakdown
-                allocations={optimalAllocations}
-                open={showVaultBreakdown}
-                onOpenChange={setShowVaultBreakdown}
-              />
+              <>
+                <VaultBreakdown
+                  allocations={optimalAllocations}
+                  open={showVaultBreakdown}
+                  onOpenChange={setShowVaultBreakdown}
+                />
+                {(debtFloorHit || debtCeilingHit) && (
+                  <div className="p-3 rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                    <p className="text-xs text-amber-800 dark:text-amber-200">
+                      ⚠️ One or more vaults have hit a debt {debtFloorHit && debtCeilingHit ? 'floor/ceiling' : debtFloorHit ? 'floor' : 'ceiling'}. Effective mint amount may be lower than requested.
+                    </p>
+                  </div>
+                )}
+              </>
             ) : (
               <div className="p-3 rounded-md bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
                 <p className="text-sm font-semibold text-yellow-800 dark:text-yellow-200 mb-2">

@@ -95,7 +95,7 @@ export function getMaxAllocations(
     // Pass candidate's current globalDebt (not tracking across allocations since each is independent)
     const result = allocate(candidate, headroom, targetCR, candidate.globalDebt);
 
-    if (result !== 'DEBT_FLOOR_HIT' && result.mintAmount > 0n) {
+    if (result !== 'DEBT_FLOOR_HIT' && result !== 'DEBT_CEILING_HIT' && result.mintAmount > 0n) {
       allocations.push(result);
     }
   }
@@ -168,6 +168,7 @@ export function computeTotalHeadroom(
 interface Allocations {
   allocations: Allocation[];
   debtFloorHit: boolean;
+  debtCeilingHit: boolean;
 }
 
 export function getOptimalAllocations(
@@ -176,12 +177,13 @@ export function getOptimalAllocations(
   candidates: VaultCandidate[]
 ): Allocations {
   if (targetMint <= 0n || candidates.length === 0 || riskBuffer <= 0) {
-    return { allocations: [], debtFloorHit: false };
+    return { allocations: [], debtFloorHit: false, debtCeilingHit: false };
   }
 
   const allocations: Allocation[] = [];
   let remainingMint = targetMint;
   let debtFloorHit = false;
+  let debtCeilingHit = false;
 
   // Sort candidates by stability fee rate, then by existing collateral, then by headroom
   const sortedCandidates = sortCandidates(candidates, riskBuffer);
@@ -210,6 +212,11 @@ export function getOptimalAllocations(
       continue;
     }
     
+    if (result === 'DEBT_CEILING_HIT') {
+      debtCeilingHit = true;
+      continue;
+    }
+    
     if (result && result.mintAmount > 0n) {
       allocations.push(result);
       remainingMint -= result.mintAmount;
@@ -218,7 +225,7 @@ export function getOptimalAllocations(
     }
   }
 
-  return { allocations, debtFloorHit };
+  return { allocations, debtFloorHit, debtCeilingHit };
 }
 
 function allocate(
@@ -226,7 +233,7 @@ function allocate(
   remainingMint: bigint,
   targetCR: bigint,
   globalDebt: bigint
-): Allocation | 'DEBT_FLOOR_HIT' {
+): Allocation | 'DEBT_FLOOR_HIT' | 'DEBT_CEILING_HIT' {
   let mintAmount = remainingMint;
   let depositAmount = 0n;
 
@@ -281,7 +288,7 @@ function allocate(
       : 0n;
 
     if (ceilingHeadroom <= 0n) {
-      return 'DEBT_FLOOR_HIT'; // No room under ceiling, skip
+      return 'DEBT_CEILING_HIT'; // No room under ceiling, skip
     }
 
     if (mintAmount > ceilingHeadroom) {
@@ -300,7 +307,7 @@ function allocate(
           : INF;
 
         if (maxCRAfterCap < targetCR) {
-          return 'DEBT_FLOOR_HIT'; // Can't achieve target even with full deposit
+          return 'DEBT_CEILING_HIT'; // Can't achieve target CR with ceiling constraint
         }
 
         const requiredCollateral = computeRequiredCollateralForCR(
