@@ -27,25 +27,31 @@ const Advanced = () => {
   const { userRewards, loading: rewardsLoading, refetch: refetchRewards } = useRewardsUserInfo();
   const { fetchTokens } = useUserTokens();
 
-  const handleBorrowSuccess = () => {
+  // Unified refresh function that refreshes ALL CDP components after any transaction
+  // This ensures MintPlanner, VaultsList, and MintWidget all have fresh data
+  const refreshAllCDPComponents = useCallback(async () => {
+    // Increment both triggers to refresh both MintPlanner and VaultsList
     setVaultsRefreshTrigger(prev => prev + 1);
-  };
-
-  const handleVaultActionSuccess = useCallback(async () => {
-    refreshVaults();
     setMintPlannerRefreshTrigger(prev => prev + 1);
-    // Refresh user token balances since MintPlanner uses them for allocations
-    await fetchTokens();
-  }, [refreshVaults, fetchTokens]);
-
-  const handleQuickMintSuccess = useCallback(async () => {
+    
+    // Refresh CDP context
     refreshVaults();
-    setVaultsRefreshTrigger(prev => prev + 1);
+    
+    // Refresh all related data in parallel
     await Promise.all([
       refetchRewards(),
-      fetchTokens(), // Refresh user token balances for VaultsList
+      fetchTokens(), // Token balances used by all components
     ]);
   }, [refreshVaults, refetchRewards, fetchTokens]);
+
+  // Use the unified refresh for all CDP component callbacks
+  const handleVaultActionSuccess = useCallback(async () => {
+    await refreshAllCDPComponents();
+  }, [refreshAllCDPComponents]);
+
+  const handleQuickMintSuccess = useCallback(async () => {
+    await refreshAllCDPComponents();
+  }, [refreshAllCDPComponents]);
 
   return (
     <div className="min-h-screen bg-background">
