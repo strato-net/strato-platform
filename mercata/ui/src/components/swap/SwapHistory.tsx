@@ -182,14 +182,11 @@ const SwapHistory: React.FC = () => {
   useEffect(() => {
     setCurrentPage(1);
     if (pool?.address) {
-      const params: Record<string, string> = {
+      refreshSwapHistory({
         limit: ITEMS_PER_PAGE.toString(),
         page: "1",
-      };
-      if (showMySwapsOnly && userAddress) {
-        params.sender = userAddress;
-      }
-      refreshSwapHistory(params);
+        ...(showMySwapsOnly && userAddress ? { sender: userAddress } : {}),
+      });
     }
   }, [pool?.address, refreshSwapHistory, showMySwapsOnly, userAddress]);
 
@@ -210,14 +207,11 @@ const SwapHistory: React.FC = () => {
     if (!pool?.address) return;
     
     setCurrentPage(newPage);
-    const params: Record<string, string> = {
+    refreshSwapHistory({
       limit: ITEMS_PER_PAGE.toString(),
       page: newPage.toString(),
-    };
-    if (showMySwapsOnly && userAddress) {
-      params.sender = userAddress;
-    }
-    refreshSwapHistory(params);
+      ...(showMySwapsOnly && userAddress ? { sender: userAddress } : {}),
+    });
   };
 
   // ========================================================================
