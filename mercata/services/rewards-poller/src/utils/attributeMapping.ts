@@ -28,6 +28,7 @@ export interface AttributeMapping {
   [contractAddress: string]: {
     [eventName: string]: {
       amount: string;
+      user?: string;
     };
   };
 }

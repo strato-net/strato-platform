@@ -12,7 +12,8 @@
   },
   "0000000000000000000000000000000000001008": {
     "DepositInitiated": {
-      "amount": "stratoTokenAmount"
+      "amount": "stratoTokenAmount",
+      "user": "stratoRecipient"
     },
     "WithdrawalRequested": {
       "amount": "stratoTokenAmount"
