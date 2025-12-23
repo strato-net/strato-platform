@@ -83,25 +83,6 @@ const calculateExchangeRates = (pool: Pool | null, fromAsset: SwapToken | null) 
   };
 };
 
-/**
- * Get activity name for swap rewards based on asset symbol/name
- * Maps to activityType 1 (OneTime) swap activities
- */
-const getSwapActivityName = (asset: SwapToken | null | undefined): string | null => {
-  if (!asset) return null;
-  
-  const symbol = asset._symbol?.toUpperCase() || "";
-  const name = asset._name?.toUpperCase() || "";
-  
-  // Check by symbol or name
-  if (symbol.includes("ETHST") || name.includes("ETHST")) return "ETHST-USDST Swap";
-  if (symbol.includes("WBTCST") || name.includes("WBTCST")) return "WBTCST-USDST Swap";
-  if (symbol.includes("GOLDST") || name.includes("GOLDST")) return "GOLDST-USDST Swap";
-  if (symbol.includes("SILVST") || name.includes("SILVST")) return "SILVST-USDST Swap";
-  
-  return null;
-};
-
 // ============================================================================
 // UI COMPONENTS
 // ============================================================================
@@ -259,24 +240,6 @@ const TokenInput = ({
     <div className="bg-muted/50 p-4 rounded-lg border border-border">
       <div className="flex flex-col sm:flex-row sm:justify-between mb-2">
         <label className="text-sm text-muted-foreground font-semibold">{label}</label>
-        {isFromInput && (
-          <span className={`text-sm mt-1 sm:mt-0 flex gap-1 ${
-            toWei(maxAmountWei) === 0n ? "text-red-600" : "text-muted-foreground"
-          }`}>
-            Available for swap: <AnimatedNumber 
-              value={maxAmountWei !== "0" ? formatBalance(maxAmountWei, asset?._symbol || "", undefined, 2, 6) : "0"} 
-              isLoading={loading} 
-            />
-            <button
-              type="button"
-              className={`text-blue-600 text-xs ml-2 underline ${toWei(maxAmountWei) === 0n ? "opacity-50 cursor-not-allowed" : ""}`}
-              onClick={onMaxClick}
-              disabled={toWei(maxAmountWei) === 0n}
-            >
-              Max
-            </button>
-          </span>
-        )}
       </div>
       <div className="flex items-center gap-2">
         <div className="flex-1 min-w-0 flex flex-col">
@@ -308,12 +271,31 @@ const TokenInput = ({
       </div>
       {asset && (
         <div className="mt-2 flex justify-between">
-          <span className="text-sm text-muted-foreground">
-            User Balance: <AnimatedNumber 
-              value={userBalanceWei !== "0" ? formatBalance(userBalanceWei, asset._symbol || "", undefined, 2, 6) : "0"} 
-              isLoading={loading} 
-            />
-          </span>
+          {isFromInput ? (
+            <span className={`text-sm flex items-center gap-1 ${
+              toWei(maxAmountWei) === 0n ? "text-red-600" : "text-muted-foreground"
+            }`}>
+              Your Balance: <AnimatedNumber 
+                value={maxAmountWei !== "0" ? formatBalance(maxAmountWei, asset._symbol || "", undefined, 2, 6) : "0"} 
+                isLoading={loading} 
+              />
+              <button
+                type="button"
+                className={`text-blue-600 text-xs ml-2 underline ${toWei(maxAmountWei) === 0n ? "opacity-50 cursor-not-allowed" : ""}`}
+                onClick={onMaxClick}
+                disabled={toWei(maxAmountWei) === 0n}
+              >
+                Max
+              </button>
+            </span>
+          ) : (
+            <span className="text-sm text-muted-foreground">
+              Your Balance: <AnimatedNumber 
+                value={userBalanceWei !== "0" ? formatBalance(userBalanceWei, asset._symbol || "", undefined, 2, 6) : "0"} 
+                isLoading={loading} 
+              />
+            </span>
+          )}
           <span className="text-sm text-muted-foreground">
             Pool Balance: <AnimatedNumber 
               value={poolBalanceWei !== "0" ? formatBalance(poolBalanceWei, asset._symbol || "", undefined, 2, 6) : "0"} 
@@ -494,7 +476,7 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
   // ========================================================================
   // CONTEXT & HOOKS
   // ========================================================================
-  const { swappableTokens, pairableTokens, fetchPairableTokens, swap, getPoolByTokenPair, fromAsset, toAsset, pool, poolLoading, loading: swapLoading, setFromAsset, setToAsset, refreshSwapHistory } = useSwapContext();
+  const { swappableTokens, pairableTokens, pairablesLoading, fetchPairableTokens, swap, getPoolByTokenPair, fromAsset, toAsset, pool, poolLoading, loading: swapLoading, setFromAsset, setToAsset, refreshSwapHistory } = useSwapContext();
 
   // ========================================================================
   // DERIVED STATE
@@ -634,9 +616,11 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
   // Safe auto-select after pairables change
   useEffect(() => {
     if (!fromAsset?.address) return;
+    // Don't auto-select while pairables are loading - data may be stale
+    if (pairablesLoading) return;
     if (toAsset && toOptions.some(t => t.address === toAsset.address)) return;
     if (toOptions.length) setToAsset(toOptions[0]);
-  }, [fromAsset?.address, toOptions, toAsset?.address]);
+  }, [fromAsset?.address, toOptions, toAsset?.address, pairablesLoading]);
 
   // Fetch pool immediately when both assets are selected
   useEffect(() => {
@@ -768,8 +752,11 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
     if (!newFrom?.address) return;
 
     const nextPairables = await fetchPairableTokens(newFrom.address); // <-- fresh list
-    if (nextPairables.length > 0 && !nextPairables.some(t => t.address === newTo?.address)) {
-      setToAsset(nextPairables[0]); // or undefined
+    // Always re-set toAsset after fetch to override any stale effect that ran during the await
+    if (nextPairables.length > 0) {
+      const newToAddress = newTo?.address?.toLowerCase();
+      const validNewTo = nextPairables.find(t => t.address?.toLowerCase() === newToAddress);
+      setToAsset(validNewTo || nextPairables[0]);
     }
   };
 
@@ -907,22 +894,20 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
         loading={poolLoading}
       />
       {(() => {
-        // Activity name is based on pair type, so check either token
-        const activityName =
-          getSwapActivityName(fromAsset) || getSwapActivityName(toAsset);
-        if (!activityName) return null;
+        // Find activity by pool address (OneTime swap rewards)
+        const activity = userRewards?.activities?.find(
+          (a) => a.activity.sourceContract?.toLowerCase() === pool?.address?.toLowerCase()
+        );
+        if (!activity) return null;
 
         // Swap rewards are tracked in USDST terms, so use the USDST side of the swap
-        // - If swapping FROM USDST, use fromAmount
-        // - If swapping TO USDST, use toAmount
-        const isFromUsdst =
-          fromAsset?.address?.toLowerCase() === usdstAddress.toLowerCase();
+        const isFromUsdst = fromAsset?.address?.toLowerCase() === usdstAddress.toLowerCase();
         const inputAmount = isFromUsdst ? fromAmount : toAmount;
 
         return (
           <CompactRewardsDisplay
             userRewards={userRewards}
-            activityName={activityName}
+            activityName={activity.activity.name}
             inputAmount={inputAmount}
             actionLabel="Swap"
           />

@@ -65,6 +65,7 @@ const Rewards = () => {
     refetchState();
     refetchActivities();
     refetchUserRewards();
+    getInactiveTokens(false); // Refresh CATA balance (Total Earned)
     refetchLeaderboard();
   };
 

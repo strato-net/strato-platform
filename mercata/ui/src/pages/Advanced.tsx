@@ -84,16 +84,6 @@ const Advanced = () => {
                       <div className="space-y-6">
 
                         <div className="border border-border bg-card rounded-xl p-4 flex flex-col shadow-sm">
-
-                       
-                          <div className="flex items-center justify-end mb-4">
-                            <CompactRewardsDisplay
-                              userRewards={userRewards}
-                              loading={rewardsLoading}
-                              activityName="CDP USDST Mint"
-                              variant="button"
-                            />
-                          </div>
                           <MintWidget onSuccess={handleBorrowSuccess} />
                         </div>
                         <VaultsList 

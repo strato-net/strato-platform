@@ -1,4 +1,5 @@
 import { useMemo, useState, useCallback } from "react";
+import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatBalance } from "@/utils/numberUtils";
 import { useLendingContext } from "@/context/LendingContext";
@@ -135,19 +136,28 @@ export default function MyPoolParticipationSection({
                 return (
                   <div key={token.address} className="space-y-0">
                     <div
-                      className={`grid grid-cols-4 items-center bg-muted/30 px-4 py-3 rounded-md ${
-                        canExpand ? "cursor-pointer hover:bg-muted/50" : ""
-                      }`}
-                      onClick={() => canExpand && toggleExpanded(token.address)}
+                      className={`grid grid-cols-4 items-center bg-muted/30 px-4 py-3 rounded-md`}
                     >
-                      <div className="flex items-center gap-2 font-semibold text-foreground/80">
-                        {token._name || token._symbol}
+                      <div className="flex items-center gap-2">
+                        <Link
+                          to={`/dashboard/deposits/${token.address}`}
+                          className="font-medium text-blue-600 hover:text-blue-800 underline transition-colors"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {token._name || token._symbol}
+                        </Link>
                         {canExpand &&
-                          (isExpanded ? (
-                            <ChevronUp size={16} />
-                          ) : (
-                            <ChevronDown size={16} />
-                          ))}
+                          <div 
+                            className="cursor-pointer hover:opacity-70"
+                            onClick={() => toggleExpanded(token.address)}
+                          >
+                            {isExpanded ? (
+                              <ChevronUp size={16} />
+                            ) : (
+                              <ChevronDown size={16} />
+                            )}
+                          </div>
+                        }
                       </div>
 
                       <div className="text-center font-semibold text-foreground">

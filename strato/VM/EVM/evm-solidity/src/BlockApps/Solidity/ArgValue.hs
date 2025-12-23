@@ -20,6 +20,7 @@ import qualified Data.Bimap as Bimap
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Base16 as Base16
+import qualified Data.ByteString.Lazy as BSL
 import Data.Decimal
 import Data.Either
 import qualified Data.Map.Strict as Map
@@ -84,6 +85,10 @@ argValueToType v@(ArgString s') = maybe (SimpleType TypeString, v) id $
         '0':'x':_ -> ((SimpleType TypeAddress, v) <$ ((readMaybe s) :: Maybe Address))
                  <|> ((SimpleType typeInt,) . ArgInt <$> ((readMaybe s) :: Maybe Integer))
         '"':_     -> ((SimpleType TypeString,) . ArgString . Text.pack <$> ((readMaybe s) :: Maybe String))
+        -- Try to parse strings that look like JSON arrays
+        '[':_     -> (argValueToType <$> A.decode (BSL.fromStrict $ Text.encodeUtf8 s'))
+        -- Try to parse strings that look like JSON objects
+        '{':_     -> (argValueToType <$> A.decode (BSL.fromStrict $ Text.encodeUtf8 s'))
         _         -> ((SimpleType typeInt,) . ArgInt <$> ((readMaybe s) :: Maybe Integer))
                  <|> ((SimpleType TypeAddress, v) <$ ((readMaybe s) :: Maybe Address))
 argValueToType v@(ArgDecimal _) = (SimpleType TypeDecimal, v)

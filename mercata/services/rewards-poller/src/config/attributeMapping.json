@@ -77,5 +77,31 @@
     "Burned": {
       "amount": "value"
     }
+  },
+  "cb85e12ca5d98de95715fc75ae251a66b662ea06": {
+    "Swap": {
+      "amount": "amountIn"
+    }
+  },
+  "ac621a150f49198036f84ffe90b4f2286b623583": {
+    "Minted": {
+      "amount": "value"
+    },
+    "Burned": {
+      "amount": "value"
+    }
+  },
+  "34d7caf576cf9493f054d9eced99dcd463eba4b7": {
+    "Swap": {
+      "amount": "amountIn"
+    }
+  },
+  "69010124cdaa64286f6e413267a7001ea9379df4": {
+    "Minted": {
+      "amount": "value"
+    },
+    "Burned": {
+      "amount": "value"
+    }
   }
 }

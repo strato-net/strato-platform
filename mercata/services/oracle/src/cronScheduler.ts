@@ -16,9 +16,38 @@ export async function getCronSchedule(): Promise<string> {
     return schedule;
 }
 
+function isMetalsMarketClosed(): boolean {
+    const now = new Date();
+    const etString = now.toLocaleString('en-US', { timeZone: 'America/New_York' });
+    const etDate = new Date(etString);
+    const day = etDate.getDay();
+    const hour = etDate.getHours();
+    const minute = etDate.getMinutes();
+    
+    // Friday after 12:00 PM (noon) ET - LBMA stops
+    if (day === 5 && hour >= 12) return true;
+    // Saturday all day
+    if (day === 6) return true;
+    // Sunday all day
+    if (day === 0) return true;
+    // Monday before 5:30 AM ET - first LBMA auction
+    if (day === 1 && (hour < 5 || (hour === 5 && minute < 30))) return true;
+    
+    return false;
+}
+
 // Process all feeds in parallel and combine results
 async function processAllFeeds(configLoader: ConfigLoader): Promise<void> {
-    const resolvedFeeds = configLoader.getResolvedFeeds();
+    const allFeeds = configLoader.getResolvedFeeds();
+    const marketClosed = isMetalsMarketClosed();
+    
+    const resolvedFeeds = allFeeds.filter(feed => {
+        if (feed.name === 'metals-batch') return !marketClosed;
+        if (feed.name === 'metals-weekend') return marketClosed;
+        return true;
+    });
+    
+    logInfo('CronScheduler', `Metals market ${marketClosed ? 'closed' : 'open'}, using feeds: [${resolvedFeeds.map(f => f.name).join(', ')}]`);
     
     // Process all feeds in parallel
     const feedPromises = resolvedFeeds.map(async (feed) => {

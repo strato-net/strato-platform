@@ -1,24 +1,29 @@
 import { Link } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
+import { useTheme } from 'next-themes';
 import heroBackground from '../../assets/home/hero-background.png';
+import darkThemeBackground from '../../assets/home/darktheme-hero-bg.png';
 
 const Hero = () => {
+  const { resolvedTheme } = useTheme();
+  const backgroundImage = resolvedTheme === 'dark' ? darkThemeBackground : heroBackground;
+
   return (
     <div className="relative pt-16 overflow-hidden">
       {/* Background Image */}
       <div
         className="absolute inset-0 bg-cover bg-center bg-no-repeat"
         style={{
-          backgroundImage: `url(${heroBackground})`
+          backgroundImage: `url(${backgroundImage})`
         }}
       />
       <div className="container mx-auto px-4 py-48 relative z-10">
         {/* Hero Header */}
         <div className="max-w-2xl">
-          <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold mb-8 text-[#001f5c] leading-tight animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-200">
+          <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold mb-8 text-[#001f5c] dark:text-white leading-tight animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-200">
             WHERE STABILITY MEETS OPPORTUNITY
           </h1>
-          <p className="text-lg md:text-xl mb-10 text-muted-foreground leading-relaxed animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-100">
+          <p className="text-lg md:text-xl mb-10 text-muted-foreground dark:text-gray-300 leading-relaxed animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-100">
             Diverse asset classes, one platform. From crypto to precious metals to tokenized securities—investing made simple for everyone.
           </p>
           <div className="flex flex-col sm:flex-row gap-4">
