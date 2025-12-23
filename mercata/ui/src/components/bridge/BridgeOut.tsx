@@ -10,10 +10,10 @@ import { useBridgeContext } from "@/context/BridgeContext";
 import PercentageButtons from "@/components/ui/PercentageButtons";
 import { formatBalance, formatUnits, safeParseUnits } from "@/utils/numberUtils";
 import BridgeWalletStatus from "./BridgeWalletStatus";
-import NetworkSelector from "./NetworkSelector";
 import TokenSelector from "./TokenSelector";
 import TransactionSummary from "./TransactionSummary";
-import { BRIDGE_OUT_FEE, usdstAddress, DECIMAL } from "@/lib/constants";
+import { BRIDGE_OUT_FEE, usdstAddress, usdystAddress, DECIMAL } from "@/lib/constants";
+import { checkUSDYAllowlist } from "@/lib/bridge/contractService";
 import {
   handleAmountInputChange,
   computeMaxTransferable,
@@ -22,8 +22,8 @@ import { useTokenContext } from "@/context/TokenContext";
 import {
   NATIVE_TOKEN_ADDRESS,
   BRIDGE_MODE_LABELS,
+  SUPPORTED_CHAINS,
 } from "@/lib/bridge/constants";
-import { useUser } from "@/context/UserContext";
 import AdvancedOptionsDropdown from "./AdvancedOptionsDropdown";
 
 // Constants
@@ -38,7 +38,6 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false }) => {
   const { address, isConnected } = useAccount();
   const { toast } = useToast();
   const { usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
-  const { userAddress } = useUser();
 
   const {
     requestWithdrawal: bridgeOutAPI,
@@ -58,6 +57,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false }) => {
   const [amountError, setAmountError] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [feeError, setFeeError] = useState("");
+  const [usdyError, setUsdyError] = useState("");
 
   // Computed values
   const modeLabels = BRIDGE_MODE_LABELS[isSaving ? "convert" : "bridge"];
@@ -122,7 +122,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false }) => {
     }
   }, [maxAmount, amount]);
 
-  const hasValidAmount = !!amount && !amountError && !feeError;
+  const hasValidAmount = !!amount && !amountError && !feeError && !usdyError;
 
   const formatBalanceDisplay = useCallback(
     (valueWei: string) => {
@@ -169,6 +169,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false }) => {
     setAmount("");
     setAmountError("");
     setFeeError("");
+    setUsdyError("");
   }, [
     availableNetworks,
     currentTokens,
@@ -202,6 +203,33 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false }) => {
     };
   }, [selectedToken?.stratoToken, refetchBalance]);
 
+  useEffect(() => {
+    const checkUSDYAllowlistStatus = async () => {
+      if (selectedToken?.stratoToken.toLowerCase() === usdystAddress.toLowerCase() && 
+          currentNetwork && 
+          currentNetwork.chainId && 
+          address &&
+          (Number(currentNetwork.chainId) === SUPPORTED_CHAINS.MAINNET || 
+           Number(currentNetwork.chainId) === SUPPORTED_CHAINS.SEPOLIA)) {
+        try {
+          const isReceiverAllowed = await checkUSDYAllowlist(address, currentNetwork.chainId);
+          if (!isReceiverAllowed) {
+            setUsdyError("The receiver address is not on the USDY allowlist. Please swap your USDYST to USDST or USDTST before bridging out, or use a different receiver address.");
+          } else {
+            setUsdyError("");
+          }
+        } catch (error) {
+          console.error('Error checking USDY allowlist:', error);
+          setUsdyError("Unable to verify USDY allowlist status. Please try again.");
+        }
+      } else {
+        setUsdyError("");
+      }
+    };
+
+    checkUSDYAllowlistStatus();
+  }, [selectedToken?.stratoToken, currentNetwork?.chainId, address]);
+
   // Handlers
   const handleAmountChange = useCallback(
     (value: string) => {
@@ -216,7 +244,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false }) => {
     [maxAmount]
   );
 
-  const showConfirmModal = () => {
+  const showConfirmModal = async () => {
     if (!selectedToken?.stratoToken || !address || !selectedNetwork) {
       toast({
         title: "Error",
@@ -230,6 +258,14 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false }) => {
       toast({
         title: "Invalid Amount",
         description: "Please enter a valid amount.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (usdyError) {
+      toast({
+        title: "Receiver Not on Allowlist",
+        description: usdyError,
         variant: "destructive",
       });
       return;
@@ -349,6 +385,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false }) => {
         />
         {amountError && <p className="text-sm text-red-500">{amountError}</p>}
         {feeError && <p className="text-sm text-yellow-600">{feeError}</p>}
+        {usdyError && <p className="text-sm text-red-500">{usdyError}</p>}
 
         {isConnected && (
           <PercentageButtons

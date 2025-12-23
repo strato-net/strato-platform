@@ -174,6 +174,29 @@ export const DEPOSIT_ROUTER_ABI = [
   }
 ] as const;
 
+export const USDY_CONTRACT_ABI = [
+  {
+    inputs: [],
+    name: 'allowlist',
+    outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view',
+    type: 'function'
+  }
+] as const;
+
+export const USDY_ALLOWLIST_ABI = [
+  {
+    inputs: [{ name: 'account', type: 'address' }],
+    name: 'isAllowed',
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'view',
+    type: 'function'
+  }
+] as const;
+
+export const USDY_ETHEREUM_ADDRESS = '0x96F6eF951840721AdBF46Ac996b59E0235CB985C' as const;
+export const USDY_SEPOLIA_ADDRESS = '0x5af5461786c165ad7780744b54229f85c040723b' as const;
+
 // Chain Management
 export const SUPPORTED_CHAINS = {
   MAINNET: 1,

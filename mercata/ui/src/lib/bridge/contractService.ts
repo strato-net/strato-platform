@@ -5,6 +5,11 @@ import {
   ERC20_ABI, 
   NATIVE_TOKEN_ADDRESS, 
   PERMIT2_ADDRESS,
+  USDY_CONTRACT_ABI,
+  USDY_ALLOWLIST_ABI,
+  USDY_ETHEREUM_ADDRESS,
+  USDY_SEPOLIA_ADDRESS,
+  SUPPORTED_CHAINS,
 } from './constants';
 import { safeParseUnits, formatBalance } from '../../utils/numberUtils';
 import { 
@@ -99,7 +104,7 @@ export async function checkPermit2Approval({
       formatAddress(owner),
         PERMIT2_ADDRESS as `0x${string}`
       ]
-    });
+    } as any) as bigint;
     
     return {
       isApproved: allowance >= amount,
@@ -127,7 +132,7 @@ export async function getTokenConfig({
       abi: DEPOSIT_ROUTER_ABI,
       functionName: "tokenConfig",
       args: [normalizedAddress]
-    });
+    } as any);
     
     return {
       minAmount: config[0].toString(),
@@ -152,7 +157,7 @@ export async function validateRouterContract({
         abi: DEPOSIT_ROUTER_ABI,
         functionName: "tokenConfig",
         args: [normalizedTokenAddress]
-      });
+      } as any);
       const minAmount = config[0];
       const isPermitted = config[1];
 
@@ -161,7 +166,7 @@ export async function validateRouterContract({
         abi: DEPOSIT_ROUTER_ABI,
         functionName: "canDeposit",
         args: [normalizedTokenAddress, depositAmount]
-      });
+      } as any);
 
       const tokenType = normalizedTokenAddress === NATIVE_TOKEN_ADDRESS ? "ETH" : "ERC20";
       
@@ -275,3 +280,48 @@ export async function simulateDeposit({
     });
   }
 }
+
+export async function checkUSDYAllowlist(
+  receiverAddress: string,
+  chainId: string
+): Promise<boolean> {
+  try {
+    const client = await getClient(chainId);
+    const chainIdNum = Number(chainId);
+    
+    let usdyAddress: string;
+    if (chainIdNum === SUPPORTED_CHAINS.MAINNET) {
+      usdyAddress = USDY_ETHEREUM_ADDRESS;
+    } else if (chainIdNum === SUPPORTED_CHAINS.SEPOLIA) {
+      usdyAddress = USDY_SEPOLIA_ADDRESS;
+    } else {
+      console.warn(`USDY not supported on chain ${chainId}`);
+      return true;
+    }
+    
+    const allowlistAddress = await client.readContract({
+      address: formatAddress(usdyAddress),
+      abi: USDY_CONTRACT_ABI,
+      functionName: 'allowlist',
+      args: [],
+    } as any) as string;
+
+    if (!allowlistAddress || allowlistAddress === '0x0000000000000000000000000000000000000000') {
+      console.warn('USDY allowlist address not found or is zero address');
+      return true;
+    }
+    
+    const isAllowed = await client.readContract({
+      address: formatAddress(allowlistAddress),
+      abi: USDY_ALLOWLIST_ABI,
+      functionName: 'isAllowed',
+      args: [formatAddress(receiverAddress)],
+    } as any);
+    
+    return isAllowed as boolean;
+  } catch (error) {
+    console.error('Error checking USDY allowlist:', error);
+    return false;
+  }
+}
+

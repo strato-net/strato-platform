@@ -7,6 +7,7 @@ export const mUsdstAddress = "000000000000000000000000000000000000100f"
 export const cataAddress = "2680dc6693021cd3fefb84351570874fbef8332a"
 export const rewardsChefAddress = "000000000000000000000000000000000000101f"
 export const rewardsAddress = "0000000000000000000000000000000000001020" // TODO: Update with actual deployed address
+export const usdystAddress = "5a98d10ad6822eeefdb2fa047a6bddb916382012"
 export const DECIMAL = 18
 
 // ============================================
