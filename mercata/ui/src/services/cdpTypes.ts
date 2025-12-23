@@ -1,38 +1,19 @@
-/**
- * CDP (Collateralized Debt Position) Type Definitions
- * 
- * This file contains all data structures, interfaces, and types related to CDP operations.
- */
-
-// ============================================================================
-// Vault Data Structures
-// ============================================================================
-
-/**
- * Vault data returned from the backend API
- */
 export interface VaultData {
   asset: string;                               // Collateral asset address
   symbol: string;                              // Asset symbol (e.g., "ETH", "WBTC")
   collateralAmount: string;                    // Raw integer string (wei format)
   collateralAmountDecimals: number;            // Decimals for proper formatting
   collateralValueUSD: string;                  // Raw integer string (18 decimals)
-  debtAmount: string;                          // Raw integer string (18 decimals)
-  debtValueUSD: string;                        // Raw integer string (18 decimals)
+  debtAmount: string;                          // Raw integer string (18 decimals) - USDST debt
   collateralizationRatio: number;              // Ratio of collateral to debt (percentage)
   liquidationRatio: number;                    // Minimum required collateralization ratio
   healthFactor: number;                        // Vault health (CR / liquidationRatio)
   stabilityFeeRate: number;                    // Annual interest rate (percentage)
-  health: "healthy" | "warning" | "danger";    // Health status indicator
   borrower?: string;                           // Borrower address (for liquidatable positions)
-  // Raw data for precision calculations
-  scaledDebt: string;                          // Raw scaled debt (wei format)
-  rateAccumulator: string;                     // Current rate accumulator (RAY format)
+  scaledDebt: string;                          // Raw scaled debt (wei format) - for precision calculations
+  rateAccumulator: string;                     // Current rate accumulator (RAY format) - for precision calculations
 }
 
-/**
- * Asset configuration for CDP operations
- */
 export interface AssetConfig {
   asset: string;                          // Asset address
   symbol: string;                         // Asset symbol
@@ -48,45 +29,15 @@ export interface AssetConfig {
   isSupported: boolean;                   // Whether asset is supported
 }
 
-/**
- * Vault candidate for mint planning (from backend API)
- * Represents both existing vaults and potential vaults that can be opened
- */
-export interface VaultCandidate {
-  assetAddress: string;
-  symbol: string;
-  collateralAmount: string; // raw integer string
-  collateralAmountDecimals: number;
-  scaledDebt: string; // raw integer string
-  rateAccumulator: string; // RAY format
-  userNonCollateralBalance: string; // raw integer string
-  oraclePrice: string; // raw integer string (18 decimals)
-  currentTotalDebt: string; // raw integer string (18 decimals)
-  liquidationRatio: number; // percentage
-  minCR: number; // percentage
-  stabilityFeeRate: number; // annual percentage
-  debtFloor: string;
-  debtCeiling: string;
-  unitScale: string;
-  isPaused: boolean;
-  isSupported: boolean;
-}
-
-/**
- * Vault candidate input for mint planning algorithm
- * Same structure as VaultCandidate
- */
-export type VaultCandidateInput = VaultCandidate;
-
 // ============================================================================
 // Mint Planning Types
 // ============================================================================
 
 /**
- * Allocation result from optimal mint planning
- * Represents the planned allocation for a specific asset
+ * PlanItem for UI display (decimal values)
+ * Derived from Allocation with decimal string values for display
  */
-export interface Allocation {
+export interface PlanItem {
   assetAddress: string;
   symbol: string;
   depositAmount: string;
@@ -98,34 +49,17 @@ export interface Allocation {
   userBalanceUSD: string;
 }
 
-// ============================================================================
-// Transaction & Response Types
-// ============================================================================
-
-/**
- * Transaction response from backend API
- */
 export interface TransactionResponse {
   status: string;                         // Transaction status (e.g., "success")
   hash: string;                           // Transaction hash
 }
 
-// ============================================================================
-// Protocol State Types
-// ============================================================================
-
-/**
- * Bad debt information for an asset
- */
 export interface BadDebt {
   asset: string;                          // Asset address
   badDebt: string;                        // Raw integer string (wei format, 18 decimals)
   symbol?: string;                        // Token symbol (e.g., "WBTC", "ETHST")
 }
 
-/**
- * Junior note information for CDP protocol
- */
 export interface JuniorNote {
   owner: string;                          // Account that owns the note
   capUSDST: string;                       // Remaining payout cap in wei (18 decimals)

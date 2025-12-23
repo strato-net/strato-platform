@@ -29,17 +29,57 @@ export function rpow(x: bigint, n: bigint, ray: bigint = RAY): bigint {
 }
 
 /**
+ * Convert per-second RAY rate to annual percentage (reverse of convertAnnualPercentageToPerSecondRate)
+ * Formula: annualFactor = rate^secondsPerYear
+ * Annual percentage = (annualFactor - 1) * 100
+ * @param stabilityFeeRateRay - Per-second rate in RAY format (e.g., 1.000000088e27 for ~2.8% APR)
+ * @returns Annual percentage (e.g., 2.8 for 2.8% APR)
+ */
+export function convertStabilityFeeRateToAnnualPercentage(stabilityFeeRateRay: bigint): number {
+  // Edge case: if rate is exactly RAY (0% APR), return 0
+  if (stabilityFeeRateRay <= RAY) return 0;
+  
+  // Edge case: if rate is too high, cap to prevent overflow
+  // Max reasonable APR is ~1000% (rate ~1.00000033 per second)
+  const MAX_REASONABLE_RATE = RAY + (RAY / 300000n); // ~100% APR
+  const cappedRate = stabilityFeeRateRay > MAX_REASONABLE_RATE ? MAX_REASONABLE_RATE : stabilityFeeRateRay;
+  
+  const annualFactorRay = rpow(cappedRate, SECONDS_PER_YEAR);
+  const factorMinusOne = annualFactorRay - RAY;
+  const integerPart = factorMinusOne / RAY;
+  const remainder = factorMinusOne % RAY;
+  const PRECISION_SCALE = BigInt(1e18);
+  const fractionalPart = (remainder * PRECISION_SCALE) / RAY;
+  const annualPercentage = (Number(integerPart) + Number(fractionalPart) / Number(PRECISION_SCALE)) * 100;
+  
+  // Ensure result is finite
+  return isFinite(annualPercentage) ? annualPercentage : 0;
+}
+
+/**
  * Convert annual percentage (e.g., 2.8 for 2.8% APR) to per-second RAY rate
  * Target: (1 + annualPercentage/100) = (1 + rate)^secondsPerYear
  * So: rate = (1 + annualPercentage/100)^(1/secondsPerYear) - 1
  * In RAY: targetFactor = RAY + (annualPercentage/100) * RAY
  */
 export function convertAnnualPercentageToPerSecondRate(annualPercentage: number): bigint {
-  const targetAnnualFactorRay = RAY + BigInt(Math.floor((annualPercentage / 100) * Number(RAY)));
+  // Validate input
+  if (!isFinite(annualPercentage) || annualPercentage <= 0) return RAY;
+  
+  // Calculate target factor: (1 + annualPercentage/100) * RAY
+  // Avoid precision loss by using BigInt arithmetic
+  const percentageScaled = BigInt(Math.floor(annualPercentage * 1e9)); // Scale to 9 decimal places
+  const targetAnnualFactorRay = RAY + (RAY * percentageScaled) / BigInt(1e9) / 100n;
   
   // Binary search for per-second rate
+  // Initial bounds: RAY (0% APR) to RAY * 1.01 (1% per-second, ~infinite APR)
   let low = RAY;
   let high = RAY + (RAY / 100n);
+  
+  // Expand upper bound if target is very high
+  if (annualPercentage > 100) {
+    high = RAY + (RAY * BigInt(Math.floor(annualPercentage)) / 10000n);
+  }
   
   for (let i = 0; i < 100; i++) {
     const mid = (low + high) / 2n;
@@ -56,6 +96,7 @@ export function convertAnnualPercentageToPerSecondRate(annualPercentage: number)
     }
   }
   
+  // Choose the rate closest to target
   const lowResult = rpow(low, SECONDS_PER_YEAR);
   const highResult = rpow(high, SECONDS_PER_YEAR);
   const lowDiff = lowResult > targetAnnualFactorRay ? lowResult - targetAnnualFactorRay : targetAnnualFactorRay - lowResult;
@@ -76,14 +117,18 @@ export function getCompoundInterest(
   annualPercentage: number,
   seconds: bigint
 ): number {
-  if (debtUSD <= 0 || annualPercentage <= 0) return 0;
+  // Edge case checks
+  if (!isFinite(debtUSD) || debtUSD <= 0) return 0;
+  if (!isFinite(annualPercentage) || annualPercentage <= 0) return 0;
+  if (seconds <= 0n) return 0;
   
   const debtWei = parseUnits(debtUSD.toFixed(18), 18);
   const perSecondRate = convertAnnualPercentageToPerSecondRate(annualPercentage);
   const factor = rpow(perSecondRate, seconds);
   const interestWei = (debtWei * (factor - RAY)) / RAY;
   
-  return parseFloat(formatUnits(interestWei, 18));
+  const result = parseFloat(formatUnits(interestWei, 18));
+  return isFinite(result) ? result : 0;
 }
 
 // ============================================================================
@@ -101,14 +146,14 @@ export const USDST_ADDRESS = "937efa7e3a77e20bbdbd7c0d32b6514f368c1010";
 // ============================================================================
 
 /**
- * Compute target collateralization ratio (CR) from minimum CR and risk factor
+ * Compute target collateralization ratio (CR) from minimum CR and risk buffer
  * @param minCRWad - Minimum CR in WAD format (e.g., 200% = 2e18)
- * @param riskFactor - Risk factor to apply (e.g., 1.2 for 20% buffer)
+ * @param riskBuffer - Risk buffer to apply (e.g., 1.2 for 20% buffer)
  * @returns Target CR in WAD format
  */
-export function computeTargetCRWadFromRiskFactor(minCRWad: bigint, riskFactor: number): bigint {
-  const riskFactorWad = BigInt(Math.floor(riskFactor * 1000));
-  return (minCRWad * riskFactorWad) / 1000n;
+export function computeTargetCRWadFromRiskBuffer(minCRWad: bigint, riskBuffer: number): bigint {
+  const riskBufferWad = BigInt(Math.floor(riskBuffer * 1000));
+  return (minCRWad * riskBufferWad) / 1000n;
 }
 
 // ============================================================================

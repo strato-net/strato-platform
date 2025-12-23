@@ -298,7 +298,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
     const currentCollateral = parseFloat(formatWeiToDecimalHP(position.collateralAmount, position.collateralAmountDecimals));
     const currentDebt = parseFloat(formatWeiToDecimalHP(position.debtAmount, 18));
     const currentCollateralUSD = parseFloat(formatWeiToDecimalHP(position.collateralValueUSD, 18));
-    const currentDebtUSD = parseFloat(formatWeiToDecimalHP(position.debtValueUSD, 18));
+    const currentDebtUSD = currentDebt; // USDST is 1:1 with USD
     
     // Get the actual token price from oracle
     const priceWei = getPrice(position.asset);
@@ -351,7 +351,6 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
       collateralAmount: formatNumber(newCollateral),
       collateralValueUSD: formatNumber(newCollateralUSD),
       debtAmount: formatNumber(newDebt),
-      debtValueUSD: formatNumber(newDebtUSD),
       healthFactor: newHealthFactor
     };
   };
@@ -701,7 +700,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Debt</p>
                   <p className="font-semibold">{formatNumber(parseFloat(formatWeiToDecimalHP(position.debtAmount, 18)))} USDST</p>
-                  <p className="text-xs text-muted-foreground">${formatNumber(parseFloat(formatWeiToDecimalHP(position.debtValueUSD, 18)))}</p>
+                  <p className="text-xs text-muted-foreground">${formatNumber(parseFloat(formatWeiToDecimalHP(position.debtAmount, 18)))}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Health Factor</p>
@@ -749,7 +748,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                     <div>
                       <p className="text-xs text-blue-600 dark:text-blue-400 mb-1">Debt</p>
                       <p className="font-semibold text-blue-900 dark:text-blue-100">{previewValues.debtAmount} USDST</p>
-                      <p className="text-xs text-blue-500 dark:text-blue-400">${previewValues.debtValueUSD}</p>
+                      <p className="text-xs text-blue-500 dark:text-blue-400">${previewValues.debtAmount}</p>
                     </div>
                     <div>
                       <p className="text-xs text-blue-600 dark:text-blue-400 mb-1">Health Factor</p>
@@ -763,7 +762,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                           <div className="whitespace-pre-line text-center">
                             {previewValues.healthFactor === Infinity 
                               ? 'Health Factor = CR ÷ Liquidation Threshold'
-                              : `Health Factor = CR ÷ Liquidation Threshold\n${formatNumber((parseFloat(previewValues.collateralValueUSD) / parseFloat(previewValues.debtValueUSD)) * 100)}% ÷ ${formatNumber(position.liquidationRatio)}% = ${formatNumber(previewValues.healthFactor)}`
+                              : `Health Factor = CR ÷ Liquidation Threshold\n${formatNumber((parseFloat(previewValues.collateralValueUSD) / parseFloat(previewValues.debtAmount)) * 100)}% ÷ ${formatNumber(position.liquidationRatio)}% = ${formatNumber(previewValues.healthFactor)}`
                             }
                           </div>
                         </TooltipContent>

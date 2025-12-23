@@ -3,19 +3,20 @@ import { parseUnits } from "ethers";
 import type {
   VaultData,
   AssetConfig,
-  VaultCandidate,
   TransactionResponse,
   BadDebt,
   JuniorNote,
 } from "./cdpTypes";
+import type { VaultCandidateAPI } from "./mintPlanService";
+import { apiToVaultCandidate, type VaultCandidate } from "./mintPlanService";
 
 export type {
   VaultData,
   AssetConfig,
-  VaultCandidate,
   TransactionResponse,
   BadDebt,
   JuniorNote,
+  VaultCandidate,
 };
 
 // Constants for better maintainability
@@ -50,8 +51,11 @@ export const cdpService = {
   },
 
   async getVaultCandidates(): Promise<{ existingVaults: VaultCandidate[]; potentialVaults: VaultCandidate[] }> {
-    const response = await api.get("/cdp/vault-candidates");
-    return response.data;
+    const response = await api.get<{ existingVaults: VaultCandidateAPI[]; potentialVaults: VaultCandidateAPI[] }>("/cdp/vault-candidates");
+    return {
+      existingVaults: response.data.existingVaults.map(apiToVaultCandidate),
+      potentialVaults: response.data.potentialVaults.map(apiToVaultCandidate),
+    };
   },
 
   // Get specific vault for an asset
