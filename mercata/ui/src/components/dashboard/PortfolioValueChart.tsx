@@ -60,10 +60,9 @@ const calculateChange = (data: PortfolioDataPoint[]): { percentage: number | nul
   const first = data[0].balance;
   const last = data[data.length - 1].balance;
   const changeAmount = last - first;
-  const changePercentage = (changeAmount / first) * 100;
   
   return {
-    percentage: first === 0 ? null : Math.abs(changePercentage),
+    percentage: first === 0 ? null : Math.abs((changeAmount / first) * 100),
     amount: Math.abs(changeAmount),
     isPositive: changeAmount >= 0
   };
