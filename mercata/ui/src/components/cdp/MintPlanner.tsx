@@ -505,7 +505,12 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
       }));
       setProgressTransactions(progressTxs);
 
-      const SAFETY_BUFFER_PERCENT = 0.001;
+      // Safety buffer of 0.5% (5/1000) to account for:
+      // 1. Rate accumulator drift (interest accrual between frontend calc and on-chain execution)
+      // 2. Rounding differences between BigInt divisions
+      // 3. On-chain uses strict < check: currentDebt + amountUSD < maxBorrowableUSD
+      const SAFETY_BUFFER_BPS = 5n; // 0.5% = 5 basis points
+      const BPS_SCALE = 1000n;
       let allSuccessful = true;
       let currentTxIndex = 0;
 
@@ -568,14 +573,20 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
         });
 
         try {
+          // Get max mintable from backend (returns wei string)
           const maxMintResult = await cdpService.getMaxMint(tx.asset);
-          const maxMintableUSD = parseFloat(formatUnits(maxMintResult.maxAmount, 18));
-          const plannedMintUSD = parseFloat(tx.amount);
-          const safeMaxMintableUSD = maxMintableUSD * (1 - SAFETY_BUFFER_PERCENT);
+          const maxMintableWei = BigInt(maxMintResult.maxAmount);
+          
+          // Convert planned mint to wei for precise comparison (avoid parseFloat precision loss)
+          const plannedMintWei = parseUnits(tx.amount, 18);
+          
+          // Apply safety buffer using BigInt arithmetic to avoid floating point issues
+          // safeMax = maxMintable * (1000 - 5) / 1000 = maxMintable * 995 / 1000
+          const safeMaxMintableWei = (maxMintableWei * (BPS_SCALE - SAFETY_BUFFER_BPS)) / BPS_SCALE;
 
-          if (plannedMintUSD > safeMaxMintableUSD) {
-            const clampedMintUSD = Math.max(0, safeMaxMintableUSD);
-            if (clampedMintUSD <= 0) {
+          if (plannedMintWei > safeMaxMintableWei) {
+            // Clamp to safe max
+            if (safeMaxMintableWei <= 0n) {
               setProgressTransactions(prev => {
                 const updated = [...prev];
                 updated[currentTxIndex] = { 
@@ -588,7 +599,8 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
               currentTxIndex++;
               continue;
             }
-            tx.amount = clampedMintUSD.toString();
+            // Convert clamped wei back to decimal string for mint call
+            tx.amount = formatUnits(safeMaxMintableWei, 18);
           }
 
           const result = await cdpService.mint(tx.asset, tx.amount);

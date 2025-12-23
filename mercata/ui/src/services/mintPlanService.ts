@@ -104,11 +104,23 @@ export function getMaxAllocations(
 }
 
 // Helper to compute headroom for a single candidate (used by both sorting and total headroom calculation)
+// NOTE: Conservative buffer is applied because:
+//   1. On-chain uses strict < check: require(currentDebt + amountUSD < maxBorrowableUSD)
+//   2. Rate accumulator can drift between frontend calc and on-chain execution
+//   3. Indexed currentDebt may be slightly stale
+// Buffer: 0.1% (1/1000) of max debt, minimum 1 wei
 function computeHeadroom(c: VaultCandidate, targetCR: bigint): bigint {
   const maxCollateral = c.currentCollateral + c.potentialCollateral;
   const collateralValue = computeCollateralUSD(maxCollateral, c.oraclePrice, c.assetScale);
   const maxDebtRaw = (collateralValue * WAD) / targetCR;
-  const maxDebtFromCollateral = maxDebtRaw > 0n ? maxDebtRaw - 1n : 0n;
+  
+  // Apply conservative buffer: 0.1% of max debt, minimum 1 wei
+  const BUFFER_BPS = 1n; // 0.1% = 1 basis point (1/1000)
+  const BPS_SCALE = 1000n;
+  const percentBuffer = (maxDebtRaw * BUFFER_BPS) / BPS_SCALE;
+  const safetyBuffer = percentBuffer > 0n ? percentBuffer : 1n;
+  
+  const maxDebtFromCollateral = maxDebtRaw > safetyBuffer ? maxDebtRaw - safetyBuffer : 0n;
   const headroomFromCollateral = maxDebtFromCollateral > c.currentDebt 
     ? maxDebtFromCollateral - c.currentDebt 
     : 0n;
@@ -265,7 +277,14 @@ function allocate(
 
     if (maxCR < targetCR) {
       // Even full deposit isn't enough → reduce mint to achievable amount
-      const maxDebtFromCollateral = (maxCollateralValue * WAD) / targetCR;
+      // Apply conservative buffer for on-chain strict < check and rate accumulator drift
+      const maxDebtRaw = (maxCollateralValue * WAD) / targetCR;
+      // Buffer: 0.1% of max debt, minimum 1 wei
+      const BUFFER_BPS = 1n;
+      const BPS_SCALE = 1000n;
+      const percentBuffer = (maxDebtRaw * BUFFER_BPS) / BPS_SCALE;
+      const safetyBuffer = percentBuffer > 0n ? percentBuffer : 1n;
+      const maxDebtFromCollateral = maxDebtRaw > safetyBuffer ? maxDebtRaw - safetyBuffer : 0n;
       mintAmount = maxDebtFromCollateral > candidate.currentDebt
         ? maxDebtFromCollateral - candidate.currentDebt
         : 0n;
@@ -340,6 +359,43 @@ function allocate(
   // ═══════════════════════════════════════════════════════════════════════════
   // STEP 4: Final validation - no headroom at target CR
   // ═══════════════════════════════════════════════════════════════════════════
+  if (mintAmount <= 0n) {
+    return 'NO_HEADROOM';
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // STEP 5: Apply final safety buffer for on-chain strict < check
+  // On-chain: require(currentDebt + amountUSD < maxBorrowableUSD)
+  // 
+  // Apply conservative buffer to account for:
+  // 1. Strict < check on-chain (vs >= or <=)
+  // 2. Rate accumulator drift (interest accrual between frontend calc and execution)
+  // 3. Potential staleness in indexed currentDebt value
+  // 
+  // Buffer: 0.1% (1/1000) of mint amount, minimum 1 wei
+  // ═══════════════════════════════════════════════════════════════════════════
+  const finalCollateral = candidate.currentCollateral + depositAmount;
+  const finalCollateralValue = computeCollateralUSD(finalCollateral, candidate.oraclePrice, candidate.assetScale);
+  // Use candidate.minCR (on-chain constraint) not targetCR (user's risk buffer)
+  const maxBorrowableOnChain = (finalCollateralValue * WAD) / candidate.minCR;
+  const finalDebt = candidate.currentDebt + mintAmount;
+  
+  // Calculate safety buffer: 0.1% of mintAmount, minimum 1 wei
+  const BUFFER_BPS = 1n; // 0.1% = 1 basis point (1/1000)
+  const BPS_SCALE = 1000n;
+  const percentBuffer = (mintAmount * BUFFER_BPS) / BPS_SCALE;
+  const safetyBuffer = percentBuffer > 0n ? percentBuffer : 1n;
+  
+  // On-chain uses strict <, so finalDebt must be < maxBorrowableOnChain
+  // Also subtract safety buffer to account for rate accumulator drift
+  if (finalDebt + safetyBuffer >= maxBorrowableOnChain && mintAmount > 0n) {
+    // Reduce mintAmount to satisfy strict < check with safety margin
+    const safeMaxMint = maxBorrowableOnChain > candidate.currentDebt + safetyBuffer
+      ? maxBorrowableOnChain - candidate.currentDebt - safetyBuffer - 1n 
+      : 0n;
+    mintAmount = safeMaxMint > 0n ? safeMaxMint : 0n;
+  }
+
   if (mintAmount <= 0n) {
     return 'NO_HEADROOM';
   }
