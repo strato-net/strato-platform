@@ -244,7 +244,8 @@ class SwappingController {
 
       const page = query.page ? parseInt(query.page as string, 10) : 1;
       const limit = query.limit ? parseInt(query.limit as string, 10) : 10;
-      const swapHistory = await getSwapHistory(accessToken, params.poolAddress, page, limit);
+      const sender = query.sender as string | undefined;
+      const swapHistory = await getSwapHistory(accessToken, params.poolAddress, page, limit, sender);
       res.status(RestStatus.OK).json(swapHistory);
     } catch (error) {
       next(error);

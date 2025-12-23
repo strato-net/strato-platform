@@ -4,6 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Copy, Loader2 } from 'lucide-react';
 import { useSwapContext } from '@/context/SwapContext';
+import { useUser } from '@/context/UserContext';
 import { formatWeiAmount, formatHash } from '@/utils/numberUtils';
 
 // ============================================================================
@@ -159,6 +160,7 @@ const SwapHistory: React.FC = () => {
   // CONTEXT & HOOKS
   // ========================================================================
   const { refreshSwapHistory, pool, poolLoading, swapHistory, swapHistoryCount, swapHistoryLoading } = useSwapContext();
+  const { userAddress } = useUser();
   const tableRef = useRef<HTMLDivElement>(null);
 
   // ========================================================================
@@ -166,12 +168,13 @@ const SwapHistory: React.FC = () => {
   // ========================================================================
   const [currentPage, setCurrentPage] = useState(1);
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
+  const [showMySwapsOnly, setShowMySwapsOnly] = useState(false);
 
   // ========================================================================
   // COMPUTED VALUES
   // ========================================================================
   const totalPages = Math.ceil(swapHistoryCount / ITEMS_PER_PAGE);
-  const shouldShowLoading = swapHistoryLoading || !pool?.address;
+  const isInitialLoad = swapHistoryLoading && swapHistory.length === 0;
 
   // ========================================================================
   // EFFECTS
@@ -179,12 +182,16 @@ const SwapHistory: React.FC = () => {
   useEffect(() => {
     setCurrentPage(1);
     if (pool?.address) {
-      refreshSwapHistory({
+      const params: Record<string, string> = {
         limit: ITEMS_PER_PAGE.toString(),
         page: "1",
-      });
+      };
+      if (showMySwapsOnly && userAddress) {
+        params.sender = userAddress;
+      }
+      refreshSwapHistory(params);
     }
-  }, [pool?.address, refreshSwapHistory]);
+  }, [pool?.address, refreshSwapHistory, showMySwapsOnly, userAddress]);
 
   // ========================================================================
   // EVENT HANDLERS
@@ -203,10 +210,14 @@ const SwapHistory: React.FC = () => {
     if (!pool?.address) return;
     
     setCurrentPage(newPage);
-    refreshSwapHistory({
+    const params: Record<string, string> = {
       limit: ITEMS_PER_PAGE.toString(),
       page: newPage.toString(),
-    });
+    };
+    if (showMySwapsOnly && userAddress) {
+      params.sender = userAddress;
+    }
+    refreshSwapHistory(params);
   };
 
   // ========================================================================
@@ -214,7 +225,20 @@ const SwapHistory: React.FC = () => {
   // ========================================================================
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-semibold">Swap History</h3>
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">Swap History</h3>
+        {userAddress && (
+          <Button
+            variant={showMySwapsOnly ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowMySwapsOnly(!showMySwapsOnly)}
+            disabled={!pool?.address || swapHistoryLoading}
+          >
+            {swapHistoryLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+            {showMySwapsOnly ? "Showing My Swaps" : "Show My Swaps"}
+          </Button>
+        )}
+      </div>
 
       {pool?.address ? (
         <div ref={tableRef} className="bg-card rounded-lg border border-border">
@@ -230,8 +254,8 @@ const SwapHistory: React.FC = () => {
                 <TableHead className="w-[100px]">Sender</TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
-              {shouldShowLoading ? (
+            <TableBody className={`transition-opacity duration-200 ${swapHistoryLoading ? "opacity-50 pointer-events-none" : ""}`}>
+              {isInitialLoad ? (
                 <LoadingRow />
               ) : swapHistory.length > 0 ? (
                 swapHistory.map((swap) => (

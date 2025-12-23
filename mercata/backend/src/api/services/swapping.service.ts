@@ -203,14 +203,23 @@ export const getSwapHistory = async (
   accessToken: string,
   poolAddress: string,
   page: number = 1,
-  limit: number = 10
+  limit: number = 10,
+  senderAddress?: string
 ): Promise<SwapHistoryResponse> => {
   const offset = (page - 1) * limit;
+
+  const baseParams: Record<string, string> = {
+    address: `eq.${poolAddress}`,
+  };
+
+  if (senderAddress) {
+    baseParams.sender = `eq.${senderAddress}`;
+  }
 
   const [swapEventsResponse, countResponse] = await Promise.all([
     cirrus.get(accessToken, `/${PoolSwap}`, {
       params: {
-        address: `eq.${poolAddress}`,
+        ...baseParams,
         select: swapHistorySelectFields.join(','),
         order: 'block_timestamp.desc',
         limit: limit.toString(),
@@ -219,7 +228,7 @@ export const getSwapHistory = async (
     }),
     cirrus.get(accessToken, `/${PoolSwap}`, {
       params: {
-        address: `eq.${poolAddress}`,
+        ...baseParams,
         select: "count()",
       }
     })
