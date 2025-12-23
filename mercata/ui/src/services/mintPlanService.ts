@@ -95,7 +95,7 @@ export function getMaxAllocations(
     // Pass candidate's current globalDebt (not tracking across allocations since each is independent)
     const result = allocate(candidate, headroom, targetCR, candidate.globalDebt);
 
-    if (result !== 'DEBT_FLOOR_HIT' && result !== 'DEBT_CEILING_HIT' && result.mintAmount > 0n) {
+    if (result !== 'DEBT_FLOOR_HIT' && result !== 'DEBT_CEILING_HIT' && result !== 'NO_HEADROOM' && result.mintAmount > 0n) {
       allocations.push(result);
     }
   }
@@ -208,12 +208,29 @@ export function getOptimalAllocations(
     const result = allocate(candidate, remainingMint, targetCR, currentGlobalDebt);
     
     if (result === 'DEBT_FLOOR_HIT') {
+      const totalDebtAfterMint = candidate.currentDebt + remainingMint;
+      const isBelowFloor = totalDebtAfterMint > 0n && totalDebtAfterMint < candidate.debtFloor;
+      console.log(
+        `Vault hit debt floor: ${candidate.symbol} (${candidate.assetAddress})\n` +
+        `  Attempted mint: ${remainingMint.toString()} wei\n` +
+        `  Current debt: ${candidate.currentDebt.toString()} wei\n` +
+        `  Total debt after mint: ${totalDebtAfterMint.toString()} wei\n` +
+        `  Debt floor: ${candidate.debtFloor.toString()} wei\n` +
+        `  Is below floor: ${isBelowFloor}`
+      );
       debtFloorHit = true;
       continue;
     }
     
     if (result === 'DEBT_CEILING_HIT') {
+      console.log(`Vault hit debt ceiling: ${candidate.symbol} (${candidate.assetAddress}), attempted mint: ${remainingMint.toString()} wei`);
       debtCeilingHit = true;
+      continue;
+    }
+    
+    if (result === 'NO_HEADROOM') {
+      // No mintable headroom at target CR - vault is at or above capacity for the current risk buffer
+      console.log(`Vault has no headroom: ${candidate.symbol} (${candidate.assetAddress}) - already at max debt for target CR`);
       continue;
     }
     
@@ -233,7 +250,7 @@ function allocate(
   remainingMint: bigint,
   targetCR: bigint,
   globalDebt: bigint
-): Allocation | 'DEBT_FLOOR_HIT' | 'DEBT_CEILING_HIT' {
+): Allocation | 'DEBT_FLOOR_HIT' | 'DEBT_CEILING_HIT' | 'NO_HEADROOM' {
   let mintAmount = remainingMint;
   let depositAmount = 0n;
 
@@ -333,10 +350,10 @@ function allocate(
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // STEP 4: Final validation
+  // STEP 4: Final validation - no headroom at target CR
   // ═══════════════════════════════════════════════════════════════════════════
   if (mintAmount <= 0n) {
-    return 'DEBT_FLOOR_HIT';
+    return 'NO_HEADROOM';
   }
 
   return {

@@ -322,6 +322,16 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
     }, 0n);
   }, [maxAllocations]);
 
+  // Update input value when MAX mode is enabled and max amount changes
+  useEffect(() => {
+    if (isMaxMode && totalMaxMintWei > 0n) {
+      const maxMint = formatUnits(totalMaxMintWei, 18);
+      const cleaned = maxMint.replace(/\.?0+$/, '');
+      const formatted = formatNumberWithCommas(cleaned);
+      setMintAmountInput(formatted);
+    }
+  }, [isMaxMode, totalMaxMintWei]);
+
   // Disable MAX mode if risk buffer changes and no allocations are possible
   useEffect(() => {
     if (isMaxMode && (maxAllocations.length === 0 || totalMaxMintWei === 0n)) {
