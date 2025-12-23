@@ -341,8 +341,9 @@ export const fetchLeaderboard = async (
 ): Promise<LeaderboardResponse> => {
   const rewardsAddress = getRewardsAddress();
   
-  // Fetch season info for both season and all-time leaderboards
-  const seasonInfo = await fetchSeasonInfo(accessToken, rewardsAddress, forceRefresh);
+  // Hardcoded season info for now
+  const currentSeason = 1;
+  const seasonName = "Season 1";
 
   // Return dummy data for season (until season contracts are ready)
   if (season) {
@@ -357,8 +358,8 @@ export const fetchLeaderboard = async (
       total, 
       offset, 
       limit,
-      currentSeason: seasonInfo.currentSeason,
-      seasonName: seasonInfo.seasonName
+      currentSeason,
+      seasonName
     };
   }
 
@@ -384,8 +385,8 @@ export const fetchLeaderboard = async (
       total, 
       offset, 
       limit,
-      currentSeason: seasonInfo.currentSeason,
-      seasonName: seasonInfo.seasonName
+      currentSeason,
+      seasonName
     };
   } catch (error) {
     console.error("Failed to fetch leaderboard:", error);
