@@ -739,7 +739,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
                     color: getRiskColor(riskBuffer)
                   }}
                 >
-                  {riskBuffer === 1.0 ? "No Buffer" : `${riskBuffer.toFixed(1)}x`}
+                  {riskBuffer === 1.0 ? "No Buffer" : `${riskBuffer.toFixed(2)}x`}
                 </span>
               </div>
               <div className="relative w-full">
@@ -749,7 +749,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
                     onValueChange={(value) => setRiskBuffer(3.5 - value[0])}
                     min={1}
                     max={2.5}
-                    step={0.1}
+                    step={0.01}
                     className="w-full risk-slider"
                     trackClassName="risk-slider-track"
                     rangeClassName="risk-slider-range"
