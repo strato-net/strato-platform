@@ -260,6 +260,15 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
     return Math.max(HF_MIN, minAchievableHF);
   }, [HF_MIN, minAchievableHF]);
 
+  const sliderStep = useMemo(() => {
+    const range = hfSliderMax - hfSliderMin;
+    const minSteps = 20;
+    const baseStep = 0.05;
+    const minStep = 0.01;
+    const dynamicStep = range / baseStep < minSteps ? range / minSteps : baseStep;
+    return Math.max(minStep, Math.floor(dynamicStep * 100) / 100);
+  }, [hfSliderMax, hfSliderMin]);
+
   // Default HF choice when user enters a borrow amount:
   // max( HF with no additional collateral, min( SAFE_DEFAULT, HF with all collateral ) )
   const defaultRecommendedHF = useMemo(() => {
@@ -952,7 +961,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
             value={[invertedSliderValue]}
             min={HF_MIN}
             max={hfSliderMax}
-            step={0.05}
+            step={sliderStep}
             onValueChange={handleHealthFactorSliderChange}
             disabled={!loanForPreview || !hasPreviewBorrowPower || !borrowAmount || borrowAmountWei <= 0n}
             trackClassName="h-3"
