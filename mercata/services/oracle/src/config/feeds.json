@@ -11,6 +11,11 @@
       "assets": ["XAU", "XAG"]
     },
     {
+      "name": "metals-weekend",
+      "sources": ["CoinMarketCap"],
+      "assets": ["XAU-WEEKEND", "XAG-WEEKEND"]
+    },
+    {
       "name": "constant-price",
       "sources": ["constant"],
       "assets": ["USDST"]
