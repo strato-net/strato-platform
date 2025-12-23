@@ -20,6 +20,7 @@ import {
   convertStabilityFeeRateToAnnualPercentage,
 } from "@/services/cdpUtils";
 import { formatUnits, parseUnits } from "ethers";
+import { formatNumberWithCommas, parseCommaNumber } from "@/utils/numberUtils";
 import { useToast } from "@/hooks/use-toast";
 import { CompactRewardsDisplay } from "@/components/rewards/CompactRewardsDisplay";
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
@@ -86,39 +87,6 @@ const formatPercentage = (num: number, decimals: number = 2): string => {
   if (isNaN(num)) return '0.00%';
   return num.toFixed(decimals) + '%';
 };
-
-// Helper to format number with commas for display
-const formatNumberWithCommas = (value: string | number): string => {
-  if (value === "" || value === null || value === undefined) return "";
-  const str = typeof value === "number" ? value.toString() : value;
-  // Remove any existing commas
-  const cleaned = str.replace(/,/g, "");
-  
-  // Handle empty string or just decimal point
-  if (cleaned === "" || cleaned === ".") return cleaned;
-  
-  // Split into integer and decimal parts
-  const parts = cleaned.split(".");
-  const integerPart = parts[0] || "";
-  const decimalPart = parts[1];
-  
-  // Format integer part with commas (only if there's content)
-  let formattedInteger = integerPart;
-  if (integerPart) {
-    // Remove leading zeros except for single zero
-    const normalizedInteger = integerPart.replace(/^0+/, "") || "0";
-    formattedInteger = normalizedInteger.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  }
-  
-  // Combine with decimal part if present
-  return decimalPart !== undefined ? `${formattedInteger}.${decimalPart}` : formattedInteger;
-};
-
-// Helper to parse comma-separated number string to numeric string
-const parseCommaNumber = (value: string): string => {
-  return value.replace(/,/g, "");
-};
-
 
 const VaultBreakdown: React.FC<{
   allocations: OptimalAllocation[];
@@ -676,12 +644,18 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
                   value={mintAmountInput}
                   onChange={(e) => {
                     const rawValue = e.target.value;
+                    const cursorPosition = e.target.selectionStart || 0;
+                    
                     // Allow empty string
                     if (rawValue === "") {
                       setMintAmountInput("");
                       setIsMaxMode(false);
                       return;
                     }
+                    
+                    // Get the part before cursor (without commas) to track position in unformatted string
+                    const beforeCursor = rawValue.substring(0, cursorPosition);
+                    const beforeCursorNoCommas = parseCommaNumber(beforeCursor);
                     
                     // Remove commas and validate format
                     const parsed = parseCommaNumber(rawValue);
@@ -692,6 +666,25 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
                       const formatted = formatNumberWithCommas(parsed);
                       setMintAmountInput(formatted);
                       setIsMaxMode(false); // Disable MAX mode when user types
+                      
+                      // Adjust cursor position to maintain correct position after comma insertion
+                      setTimeout(() => {
+                        const input = e.target;
+                        if (input) {
+                          // Find position in formatted string matching the unformatted cursor position
+                          let unformattedPos = 0;
+                          let formattedPos = 0;
+                          
+                          while (formattedPos < formatted.length && unformattedPos < beforeCursorNoCommas.length) {
+                            if (formatted[formattedPos] !== ',') {
+                              unformattedPos++;
+                            }
+                            formattedPos++;
+                          }
+                          
+                          input.setSelectionRange(formattedPos, formattedPos);
+                        }
+                      }, 0);
                     }
                     // If invalid format, don't update (prevents invalid input)
                   }}

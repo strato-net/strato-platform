@@ -123,6 +123,50 @@ export const addCommasToInput = (value: string): string => {
 };
 
 /**
+ * Format number with commas for display in input fields
+ * Handles edge cases like empty strings, decimal points, and leading zeros
+ * 
+ * @param value - The value to format (string or number)
+ * @returns Formatted string with commas
+ */
+export const formatNumberWithCommas = (value: string | number): string => {
+  if (value === "" || value === null || value === undefined) return "";
+  const str = typeof value === "number" ? value.toString() : value;
+  // Remove any existing commas
+  const cleaned = str.replace(/,/g, "");
+  
+  // Handle empty string or just decimal point
+  if (cleaned === "" || cleaned === ".") return cleaned;
+  
+  // Split into integer and decimal parts
+  const parts = cleaned.split(".");
+  const integerPart = parts[0] || "";
+  const decimalPart = parts[1];
+  
+  // Format integer part with commas (only if there's content)
+  let formattedInteger = integerPart;
+  if (integerPart) {
+    // Remove leading zeros except for single zero
+    const normalizedInteger = integerPart.replace(/^0+/, "") || "0";
+    formattedInteger = normalizedInteger.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  }
+  
+  // Combine with decimal part if present
+  return decimalPart !== undefined ? `${formattedInteger}.${decimalPart}` : formattedInteger;
+};
+
+/**
+ * Parse comma-separated number string to numeric string
+ * Removes all commas from the input string
+ * 
+ * @param value - The comma-separated number string
+ * @returns Numeric string without commas
+ */
+export const parseCommaNumber = (value: string): string => {
+  return value.replace(/,/g, "");
+};
+
+/**
  * Formats a transaction hash to show first 6 and last 4 characters
  */
 export const formatHash = (hash: string): string => {

@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { useOracleContext } from "@/context/OracleContext";
-import { formatWeiToDecimalHP, formatNumber, formatDecimalToWeiHP } from "@/utils/numberUtils";
+import { formatWeiToDecimalHP, formatNumber, formatDecimalToWeiHP, formatNumberWithCommas, parseCommaNumber } from "@/utils/numberUtils";
 import { usdstAddress } from "@/lib/constants";
 
 // Calculate Health Factor: CR / LT (Liquidation Threshold)
@@ -141,7 +141,8 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
 
   // Check if amount is above maximum for the given action (synchronous)
   const isAmountAboveMax = (asset: string, inputAmount: string): boolean => {
-    const currentAmount = parseFloat(inputAmount || "0");
+    const parsed = parseCommaNumber(inputAmount || "0");
+    const currentAmount = parseFloat(parsed);
     if (currentAmount <= 0) return false;
     
     const maxAmount = maxValues[asset] || 0;
@@ -154,17 +155,44 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
     const cursorPosition = event?.target.selectionStart || 0;
     const inputElement = event?.target;
     
-    const currentAmount = parseFloat(value || "0");
+    // Get the part before cursor (without commas) to track position in unformatted string
+    const beforeCursor = value.substring(0, cursorPosition);
+    const beforeCursorNoCommas = parseCommaNumber(beforeCursor);
+    
+    // Remove commas and validate format
+    const parsed = parseCommaNumber(value);
+    
+    // Allow: empty, numbers, single decimal point, or number with decimal
+    if (parsed !== "" && parsed !== "." && !/^\d*\.?\d*$/.test(parsed)) {
+      // Invalid format, don't update (prevents invalid input)
+      return;
+    }
+    
+    // Format with commas for display
+    const formatted = formatNumberWithCommas(parsed);
+    
+    const currentAmount = parseFloat(parsed || "0");
     const position = positions.find(p => p.asset === asset);
     const currentAction = activeActions[asset];
     
     // Always update the input amount first to prevent cursor jumping
-    setInputAmounts(prev => ({ ...prev, [asset]: value }));
+    setInputAmounts(prev => ({ ...prev, [asset]: formatted }));
     
-    // Restore cursor position after state update
+    // Restore cursor position after state update, adjusting for added/removed commas
     if (inputElement) {
       setTimeout(() => {
-        inputElement.setSelectionRange(cursorPosition, cursorPosition);
+        // Find position in formatted string matching the unformatted cursor position
+        let unformattedPos = 0;
+        let formattedPos = 0;
+        
+        while (formattedPos < formatted.length && unformattedPos < beforeCursorNoCommas.length) {
+          if (formatted[formattedPos] !== ',') {
+            unformattedPos++;
+          }
+          formattedPos++;
+        }
+        
+        inputElement.setSelectionRange(formattedPos, formattedPos);
       }, 0);
     }
     
@@ -277,7 +305,9 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
         // Store the max value for comparison
         setMaxValues(prev => ({ ...prev, [asset]: maxAmount }));
         setMaxStates(prev => ({ ...prev, [asset]: true }));
-        setInputAmounts(prev => ({ ...prev, [asset]: maxValue }));
+        // Format max value with commas for display
+        const formattedMaxValue = formatNumberWithCommas(maxValue);
+        setInputAmounts(prev => ({ ...prev, [asset]: formattedMaxValue }));
       } catch (error) {
         console.error("Failed to calculate max value:", error);
         toast({
@@ -291,7 +321,8 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
 
   // Calculate preview values based on input
   const calculatePreviewValues = (position: VaultData, action: 'deposit' | 'withdraw' | 'mint' | 'repay', inputAmount: string) => {
-    const amount = parseFloat(inputAmount);
+    const parsed = parseCommaNumber(inputAmount);
+    const amount = parseFloat(parsed);
     if (isNaN(amount) || amount <= 0) return null;
 
     // Convert wei strings to decimal numbers for calculations
@@ -433,7 +464,9 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
 
   // Handle action button clicks
   const handleAction = async (asset: string, action: 'deposit' | 'withdraw' | 'mint' | 'repay', amount: string) => {
-    if (!amount || parseFloat(amount) <= 0) {
+    // Parse commas from input
+    const parsedAmount = parseCommaNumber(amount);
+    if (!parsedAmount || parseFloat(parsedAmount) <= 0) {
       toast({
         title: "Invalid Amount",
         description: "Please enter a valid amount greater than 0",
@@ -444,7 +477,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
 
     // Validate debt constraints for mint actions
     if (action === 'mint') {
-      const mintAmountDecimal = parseFloat(amount);
+      const mintAmountDecimal = parseFloat(parsedAmount);
       const isValid = await validateDebtConstraints(asset, mintAmountDecimal);
       if (!isValid) {
         return; // Validation failed, error already shown
@@ -460,14 +493,14 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
       
       switch (action) {
         case 'deposit':
-          result = await cdpService.deposit(asset, amount);
+          result = await cdpService.deposit(asset, parsedAmount);
           break;
         case 'withdraw':
           // If user is in max state, use withdrawMax endpoint
           if (maxStates[asset]) {
             result = await cdpService.withdrawMax(asset);
           } else {
-            result = await cdpService.withdraw(asset, amount);
+            result = await cdpService.withdraw(asset, parsedAmount);
           }
           break;
         case 'mint':
@@ -475,7 +508,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
           if (maxStates[asset]) {
             result = await cdpService.mintMax(asset);
           } else {
-            result = await cdpService.mint(asset, amount);
+            result = await cdpService.mint(asset, parsedAmount);
           }
           break;
         case 'repay':
@@ -493,13 +526,13 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                 result = await cdpService.repayAll(asset);
               } else {
                 // Use regular repay with the limited amount they can afford
-                result = await cdpService.repay(asset, amount);
+                result = await cdpService.repay(asset, parsedAmount);
               }
             } else {
-              result = await cdpService.repay(asset, amount);
+              result = await cdpService.repay(asset, parsedAmount);
             }
           } else {
-            result = await cdpService.repay(asset, amount);
+            result = await cdpService.repay(asset, parsedAmount);
           }
           break;
         default:
@@ -814,8 +847,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                                 ? 'text-destructive bg-destructive/10 border-destructive/50'
                                 : ''
                           }`}
-                          type="number"
-                          step="any"
+                          inputMode="decimal"
                         />
                       <Button 
                         variant={maxStates[position.asset] ? "default" : "outline"}
