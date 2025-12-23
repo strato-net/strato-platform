@@ -28,6 +28,16 @@
       "targetAssetAddress": "937efa7e3a77e20bbdbd7c0d32b6514f368c1010",
       "constantPrice": 1000000000000000000
     },
+    "USDY": {
+      "name": "USDY-USD",
+      "tokenAddress": "0x96F6eF951840721AdBF46Ac996b59E0235CB985C",
+      "targetAssetAddress": "5a98d10ad6822eeefdb2fa047a6bddb916382012"
+    },
+    "SUSDS": {
+      "name": "SUSDS-USD",
+      "tokenAddress": "0xa3931d71877c0e7a3148cb7eb4463524fec27fbd",
+      "targetAssetAddress": "6e2d93d323edf1b3cc4672a909681b6a430cae64"
+    },
     "XAU-WEEKEND": {
       "name": "PAXG-USD-WEEKEND",
       "tokenAddress": "0x45804880De22913dAFE09f4980848ECE6EcbAf78",
