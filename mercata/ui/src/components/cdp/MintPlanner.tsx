@@ -99,17 +99,24 @@ const VaultBreakdown: React.FC<{
     return sum + parseFloat(allocation.mintAmount || "0");
   }, 0);
 
-  // Calculate transaction fees (0.01 USDST per transaction)
-  const TX_FEE_USDST = 0.01;
+  // Calculate transaction fees (matching VaultsList.tsx pricing)
+  // Deposit: 0.02 USDST, Mint: 0.01 USDST
+  const DEPOSIT_FEE_USDST = 0.02;
+  const MINT_FEE_USDST = 0.01;
   const transactionCount = allocations.reduce((count, allocation) => {
     const depositAmount = parseFloat(allocation.depositAmount || "0");
     const mintAmount = parseFloat(allocation.mintAmount || "0");
-    // Each deposit is 1 transaction, each mint is 1 transaction
     if (depositAmount > 0) count += 1; // Deposit transaction
     if (mintAmount > 0) count += 1; // Mint transaction
     return count;
   }, 0);
-  const totalTransactionFees = transactionCount * TX_FEE_USDST;
+  const totalTransactionFees = allocations.reduce((total, allocation) => {
+    const depositAmount = parseFloat(allocation.depositAmount || "0");
+    const mintAmount = parseFloat(allocation.mintAmount || "0");
+    if (depositAmount > 0) total += DEPOSIT_FEE_USDST;
+    if (mintAmount > 0) total += MINT_FEE_USDST;
+    return total;
+  }, 0);
 
   return (
     <Collapsible open={open} onOpenChange={onOpenChange}>
