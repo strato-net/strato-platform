@@ -6,7 +6,7 @@ import AssetSummary from "../components/dashboard/AssetSummary";
 import AssetsList from "../components/dashboard/AssetsList";
 import DashboardFAQ from "../components/dashboard/DashboardFAQ";
 import BorrowingSection from "../components/dashboard/BorrowingSection";
-import { Wallet, Coins, Shield, Banknote, Loader2, Trophy, Download, Send, Book, ArrowRightLeft } from "lucide-react";
+import { Wallet, Coins, Shield, Banknote, Loader2, Trophy, Send, ArrowRightLeft, Landmark } from "lucide-react";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
 import { usePendingRewards } from "@/hooks/usePendingRewards";
@@ -388,9 +388,9 @@ const Dashboard = () => {
           {/* Action Buttons - Always 4 columns */}
           <div className="grid grid-cols-4 gap-2 md:gap-4 mb-4 md:mb-6">
             {[
-              { label: 'Deposit', icon: Download, path: '/dashboard/deposits' },
+              { label: 'Deposit', icon: Wallet, path: '/dashboard/deposits' },
               { label: 'Transfer', icon: Send, path: '/dashboard/transfer' },
-              { label: 'Borrow', icon: Book, path: '/dashboard/borrow' },
+              { label: 'Borrow', icon: Landmark, path: '/dashboard/borrow' },
               { label: 'Swap', icon: ArrowRightLeft, path: '/dashboard/swap' },
             ].map(({ label, icon: Icon, path }) => (
               <Button

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Gift, Activity, Menu, Download, BarChart3, Droplets, Shield, X } from 'lucide-react';
-import { Drawer, DrawerClose, DrawerPortal, DrawerOverlay } from '@/components/ui/drawer';
+import { Drawer, DrawerClose, DrawerContent } from '@/components/ui/drawer';
 import { useUser } from '@/context/UserContext';
 
 const NAV_ITEMS = [
@@ -66,39 +66,36 @@ const MobileBottomNav = () => {
         </div>
       </nav>
 
-      {/* More Drawer - Compact */}
+      {/* More Drawer - Compact with smooth animation */}
       <Drawer open={isMoreOpen} onOpenChange={setIsMoreOpen}>
-        <DrawerPortal>
-          <DrawerOverlay className="fixed inset-0 z-50 bg-black/50" />
-          <div className="fixed inset-x-0 bottom-0 z-50 bg-background rounded-t-xl border-t border-border">
-            {/* Close Button */}
-            <div className="flex justify-end p-3">
-              <DrawerClose asChild>
-                <button className="p-1.5 rounded-md border border-border hover:bg-muted">
-                  <X size={16} />
-                </button>
-              </DrawerClose>
-            </div>
-            
-            {/* Menu Items */}
-            <div className="px-4 pb-4 space-y-1">
-              {filteredMoreItems.map(({ icon: Icon, label, path }) => (
-                <button
-                  key={path}
-                  onClick={() => handleMoreItemClick(path)}
-                  className={`flex items-center gap-3 w-full px-3 pb-3 rounded-lg transition-colors ${
-                    isActive(path)
-                      ? 'bg-primary/10 text-primary'
-                      : 'text-foreground hover:bg-muted'
-                  }`}
-                >
-                  <Icon size={20} />
-                  <span className="font-medium">{label}</span>
-                </button>
-              ))}
-            </div>
+        <DrawerContent className="pb-6">
+          {/* Close Button */}
+          <div className="flex justify-end p-3">
+            <DrawerClose asChild>
+              <button className="p-1.5 rounded-md border border-border hover:bg-muted transition-colors">
+                <X size={16} />
+              </button>
+            </DrawerClose>
           </div>
-        </DrawerPortal>
+          
+          {/* Menu Items */}
+          <div className="px-4 space-y-1">
+            {filteredMoreItems.map(({ icon: Icon, label, path }) => (
+              <button
+                key={path}
+                onClick={() => handleMoreItemClick(path)}
+                className={`flex items-center gap-3 w-full px-3 py-3 rounded-lg transition-colors ${
+                  isActive(path)
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-foreground hover:bg-muted'
+                }`}
+              >
+                <Icon size={20} />
+                <span className="font-medium">{label}</span>
+              </button>
+            ))}
+          </div>
+        </DrawerContent>
       </Drawer>
     </>
   );

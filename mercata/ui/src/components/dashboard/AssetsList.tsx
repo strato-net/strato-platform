@@ -49,7 +49,7 @@ const AssetsList = ({
                 href="/dashboard/deposits"
                 className="text-sm text-white flex items-center justify-end"
               >
-                Add Deposits
+                Deposit
               </a>
             </Button>
           </div>

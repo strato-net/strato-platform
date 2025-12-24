@@ -61,8 +61,8 @@ const DashboardHeader = ({ title }: DashboardHeaderProps) => {
           alt="STRATO" 
           className="h-8 md:hidden" 
         />
-        {/* Title hidden on mobile for inner pages to save space */}
-        <h1 className={`text-xl font-bold ${!isPortfolioPage ? 'hidden md:block' : ''}`}>{title}</h1>
+        {/* Title always visible */}
+        <h1 className="text-xl font-bold">{title}</h1>
         {isTestnet && (
           <span className="bg-orange-500 text-white px-2 py-1 rounded text-xs font-bold uppercase hidden sm:inline-block">
             TESTNET
