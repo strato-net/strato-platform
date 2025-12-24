@@ -372,6 +372,12 @@ router.post("/swap", authHandler.authorizeRequest(), SwappingController.swap);
  *         description: Page size (defaults to 10)
  *         schema:
  *           type: integer
+ *       - name: sender
+ *         in: query
+ *         required: false
+ *         description: Filter by sender address (user who performed the swap)
+ *         schema:
+ *           type: string
  *     responses:
  *       200:
  *         description: Paginated swap history
