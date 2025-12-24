@@ -48,8 +48,7 @@
       "ETH": "ethereum",
       "WBTC": "wrapped-bitcoin",
       "PAXG": "pax-gold",
-      "XAG": "silver",
-      "XAU": "pax-gold"
+      "KAG": "silver"
     }
   }
 } 
