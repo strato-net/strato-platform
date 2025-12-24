@@ -1,8 +1,8 @@
-import React, { useState, useRef, useEffect } from "react";
-import { Button } from "@/components/ui/button";
+import React, { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import {
   Collapsible,
+  CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import NetworkSelector from "./NetworkSelector";
@@ -23,94 +23,25 @@ const AdvancedOptionsDropdown: React.FC<AdvancedOptionsDropdownProps> = ({
   direction = "out",
   disabled = false,
 }) => {
-  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
-  const advancedOptionsRef = useRef<HTMLDivElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!isAdvancedOpen || !advancedOptionsRef.current || !dropdownRef.current) {
-      return;
-    }
-
-    const updatePosition = () => {
-      if (advancedOptionsRef.current && dropdownRef.current) {
-        const rect = advancedOptionsRef.current.getBoundingClientRect();
-        dropdownRef.current.style.top = `${rect.bottom - 1}px`;
-        dropdownRef.current.style.left = `${rect.left}px`;
-        dropdownRef.current.style.width = `${rect.width}px`;
-      }
-    };
-
-    const handleScroll = () => {
-      setIsAdvancedOpen(false);
-    };
-
-    const handleWheel = (e: WheelEvent) => {
-      if (dropdownRef.current && dropdownRef.current.contains(e.target as Node)) {
-        e.preventDefault();
-        e.stopPropagation();
-        setIsAdvancedOpen(false);
-      }
-    };
-
-    updatePosition();
-    window.addEventListener('scroll', handleScroll, true);
-    window.addEventListener('resize', updatePosition);
-    window.addEventListener('wheel', handleWheel, { passive: false, capture: true });
-
-    return () => {
-      window.removeEventListener('scroll', handleScroll, true);
-      window.removeEventListener('resize', updatePosition);
-      window.removeEventListener('wheel', handleWheel, { capture: true } as EventListenerOptions);
-    };
-  }, [isAdvancedOpen]);
+  const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <div className="relative" ref={advancedOptionsRef}>
-      <Collapsible open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
-        <CollapsibleTrigger asChild>
-          <Button
-            type="button"
-            variant="ghost"
-            className={`w-full flex items-center justify-between bg-transparent hover:bg-accent ${
-              isAdvancedOpen ? "border border-b-0 border-border rounded-b-none" : "border-0"
-            }`}
-            disabled={disabled}
-          >
-            <span>See Advanced Options</span>
-            <ChevronDown
-              className={`h-4 w-4 transition-transform duration-200 ${
-                isAdvancedOpen ? "rotate-180" : ""
-              }`}
-            />
-          </Button>
-        </CollapsibleTrigger>
-      </Collapsible>
-      {isAdvancedOpen && (
-        <div
-          ref={dropdownRef}
-          className="fixed bg-card border border-t-0 border-border rounded-t-none rounded-lg shadow-lg p-4 space-y-4 z-50"
-          style={{
-            top: advancedOptionsRef.current ? `${advancedOptionsRef.current.getBoundingClientRect().bottom - 1}px` : '0',
-            left: advancedOptionsRef.current ? `${advancedOptionsRef.current.getBoundingClientRect().left}px` : '0',
-            width: advancedOptionsRef.current ? `${advancedOptionsRef.current.getBoundingClientRect().width}px` : 'auto',
-            overflow: 'hidden',
-            overscrollBehavior: 'none',
-            touchAction: 'none',
-          }}
-        >
-          <NetworkSelector
-            selectedNetwork={selectedNetwork}
-            availableNetworks={availableNetworks}
-            onNetworkChange={onNetworkChange}
-            direction={direction}
-            disabled={disabled}
-          />
-        </div>
-      )}
-    </div>
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <CollapsibleTrigger className="w-full flex items-center justify-between py-2 text-sm font-medium text-foreground hover:text-foreground/80 transition-colors" disabled={disabled}>
+        <span>See Advanced Options</span>
+        <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+      </CollapsibleTrigger>
+      <CollapsibleContent className="pt-4 space-y-4">
+        <NetworkSelector
+          selectedNetwork={selectedNetwork}
+          availableNetworks={availableNetworks}
+          onNetworkChange={onNetworkChange}
+          direction={direction}
+          disabled={disabled}
+        />
+      </CollapsibleContent>
+    </Collapsible>
   );
 };
 
 export default AdvancedOptionsDropdown;
-

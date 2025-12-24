@@ -47,27 +47,17 @@ const NetworkSelector: React.FC<NetworkSelectorProps> = ({
   );
 
   return (
-    <div className="flex items-center gap-4">
-      <div className="flex-1 space-y-1.5">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="space-y-1.5">
         <Label htmlFor="from-network">From Network</Label>
-        {isBridgeIn ? (
-          <NetworkSelect id="from-network" />
-        ) : (
-          <StratoInput id="from-network" />
-        )}
+        {isBridgeIn ? <NetworkSelect id="from-network" /> : <StratoInput id="from-network" />}
       </div>
-
-      <div className="flex-1 space-y-1.5">
+      <div className="space-y-1.5">
         <Label htmlFor="to-network">To Network</Label>
-        {isBridgeIn ? (
-          <StratoInput id="to-network" />
-        ) : (
-          <NetworkSelect id="to-network" />
-        )}
+        {isBridgeIn ? <StratoInput id="to-network" /> : <NetworkSelect id="to-network" />}
       </div>
     </div>
   );
 };
 
 export default NetworkSelector;
-

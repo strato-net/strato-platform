@@ -22,26 +22,24 @@ const BridgeWalletStatus = () => {
   };
 
   return (
-    <div className="w-full mb-4">
+    <div className="w-full mb-2 md:mb-4">
       {isConnected ? (
-        <div className="flex items-center gap-3 w-full">
+        <div className="flex items-center gap-1.5 md:gap-2 w-full">
           <div
             onClick={() => disconnect()}
-            className="relative group cursor-pointer flex-1"
+            className="relative group cursor-pointer shrink-0"
           >
-            <div className="px-4 py-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 rounded-xl font-semibold group-hover:opacity-0 transition-opacity w-full text-center h-[42px] flex items-center justify-center">
+            <div className="px-2 md:px-3 py-1.5 md:py-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 rounded-lg text-[10px] md:text-xs font-semibold group-hover:opacity-0 transition-opacity text-center h-[32px] md:h-[38px] flex items-center justify-center whitespace-nowrap">
               Wallet Connected
             </div>
-            <div className="absolute inset-0 bg-destructive/10 border border-destructive/20 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-              <span className="text-destructive font-semibold">
-                Disconnect
-              </span>
+            <div className="absolute inset-0 bg-destructive/10 border border-destructive/20 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+              <span className="text-destructive text-[10px] md:text-xs font-semibold">Disconnect</span>
             </div>
           </div>
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="flex items-center justify-center gap-2 text-xs bg-emerald-500/10 border border-emerald-500/20 px-2 py-2 rounded-xl font-mono text-emerald-600 dark:text-emerald-400 cursor-pointer flex-1 h-[42px]">
+                <div className="flex items-center justify-center gap-1 text-[10px] md:text-xs bg-emerald-500/10 border border-emerald-500/20 px-2 md:px-3 py-1.5 md:py-2 rounded-lg font-mono text-emerald-600 dark:text-emerald-400 cursor-pointer flex-1 h-[32px] md:h-[38px]">
                   {address?.slice(0, 6)}...{address?.slice(-4)}
                   <button
                     onClick={(e) => {
@@ -50,7 +48,7 @@ const BridgeWalletStatus = () => {
                     }}
                     className="hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors cursor-pointer"
                   >
-                    <Copy size={12} />
+                    <Copy size={10} className="md:w-3 md:h-3" />
                   </button>
                 </div>
               </TooltipTrigger>
@@ -61,7 +59,7 @@ const BridgeWalletStatus = () => {
           </TooltipProvider>
         </div>
       ) : (
-        <div className="w-full [&_button]:!w-full [&_button]:bg-gradient-to-r [&_button]:from-[#1f1f5f] [&_button]:via-[#293b7d] [&_button]:to-[#16737d] [&_button]:text-white [&_button]:px-4 [&_button]:py-2 [&_button]:rounded-xl [&_button]:font-semibold [&_button]:hover:opacity-90 [&_button]:transition-all [&_button]:flex [&_button]:items-center [&_button]:justify-center">
+        <div className="w-full [&_button]:!w-full [&_button]:bg-primary [&_button]:hover:bg-primary/90 [&_button]:text-primary-foreground [&_button]:px-4 [&_button]:py-2 [&_button]:rounded-lg [&_button]:font-semibold [&_button]:transition-all [&_button]:flex [&_button]:items-center [&_button]:justify-center">
           <ConnectButton label={"Connect Wallet"} />
         </div>
       )}
@@ -69,4 +67,4 @@ const BridgeWalletStatus = () => {
   );
 };
 
-export default BridgeWalletStatus; 
+export default BridgeWalletStatus;

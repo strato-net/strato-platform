@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { ExternalLink } from "lucide-react";
 import {
   useAccount,
   useChainId,
@@ -620,12 +621,22 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false }) => {
   };
   
   return (
-    <div className="space-y-6">
-      <div className="space-y-2 text-center">
-        <h3 className="text-lg font-semibold text-foreground">
-          {modeLabels.title}
-        </h3>
-        <p className="text-sm text-muted-foreground">{modeLabels.description}</p>
+    <div className="space-y-4 md:space-y-6">
+      <div className="space-y-1">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-base md:text-lg font-bold text-foreground">
+            {modeLabels.title}
+          </h3>
+          <a
+            href="/bridge-transactions"
+            className="flex items-center gap-1 text-xs md:text-sm font-medium text-primary hover:text-primary/80 transition-colors whitespace-nowrap"
+          >
+            <ExternalLink size={12} className="md:w-3.5 md:h-3.5" />
+            <span className="hidden sm:inline">View Transactions</span>
+            <span className="sm:hidden">Transactions</span>
+          </a>
+        </div>
+        <p className="text-xs md:text-sm text-muted-foreground">{modeLabels.description}</p>
       </div>
 
       <div className="w-full">
@@ -640,23 +651,13 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false }) => {
       />
 
       <div className="space-y-1.5">
-        <div className="flex justify-between items-center">
-        <Label>Amount</Label>
+        <div className="flex justify-between items-center flex-wrap gap-1">
+          <Label className="text-sm">Amount</Label>
           {maxAmount && (
-            <div className="flex items-center gap-3">
-              <p className="text-sm text-muted-foreground">
-                Max: {formatBalance(
-                  maxAmount,
-                  undefined,
-                  parseInt(selectedToken?.externalDecimals || "18"),
-                  2,
-                  parseInt(selectedToken?.externalDecimals || "18")
-                )}
-              </p>
+            <div className="flex items-center gap-2 md:gap-3 text-xs md:text-sm text-muted-foreground">
+              <span>Max: {formatBalance(maxAmount, undefined, parseInt(selectedToken?.externalDecimals || "18"), 2, 6)}</span>
               {selectedToken && currentNetwork && (
-                <p className="text-sm text-muted-foreground">
-                  Min: {minDepositInfo.amount || "0"}
-                </p>
+                <span>Min: {minDepositInfo.amount || "0"}</span>
               )}
             </div>
           )}
@@ -713,9 +714,9 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false }) => {
         <Button
           onClick={handleBridge}
         disabled={isButtonDisabled}
-        className="w-full bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
+        className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
         >
-        {isLoading ? "Processing..." : isSaving && autoDeposit ? "Deposit and Earn" : "Deposit"}
+        {isLoading ? "Processing..." : isSaving && autoDeposit ? "1. Bridge In" : "Deposit"}
         </Button>
 
       <AdvancedOptionsDropdown
