@@ -7,9 +7,8 @@ import { useUser } from "@/context/UserContext";
 import { useTokenContext } from "@/context/TokenContext";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
-import MobileSidebar from "../components/dashboard/MobileSidebar";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import MobileBottomNav from "../components/dashboard/MobileBottomNav";
+import { Card, CardContent } from "@/components/ui/card";
 import { CollateralData } from "@/interface";
 import PositionSection from "@/components/Positions";
 import CollateralModal from "@/components/borrow/CollateralModal";
@@ -30,9 +29,9 @@ const Borrow = () => {
     type: "supply" | "withdraw" | null;
   }>({ isOpen: false, type: null });
   const [modalLoading, setModalLoading] = useState(false);
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [repayLoading, setRepayLoading] = useState(false);
   const [eligibleCollateral, setEligibleCollateral] = useState<CollateralData[]>([]);
+  const [activeTab, setActiveTab] = useState<"borrow" | "repay">("borrow");
   const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
   const { toast } = useToast();
@@ -51,7 +50,6 @@ const Borrow = () => {
     borrowMax
   } = useLendingContext();
 
-  // Use the new smart polling hook for balance updates
   const { startPolling, stopPolling } = useSmartPolling({
     fetchFn: fetchUsdstBalance,
     shouldPoll: () => true,
@@ -63,16 +61,10 @@ const Borrow = () => {
     document.title = "Borrow Assets | STRATO";
   }, []);
 
-
-  // Refresh data when page loads
   useEffect(() => {
     const refreshData = async () => {
       try {
-        await Promise.all([
-          refreshLoans(),
-          refreshCollateral(),
-          fetchUsdstBalance(),
-        ]);
+        await Promise.all([refreshLoans(), refreshCollateral(), fetchUsdstBalance()]);
       } catch (error) {
         console.error("Error refreshing data:", error);
       }
@@ -80,22 +72,19 @@ const Borrow = () => {
     refreshData();
   }, [userAddress, refreshLoans, refreshCollateral, fetchUsdstBalance]);
 
-    useEffect(() => {
+  useEffect(() => {
     if (collateralInfo && Array.isArray(collateralInfo)) {
-      // Only show assets that have a balance > 0
-      const eligibleWithBalance = collateralInfo.filter((item) => 
-        BigInt(item.userBalance || 0) > 0n
-      );
+      const eligibleWithBalance = collateralInfo.filter((item) => BigInt(item.userBalance || 0) > 0n);
       setEligibleCollateral(eligibleWithBalance);
     }
-  }, [collateralInfo])
+  }, [collateralInfo]);
 
-  const handleSupply = (asset) => {
+  const handleSupply = (asset: CollateralData) => {
     setSelectedAsset(asset);
     setModalState({ isOpen: true, type: "supply" });
   };
 
-  const handleWithdraw = (asset) => {
+  const handleWithdraw = (asset: CollateralData) => {
     setSelectedAsset(asset);
     setModalState({ isOpen: true, type: "withdraw" });
   };
@@ -108,23 +97,11 @@ const Borrow = () => {
   const executeSupply = async (asset: CollateralData, amount: string) => {
     try {
       setModalLoading(true);
-      await supplyCollateral({
-        asset: asset.address,
-        amount: safeParseUnits(amount).toString(),
-      });
-      toast({
-        title: "Supply Initiated",
-        description: `You supplied ${amount} ${asset._symbol}`,
-        variant: "success",
-      });
+      await supplyCollateral({ asset: asset.address, amount: safeParseUnits(amount).toString() });
+      toast({ title: "Supply Initiated", description: `You supplied ${amount} ${asset._symbol}`, variant: "success" });
       setModalLoading(false);
       setModalState({ isOpen: false, type: null });
-      // Refresh all data after successful supply
-      await Promise.all([
-        refreshLoans(),
-        refreshCollateral(),
-        fetchUsdstBalance(),
-      ]);
+      await Promise.all([refreshLoans(), refreshCollateral(), fetchUsdstBalance()]);
     } catch (error) {
       setModalLoading(false);
       setModalState({ isOpen: false, type: null });
@@ -137,57 +114,30 @@ const Borrow = () => {
       if (amount === 'ALL') {
         await withdrawCollateralMax({ asset: asset.address });
       } else {
-        await withdrawCollateral({
-          asset: asset.address,
-          amount: safeParseUnits(amount).toString(),
-        });
+        await withdrawCollateral({ asset: asset.address, amount: safeParseUnits(amount).toString() });
       }
-      toast({
-        title: "Withdraw Initiated",
-        description: `Withdrawal submitted: ${amount === 'ALL' ? 'max available' : amount} ${asset._symbol}`,
-        variant: "success",
-      });
+      toast({ title: "Withdraw Initiated", description: `Withdrawal submitted: ${amount === 'ALL' ? 'max available' : amount} ${asset._symbol}`, variant: "success" });
       setModalLoading(false);
       setModalState({ isOpen: false, type: null });
-      // Refresh all data after successful withdraw
-      await Promise.all([
-        refreshLoans(),
-        refreshCollateral(),
-        fetchUsdstBalance(),
-      ]);
+      await Promise.all([refreshLoans(), refreshCollateral(), fetchUsdstBalance()]);
     } catch (error) {
-      console.log(error, "error");
       setModalLoading(false);
       setModalState({ isOpen: false, type: null });
-      // Error toast is now handled globally by axios interceptor
     }
   };
-
 
   const executeEmbeddedBorrow = async (amount: string) => {
     try {
       setBorrowLoading(true);
       if (amount === 'ALL') {
         await borrowMax();
-        toast({
-          title: "Borrow Initiated",
-          description: `Borrowed max available USDST`,
-          variant: "success",
-        });
+        toast({ title: "Borrow Initiated", description: `Borrowed max available USDST`, variant: "success" });
       } else {
         await borrowAssetFn({ amount: safeParseUnits(amount).toString() });
-        toast({
-          title: "Borrow Initiated",
-          description: `You borrowed ${amount} USDST`,
-          variant: "success",
-        });
+        toast({ title: "Borrow Initiated", description: `You borrowed ${amount} USDST`, variant: "success" });
       }
       setBorrowLoading(false);
-      await Promise.all([
-        refreshLoans(),
-        refreshCollateral(),
-        fetchUsdstBalance(),
-      ]);
+      await Promise.all([refreshLoans(), refreshCollateral(), fetchUsdstBalance()]);
     } catch (error) {
       setBorrowLoading(false);
     }
@@ -199,26 +149,14 @@ const Borrow = () => {
       if (amount === 'ALL') {
         const res = await repayAll();
         const sent = res?.estimatedDebtAtRead ? formatUnits(BigInt(res.estimatedDebtAtRead)) : 'all';
-        toast({
-          title: "Success",
-          description: `Successfully repaid ${sent} USDST`,
-          variant: "success",
-        });
+        toast({ title: "Success", description: `Successfully repaid ${sent} USDST`, variant: "success" });
       } else {
         const res = await repayLoanFn({ amount: safeParseUnits(amount).toString() } as any);
         const sent = res?.amountSent ? formatUnits(BigInt(res.amountSent)) : amount;
-        toast({
-          title: "Success",
-          description: `Successfully repaid ${sent} USDST`,
-          variant: "success",
-        });
+        toast({ title: "Success", description: `Successfully repaid ${sent} USDST`, variant: "success" });
       }
       setRepayLoading(false);
-      await Promise.all([
-        refreshLoans(),
-        refreshCollateral(),
-        fetchUsdstBalance(),
-      ]);
+      await Promise.all([refreshLoans(), refreshCollateral(), fetchUsdstBalance()]);
     } catch (error) {
       console.error("Error repaying loan:", error);
       setRepayLoading(false);
@@ -228,52 +166,61 @@ const Borrow = () => {
   return (
     <div className="min-h-screen bg-background">
       <DashboardSidebar />
-      <MobileSidebar 
-        isOpen={isMobileSidebarOpen} 
-        onClose={() => setIsMobileSidebarOpen(false)} 
-      />
-      <div className="transition-all duration-300 md:pl-64" style={{ paddingLeft: 'var(--sidebar-width, 0rem)' }}>
-        <DashboardHeader title="Borrow" onMenuClick={() => setIsMobileSidebarOpen(true)} />
-
-        <main className="p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            {/* Left Column - Borrow/Repay Tabbed Card */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle>Borrow & Repay</CardTitle>
+      <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
+        <DashboardHeader title="Borrow" />
+        <main className="p-4 md:p-6 pb-20 md:pb-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mb-4 md:mb-6">
+            {/* Left Column - Borrow/Repay Card */}
+            <Card className="shadow-sm rounded-xl">
+              <CardContent className="pt-6">
+                <h2 className="text-xl font-bold mb-4">Borrow & Repay</h2>
+                
+                {/* Underline Tabs - same as Deposits page */}
+                <div className="flex border-b border-border mb-4 md:mb-6">
+                  <button
+                    onClick={() => setActiveTab("borrow")}
+                    className={`flex-1 py-2 md:py-2.5 px-4 text-sm font-medium transition-colors border-b-2 ${
+                      activeTab === "borrow"
+                        ? "border-primary text-primary"
+                        : "border-transparent text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Borrow
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("repay")}
+                    className={`flex-1 py-2 md:py-2.5 px-4 text-sm font-medium transition-colors border-b-2 ${
+                      activeTab === "repay"
+                        ? "border-primary text-primary"
+                        : "border-transparent text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Repay
+                  </button>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <Tabs defaultValue="borrow" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="borrow">Borrow</TabsTrigger>
-                    <TabsTrigger value="repay">Repay</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="borrow">
-                    <BorrowForm
-                      loans={loans}
-                      borrowLoading={borrowLoading}
-                      onBorrow={executeEmbeddedBorrow}
-                      usdstBalance={usdstBalance}
-                      voucherBalance={voucherBalance}
-                      collateralInfo={eligibleCollateral}
-                      startPolling={startPolling}
-                      stopPolling={stopPolling}
-                      userRewards={userRewards}
-                      rewardsLoading={rewardsLoading}
-                    />
-                  </TabsContent>
-                  <TabsContent value="repay">
-                    <RepayForm
-                      loans={loans}
-                      repayLoading={repayLoading}
-                      onRepay={executeEmbeddedRepay}
-                      usdstBalance={usdstBalance}
-                      voucherBalance={voucherBalance}
-                    />
-                  </TabsContent>
-                </Tabs>
+
+                {activeTab === "borrow" ? (
+                  <BorrowForm
+                    loans={loans}
+                    borrowLoading={borrowLoading}
+                    onBorrow={executeEmbeddedBorrow}
+                    usdstBalance={usdstBalance}
+                    voucherBalance={voucherBalance}
+                    collateralInfo={eligibleCollateral}
+                    startPolling={startPolling}
+                    stopPolling={stopPolling}
+                    userRewards={userRewards}
+                    rewardsLoading={rewardsLoading}
+                  />
+                ) : (
+                  <RepayForm
+                    loans={loans}
+                    repayLoading={repayLoading}
+                    onRepay={executeEmbeddedRepay}
+                    usdstBalance={usdstBalance}
+                    voucherBalance={voucherBalance}
+                  />
+                )}
               </CardContent>
             </Card>
 
@@ -282,6 +229,7 @@ const Borrow = () => {
               <PositionSection loanData={loans} userCollaterals={collateralInfo} />
             </div>
           </div>
+
           <CollateralManagementTable
             collateralInfo={collateralInfo}
             loadingCollateral={loadingCollateral}
@@ -292,28 +240,28 @@ const Borrow = () => {
         </main>
       </div>
 
+      <MobileBottomNav />
 
-      {modalState.isOpen && modalState.type && (
+      {modalState.isOpen && modalState.type && selectedAsset && (
         <CollateralModal 
-            type={modalState.type}
-            loading={modalLoading}
-            asset={selectedAsset}
-            loanData={loans}
-            isOpen={modalState.isOpen}
-            onClose={closeModal}
-            onAction={(amount) => {
-              if (modalState.type === "supply") {
-                executeSupply(selectedAsset, amount);
-              } else if (modalState.type === "withdraw") {
-                executeWithdraw(selectedAsset, amount);
-              }
-            }}
-            usdstBalance={usdstBalance}
-            voucherBalance={voucherBalance}
-            transactionFee={modalState.type === "supply" ? SUPPLY_COLLATERAL_FEE : WITHDRAW_COLLATERAL_FEE}
+          type={modalState.type}
+          loading={modalLoading}
+          asset={selectedAsset}
+          loanData={loans}
+          isOpen={modalState.isOpen}
+          onClose={closeModal}
+          onAction={(amount) => {
+            if (modalState.type === "supply") {
+              executeSupply(selectedAsset, amount);
+            } else if (modalState.type === "withdraw") {
+              executeWithdraw(selectedAsset, amount);
+            }
+          }}
+          usdstBalance={usdstBalance}
+          voucherBalance={voucherBalance}
+          transactionFee={modalState.type === "supply" ? SUPPLY_COLLATERAL_FEE : WITHDRAW_COLLATERAL_FEE}
         />
       )}
-
     </div>
   );
 };

@@ -98,52 +98,31 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance 
   }
 
   return (
-    <div className="space-y-4 pt-4">
+    <div className="space-y-3 md:space-y-4">
       {/* Loan Details */}
       <div className="space-y-2">
         <div className="flex justify-between items-center">
-          <span className="text-sm text-muted-foreground">Total Amount Owed</span>
-          <span className="font-normal">
+          <span className="text-xs md:text-sm text-muted-foreground">Total Amount Owed</span>
+          <span className="text-xs md:text-sm font-medium">
             {(() => {
               try {
                 const bi = BigInt(loans?.totalAmountOwed ?? "0");
                 const display = bi <= 1n ? 0n : bi;
-                return `USDST ${formatUnits(display)}`;
+                return `USDST ${formatCurrency(formatUnits(display))}`;
               } catch {
                 return `USDST 0`;
               }
             })()}
           </span>
         </div>
-
-        {loans?.totalAmountOwedPreview && (
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">Projected Debt</span>
-            <span className="font-medium">
-              {(() => {
-                try {
-                  const bi = BigInt(loans?.totalAmountOwedPreview ?? "0");
-                  const display = bi <= 1n ? 0n : bi;
-                  return `USDST ${formatUnits(display)}`;
-                } catch {
-                  return `USDST 0`;
-                }
-              })()}
-            </span>
-          </div>
-        )}
-        
-        <div className="flex justify-between items-center pt-2 border-t">
-          <span className="text-lg">{(() => { try { const bi = BigInt(loans?.totalAmountOwed ?? "0"); const display = bi <= 1n ? 0n : bi; return `USDST ${formatUnits(display)}`; } catch { return `USDST 0`; } })()}</span>
-        </div>
       </div>
 
       {/* Repay Amount Input */}
-      <div className="space-y-3">
-        <label className="text-sm font-medium">Repay Amount (USDST)</label>
-        <div className="flex justify-between items-center text-xs text-muted-foreground">
+      <div className="space-y-2 md:space-y-3">
+        <label className="text-xs md:text-sm font-medium">Repay Amount (USDST)</label>
+        <div className="flex justify-between items-center text-[10px] md:text-xs text-muted-foreground">
           <span>Min: 0.01 USDST</span>
-          <div>
+          <div className="flex items-center">
             <button
               type="button"
               onClick={() => {
@@ -152,20 +131,13 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance 
                   setRepayAmountError("");
                 } catch {}
               }}
-                disabled={(() => {
-                return BigInt(maxAmount) === 0n;
-              })()}
-              className="px-2 py-1 mr-1 bg-muted hover:bg-muted/80 rounded-full text-foreground text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
-              title={(() => {
-                const owed = BigInt(loans?.totalAmountOwed || 0);
-                return owed === 0n ? "No amount available to repay" : "Set to total debt (Repay All)";
-              })()}
+              disabled={BigInt(maxAmount) === 0n}
+              className="px-1.5 md:px-2 py-0.5 md:py-1 mr-1 bg-muted hover:bg-muted/80 rounded-full text-foreground text-[10px] md:text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
+              title={BigInt(loans?.totalAmountOwed || 0) === 0n ? "No amount to repay" : "Set to max"}
             >
-              Max :
+              Max:
             </button>
-            <span>{(() => {
-              return BigInt(maxAmount) <= 0n ? '-' : formatCurrency(formatUnits(BigInt(maxAmount)));
-            })()} USDST</span>
+            <span>{BigInt(maxAmount) <= 0n ? '-' : formatCurrency(formatUnits(BigInt(maxAmount)))} USDST</span>
           </div>
         </div>
         <div className="relative">
@@ -251,7 +223,7 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance 
           !!repayAmountError ||
           (() => { try { return safeParseUnits(repayAmount || "0") === 0n; } catch { return true; } })()
         }
-        className="w-full"
+        className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
       >
         {repayLoading ? (
           <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-2"></div>

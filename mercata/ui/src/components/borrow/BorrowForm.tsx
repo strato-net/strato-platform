@@ -107,39 +107,31 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
   })();
 
   return (
-    <div className="space-y-4 pt-4">
+    <div className="space-y-3 md:space-y-4">
       {/* Loan Details */}
-      <div className="space-y-3">
-        <div className="flex justify-between">
-          <span className="text-sm text-muted-foreground">Available to borrow</span>
-          <span className="font-medium">
-            USDST {safeParseFloat(formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18)) === 0 ? '-' : formatWeiAmount(loans?.maxAvailableToBorrowUSD || '0')}
+      <div className="space-y-2 md:space-y-3">
+        <div className="flex justify-between items-center">
+          <span className="text-xs md:text-sm text-muted-foreground">Available to borrow</span>
+          <span className="text-xs md:text-sm font-medium">
+            {safeParseFloat(formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18)) === 0 
+              ? '-' 
+              : `${Number(formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })} USDST`}
           </span>
         </div>
-        <div className="flex justify-between">
-          <span className="text-sm text-muted-foreground">Total Amount Owed</span>
-          <span className="font-medium">
-            {(() => {
-              const owed = (() => { try { return BigInt(loans?.totalAmountOwed || 0); } catch { return 0n; } })();
-              const display = owed <= 1n ? 0n : owed;
-              return `USDST ${formatUnits(display, 18)}`;
-            })()}
-          </span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-sm text-muted-foreground">Interest Rate</span>
-          <span className="font-medium">
+        <div className="flex justify-between items-center">
+          <span className="text-xs md:text-sm text-muted-foreground">Interest Rate</span>
+          <span className="text-xs md:text-sm font-medium">
             {interestRateDisplay}
           </span>
         </div>
       </div>
 
       {/* Borrow Amount Input */}
-      <div className="space-y-3">
-        <label className="text-sm font-medium">Borrow Amount (USDST)</label>
-        <div className="flex justify-between items-center text-xs text-muted-foreground">
+      <div className="space-y-2 md:space-y-3">
+        <label className="text-xs md:text-sm font-medium">Borrow Amount (USDST)</label>
+        <div className="flex justify-between items-center text-[10px] md:text-xs text-muted-foreground">
           <span>Min: 0.01 USDST</span>
-          <div>
+          <div className="flex items-center">
             <button
               type="button"
               onClick={() => {
@@ -149,12 +141,14 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
                 } catch {}
               }}
               disabled={safeParseFloat(formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18)) === 0}
-              className="px-2 py-1 mr-1 bg-muted hover:bg-muted/80 rounded-full text-muted-foreground hover:text-foreground text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-muted"
+              className="px-1.5 md:px-2 py-0.5 md:py-1 mr-1 bg-muted hover:bg-muted/80 rounded-full text-muted-foreground hover:text-foreground text-[10px] md:text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
               title={safeParseFloat(formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18)) === 0 ? "No amount available to borrow" : "Set to safe maximum available amount"}
             >
-              Max :
+              Max:
             </button>
-            <span>{safeParseFloat(formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18)) === 0 ? '-' : formatWeiAmount(loans?.maxAvailableToBorrowUSD || '0')} USDST</span>
+            <span>{safeParseFloat(formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18)) === 0 
+              ? '-' 
+              : `${Number(formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18)).toLocaleString(undefined, { maximumFractionDigits: 2 })}`} USDST</span>
           </div>
         </div>
         <div className="relative">
@@ -215,7 +209,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
           borrowLoading ||
           safeParseUnits(borrowAmount || "0") > BigInt(maxAmount)
         }
-        className="w-full"
+        className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
       >
         {borrowLoading ? (
           <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-2"></div>
@@ -227,24 +221,19 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
       {(() => {
         const availableToBorrowFormatted = formatUnits(loans?.maxAvailableToBorrowUSD || 0);
         const isZeroAvailable = safeParseFloat(availableToBorrowFormatted) === 0;
-        
-        // collateralInfo already contains only eligible collateral (balance > 0)
         const eligibleCollateralTokens = collateralInfo || [];
 
         const borrowInfoMessage = (
-          <p className="text-muted-foreground mt-2">
-            Borrowing against your assets allows you to access liquidity
-            without selling your holdings. Be mindful of the risk level, as
-            high borrowing increases liquidation risk during market
-            volatility.
+          <p className="text-[10px] md:text-xs text-muted-foreground mt-1.5">
+            Borrowing against your assets allows you to access liquidity without selling your holdings. Be mindful of the risk level, as high borrowing increases liquidation risk.
           </p>
         );
 
         if (isZeroAvailable) {
           return (
             <div className="mt-2">
-              <p className="text-muted-foreground">
-                You currently have no available borrowing power. Supply collateral to enable borrowing.
+              <p className="text-xs md:text-sm text-muted-foreground">
+                No available borrowing power. Supply collateral to enable borrowing.
               </p>
               {borrowInfoMessage}
             </div>
@@ -254,8 +243,8 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
         if (eligibleCollateralTokens.length === 0) {
           return (
             <div className="mt-2">
-              <p className="text-muted-foreground">
-                You have no eligible collateral. Supply assets to enable borrowing.
+              <p className="text-xs md:text-sm text-muted-foreground">
+                No eligible collateral. Supply assets to enable borrowing.
               </p>
               {borrowInfoMessage}
             </div>
