@@ -30,19 +30,19 @@ const AssetSummary = ({
 }: AssetSummaryProps) => {
   return (
     <div 
-      className={`bg-card rounded-xl border-2 p-5 shadow-sm transition-all w-full h-full flex flex-col justify-center ${
-        isActive ? 'border-blue-500 shadow-md' : 'border-border hover:shadow-md'
+      className={`bg-card rounded-xl border-2 p-3 md:p-5 shadow-sm transition-all w-full flex flex-col justify-center ${
+        isActive ? 'border-primary shadow-md' : 'border-border hover:shadow-md'
       } ${onClick ? 'cursor-pointer' : ''}`}
       onClick={onClick}
     >
-      <div className="flex justify-between items-start">
-        <div className="flex-1">
+      <div className="flex justify-between items-center gap-2">
+        <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1">
-            <p className="text-muted-foreground text-sm">{title}</p>
+            <p className="text-muted-foreground text-xs md:text-sm truncate">{title}</p>
             {tooltip && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <HelpCircle className="h-4 w-4 text-muted-foreground hover:text-foreground cursor-help" />
+                  <HelpCircle className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground hover:text-foreground cursor-help flex-shrink-0" />
                 </TooltipTrigger>
                 <TooltipContent>
                   <p className="max-w-xs text-sm">{tooltip}</p>
@@ -52,21 +52,21 @@ const AssetSummary = ({
           </div>
           {isLoading ? (
             <div className="flex items-center gap-2 mt-1">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              <span className="text-muted-foreground text-sm">Loading...</span>
+              <Loader2 className="h-4 w-4 md:h-6 md:w-6 animate-spin text-muted-foreground" />
+              <span className="text-muted-foreground text-xs md:text-sm">Loading...</span>
             </div>
           ) : (
-            <h3 className="text-2xl font-bold mt-1 whitespace-nowrap">{value}</h3>
+            <h3 className="text-lg md:text-2xl font-bold mt-0.5 md:mt-1 truncate">{value}</h3>
           )}
           {additionalContent && (
-            <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+            <div className="mt-1 md:mt-2" onClick={(e) => e.stopPropagation()}>
               {additionalContent}
             </div>
           )}
         </div>
 
         <div
-          className={`${color === 'bg-transparent' ? '' : 'w-10 h-10 rounded-full'} flex items-center justify-center ${color} transition-opacity flex-shrink-0`}
+          className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center ${color} flex-shrink-0`}
         >
           {icon}
         </div>

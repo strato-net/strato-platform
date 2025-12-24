@@ -20,7 +20,7 @@ const AssetsList = ({
   isDashboard = true,
 }: AssetsProps) => {
   const [showNonEarningAssetsTable, setShowNonEarningAssetsTable] =
-    useState(false);
+    useState(true);
 
   const hasEarningAssets = tokens.length > 0;
   const hasInactiveTokens = inActiveTokens.length > 0;
@@ -36,7 +36,7 @@ const AssetsList = ({
   }, [tokens]);
 
   return (
-    <div className="w-full overflow-hidden">
+    <div className="w-full overflow-hidden bg-card rounded-xl border border-border shadow-sm">
       {isDashboard && (
         <div className="p-5 border-b border-border">
           <div className="flex justify-between items-center">
@@ -246,14 +246,14 @@ const AssetsList = ({
                 : "max-h-0 opacity-0"
             }`}
           >
-            <div className="overflow-y-auto max-h-[400px]">
-              <table className="w-full table-fixed">
+            <div className="w-full overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+              <table style={{ minWidth: '400px', width: '100%' }}>
                 <thead>
                   <tr className="bg-muted/50">
-                    <th className="w-[50%] text-left text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
+                    <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4 min-w-[200px]">
                       Asset
                     </th>
-                    <th className="w-[50%] text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
+                    <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4 min-w-[100px]">
                       Balance
                     </th>
                   </tr>

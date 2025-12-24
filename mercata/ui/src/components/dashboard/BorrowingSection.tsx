@@ -1,52 +1,43 @@
 import { Button } from "@/components/ui/button";
-import { ArrowUpRight } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Plus } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
 import { formatUnits } from "ethers";
 import { NewLoanData } from "@/interface";
-import RiskLevelProgress from "@/components/ui/RiskLevelProgress";
 
 interface BorrowingSectionProps {
   loanData?: NewLoanData;
 }
 
 const BorrowingSection = ({ loanData }: BorrowingSectionProps) => {
-  const navigate = useNavigate()
+  const navigate = useNavigate();
 
-  function getTextColor(value: number, maxValue = 10) {
-    const clamped = Math.min(Math.max(value, 1), maxValue);
-    const ratio = (clamped - 1) / (maxValue - 1);
+  const getHealthFactorColor = (value: number) => {
+    if (value >= 3) return 'text-green-500';
+    if (value >= 1.5) return 'text-orange-500';
+    return 'text-red-500';
+  };
 
-    const red = Math.round(255 * (1 - ratio));
-    const green = Math.round(255 * ratio);
+  const getRiskBadge = (riskLevel: number) => {
+    if (riskLevel < 30) return { label: 'Low', color: 'bg-green-50 text-green-600 border-green-200' };
+    if (riskLevel < 60) return { label: 'Medium', color: 'bg-yellow-50 text-yellow-600 border-yellow-200' };
+    return { label: 'High', color: 'bg-red-50 text-red-600 border-red-200' };
+  };
 
-    return `rgb(${red}, ${green}, 0)`;
-  }
-
-  // Calculate available borrowing power from loanData
   const availableBorrowingPower = loanData?.maxAvailableToBorrowUSD 
     ? parseFloat(formatUnits(loanData.maxAvailableToBorrowUSD, 18))
     : 0;
 
-  // Calculate current borrowed amount
   const currentBorrowed = loanData?.totalAmountOwed 
     ? parseFloat(formatUnits((() => { try { return (BigInt(loanData.totalAmountOwed) <= 1n ? 0n : BigInt(loanData.totalAmountOwed)); } catch { return 0n; } })(), 18))
     : 0;
 
-  // Calculate risk level using the same logic as other components
   const calculateRiskLevel = () => {
     try {
-      if (!loanData?.totalCollateralValueUSD || !loanData?.totalAmountOwed) {
-        return 0;
-      }
-
+      if (!loanData?.totalCollateralValueUSD || !loanData?.totalAmountOwed) return 0;
       const totalBorrowedBigInt = BigInt(loanData.totalAmountOwed);
       const collateralValueBigInt = BigInt(loanData.totalCollateralValueUSD);
-
-      if (collateralValueBigInt === 0n) {
-        return 0;
-      }
-
+      if (collateralValueBigInt === 0n) return 0;
       const risk = Number((totalBorrowedBigInt * 10000n) / collateralValueBigInt) / 100;
       return Math.min(risk, 100);
     } catch {
@@ -55,75 +46,76 @@ const BorrowingSection = ({ loanData }: BorrowingSectionProps) => {
   };
 
   const riskLevel = calculateRiskLevel();
+  const riskBadge = getRiskBadge(riskLevel);
 
   return (
-    <Card className="border border-border shadow-sm">
-      <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-2 space-y-2 sm:space-y-0">
-        <div>
-          <CardTitle className="text-xl font-bold">My Borrowing</CardTitle>
-          <CardDescription className="text-muted-foreground">Leverage your assets with secured loans</CardDescription>
-        </div>
-        <div className="hidden sm:block">
-          <Button onClick={()=> navigate('/dashboard/borrow')} className="flex items-center gap-2">
-            <ArrowUpRight size={16} /> Start Borrowing
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="py-4">
-          <div className="space-y-6">
-            {/* Risk Level Progress Bar */}
-            <RiskLevelProgress riskLevel={riskLevel} />
+    <Card className="bg-card border border-border shadow-sm rounded-xl p-4 md:p-6">
+      {/* Header - Different layout for mobile vs desktop */}
+      <div className="flex flex-col md:flex-row md:items-start md:justify-between mb-4 md:mb-6">
+        <h2 className="text-xl font-bold mb-3 md:mb-0">My Borrowing</h2>
+        
+        {/* Mobile: Full-width button below title */}
+        <Button 
+          onClick={() => navigate('/dashboard/borrow')} 
+          className="w-full md:w-auto bg-primary hover:bg-primary/90 text-primary-foreground gap-1.5 mb-3 md:mb-0"
+        >
+          <Plus size={16} /> Borrow
+        </Button>
+      </div>
+      
+      {/* Subtitle - Shows after button on mobile */}
+      <p className="text-sm text-muted-foreground mb-4 md:hidden">Leverage your assets with secured loans</p>
 
-            {/* Added extra spacing with mt-8 to separate indicators from data */}
-            <div className="flex flex-col gap-2 mt-8">
-              <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
-                <span className="text-muted-foreground text-sm sm:text-base">Available Borrowing Power</span>
-                <span className="font-semibold text-sm sm:text-base">
-                  {availableBorrowingPower.toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })} USDST
-                </span>
-              </div>
-              <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
-                <span className="text-muted-foreground text-sm sm:text-base">Total Amount Owed</span>
-                <span className="font-semibold text-sm sm:text-base">
-                  {currentBorrowed.toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })} USDST
-                </span>
-              </div>
-              <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
-                <span className="text-muted-foreground text-sm sm:text-base">Interest Rate</span>
-                <span className="font-semibold text-sm sm:text-base">{((Number(loanData?.interestRate) || 0) / 100).toFixed(2)}%</span>
-              </div>
+      <CardContent className="p-0 space-y-5">
+        {/* Desktop subtitle */}
+        <p className="text-sm text-muted-foreground hidden md:block -mt-4">Leverage your assets with secured loans</p>
+        
+        {/* Risk Level Section */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-foreground">Risk Level:</span>
+            <span className={`px-2.5 py-0.5 text-xs font-medium rounded-full border ${riskBadge.color}`}>
+              {riskBadge.label}
+            </span>
+          </div>
+          
+          <div className="relative h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+            <div 
+              className="absolute left-0 top-0 h-full bg-primary rounded-full transition-all"
+              style={{ width: `${Math.max(riskLevel, 2)}%` }}
+            />
+          </div>
+          
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span className="text-primary font-medium">Safe</span>
+            <span>Risk Increases →</span>
+            <span>Liquidation</span>
+          </div>
+        </div>
 
-              <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
-                <span className="text-muted-foreground text-sm sm:text-base">Health Factor</span>
-                <span className="font-semibold text-sm sm:text-base" style={{ color: getTextColor((loanData?.healthFactor || 0)) }}>
-                  {(() => {
-                    // Check if there's no outstanding debt
-                    if (currentBorrowed === 0) {
-                      return "No Loan";
-                    }
-                    // Check if health factor is valid
-                    if (loanData?.healthFactor && !isNaN((loanData.healthFactor))) {
-                      return (loanData.healthFactor).toFixed(2);
-                    }
-                    return "N/A";
-                  })()}
-                </span>
-              </div>
-            </div>
-            
-            {/* Mobile Button */}
-            <div className="sm:hidden mt-6">
-              <Button onClick={()=> navigate('/dashboard/borrow')} className="flex items-center justify-center gap-2 w-full">
-                <ArrowUpRight size={16} /> Start Borrowing
-              </Button>
-            </div>
+        {/* Stats - Single column on mobile, 2x2 grid on desktop */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-x-8 md:gap-y-4">
+          <div>
+            <p className="text-sm text-muted-foreground mb-1">Available Borrowing Power</p>
+            <p className="text-lg font-bold">
+              {availableBorrowingPower.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDST
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground mb-1">Total Amount Owed</p>
+            <p className="text-lg font-bold">
+              {currentBorrowed.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDST
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground mb-1">Interest Rate</p>
+            <p className="text-lg font-bold">{((Number(loanData?.interestRate) || 0) / 100).toFixed(2)}%</p>
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground mb-1">Health Factor</p>
+            <p className={`text-lg font-bold ${currentBorrowed === 0 ? 'text-foreground' : getHealthFactorColor(loanData?.healthFactor || 0)}`}>
+              {currentBorrowed === 0 ? "No Loan" : (loanData?.healthFactor?.toFixed(2) || "N/A")}
+            </p>
           </div>
         </div>
       </CardContent>

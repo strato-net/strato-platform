@@ -1,12 +1,12 @@
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
-import MobileSidebar from "../components/dashboard/MobileSidebar";
+import MobileBottomNav from "../components/dashboard/MobileBottomNav";
 import AssetSummary from "../components/dashboard/AssetSummary";
 import AssetsList from "../components/dashboard/AssetsList";
 import DashboardFAQ from "../components/dashboard/DashboardFAQ";
 import BorrowingSection from "../components/dashboard/BorrowingSection";
-import { Wallet, Coins, Shield, Banknote, Loader2, Trophy } from "lucide-react";
+import { Wallet, Coins, Shield, Banknote, Loader2, Trophy, Download, Send, Book, ArrowRightLeft } from "lucide-react";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
 import { usePendingRewards } from "@/hooks/usePendingRewards";
@@ -62,7 +62,6 @@ const Dashboard = () => {
   });
   const { loans, refreshLoans } = useLendingContext();
   const { totalCDPDebt, refreshVaults } = useCDP();
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [selectedTimeRange, setSelectedTimeRange] = useState<TimeRange>(() => {
     const stored = localStorage.getItem('dashboard-timeRange');
     if (stored && TIME_RANGES.includes(stored as TimeRange)) {
@@ -292,25 +291,19 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-16 md:pb-0">
       <DashboardSidebar />
-      <MobileSidebar 
-        isOpen={isMobileSidebarOpen} 
-        onClose={() => setIsMobileSidebarOpen(false)} 
-      />
 
-      <div className="transition-all duration-300 md:pl-64" style={{ paddingLeft: 'var(--sidebar-width, 0rem)' }}>
-        <DashboardHeader 
-          title="Overview" 
-          onMenuClick={() => setIsMobileSidebarOpen(true)}
-        />
+      <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
+        <DashboardHeader title="Portfolio" />
 
-        <main className="p-6">
-          <div className={`grid grid-cols-1 ${rewardsEnabled ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-6 mb-8`}>
+        <main className="p-4 md:p-6">
+          {/* Summary Cards */}
+          <div className={`grid grid-cols-1 gap-3 md:gap-6 mb-6 md:mb-8 ${rewardsEnabled ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}>
             <AssetSummary
               title="Net Balance"
               value={`$${totalBalance.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`}
-              icon={<Wallet className="text-white" size={18} />}
+              icon={<Wallet className="text-white" size={16} />}
               color="bg-blue-500"
               onClick={() => setActiveTab('netBalance')}
               isActive={activeTab === 'netBalance'}
@@ -318,70 +311,68 @@ const Dashboard = () => {
             />
 
             <AssetSummary
-              title="Rewards (Season)"
+              title="Rewards"
               value={(() => {
                 if (rankLoading) return "Loading...";
-                if (!totalEarned) return "0 Reward Points";
+                if (!totalEarned) return "0 points";
                 const totalEarnedNum = parseFloat(totalEarned) / 1e18;
-                return `${totalEarnedNum.toLocaleString("en-US", { maximumFractionDigits: 2 })} Reward Points`;
+                return `${totalEarnedNum.toLocaleString("en-US", { maximumFractionDigits: 2 })} points`;
               })()}
-              icon={<Coins className="text-white" size={18} />}
+              icon={<Coins className="text-white" size={16} />}
               color="bg-purple-500"
               onClick={() => setActiveTab('rewards')}
               isActive={activeTab === 'rewards'}
               isLoading={rankLoading}
               additionalContent={
-                <div className="mt-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-xs border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900 hover:border-blue-300 dark:hover:border-blue-700 text-blue-700 dark:text-blue-300 font-medium"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate(`/dashboard/rewards?tab=leaderboard`);
-                    }}
-                  >
-                    {rankLoading ? (
-                      <>
-                        <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
-                        Loading...
-                      </>
-                    ) : userRank !== null ? (
-                      <>
-                        <Trophy className="h-3.5 w-3.5 mr-1.5 text-yellow-500" />
-                        Rank #{userRank} - Leaderboard
-                      </>
-                    ) : (
-                      "View Leaderboard"
-                    )}
-                  </Button>
-                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-6 md:h-7 text-[10px] md:text-xs px-2 md:px-3 border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900 text-blue-700 dark:text-blue-300 font-medium"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/dashboard/rewards?tab=leaderboard`);
+                  }}
+                >
+                  {rankLoading ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : userRank !== null ? (
+                    <>
+                      <Trophy className="h-3 w-3 mr-1 text-yellow-500" />
+                      Rank #{userRank} - Leaderboard
+                    </>
+                  ) : (
+                    "Leaderboard"
+                  )}
+                </Button>
               }
             />
-
-            {rewardsEnabled && (
-              <AssetSummary
-                title="Pending CATA"
-                value={`${parseFloat(pendingRewards).toLocaleString("en-US", { maximumFractionDigits: 2 })} CATA`}
-                icon={isClaiming ? <Loader2 className="text-white animate-spin" size={18} /> : <Banknote className="text-white" size={18} />}
-                color={parseFloat(pendingRewards) > 0 ? "bg-green-500" : "bg-muted-foreground"}
-                onClick={parseFloat(pendingRewards) > 0 && !isClaiming ? handleClaimRewards : undefined}
-                tooltip={isClaiming ? "Processing claim..." : (parseFloat(pendingRewards) > 0 ? "Click to claim your rewards" : undefined)}
-              />
-            )}
 
             <AssetSummary
               title="Total Borrowed"
               value={`${totalBorrowed.toFixed(2)} USDST`}
-              icon={<Shield className="text-white" size={18} />}
+              icon={<Shield className="text-white" size={16} />}
               color="bg-orange-500"
               onClick={() => setActiveTab('borrowed')}
               isActive={activeTab === 'borrowed'}
             />
+
+            {/* Pending CATA - Hidden on mobile */}
+            {rewardsEnabled && (
+              <div className="hidden lg:block">
+                <AssetSummary
+                  title="Pending CATA"
+                  value={`${parseFloat(pendingRewards).toLocaleString("en-US", { maximumFractionDigits: 2 })} CATA`}
+                  icon={isClaiming ? <Loader2 className="text-white animate-spin" size={16} /> : <Banknote className="text-white" size={16} />}
+                  color={parseFloat(pendingRewards) > 0 ? "bg-green-500" : "bg-muted-foreground"}
+                  onClick={parseFloat(pendingRewards) > 0 && !isClaiming ? handleClaimRewards : undefined}
+                  tooltip={isClaiming ? "Processing claim..." : (parseFloat(pendingRewards) > 0 ? "Click to claim your rewards" : undefined)}
+                />
+              </div>
+            )}
           </div>
 
-          {/* Portfolio Value Chart */}
-          <div className="mb-8">
+          {/* Portfolio Value Chart - Hidden on mobile */}
+          <div className="hidden md:block mb-6">
             <PortfolioValueChart 
               data={chartConfig[activeTab].data || []}
               onTimeRangeChange={onTimeRangeChange}
@@ -394,7 +385,26 @@ const Dashboard = () => {
             />
           </div>
 
-          <div className="mb-8">
+          {/* Action Buttons - Always 4 columns */}
+          <div className="grid grid-cols-4 gap-2 md:gap-4 mb-4 md:mb-6">
+            {[
+              { label: 'Deposit', icon: Download, path: '/dashboard/deposits' },
+              { label: 'Transfer', icon: Send, path: '/dashboard/transfer' },
+              { label: 'Borrow', icon: Book, path: '/dashboard/borrow' },
+              { label: 'Swap', icon: ArrowRightLeft, path: '/dashboard/swap' },
+            ].map(({ label, icon: Icon, path }) => (
+              <Button
+                key={label}
+                onClick={() => navigate(path)}
+                className="h-auto py-3 md:py-4 flex-col gap-1 md:flex-row md:gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-medium text-xs md:text-sm"
+              >
+                <Icon size={18} />
+                <span>{label}</span>
+              </Button>
+            ))}
+          </div>
+
+          <div className="mb-4 md:mb-6">
             <AssetsList 
               loading={loadingEarningAssets || loadingInactiveTokens} 
               tokens={nonPoolTokens} 
@@ -402,24 +412,26 @@ const Dashboard = () => {
             />
           </div>
 
-          <div className="mb-8">
+          <div className="mb-4 md:mb-6">
             <BorrowingSection 
               loanData={loans}
             />
           </div>
 
-          <div className="mb-8">
+          <div className="mb-4 md:mb-6">
             <MyPoolParticipationSection 
               poolTokens={poolTokens}
               loading={loadingEarningAssets || loadingInactiveTokens}
             />
           </div>
 
-          <div className="mb-8">
+          <div className="mb-4 md:mb-6">
             <DashboardFAQ />
           </div>
         </main>
       </div>
+
+      <MobileBottomNav />
     </div>
   );
 };
