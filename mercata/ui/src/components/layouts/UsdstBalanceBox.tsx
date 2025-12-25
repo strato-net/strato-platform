@@ -149,7 +149,7 @@ const UsdstBalanceBox: React.FC = () => {
   if (isMinimized) {
     return (
       <Card
-        className={`fixed bottom-20 md:bottom-4 right-4 z-40 w-12 h-12 shadow-lg ${getCardClasses()} backdrop-blur-sm`}
+        className={`fixed bottom-20 md:bottom-4 right-2 md:right-4 z-40 w-9 h-9 md:w-12 md:h-12 shadow-lg ${getCardClasses()} backdrop-blur-sm`}
       >
         <CardContent className="p-0 h-full flex items-center justify-center">
           <Button
@@ -158,7 +158,7 @@ const UsdstBalanceBox: React.FC = () => {
             className="h-full w-full p-0"
             onClick={() => setIsMinimized(false)}
           >
-            {renderIcon("lg")}
+            {renderIcon("md")}
           </Button>
         </CardContent>
       </Card>

@@ -40,7 +40,7 @@ export const RewardsOverview = ({ state, loading, onRefresh }: RewardsOverviewPr
     return (
       <Card>
         <CardHeader>
-          <CardTitle>{seasonDisplay} Reward Overview</CardTitle>
+          <CardTitle className="text-lg md:text-xl">{seasonDisplay} Reward Overview</CardTitle>
           <CardDescription>Global rewards system statistics</CardDescription>
         </CardHeader>
         <CardContent>
@@ -94,9 +94,9 @@ export const RewardsOverview = ({ state, loading, onRefresh }: RewardsOverviewPr
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>{seasonDisplay} Reward Overview</CardTitle>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <CardTitle className="text-lg md:text-xl">{seasonDisplay} Reward Overview</CardTitle>
             <CardDescription>Global rewards system statistics</CardDescription>
           </div>
           {onRefresh && (
@@ -105,7 +105,7 @@ export const RewardsOverview = ({ state, loading, onRefresh }: RewardsOverviewPr
               size="sm"
               onClick={handleRefresh}
               disabled={loading || isRefreshing}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 shrink-0"
             >
               <RefreshCw className={`h-4 w-4 ${(loading || isRefreshing) ? "animate-spin" : ""}`} />
               Refresh

@@ -623,17 +623,16 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false }) => {
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="space-y-1">
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center justify-between gap-3">
           <h3 className="text-base md:text-lg font-bold text-foreground">
             {modeLabels.title}
           </h3>
           <a
             href="/bridge-transactions"
-            className="flex items-center gap-1 text-xs md:text-sm font-medium text-primary hover:text-primary/80 transition-colors whitespace-nowrap"
+            className="flex items-center gap-1 text-[10px] md:text-xs font-medium text-primary hover:text-primary/80 transition-colors whitespace-nowrap"
           >
-            <ExternalLink size={12} className="md:w-3.5 md:h-3.5" />
-            <span className="hidden sm:inline">View Transactions</span>
-            <span className="sm:hidden">Transactions</span>
+            <span>View Transactions</span>
+            <ExternalLink size={10} className="md:w-3 md:h-3" />
           </a>
         </div>
         <p className="text-xs md:text-sm text-muted-foreground">{modeLabels.description}</p>

@@ -3,7 +3,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Plus, Settings, AlertTriangle, Pause, Play, Edit, Save, X, Loader2, ChevronDown, Ban
 } from 'lucide-react';
@@ -280,77 +279,94 @@ const CollateralConfigManager = () => {
 
 
   return (
-    <div className="space-y-6">
-      <Card className="dark:bg-card">
-        <CardHeader>
+    <div className="space-y-4 md:space-y-6">
+      <Card className="dark:bg-card rounded-none md:rounded-xl border-x-0 md:border-x overflow-hidden">
+        <CardHeader className="px-3 md:px-6">
           <CardTitle className="flex items-center justify-between dark:text-foreground">
-            <span className="flex items-center space-x-2">
-              <AlertTriangle className="h-5 w-5" />
-              <span>System Control</span>
+            <span className="flex items-center gap-1.5 md:gap-2 whitespace-nowrap">
+              <AlertTriangle className="h-4 w-4 md:h-5 md:w-5 shrink-0" />
+              <span className="text-base md:text-lg">System Control</span>
             </span>
             <Button
               onClick={handleToggleGlobalPause}
               disabled={loading}
               variant={globalPaused ? "destructive" : "default"}
-              className="flex items-center space-x-2"
+              size="sm"
+              className="flex items-center gap-1.5 text-xs md:text-sm px-2 md:px-3 h-8 md:h-9"
             >
               {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
               ) : globalPaused ? (
-                <Play className="h-4 w-4" />
+                <Play className="h-3 w-3 md:h-4 md:w-4" />
               ) : (
-                <Pause className="h-4 w-4" />
+                <Pause className="h-3 w-3 md:h-4 md:w-4" />
               )}
-              <span>{globalPaused ? 'Unpause System' : 'Pause System'}</span>
+              <span className="hidden sm:inline">{globalPaused ? 'Unpause' : 'Pause'}</span>
+              <span className="sm:hidden">{globalPaused ? 'On' : 'Off'}</span>
             </Button>
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-xs md:text-sm">
             {globalPaused ? (
-              <span className="text-red-600 dark:text-red-400 font-medium flex items-center space-x-2">
+              <span className="text-red-600 dark:text-red-400 font-medium flex items-center gap-1.5">
                 <ExclamationCircleOutlined />
-                <span>CDP system is paused - All operations are blocked</span>
+                <span>System paused - Operations blocked</span>
               </span>
             ) : (
-              <span className="text-green-600 dark:text-green-400 font-medium flex items-center space-x-2">
+              <span className="text-green-600 dark:text-green-400 font-medium flex items-center gap-1.5">
                 <CheckCircleOutlined />
-                <span>CDP system is active - All operations are allowed</span>
+                <span>System active - Operations allowed</span>
               </span>
             )}
           </CardDescription>
         </CardHeader>
       </Card>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2 dark:bg-muted">
-          <TabsTrigger value="add" className="flex items-center space-x-2 data-[state=active]:bg-background dark:data-[state=active]:bg-card">
-            <Plus className="h-4 w-4" />
-            <span>Add/Edit Config</span>
-          </TabsTrigger>
-          <TabsTrigger value="manage" className="flex items-center space-x-2 data-[state=active]:bg-background dark:data-[state=active]:bg-card">
-            <Settings className="h-4 w-4" />
-            <span>Manage Assets</span>
-          </TabsTrigger>
-        </TabsList>
+      {/* Underline Tabs */}
+      <div className="flex border-b border-border">
+        <button
+          onClick={() => setActiveTab('add')}
+          className={`flex items-center gap-1.5 py-2.5 px-3 md:px-4 text-xs md:text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${
+            activeTab === 'add'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Plus className="h-3 w-3 md:h-4 md:w-4" />
+          <span>Add/Edit Config</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('manage')}
+          className={`flex items-center gap-1.5 py-2.5 px-3 md:px-4 text-xs md:text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${
+            activeTab === 'manage'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Settings className="h-3 w-3 md:h-4 md:w-4" />
+          <span>Manage Assets</span>
+        </button>
+      </div>
 
-        <TabsContent value="add" className="space-y-6">
-          <Card className="dark:bg-card">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2 dark:text-foreground">
-                <Settings className="h-5 w-5" />
-                <span>Collateral Asset Configuration</span>
+      {activeTab === 'add' && (
+        <div className="space-y-4 md:space-y-6">
+          <Card className="dark:bg-card rounded-none md:rounded-xl border-x-0 md:border-x overflow-hidden">
+            <CardHeader className="px-3 md:px-6">
+              <CardTitle className="flex items-center gap-1.5 md:gap-2 dark:text-foreground whitespace-nowrap">
+                <Settings className="h-4 w-4 md:h-5 md:w-5 shrink-0" />
+                <span className="text-sm md:text-lg">Collateral Asset Config</span>
               </CardTitle>
-              <CardDescription className="dark:text-muted-foreground">
-                Configure risk parameters for collateral assets in the CDP system
+              <CardDescription className="dark:text-muted-foreground text-xs md:text-sm">
+                Configure risk parameters for collateral assets
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-4 md:space-y-6 px-3 md:px-6">
               <Form
                 form={form}
                 layout="vertical"
                 onFinish={handleSubmit}
-                className="space-y-6"
+                className="space-y-4 md:space-y-6"
               >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                   <Form.Item
                     name="asset"
                     label={<span className="dark:text-foreground">Asset Address</span>}
@@ -536,62 +552,65 @@ const CollateralConfigManager = () => {
               </Form>
             </CardContent>
           </Card>
-        </TabsContent>
+        </div>
+      )}
 
-        <TabsContent value="manage" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Settings className="h-5 w-5" />
-                <span>Manage Collateral Assets</span>
+      {activeTab === 'manage' && (
+        <div className="space-y-4 md:space-y-6">
+          <Card className="rounded-none md:rounded-xl border-x-0 md:border-x overflow-hidden">
+            <CardHeader className="px-3 md:px-6">
+              <CardTitle className="flex items-center gap-1.5 md:gap-2 whitespace-nowrap">
+                <Settings className="h-4 w-4 md:h-5 md:w-5 shrink-0" />
+                <span className="text-sm md:text-lg">Manage Collateral Assets</span>
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-xs md:text-sm">
                 View and manage existing collateral asset configurations
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-3 md:px-6">
               {loading ? (
                 <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-8 w-8 animate-spin text-strato-blue" />
+                  <Loader2 className="h-6 w-6 md:h-8 md:w-8 animate-spin text-strato-blue" />
                 </div>
               ) : !assets.length ? (
                 <Alert>
                   <AlertTriangle className="h-4 w-4" />
-                  <AlertDescription>
+                  <AlertDescription className="text-xs md:text-sm">
                     No collateral assets configured yet. Add your first asset using the "Add/Edit Config" tab.
                   </AlertDescription>
                 </Alert>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-3 md:space-y-4">
                   {assets.map((asset) => (
-                    <Card key={asset.asset} className="border-l-4 border-l-strato-blue">
-                      <CardContent className="pt-6">
-                        <div className="flex items-center justify-between">
-                          <div className="space-y-2">
-                            <div className="flex items-center space-x-2">
-                              <h3 className="font-semibold">{asset.symbol}</h3>
+                    <Card key={asset.asset} className="border-l-4 border-l-strato-blue overflow-hidden">
+                      <CardContent className="pt-4 md:pt-6 px-3 md:px-6">
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                          <div className="space-y-1.5 md:space-y-2 min-w-0">
+                            <div className="flex items-center flex-wrap gap-1.5 md:gap-2">
+                              <h3 className="font-semibold text-sm md:text-base">{asset.symbol}</h3>
                               {asset.isPaused && asset.isSupported && (
-                                <Badge variant="destructive">Paused</Badge>
+                                <Badge variant="destructive" className="text-[10px] md:text-xs">Paused</Badge>
                               )}
                               {!asset.isPaused && asset.isSupported && (
-                                <Badge variant="default">Active</Badge>
+                                <Badge variant="default" className="text-[10px] md:text-xs">Active</Badge>
                               )}
-                              <Badge variant={asset.isSupported ? "outline" : "destructive"}>
-                                {asset.isSupported ? 'Supported' : 'Not Supported'}
+                              <Badge variant={asset.isSupported ? "outline" : "destructive"} className="text-[10px] md:text-xs">
+                                {asset.isSupported ? 'Supported' : 'Unsupported'}
                               </Badge>
                             </div>
-                            <p className="text-sm text-muted-foreground font-mono">{asset.asset}</p>
+                            <p className="text-[10px] md:text-sm text-muted-foreground font-mono truncate">{asset.asset}</p>
                           </div>
                           
-                          <div className="flex items-center space-x-2">
+                          <div className="flex items-center gap-2 shrink-0">
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => handleEditAsset(asset)}
                               disabled={loading}
+                              className="text-xs h-7 md:h-8 px-2 md:px-3"
                             >
-                              <Edit className="h-4 w-4 mr-1" />
-                              Edit
+                              <Edit className="h-3 w-3 md:h-4 md:w-4 md:mr-1" />
+                              <span className="hidden md:inline">Edit</span>
                             </Button>
                             
                             {!asset.isSupported ? (
@@ -600,9 +619,10 @@ const CollateralConfigManager = () => {
                                 size="sm"
                                 onClick={() => handleToggleDisable(asset.asset, true)}
                                 disabled={loading}
+                                className="text-xs h-7 md:h-8 px-2 md:px-3"
                               >
-                                <Play className="h-4 w-4 mr-1" />
-                                Enable
+                                <Play className="h-3 w-3 md:h-4 md:w-4 md:mr-1" />
+                                <span className="hidden md:inline">Enable</span>
                               </Button>
                             ) : (
                               <DropdownMenu>
@@ -611,10 +631,11 @@ const CollateralConfigManager = () => {
                                     variant="outline"
                                     size="sm"
                                     disabled={loading}
+                                    className="text-xs h-7 md:h-8 px-2 md:px-3"
                                   >
-                                    <Settings className="h-4 w-4 mr-1" />
-                                    Actions
-                                    <ChevronDown className="h-4 w-4 ml-1" />
+                                    <Settings className="h-3 w-3 md:h-4 md:w-4 md:mr-1" />
+                                    <span className="hidden md:inline">Actions</span>
+                                    <ChevronDown className="h-3 w-3 md:h-4 md:w-4 md:ml-1" />
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
@@ -649,26 +670,26 @@ const CollateralConfigManager = () => {
                           </div>
                         </div>
                         
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4 mt-3 md:mt-4">
                           <div>
-                            <p className="text-sm text-muted-foreground">Liquidation Ratio</p>
-                            <p className="font-semibold">{formatValue(asset.liquidationRatio.toString(), 'percentage')}</p>
+                            <p className="text-[10px] md:text-sm text-muted-foreground">Liq. Ratio</p>
+                            <p className="font-semibold text-xs md:text-base">{formatValue(asset.liquidationRatio.toString(), 'percentage')}</p>
                           </div>
                           <div>
-                            <p className="text-sm text-muted-foreground">Min CR</p>
-                            <p className="font-semibold">{formatValue((asset.minCR || asset.liquidationRatio).toString(), 'percentage')}</p>
+                            <p className="text-[10px] md:text-sm text-muted-foreground">Min CR</p>
+                            <p className="font-semibold text-xs md:text-base">{formatValue((asset.minCR || asset.liquidationRatio).toString(), 'percentage')}</p>
                           </div>
                           <div>
-                            <p className="text-sm text-muted-foreground">Penalty</p>
-                            <p className="font-semibold">{formatValue(asset.liquidationPenaltyBps.toString(), 'bps')}</p>
+                            <p className="text-[10px] md:text-sm text-muted-foreground">Penalty</p>
+                            <p className="font-semibold text-xs md:text-base">{formatValue(asset.liquidationPenaltyBps.toString(), 'bps')}</p>
                           </div>
                           <div>
-                            <p className="text-sm text-muted-foreground">Close Factor</p>
-                            <p className="font-semibold">{formatValue(asset.closeFactorBps.toString(), 'bps')}</p>
+                            <p className="text-[10px] md:text-sm text-muted-foreground">Close Factor</p>
+                            <p className="font-semibold text-xs md:text-base">{formatValue(asset.closeFactorBps.toString(), 'bps')}</p>
                           </div>
                           <div>
-                            <p className="text-sm text-muted-foreground">Debt Floor</p>
-                            <p className="font-semibold">{formatValue(asset.debtFloor, 'usd')}</p>
+                            <p className="text-[10px] md:text-sm text-muted-foreground">Debt Floor</p>
+                            <p className="font-semibold text-xs md:text-base">{formatValue(asset.debtFloor, 'usd')}</p>
                           </div>
                         </div>
                       </CardContent>
@@ -678,8 +699,8 @@ const CollateralConfigManager = () => {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
+        </div>
+      )}
     </div>
   );
 };

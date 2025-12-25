@@ -46,10 +46,10 @@ const DashboardHeader = ({ title }: DashboardHeaderProps) => {
   return (
     <header className="bg-background border-b border-border py-4 px-4 md:px-6 flex items-center justify-between">
       <div className="flex items-center gap-2 md:gap-3">
-        {/* Back button for non-portfolio pages (both mobile and desktop) */}
+        {/* Back button for non-portfolio pages (both mobile and desktop) - uses browser history */}
         {!isPortfolioPage && (
           <button 
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate(-1)}
             className="flex items-center justify-center p-1 hover:bg-muted rounded-md transition-colors"
           >
             <ChevronLeft size={20} className="text-muted-foreground" />
@@ -62,7 +62,7 @@ const DashboardHeader = ({ title }: DashboardHeaderProps) => {
           className="h-8 md:hidden" 
         />
         {/* Title always visible */}
-        <h1 className="text-xl font-bold">{title}</h1>
+        <h1 className="text-base md:text-xl font-bold whitespace-nowrap">{title}</h1>
         {isTestnet && (
           <span className="bg-orange-500 text-white px-2 py-1 rounded text-xs font-bold uppercase hidden sm:inline-block">
             TESTNET

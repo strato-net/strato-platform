@@ -208,8 +208,8 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
   ];
 
   return (
-    <div className="space-y-4 ant-table-themed">
-      <Card className="bg-card rounded-xl shadow-sm border border-border">
+    <div className="space-y-2 md:space-y-4 ant-table-themed">
+      <Card className="bg-card md:rounded-xl rounded-none shadow-sm border-y md:border border-border mx-3 md:mx-0">
         <Space 
           size="large" 
           direction={isMobile ? "vertical" : "horizontal"} 
@@ -268,7 +268,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
         </Space>
       </Card>
       
-      <div className="bg-card rounded-xl shadow-sm border border-border overflow-x-auto">
+      <div className="bg-card md:rounded-xl rounded-none shadow-sm border-y md:border border-border overflow-x-auto [&_.ant-table-pagination]:mb-0 [&_.ant-table-pagination]:py-3 md:[&_.ant-table-pagination]:py-4">
         <Table
           columns={columns}
           dataSource={transactions}

@@ -2,8 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Shield, Coins, DollarSign, Droplets, Settings, ArrowLeft, ToggleLeft, Cog, CreditCard, TrendingUp, Vote, Database, ChevronDown, ArrowRightLeft } from 'lucide-react';
+import { Shield, Coins, DollarSign, Droplets, Settings, ArrowLeft, ToggleLeft, Cog, TrendingUp, Vote, Database, ChevronDown, ArrowRightLeft } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import CreateTokenForm from '@/components/admin/CreateTokenForm';
 import CreatePoolForm from '@/components/admin/CreatePoolForm';
@@ -24,182 +23,227 @@ const Admin = () => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="bg-card border-b border-border">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate('/dashboard')}
-                className="flex items-center space-x-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                <span>Back to Dashboard</span>
-              </Button>
-              <div className="flex items-center space-x-2">
-                <Shield className="h-6 w-6 text-strato-blue" />
-                <h1 className="text-xl font-bold">Admin Panel</h1>
-              </div>
+        <div className="container mx-auto px-3 md:px-6 lg:px-8">
+          <div className="flex items-center h-14 md:h-16 gap-2 md:gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate('/dashboard')}
+              className="flex items-center p-1.5 md:p-2 h-auto"
+            >
+              <ArrowLeft className="h-4 w-4 md:h-5 md:w-5" />
+              <span className="hidden md:inline ml-2">Back to Dashboard</span>
+            </Button>
+            <div className="flex items-center gap-1.5 md:gap-2">
+              <Shield className="h-5 w-5 md:h-6 md:w-6 text-strato-blue shrink-0" />
+              <h1 className="text-base md:text-xl font-bold whitespace-nowrap">Admin Panel</h1>
             </div>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold mb-2 text-foreground">Platform Administration</h2>
-          <p className="text-muted-foreground">Manage tokens, pools, liquidity, and asset pricing</p>
+      <div className="container mx-auto px-3 md:px-6 lg:px-8 py-4 md:py-8">
+        <div className="mb-4 md:mb-6">
+          <h2 className="text-xl md:text-3xl font-bold mb-1 md:mb-2 text-foreground">Platform Administration</h2>
+          <p className="text-xs md:text-base text-muted-foreground">Manage tokens, pools, liquidity, and asset pricing</p>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 ">
-          <div className="w-full overflow-x-auto">
-            <TabsList className="grid grid-cols-6 w-full min-w-[600px] md:min-w-0">
-              <TabsTrigger value="pools" className="flex items-center space-x-1 md:space-x-2 text-xs md:text-sm">
-                <Droplets className="h-3 w-3 md:h-4 md:w-4" />
-                <span className="hidden sm:inline">Create Pools</span>
-                <span className="sm:hidden">Pools</span>
-              </TabsTrigger>
-              <DropdownMenu modal={false}>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-xs md:text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 space-x-1 md:space-x-2 ${
-                      ['lending', 'configs'].includes(activeTab)
-                        ? 'bg-background text-foreground shadow-sm dark:bg-muted dark:text-primary-foreground'
-                        : 'hover:bg-muted hover:text-accent-foreground dark:hover:bg-muted/50 dark:hover:text-primary-foreground'
-                    }`}
-                  >
-                    <TrendingUp className="h-3 w-3 md:h-4 md:w-4" />
-                    <span className="hidden sm:inline">Lending</span>
-                    <span className="sm:hidden">Lending</span>
-                    <ChevronDown className="h-3 w-3" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start">
-                  <DropdownMenuItem onClick={() => setActiveTab('lending')}>
-                    <TrendingUp className="h-4 w-4 mr-2" />
-                    Lending Config
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setActiveTab('configs')}>
-                    <Cog className="h-4 w-4 mr-2" />
-                    Token Configs
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <DropdownMenu modal={false}>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-xs md:text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 space-x-1 md:space-x-2 ${
-                      ['tokens', 'pricing', 'status'].includes(activeTab)
-                        ? 'bg-background text-foreground shadow-sm dark:bg-muted dark:text-primary-foreground'
-                        : 'hover:bg-muted hover:text-accent-foreground dark:hover:bg-muted/50 dark:hover:text-primary-foreground'
-                    }`}
-                  >
-                    <Settings className="h-3 w-3 md:h-4 md:w-4" />
-                    <span className="hidden sm:inline">Token</span>
-                    <span className="sm:hidden">Token</span>
-                    <ChevronDown className="h-3 w-3" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start">
-                  <DropdownMenuItem onClick={() => setActiveTab('tokens')}>
-                    <Coins className="h-4 w-4 mr-2" />
-                    Create Tokens
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setActiveTab('pricing')}>
-                    <DollarSign className="h-4 w-4 mr-2" />
-                    Set Prices
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setActiveTab('status')}>
-                    <ToggleLeft className="h-4 w-4 mr-2" />
-                    Token Status
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <TabsTrigger value="cdp" className="flex items-center space-x-1 md:space-x-2 text-xs md:text-sm">
-                <Database className="h-3 w-3 md:h-4 md:w-4" />
-                <span className="hidden sm:inline">CDP Config</span>
-                <span className="sm:hidden">CDP</span>
-              </TabsTrigger>
-              <TabsTrigger value="vote" className="flex items-center space-x-1 md:space-x-2 text-xs md:text-sm">
-                <Vote className="h-3 w-3 md:h-4 md:w-4" />
-                <span className="hidden sm:inline">Vote on Issues</span>
-                <span className="sm:hidden">Vote</span>
-              </TabsTrigger>
-              <TabsTrigger value="bridge" className="flex items-center space-x-1 md:space-x-2 text-xs md:text-sm">
-                <ArrowRightLeft className="h-3 w-3 md:h-4 md:w-4" />
-                <span className="hidden sm:inline">Bridge</span>
-                <span className="sm:hidden">Bridge</span>
-              </TabsTrigger>
-            </TabsList>
-          </div>
+        {/* Underline Tabs */}
+        <div className="flex border-b border-border mb-4 md:mb-6 overflow-x-auto">
+          <button
+            onClick={() => setActiveTab('pools')}
+            className={`flex items-center gap-1 py-2.5 px-2 md:px-4 text-xs md:text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${
+              activeTab === 'pools'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Droplets className="h-3 w-3 md:h-4 md:w-4" />
+            <span className="hidden sm:inline">Pools</span>
+            <span className="sm:hidden">Pools</span>
+          </button>
+          
+          {/* Lending Dropdown */}
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <button
+                className={`flex items-center gap-1 py-2.5 px-2 md:px-4 text-xs md:text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${
+                  ['lending', 'configs'].includes(activeTab)
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <TrendingUp className="h-3 w-3 md:h-4 md:w-4" />
+                <span>Lending</span>
+                <ChevronDown className="h-3 w-3" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={() => setActiveTab('lending')}>
+                <TrendingUp className="h-4 w-4 mr-2" />
+                Lending Config
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setActiveTab('configs')}>
+                <Cog className="h-4 w-4 mr-2" />
+                Token Configs
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          
+          {/* Token Dropdown */}
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <button
+                className={`flex items-center gap-1 py-2.5 px-2 md:px-4 text-xs md:text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${
+                  ['tokens', 'pricing', 'status'].includes(activeTab)
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Settings className="h-3 w-3 md:h-4 md:w-4" />
+                <span>Token</span>
+                <ChevronDown className="h-3 w-3" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={() => setActiveTab('tokens')}>
+                <Coins className="h-4 w-4 mr-2" />
+                Create Tokens
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setActiveTab('pricing')}>
+                <DollarSign className="h-4 w-4 mr-2" />
+                Set Prices
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setActiveTab('status')}>
+                <ToggleLeft className="h-4 w-4 mr-2" />
+                Token Status
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          
+          <button
+            onClick={() => setActiveTab('cdp')}
+            className={`flex items-center gap-1 py-2.5 px-2 md:px-4 text-xs md:text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${
+              activeTab === 'cdp'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Database className="h-3 w-3 md:h-4 md:w-4" />
+            <span>CDP</span>
+          </button>
+          
+          <button
+            onClick={() => setActiveTab('vote')}
+            className={`flex items-center gap-1 py-2.5 px-2 md:px-4 text-xs md:text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${
+              activeTab === 'vote'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Vote className="h-3 w-3 md:h-4 md:w-4" />
+            <span>Vote</span>
+          </button>
+          
+          <button
+            onClick={() => setActiveTab('bridge')}
+            className={`flex items-center gap-1 py-2.5 px-2 md:px-4 text-xs md:text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${
+              activeTab === 'bridge'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <ArrowRightLeft className="h-3 w-3 md:h-4 md:w-4" />
+            <span>Bridge</span>
+          </button>
+        </div>
 
-          <TabsContent value="tokens" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Create New Token</CardTitle>
-                <CardDescription>
+        {/* Tab Contents */}
+        {activeTab === 'tokens' && (
+          <div className="space-y-4 md:space-y-6">
+            <Card className="rounded-lg md:rounded-xl">
+              <CardHeader className="px-4 md:px-6">
+                <CardTitle className="text-base md:text-lg">Create New Token</CardTitle>
+                <CardDescription className="text-xs md:text-sm">
                   Deploy a new ERC20 token on the STRATO blockchain
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="px-4 md:px-6">
                 <CreateTokenForm />
               </CardContent>
             </Card>
-          </TabsContent>
+          </div>
+        )}
 
-          <TabsContent value="pools" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Create Swap Pool</CardTitle>
-                <CardDescription>
-                  Select pairing  tokens and set initial liquidity
+        {activeTab === 'pools' && (
+          <div className="space-y-4 md:space-y-6">
+            <Card className="rounded-lg md:rounded-xl">
+              <CardHeader className="px-4 md:px-6">
+                <CardTitle className="text-base md:text-lg">Create Swap Pool</CardTitle>
+                <CardDescription className="text-xs md:text-sm">
+                  Select pairing tokens and set initial liquidity
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="px-4 md:px-6">
                 <CreatePoolForm />
               </CardContent>
             </Card>
             <SwapPoolsTable />
-          </TabsContent>
+          </div>
+        )}
 
-          <TabsContent value="lending" className="space-y-6">
+        {activeTab === 'lending' && (
+          <div className="space-y-4 md:space-y-6">
             <LendingTab />
-          </TabsContent>
+          </div>
+        )}
 
-          <TabsContent value="pricing" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Set Asset Prices</CardTitle>
-                <CardDescription>
+        {activeTab === 'pricing' && (
+          <div className="space-y-4 md:space-y-6">
+            <Card className="rounded-lg md:rounded-xl">
+              <CardHeader className="px-4 md:px-6">
+                <CardTitle className="text-base md:text-lg">Set Asset Prices</CardTitle>
+                <CardDescription className="text-xs md:text-sm">
                   Configure oracle pricing for assets
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="px-4 md:px-6">
                 <SetAssetPriceForm />
               </CardContent>
             </Card>
-          </TabsContent>
+          </div>
+        )}
 
-          <TabsContent value="configs" className="space-y-6">
+        {activeTab === 'configs' && (
+          <div className="space-y-4 md:space-y-6">
             <TokenConfigTable />
-          </TabsContent>
+          </div>
+        )}
 
-          <TabsContent value="status" className="space-y-6">
+        {activeTab === 'status' && (
+          <div className="space-y-4 md:space-y-6">
             <TokenStatusTable />
-          </TabsContent>
+          </div>
+        )}
 
-          <TabsContent value="cdp" className="space-y-6">
+        {activeTab === 'cdp' && (
+          <div className="space-y-4 md:space-y-6">
             <CollateralConfigManager />
-          </TabsContent>
+          </div>
+        )}
 
-          <TabsContent value="vote" className="space-y-6">
+        {activeTab === 'vote' && (
+          <div className="space-y-4 md:space-y-6">
             <VoteTab />
-          </TabsContent>
-          <TabsContent value="bridge" className="space-y-6">
+          </div>
+        )}
+
+        {activeTab === 'bridge' && (
+          <div className="space-y-4 md:space-y-6">
             <BridgeTransactionsPage isAdmin={true} />
-          </TabsContent>
-        </Tabs>
+          </div>
+        )}
       </div>
     </div>
   );

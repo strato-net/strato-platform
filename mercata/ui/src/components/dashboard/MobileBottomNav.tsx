@@ -66,32 +66,32 @@ const MobileBottomNav = () => {
         </div>
       </nav>
 
-      {/* More Drawer - Compact with smooth animation */}
+      {/* More Drawer - Compact (30% height) with smooth animation */}
       <Drawer open={isMoreOpen} onOpenChange={setIsMoreOpen}>
-        <DrawerContent className="pb-6">
+        <DrawerContent className="max-h-[30vh] pb-3">
           {/* Close Button */}
-          <div className="flex justify-end p-3">
+          <div className="flex justify-end px-3 pt-1">
             <DrawerClose asChild>
-              <button className="p-1.5 rounded-md border border-border hover:bg-muted transition-colors">
-                <X size={16} />
+              <button className="p-1 rounded-md border border-border hover:bg-muted transition-colors">
+                <X size={14} />
               </button>
             </DrawerClose>
           </div>
           
           {/* Menu Items */}
-          <div className="px-4 space-y-1">
+          <div className="px-4">
             {filteredMoreItems.map(({ icon: Icon, label, path }) => (
               <button
                 key={path}
                 onClick={() => handleMoreItemClick(path)}
-                className={`flex items-center gap-3 w-full px-3 py-3 rounded-lg transition-colors ${
+                className={`flex items-center gap-3 w-full px-3 py-2 rounded-lg transition-colors ${
                   isActive(path)
                     ? 'bg-primary/10 text-primary'
                     : 'text-foreground hover:bg-muted'
                 }`}
               >
-                <Icon size={20} />
-                <span className="font-medium">{label}</span>
+                <Icon size={18} />
+                <span className="text-sm font-medium">{label}</span>
               </button>
             ))}
           </div>

@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
-import MobileSidebar from '../components/dashboard/MobileSidebar';
+import MobileBottomNav from '../components/dashboard/MobileBottomNav';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/lib/axios";
 import { formatUnits } from '@/utils/numberUtils';
 
@@ -122,7 +121,7 @@ const createEmptyRevenuePeriod = (): RevenuePeriod => ({
 });
 
 const MercataStats = () => {
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'tokens' | 'cdp' | 'revenue'>('tokens');
   const [tokens, setTokens] = useState<TokenWithStats[]>([]);
   const [totalMarketCap, setTotalMarketCap] = useState<string>('0');
   const [loading, setLoading] = useState(true);
@@ -320,31 +319,51 @@ const MercataStats = () => {
   };
   
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-16 md:pb-0">
       <DashboardSidebar />
-      <MobileSidebar 
-        isOpen={isMobileSidebarOpen} 
-        onClose={() => setIsMobileSidebarOpen(false)} 
-      />
+      <MobileBottomNav />
       <div className="transition-all duration-300 md:pl-64" style={{ paddingLeft: 'var(--sidebar-width, 0rem)' }}>
-        <DashboardHeader title="Mercata Stats" onMenuClick={() => setIsMobileSidebarOpen(true)} />
+        <DashboardHeader title="Mercata Stats" />
         
-        <main className="p-6">
+        <main className="p-3 md:p-6">
           <div className="max-w-7xl mx-auto">
-            <Tabs defaultValue="tokens" className="w-full">
-                <TabsList className="grid w-full grid-cols-3 mb-6">
-                  <TabsTrigger value="tokens">
-                    Token Stats
-                  </TabsTrigger>
-                  <TabsTrigger value="cdp">
-                    CDP Stats
-                  </TabsTrigger>
-                  <TabsTrigger value="revenue">
-                    Protocol Revenue
-                  </TabsTrigger>
-                </TabsList>
+            {/* Underline Tabs */}
+            <div className="flex border-b border-border mb-6">
+              <button
+                onClick={() => setActiveTab('tokens')}
+                className={`flex-1 py-2 px-2 md:px-4 text-xs md:text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${
+                  activeTab === 'tokens'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Token Stats
+              </button>
+              <button
+                onClick={() => setActiveTab('cdp')}
+                className={`flex-1 py-2 px-2 md:px-4 text-xs md:text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${
+                  activeTab === 'cdp'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                CDP Stats
+              </button>
+              <button
+                onClick={() => setActiveTab('revenue')}
+                className={`flex-1 py-2 px-2 md:px-4 text-xs md:text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${
+                  activeTab === 'revenue'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Protocol Revenue
+              </button>
+            </div>
 
-              <TabsContent value="tokens">
+            {/* Token Stats Tab */}
+            {activeTab === 'tokens' && (
+              <>
                 {/* Summary Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                   <Card>
@@ -408,9 +427,12 @@ const MercataStats = () => {
                     )}
                   </CardContent>
                 </Card>
-              </TabsContent>
+              </>
+            )}
 
-              <TabsContent value="cdp">
+            {/* CDP Stats Tab */}
+            {activeTab === 'cdp' && (
+              <>
                 {/* CDP Summary Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                   <Card>
@@ -512,65 +534,68 @@ const MercataStats = () => {
                     )}
                   </CardContent>
                 </Card>
-              </TabsContent>
+              </>
+            )}
 
-              <TabsContent value="revenue">
+            {/* Protocol Revenue Tab */}
+            {activeTab === 'revenue' && (
+              <>
                 {/* Time Period Selector */}
-                <div className="flex flex-wrap gap-2 mb-6">
-                    <button
-                      onClick={() => setSelectedPeriod('daily')}
-                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                        selectedPeriod === 'daily' 
-                          ? 'bg-blue-600 text-white dark:bg-blue-700' 
-                          : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                      }`}
-                    >
-                      Daily
-                    </button>
-                    <button
-                      onClick={() => setSelectedPeriod('weekly')}
-                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                        selectedPeriod === 'weekly' 
-                          ? 'bg-blue-600 text-white dark:bg-blue-700' 
-                          : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                      }`}
-                    >
-                      Weekly
-                    </button>
-                    <button
-                      onClick={() => setSelectedPeriod('monthly')}
-                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                        selectedPeriod === 'monthly' 
-                          ? 'bg-blue-600 text-white dark:bg-blue-700' 
-                          : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                      }`}
-                    >
-                      Monthly
-                    </button>
-                    <button
-                      onClick={() => setSelectedPeriod('ytd')}
-                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                        selectedPeriod === 'ytd' 
-                          ? 'bg-blue-600 text-white dark:bg-blue-700' 
-                          : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                      }`}
-                    >
-                      YTD
-                    </button>
-                    <button
-                      onClick={() => setSelectedPeriod('allTime')}
-                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                        selectedPeriod === 'allTime' 
-                          ? 'bg-blue-600 text-white dark:bg-blue-700' 
-                          : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                      }`}
-                    >
-                      All Time
-                    </button>
-                  </div>
+                <div className="flex gap-1.5 md:gap-2 mb-4 md:mb-6">
+                  <button
+                    onClick={() => setSelectedPeriod('daily')}
+                    className={`px-2.5 md:px-4 py-1.5 md:py-2 rounded-md text-[11px] md:text-sm font-medium transition-colors ${
+                      selectedPeriod === 'daily' 
+                        ? 'bg-primary text-primary-foreground' 
+                        : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                    }`}
+                  >
+                    Daily
+                  </button>
+                  <button
+                    onClick={() => setSelectedPeriod('weekly')}
+                    className={`px-2.5 md:px-4 py-1.5 md:py-2 rounded-md text-[11px] md:text-sm font-medium transition-colors ${
+                      selectedPeriod === 'weekly' 
+                        ? 'bg-primary text-primary-foreground' 
+                        : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                    }`}
+                  >
+                    Weekly
+                  </button>
+                  <button
+                    onClick={() => setSelectedPeriod('monthly')}
+                    className={`px-2.5 md:px-4 py-1.5 md:py-2 rounded-md text-[11px] md:text-sm font-medium transition-colors ${
+                      selectedPeriod === 'monthly' 
+                        ? 'bg-primary text-primary-foreground' 
+                        : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                    }`}
+                  >
+                    Monthly
+                  </button>
+                  <button
+                    onClick={() => setSelectedPeriod('ytd')}
+                    className={`px-2.5 md:px-4 py-1.5 md:py-2 rounded-md text-[11px] md:text-sm font-medium transition-colors ${
+                      selectedPeriod === 'ytd' 
+                        ? 'bg-primary text-primary-foreground' 
+                        : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                    }`}
+                  >
+                    YTD
+                  </button>
+                  <button
+                    onClick={() => setSelectedPeriod('allTime')}
+                    className={`px-2.5 md:px-4 py-1.5 md:py-2 rounded-md text-[11px] md:text-sm font-medium transition-colors ${
+                      selectedPeriod === 'allTime' 
+                        ? 'bg-primary text-primary-foreground' 
+                        : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                    }`}
+                  >
+                    All Time
+                  </button>
+                </div>
 
                 {/* Revenue Summary Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-6 mb-4 md:mb-6">
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium">CDP Revenue</CardTitle>
@@ -744,8 +769,8 @@ const MercataStats = () => {
                     )}
                   </CardContent>
                 </Card>
-              </TabsContent>
-            </Tabs>
+              </>
+            )}
           </div>
         </main>
       </div>

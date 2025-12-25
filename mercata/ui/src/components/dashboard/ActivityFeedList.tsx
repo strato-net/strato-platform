@@ -342,76 +342,74 @@ const ActivityFeedList = () => {
 
   // Memoized event card renderer to prevent unnecessary re-renders
   const renderEventCard = useCallback((event: Event) => (
-    <Card key={event.id} className="mb-3 sm:mb-4 hover:shadow-md transition-shadow">
+    <Card key={event.id} className="mb-3 sm:mb-4 hover:shadow-md transition-shadow overflow-hidden">
       <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className={`p-1.5 sm:p-2 rounded-full ${getEventColor(event.event_name)}`}>
+        {/* Event Name + Block on single line */}
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className={`p-1.5 sm:p-2 rounded-full shrink-0 ${getEventColor(event.event_name)}`}>
               {getEventIcon(event?.event_name ? event?.event_name : 'N/A')}
             </div>
-            <div>
-              <CardTitle className="text-base sm:text-lg font-semibold">{event?.event_name ? event?.event_name : 'N/A'}</CardTitle>
-              <div className="flex flex-wrap items-center gap-1 sm:gap-2 text-xs sm:text-sm text-muted-foreground">
-                <Building2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span>{event?.contract_name ? event?.contract_name : 'N/A'}</span>
-              </div>
-            </div>
+            <CardTitle className="text-sm sm:text-lg font-semibold truncate">{event?.event_name ? event?.event_name : 'N/A'}</CardTitle>
           </div>
-          <div className="flex flex-col gap-1 sm:block sm:text-right">
-            <Badge variant="outline" className="text-xs inline-flex w-fit">
-              Block #{event?.block_number ? event?.block_number : 'N/A'}
-            </Badge>
-            <div className="text-xs text-muted-foreground">
-              {formatTimestamp(event?.block_timestamp ? event?.block_timestamp : 'N/A')}
-            </div>
+          <Badge variant="outline" className="text-[10px] sm:text-xs shrink-0">
+            Block #{event?.block_number ? event?.block_number : 'N/A'}
+          </Badge>
+        </div>
+        {/* Contract name + Timestamp */}
+        <div className="flex items-center justify-between text-[10px] sm:text-sm text-muted-foreground pl-8 sm:pl-10">
+          <div className="flex items-center gap-1">
+            <Building2 className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
+            <span className="truncate">{event?.contract_name ? event?.contract_name : 'N/A'}</span>
           </div>
+          <span className="shrink-0">{formatTimestamp(event?.block_timestamp ? event?.block_timestamp : 'N/A')}</span>
         </div>
       </CardHeader>
       
-      <CardContent className="px-3 sm:px-6 pt-3">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
-          <div className="space-y-2">
-            <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
-              <User className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
-              <span className="font-medium">Sender:</span>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <code className="text-xs bg-muted px-2 py-1 rounded cursor-help">
-                      {event?.transaction_sender ? formatAddress(event?.transaction_sender) : 'N/A'}
-                    </code>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p className="font-mono text-xs">{event?.transaction_sender ? event?.transaction_sender : 'N/A'}</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-            <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
-              <FileText className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="font-medium">Contract:</span>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <code className="text-xs bg-muted px-2 py-1 rounded cursor-help">
-                      {event?.address ? formatAddress(event?.address) : 'N/A'}
-                    </code>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p className="font-mono text-xs">{event?.address ? event?.address : 'N/A'}</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
+      <CardContent className="px-3 sm:px-6 pt-2 sm:pt-3">
+        {/* Sender + Contract on single line */}
+        <div className="flex flex-wrap gap-x-4 gap-y-1 mb-3 text-[10px] sm:text-sm">
+          <div className="flex items-center gap-1">
+            <User className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground shrink-0" />
+            <span className="font-medium">Sender:</span>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <code className="text-[10px] sm:text-xs bg-muted px-1.5 py-0.5 rounded cursor-help">
+                    {event?.transaction_sender ? formatAddress(event?.transaction_sender) : 'N/A'}
+                  </code>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="font-mono text-xs">{event?.transaction_sender ? event?.transaction_sender : 'N/A'}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
-          
-          <div className="space-y-2">
-            <div className="text-xs sm:text-sm font-medium text-foreground">Event Attributes:</div>
+          <div className="flex items-center gap-1">
+            <FileText className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
+            <span className="font-medium">Contract:</span>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <code className="text-[10px] sm:text-xs bg-muted px-1.5 py-0.5 rounded cursor-help">
+                    {event?.address ? formatAddress(event?.address) : 'N/A'}
+                  </code>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="font-mono text-xs">{event?.address ? event?.address : 'N/A'}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        </div>
+
+        <div className="space-y-2 min-w-0">
+            <div className="text-[10px] sm:text-sm font-medium text-foreground">Event Attributes:</div>
             <div className="space-y-1">
               {Object.entries(event?.attributes).map(([key, value]) => (
-                <div key={key} className="flex justify-between text-xs sm:text-sm">
-                  <span className="text-muted-foreground capitalize">{key}:</span>
-                  <span className="font-mono text-xs">
+                <div key={key} className="flex justify-between gap-2 text-[10px] sm:text-sm">
+                  <span className="text-muted-foreground capitalize shrink-0">{key}:</span>
+                  <span className="font-mono text-[10px] sm:text-xs break-all text-right">
                     {key.toLowerCase().includes('value') 
                       ? formatValue(value)
                       : key.toLowerCase().includes('address') || key.toLowerCase().includes('from') || key.toLowerCase().includes('to')
@@ -436,7 +434,6 @@ const ActivityFeedList = () => {
               ))}
             </div>
           </div>
-        </div>
       </CardContent>
     </Card>
   ), [formatAddress, formatTimestamp, getEventIcon, getEventColor, formatValue]);

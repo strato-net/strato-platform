@@ -368,7 +368,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 md:space-y-4">
       <style>{`
         /* Hide number input arrows */
         input[type="number"]::-webkit-outer-spin-button,
@@ -380,14 +380,14 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
           -moz-appearance: textfield;
         }
       `}</style>
-      {/* Main Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Liquidatable Positions</CardTitle>
+      {/* Main Card - Edge-to-edge on mobile */}
+      <Card className="rounded-none md:rounded-xl border-x-0 md:border-x">
+        <CardHeader className="px-3 md:px-6 py-3 md:py-6">
+          <CardTitle className="text-base md:text-lg">Liquidatable Positions</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-3 md:space-y-4 px-0 md:px-6 pb-3 md:pb-6 pt-0">
           {liquidatableVaults.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
+            <div className="text-center py-6 md:py-8 text-muted-foreground text-sm">
               No liquidatable positions found
             </div>
           ) : (
@@ -398,29 +398,29 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
               const isLiquidating = liquidatingVaults[vaultKey];
               
               return (
-                <div key={vaultKey} className="border rounded-lg">
-                  {/* Collapsed View */}
+                <div key={vaultKey} className="border-y md:border md:rounded-lg md:mx-0 mx-0">
+                  {/* Collapsed View - Responsive */}
                   <div 
-                    className="p-4 cursor-pointer hover:bg-muted/50 flex items-center justify-between"
+                    className="p-3 md:p-4 cursor-pointer hover:bg-muted/50 flex items-start md:items-center gap-2 md:gap-4"
                     onClick={() => toggleExpanded(vaultKey)}
                   >
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center shrink-0 pt-1 md:pt-0">
                       {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                     </div>
-                    <div className="flex items-center space-x-8">
-                      <div>
-                        <span className="text-muted-foreground">Borrower</span>
-                        <div className="font-medium font-mono text-sm">
+                    <div className="flex-1 grid grid-cols-2 md:flex md:items-center gap-2 md:gap-8">
+                      <div className="col-span-2 md:col-span-1">
+                        <span className="text-[10px] md:text-sm text-muted-foreground">Borrower</span>
+                        <div className="font-medium font-mono text-xs md:text-sm">
                           {vault.borrower ? `${vault.borrower.slice(0, 6)}...${vault.borrower.slice(-4)}` : "Unknown"}
                         </div>
                       </div>
                       <div>
-                        <span className="text-muted-foreground">Borrowed</span>
-                        <div className="font-medium">{formatNumber(parseFloat(formatWeiToDecimalHP(vault.debtAmount, 18)))} USDST</div>
+                        <span className="text-[10px] md:text-sm text-muted-foreground">Borrowed</span>
+                        <div className="font-medium text-xs md:text-sm">{formatNumber(parseFloat(formatWeiToDecimalHP(vault.debtAmount, 18)))} USDST</div>
                       </div>
                       <div>
-                        <span className="text-muted-foreground">Health Factor</span>
-                        <div className="font-medium text-red-600 dark:text-red-400">{formatNumber(vault.healthFactor)}</div>
+                        <span className="text-[10px] md:text-sm text-muted-foreground">Health Factor</span>
+                        <div className="font-medium text-xs md:text-sm text-red-600 dark:text-red-400">{formatNumber(vault.healthFactor)}</div>
                       </div>
                     </div>
                   </div>
@@ -428,84 +428,144 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
                   {/* Expanded View */}
                   {isExpanded && (
                     <div className="border-t bg-muted/30">
-                      {/* Table Header */}
-                      <div className="grid grid-cols-4 gap-4 p-4 text-sm text-muted-foreground font-medium border-b border-border">
-                        <div>Collateral Asset</div>
-                        <div>Amount</div>
-                        <div>Value (USD)</div>
-                        <div>Expected Profit</div>
-                      </div>
-                      
-                      {/* Table Row - Position Values */}
-                      <div className="grid grid-cols-4 gap-4 p-4 items-center border-b">
-                        <div className="flex items-center space-x-1.5 min-w-0">
-                          <div className="w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                            {vault.symbol.charAt(0)}
+                      {/* Mobile: Stacked Layout */}
+                      <div className="md:hidden p-3 space-y-3">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <span className="text-[10px] text-muted-foreground">Collateral Asset</span>
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-white text-[8px] font-bold">
+                                {vault.symbol.charAt(0)}
+                              </div>
+                              <span className="font-medium text-xs">{vault.symbol}</span>
+                            </div>
                           </div>
-                          <span className="font-medium truncate min-w-[80px]">{vault.symbol}</span>
-                        </div>
-                        <div>{formatNumber(parseFloat(formatWeiToDecimalHP(vault.collateralAmount, vault.collateralAmountDecimals)))}</div>
-                        <div>${formatNumber(parseFloat(formatWeiToDecimalHP(vault.collateralValueUSD, 18)))}</div>
-                        <div className="text-green-600 font-medium">
-                          {calculateExpectedProfit(vault, liquidationAmount)}
-                        </div>
-                      </div>
-                      
-                      {/* Action Row - Input and Button */}
-                      <div className="p-4">
-                        {/* Transaction Fee Display */}
-                        <div className="text-center mb-3">
-                          <p className="text-xs text-muted-foreground">
-                            Transaction Fee: 0.02 USDST
-                          </p>
+                          <div>
+                            <span className="text-[10px] text-muted-foreground">Amount</span>
+                            <div className="font-medium text-xs">{formatNumber(parseFloat(formatWeiToDecimalHP(vault.collateralAmount, vault.collateralAmountDecimals)))}</div>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-muted-foreground">Value (USD)</span>
+                            <div className="font-medium text-xs">${formatNumber(parseFloat(formatWeiToDecimalHP(vault.collateralValueUSD, 18)))}</div>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-muted-foreground">Expected Profit</span>
+                            <div className="text-green-600 font-medium text-xs">
+                              {calculateExpectedProfit(vault, liquidationAmount)}
+                            </div>
+                          </div>
                         </div>
                         
-                        <div className="flex flex-col items-center space-y-2">
-                          <div className="flex items-center space-x-3">
+                        {/* Mobile Action Row */}
+                        <div className="pt-2 border-t space-y-2">
+                          <p className="text-[10px] text-muted-foreground text-center">
+                            Transaction Fee: 0.02 USDST
+                          </p>
+                          <div className="flex gap-2">
                             <Input
                               type="number"
-                              placeholder="Amount to liquidate"
+                              placeholder="Amount"
                               value={liquidationAmount}
                               onChange={(e) => handleLiquidationAmountChange(vaultKey, e.target.value)}
-                              className={`w-40 ${isAmountExceedsMax(vaultKey) ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+                              className={`flex-1 h-8 text-xs ${isAmountExceedsMax(vaultKey) ? 'border-red-500' : ''}`}
                               min="0"
                               step="0.01"
                             />
                             <Button 
                               variant={maxStates[vaultKey] ? "default" : "outline"}
                               size="sm" 
-                              className={`min-w-[50px] ${maxStates[vaultKey] ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}`}
+                              className={`h-8 px-2 text-xs ${maxStates[vaultKey] ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}`}
                               onClick={() => handleMaxClick(vault, vaultKey)}
                               disabled={isUsdstBalanceInsufficient()}
                             >
                               MAX
                             </Button>
-                            <Button 
-                              className="bg-red-600 hover:bg-red-700 text-white"
-                              onClick={() => handleLiquidate(vault, vaultKey)}
-                              disabled={isLiquidating || !liquidationAmount || isAmountExceedsMax(vaultKey) || isUsdstBalanceInsufficient()}
-                            >
-                              {isLiquidating ? "Liquidating..." : "Liquidate"}
-                            </Button>
+                          </div>
+                          <Button 
+                            className="w-full h-8 text-xs bg-red-600 hover:bg-red-700 text-white"
+                            onClick={() => handleLiquidate(vault, vaultKey)}
+                            disabled={isLiquidating || !liquidationAmount || isAmountExceedsMax(vaultKey) || isUsdstBalanceInsufficient()}
+                          >
+                            {isLiquidating ? "Liquidating..." : "Liquidate"}
+                          </Button>
+                          {isAmountExceedsMax(vaultKey) && (
+                            <p className="text-[10px] text-red-500 text-center">Maximum amount reached</p>
+                          )}
+                          {isUsdstBalanceInsufficient() && (
+                            <p className="text-[10px] text-red-500 text-center">Insufficient USDST Balance</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Desktop: Table Layout */}
+                      <div className="hidden md:block">
+                        {/* Table Header */}
+                        <div className="grid grid-cols-4 gap-4 p-4 text-sm text-muted-foreground font-medium border-b border-border">
+                          <div>Collateral Asset</div>
+                          <div>Amount</div>
+                          <div>Value (USD)</div>
+                          <div>Expected Profit</div>
+                        </div>
+                        
+                        {/* Table Row - Position Values */}
+                        <div className="grid grid-cols-4 gap-4 p-4 items-center border-b">
+                          <div className="flex items-center space-x-1.5 min-w-0">
+                            <div className="w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                              {vault.symbol.charAt(0)}
+                            </div>
+                            <span className="font-medium truncate min-w-[80px]">{vault.symbol}</span>
+                          </div>
+                          <div>{formatNumber(parseFloat(formatWeiToDecimalHP(vault.collateralAmount, vault.collateralAmountDecimals)))}</div>
+                          <div>${formatNumber(parseFloat(formatWeiToDecimalHP(vault.collateralValueUSD, 18)))}</div>
+                          <div className="text-green-600 font-medium">
+                            {calculateExpectedProfit(vault, liquidationAmount)}
+                          </div>
+                        </div>
+                        
+                        {/* Action Row - Input and Button */}
+                        <div className="p-4">
+                          <div className="text-center mb-3">
+                            <p className="text-xs text-muted-foreground">
+                              Transaction Fee: 0.02 USDST
+                            </p>
                           </div>
                           
-                          {/* Error message when amount exceeds max */}
-                          {isAmountExceedsMax(vaultKey) && (
-                            <div className="text-center">
-                              <p className="text-xs text-red-500">
-                                Maximum liquidation amount reached
-                              </p>
+                          <div className="flex flex-col items-center space-y-2">
+                            <div className="flex items-center space-x-3">
+                              <Input
+                                type="number"
+                                placeholder="Amount to liquidate"
+                                value={liquidationAmount}
+                                onChange={(e) => handleLiquidationAmountChange(vaultKey, e.target.value)}
+                                className={`w-40 ${isAmountExceedsMax(vaultKey) ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+                                min="0"
+                                step="0.01"
+                              />
+                              <Button 
+                                variant={maxStates[vaultKey] ? "default" : "outline"}
+                                size="sm" 
+                                className={`min-w-[50px] ${maxStates[vaultKey] ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}`}
+                                onClick={() => handleMaxClick(vault, vaultKey)}
+                                disabled={isUsdstBalanceInsufficient()}
+                              >
+                                MAX
+                              </Button>
+                              <Button 
+                                className="bg-red-600 hover:bg-red-700 text-white"
+                                onClick={() => handleLiquidate(vault, vaultKey)}
+                                disabled={isLiquidating || !liquidationAmount || isAmountExceedsMax(vaultKey) || isUsdstBalanceInsufficient()}
+                              >
+                                {isLiquidating ? "Liquidating..." : "Liquidate"}
+                              </Button>
                             </div>
-                          )}
-                          
-                          {/* Error message when USDST balance is insufficient */}
-                          {isUsdstBalanceInsufficient() && (
-                            <div className="text-center">
-                              <p className="text-xs text-red-500">
-                                Insufficient USDST Balance
-                              </p>
-                            </div>
-                          )}
+                            
+                            {isAmountExceedsMax(vaultKey) && (
+                              <p className="text-xs text-red-500">Maximum liquidation amount reached</p>
+                            )}
+                            {isUsdstBalanceInsufficient() && (
+                              <p className="text-xs text-red-500">Insufficient USDST Balance</p>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>

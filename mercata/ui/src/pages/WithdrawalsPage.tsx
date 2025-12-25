@@ -1,18 +1,16 @@
 import { useEffect, useState, useRef } from "react";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
-import MobileSidebar from "../components/dashboard/MobileSidebar";
+import MobileBottomNav from "../components/dashboard/MobileBottomNav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs as AntdTabs } from "antd";
 import BridgeOut from "@/components/bridge/BridgeOut";
 import WithdrawTransactionDetails from "@/components/dashboard/WithdrawTransactionDetails";
 import { useSearchParams, Link } from "react-router-dom";
 import { useBridgeContext } from "@/context/BridgeContext";
-import { Loader2, ArrowRight } from "lucide-react";
+import { Loader2, ArrowRight, ExternalLink } from "lucide-react";
 import { formatBalance } from "@/utils/numberUtils";
 
 const WithdrawalsPage = () => {
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"from-savings" | "bridge-out">(
     "from-savings"
   );
@@ -54,86 +52,68 @@ const WithdrawalsPage = () => {
 
   return (
     <div className="h-screen bg-background overflow-hidden">
-      <style>{`
-        .custom-tabs .ant-tabs-tab {
-          justify-content: center !important;
-        }
-        .custom-tabs .ant-tabs-tab-btn {
-          justify-content: center !important;
-          text-align: center !important;
-          width: 100% !important;
-          color: hsl(var(--muted-foreground)) !important;
-        }
-        .custom-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
-          color: hsl(var(--primary)) !important;
-          text-shadow: none !important;
-        }
-        .custom-tabs .ant-tabs-ink-bar {
-          background: hsl(var(--primary)) !important;
-        }
-      `}</style>
-
       <DashboardSidebar />
-
-      <MobileSidebar
-        isOpen={isMobileSidebarOpen}
-        onClose={() => setIsMobileSidebarOpen(false)}
-      />
+      <MobileBottomNav />
 
       <div
         className="h-screen flex flex-col transition-all duration-300 md:pl-64"
         style={{ paddingLeft: "var(--sidebar-width, 0rem)" }}
       >
-        <DashboardHeader
-          title="Withdrawals"
-          onMenuClick={() => setIsMobileSidebarOpen(true)}
-        />
+        <DashboardHeader title="Withdrawals" />
 
-        <main className="flex-1 p-6 overflow-y-auto">
-          <div className="mb-8 flex flex-col lg:flex-row gap-6 items-stretch">
+        <main className="flex-1 p-3 md:p-6 pb-20 md:pb-6 overflow-y-auto">
+          <div className="mb-4 md:mb-8 flex flex-col lg:flex-row gap-4 md:gap-6 items-stretch">
             <div className="w-full lg:w-[50%] flex">
-              <Card className="shadow-sm flex-1 flex flex-col">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle>Withdraw Assets</CardTitle>
+              <Card className="shadow-sm flex-1 flex flex-col rounded-xl">
+                <CardContent className="flex-1 flex flex-col min-h-0 px-3 md:px-6 pt-4 md:pt-6">
+                  {/* Underline Tabs - same style as DepositsPage */}
+                  <div className="flex border-b border-border mb-4 md:mb-6">
+                    <button
+                      onClick={() => setActiveTab("from-savings")}
+                      className={`flex-1 py-2.5 px-4 text-sm font-medium transition-colors border-b-2 ${
+                        activeTab === "from-savings"
+                          ? "border-primary text-primary"
+                          : "border-transparent text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      From Savings
+                    </button>
+                    <button
+                      onClick={() => setActiveTab("bridge-out")}
+                      className={`flex-1 py-2.5 px-4 text-sm font-medium transition-colors border-b-2 ${
+                        activeTab === "bridge-out"
+                          ? "border-primary text-primary"
+                          : "border-transparent text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      Bridge Out
+                    </button>
+                  </div>
+
+                  {/* Title with View Transactions link */}
+                  <div className="flex items-start justify-between gap-3 mb-4">
+                    <div>
+                      <h3 className="text-base md:text-lg font-bold text-foreground">
+                        {activeTab === "from-savings" ? "Redeem to Stablecoins" : "Bridge Out Crypto"}
+                      </h3>
+                      <p className="text-xs md:text-sm text-muted-foreground">
+                        {activeTab === "from-savings" 
+                          ? "Redeem USDST back to external stablecoins" 
+                          : "Bridge assets to external networks"}
+                      </p>
+                    </div>
                     <Link
                       to="/bridge-transactions"
                       onClick={() => setTargetTransactionTab('WithdrawalInitiated')}
-                      className="flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors"
+                      className="flex items-center gap-1 text-[10px] md:text-xs font-medium text-primary hover:text-primary/80 transition-colors whitespace-nowrap shrink-0"
                     >
-                      <ArrowRight size={16} />
-                      View Transactions
+                      <span>View Transactions</span>
+                      <ExternalLink size={10} className="md:w-3 md:h-3 shrink-0" />
                     </Link>
                   </div>
-                </CardHeader>
-                <CardContent className="flex-1 flex flex-col min-h-0">
-                  <div className="w-full flex-1 flex flex-col min-h-0">
-                    <AntdTabs
-                      activeKey={activeTab}
-                      items={[
-                        {
-                          key: "from-savings",
-                          label: "From Savings",
-                        },
-                        {
-                          key: "bridge-out",
-                          label: "Bridge Out",
-                        },
-                      ]}
-                      onChange={(value) =>
-                        setActiveTab(value as "from-savings" | "bridge-out")
-                      }
-                      className="custom-tabs"
-                      style={
-                        {
-                          "--ant-primary-color": "hsl(var(--primary))",
-                          "--ant-primary-color-hover": "hsl(var(--primary))",
-                        } as React.CSSProperties
-                      }
-                    />
-                    <div className="mt-4 flex-1 min-h-0 overflow-auto">
-                      <BridgeOut isSaving={activeTab === "from-savings"} />
-                    </div>
+
+                  <div className="flex-1 min-h-0 overflow-auto">
+                    <BridgeOut isSaving={activeTab === "from-savings"} />
                   </div>
                 </CardContent>
               </Card>
@@ -201,14 +181,15 @@ const WithdrawalsPage = () => {
             </div>
           </div>
 
-          <Card className="shadow-sm">
-            <CardHeader>
+          {/* Withdrawal History - Commented out for now */}
+          {/* <Card className="shadow-sm">
+            <CardHeader className="px-3 md:px-6">
               <CardTitle>Withdrawal History</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-0 md:px-6 pb-0 md:pb-6">
               <WithdrawTransactionDetails context="withdrawals" />
             </CardContent>
-          </Card>
+          </Card> */}
         </main>
       </div>
     </div>
