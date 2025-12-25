@@ -158,36 +158,41 @@ const TokenAvatar = ({ token, size = "w-4 h-4" }: TokenAvatarProps) => {
 const TokenSelectorComponent = ({ asset, onSelect, tokens, isOpen, onOpenChange }: TokenSelectorProps) => (
   <Popover open={isOpen} onOpenChange={onOpenChange}>
     <PopoverTrigger asChild>
-      <Button variant="outline" className="flex items-center gap-2 justify-between text-sm px-3 py-2">
-        <div className="flex items-center gap-2">
-          {asset ? <TokenAvatar token={asset} /> : null}
-          <span className="whitespace-nowrap">{asset?._symbol || "Select Token"}</span>
+      <button className="flex items-center justify-between gap-2 border border-border rounded-lg px-3 md:px-4 py-2.5 md:py-3 hover:border-primary/50 transition-colors bg-background min-w-[110px] md:min-w-[130px]">
+        <div className="flex items-center gap-1.5 md:gap-2">
+          {asset ? (
+            <>
+              <TokenAvatar token={asset} size="w-4 h-4 md:w-5 md:h-5" />
+              <span className="font-medium text-sm md:text-base whitespace-nowrap">{asset._symbol}</span>
+            </>
+          ) : (
+            <span className="text-sm md:text-base text-muted-foreground">Select</span>
+          )}
         </div>
-        <ChevronDown className="h-4 w-4 flex-shrink-0" />
-      </Button>
+        <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+      </button>
     </PopoverTrigger>
-    <PopoverContent className="w-56 max-w-[calc(100vw-2rem)] p-0" align="end">
+    <PopoverContent className="w-48 md:w-56 max-w-[calc(100vw-2rem)] p-1" align="end">
       <div className="flex flex-col">
         {tokens.length > 0 ? (
           tokens.map((token) => (
-            <Button
+            <button
               key={token._symbol}
-              variant="ghost"
-              className="justify-start gap-2"
+              className="flex items-center justify-between gap-2 px-3 py-2.5 hover:bg-muted rounded-lg transition-colors text-left"
               onClick={() => {
                 onOpenChange(false);
                 onSelect(token);
               }}
             >
               <div className="flex items-center gap-2">
-                <TokenAvatar token={token} />
-                <span>{token._symbol}</span>
+                <TokenAvatar token={token} size="w-5 h-5" />
+                <span className="font-medium text-sm">{token._symbol}</span>
               </div>
-              {token._symbol === asset?._symbol && <Check className="h-4 w-4 ml-auto" />}
-            </Button>
+              {token._symbol === asset?._symbol && <Check className="h-4 w-4 text-primary" />}
+            </button>
           ))
         ) : (
-          <span className="p-2">No tokens available</span>
+          <span className="p-3 text-sm text-muted-foreground">No tokens available</span>
         )}
       </div>
     </PopoverContent>
@@ -237,12 +242,34 @@ const TokenInput = ({
   loading,
 }: TokenInputProps) => {      
   return (
-    <div className="bg-muted/50 p-4 rounded-lg border border-border">
-      <div className="flex flex-col sm:flex-row sm:justify-between mb-2">
-        <label className="text-sm text-muted-foreground font-semibold">{label}</label>
+    <div className="space-y-2 md:space-y-3">
+      {/* Label Row */}
+      <div className="flex items-center justify-between">
+        <label className="text-xs md:text-sm text-muted-foreground font-medium">{label}</label>
+        {asset && isFromInput && (
+          <div className="flex items-center gap-1">
+            <span className={`text-[10px] md:text-xs ${toWei(maxAmountWei) === 0n ? "text-red-500" : "text-muted-foreground"}`}>
+              Available for swap:{" "}
+              <AnimatedNumber 
+                value={maxAmountWei !== "0" ? formatBalance(maxAmountWei, asset._symbol || "", undefined, 2, 6) : "0"} 
+                isLoading={loading} 
+              />
+            </span>
+            <button
+              type="button"
+              className={`text-[10px] md:text-xs font-medium text-primary hover:text-primary/80 hover:underline ${toWei(maxAmountWei) === 0n ? "opacity-50 cursor-not-allowed" : ""}`}
+              onClick={onMaxClick}
+              disabled={toWei(maxAmountWei) === 0n}
+            >
+              Max
+            </button>
+          </div>
+        )}
       </div>
-      <div className="flex items-center gap-2">
-        <div className="flex-1 min-w-0 flex flex-col">
+
+      {/* Input Row - Bordered input and bordered token selector side by side */}
+      <div className="flex items-stretch gap-2 md:gap-3">
+        <div className="flex-1 min-w-0">
           <input
             type="text"
             value={amount}
@@ -251,15 +278,12 @@ const TokenInput = ({
             placeholder="0.00"
             inputMode="decimal"
             disabled={toWei(maxAmountWei) === 0n && isFromInput}
-            className={`p-2 bg-transparent border-none text-lg font-medium focus:outline-none text-foreground placeholder:text-muted-foreground ${
-              amountError ? " border border-red-500 rounded-md" : ""
-              } ${(toWei(maxAmountWei) === 0n && isFromInput) ? "opacity-50 cursor-not-allowed" : ""}`}
+            className={`w-full h-full border border-border rounded-lg px-3 md:px-4 py-2.5 md:py-3 bg-background text-base md:text-lg focus:outline-none focus:border-primary/50 text-foreground placeholder:text-muted-foreground/50 transition-colors ${
+              amountError ? "border-red-500 focus:border-red-500" : ""
+            } ${(toWei(maxAmountWei) === 0n && isFromInput) ? "opacity-50 cursor-not-allowed" : ""}`}
           />
-          {amountError && (
-            <p className="text-red-600 text-sm mt-1">{amountError}</p>
-          )}
         </div>
-        <div className="flex-shrink-0">
+        <div className="shrink-0">
           <TokenSelector
             asset={asset}
             onSelect={onSelect}
@@ -269,35 +293,28 @@ const TokenInput = ({
           />
         </div>
       </div>
+
+      {/* Error Message */}
+      {amountError && (
+        <p className="text-red-500 text-[10px] md:text-xs">{amountError}</p>
+      )}
+
+      {/* Balance Row - User Balance on left, Pool Balance on right */}
       {asset && (
-        <div className="mt-2 flex justify-between">
-          {isFromInput ? (
-            <span className={`text-sm flex items-center gap-1 ${
-              toWei(maxAmountWei) === 0n ? "text-red-600" : "text-muted-foreground"
-            }`}>
-              Your Balance: <AnimatedNumber 
-                value={maxAmountWei !== "0" ? formatBalance(maxAmountWei, asset._symbol || "", undefined, 2, 6) : "0"} 
-                isLoading={loading} 
-              />
-              <button
-                type="button"
-                className={`text-blue-600 text-xs ml-2 underline ${toWei(maxAmountWei) === 0n ? "opacity-50 cursor-not-allowed" : ""}`}
-                onClick={onMaxClick}
-                disabled={toWei(maxAmountWei) === 0n}
-              >
-                Max
-              </button>
-            </span>
-          ) : (
-            <span className="text-sm text-muted-foreground">
-              Your Balance: <AnimatedNumber 
-                value={userBalanceWei !== "0" ? formatBalance(userBalanceWei, asset._symbol || "", undefined, 2, 6) : "0"} 
-                isLoading={loading} 
-              />
-            </span>
-          )}
-          <span className="text-sm text-muted-foreground">
-            Pool Balance: <AnimatedNumber 
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] md:text-xs text-muted-foreground">
+            User Balance:{" "}
+            <AnimatedNumber 
+              value={isFromInput 
+                ? (maxAmountWei !== "0" ? formatBalance(maxAmountWei, asset._symbol || "", undefined, 2, 6) : "0")
+                : (userBalanceWei !== "0" ? formatBalance(userBalanceWei, asset._symbol || "", undefined, 2, 6) : "0")
+              } 
+              isLoading={loading} 
+            />
+          </span>
+          <span className="text-[10px] md:text-xs text-muted-foreground">
+            Pool Balance:{" "}
+            <AnimatedNumber 
               value={poolBalanceWei !== "0" ? formatBalance(poolBalanceWei, asset._symbol || "", undefined, 2, 6) : "0"} 
               isLoading={loading} 
             />

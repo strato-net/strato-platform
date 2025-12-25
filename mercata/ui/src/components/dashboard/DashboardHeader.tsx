@@ -1,4 +1,3 @@
-import { Avatar, AvatarFallback } from "../ui/avatar";
 import { useUser } from '@/context/UserContext';
 import { useNetwork } from '@/context/NetworkContext';
 import { useTheme } from 'next-themes';
@@ -75,31 +74,38 @@ const DashboardHeader = ({ title }: DashboardHeaderProps) => {
         
         <Popover>
           <PopoverTrigger asChild>
-            <Avatar className="w-9 h-9 bg-strato-blue cursor-pointer">
-              <AvatarFallback className="text-white text-sm bg-strato-blue">
+            <button className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-[#1e2a4a] flex items-center justify-center cursor-pointer hover:opacity-90 transition-opacity">
+              <span className="text-white text-xs md:text-sm font-semibold">
                 {userName?.slice(0, 2).toUpperCase() || "NA"}
-              </AvatarFallback>
-            </Avatar>
+              </span>
+            </button>
           </PopoverTrigger>
           
-          <PopoverContent className="w-72 p-4" align="end">
-            <div className="space-y-4">
+          <PopoverContent className="w-64 md:w-72 p-3 md:p-4" align="end">
+            <div className="space-y-3 md:space-y-4">
               {/* User Info */}
-              <div>
-                <p className="font-medium">{userName || "N/A"}</p>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono mt-1">
-                  <span>{truncateAddress(userAddress, 12, 6)}</span>
-                  <button onClick={() => copyAddress(userAddress, 'User')} className="hover:text-foreground">
-                    <Copy size={12} />
-                  </button>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-[#1e2a4a] flex items-center justify-center shrink-0">
+                  <span className="text-white text-sm font-semibold">
+                    {userName?.slice(0, 2).toUpperCase() || "NA"}
+                  </span>
+                </div>
+                <div className="min-w-0">
+                  <p className="font-medium text-sm truncate">{userName || "N/A"}</p>
+                  <div className="flex items-center gap-1.5 text-[10px] md:text-xs text-muted-foreground font-mono">
+                    <span className="truncate">{truncateAddress(userAddress, 8, 4)}</span>
+                    <button onClick={() => copyAddress(userAddress, 'User')} className="hover:text-foreground shrink-0">
+                      <Copy size={10} />
+                    </button>
+                  </div>
                 </div>
               </div>
 
               {/* External Wallet */}
-              <div className="border-t pt-4">
+              <div className="border-t pt-3">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-medium text-muted-foreground">External Wallet</span>
-                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                  <span className="text-[10px] md:text-xs font-medium text-muted-foreground">External Wallet</span>
+                  <span className={`px-1.5 py-0.5 rounded text-[9px] md:text-[10px] font-semibold ${
                     isConnected ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
                   }`}>
                     {isConnected ? "Connected" : "Disconnected"}
@@ -111,17 +117,17 @@ const DashboardHeader = ({ title }: DashboardHeaderProps) => {
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <div className="flex items-center gap-2 text-xs font-mono">
-                            <span>{truncateAddress(walletAddress, 12, 6)}</span>
+                          <div className="flex items-center gap-1.5 text-[10px] md:text-xs font-mono">
+                            <span>{truncateAddress(walletAddress, 8, 4)}</span>
                             <button onClick={() => copyAddress(walletAddress, 'Wallet')} className="hover:text-foreground">
-                              <Copy size={12} />
+                              <Copy size={10} />
                             </button>
                           </div>
                         </TooltipTrigger>
                         <TooltipContent><p>{walletAddress}</p></TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
-                    <Button onClick={() => disconnect()} className={GRADIENT_BUTTON_CLASS}>
+                    <Button onClick={() => disconnect()} size="sm" className={`${GRADIENT_BUTTON_CLASS} h-8 text-xs`}>
                       Disconnect Wallet
                     </Button>
                   </div>
@@ -130,7 +136,7 @@ const DashboardHeader = ({ title }: DashboardHeaderProps) => {
                     {({ openConnectModal, mounted, authenticationStatus }) => {
                       if (!mounted || authenticationStatus === 'loading') return null;
                       return (
-                        <Button onClick={openConnectModal} className={GRADIENT_BUTTON_CLASS}>
+                        <Button onClick={openConnectModal} size="sm" className={`${GRADIENT_BUTTON_CLASS} h-8 text-xs`}>
                           Connect Wallet
                         </Button>
                       );
@@ -140,10 +146,15 @@ const DashboardHeader = ({ title }: DashboardHeaderProps) => {
               </div>
 
               {/* Logout */}
-              <div className="border-t pt-4">
-                <Button variant="destructive" size="sm" onClick={logout} className="w-full">
-                  <LogOutIcon className="mr-2" size={16} />
-                  Logout
+              <div className="border-t pt-3">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={logout} 
+                  className="w-full h-9 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 justify-start gap-2"
+                >
+                  <LogOutIcon size={16} />
+                  <span className="text-sm font-medium">Logout</span>
                 </Button>
               </div>
             </div>
