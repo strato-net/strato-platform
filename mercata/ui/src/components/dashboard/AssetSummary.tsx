@@ -30,9 +30,9 @@ const AssetSummary = ({
 }: AssetSummaryProps) => {
   return (
     <div 
-      className={`bg-card rounded-xl border-2 p-3 md:p-5 shadow-sm transition-all w-full flex flex-col justify-center ${
-        isActive ? 'border-primary shadow-md' : 'border-border hover:shadow-md'
-      } ${onClick ? 'cursor-pointer' : ''}`}
+      className={`bg-card rounded-xl border-2 p-3 md:p-5 shadow-sm transition-all w-full flex flex-col justify-center border-border ${
+        isActive ? 'md:border-primary md:shadow-md' : 'md:hover:shadow-md'
+      } ${onClick ? 'md:cursor-pointer' : ''}`}
       onClick={onClick}
     >
       <div className="flex justify-between items-center gap-2">

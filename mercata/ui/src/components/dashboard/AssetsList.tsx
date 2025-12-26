@@ -38,18 +38,16 @@ const AssetsList = ({
   return (
     <div className="w-full overflow-hidden bg-card rounded-xl border border-border shadow-sm">
       {isDashboard && (
-        <div className="p-5 border-b border-border">
-          <div className="flex justify-between items-center">
-            <h2 className="font-bold text-lg">My Deposits</h2>
+        <div className="p-4 md:p-5 border-b border-border">
+          <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3 md:gap-0">
+            <h2 className="font-bold text-xl md:text-lg">My Deposits</h2>
             <Button
-              size="sm"
+              asChild
+              className="w-full md:w-auto"
             >
-              <Plus size={16} />
-              <a
-                href="/dashboard/deposits"
-                className="text-sm text-white flex items-center justify-end"
-              >
-                Deposit
+              <a href="/dashboard/deposits" className="flex items-center justify-center gap-2">
+                <Plus size={16} />
+                <span>Deposit</span>
               </a>
             </Button>
           </div>
