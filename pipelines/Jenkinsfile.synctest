@@ -46,7 +46,8 @@ pipeline {
                   --namespace 'Testnet/Synctest/Time' \
                   --metric-name 'SyncTime' \
                   --value ${syncTimeTestnetSeconds} \
-                  --unit 'Seconds'
+                  --unit 'Seconds' \
+                  --region 'us-east-1'
               """
             }
           }
@@ -84,7 +85,8 @@ pipeline {
                   --namespace 'Mainnet/Synctest/Time' \
                   --metric-name 'SyncTime' \
                   --value ${syncTimeMainnetSeconds} \
-                  --unit 'Seconds'
+                  --unit 'Seconds' \
+                  --region 'us-east-1'
               """
             }
           }
