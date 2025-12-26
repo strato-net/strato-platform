@@ -20,8 +20,8 @@ pipeline {
         sh 'rm -rf strato-getting-started'
         sh 'git clone https://github.com/blockapps/strato-getting-started'
         dir("strato-getting-started") {
-          sh "cp ~/ssl/server.pem ssl/certs/"
-          sh "cp ~/ssl/server.key ssl/private/"
+          sh "cp /datadrive/letsencrypt-ssl//server.pem ssl/certs/"
+          sh "cp /datadrive/letsencrypt-ssl//server.key ssl/private/"
           sh "sudo ./strato --compose"
           sh "sudo ./strato --pull"
           withCredentials([usernamePassword(credentialsId: 'testsync1-client', passwordVariable: 'TESTSYNC1_CLIENT_SECRET', usernameVariable: 'TESTSYNC1_CLIENT_ID')]) {
@@ -36,16 +36,16 @@ pipeline {
             sh "sudo ./strato --wipe"
             sh "sudo ./strato-run.sh"
             script {
-              def timeStart = System.currentTimeMillis()
+              def timeStartTestnet = System.currentTimeMillis()
               lib.waitLocalNodeIsSynced()
-              def syncTimeSeconds = (System.currentTimeMillis() - timeStart) / 1000
+              def syncTimeTestnetSeconds = (System.currentTimeMillis() - timeStartTestnet) / 1000
               
               // Push sync time to AWS CloudWatch
               sh """
                 aws cloudwatch put-metric-data \
                   --namespace 'Testnet/Synctest/Time' \
                   --metric-name 'SyncTime' \
-                  --value ${syncTimeSeconds} \
+                  --value ${syncTimeTestnetSeconds} \
                   --unit 'Seconds'
               """
             }
@@ -58,8 +58,8 @@ pipeline {
         sh 'rm -rf strato-getting-started'
         sh 'git clone https://github.com/blockapps/strato-getting-started'
         dir("strato-getting-started") {
-          sh "cp ~/ssl/server.pem ssl/certs/"
-          sh "cp ~/ssl/server.key ssl/private/"
+          sh "cp /datadrive/letsencrypt-ssl//server.pem ssl/certs/"
+          sh "cp /datadrive/letsencrypt-ssl//server.key ssl/private/"
           sh "sudo ./strato --compose"
           sh "sudo ./strato --pull"
           withCredentials([usernamePassword(credentialsId: 'testsync1-client', passwordVariable: 'TESTSYNC1_CLIENT_SECRET', usernameVariable: 'TESTSYNC1_CLIENT_ID')]) {
@@ -74,16 +74,16 @@ pipeline {
             sh "sudo ./strato --wipe"
             sh "sudo ./strato-run.sh"
             script {
-              def timeStart = System.currentTimeMillis()
+              def timeStartMainnet = System.currentTimeMillis()
               lib.waitLocalNodeIsSynced()
-              def syncTimeSeconds = (System.currentTimeMillis() - timeStart) / 1000
+              def syncTimeMainnetSeconds = (System.currentTimeMillis() - timeStartMainnet) / 1000
               
               // Push sync time to AWS CloudWatch
               sh """
                 aws cloudwatch put-metric-data \
                   --namespace 'Mainnet/Synctest/Time' \
                   --metric-name 'SyncTime' \
-                  --value ${syncTimeSeconds} \
+                  --value ${syncTimeMainnetSeconds} \
                   --unit 'Seconds'
               """
             }
