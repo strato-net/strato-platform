@@ -4,7 +4,7 @@ pipeline {
   }
   options { disableConcurrentBuilds() }
   triggers {
-    cron('H */6 * * *')
+    cron('H */3 * * *')
   }
   stages {
     stage('Prepare') {
@@ -38,14 +38,14 @@ pipeline {
             script {
               def timeStartTestnet = System.currentTimeMillis()
               lib.waitLocalNodeIsSynced()
-              def syncTimeTestnetSeconds = (System.currentTimeMillis() - timeStartTestnet) / 1000
+              def syncTimeTestnetMinutes = (System.currentTimeMillis() - timeStartTestnet) / 1000 / 60
               
               // Push sync time to AWS CloudWatch
               sh """
                 aws cloudwatch put-metric-data \
-                  --namespace 'Testnet/Synctest/Time' \
-                  --metric-name 'SyncTime' \
-                  --value ${syncTimeTestnetSeconds} \
+                  --namespace 'Testnet/Synctest/TimeMins' \
+                  --metric-name 'TestnetSyncTime' \
+                  --value ${syncTimeTestnetMinutes} \
                   --unit 'Seconds' \
                   --region 'us-east-1'
               """
@@ -77,14 +77,14 @@ pipeline {
             script {
               def timeStartMainnet = System.currentTimeMillis()
               lib.waitLocalNodeIsSynced()
-              def syncTimeMainnetSeconds = (System.currentTimeMillis() - timeStartMainnet) / 1000
+              def syncTimeMainnetMinutes = (System.currentTimeMillis() - timeStartMainnet) / 1000 / 60
               
               // Push sync time to AWS CloudWatch
               sh """
                 aws cloudwatch put-metric-data \
-                  --namespace 'Mainnet/Synctest/Time' \
-                  --metric-name 'SyncTime' \
-                  --value ${syncTimeMainnetSeconds} \
+                  --namespace 'Mainnet/Synctest/TimeMins' \
+                  --metric-name 'MainnetSyncTime' \
+                  --value ${syncTimeMainnetMinutes} \
                   --unit 'Seconds' \
                   --region 'us-east-1'
               """
