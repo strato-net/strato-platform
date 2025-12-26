@@ -20,8 +20,8 @@ pipeline {
         sh 'rm -rf strato-getting-started'
         sh 'git clone https://github.com/blockapps/strato-getting-started'
         dir("strato-getting-started") {
-          sh "cp /datadrive/letsencrypt-ssl//server.pem ssl/certs/"
-          sh "cp /datadrive/letsencrypt-ssl//server.key ssl/private/"
+          sh "sudo cp /datadrive/letsencrypt-ssl/server.pem ssl/certs/"
+          sh "sudo cp /datadrive/letsencrypt-ssl/server.key ssl/private/"
           sh "sudo ./strato --compose"
           sh "sudo ./strato --pull"
           withCredentials([usernamePassword(credentialsId: 'testsync1-client', passwordVariable: 'TESTSYNC1_CLIENT_SECRET', usernameVariable: 'TESTSYNC1_CLIENT_ID')]) {
@@ -58,8 +58,8 @@ pipeline {
         sh 'rm -rf strato-getting-started'
         sh 'git clone https://github.com/blockapps/strato-getting-started'
         dir("strato-getting-started") {
-          sh "cp /datadrive/letsencrypt-ssl//server.pem ssl/certs/"
-          sh "cp /datadrive/letsencrypt-ssl//server.key ssl/private/"
+          sh "sudo cp /datadrive/letsencrypt-ssl/server.pem ssl/certs/"
+          sh "sudo cp /datadrive/letsencrypt-ssl/server.key ssl/private/"
           sh "sudo ./strato --compose"
           sh "sudo ./strato --pull"
           withCredentials([usernamePassword(credentialsId: 'testsync1-client', passwordVariable: 'TESTSYNC1_CLIENT_SECRET', usernameVariable: 'TESTSYNC1_CLIENT_ID')]) {
