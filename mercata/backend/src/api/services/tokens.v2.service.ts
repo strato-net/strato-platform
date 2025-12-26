@@ -292,7 +292,7 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
     const tokenValue = (tokenPrice / 1000000000) * (tokenBalance / 1000000000);
     netBalance += tokenValue;
   }
-  netBalance -= netLoan + ((snapshot.data.userLoan?.scaledDebt || 0) / 1e27);
+  netBalance -= netLoan + parseFloat(snapshot.data.userLoan?.scaledDebt || '0');
   return { timestamp: snapshot.timestamp, data: {netBalance: netBalance / 1e18 }};
 }
 
