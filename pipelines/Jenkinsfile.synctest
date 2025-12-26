@@ -1,0 +1,120 @@
+pipeline {
+  agent {
+    label "testsync1"
+  }
+  options { disableConcurrentBuilds() }
+  triggers {
+    cron('H */6 * * *')
+  }
+  stages {
+    stage('Prepare') {
+      steps {
+        script {
+          lib = load("${env.WORKSPACE}/pipelines/Jenkinsfile.library")
+        }
+      }
+    }
+    
+    stage('Deploy Testnet') {
+      steps {
+        sh 'rm -rf strato-getting-started'
+        sh 'git clone https://github.com/blockapps/strato-getting-started'
+        dir("strato-getting-started") {
+          sh "cp ~/ssl/server.pem ssl/certs/"
+          sh "cp ~/ssl/server.key ssl/private/"
+          sh "sudo ./strato --compose"
+          sh "sudo ./strato --pull"
+          withCredentials([usernamePassword(credentialsId: 'testsync1-client', passwordVariable: 'TESTSYNC1_CLIENT_SECRET', usernameVariable: 'TESTSYNC1_CLIENT_ID')]) {
+            writeFile file: "strato-run.sh", text: """#!/bin/bash
+                NODE_HOST=\$(</host) \\
+                  network='helium' \\
+                  OAUTH_CLIENT_ID='$TESTSYNC1_CLIENT_ID' \\
+                  OAUTH_CLIENT_SECRET='$TESTSYNC1_CLIENT_SECRET' \\
+                  ssl='true' \\
+                  ./strato
+            """
+            sh "sudo ./strato --wipe"
+            sh "sudo ./strato-run.sh"
+            script {
+              def timeStart = System.currentTimeMillis()
+              lib.waitLocalNodeIsSynced()
+              def syncTimeSeconds = (System.currentTimeMillis() - timeStart) / 1000
+              
+              // Push sync time to AWS CloudWatch
+              sh """
+                aws cloudwatch put-metric-data \
+                  --namespace 'Testnet/Synctest/Time' \
+                  --metric-name 'SyncTime' \
+                  --value ${syncTimeSeconds} \
+                  --unit 'Seconds'
+              """
+            }
+          }
+        }
+      }
+    }
+    stage('Deploy Mainnet') {
+      steps {
+        sh 'rm -rf strato-getting-started'
+        sh 'git clone https://github.com/blockapps/strato-getting-started'
+        dir("strato-getting-started") {
+          sh "cp ~/ssl/server.pem ssl/certs/"
+          sh "cp ~/ssl/server.key ssl/private/"
+          sh "sudo ./strato --compose"
+          sh "sudo ./strato --pull"
+          withCredentials([usernamePassword(credentialsId: 'testsync1-client', passwordVariable: 'TESTSYNC1_CLIENT_SECRET', usernameVariable: 'TESTSYNC1_CLIENT_ID')]) {
+            writeFile file: "strato-run.sh", text: """#!/bin/bash
+                NODE_HOST=\$(</host) \\
+                  network='upquark' \\
+                  OAUTH_CLIENT_ID='$TESTSYNC1_CLIENT_ID' \\
+                  OAUTH_CLIENT_SECRET='$TESTSYNC1_CLIENT_SECRET' \\
+                  ssl='true' \\
+                  ./strato
+            """
+            sh "sudo ./strato --wipe"
+            sh "sudo ./strato-run.sh"
+            script {
+              def timeStart = System.currentTimeMillis()
+              lib.waitLocalNodeIsSynced()
+              def syncTimeSeconds = (System.currentTimeMillis() - timeStart) / 1000
+              
+              // Push sync time to AWS CloudWatch
+              sh """
+                aws cloudwatch put-metric-data \
+                  --namespace 'Mainnet/Synctest/Time' \
+                  --metric-name 'SyncTime' \
+                  --value ${syncTimeSeconds} \
+                  --unit 'Seconds'
+              """
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  post {
+    success {
+      slackSend (
+          color: 'good',
+          message: "Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+      )
+    }
+    
+    failure {
+      slackSend (
+          color: 'danger',
+          message: "Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+      )
+//      script {
+//        if (env.BRANCH_NAME == 'develop') {
+//          slackSend(
+//              channel: '#engineering',
+//              color: 'danger',
+//              message: "Sync test build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL} on node ${env.NODE_NAME})"
+//          )
+//        }
+//      }
+    }
+  }
+}
