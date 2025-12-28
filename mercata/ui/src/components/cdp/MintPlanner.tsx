@@ -288,12 +288,15 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
   }, [isMaxMode, totalMaxMintWei, maxAllocations.length]);
 
   const handleMaxClick = useCallback(() => {
-    if (totalMaxMintWei > 0n) {
+    if (isMaxMode) {
+      setIsMaxMode(false);
+      setMintAmountInput("");
+    } else if (totalMaxMintWei > 0n) {
       const maxMint = formatUnits(totalMaxMintWei, 18).replace(/\.?0+$/, "");
       setMintAmountInput(formatNumberWithCommas(maxMint));
       setIsMaxMode(true);
     }
-  }, [totalMaxMintWei]);
+  }, [totalMaxMintWei, isMaxMode]);
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const rawValue = e.target.value;
