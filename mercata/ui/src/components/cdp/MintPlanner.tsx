@@ -533,11 +533,11 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
 
   const getButtonText = () => {
     if (transactionLoading) return "Processing...";
-    if (shouldLockInput) return "Insufficient Collateral: Decrease Risk Buffer";
+    if (shouldLockInput) return "Insufficient Collateral: Move Risk Slider to the right";
     if (mintAmount <= 0 && !isMaxMode) return "Enter mint amount";
-    if (exceedsMaxCollateral) return "Insufficient Collateral: Decrease Mint Amount or Risk Buffer";
+    if (exceedsMaxCollateral) return "Insufficient Collateral: Decrease Mint Amount or move Risk Slider to the right";
     if (optimalAllocations.length === 0 && debtFloorHit) return "Debt Floor: Increase Mint Amount";
-    if (optimalAllocations.length === 0 && totalHeadroomWei <= 0n) return "Vaults at Capacity: Decrease Risk Buffer";
+    if (optimalAllocations.length === 0 && totalHeadroomWei <= 0n) return "Vaults at Capacity: Move Risk Slider to the right";
     if (optimalAllocations.length === 0) return "No vaults available";
     return isMaxMode ? "Confirm Max Mint" : "Confirm Quick Mint";
   };
@@ -575,7 +575,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="top" className="w-48 text-sm">
-                      Quick Mint finds an optimal collateral allocation by ranking vaults by stability fee and proposing deposit/mint amounts that satisfy your target risk buffer, constrained by your asset balances.
+                      Quick Mint finds an optimal collateral allocation by ranking vaults by stability fee and proposing deposit/mint amounts that satisfy your target risk value, constrained by your asset balances.
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
@@ -611,10 +611,23 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium">Risk Buffer</label>
+                  <TooltipProvider delayDuration={0}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <label className="text-sm font-medium cursor-help">Risk</label>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="text-sm">
+                        Lower value = More Risk
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                   <span className="text-sm font-semibold" style={{ color: getRiskColor(riskBuffer) }}>
                     {riskBuffer === 1.0 ? "No Buffer" : `${riskBuffer.toFixed(2)}x`}
                   </span>
+                </div>
+                <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                  <span>&lt;-- Less Risk</span>
+                  <span>More Risk --&gt;</span>
                 </div>
                 <div style={{ "--risk-slider-color": getRiskColor(riskBuffer) } as React.CSSProperties}>
                   <Slider
@@ -647,12 +660,12 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
                 <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
                   <p className="text-sm font-semibold text-red-800 dark:text-red-200 mb-2">Insufficient Collateral</p>
                   <p className="text-xs text-red-700 dark:text-red-300">
-                    Zero USDST can be minted with your current asset balances and selected Risk Buffer. Try decreasing the risk buffer to increase headroom.
+                    Zero USDST can be minted with your current asset balances and selected Risk value. Try moving the Risk Slider to the right to increase headroom.
                   </p>
                 </div>
               ) : mintAmount <= 0 && !isMaxMode ? (
                 <div className="p-3 rounded-md bg-muted border border-border text-center">
-                  <p className="text-sm text-muted-foreground">Enter a mint amount and select risk buffer to see your optimal mint plan</p>
+                  <p className="text-sm text-muted-foreground">Enter a mint amount and select a risk value to see your optimal mint plan</p>
                 </div>
               ) : exceedsMaxCollateral ? null : optimalAllocations.length > 0 ? (
                 <>
@@ -668,13 +681,13 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
               ) : (
                 <div className="p-3 rounded-md bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
                   <p className="text-sm font-semibold text-yellow-800 dark:text-yellow-200 mb-2">
-                    {debtFloorHit ? "Debt floor prevents allocation" : totalHeadroomWei <= 0n ? "Vaults at capacity for current risk buffer" : "No suitable vaults found"}
+                    {debtFloorHit ? "Debt floor prevents allocation" : totalHeadroomWei <= 0n ? "Vaults at capacity for current risk value" : "No suitable vaults found"}
                   </p>
                   <p className="text-xs text-yellow-700 dark:text-yellow-300 mb-2">
                     {debtFloorHit
                       ? "Each vault requires a minimum debt amount. Try increasing your mint amount or use a different vault."
                       : totalHeadroomWei <= 0n
-                      ? "Your vaults have reached their borrowing limit at the current risk buffer. Try decreasing the risk buffer to allow more borrowing."
+                      ? "Your vaults have reached their borrowing limit at the current risk value. Try moving the Risk Slider to the right to allow more borrowing."
                       : "No vaults are available for minting at this time."}
                   </p>
                   {totalHeadroomWei > 0n && supportedAssetsWithBalances.length > 0 && (
