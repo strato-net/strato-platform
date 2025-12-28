@@ -27,7 +27,7 @@ OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata/.well-kno
 # API Keys
 ALCHEMY_API_KEY=your-alchemy-key
 COINMARKETCAP_API_KEY=your-coinmarketcap-key
-COINGECKO_API_KEY=your-coingecko-demo-key
+COINGECKO_API_KEY=your-coingecko-api-key
 METALS_DEV_API_KEY=your-metals-dev-key
 METALS_API_API_KEY=your-metals-api-key
 

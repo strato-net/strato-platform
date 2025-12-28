@@ -66,7 +66,7 @@ function buildBatchUrl(sourceConfig: SourceConfig, assets: Asset[], apiKey: stri
         
         params.forEach(param => {
             // API key params
-            if ((param === 'api_key' || param === 'access_key' || param === 'x_cg_demo_api_key') && apiKey) {
+            if ((param === 'api_key' || param === 'access_key' || param === 'x_cg_pro_api_key') && apiKey) {
                 queryParams.append(param, apiKey);
             // Dynamic asset-based params
             } else if (param === 'ids') {
