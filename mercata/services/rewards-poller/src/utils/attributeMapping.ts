@@ -12,10 +12,7 @@ const PriceOracleBatchUpdateEvents = `${MERCATA_PREFIX}PriceOracle-BatchPricesUp
 const PRICE_CONVERSION_MAP: Record<string, string> = {
   Swap: "tokenIn",
   DepositInitiated: "stratoToken",
-  WithdrawalRequested: "token",
 };
-
-const DEPOSIT_WITHDRAW_EVENTS = new Set(["DepositInitiated", "WithdrawalRequested"]);
 
 const toBigIntSafeString = (value: string | number): string => {
   if (typeof value === "string") {
@@ -173,67 +170,68 @@ export const extractAmountFromAttributes = async (
   }
 
   const tokenAttributeName = PRICE_CONVERSION_MAP[eventName];
-  if (!tokenAttributeName) {
-    return toBigIntSafeString(amount);
-  }
+  if (tokenAttributeName) {
+    const tokenAddress = attributes[tokenAttributeName];
+    if (!tokenAddress) {
+      logError(
+        "AttributeMapping",
+        new Error(`${tokenAttributeName} not found in ${eventName} event`),
+        {
+          operation: "extractAmountFromAttributes",
+          contractAddress,
+          eventName,
+          availableAttributes: Object.keys(attributes),
+        }
+      );
+      return null;
+    }
 
-  const tokenAddress = attributes[tokenAttributeName];
-  if (!tokenAddress) {
-    logError(
-      "AttributeMapping",
-      new Error(`${tokenAttributeName} not found in ${eventName} event`),
-      {
-        operation: "extractAmountFromAttributes",
-        contractAddress,
-        eventName,
-        availableAttributes: Object.keys(attributes),
+    if (eventName === "DepositInitiated") {
+      const isUsdt =
+        tokenAddress.toLowerCase() === config.usdst.address.toLowerCase();
+
+      if (!isUsdt) {
+        logError(
+          "AttributeMapping",
+          new Error(
+            `Non-USDT token ${tokenAddress} filtered out for ${eventName} event`
+          ),
+          {
+            operation: "extractAmountFromAttributes",
+            contractAddress,
+            eventName,
+            tokenAddress,
+          }
+        );
+        return null;
       }
-    );
-    return null;
+    }
+
+    const price = await getPriceAtTimestamp(tokenAddress, blockTimestamp);
+    if (!price) {
+      logError(
+        "AttributeMapping",
+        new Error(
+          `Price not found for token ${tokenAddress} at timestamp ${blockTimestamp}`
+        ),
+        {
+          operation: "extractAmountFromAttributes",
+          contractAddress,
+          eventName,
+          tokenAddress,
+          blockTimestamp,
+        }
+      );
+      return null;
+    }
+
+    const amountStr = toBigIntSafeString(amount);
+    const usdValue =
+      (BigInt(amountStr) * BigInt(price)) / BigInt(10 ** 18);
+    return usdValue.toString();
   }
 
-  const isDepositOrWithdraw = DEPOSIT_WITHDRAW_EVENTS.has(eventName);
-  const isUsdt =
-    tokenAddress.toLowerCase() === config.usdst.address.toLowerCase();
-
-  if (isDepositOrWithdraw && !isUsdt) {
-    logError(
-      "AttributeMapping",
-      new Error(
-        `Non-USDT token ${tokenAddress} filtered out for ${eventName} event`
-      ),
-      {
-        operation: "extractAmountFromAttributes",
-        contractAddress,
-        eventName,
-        tokenAddress,
-      }
-    );
-    return null;
-  }
-
-  const price = await getPriceAtTimestamp(tokenAddress, blockTimestamp);
-
-  if (!price) {
-    logError(
-      "AttributeMapping",
-      new Error(
-        `Price not found for token ${tokenAddress} at timestamp ${blockTimestamp}`
-      ),
-      {
-        operation: "extractAmountFromAttributes",
-        contractAddress,
-        eventName,
-        tokenAddress,
-        blockTimestamp,
-      }
-    );
-    return null;
-  }
-
-  const amountStr = toBigIntSafeString(amount);
-  const usdValue = (BigInt(amountStr) * BigInt(price)) / BigInt(10 ** 18);
-  return usdValue.toString();
+  return toBigIntSafeString(amount);
 };
 
 export const splitAddressesAndEvents = (

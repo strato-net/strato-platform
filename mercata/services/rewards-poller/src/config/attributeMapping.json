@@ -1,7 +1,8 @@
 {
   "0000000000000000000000000000000000001004": {
     "Deposited": {
-      "amount": "mTokenMinted"
+      "amount": "mTokenMinted",
+      "user": "user"
     },
     "Withdrawn": {
       "amount": "mTokenBurned"
@@ -14,9 +15,6 @@
     "DepositInitiated": {
       "amount": "stratoTokenAmount",
       "user": "stratoRecipient"
-    },
-    "WithdrawalRequested": {
-      "amount": "stratoTokenAmount"
     }
   },
   "0000000000000000000000000000000000001011": {
