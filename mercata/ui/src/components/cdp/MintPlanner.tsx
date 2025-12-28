@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Slider } from "@/components/ui/slider";
-import { ChevronDown, Info } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Info } from "lucide-react";
 import { useOracleContext } from "@/context/OracleContext";
 import { cdpService } from "@/services/cdpService";
 import { getOptimalAllocations, computeTotalHeadroom, getMaxAllocations, type VaultCandidate } from "@/services/mintPlanService";
@@ -625,10 +625,6 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
                     {riskBuffer === 1.0 ? "No Buffer" : `${riskBuffer.toFixed(2)}x`}
                   </span>
                 </div>
-                <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-                  <span>&lt;-- Less Risk</span>
-                  <span>More Risk --&gt;</span>
-                </div>
                 <div style={{ "--risk-slider-color": getRiskColor(riskBuffer) } as React.CSSProperties}>
                   <Slider
                     value={[3.5 - riskBuffer]}
@@ -641,9 +637,16 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
                     rangeClassName="risk-slider-range"
                   />
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  This value will determine the size of the safety buffer between each vault's target CR and the protocol minimum.
-                </p>
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <ChevronLeft className="h-3 w-3" />
+                    Less Risk
+                  </span>
+                  <span className="flex items-center gap-1">
+                    More Risk
+                    <ChevronRight className="h-3 w-3" />
+                  </span>
+                </div>
               </div>
 
               <Button
