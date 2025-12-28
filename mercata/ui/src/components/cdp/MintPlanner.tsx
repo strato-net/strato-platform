@@ -607,6 +607,11 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
                     <span className="text-muted-foreground text-sm">USDST</span>
                   </div>
                 </div>
+                {totalMaxMintWei > 0n && (
+                  <p className="text-xs text-muted-foreground">
+                    Max: {formatNumberWithCommas(formatUnits(totalMaxMintWei, 18).replace(/\.?0+$/, ""))} USDST
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
