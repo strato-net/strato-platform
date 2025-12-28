@@ -12,7 +12,7 @@ async function callListAndWait(callListArgs: CallListArg[]): Promise<Transaction
     const submitTime = Date.now();
     
     const response = await apiPost(
-        `${process.env.STRATO_NODE_URL}/bloc/v2.2/transaction/parallel`,
+        `${process.env.STRATO_NODE_URL}/bloc/v2.2/transaction/parallel?resolve=true`,
         {
             txs: callListArgs.map(callArg => ({
                 type: "FUNCTION",
@@ -36,7 +36,30 @@ async function callListAndWait(callListArgs: CallListArg[]): Promise<Transaction
     );
 
     const txHash = extractTransactionHash(response.data);
-    const result = await waitForTransaction(txHash);
+
+    // Evaluate immediate status from resolve=true; fallback to polling on Pending or undefined
+    const getImmediateResult = (data: unknown): TransactionResult | undefined => {
+        const first: any = Array.isArray(data) ? (data as any[])[0] : data;
+        const status: string | undefined = first?.status;
+
+        switch (status) {
+            case 'Success':
+                return { status: 'Success', hash: txHash, timestamp: Date.now().toString() };
+            case 'Failed':
+            case 'Failure': {
+                const errorMessage = first?.txResult?.message ?? first?.error ?? 'Unknown error';
+                throw new Error(`Transaction failed: ${errorMessage}`);
+            }
+            case 'Pending':
+            case undefined:
+            default:
+                // Pending, undefined, or any unknown status: fall back to polling
+                return undefined;
+        }
+    };
+
+    const immediate = getImmediateResult(response.data);
+    const result = immediate ?? await waitForTransaction(txHash);
     
     // Record metrics (errors are handled inside txMetricsService)
     await txMetricsService.recordTxMetric({
