@@ -69,6 +69,7 @@ interface Allocation {
  * Get max possible allocations for each candidate vault.
  * Unlike getOptimalAllocations which distributes a target amount,
  * this returns the maximum mintable from EACH vault independently.
+ * Always deposits ALL available collateral to maximize mint.
  */
 export function getMaxAllocations(
   candidates: VaultCandidate[],
@@ -79,21 +80,17 @@ export function getMaxAllocations(
   const allocations: Allocation[] = [];
 
   for (const candidate of candidates) {
-    // Skip candidates with no collateral or invalid oracle price
     if ((candidate.potentialCollateral <= 0n && candidate.currentCollateral <= 0n) || candidate.oraclePrice <= 0n) {
       continue;
     }
 
     const targetCR = computeTargetCRWadFromRiskBuffer(candidate.minCR, riskBuffer);
-    
-    // Compute max headroom for this candidate (collateral + ceiling constrained)
     const headroom = computeHeadroom(candidate, targetCR);
     
     if (headroom <= 0n) continue;
 
-    // Use allocate() with headroom as the max we want to mint
-    // Pass candidate's current globalDebt (not tracking across allocations since each is independent)
-    const result = allocate(candidate, headroom, targetCR, candidate.globalDebt);
+    // For MAX mode: use headroom as target and force deposit of all collateral
+    const result = allocate(candidate, headroom, targetCR, candidate.globalDebt, true);
 
     if (result !== 'DEBT_FLOOR_HIT' && result !== 'DEBT_CEILING_HIT' && result !== 'NO_HEADROOM' && result.mintAmount > 0n) {
       allocations.push(result);
@@ -217,7 +214,7 @@ export function getOptimalAllocations(
 
     const targetCR = computeTargetCRWadFromRiskBuffer(candidate.minCR, riskBuffer);
     const currentGlobalDebt = globalDebtByAsset.get(candidate.assetAddress) ?? candidate.globalDebt;
-    const result = allocate(candidate, remainingMint, targetCR, currentGlobalDebt);
+    const result = allocate(candidate, remainingMint, targetCR, currentGlobalDebt, false);
     
     if (result === 'DEBT_FLOOR_HIT') {
       debtFloorHit = true;
@@ -249,7 +246,8 @@ function allocate(
   candidate: VaultCandidate,
   remainingMint: bigint,
   targetCR: bigint,
-  globalDebt: bigint
+  globalDebt: bigint,
+  maximizeDeposit: boolean = false
 ): Allocation | 'DEBT_FLOOR_HIT' | 'DEBT_CEILING_HIT' | 'NO_HEADROOM' {
   let mintAmount = remainingMint;
   let depositAmount = 0n;
@@ -262,44 +260,51 @@ function allocate(
   const maxCollateral = candidate.currentCollateral + candidate.potentialCollateral;
   const maxCollateralValue = computeCollateralUSD(maxCollateral, candidate.oraclePrice, candidate.assetScale);
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // STEP 1: Compute CR and determine deposit needed
-  // ═══════════════════════════════════════════════════════════════════════════
-  const newDebt = candidate.currentDebt + mintAmount;
-  const currentCR = newDebt > 0n ? (currentCollateralValue * WAD) / newDebt : INF;
-
-  if (currentCR >= targetCR) {
-    // Happy path: no deposit needed
-    depositAmount = 0n;
+  // STEP 1: Compute deposit and mint amounts
+  if (maximizeDeposit) {
+    // MAX mode: deposit everything and compute max mintable
+    depositAmount = candidate.potentialCollateral;
+    const maxDebtRaw = (maxCollateralValue * WAD) / targetCR;
+    const BUFFER_BPS = 1n;
+    const BPS_SCALE = 1000n;
+    const percentBuffer = (maxDebtRaw * BUFFER_BPS) / BPS_SCALE;
+    const safetyBuffer = percentBuffer > 0n ? percentBuffer : 1n;
+    const maxDebtFromCollateral = maxDebtRaw > safetyBuffer ? maxDebtRaw - safetyBuffer : 0n;
+    mintAmount = maxDebtFromCollateral > candidate.currentDebt
+      ? maxDebtFromCollateral - candidate.currentDebt
+      : 0n;
   } else {
-    // Need deposit - check if full deposit is enough
-    const maxCR = newDebt > 0n ? (maxCollateralValue * WAD) / newDebt : INF;
+    // Normal mode: minimize deposit while achieving target mint
+    const newDebt = candidate.currentDebt + mintAmount;
+    const currentCR = newDebt > 0n ? (currentCollateralValue * WAD) / newDebt : INF;
 
-    if (maxCR < targetCR) {
-      // Even full deposit isn't enough → reduce mint to achievable amount
-      // Apply conservative buffer for on-chain strict < check and rate accumulator drift
-      const maxDebtRaw = (maxCollateralValue * WAD) / targetCR;
-      // Buffer: 0.1% of max debt, minimum 1 wei
-      const BUFFER_BPS = 1n;
-      const BPS_SCALE = 1000n;
-      const percentBuffer = (maxDebtRaw * BUFFER_BPS) / BPS_SCALE;
-      const safetyBuffer = percentBuffer > 0n ? percentBuffer : 1n;
-      const maxDebtFromCollateral = maxDebtRaw > safetyBuffer ? maxDebtRaw - safetyBuffer : 0n;
-      mintAmount = maxDebtFromCollateral > candidate.currentDebt
-        ? maxDebtFromCollateral - candidate.currentDebt
-        : 0n;
-      depositAmount = candidate.potentialCollateral;
+    if (currentCR >= targetCR) {
+      depositAmount = 0n;
     } else {
-      // Find minimum deposit needed to achieve target CR
-      const requiredCollateral = computeRequiredCollateralForCR(
-        newDebt,
-        targetCR,
-        candidate.oraclePrice,
-        candidate.assetScale
-      );
-      depositAmount = requiredCollateral > candidate.currentCollateral
-        ? requiredCollateral - candidate.currentCollateral
-        : 0n;
+      const maxCR = newDebt > 0n ? (maxCollateralValue * WAD) / newDebt : INF;
+
+      if (maxCR < targetCR) {
+        const maxDebtRaw = (maxCollateralValue * WAD) / targetCR;
+        const BUFFER_BPS = 1n;
+        const BPS_SCALE = 1000n;
+        const percentBuffer = (maxDebtRaw * BUFFER_BPS) / BPS_SCALE;
+        const safetyBuffer = percentBuffer > 0n ? percentBuffer : 1n;
+        const maxDebtFromCollateral = maxDebtRaw > safetyBuffer ? maxDebtRaw - safetyBuffer : 0n;
+        mintAmount = maxDebtFromCollateral > candidate.currentDebt
+          ? maxDebtFromCollateral - candidate.currentDebt
+          : 0n;
+        depositAmount = candidate.potentialCollateral;
+      } else {
+        const requiredCollateral = computeRequiredCollateralForCR(
+          newDebt,
+          targetCR,
+          candidate.oraclePrice,
+          candidate.assetScale
+        );
+        depositAmount = requiredCollateral > candidate.currentCollateral
+          ? requiredCollateral - candidate.currentCollateral
+          : 0n;
+      }
     }
   }
 
