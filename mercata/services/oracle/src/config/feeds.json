@@ -2,7 +2,7 @@
   "feeds": [
     {
       "name": "crypto-batch",
-      "sources": ["Alchemy", "CoinMarketCap"],
+      "sources": ["Alchemy", "CoinMarketCap", "CoinGecko"],
       "assets": ["ETH", "WBTC", "PAXG", "XAUt"]
     },
     {
@@ -12,7 +12,7 @@
     },
     {
       "name": "metals-weekend",
-      "sources": ["CoinMarketCap"],
+      "sources": ["CoinMarketCap", "CoinGecko"],
       "assets": ["XAU-WEEKEND", "XAG-WEEKEND"]
     },
     {
