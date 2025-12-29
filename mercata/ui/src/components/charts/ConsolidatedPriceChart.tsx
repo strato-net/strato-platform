@@ -190,6 +190,39 @@ const ConsolidatedPriceChart: React.FC<ConsolidatedPriceChartProps> = ({
     ];
     const yAxisDomain = calculateYAxisDomain(allPrices);
 
+    // Smart tick calculation based on data density
+    // 1. Pick the dataset with more data points
+    const primaryData = spotData.length > swapData.length ? spotData : swapData;
+    
+    // 2. Calculate time range in days
+    const timestamps = primaryData.map(p => p.timestamp).filter(t => t !== undefined) as number[];
+    if (timestamps.length === 0) {
+      return renderEmptyState("No valid timestamp data available");
+    }
+    
+    const minTime = Math.min(...timestamps);
+    const maxTime = Math.max(...timestamps);
+    const daysOfData = Math.max(1, (maxTime - minTime) / (1000 * 60 * 60 * 24));
+    
+    // 3. Calculate average data points per day
+    const avgPointsPerDay = Math.max(1, Math.round(primaryData.length / daysOfData));
+    
+    // 4. Calculate total slices needed
+    const totalSlices = Math.ceil(daysOfData * avgPointsPerDay);
+    
+    // 5. Calculate interval to sample merged data
+    const tickInterval = Math.max(1, Math.floor(mergedData.length / Math.min(totalSlices, 12)));
+    
+    // 6. Generate custom ticks at regular intervals
+    const customTicks = mergedData
+      .filter((_, index) => index % tickInterval === 0)
+      .map(d => d.date);
+    
+    // Add the last data point if not already included
+    if (mergedData.length > 0 && customTicks[customTicks.length - 1] !== mergedData[mergedData.length - 1].date) {
+      customTicks.push(mergedData[mergedData.length - 1].date);
+    }
+
     return (
       <div className="w-full aspect-[21/9]">
         <ChartContainer
@@ -231,8 +264,8 @@ const ConsolidatedPriceChart: React.FC<ConsolidatedPriceChartProps> = ({
                 dataKey="date"
                 axisLine={false}
                 tickLine={false}
-                tick={{ fontSize: 10 }}
-                tickCount={8}
+                tick={{ fontSize: 10, dy: 15 }}
+                ticks={customTicks}
                 tickFormatter={(value) => {
                   const parts = value.split(' ');
                   return parts[0];
@@ -242,9 +275,9 @@ const ConsolidatedPriceChart: React.FC<ConsolidatedPriceChartProps> = ({
               <YAxis
                 axisLine={false}
                 tickLine={false}
-                tick={{ fontSize: 12 }}
+                tick={{ fontSize: 12, dx: -15 }}
                 domain={yAxisDomain}
-                width={80}
+                width={110}
                 tickFormatter={(value) => `$${parseFloat(value).toLocaleString('en-US', { 
                   minimumFractionDigits: 2, 
                   maximumFractionDigits: 2 
