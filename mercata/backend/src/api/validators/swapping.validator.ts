@@ -40,6 +40,7 @@ export function validateCreatePoolsArgs(args: any) {
   const schema = Joi.object({
     tokenA: validateAddressField("tokenA"),
     tokenB: validateAddressField("tokenB"),
+    isStable: Joi.boolean(),
   });
 
   const { error } = schema.validate(args);

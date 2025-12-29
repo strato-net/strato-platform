@@ -65,32 +65,29 @@ function buildBatchUrl(sourceConfig: SourceConfig, assets: Asset[], apiKey: stri
         const queryParams = new URLSearchParams();
         
         params.forEach(param => {
-            if (param === 'api_key' && apiKey) {
-                queryParams.append('api_key', apiKey);
-            } else if (param === 'access_key' && apiKey) {
-                queryParams.append('access_key', apiKey);
-            } else if (param === 'symbol') {
+            // API key params
+            if ((param === 'api_key' || param === 'access_key' || param === 'x_cg_pro_api_key') && apiKey) {
+                queryParams.append(param, apiKey);
+            // Dynamic asset-based params
+            } else if (param === 'ids') {
+                const ids = assets.map(asset => {
+                    const symbol = asset.name.split('-')[0];
+                    return sourceConfig.symbolMapping?.[symbol] || symbol.toLowerCase();
+                }).join(',');
+                queryParams.append('ids', ids);
+            } else if (param === 'symbol' || param === 'symbols') {
                 const symbols = assets.map(asset => asset.name.split('-')[0]).join(',');
-                queryParams.append('symbol', symbols);
-            } else if (param === 'symbols') {
-                const symbols = assets.map(asset => asset.name.split('-')[0]).join(',');
-                queryParams.append('symbols', symbols);
+                queryParams.append(param, symbols);
             } else if (param === 'metals') {
                 const metals = assets.map(asset => {
                     const symbol = asset.name.split('-')[0];
                     return sourceConfig.symbolMapping?.[symbol] || symbol;
                 }).join(',');
                 queryParams.append('metals', metals);
-            } else if (param.startsWith('currency=')) {
-                queryParams.append('currency', param.split('=')[1]);
-            } else if (param.startsWith('convert=')) {
-                queryParams.append('convert', param.split('=')[1]);
-            } else if (param.startsWith('base=')) {
-                queryParams.append('base', param.split('=')[1]);
-            } else if (param.startsWith('currencies=')) {
-                queryParams.append('currencies', param.split('=')[1]);
-            } else if (param.startsWith('unit=')) {
-                queryParams.append('unit', param.split('=')[1]);
+            // Static key=value params
+            } else if (param.includes('=')) {
+                const [key, value] = param.split('=');
+                queryParams.append(key, value);
             }
         });
         
@@ -178,6 +175,23 @@ function parseBatchResponse(
                 const priceUSD = parseFloat(symbolData[0].quote.USD.price);
                 const price = Math.floor(priceUSD * 1e18);
                 const feedTimestamp = symbolData[0].quote.USD.last_updated || new Date().toISOString();
+                result[asset.name] = { price, feedTimestamp };
+            }
+        });
+        
+    // Handle CoinGecko response structures
+    } else if (parsePattern === '{id}.usd') {
+        assets.forEach(asset => {
+            const symbol = asset.name.split('-')[0];
+            const id = sourceConfig.symbolMapping?.[symbol] || symbol.toLowerCase();
+            const priceData = data[id];
+            
+            if (priceData && priceData.usd) {
+                const priceUSD = parseFloat(priceData.usd);
+                const price = Math.floor(priceUSD * 1e18);
+                const feedTimestamp = priceData.last_updated_at 
+                    ? new Date(priceData.last_updated_at * 1000).toISOString()
+                    : new Date().toISOString();
                 result[asset.name] = { price, feedTimestamp };
             }
         });
