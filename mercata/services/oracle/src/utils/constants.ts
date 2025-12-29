@@ -18,9 +18,9 @@ export const GAS_PARAMS = {
 
 // Timeout configurations
 export const TIMEOUTS = { 
-    SUBMIT: 30000, 
-    WAIT: 120000, 
-    STATUS: 10000 
+    SUBMIT: 20000, 
+    WAIT: 180000,
+    STATUS: 10000,
 };
 
 // Retry delay configurations
