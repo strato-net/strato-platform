@@ -1,4 +1,4 @@
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { ChartContainer, ChartTooltip } from '@/components/ui/chart';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Area,
@@ -8,6 +8,7 @@ import {
   YAxis,
   CartesianGrid,
   Legend,
+  Tooltip,
 } from "recharts";
 
 // Types
@@ -36,8 +37,8 @@ interface ConsolidatedPriceChartProps {
 
 // Color scheme
 const CHART_COLORS = {
-  SPOT: "#2563eb",      // Blue - Oracle/Spot price (reference)
-  SWAP: "#f97316",      // Orange - Swap pool price (actual trading)
+  SPOT: "#2563eb",      // Blue - Spot price
+  SWAP: "#f97316",      // Orange - STRATO price
 };
 
 // Utilities
@@ -60,8 +61,40 @@ const calculateYAxisDomain = (prices: number[], paddingPercent: number = 0.15): 
 const formatTooltipValue = (value: string | number): string => {
   return `$${parseFloat(value.toString()).toLocaleString('en-US', { 
     minimumFractionDigits: 2, 
-    maximumFractionDigits: 6 
+    maximumFractionDigits: 2 
   })}`;
+};
+
+// Custom tooltip component that always shows both prices
+const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<Record<string, unknown>>; label?: string }) => {
+  if (!active || !payload || payload.length === 0) {
+    return null;
+  }
+
+  // Always get both values from the underlying data point
+  const dataPoint = (payload[0] && 'payload' in payload[0] ? payload[0].payload : {}) as Record<string, unknown>;
+  const stratoPrice = dataPoint.swapPrice as number | undefined;
+  const spotPrice = dataPoint.spotPrice as number | undefined;
+
+  return (
+    <div className="rounded-lg border bg-background p-3 shadow-lg">
+      <p className="text-sm font-medium mb-2">{label}</p>
+      <div className="space-y-1">
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: CHART_COLORS.SWAP }} />
+          <span className="text-sm">
+            STRATO Price: {stratoPrice !== undefined && stratoPrice !== null ? formatTooltipValue(stratoPrice) : 'N/A'}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: CHART_COLORS.SPOT }} />
+          <span className="text-sm">
+            Spot Price: {spotPrice !== undefined && spotPrice !== null ? formatTooltipValue(spotPrice) : 'N/A'}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 const renderLoadingState = (message: string) => (
@@ -132,8 +165,23 @@ const ConsolidatedPriceChart: React.FC<ConsolidatedPriceChartProps> = ({
       return renderEmptyState("No price history available for this asset");
     }
 
-    // Merge data by timestamp/date
-    const mergedData = mergeDataByTimestamp(spotData, swapData);
+    // Merge data by timestamp/date and forward-fill missing values
+    let mergedData = mergeDataByTimestamp(spotData, swapData);
+    
+    // Forward-fill missing values to avoid N/A in tooltips
+    let lastSpotPrice: number | undefined;
+    let lastSwapPrice: number | undefined;
+    
+    mergedData = mergedData.map(point => {
+      if (point.spotPrice !== undefined) lastSpotPrice = point.spotPrice;
+      if (point.swapPrice !== undefined) lastSwapPrice = point.swapPrice;
+      
+      return {
+        ...point,
+        spotPrice: point.spotPrice ?? lastSpotPrice,
+        swapPrice: point.swapPrice ?? lastSwapPrice
+      };
+    });
     
     // Calculate y-axis domain from all prices
     const allPrices = [
@@ -147,14 +195,14 @@ const ConsolidatedPriceChart: React.FC<ConsolidatedPriceChartProps> = ({
         <ChartContainer
           config={{
             spotPrice: {
-              label: "Spot Price (Oracle)",
+              label: "Spot Price",
               theme: {
                 light: CHART_COLORS.SPOT,
                 dark: CHART_COLORS.SPOT,
               }
             },
             swapPrice: {
-              label: "Swap Pool Price",
+              label: "STRATO Price",
               theme: {
                 light: CHART_COLORS.SWAP,
                 dark: CHART_COLORS.SWAP,
@@ -211,22 +259,13 @@ const ConsolidatedPriceChart: React.FC<ConsolidatedPriceChartProps> = ({
                 iconType="line"
                 wrapperStyle={{ paddingBottom: '10px' }}
                 formatter={(value) => {
-                  if (value === 'spotPrice') return 'Spot Price (Oracle)';
-                  if (value === 'swapPrice') return 'Swap Pool Price (Trading)';
+                  if (value === 'spotPrice') return 'Spot Price';
+                  if (value === 'swapPrice') return 'STRATO Price';
                   return value;
                 }}
               />
               
-              <ChartTooltip
-                content={<ChartTooltipContent 
-                  labelFormatter={(value) => `${value}`}
-                  formatter={(value: string | number, name: string) => {
-                    if (value === undefined || value === null) return null;
-                    const label = name === 'spotPrice' ? 'Spot Price' : 'Swap Pool Price';
-                    return [formatTooltipValue(value), label];
-                  }}
-                />}
-              />
+              <Tooltip content={<CustomTooltip />} />
               
               {/* Spot Price - Solid line with subtle gradient */}
               {hasSpotData && (
@@ -243,7 +282,7 @@ const ConsolidatedPriceChart: React.FC<ConsolidatedPriceChartProps> = ({
                 />
               )}
               
-              {/* Swap Pool Price - Dashed line with lighter gradient */}
+              {/* STRATO Price - Solid line with lighter gradient */}
               {hasSwapData && (
                 <Area
                   type="monotone"
@@ -251,7 +290,6 @@ const ConsolidatedPriceChart: React.FC<ConsolidatedPriceChartProps> = ({
                   name="swapPrice"
                   stroke={CHART_COLORS.SWAP}
                   strokeWidth={2}
-                  strokeDasharray="5 5"
                   fillOpacity={1}
                   fill="url(#colorSwap)"
                   activeDot={{ r: 6 }}

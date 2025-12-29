@@ -4,14 +4,13 @@ import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChevronLeft, Wallet, ArrowUp, ArrowDown, AlertCircle } from 'lucide-react';
+import { ChevronLeft, Wallet, ArrowUp, ArrowDown } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { useUserTokens } from '@/context/UserTokensContext';
 import { useTokenContext } from '@/context/TokenContext';
 import { Token, PriceHistoryEntry, SwapHistoryEntry } from '@/interface';
 import { formatUnits } from 'ethers';
 import { api } from '@/lib/axios';
-import PriceChart from '@/components/charts/PriceChart';
 import ConsolidatedPriceChart from '@/components/charts/ConsolidatedPriceChart';
 import CopyButton from '@/components/ui/copy';
 import { addCommasToInput, roundToDecimals } from '@/utils/numberUtils';
@@ -179,13 +178,6 @@ const fetchSwapPoolPrices = async (assetAddress: string): Promise<SwapPricePoint
   }
 };
 
-// Consistent color scheme for all charts
-const CHART_COLORS = {
-  GREEN: "#10b981", // Consistent green for upward trends
-  RED: "#ef4444",   // Consistent red for downward trends  
-  BLUE: "#2563eb"   // Default blue for neutral/no data
-};
-
 const AssetDetail = () => {
 
   const { id } = useParams<{ id: string }>();
@@ -202,41 +194,6 @@ const AssetDetail = () => {
   const [fetchingSingleAsset, setFetchingSingleAsset] = useState(false);
 
   const PRICE_WINDOW = 30; // Number of days to show in the price chart
-  const getChartColor = (currentPrice: string | undefined, priceData: PricePoint[]): string => {
-    if (!currentPrice || priceData.length === 0) return CHART_COLORS.BLUE;
-    
-    const current = parseFloat(formatUnits(currentPrice.toString(), 18));
-    const first = parseFloat(priceData[0].price);
-    return current > first ? CHART_COLORS.GREEN : CHART_COLORS.RED;
-  };
-  
-  const getSwapChartColor = (swapPriceData: SwapPricePoint[]): string => {
-    if (swapPriceData.length === 0) return CHART_COLORS.BLUE;
-    
-    const first = parseFloat(swapPriceData[0].price);
-    const last = parseFloat(swapPriceData[swapPriceData.length - 1].price);
-    return last > first ? CHART_COLORS.GREEN : CHART_COLORS.RED;
-  };
-
-  // Check if spot and swap prices are magnitudes apart (10x or more difference)
-  const arePricesMagnitudesApart = (spotData: PricePoint[], swapData: SwapPricePoint[]): boolean => {
-    if (spotData.length === 0 || swapData.length === 0) return false;
-    
-    // Get average prices from each dataset
-    const spotPrices = spotData.map(p => parseFloat(p.price)).filter(p => p > 0);
-    const swapPrices = swapData.map(p => parseFloat(p.price)).filter(p => p > 0);
-    
-    if (spotPrices.length === 0 || swapPrices.length === 0) return false;
-    
-    const avgSpotPrice = spotPrices.reduce((a, b) => a + b, 0) / spotPrices.length;
-    const avgSwapPrice = swapPrices.reduce((a, b) => a + b, 0) / swapPrices.length;
-    
-    // Calculate the ratio between the two averages
-    const ratio = Math.max(avgSpotPrice, avgSwapPrice) / Math.min(avgSpotPrice, avgSwapPrice);
-    
-    // If ratio is 10x or more, they're magnitudes apart
-    return ratio >= 3;
-  };
   
   useEffect(() => {
     fetchTokens()
@@ -503,57 +460,14 @@ const AssetDetail = () => {
             </div>
 
             <div className="lg:col-span-2">
-                {arePricesMagnitudesApart(priceData, swapPriceData) ? (
-                  <>
-                    {/* Show indicator when prices are too far apart */}
-                    <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-                      <div className="flex items-start gap-3">
-                        <AlertCircle className="text-amber-600 dark:text-amber-500 flex-shrink-0 mt-0.5" size={20} />
-                        <div>
-                          <h4 className="font-medium text-amber-900 dark:text-amber-100 mb-1">
-                            Swap Pool & Spot Prices are very far off
-                          </h4>
-                          <p className="text-sm text-amber-800 dark:text-amber-200">
-                            The prices differ by a significant magnitude. Displaying separate charts for better visualization.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Show separate charts */}
-                    <PriceChart
-                      data={priceData}
-                      loading={priceDataLoading}
-                      title="Spot Price History"
-                      subtitle={priceData.length > 0 ? "Hourly price data from first available oracle price to present" : undefined}
-                      loadingMessage="Loading price history..."
-                      emptyMessage="No price history available for this asset"
-                      chartColor={getChartColor(asset?.price?.toLocaleString("fullwide", { useGrouping: false }), priceData)}
-                      gradientId="colorPrice"
-                    />
-
-                    <PriceChart
-                      data={swapPriceData}
-                      loading={swapPriceDataLoading}
-                      title="Swap Pool Price History"
-                      subtitle={swapPriceData.length > 0 ? "Actual trading prices from swap pools (Last 30 days)" : undefined}
-                      loadingMessage="Loading swap pool prices..."
-                      emptyMessage="No swap pool data available for this asset"
-                      chartColor={getSwapChartColor(swapPriceData)}
-                      gradientId="colorSwapPrice"
-                    />
-                  </>
-                ) : (
-                  /* Show consolidated chart when prices are comparable */
-                  <ConsolidatedPriceChart
-                    spotData={priceData}
-                    swapData={swapPriceData}
-                    spotLoading={priceDataLoading}
-                    swapLoading={swapPriceDataLoading}
-                    title="Price History"
-                    subtitle="Oracle spot price (solid blue) and swap pool trading prices (dashed orange)"
-                  />
-                )}
+                <ConsolidatedPriceChart
+                  spotData={priceData}
+                  swapData={swapPriceData}
+                  spotLoading={priceDataLoading}
+                  swapLoading={swapPriceDataLoading}
+                  title="Price History"
+                  subtitle="Spot price (blue) and STRATO price (orange)"
+                />
             </div>
           </div>
         </main>
