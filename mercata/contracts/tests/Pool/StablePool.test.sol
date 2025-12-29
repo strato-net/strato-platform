@@ -250,10 +250,10 @@ contract Describe_StablePool is Authorizable {
             uint256 output = pool.exchange(0, 1, swapAmount, 1, address(0));
             uint tokenAPost = ERC20(tokenAAddress).balanceOf(address(pool));
             uint tokenBPost = ERC20(tokenBAddress).balanceOf(address(pool));
-            peg += 1e16;
+            peg = (1025e15 * peg) / 1e18;
             pool.updatePeg(peg);
             // log(string(tokenAPost/1e14) + "," + string(tokenBPost/1e14) + "," + string(uint(pool.aToBRatio()*10000.0)));
-            // log("Point " + string(i) + "::" + string(tokenAPre/1e14) + "::" + string(tokenBPre/1e14) + "::" + string(uint(pool.aToBRatio()*10000.0)) + "::" + string(uint(pool.aToBRatio()*10000.0)) + "::10::A::1::0::0::0::0;");
+            // log("Point " + string(i) + "::" + string(tokenAPre/1e14) + "::" + string(tokenBPre/1e14) + "::" + string(uint(pool.bToARatio()*10000.0)) + "::" + string(uint(pool.bToARatio()*10000.0)) + "::10::A::1::0::0::0::0;");
             // log("Point " + string(i) + "::" + string(tokenAPre/1e14) + "::" + string(tokenBPre/1e14) + "::" + string(output/1e14) + "::" + string(output/1e14) + "::10::A::1::0::0::0::0;");
             // log("After round " + string(i) + ": ");
             // log("Token A pre: " + string(tokenAPre));
@@ -285,7 +285,7 @@ contract Describe_StablePool is Authorizable {
             uint256 output = pool.exchange(1, 0, swapAmount, 1, address(0));
             uint tokenAPost = ERC20(tokenAAddress).balanceOf(address(pool));
             uint tokenBPost = ERC20(tokenBAddress).balanceOf(address(pool));
-            peg -= 1e16;
+            peg = (975e15 * peg) / 1e18;
             pool.updatePeg(peg);
             // log(string(tokenAPost/1e14) + "," + string(tokenBPost/1e14) + "," + string(uint(pool.aToBRatio()*10000.0)));
             // log("Point " + string(i+Q) + "::" + string(tokenAPre/1e14) + "::" + string(tokenBPre/1e14) + "::" + string(uint(pool.bToARatio()*10000.0)) + "::" + string(uint(pool.bToARatio()*10000.0)) + "::10::A::1::0::0::0::0;");

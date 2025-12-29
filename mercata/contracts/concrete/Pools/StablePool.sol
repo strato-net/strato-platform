@@ -434,7 +434,7 @@ contract record StablePool is Ownable {
         lpToken.mint(receiver, mintAmount);
 
         uint[] xpFinal = _xpMem(rates, newBalances);
-        _updateRatios(xpFinal, amp, d1);
+        _updateRatios(rates, xpFinal, amp, d1);
 
         emit Transfer(address(0), receiver, mintAmount);
         emit AddLiquidity(msg.sender, _amounts, fees, d1, totalSupply);
@@ -502,7 +502,7 @@ contract record StablePool is Ownable {
         emit RemoveLiquidityOne(msg.sender, i, _burnAmount, dy, lpToken.totalSupply());
 
         upkeepOracles(xp, amp, d);
-        _updateRatios(xp, amp, d);
+        _updateRatios(_storedRates(), xp, amp, d);
 
         return dy;
     }
@@ -562,7 +562,7 @@ contract record StablePool is Ownable {
         lpToken.burn(msg.sender, burnAmount);
 
         uint[] xp = _xpMem(rates, _balances());
-        _updateRatios(xp, amp, d1);
+        _updateRatios(rates, xp, amp, d1);
 
         emit RemoveLiquidityImbalance(
             msg.sender,
@@ -647,8 +647,9 @@ contract record StablePool is Ownable {
             _withdrawAdminFees();
         }
 
-        uint[] xp = _xpMem(_storedRates(), _balances());
-        _updateRatios(xp, _A(), newD);
+        uint[] rates = _storedRates();
+        uint[] xp = _xpMem(rates, _balances());
+        _updateRatios(rates, xp, _A(), newD);
 
         return amounts;
     }
@@ -708,7 +709,7 @@ contract record StablePool is Ownable {
         _transferOut(j, dy, _receiver);
 
         xp = _xpMem(rates, _balances());
-        _updateRatios(xp, amp, d);
+        _updateRatios(rates, xp, amp, d);
 
         emit Swap(msg.sender, address(coins[i]), address(coins[j]), dx, dy);
 
@@ -1040,10 +1041,10 @@ contract record StablePool is Ownable {
         return lastEmaValue;
     }
 
-    function _updateRatios(uint[] xp, uint amp, uint d) internal {
+    function _updateRatios(uint[] rates, uint[] xp, uint amp, uint d) internal {
         uint[] ps = _getP(xp, amp, d);
-        decimal priceA = decimal(ps[0]).truncate(18);
-        decimal priceB = decimal(ps[1]).truncate(18);
+        decimal priceA = decimal(ps[0] * rates[0]).truncate(18);
+        decimal priceB = decimal(ps[1] * rates[1]).truncate(18);
         aToBRatio = priceB == 0.0 ? 0.0 : priceA / priceB;
         bToARatio = priceA == 0.0 ? 0.0 : priceB / priceA;
     }
