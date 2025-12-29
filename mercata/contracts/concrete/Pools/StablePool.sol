@@ -272,6 +272,24 @@ contract record StablePool is Ownable {
         return rates;
     }
 
+    function updateRateMultipliers(uint[] _rates) external onlyOwner {
+        for (uint i = 0; i < coins.length; i++) {
+            if (_rates[i] != 0) {
+                address tokenAddr = address(coins[i]);
+                rateMultipliers[tokenAddr] = _rates[i];
+            }
+        }
+    }
+
+    function updateRateOracles(address[] _oracles) external onlyOwner {
+        for (uint i = 0; i < coins.length; i++) {
+            if (_oracles[i] != address(0xffffffffffffffffffffffffffffffffffffffff)) { // Allow oracles to be set to 0
+                address tokenAddr = address(coins[i]);
+                rateOracles[tokenAddr] = _oracles[i];
+            }
+        }
+    }
+
     function _balances() internal view returns (uint[]) {
         uint[] result;
         for (uint i = 0; i < coins.length; i++) {
