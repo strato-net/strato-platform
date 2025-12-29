@@ -218,8 +218,8 @@ contract Describe_StablePool is Authorizable {
             uint tokenAPost = ERC20(tokenAAddress).balanceOf(address(pool));
             uint tokenBPost = ERC20(tokenBAddress).balanceOf(address(pool));
             // log(string(tokenAPost/1e14) + "," + string(tokenBPost/1e14) + "," + string(uint(pool.aToBRatio()*10000.0)));
-            // log("Point " + string(i+80) + "::" + string(tokenAPre/1e14) + "::" + string(tokenBPre/1e14) + "::" + string(uint(pool.bToARatio()*10000.0)) + "::" + string(uint(pool.bToARatio()*10000.0)) + "::10::A::1::0::0::0::0;");
-            // log("Point " + string(i+80) + "::" + string(tokenAPre/1e14) + "::" + string(tokenBPre/1e14) + "::" + string(output/1e14) + "::" + string(output/1e14) + "::10::A::1::0::0::0::0;");
+            // log("Point " + string(i+N) + "::" + string(tokenAPre/1e14) + "::" + string(tokenBPre/1e14) + "::" + string(uint(pool.bToARatio()*10000.0)) + "::" + string(uint(pool.bToARatio()*10000.0)) + "::10::A::1::0::0::0::0;");
+            // log("Point " + string(i+N) + "::" + string(tokenAPre/1e14) + "::" + string(tokenBPre/1e14) + "::" + string(output/1e14) + "::" + string(output/1e14) + "::10::A::1::0::0::0::0;");
             // log("After round " + string(i) + ": ");
             // log("Token A pre: " + string(tokenAPre));
             // log("Token B pre: " + string(tokenBPre));
@@ -234,7 +234,7 @@ contract Describe_StablePool is Authorizable {
     function it_pool_can_swap_a_to_b_multiple_times_with_changing_peg() {
         uint256 amountA = 2000e18;
         uint256 amountB = 2000e18;
-        uint pegB = 1e18;
+        uint peg = 1e18;
 
         // Add liquidity first
         require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
@@ -250,8 +250,8 @@ contract Describe_StablePool is Authorizable {
             uint256 output = pool.exchange(0, 1, swapAmount, 1, address(0));
             uint tokenAPost = ERC20(tokenAAddress).balanceOf(address(pool));
             uint tokenBPost = ERC20(tokenBAddress).balanceOf(address(pool));
-            pegB -= 1e16;
-            pool.updateRateMultipliers([1e18, pegB]);
+            peg += 1e16;
+            pool.updatePeg(peg);
             // log(string(tokenAPost/1e14) + "," + string(tokenBPost/1e14) + "," + string(uint(pool.aToBRatio()*10000.0)));
             // log("Point " + string(i) + "::" + string(tokenAPre/1e14) + "::" + string(tokenBPre/1e14) + "::" + string(uint(pool.aToBRatio()*10000.0)) + "::" + string(uint(pool.aToBRatio()*10000.0)) + "::10::A::1::0::0::0::0;");
             // log("Point " + string(i) + "::" + string(tokenAPre/1e14) + "::" + string(tokenBPre/1e14) + "::" + string(output/1e14) + "::" + string(output/1e14) + "::10::A::1::0::0::0::0;");
@@ -269,7 +269,7 @@ contract Describe_StablePool is Authorizable {
     function it_pool_can_swap_b_to_a_multiple_times_with_changing_peg() {
         uint256 amountA = 2000e18;
         uint256 amountB = 2000e18;
-        uint pegB = 1e18;
+        uint peg = 1e18;
 
         // Add liquidity first
         require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
@@ -285,11 +285,11 @@ contract Describe_StablePool is Authorizable {
             uint256 output = pool.exchange(1, 0, swapAmount, 1, address(0));
             uint tokenAPost = ERC20(tokenAAddress).balanceOf(address(pool));
             uint tokenBPost = ERC20(tokenBAddress).balanceOf(address(pool));
-            pegB += 1e16;
-            pool.updateRateMultipliers([1e18, pegB]);
+            peg -= 1e16;
+            pool.updatePeg(peg);
             // log(string(tokenAPost/1e14) + "," + string(tokenBPost/1e14) + "," + string(uint(pool.aToBRatio()*10000.0)));
-            // log("Point " + string(i+80) + "::" + string(tokenAPre/1e14) + "::" + string(tokenBPre/1e14) + "::" + string(uint(pool.bToARatio()*10000.0)) + "::" + string(uint(pool.bToARatio()*10000.0)) + "::10::A::1::0::0::0::0;");
-            // log("Point " + string(i+80) + "::" + string(tokenAPre/1e14) + "::" + string(tokenBPre/1e14) + "::" + string(output/1e14) + "::" + string(output/1e14) + "::10::A::1::0::0::0::0;");
+            // log("Point " + string(i+Q) + "::" + string(tokenAPre/1e14) + "::" + string(tokenBPre/1e14) + "::" + string(uint(pool.bToARatio()*10000.0)) + "::" + string(uint(pool.bToARatio()*10000.0)) + "::10::A::1::0::0::0::0;");
+            // log("Point " + string(i+Q) + "::" + string(tokenAPre/1e14) + "::" + string(tokenBPre/1e14) + "::" + string(output/1e14) + "::" + string(output/1e14) + "::10::A::1::0::0::0::0;");
             // log("After round " + string(i) + ": ");
             // log("Token A pre: " + string(tokenAPre));
             // log("Token B pre: " + string(tokenBPre));

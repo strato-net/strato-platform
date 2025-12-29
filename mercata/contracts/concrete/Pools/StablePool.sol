@@ -273,6 +273,18 @@ contract record StablePool is Ownable {
     }
 
     function updateRateMultipliers(uint[] _rates) external onlyOwner {
+        _updateRateMultipliers(_rates);
+    }
+
+    function updatePeg(uint _aToBRatio) external onlyOwner {
+        uint[] rates = [0, 1e36 / _aToBRatio];
+        for (uint i = 2; i < coins.length; i++) {
+            rates.push(0);
+        }
+        _updateRateMultipliers(rates);
+    }
+
+    function _updateRateMultipliers(uint[] _rates) internal {
         for (uint i = 0; i < coins.length; i++) {
             if (_rates[i] != 0) {
                 address tokenAddr = address(coins[i]);
@@ -281,7 +293,19 @@ contract record StablePool is Ownable {
         }
     }
 
-    function updateRateOracles(address[] _oracles) external onlyOwner {
+    function updateRateOraclesGeneral(address[] _oracles) external onlyOwner {
+        _updateRateOraclesGeneral(_oracles);
+    }
+
+    function updateRateOracles(address _oracleA, address _oracleB) external onlyOwner {
+        address[] oracles = [_oracleA, _oracleB];
+        for (uint i = 2; i < coins.length; i++) {
+            oracles.push(address(0xffffffffffffffffffffffffffffffffffffffff));
+        }
+        _updateRateOraclesGeneral(oracles);
+    }
+
+    function _updateRateOraclesGeneral(address[] _oracles) internal {
         for (uint i = 0; i < coins.length; i++) {
             if (_oracles[i] != address(0xffffffffffffffffffffffffffffffffffffffff)) { // Allow oracles to be set to 0
                 address tokenAddr = address(coins[i]);
