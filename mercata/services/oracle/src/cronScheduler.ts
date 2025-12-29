@@ -87,7 +87,16 @@ async function processAllFeeds(configLoader: ConfigLoader): Promise<void> {
                 });
             }
         });
+
+        const allExpectedAssets = new Set(
+            resolvedFeeds.flatMap(feed => feed.assets.map(asset => asset.name))
+        );
         
+        const missingAssets = Array.from(allExpectedAssets).filter(name => !allAssetPrices[name]);
+        if (missingAssets.length > 0) {
+            logError('CronScheduler', new Error(`No price data found for assets: [${missingAssets.join(', ')}]`));
+        }
+
         if (Object.keys(allAssetPrices).length === 0) {
             throw new Error('No valid prices received from any feed');
         }
