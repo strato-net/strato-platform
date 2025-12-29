@@ -51,6 +51,7 @@ export interface RemoveLiquidityParams {
 export interface CreatePoolParams {
   tokenA: string;
   tokenB: string;
+  isStable?: boolean;
 }
 
 /**

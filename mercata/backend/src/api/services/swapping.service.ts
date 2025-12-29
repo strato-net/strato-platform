@@ -263,11 +263,12 @@ export const createPool = async (
   body: CreatePoolParams,
   userAddress: string
 ): Promise<TransactionResponse> => {
+  const { isStable, ...restBody } = body;
   const tx = await buildFunctionTx({
     contractName: extractContractName(PoolFactory),
     contractAddress: constants.poolFactory,
-    method: "createPool",
-    args: body,
+    method: isStable ? "createStablePool" : "createPool",
+    args: restBody,
   }, userAddress, accessToken);
 
   return executeTransaction(accessToken, tx);
