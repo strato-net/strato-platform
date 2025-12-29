@@ -7,7 +7,6 @@ import type {
   Pool,
   SwapToken,
 } from '@mercata/shared-types';
-import { SafetyModuleData } from '.';
 
 export * from '@mercata/shared-types';
 // UI-SPECIFIC SWAP INTERFACES
@@ -58,7 +57,7 @@ export interface SwapContextActions {
   fetchPairableTokens: (tokenAddress: string) => Promise<SwapToken[]>;
   
   // Pool operations
-  createPool: (data: { tokenA: string; tokenB: string }) => Promise<void>;
+  createPool: (data: { tokenA: string; tokenB: string, isStable: boolean }) => Promise<void>;
   getPoolByTokenPair: (tokenA: string, tokenB: string, signal?: AbortSignal) => Promise<Pool>;
   getPoolByAddress: (address: string) => Promise<Pool>;
   fetchPools: () => Promise<Pool[]>;
@@ -78,11 +77,13 @@ export interface SwapContextActions {
     poolAddress: string;
     tokenBAmount: string;
     maxTokenAAmount: string;
+    stakeLPToken?: boolean;
   }) => Promise<void>;
   addLiquiditySingleToken: (data: {
     poolAddress: string;
     singleTokenAmount: string;
     isAToB: boolean;
+    stakeLPToken?: boolean;
   }) => Promise<void>;
   removeLiquidity: (data: {
     poolAddress: string;

@@ -2,14 +2,15 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTheme } from 'next-themes';
 import { useUser } from '@/context/UserContext';
+import { useNetwork } from '@/context/NetworkContext';
 import { ModeToggle } from './mode-toggle';
 import STRATOLOGO from '@/assets/strato.png';
 import STRATOLOGODARK from '@/assets/strato-dark.png';
 
-
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { isLoggedIn, logout, loading } = useUser();
+  const { isTestnet } = useNetwork();
   const { resolvedTheme } = useTheme();
   const logo = resolvedTheme === 'dark' ? STRATOLOGODARK : STRATOLOGO;
 
@@ -20,7 +21,8 @@ const Navbar = () => {
     if (isLoggedIn) {
       logout();
     } else {
-      window.location.href = '/login';
+      const theme = resolvedTheme || 'light';
+      window.location.href = `/login?theme=${theme}`;
     }
   };
 
@@ -33,7 +35,7 @@ const Navbar = () => {
     <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md shadow-sm">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          <div className="flex items-center">
+          <div className="flex items-center gap-3">
             <Link to="/" className="flex-shrink-0">
               <img 
                 src={logo} 
@@ -41,6 +43,11 @@ const Navbar = () => {
                 className="h-10" 
               />
             </Link>
+            {isTestnet && (
+              <span className="bg-orange-500 text-white px-3 py-1.5 rounded-md text-sm font-bold uppercase tracking-wide shadow-md">
+                TESTNET
+              </span>
+            )}
           </div>
           <div className="hidden md:flex items-center space-x-4">
             <ModeToggle />

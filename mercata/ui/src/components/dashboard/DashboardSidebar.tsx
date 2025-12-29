@@ -6,6 +6,7 @@ import { useUser } from '@/context/UserContext';
 import STRATOLOGO from '@/assets/strato.png';
 import STRATOLOGODARK from '@/assets/strato-dark.png';
 import MERCATAICON from '@/assets/icon.png';
+import MERCATAICONDARK from '@/assets/dark-theme-strato-compressed-logo.png';
 import {
   Tooltip,
   TooltipContent,
@@ -19,6 +20,7 @@ const DashboardSidebar = () => {
   const location = useLocation();
   const { resolvedTheme } = useTheme();
   const logo = resolvedTheme === 'dark' ? STRATOLOGODARK : STRATOLOGO;
+  const icon = resolvedTheme === 'dark' ? MERCATAICONDARK : MERCATAICON;
 
   useEffect(() => {
     // Update CSS variable when collapsed state changes - only on desktop
@@ -104,7 +106,7 @@ const DashboardSidebar = () => {
               <ArrowRight size={16} />
             </button>
             <img
-              src={MERCATAICON}
+              src={icon}
               alt="STRATO"
               className="h-8"
             />

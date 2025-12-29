@@ -117,6 +117,14 @@ const SwapPoolsSection = () => {
     pool.poolName?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const formatYourLiquidityValue = (pool: Pool): string => {
+    const totalBalance = BigInt(pool.lpToken.totalBalance || "0");
+    const price = BigInt(pool.lpToken.price || "0");
+    if (price === 0n || totalBalance === 0n) return "$0.00";
+    const valueInWei = (totalBalance * price) / BigInt(10**18);
+    return formatBalance(valueInWei, undefined, 18, 2, 2, true);
+  };
+
   useEffect(() => {
     return () => {
       if (poolPollIntervalRef.current) {
@@ -187,10 +195,10 @@ const SwapPoolsSection = () => {
                     <div>
                       <h3 className="font-medium">{pool.poolName}</h3>
                       <div className="flex items-center text-xs text-muted-foreground mt-1">
-                        <span>Liquidity: {formatBalance(pool.lpToken._totalSupply, undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
+                        <span>TVL: {formatBalance(pool.totalLiquidityUSD, undefined, 18, 0, 0, true)}</span>
                       </div>
                       <div className="flex items-center text-xs text-muted-foreground mt-1">
-                        <span>Your Liquidity (Total): {formatBalance(pool.lpToken.totalBalance || "0", undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
+                        <span>Your Liquidity: {formatYourLiquidityValue(pool)}</span>
                       </div>
                       {rewardsEnabled && pool.lpToken.stakedBalance !== undefined && (
                         <>
@@ -223,7 +231,7 @@ const SwapPoolsSection = () => {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="border-strato-blue text-strato-blue hover:bg-strato-blue/10"
+                        className="border-strato-blue text-strato-blue hover:bg-strato-blue/10 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-400/10 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-auto disabled:border-muted disabled:text-muted-foreground disabled:hover:bg-transparent disabled:dark:border-muted disabled:dark:text-muted-foreground"
                         onClick={() => handleOpenWithdrawModal(pool)}
                         disabled={BigInt(pool.lpToken.totalBalance || "0") === BigInt(0)}
                         title={BigInt(pool.lpToken.totalBalance || "0") === BigInt(0) ? "No LP tokens to withdraw" : "Withdraw"}

@@ -203,7 +203,8 @@ export const getSwapHistory = async (
   accessToken: string,
   poolAddress: string,
   page: number = 1,
-  limit: number = 10
+  limit: number = 10,
+  senderAddress?: string
 ): Promise<SwapHistoryResponse> => {
   const offset = (page - 1) * limit;
 
@@ -211,6 +212,7 @@ export const getSwapHistory = async (
     cirrus.get(accessToken, `/${PoolSwap}`, {
       params: {
         address: `eq.${poolAddress}`,
+        ...(senderAddress ? { sender: `eq.${senderAddress}` } : {}),
         select: swapHistorySelectFields.join(','),
         order: 'block_timestamp.desc',
         limit: limit.toString(),
@@ -220,6 +222,7 @@ export const getSwapHistory = async (
     cirrus.get(accessToken, `/${PoolSwap}`, {
       params: {
         address: `eq.${poolAddress}`,
+        ...(senderAddress ? { sender: `eq.${senderAddress}` } : {}),
         select: "count()",
       }
     })
@@ -233,7 +236,7 @@ export const getSwapHistory = async (
   }
 
   const swapHistory: SwapHistoryEntry[] = (swapEvents as RawSwapEvent[]).map(event => {
-    const { tokenA, tokenB } = event.pool;
+    const { tokenA, tokenB, isStable } = event.pool;
     const isAToB = event.tokenIn === tokenA.address;
 
     return {
@@ -243,7 +246,7 @@ export const getSwapHistory = async (
       tokenOut: isAToB ? tokenB.symbol : tokenA.symbol,
       amountIn: event.amountIn,
       amountOut: event.amountOut,
-      impliedPrice: calculateImpliedPrice(event.amountIn, event.amountOut, isAToB),
+      impliedPrice: calculateImpliedPrice(event.amountIn, event.amountOut, isAToB, isStable),
       sender: event.sender
     };
   });
@@ -260,11 +263,12 @@ export const createPool = async (
   body: CreatePoolParams,
   userAddress: string
 ): Promise<TransactionResponse> => {
+  const { isStable, ...restBody } = body;
   const tx = await buildFunctionTx({
     contractName: extractContractName(PoolFactory),
     contractAddress: constants.poolFactory,
-    method: "createPool",
-    args: body,
+    method: isStable ? "createStablePool" : "createPool",
+    args: restBody,
   }, userAddress, accessToken);
 
   return executeTransaction(accessToken, tx);

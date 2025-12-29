@@ -102,10 +102,10 @@ const UsdstBalanceBox: React.FC = () => {
   }
 
   const getCardClasses = () => {
-    if (loadingUsdstBalance) return "border-border bg-card/95";
-    if (isCriticalBalance) return "border-red-300 dark:border-red-700 bg-red-100/95 dark:bg-red-900/30";
-    if (isLowBalance) return "border-orange-300 dark:border-orange-700 bg-orange-100/95 dark:bg-orange-900/30";
-    return "border-border bg-card/95";
+    if (loadingUsdstBalance) return "border-blue-200 dark:border-blue-800 bg-card/95";
+    if (isCriticalBalance) return "border-red-300 dark:border-red-700 bg-red-200/95 dark:bg-red-900/95";
+    if (isLowBalance) return "border-orange-300 dark:border-orange-700 bg-orange-200/95 dark:bg-orange-900/95";
+    return "border-blue-200 dark:border-blue-800 bg-card/95";
   };
 
   // Render the appropriate icon based on state and token image availability
@@ -129,7 +129,7 @@ const UsdstBalanceBox: React.FC = () => {
 
     // Don't show warning icons when loading
     if (loadingUsdstBalance) {
-      return <Coins className={`${sizeClasses[size]} text-blue-600`} />;
+      return <Coins className={`${sizeClasses[size]} text-blue-600 dark:text-blue-400`} />;
     }
 
     // Fallback to warning/normal icons
@@ -137,13 +137,13 @@ const UsdstBalanceBox: React.FC = () => {
       return (
         <AlertTriangle
           className={`${sizeClasses[size]} ${
-            isCriticalBalance ? "text-red-600" : "text-orange-600"
+            isCriticalBalance ? "text-red-600 dark:text-red-400" : "text-orange-600 dark:text-orange-400"
           }`}
         />
       );
     }
 
-    return <Coins className={`${sizeClasses[size]} text-blue-600`} />;
+    return <Coins className={`${sizeClasses[size]} text-blue-600 dark:text-blue-400`} />;
   };
 
   if (isMinimized) {
@@ -174,12 +174,12 @@ const UsdstBalanceBox: React.FC = () => {
           <div
             className={`p-1.5 rounded-full ${
               loadingUsdstBalance
-                ? "bg-blue-100 dark:bg-blue-900/30"
+                ? "bg-blue-100 dark:bg-blue-900/50"
                 : isCriticalBalance
-                ? "bg-red-100 dark:bg-red-900/30"
+                ? "bg-red-100 dark:bg-red-900/50"
                 : isLowBalance
-                ? "bg-orange-100 dark:bg-orange-900/30"
-                : "bg-blue-100 dark:bg-blue-900/30"
+                ? "bg-orange-100 dark:bg-orange-900/50"
+                : "bg-blue-100 dark:bg-blue-900/50"
             }`}
           >
             {renderIcon("lg")}
@@ -219,7 +219,7 @@ const UsdstBalanceBox: React.FC = () => {
           <div className="mt-2 pt-2 border-t border-border">
             <div
               className={`flex items-start space-x-1 ${
-                isCriticalBalance ? "text-red-600" : "text-orange-600"
+                isCriticalBalance ? "text-red-600 dark:text-red-400" : "text-orange-600 dark:text-orange-400"
               }`}
             >
               <AlertTriangle className="h-3 w-3 mt-0.5 flex-shrink-0" />
