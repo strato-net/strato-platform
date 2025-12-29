@@ -276,8 +276,8 @@ contract record StablePool is Ownable {
         _updateRateMultipliers(_rates);
     }
 
-    function updatePeg(uint _aToBRatio) external onlyOwner {
-        uint[] rates = [0, 1e36 / _aToBRatio];
+    function updatePeg(uint _peg) external onlyOwner {
+        uint[] rates = [0, _peg];
         for (uint i = 2; i < coins.length; i++) {
             rates.push(0);
         }
