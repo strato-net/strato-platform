@@ -41,6 +41,11 @@
     "XAG-WEEKEND": {
       "name": "KAG-USD-WEEKEND",
       "targetAssetAddress": "2c59ef92d08efde71fe1a1cb5b45f4f6d48fcc94"
+    },
+    "sUSDS": {
+      "name": "sUSDS-USD",
+      "tokenAddress": "0xa3931d71877c0e7a3148cb7eb4463524fec27fbd",
+      "targetAssetAddress": "6e2d93d323edf1b3cc4672a909681b6a430cae64"
     }
   }
 } 

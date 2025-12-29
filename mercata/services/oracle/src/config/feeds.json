@@ -3,7 +3,7 @@
     {
       "name": "crypto-batch",
       "sources": ["Alchemy", "CoinMarketCap", "CoinGecko"],
-      "assets": ["ETH", "WBTC", "PAXG", "XAUt"]
+      "assets": ["ETH", "WBTC", "PAXG", "XAUt", "sUSDS"]
     },
     {
       "name": "metals-batch",
