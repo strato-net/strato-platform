@@ -30,4 +30,4 @@
 * [Rewards](design/rewards.md)
 
 ## Miscellaneous
-* [LLMs / AI Agents](llm-instructions.md)
+* [LLMs / AI Agents](miscellaneous/llm-instructions.md)
