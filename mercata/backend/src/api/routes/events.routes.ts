@@ -75,4 +75,42 @@ router.get("/", authHandler.authorizeRequest(), EventsController.getEvents);
  */
 router.get("/contracts", authHandler.authorizeRequest(), EventsController.getContractInfo);
 
+/**
+ * @openapi
+ * /events/activities:
+ *   get:
+ *     summary: Get user-friendly activity feed
+ *     tags: [Events]
+ *     parameters:
+ *       - name: user
+ *         in: query
+ *         description: Filter by user address (for My Activity)
+ *         schema:
+ *           type: string
+ *       - name: type
+ *         in: query
+ *         description: Filter by activity type (deposit, withdraw, borrow, swap, bridge, cdp)
+ *         schema:
+ *           type: string
+ *       - name: period
+ *         in: query
+ *         description: Filter by time period (today, week, month, all)
+ *         schema:
+ *           type: string
+ *       - name: limit
+ *         in: query
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *       - name: offset
+ *         in: query
+ *         schema:
+ *           type: integer
+ *           default: 0
+ *     responses:
+ *       200:
+ *         description: Activity list with total count
+ */
+router.get("/activities", authHandler.authorizeRequest(), EventsController.getActivities);
+
 export default router;
