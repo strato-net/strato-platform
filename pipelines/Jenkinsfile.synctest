@@ -36,16 +36,31 @@ pipeline {
             sh "sudo ./strato --wipe"
             sh "sudo ./strato-run.sh"
             script {
-              def timeStartTestnet = System.currentTimeMillis()
+              def timeStart = System.currentTimeMillis()
               lib.waitLocalNodeIsSynced()
-              def syncTimeTestnetMinutes = (System.currentTimeMillis() - timeStartTestnet) / 1000 / 60
+              def syncTimeSec = (System.currentTimeMillis() - timeStart) / 1000 
+              def syncTimeMin = syncTimeSec / 60
+              def blocksTotal = sh(
+                  script: "sudo docker exec strato-nginx-1 curl -s apex:3009/status | jq -r .lastBlock.number",
+                  returnStdout: true
+              ).trim().toBigInteger()
+              def syncTimePerBlockSec = blocksTotal == 0 ? 0 : (syncTimeSec / blocksTotal)
               
               // Push sync time to AWS CloudWatch
               sh """
                 aws cloudwatch put-metric-data \
                   --namespace 'Testnet/Synctest/TimeMins' \
                   --metric-name 'TestnetSyncTime' \
-                  --value ${syncTimeTestnetMinutes} \
+                  --value ${syncTimeMin} \
+                  --unit 'Seconds' \
+                  --region 'us-east-1'
+              """
+              // Push sync time per block to AWS CloudWatch
+              sh """
+                aws cloudwatch put-metric-data \
+                  --namespace 'Testnet/Synctest/TimePerBlockSec' \
+                  --metric-name 'TestnetSyncTimePerBlock' \
+                  --value ${syncTimePerBlockSec} \
                   --unit 'Seconds' \
                   --region 'us-east-1'
               """
@@ -75,16 +90,31 @@ pipeline {
             sh "sudo ./strato --wipe"
             sh "sudo ./strato-run.sh"
             script {
-              def timeStartMainnet = System.currentTimeMillis()
+              def timeStart = System.currentTimeMillis()
               lib.waitLocalNodeIsSynced()
-              def syncTimeMainnetMinutes = (System.currentTimeMillis() - timeStartMainnet) / 1000 / 60
+              def syncTimeSec = (System.currentTimeMillis() - timeStart) / 1000
+              def syncTimeMin = syncTimeSec / 60
+              def blocksTotal = sh(
+                  script: "sudo docker exec strato-nginx-1 curl -s apex:3009/status | jq -r .lastBlock.number",
+                  returnStdout: true
+              ).trim().toBigInteger()
+              def syncTimePerBlockSec = blocksTotal == 0 ? 0 : (syncTimeSec / blocksTotal)
               
               // Push sync time to AWS CloudWatch
               sh """
                 aws cloudwatch put-metric-data \
                   --namespace 'Mainnet/Synctest/TimeMins' \
                   --metric-name 'MainnetSyncTime' \
-                  --value ${syncTimeMainnetMinutes} \
+                  --value ${syncTimeMin} \
+                  --unit 'Seconds' \
+                  --region 'us-east-1'
+              """
+              // Push sync time per block to AWS CloudWatch
+              sh """
+                aws cloudwatch put-metric-data \
+                  --namespace 'Mainnet/Synctest/TimePerBlockSec' \
+                  --metric-name 'MainnetSyncTimePerBlock' \
+                  --value ${syncTimePerBlockSec} \
                   --unit 'Seconds' \
                   --region 'us-east-1'
               """
