@@ -12,7 +12,7 @@
     }
   },
   "0000000000000000000000000000000000001008": {
-    "DepositInitiated": {
+    "DepositCompleted": {
       "amount": "stratoTokenAmount",
       "user": "stratoRecipient"
     }
