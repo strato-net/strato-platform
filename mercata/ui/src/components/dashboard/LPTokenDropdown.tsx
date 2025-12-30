@@ -14,37 +14,37 @@ export default function LPTokenDropdown({ lpToken, className = "", isExpanded }:
   return (
     <div className={`${className}`}>
       {isExpanded && (
-        <div className="p-3 bg-card border border-border rounded-md mb-2">
-          <div className="space-y-3">
-            <div className="text-sm font-medium text-foreground mb-2">
-              Your Position Breakdown ({userShare < 0.01 ? '<0.01' : userShare.toFixed(2)}% share):
+        <div className="p-2 md:p-3 bg-card border border-border rounded-md mb-1.5 md:mb-2">
+          <div className="space-y-2 md:space-y-3">
+            <div className="text-[10px] md:text-sm font-medium text-foreground mb-1.5 md:mb-2">
+              Your Position ({userShare < 0.01 ? '<0.01' : userShare.toFixed(2)}% share):
             </div>
             
             {/* Token A */}
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2">
+            <div className="flex justify-between items-center gap-2">
+              <div className="flex items-center gap-1.5 md:gap-2 min-w-0">
                 {lpToken.tokenA?.images?.[0]?.value ? (
                   <img
                     src={lpToken.tokenA.images[0].value}
                     alt={lpToken.tokenA._symbol}
-                    className="w-6 h-6 rounded-full"
+                    className="w-4 h-4 md:w-6 md:h-6 rounded-full shrink-0"
                   />
                 ) : (
-                  <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center">
-                    <span className="text-xs font-medium text-blue-500">
+                  <div className="w-4 h-4 md:w-6 md:h-6 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0">
+                    <span className="text-[8px] md:text-xs font-medium text-blue-500">
                       {lpToken.tokenA._symbol?.slice(0, 2)}
                     </span>
                   </div>
                 )}
-                <span className="text-sm font-medium text-foreground">
-                  {lpToken.tokenA._name} ({lpToken.tokenA._symbol})
+                <span className="text-[10px] md:text-sm font-medium text-foreground truncate">
+                  {lpToken.tokenA._symbol}
                 </span>
               </div>
-              <div className="text-right">
-                <div className="text-sm font-medium text-foreground">
-                  {formatBalance(tokenQuantities.tokenA, lpToken.tokenA._symbol, 18, 6, 12)}
+              <div className="text-right shrink-0">
+                <div className="text-[10px] md:text-sm font-medium text-foreground">
+                  {formatBalance(tokenQuantities.tokenA, lpToken.tokenA._symbol, 18, 4, 8)}
                 </div>
-                <div className="text-xs text-muted-foreground">
+                <div className="text-[8px] md:text-xs text-muted-foreground">
                   {formatBalance(
                     (BigInt(tokenQuantities.tokenA) * BigInt(lpToken.tokenA.price || "0")) / BigInt(10 ** 18),
                     undefined, 18, 2, 2, true
@@ -54,30 +54,30 @@ export default function LPTokenDropdown({ lpToken, className = "", isExpanded }:
             </div>
             
             {/* Token B */}
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2">
+            <div className="flex justify-between items-center gap-2">
+              <div className="flex items-center gap-1.5 md:gap-2 min-w-0">
                 {lpToken.tokenB?.images?.[0]?.value ? (
                   <img
                     src={lpToken.tokenB.images[0].value}
                     alt={lpToken.tokenB._symbol}
-                    className="w-6 h-6 rounded-full"
+                    className="w-4 h-4 md:w-6 md:h-6 rounded-full shrink-0"
                   />
                 ) : (
-                  <div className="w-6 h-6 rounded-full bg-green-500/20 flex items-center justify-center">
-                    <span className="text-xs font-medium text-green-500">
+                  <div className="w-4 h-4 md:w-6 md:h-6 rounded-full bg-green-500/20 flex items-center justify-center shrink-0">
+                    <span className="text-[8px] md:text-xs font-medium text-green-500">
                       {lpToken.tokenB._symbol?.slice(0, 2)}
                     </span>
                   </div>
                 )}
-                <span className="text-sm font-medium text-foreground">
-                  {lpToken.tokenB._name} ({lpToken.tokenB._symbol})
+                <span className="text-[10px] md:text-sm font-medium text-foreground truncate">
+                  {lpToken.tokenB._symbol}
                 </span>
               </div>
-              <div className="text-right">
-                <div className="text-sm font-medium text-foreground">
-                  {formatBalance(tokenQuantities.tokenB, lpToken.tokenB._symbol, 18, 6, 12)}
+              <div className="text-right shrink-0">
+                <div className="text-[10px] md:text-sm font-medium text-foreground">
+                  {formatBalance(tokenQuantities.tokenB, lpToken.tokenB._symbol, 18, 4, 8)}
                 </div>
-                <div className="text-xs text-muted-foreground">
+                <div className="text-[8px] md:text-xs text-muted-foreground">
                   {formatBalance(
                     (BigInt(tokenQuantities.tokenB) * BigInt(lpToken.tokenB.price || "0")) / BigInt(10 ** 18),
                     undefined, 18, 2, 2, true

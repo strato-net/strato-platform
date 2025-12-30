@@ -101,16 +101,16 @@ export default function MyPoolParticipationSection({
   };
 
   return (
-    <Card className="rounded-2xl shadow-sm w-full mb-6">
-      <CardHeader>
-        <CardTitle className="text-lg font-semibold text-foreground">
+    <Card className="rounded-none md:rounded-2xl border-x-0 md:border-x shadow-sm w-full mb-6">
+      <CardHeader className="px-3 md:px-6 py-3 md:py-4">
+        <CardTitle className="text-base md:text-lg font-semibold text-foreground whitespace-nowrap">
           My Pool Participation
         </CardTitle>
       </CardHeader>
 
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-2 md:space-y-4 px-2 md:px-6">
         {/* Header Row */}
-        <div className="grid grid-cols-4 px-4 text-sm text-muted-foreground font-medium">
+        <div className="grid grid-cols-4 px-2 md:px-4 text-[10px] md:text-sm text-muted-foreground font-medium">
           <div>Token</div>
           <div className="text-center">Balance</div>
           <div className="text-center">APY</div>
@@ -119,15 +119,15 @@ export default function MyPoolParticipationSection({
 
         {shouldShowLoading ? (
           <div className="flex items-center justify-center gap-2">
-            <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary" />
-            <span className="text-sm text-muted-foreground">Loading...</span>
+            <div className="animate-spin rounded-full h-4 w-4 md:h-5 md:w-5 border-t-2 border-b-2 border-primary" />
+            <span className="text-xs md:text-sm text-muted-foreground">Loading...</span>
           </div>
         ) : !hasData ? (
-          <div className="p-2 flex justify-center text-muted-foreground">
+          <div className="p-2 flex justify-center text-xs md:text-sm text-muted-foreground">
             No pool tokens found
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-1.5 md:space-y-2">
             {rows.map(
               ({ token, formattedBalance, apy, value, isLPToken, pool }) => {
                 const isExpanded = !!expandedTokens[token.address];
@@ -136,38 +136,39 @@ export default function MyPoolParticipationSection({
                 return (
                   <div key={token.address} className="space-y-0">
                     <div
-                      className={`grid grid-cols-4 items-center bg-muted/30 px-4 py-3 rounded-md`}
+                      className={`grid grid-cols-4 items-center bg-muted/30 px-2 md:px-4 py-2 md:py-3 rounded-md`}
                     >
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 md:gap-2 min-w-0">
                         <Link
                           to={`/dashboard/deposits/${token.address}`}
-                          className="font-medium text-blue-600 hover:text-blue-800 underline transition-colors"
+                          className="text-xs md:text-sm font-medium text-blue-600 hover:text-blue-800 underline transition-colors truncate"
                           onClick={(e) => e.stopPropagation()}
+                          title={token._name || token._symbol}
                         >
-                          {token._name || token._symbol}
+                          {token._symbol || token._name}
                         </Link>
                         {canExpand &&
                           <div 
-                            className="cursor-pointer hover:opacity-70"
+                            className="cursor-pointer hover:opacity-70 shrink-0"
                             onClick={() => toggleExpanded(token.address)}
                           >
                             {isExpanded ? (
-                              <ChevronUp size={16} />
+                              <ChevronUp className="w-3 h-3 md:w-4 md:h-4" />
                             ) : (
-                              <ChevronDown size={16} />
+                              <ChevronDown className="w-3 h-3 md:w-4 md:h-4" />
                             )}
                           </div>
                         }
                       </div>
 
-                      <div className="text-center font-semibold text-foreground">
+                      <div className="text-center text-xs md:text-sm font-semibold text-foreground">
                         {formattedBalance}
                       </div>
 
-                      <div className="text-center font-semibold text-foreground">
+                      <div className="text-center text-xs md:text-sm font-semibold text-foreground">
                         {anyLoading ? (
                           <div className="flex items-center justify-center">
-                            <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-primary" />
+                            <div className="animate-spin rounded-full h-3 w-3 md:h-4 md:w-4 border-t-2 border-b-2 border-primary" />
                           </div>
                         ) : apy ? (
                           `${apy}%`
@@ -176,7 +177,7 @@ export default function MyPoolParticipationSection({
                         )}
                       </div>
 
-                      <div className="text-right font-medium text-foreground">
+                      <div className="text-right text-xs md:text-sm font-medium text-foreground">
                         {value}
                       </div>
                     </div>
@@ -185,7 +186,7 @@ export default function MyPoolParticipationSection({
                       <LPTokenDropdown
                         lpToken={pool}
                         isExpanded={isExpanded}
-                        className="px-4"
+                        className="px-1 md:px-4"
                       />
                     )}
                   </div>
