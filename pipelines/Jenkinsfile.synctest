@@ -40,10 +40,10 @@ pipeline {
               lib.waitLocalNodeIsSynced()
               def syncTimeSec = (System.currentTimeMillis() - timeStart) / 1000 
               def syncTimeMin = syncTimeSec / 60
-              def blocksTotal = sh(
+              def blocksTotal = Integer.parseInt(sh(
                   script: "sudo docker exec strato-nginx-1 curl -s apex:3009/status | jq -r .lastBlock.number",
                   returnStdout: true
-              ).trim().toBigInteger()
+              ).trim())
               def syncTimePerBlockSec = blocksTotal == 0 ? 0 : (syncTimeSec / blocksTotal)
               
               // Push sync time to AWS CloudWatch
@@ -94,10 +94,10 @@ pipeline {
               lib.waitLocalNodeIsSynced()
               def syncTimeSec = (System.currentTimeMillis() - timeStart) / 1000
               def syncTimeMin = syncTimeSec / 60
-              def blocksTotal = sh(
+              def blocksTotal = Integer.parseInt(sh(
                   script: "sudo docker exec strato-nginx-1 curl -s apex:3009/status | jq -r .lastBlock.number",
                   returnStdout: true
-              ).trim().toBigInteger()
+              ).trim())
               def syncTimePerBlockSec = blocksTotal == 0 ? 0 : (syncTimeSec / blocksTotal)
               
               // Push sync time to AWS CloudWatch
