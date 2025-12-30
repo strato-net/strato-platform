@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Gift, Activity, Menu, Download, BarChart3, Droplets, Shield, X } from 'lucide-react';
+import { LayoutDashboard, Gift, Activity, Menu, ArrowUpDown, Send, Landmark, ArrowLeftRight, Download, BarChart3, Droplets, Shield, X } from 'lucide-react';
 import { Drawer, DrawerClose, DrawerContent } from '@/components/ui/drawer';
 import { useUser } from '@/context/UserContext';
 
@@ -11,6 +11,10 @@ const NAV_ITEMS = [
 ];
 
 const MORE_ITEMS = [
+  { icon: ArrowUpDown, label: 'Deposit', path: '/dashboard/deposits' },
+  { icon: Send, label: 'Transfer', path: '/dashboard/transfer' },
+  { icon: Landmark, label: 'Borrow', path: '/dashboard/borrow' },
+  { icon: ArrowLeftRight, label: 'Swap', path: '/dashboard/swap' },
   { icon: Download, label: 'Withdraw', path: '/dashboard/withdrawals' },
   { icon: BarChart3, label: 'Mercata Stats', path: '/dashboard/stats' },
   { icon: Droplets, label: 'Advanced', path: '/dashboard/advanced' },
@@ -66,9 +70,9 @@ const MobileBottomNav = () => {
         </div>
       </nav>
 
-      {/* More Drawer - Compact (30% height) with smooth animation */}
+      {/* More Drawer - Fits all menu items */}
       <Drawer open={isMoreOpen} onOpenChange={setIsMoreOpen}>
-        <DrawerContent className="max-h-[30vh] pb-3">
+        <DrawerContent className="max-h-[55vh] pb-3">
           {/* Close Button */}
           <div className="flex justify-end px-3 pt-1">
             <DrawerClose asChild>

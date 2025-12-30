@@ -1,13 +1,17 @@
 import { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTheme } from 'next-themes';
-import { LayoutDashboard, Gift, Activity, Download, BarChart3, Droplets, Shield } from 'lucide-react';
+import { LayoutDashboard, ArrowUpDown, Send, Landmark, ArrowLeftRight, Gift, Activity, Download, BarChart3, Droplets, Shield } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import STRATOLOGO from '@/assets/strato.png';
 import STRATOLOGODARK from '@/assets/strato-dark.png';
 
 const NAV_ITEMS = [
   { icon: LayoutDashboard, label: 'Portfolio', path: '/dashboard' },
+  { icon: ArrowUpDown, label: 'Deposit', path: '/dashboard/deposits' },
+  { icon: Send, label: 'Transfer', path: '/dashboard/transfer' },
+  { icon: Landmark, label: 'Borrow', path: '/dashboard/borrow' },
+  { icon: ArrowLeftRight, label: 'Swap', path: '/dashboard/swap' },
   { icon: Gift, label: 'Rewards', path: '/dashboard/rewards' },
   { icon: Activity, label: 'Activity', path: '/dashboard/activity' },
   { icon: Download, label: 'Withdraw', path: '/dashboard/withdrawals' },
@@ -42,8 +46,8 @@ const DashboardSidebar = () => {
         <img src={resolvedTheme === 'dark' ? STRATOLOGODARK : STRATOLOGO} alt="STRATO" className="h-10" />
       </div>
 
-      <nav className="flex-1 py-6 px-4 overflow-y-auto">
-        <ul className="space-y-3">
+      <nav className="flex-1 py-4 px-4 overflow-y-auto">
+        <ul className="space-y-1">
           {NAV_ITEMS.filter(item => !item.adminOnly || isAdmin).map(({ icon: Icon, label, path }) => (
             <li key={path}>
               <Link
