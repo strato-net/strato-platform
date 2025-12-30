@@ -104,6 +104,7 @@ export const getEventQueryParams = async (): Promise<{
     params: {
       address: `eq.${config.rewards.address}`,
       collection_name: `eq.activities`,
+      "value->>emissionRate": "neq.0000000000000000000000000000000000000000", // Might break if rate becomes 0 on cirrus
       select: "value->>sourceContract,value->>actionableEvents",
     },
   });
