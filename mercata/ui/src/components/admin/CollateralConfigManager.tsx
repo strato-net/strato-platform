@@ -254,7 +254,7 @@ const CollateralConfigManager = () => {
     const num = parseFloat(value);
     switch (type) {
       case 'percentage': return `${num.toFixed(2)}%`;
-      case 'usd': return `$${(num / 1e18).toFixed(2)}`;
+      case 'usd': return `$${(num / 1e18).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
       case 'bps': return `${(num / 100).toFixed(2)}%`;
       default: return value;
     }
@@ -659,6 +659,10 @@ const CollateralConfigManager = () => {
                             <p className="font-semibold">{formatValue((asset.minCR || asset.liquidationRatio).toString(), 'percentage')}</p>
                           </div>
                           <div>
+                            <p className="text-sm text-muted-foreground">Stability Fee Rate</p>
+                            <p className="font-semibold">{asset.stabilityFeeRate.toFixed(2)}%</p>
+                          </div>
+                          <div>
                             <p className="text-sm text-muted-foreground">Penalty</p>
                             <p className="font-semibold">{formatValue(asset.liquidationPenaltyBps.toString(), 'bps')}</p>
                           </div>
@@ -669,6 +673,10 @@ const CollateralConfigManager = () => {
                           <div>
                             <p className="text-sm text-muted-foreground">Debt Floor</p>
                             <p className="font-semibold">{formatValue(asset.debtFloor, 'usd')}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Debt Ceiling</p>
+                            <p className="font-semibold">{formatValue(asset.debtCeiling, 'usd')}</p>
                           </div>
                         </div>
                       </CardContent>
