@@ -191,18 +191,6 @@ export const extractAmountFromAttributes = async (
         tokenAddress.toLowerCase() === config.usdst.address.toLowerCase();
 
       if (!isUsdt) {
-        logError(
-          "AttributeMapping",
-          new Error(
-            `Non-USDT token ${tokenAddress} filtered out for ${eventName} event`
-          ),
-          {
-            operation: "extractAmountFromAttributes",
-            contractAddress,
-            eventName,
-            tokenAddress,
-          }
-        );
         return null;
       }
     }
