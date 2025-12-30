@@ -107,7 +107,7 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   // Pool operations
-  const createPool = useCallback(async (data: { tokenA: string; tokenB: string }) => {
+  const createPool = useCallback(async (data: { tokenA: string; tokenB: string, isStable: boolean }) => {
     setLoading(true);
     try {
       await api.post('/swap-pools', data);
