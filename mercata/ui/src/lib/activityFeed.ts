@@ -1,5 +1,5 @@
 import { api } from './axios';
-import type { EventResponse, ContractInfoResponse, ActivitiesResponse } from '@mercata/shared-types';
+import type { EventResponse, ContractInfoResponse } from '@mercata/shared-types';
 
 export interface EventsFilters {
   limit?: number;
@@ -7,14 +7,6 @@ export interface EventsFilters {
   contract_name?: string;
   event_name?: string;
   transaction_sender?: string;
-}
-
-export interface ActivitiesFilters {
-  user?: string;
-  type?: string;
-  period?: string;
-  limit?: number;
-  offset?: number;
 }
 
 export const activityFeedApi = {
@@ -33,22 +25,6 @@ export const activityFeedApi = {
 
     const response = await api.get(`/events?${params.toString()}`);
     return response.data as EventResponse;
-  },
-
-  /**
-   * Fetch user-friendly activities with filters
-   */
-  getActivities: async (filters: ActivitiesFilters = {}): Promise<ActivitiesResponse> => {
-    const params = new URLSearchParams();
-    
-    if (filters.user) params.append('user', filters.user);
-    if (filters.type && filters.type !== 'all') params.append('type', filters.type);
-    if (filters.period && filters.period !== 'all') params.append('period', filters.period);
-    if (filters.limit) params.append('limit', filters.limit.toString());
-    if (filters.offset) params.append('offset', filters.offset.toString());
-
-    const response = await api.get(`/events/activities?${params.toString()}`);
-    return response.data as ActivitiesResponse;
   },
 
   /**

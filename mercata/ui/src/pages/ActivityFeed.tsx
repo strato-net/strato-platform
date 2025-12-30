@@ -64,17 +64,17 @@ const ActivityFeed = () => {
 
           {activeTab === "blockchain-events" && (
             <>
-              <div className="mb-6 sm:mb-8">
-                <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
-                  <Activity className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 dark:text-blue-400" />
-                  <h1 className="text-xl sm:text-2xl font-bold text-foreground">Blockchain Events</h1>
-                </div>
-                <p className="text-sm sm:text-base text-muted-foreground">
-                  View all events emitted from smart contracts on the blockchain
-                </p>
-              </div>
+          <div className="mb-6 sm:mb-8">
+            <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+              <Activity className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 dark:text-blue-400" />
+              <h1 className="text-xl sm:text-2xl font-bold text-foreground">Blockchain Events</h1>
+            </div>
+            <p className="text-sm sm:text-base text-muted-foreground">
+              View all events emitted from smart contracts on the blockchain
+            </p>
+          </div>
 
-              <ActivityFeedList />
+          <ActivityFeedList />
             </>
           )}
         </main>
