@@ -98,6 +98,8 @@ contract record Pool is Ownable {
     /// @notice Whether to charge swap fees on internal zap swaps (default: true)
     bool public zapSwapFeesEnabled = true;
 
+    bool public isStable = false;
+
     // ============ MODIFIERS ============
 
     /// @notice Prevents reentrant calls to functions
@@ -178,6 +180,8 @@ contract record Pool is Ownable {
         lpToken = Token(lpTokenAddr);
 
         poolFactory = PoolFactory(msg.sender);
+
+        isStable = false;
     }
 
     // ============ UTILITY FUNCTIONS ============

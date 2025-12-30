@@ -87,7 +87,7 @@ const SwapRow = ({ swap, copiedHash, onCopy }: { swap: any; copiedHash: string |
       {formatWeiAmount(swap.amountOut)}
     </TableCell>
     <TableCell className="text-sm">
-      ${swap.impliedPrice}
+      {swap.tokenIn === 'USDST' || swap.tokenOut === 'USDST' ? '$' : ''}{swap.impliedPrice}
     </TableCell>
     <SenderCell sender={swap.sender} copiedHash={copiedHash} onCopy={onCopy} />
   </TableRow>

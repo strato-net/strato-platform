@@ -236,7 +236,7 @@ export const getSwapHistory = async (
   }
 
   const swapHistory: SwapHistoryEntry[] = (swapEvents as RawSwapEvent[]).map(event => {
-    const { tokenA, tokenB } = event.pool;
+    const { tokenA, tokenB, isStable } = event.pool;
     const isAToB = event.tokenIn === tokenA.address;
 
     return {
@@ -246,7 +246,7 @@ export const getSwapHistory = async (
       tokenOut: isAToB ? tokenB.symbol : tokenA.symbol,
       amountIn: event.amountIn,
       amountOut: event.amountOut,
-      impliedPrice: calculateImpliedPrice(event.amountIn, event.amountOut, isAToB),
+      impliedPrice: calculateImpliedPrice(event.amountIn, event.amountOut, isAToB, isStable),
       sender: event.sender
     };
   });
@@ -263,11 +263,12 @@ export const createPool = async (
   body: CreatePoolParams,
   userAddress: string
 ): Promise<TransactionResponse> => {
+  const { isStable, ...restBody } = body;
   const tx = await buildFunctionTx({
     contractName: extractContractName(PoolFactory),
     contractAddress: constants.poolFactory,
-    method: "createPool",
-    args: body,
+    method: isStable ? "createStablePool" : "createPool",
+    args: restBody,
   }, userAddress, accessToken);
 
   return executeTransaction(accessToken, tx);

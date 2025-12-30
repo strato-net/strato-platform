@@ -17,17 +17,22 @@ const { Pool, PoolSwap, swapHistorySelectFields } = constants;
 export const calculateImpliedPrice = (
   amountIn: string,
   amountOut: string,
-  isAToB: boolean
+  isAToB: boolean,
+  isStable: boolean
 ): string => {
   const inBig = safeBigInt(amountIn);
   const outBig = safeBigInt(amountOut);
 
   if (inBig === 0n || outBig === 0n) return '0.00';
 
+  const one = 10n**18n;
+  let numerator = isAToB ? outBig * one : inBig * one;
+  numerator = isStable ? (isAToB ? 1000n * numerator / 997n : 997n * numerator / 1000n): numerator;
+
   // Always calculate as TokenB/TokenA
   const price = isAToB
-    ? safeBigIntDivide(outBig * 10n**18n, inBig, "A to B price calculation")  // A→B: out/in
-    : safeBigIntDivide(inBig * 10n**18n, outBig, "B to A price calculation"); // B→A: in/out
+    ? safeBigIntDivide(numerator, inBig, "A to B price calculation")  // A→B: out/in
+    : safeBigIntDivide(numerator, outBig, "B to A price calculation"); // B→A: in/out
 
   return (Number(price) / 1e18).toFixed(6);
 };
@@ -330,6 +335,7 @@ export const buildPoolList = (
       oracleBToARatio,
       swapFeeRate,
       lpSharePercent,
+      isStable: pool.isStable,
     };
   });
 };
