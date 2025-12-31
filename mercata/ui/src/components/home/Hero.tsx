@@ -30,8 +30,6 @@ const Hero = () => {
                 backgroundImage: `url(${backgroundImage})`
               }}
             />
-            {/* Overlay for better text readability */}
-            <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-background/50 to-transparent dark:from-background/90 dark:via-background/60" />
             
             <div className="relative z-10 p-8 sm:p-12 lg:p-16 min-h-[400px] lg:min-h-[500px] flex flex-col justify-center">
               {/* Badge */}
