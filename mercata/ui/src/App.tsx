@@ -25,7 +25,6 @@ import ActivityFeed from "./pages/ActivityFeed";
 import NotFound from "./pages/NotFound";
 import MercataStats from "./pages/MercataStats";
 import Rewards from "./pages/Rewards";
-import LandingPage from "./pages/LandingPage";
 
 // Import dashboard components
 
@@ -136,7 +135,6 @@ const App = () => {
                               <UsdstBalanceBox />
                               <Routes>
                                 <Route path="/" element={<Index />} />
-                                <Route path="/landing" element={<LandingPage />} />
                                 <Route
                                   path="/dashboard"
                                   element={
