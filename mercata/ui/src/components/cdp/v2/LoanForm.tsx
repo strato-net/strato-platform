@@ -1,12 +1,9 @@
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
-import { Label } from '@/components/ui/label';
-import { Info } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import MintAmountInput from './MintAmountInput';
-import { formatUSD, formatPercentage, getRiskColor, getRiskLabel } from '@/utils/loanUtils';
+import HFSlider from './HFSlider';
+import { formatUSD, formatPercentage } from '@/utils/loanUtils';
 
 interface LoanFormProps {
   // Label configuration
@@ -26,6 +23,8 @@ interface LoanFormProps {
   // Health factor state
   riskBuffer: number;
   onRiskBufferChange: (value: number) => void;
+  minHF?: number; // Minimum health factor for slider bounds
+  currentHF?: number; // Current position health factor
   
   // Action
   onConfirm: () => void;
@@ -44,6 +43,8 @@ const LoanForm: React.FC<LoanFormProps> = ({
   isMaxMode,
   riskBuffer,
   onRiskBufferChange,
+  minHF,
+  currentHF,
   onConfirm,
   isProcessing = false,
   disabled = false,
@@ -61,11 +62,11 @@ const LoanForm: React.FC<LoanFormProps> = ({
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">{availableLabel}</span>
-              <span className="text-sm font-semibold">USDST {availableAmount}</span>
+              <span className="text-sm font-semibold tabular-nums">USDST {availableAmount}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Average Stability Fee</span>
-              <span className="text-sm font-semibold">{formatPercentage(averageStabilityFee || 1.5)}</span>
+              <span className="text-sm font-semibold tabular-nums">{formatPercentage(averageStabilityFee || 1.5)}</span>
             </div>
           </div>
 
@@ -81,39 +82,13 @@ const LoanForm: React.FC<LoanFormProps> = ({
           />
 
           {/* Health Factor Slider */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Label className="text-sm font-medium">Health Factor</Label>
-              <TooltipProvider delayDuration={0}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Health factor determines your liquidation risk. Higher values are safer.</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-            <div style={{ '--risk-slider-color': getRiskColor(riskBuffer) } as React.CSSProperties}>
-              <Slider
-                value={[riskBuffer]}
-                onValueChange={(v) => onRiskBufferChange(v[0])}
-                min={1.0}
-                max={3.0}
-                step={0.01}
-                className="w-full risk-slider"
-              />
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">Safer</span>
-              <span className="font-semibold">{riskBuffer.toFixed(2)} - {getRiskLabel(riskBuffer)}</span>
-              <span className="text-muted-foreground">Riskier</span>
-            </div>
-            <div className="text-sm text-muted-foreground">
-              Current Position Health: No Position → {riskBuffer.toFixed(2)}
-            </div>
-          </div>
+          <HFSlider
+            value={riskBuffer}
+            onChange={onRiskBufferChange}
+            minHF={minHF}
+            currentHF={currentHF}
+            disabled={disabled}
+          />
 
           {/* Confirm Button */}
           <Button

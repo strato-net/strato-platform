@@ -239,3 +239,83 @@ export const getAssetColor = (symbol: string): string => {
   return colors[symbol] || '#6b7280'; // default gray
 };
 
+// Health Factor slider utilities
+const WAD = 10n ** 18n;
+
+/**
+ * Calculate the minimum health factor for the HF slider based on vault data
+ * 
+ * Formula: minHF = max(minCR across all vaults) / max(liquidationRatio across all vaults)
+ * 
+ * @param vaultCandidates - Array of vault candidates with minCR in WAD format
+ * @param liquidationRatios - Array of liquidation ratios as percentages (e.g., 133 for 133%)
+ *                           OR a single default value if all vaults use the same LT
+ * @returns Minimum health factor for slider (typically around 1.0-1.5)
+ */
+export const calculateSliderMinHF = (
+  vaultCandidates: VaultCandidate[],
+  liquidationRatios: number[] | number
+): number => {
+  if (vaultCandidates.length === 0) return 1.0;
+  
+  // Find max minCR from all vault candidates (minCR is in WAD format)
+  const maxMinCRWad = vaultCandidates.reduce((max, v) => v.minCR > max ? v.minCR : max, 0n);
+  const maxMinCRPercent = Number(maxMinCRWad) / Number(WAD) * 100; // Convert to percentage
+  
+  // Find max liquidation ratio
+  const maxLT = Array.isArray(liquidationRatios)
+    ? Math.max(...liquidationRatios)
+    : liquidationRatios;
+  
+  console.log('[calculateSliderMinHF] Vault candidates:', vaultCandidates.length);
+  console.log('[calculateSliderMinHF] max(minCR) across all vaults:', maxMinCRPercent, '%');
+  console.log('[calculateSliderMinHF] max(liquidationRatio) across all vaults:', maxLT, '%');
+  
+  if (maxLT <= 0) return 1.0;
+  
+  // minHF = max(minCR) / max(LT)
+  // e.g., 150% / 133% = 1.13
+  const minHF = maxMinCRPercent / maxLT;
+  
+  console.log('[calculateSliderMinHF] minHF = max(minCR) / max(LT) =', maxMinCRPercent, '/', maxLT, '=', minHF);
+  
+  // Round to 2 decimal places
+  const roundedMinHF = Math.round(minHF * 100) / 100;
+  console.log('[calculateSliderMinHF] Rounded minHF:', roundedMinHF);
+  
+  return roundedMinHF;
+};
+
+/**
+ * Calculate minimum HF from percentage values directly
+ * Use this when you have minCR and liquidationRatio as percentage numbers
+ * 
+ * @param minCRs - Array of minimum collateralization ratios as percentages (e.g., 150 for 150%)
+ * @param liquidationRatios - Array of liquidation ratios as percentages (e.g., 133 for 133%)
+ * @returns Minimum health factor for slider
+ */
+export const calculateSliderMinHFFromPercentages = (
+  minCRs: number[],
+  liquidationRatios: number[]
+): number => {
+  if (minCRs.length === 0 || liquidationRatios.length === 0) return 1.0;
+  
+  const maxMinCR = Math.max(...minCRs);
+  const maxLT = Math.max(...liquidationRatios);
+  
+  console.log('[calculateSliderMinHFFromPercentages] minCRs:', minCRs);
+  console.log('[calculateSliderMinHFFromPercentages] liquidationRatios:', liquidationRatios);
+  console.log('[calculateSliderMinHFFromPercentages] max(minCR) across all vaults:', maxMinCR, '%');
+  console.log('[calculateSliderMinHFFromPercentages] max(liquidationRatio) across all vaults:', maxLT, '%');
+  
+  if (maxLT <= 0) return 1.0;
+  
+  const minHF = maxMinCR / maxLT;
+  console.log('[calculateSliderMinHFFromPercentages] minHF = max(minCR) / max(LT) =', maxMinCR, '/', maxLT, '=', minHF);
+  
+  const roundedMinHF = Math.round((maxMinCR / maxLT) * 100) / 100;
+  console.log('[calculateSliderMinHFFromPercentages] Rounded minHF:', roundedMinHF);
+  
+  return roundedMinHF;
+};
+

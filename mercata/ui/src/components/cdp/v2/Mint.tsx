@@ -28,6 +28,7 @@ import {
   calculateTotalMaxMintWei,
   calculateAvailableToMint,
   calculateWeightedAverageAPR,
+  calculateSliderMinHFFromPercentages,
 } from '@/utils/loanUtils';
 
 interface MintProps {
@@ -59,6 +60,14 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   const { fetchAllPrices } = useOracleContext();
   const { toast } = useToast();
   const { userRewards } = useRewardsUserInfo();
+
+  // Calculate slider minHF only once on mount
+  // minHF = max(minCR) / max(liquidationRatio) across all vaults
+  // Currently using hardcoded values - TODO: calculate from actual vault data
+  const sliderMinHF = useMemo(() => {
+    console.log('[Mint] Calculating slider minHF on component mount');
+    return calculateSliderMinHFFromPercentages([150], [133]);
+  }, []); // Empty deps = only runs once on mount
 
   const fetchVaultCandidates = useCallback(async () => {
     try {
@@ -405,6 +414,8 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
             isMaxMode={isMaxMode}
             riskBuffer={riskBuffer}
             onRiskBufferChange={handleRiskBufferChange}
+            minHF={sliderMinHF}
+            currentHF={undefined}
             onConfirm={handleQuickMint}
             isProcessing={transactionLoading}
             disabled={mintAmount <= 0 || optimalAllocations.length === 0}
