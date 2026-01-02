@@ -82,4 +82,4 @@ Technical specifications and architecture decisions:
 - GitHub: [blockapps/strato-platform](https://github.com/blockapps/strato-platform)
 
 ## LLMs / AI Agents
-- **[Instructions for LLMs](llm-instructions.md)** - For agents reading these docs.
+- **[Instructions for LLMs](miscellaneous/llm-instructions.md)** - For agents reading these docs.
