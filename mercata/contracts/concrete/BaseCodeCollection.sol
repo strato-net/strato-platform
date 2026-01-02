@@ -14,6 +14,7 @@ import "Admin/AdminRegistry.sol";
 //Swap
 import "./Pools/Pool.sol";
 import "./Pools/PoolFactory.sol";
+import "./Pools/StablePool.sol";
 
 //Admin
 // import "Admin/FeeCollector.sol";

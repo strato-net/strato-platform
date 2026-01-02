@@ -57,7 +57,7 @@ export interface SwapContextActions {
   fetchPairableTokens: (tokenAddress: string) => Promise<SwapToken[]>;
   
   // Pool operations
-  createPool: (data: { tokenA: string; tokenB: string }) => Promise<void>;
+  createPool: (data: { tokenA: string; tokenB: string, isStable: boolean }) => Promise<void>;
   getPoolByTokenPair: (tokenA: string, tokenB: string, signal?: AbortSignal) => Promise<Pool>;
   getPoolByAddress: (address: string) => Promise<Pool>;
   fetchPools: () => Promise<Pool[]>;

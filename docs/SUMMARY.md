@@ -28,3 +28,6 @@
 
 * [Overview](design/README.md)
 * [Rewards](design/rewards.md)
+
+## Miscellaneous
+* [LLMs / AI Agents](llm-instructions.md)
