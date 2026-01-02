@@ -63,7 +63,7 @@ const DebtPosition: React.FC<DebtPositionProps> = ({ refreshTrigger }) => {
       <CardContent className="space-y-4">
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Total Amount Minted</span>
+            <span className="text-sm text-muted-foreground">Total Debt</span>
             <span className="text-sm font-semibold">{formatNumber(totalMinted, 2)} USDST</span>
           </div>
           <div className="flex items-center justify-between">
