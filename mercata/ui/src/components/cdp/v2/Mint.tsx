@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -131,19 +131,33 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     }
   }, [riskBuffer, vaultCandidates]);
 
+  // Store last allocations when auto-supply is enabled
+  const lastAllocationsRef = useRef<PlanItem[]>([]);
+
   const { optimalAllocations } = useMemo(() => {
-    if (isMaxMode) return { optimalAllocations: maxAllocations };
-    if (mintAmountWei <= 0n || vaultCandidates.length === 0) return { optimalAllocations: [] };
+    // If auto-supply is disabled, return the last calculated allocations
+    if (!autoSupplyCollateral) {
+      return { optimalAllocations: lastAllocationsRef.current };
+    }
+
+    if (isMaxMode) {
+      lastAllocationsRef.current = maxAllocations;
+      return { optimalAllocations: maxAllocations };
+    }
+    
+    if (mintAmountWei <= 0n || vaultCandidates.length === 0) {
+      return { optimalAllocations: [] };
+    }
     
     try {
       const result = getOptimalAllocations(mintAmountWei, riskBuffer, vaultCandidates);
-      return {
-        optimalAllocations: convertAllocationsToPlanItems(result.allocations, vaultCandidates),
-      };
+      const allocations = convertAllocationsToPlanItems(result.allocations, vaultCandidates);
+      lastAllocationsRef.current = allocations;
+      return { optimalAllocations: allocations };
     } catch {
       return { optimalAllocations: [] };
     }
-  }, [mintAmountWei, riskBuffer, vaultCandidates, isMaxMode, maxAllocations]);
+  }, [mintAmountWei, riskBuffer, vaultCandidates, isMaxMode, maxAllocations, autoSupplyCollateral]);
 
   const totalHeadroomWei = useMemo(() => 
     vaultCandidates.length === 0 ? 0n : computeTotalHeadroom(riskBuffer, vaultCandidates),
@@ -429,13 +443,6 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
             disabled={mintAmount <= 0 || optimalAllocations.length === 0}
           />
 
-          {/* Allocation Section */}
-          <Allocation
-            optimalAllocations={optimalAllocations}
-            vaultCandidates={vaultCandidates}
-            showMintAmounts={true}
-          />
-
           {/* Auto Supply Collateral */}
           <div className="flex items-center space-x-2">
             <Checkbox
@@ -447,6 +454,13 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
               Automatically supply collateral (if needed)
             </Label>
           </div>
+
+          {/* Allocation Section */}
+          <Allocation
+            optimalAllocations={optimalAllocations}
+            vaultCandidates={vaultCandidates}
+            showMintAmounts={true}
+          />
 
           {/* Transaction Fee */}
           <div className="text-sm text-muted-foreground">
