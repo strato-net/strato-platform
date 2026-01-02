@@ -12,6 +12,9 @@ import MintPlanner from '@/components/cdp/MintPlanner';
 import VaultsList from '@/components/cdp/VaultsList';
 import LiquidationsView from '@/components/cdp/LiquidationsView';
 import BadDebtView from '@/components/cdp/BadDebtView';
+// New v2 components
+import Mint from '@/components/cdp/v2/Mint';
+import DebtPosition from '@/components/cdp/v2/DebtPosition';
 import { useCDP } from '@/context/CDPContext';
 import { CompactRewardsDisplay } from '@/components/rewards/CompactRewardsDisplay';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
@@ -102,14 +105,23 @@ const Advanced = () => {
                       </TabsTrigger>
                     </TabsList>
                     <TabsContent value="vaults">
-                      <div className="space-y-6">
-                        <div className="border border-border bg-card rounded-xl p-4 flex flex-col space-y-6">
-                          <MintPlanner onSuccess={handleQuickMintSuccess} refreshTrigger={mintPlannerRefreshTrigger} />
+                      <div className="flex flex-col lg:flex-row gap-6">
+                        {/* Left Column - Mint Section (New v2) */}
+                        <div className="w-full lg:w-[60%]">
+                          <Mint
+                            onSuccess={handleQuickMintSuccess}
+                            refreshTrigger={mintPlannerRefreshTrigger}
+                          />
                         </div>
-                        <VaultsList 
-                          refreshTrigger={vaultsRefreshTrigger} 
-                          onVaultActionSuccess={handleVaultActionSuccess}
-                        />
+
+                        {/* Right Column - Position and Vaults (New v2) */}
+                        <div className="w-full lg:w-[40%] space-y-6">
+                          <DebtPosition refreshTrigger={vaultsRefreshTrigger} />
+                          <VaultsList
+                            refreshTrigger={vaultsRefreshTrigger}
+                            onVaultActionSuccess={handleVaultActionSuccess}
+                          />
+                        </div>
                       </div>
                     </TabsContent>
                     <TabsContent value="bad-debt">
