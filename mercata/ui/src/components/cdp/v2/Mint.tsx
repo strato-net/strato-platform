@@ -5,7 +5,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { useOracleContext } from '@/context/OracleContext';
 import { cdpService } from '@/services/cdpService';
-import { getOptimalAllocations, computeTotalHeadroom, getMaxAllocations, type VaultCandidate } from '@/services/mintPlanService';
+import { getOptimalAllocations, computeTotalHeadroom, getMaxAllocations, type VaultCandidate } from '@/services/MintService';
 import type { PlanItem } from '@/services/cdpTypes';
 import { formatUnits, parseUnits } from 'ethers';
 import { formatNumberWithCommas, parseCommaNumber } from '@/utils/numberUtils';

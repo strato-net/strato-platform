@@ -8,7 +8,7 @@ import { formatUnits } from 'ethers';
 import { formatNumberWithCommas, parseCommaNumber } from '@/utils/numberUtils';
 import { convertStabilityFeeRateToAnnualPercentage } from '@/services/cdpUtils';
 import type { PlanItem } from '@/services/cdpTypes';
-import type { VaultCandidate } from '@/services/mintPlanService';
+import type { VaultCandidate } from '@/services/MintService';
 import { formatUSD, formatPercentage, calculateTotalCollateralValue, getAssetColor } from '@/utils/loanUtils';
 
 interface AllocationProps {
