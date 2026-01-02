@@ -49,7 +49,7 @@
       "WBTC": "wrapped-bitcoin",
       "PAXG": "pax-gold",
       "XAUT": "tether-gold",
-      "KAG": "silver"
+      "KAG": "kinesis-silver"
     }
   }
 } 
