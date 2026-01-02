@@ -157,6 +157,14 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     calculateAvailableToMint(totalMaxMintWei),
   [totalMaxMintWei]);
 
+  // When MAX mode is enabled and slider changes, update the mint amount input
+  useEffect(() => {
+    if (isMaxMode && totalMaxMintWei > 0n) {
+      const maxMint = formatUnits(totalMaxMintWei, 18).replace(/\.?0+$/, '');
+      setMintAmountInput(formatNumberWithCommas(maxMint));
+    }
+  }, [isMaxMode, totalMaxMintWei, riskBuffer]);
+
   const weightedAverageAPR = useMemo(() => 
     calculateWeightedAverageAPR(optimalAllocations),
   [optimalAllocations]);
