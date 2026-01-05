@@ -312,7 +312,8 @@ export type NewLoanData = {
   healthFactor: number;
   healthFactorRaw: string;
   totalBorrowingPowerUSD: string;
-  totalCollateralValueUSD: string;
+  totalCollateralValueUSD: string;      // risk-adjusted by LT (for health factor)
+  totalCollateralValueSupplied: string; // full supplied collat $ value (for display)
   maxAvailableToBorrowUSD: string;
   interestRate: number;                // bps
   isAboveLiquidationThreshold: boolean;
