@@ -658,13 +658,11 @@ export const liquidityAndBalance = async (
   const supplyAPY = apyData.supplyAPY * (utilizationRate / 100);
 
   // Total collateral value across all users (USD 1e18)
-  const totalCollateralValue = await Promise.resolve(
-    calculateTotalCollateralValue(
-      registry.lendingPool?.assetConfigs || [],
-      allCollaterals,
-      priceMap,
-      borrowableAsset
-    )
+  const totalCollateralValue = calculateTotalCollateralValue(
+    registry.lendingPool?.assetConfigs || [],
+    allCollaterals,
+    priceMap,
+    borrowableAsset
   );
 
   // Get user's staked balance from RewardsChef

@@ -156,8 +156,14 @@ export const simulateLoan = (
   const priceUSD = toBig(borrowableAssetConfig.price); // 1e18
   const totalBorrowValueUSD = (toBig(totalAmountOwed) * priceUSD) / DECIMALS;
 
-  // 5) Total collateral value for health (USD, 18 decimals)
+  // 5) Total collateral value for health (USD, 18 decimals) - risk-adjusted by LiqThresh
   const totalCollateralValueUSD = calculateTotalCollateralValueForHealth(
+    collaterals,
+    assetConfigs
+  );
+
+  // 5b) Full supplied collateral value (USD, 18 decimals) - no LT adjustment
+  const totalCollateralValueSupplied = calculateUserCollateralValue(
     collaterals,
     assetConfigs
   );
@@ -200,6 +206,7 @@ export const simulateLoan = (
     healthFactorRaw,
     totalBorrowingPowerUSD: maxBorrowingPowerUSD.toString(),
     totalCollateralValueUSD: totalCollateralValueUSD,
+    totalCollateralValueSupplied: totalCollateralValueSupplied,
     maxAvailableToBorrowUSD: maxAvailableToBorrowUSD.toString(),
 
     // Display APR (bps → percent) if needed by callers
@@ -322,6 +329,34 @@ export const calculateUtilizationRate = (
   denom = resN < denom ? (denom - resN) : cashN;
   if (denom === 0n) return 0;
   return Number((debtN * 10000n) / denom) / 100; // percent with 2 decimals
+};
+
+/**
+ * Calculate a single user's total collateral value (raw USD, no liquidation threshold adjustment)
+ * @param collaterals Array of user's collateral assets and amounts
+ * @param assetConfigs Map of asset configurations (for price)
+ * @returns Total collateral value in USD (18 decimals)
+ */
+export const calculateUserCollateralValue = (
+  collaterals: CollateralInfo[],
+  assetConfigs: Map<string, AssetConfig>
+): string => {
+  let totalValue = 0n;
+
+  for (const collateral of collaterals) {
+    const config = assetConfigs.get(collateral.asset);
+    if (!config) continue;
+
+    const collateralAmount = toBig(collateral.amount);
+    if (collateralAmount === 0n) continue;
+
+    const price = toBig(config.price);
+    if (price === 0n) continue;
+
+    totalValue += (collateralAmount * price) / DECIMALS;
+  }
+
+  return totalValue.toString();
 };
 
 /**
