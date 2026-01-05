@@ -197,7 +197,8 @@ export interface CollateralData {
   isCollateralized: boolean;
   liquidationThreshold: string; // Possibly in basis points (e.g., "8000" = 80%)
   ltv: string; // Loan-to-Value ratio (e.g., "7500" = 75%)
-  maxBorrowingPower: string; // Usually a percent string
+  maxBorrowingPower: string; // Borrowing power from supplied collateral (collateralizedAmount * price * ltv)
+  unsuppliedBorrowingPower: string; // Potential borrowing power from user balance (userBalance * price * ltv)
   userBalance: string;
   userBalanceValue: string;
   _name: string;

@@ -1,4 +1,5 @@
 import { CollateralData, NewLoanData } from "@/interface";
+import { SUPPLY_COLLATERAL_FEE, BORROW_FEE } from "@/lib/constants";
 
 export const getMaxSafeWithdrawAmount = (
   asset: CollateralData,
@@ -52,6 +53,7 @@ export const calculateCollateralHealthImpact = (
   const currentTotalBorrowValueUSD = currentHealthFactorRaw === 0n
     ? 0n
     : (currentCollateralValueUSD * 10n ** 18n) / currentHealthFactorRaw;
+  console.log("derived, real:", currentTotalBorrowValueUSD, loanData?.totalAmountOwed);
 
   // If there's no outstanding loan, collateral operations are always healthy
   if (currentTotalBorrowValueUSD === 0n) {
@@ -206,3 +208,199 @@ export const calculateBorrowHealthImpact = (
 ) => {
   return calculateBorrowOperationHealthImpact(borrowAmountWei, loanData, true);
 }; 
+
+
+// ----
+const centFloor = (value: Number): Number => {
+  return Math.floor(+value * 100) / 100;
+};
+
+const centCeil = (value: Number): Number => {
+  return Math.ceil(+value * 100) / 100;
+};
+
+// Return the maximum amount that can be borrowed with the given health factor
+const calculateAvailableToBorrowUSD = (
+  loanData: NewLoanData,
+  healthFactor: Number,
+  newCollateral: Map<CollateralData, bigint>,
+): Number => {
+  const targetHFRaw = BigInt(Math.round(Number(healthFactor) * 1e18));
+
+  let totalCollateralValueUSD = BigInt(loanData?.totalCollateralValueUSD ?? "0"); // supplied collat, LT weighted
+  for (const [collat, amount] of newCollateral.entries()) { // Add new collateral value (LT weighted)
+    totalCollateralValueUSD += (BigInt(collat.liquidationThreshold) * amount) / 10000n;
+  }
+
+  const currentDebtUSD = BigInt(loanData?.totalAmountOwed ?? "0");
+
+  // Calculate max debt for target health factor
+  const maxDebtForTargetHF = (totalCollateralValueUSD * 10n ** 18n) / targetHFRaw;
+
+  // Available to borrow = maxDebt - currentDebt (clamped to 0)
+  return maxDebtForTargetHF > currentDebtUSD
+    ? centFloor(Number((maxDebtForTargetHF - currentDebtUSD) / 10n ** 18n))
+    : 0.00;
+};
+
+const calculateHFSliderExtrema = (
+  loanData: NewLoanData,
+  collaterals: CollateralData[],
+  DEFAULT_MAX_HEALTH_FACTOR: Number = 3.00,
+) : { min: Number, max: Number } => {
+  const minHF = Math.min(...collaterals.map(c => Number(BigInt(c.liquidationThreshold))/Number(BigInt(c.ltv))));
+  const maxHF = Math.max(+DEFAULT_MAX_HEALTH_FACTOR, loanData.healthFactor);
+  return { min: centCeil(minHF), max: centFloor(maxHF) };
+};
+
+const determineErrorMessage = (
+  borrowAmount: Number,
+  requestedHealthFactor: Number,
+  loanData: NewLoanData,
+  collaterals: CollateralData[]
+) : string => {
+  return ""; //TODO: Implement this
+};
+
+const calculateBorrowTxFee = (collateralCount: number): { fee: Number, voucher: Number } =>
+{
+    const fee = collateralCount * parseFloat(SUPPLY_COLLATERAL_FEE) + parseFloat(BORROW_FEE);
+    const voucher = Math.round(fee * 100);
+    return { fee, voucher }; // TODO verify no rounding issues, voucher is int
+};
+
+const calculateAdditionalCollateralAmountFromValue = (
+  collateralValueUSD: bigint,
+  price: bigint,
+): bigint => {
+  return (collateralValueUSD * 10n ** 18n) / price;
+};
+
+const recommendCollateralToSupply = (
+  loanData: NewLoanData,
+  healthFactor: Number,
+  borrowAmountUSD: Number,
+  collaterals: CollateralData[],
+) : Map<CollateralData, bigint> => {
+  sortCollateralAssets(collaterals);
+  // TODO this one is AI generated, needs to be verified
+  // Should greedily pull from the front of the queue until the health factor is met
+  const result = new Map<CollateralData, bigint>();
+
+  // HF = LT_weighted_collateral / debt
+  // After borrow: targetHF = (currentLTCollat + newLTCollat) / (currentDebt + borrowAmount)
+  // Solve for newLTCollat: newLTCollat = targetHF * (currentDebt + borrowAmount) - currentLTCollat
+
+  const targetHFRaw = BigInt(Math.round(Number(healthFactor) * 1e18));
+  const currentLTCollateral = BigInt(loanData?.totalCollateralValueUSD ?? "0");
+  const currentDebt = BigInt(loanData?.totalAmountOwed ?? "0");
+  const borrowAmount = BigInt(Math.round(Number(borrowAmountUSD) * 1e18));
+
+  const newDebt = currentDebt + borrowAmount;
+  if (newDebt === 0n) return result;
+
+  // Required LT-weighted collateral to achieve target HF (add 1 for floored division safety)
+  const requiredTotalLTCollateral = (targetHFRaw * newDebt) / (10n ** 18n) + 1n;
+  let neededLTValue = requiredTotalLTCollateral > currentLTCollateral
+    ? requiredTotalLTCollateral - currentLTCollateral
+    : 0n;
+
+  if (neededLTValue === 0n) return result;
+
+  // Greedily iterate through sorted collaterals
+  for (const collat of collaterals) {
+    if (neededLTValue <= 0n) break;
+
+    const price = BigInt(collat.assetPrice ?? "0");
+    const lt = BigInt(collat.liquidationThreshold ?? "0");
+    const available = BigInt(collat.userBalance ?? "0"); // unsupplied balance
+    const decimals = BigInt(10) ** BigInt(collat.customDecimals ?? 18);
+
+    if (price === 0n || lt === 0n || available === 0n) continue;
+
+    // LT-weighted value of entire available balance: (amount * price * lt) / (decimals * 10000)
+    const maxLTValue = (available * price * lt) / (decimals * 10000n);
+
+    if (maxLTValue <= neededLTValue) {
+      // Use entire available balance
+      result.set(collat, available);
+      neededLTValue -= maxLTValue;
+    } else {
+      // Calculate exact amount needed for remaining LT value (+ 1 wei for floor safety)
+      // amount = (neededLTValue * decimals * 10000) / (price * lt) + 1
+      const amountNeeded = (neededLTValue * decimals * 10000n) / (price * lt) + 1n;
+      result.set(collat, amountNeeded < available ? amountNeeded : available);
+      neededLTValue = 0n;
+    }
+  }
+
+  return result;
+};
+
+const sortCollateralAssets = (
+  collaterals: CollateralData[],
+  DO_IGNORE_ONE_WEI: boolean = true,
+) : void => {
+  // - Amongst the collateral asset types the user has already supplied, sort by `asset.balanceOf(user)*lendingPool.config[asset].LTV`
+  // - After all of those, sort remaining collateral the user possesses by `asset.balanceOf(user)*lendingPool.config[asset].LTV`
+  const nonexistant = DO_IGNORE_ONE_WEI ? 1n : 0n;
+  const isSupplied = (collat: CollateralData) => BigInt(collat.collateralizedAmount) > nonexistant;
+  collaterals.sort((a, b) => {
+    // Supplied collaterals come FIRST
+    if (isSupplied(a) && !isSupplied(b)) return -1;
+    if (!isSupplied(a) && isSupplied(b)) return 1;
+    // Within groups, sort by borrowing power descending (higher first)
+    return -Number(BigInt(a.unsuppliedBorrowingPower) - BigInt(b.unsuppliedBorrowingPower));
+  });
+};
+
+const calculateMinimumLTV = (collaterals: CollateralData[]) : bigint => {
+  if (collaterals.length === 0) return 0n;
+  return collaterals.map(c => BigInt(c.ltv ?? "0")).reduce((a, b) => a < b ? a : b);
+};
+
+const calculateAdditionalValueNeeded = (
+  collaterals: CollateralData[],
+  borrowAmount: Number,
+  loanData: NewLoanData,
+) : Number => {
+  const minLTV = calculateMinimumLTV(collaterals);
+  if (minLTV === 0n) return 0; // careful with this
+
+  const totalDebtAfterBorrow = BigInt(loanData.totalAmountOwed) + BigInt(Math.round(Number(borrowAmount) * 1e18));
+  const currentBorrowingPowerUSD = BigInt(loanData.totalBorrowingPowerUSD ?? "0");
+
+  // Borrowing power (LTV-weighted) must be >= total debt to borrow
+  if (currentBorrowingPowerUSD >= totalDebtAfterBorrow) return 0;
+
+  const additionalPowerNeeded = totalDebtAfterBorrow - currentBorrowingPowerUSD;
+
+  // Convert borrowing power to collateral value using minLTV, so it's sufficient regardless of asset chosen
+  const additionalValueNeeded = (additionalPowerNeeded * 10000n) / minLTV;
+
+  return Number(additionalValueNeeded) / 1e18;
+};
+
+const calculateAfterBorrowHealthFactor = (
+  loanData: NewLoanData,
+  borrowAmount: Number,
+  newCollateralSupplied: Map<CollateralData, bigint>
+) : Number => {
+  const totalDebtAfterBorrow = BigInt(loanData.totalAmountOwed) + BigInt(Math.round(Number(borrowAmount) * 1e18));
+  if (totalDebtAfterBorrow === 0n) return Infinity; // maybe zero can be used for no loan
+
+  // Sum LT-weighted value of new collateral
+  let newCollateralLTValue = 0n;
+  for (const [collat, amount] of newCollateralSupplied.entries()) {
+    const price = BigInt(collat.assetPrice ?? "0");
+    const lt = BigInt(collat.liquidationThreshold ?? "0");
+    newCollateralLTValue += (amount * price * lt) / (10n**18n * 10000n);
+  }
+
+  const totalLTCollateralAfterBorrow = BigInt(loanData.totalCollateralValueUSD ?? "0") + newCollateralLTValue;
+
+  // HF = (LT-weighted collateral * 1e18) / debt
+  const newHealthFactorRaw = (totalLTCollateralAfterBorrow * 10n ** 18n) / totalDebtAfterBorrow;
+
+  return Number(newHealthFactorRaw) / 1e18;
+};

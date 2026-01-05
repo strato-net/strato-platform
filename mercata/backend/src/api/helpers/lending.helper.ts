@@ -250,6 +250,7 @@ export const calculateCollateralMetrics = (
   userBalanceValue: string;
   collateralizedAmountValue: string;
   maxBorrowingPower: string;
+  unsuppliedBorrowingPower: string;
 } => {
   const balance = toBig(userBalance);
   const collateralized = toBig(collateralizedAmount);
@@ -262,11 +263,15 @@ export const calculateCollateralMetrics = (
   
   // Calculate max borrowing power using LTV: (collateralizedAmount * price * ltv) / (1e18 * 10000)
   const maxBorrowingPower = ((collateralized * price * ltvBasisPoints) / (DECIMALS * 10000n)).toString();
+  
+  // Calculate unsupplied borrowing power: userBalance * price * ltv (for sorting unsupplied collaterals)
+  const unsuppliedBorrowingPower = ((balance * price * ltvBasisPoints) / (DECIMALS * 10000n)).toString();
 
   return {
     userBalanceValue,
     collateralizedAmountValue,
     maxBorrowingPower,
+    unsuppliedBorrowingPower,
   };
 };
 

@@ -522,7 +522,7 @@ export const collateralAndBalance = async (
       const liquidationThreshold = assetConfig?.liquidationThreshold || 0;
 
       // Calculate metrics using the helper function
-      const {userBalanceValue, collateralizedAmountValue, maxBorrowingPower} = calculateCollateralMetrics(
+      const {userBalanceValue, collateralizedAmountValue, maxBorrowingPower, unsuppliedBorrowingPower} = calculateCollateralMetrics(
         userBalance,
         collateralizedAmount,
         assetPrice,
@@ -539,6 +539,7 @@ export const collateralAndBalance = async (
         isCollateralized: collateral?.amount > 0,
         canSupply: BigInt(userBalance) > 0n,
         maxBorrowingPower,
+        unsuppliedBorrowingPower,
         assetPrice,
         ltv,
         liquidationThreshold,
