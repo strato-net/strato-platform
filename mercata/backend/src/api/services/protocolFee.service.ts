@@ -328,35 +328,55 @@ const getSwapFeeCollector = async (
 
 /**
  * Get protocol revenue from lending pool operations
+ * Uses IndexAccrued events and calculates: interestDelta × reserveFactor / 10000
  */
 export const getLendingProtocolRevenue = async (
   accessToken: string,
 ): Promise<ProtocolRevenue> => {
   try {
-    // Get lending pool address from registry
-    const { lendingPool: lendingPoolAddress, liquidityPool: liquidityPoolAddress } = await getPool(accessToken, { 
-      select: "lendingPool,liquidityPool" 
+    // Get lending pool address, borrowable asset, and safetyShareBps from registry
+    const registry = await getPool(accessToken, {
+      select: `lendingPool:lendingPool_fkey(address,borrowableAsset,safetyShareBps,assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value))`
     });
     
-    if (!lendingPoolAddress || !liquidityPoolAddress) {
-      throw new Error("Lending pool address not found");
+    const lendingPoolData = registry.lendingPool;
+    if (!lendingPoolData?.address || !lendingPoolData?.borrowableAsset) {
+      throw new Error("Lending pool or borrowable asset not found");
     }
     
-    // Get fee collector address from lending pool
-    const feeCollector = await getFeeCollector(accessToken, lendingPoolAddress);
+    const lendingPoolAddress = lendingPoolData.address;
+    const borrowableAsset = lendingPoolData.borrowableAsset;
+    const safetyShareBps = BigInt(lendingPoolData.safetyShareBps || 0);
     
-    // Query all Transfer events where 'from' is the lending pool and 'to' is feeCollector
-    const { data: tokenTransferEvents } = await cirrus.get(accessToken, `/event`, {
+    // Get reserveFactor from assetConfigs for the borrowable asset (already fetched in registry query)
+    const borrowableAssetConfig = lendingPoolData.assetConfigs?.find(
+      (c: any) => c.asset === borrowableAsset
+    );
+    const reserveFactor = BigInt(borrowableAssetConfig?.AssetConfig?.reserveFactor || 0);
+    if (reserveFactor === 0n) {
+      // No reserve factor means no protocol revenue
+      return {
+        totalRevenue: "0",
+        revenueByPeriod: {
+          daily: { total: "0", byAsset: [] },
+          weekly: { total: "0", byAsset: [] },
+          monthly: { total: "0", byAsset: [] },
+          ytd: { total: "0", byAsset: [] },
+          allTime: { total: "0", byAsset: [] }
+        }
+      };
+    }
+    
+    // Query all IndexAccrued events from the lending pool
+    const { data: indexAccruedEvents } = await cirrus.get(accessToken, `/${LendingPool}-IndexAccrued`, {
       params: {
-        event_name: `eq.Transfer`,
-        select: "address,attributes,block_timestamp",
-        "attributes->>from": `eq.${liquidityPoolAddress}`,
-        "attributes->>to": `eq.${feeCollector}`,
+        address: `eq.${lendingPoolAddress}`,
+        select: "interestDelta::text,block_timestamp",
         order: "block_timestamp.desc"
       }
     });
     
-    if (!tokenTransferEvents || tokenTransferEvents.length === 0) {
+    if (!indexAccruedEvents || indexAccruedEvents.length === 0) {
       return {
         totalRevenue: "0",
         revenueByPeriod: {
@@ -371,12 +391,20 @@ export const getLendingProtocolRevenue = async (
     
     const timeCutoffs = getTimeCutoffs();
     
-    // Transform events to common format
-    const transformedEvents = tokenTransferEvents.map((event: any) => ({
-      value: BigInt(event.attributes?.value || "0"),
-      timestamp: parseTimestamp(event.block_timestamp),
-      asset: event.address.toLowerCase() // The token that emitted the Transfer event
-    }));
+    // Transform events: calculate protocol revenue
+    // Total reserves = interestDelta × reserveFactor / 10000
+    // Treasury portion = reserves × (10000 - safetyShareBps) / 10000
+    const treasuryShareBps = 10000n - safetyShareBps;
+    const transformedEvents = indexAccruedEvents.map((event: any) => {
+      const interestDelta = BigInt(event.interestDelta || "0");
+      const reserves = (interestDelta * reserveFactor) / 10000n;
+      const protocolRevenue = (reserves * treasuryShareBps) / 10000n;
+      return {
+        value: protocolRevenue,
+        timestamp: parseTimestamp(event.block_timestamp),
+        asset: borrowableAsset.toLowerCase()
+      };
+    });
     
     const periodRevenue = categorizeRevenueByPeriod(transformedEvents, timeCutoffs);
     
