@@ -1,8 +1,9 @@
-import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 import { useOracleContext } from '@/context/OracleContext';
 import { cdpService } from '@/services/cdpService';
 import { getOptimalAllocations, computeTotalHeadroom, getMaxAllocations, type VaultCandidate } from '@/services/MintService';
@@ -69,6 +70,15 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     return calculateSliderMinHFFromPercentages([150], [133]);
   }, []); // Empty deps = only runs once on mount
 
+  // Calculate slider color based on health factor (riskBuffer)
+  const sliderColor = useMemo(() => {
+    if (!autoSupplyCollateral) return 'hsl(var(--muted-foreground))';
+    if (riskBuffer >= 2.5) return '#10b981'; // green
+    if (riskBuffer >= 2.0) return '#3b82f6'; // blue
+    if (riskBuffer >= 1.5) return '#eab308'; // yellow
+    return '#ef4444'; // red
+  }, [riskBuffer, autoSupplyCollateral]);
+
   const fetchVaultCandidates = useCallback(async () => {
     try {
       const { existingVaults, potentialVaults } = await cdpService.getVaultCandidates();
@@ -131,33 +141,34 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     }
   }, [riskBuffer, vaultCandidates]);
 
-  // Store last allocations when auto-supply is enabled
-  const lastAllocationsRef = useRef<PlanItem[]>([]);
+  // Store allocations - updated by auto-supply or manual edits
+  const [customAllocations, setCustomAllocations] = useState<PlanItem[]>([]);
 
-  const { optimalAllocations } = useMemo(() => {
-    // If auto-supply is disabled, return the last calculated allocations
-    if (!autoSupplyCollateral) {
-      return { optimalAllocations: lastAllocationsRef.current };
-    }
-
+  // Compute fresh allocations when auto-supply is enabled
+  useEffect(() => {
+    if (!autoSupplyCollateral) return;
+    
     if (isMaxMode) {
-      lastAllocationsRef.current = maxAllocations;
-      return { optimalAllocations: maxAllocations };
+      setCustomAllocations(maxAllocations);
+      return;
     }
     
     if (mintAmountWei <= 0n || vaultCandidates.length === 0) {
-      return { optimalAllocations: [] };
+      setCustomAllocations([]);
+      return;
     }
     
     try {
       const result = getOptimalAllocations(mintAmountWei, riskBuffer, vaultCandidates);
       const allocations = convertAllocationsToPlanItems(result.allocations, vaultCandidates);
-      lastAllocationsRef.current = allocations;
-      return { optimalAllocations: allocations };
+      setCustomAllocations(allocations);
     } catch {
-      return { optimalAllocations: [] };
+      setCustomAllocations([]);
     }
   }, [mintAmountWei, riskBuffer, vaultCandidates, isMaxMode, maxAllocations, autoSupplyCollateral]);
+
+  // Use customAllocations as the source of truth
+  const optimalAllocations = customAllocations;
 
   const totalHeadroomWei = useMemo(() => 
     vaultCandidates.length === 0 ? 0n : computeTotalHeadroom(riskBuffer, vaultCandidates),
@@ -403,12 +414,62 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     setRiskBuffer(value);
   }, []);
 
+  // Handle manual deposit amount changes from Allocation component
+  const handleAllocationDepositChange = useCallback((assetAddress: string, amount: string) => {
+    setCustomAllocations(prev => {
+      const existing = prev.find(a => a.assetAddress === assetAddress);
+      if (existing) {
+        return prev.map(a => a.assetAddress === assetAddress 
+          ? { ...a, depositAmount: amount }
+          : a
+        );
+      }
+      // Add new allocation if not found
+      const candidate = vaultCandidates.find(c => c.assetAddress === assetAddress);
+      if (!candidate) return prev;
+      return [...prev, {
+        assetAddress,
+        symbol: candidate.symbol,
+        depositAmount: amount,
+        depositAmountUSD: '0',
+        mintAmount: '0',
+        stabilityFeeRate: 0,
+        existingCollateralUSD: '0',
+        userBalance: '0',
+        userBalanceUSD: '0',
+      }];
+    });
+  }, [vaultCandidates]);
+
+  // Handle manual mint amount changes from Allocation component
+  const handleAllocationMintChange = useCallback((assetAddress: string, amount: string) => {
+    setCustomAllocations(prev => {
+      const existing = prev.find(a => a.assetAddress === assetAddress);
+      if (existing) {
+        return prev.map(a => a.assetAddress === assetAddress 
+          ? { ...a, mintAmount: amount }
+          : a
+        );
+      }
+      // Add new allocation if not found
+      const candidate = vaultCandidates.find(c => c.assetAddress === assetAddress);
+      if (!candidate) return prev;
+      return [...prev, {
+        assetAddress,
+        symbol: candidate.symbol,
+        depositAmount: '0',
+        depositAmountUSD: '0',
+        mintAmount: amount,
+        stabilityFeeRate: 0,
+        existingCollateralUSD: '0',
+        userBalance: '0',
+        userBalanceUSD: '0',
+      }];
+    });
+  }, [vaultCandidates]);
+
   return (
     <>
-      <style>{`
-        .risk-slider-track { background-color: hsl(var(--secondary)) !important; }
-        .risk-slider-range { background-color: var(--risk-slider-color, #10b981) !important; transition: background-color 0.2s ease; }
-      `}</style>
       <Card>
         <CardContent className="pt-6 space-y-6">
           {/* Header */}
@@ -427,7 +488,6 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
           {/* Loan Form */}
           <LoanForm
             availableLabel="Available to Mint"
-            actionButtonLabel="Confirm Mint"
             availableAmount={availableToMint}
             averageStabilityFee={weightedAverageAPR || 1.5}
             mintAmountInput={mintAmountInput}
@@ -438,9 +498,12 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
             onRiskBufferChange={handleRiskBufferChange}
             minHF={sliderMinHF}
             currentHF={undefined}
+            sliderRangeColor={sliderColor}
+            disabled={!autoSupplyCollateral}
+            showButton={autoSupplyCollateral}
+            actionButtonLabel="Confirm Mint"
             onConfirm={handleQuickMint}
             isProcessing={transactionLoading}
-            disabled={mintAmount <= 0 || optimalAllocations.length === 0}
           />
 
           {/* Auto Supply Collateral */}
@@ -460,7 +523,21 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
             optimalAllocations={optimalAllocations}
             vaultCandidates={vaultCandidates}
             showMintAmounts={true}
+            autoSupplyCollateral={autoSupplyCollateral}
+            onDepositAmountChange={handleAllocationDepositChange}
+            onMintAmountChange={handleAllocationMintChange}
           />
+
+          {/* Confirm Button - only shown when auto supply is unchecked */}
+          {!autoSupplyCollateral && (
+            <Button
+              disabled={optimalAllocations.length === 0 || transactionLoading}
+              onClick={handleQuickMint}
+              className="w-full"
+            >
+              {transactionLoading ? 'Processing...' : 'Confirm Mint'}
+            </Button>
+          )}
 
           {/* Transaction Fee */}
           <div className="text-sm text-muted-foreground">
