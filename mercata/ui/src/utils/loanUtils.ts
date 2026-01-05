@@ -1,14 +1,14 @@
 import { formatUnits, parseUnits } from 'ethers';
 import { formatNumberWithCommas } from '@/utils/numberUtils';
 import type { PlanItem } from '@/services/cdpTypes';
-import type { VaultCandidate } from '@/services/mintPlanService';
+import type { VaultCandidate } from '@/services/MintService';
 import { convertStabilityFeeRateToAnnualPercentage } from '@/services/cdpUtils';
 
 // Constants
 export const DEPOSIT_FEE_USDST = 0.02;
 export const MINT_FEE_USDST = 0.01;
 export const SAFETY_BUFFER_BPS = 5n;
-export const BPS_SCALE = 1000n;
+export const BPS_SCALE = 10000n;
 
 // Formatting utilities
 export const formatUSD = (value: number, decimals = 2): string =>
