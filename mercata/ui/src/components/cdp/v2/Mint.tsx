@@ -38,7 +38,7 @@ interface MintProps {
 }
 
 const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
-  const [mintAmountInput, setMintAmountInput] = useState('10');
+  const [mintAmountInput, setMintAmountInput] = useState('');
   const [riskBuffer, setRiskBuffer] = useState(2.1);
   const [isMaxMode, setIsMaxMode] = useState(false);
   const [vaultCandidates, setVaultCandidates] = useState<VaultCandidate[]>([]);
@@ -72,12 +72,11 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
 
   // Calculate slider color based on health factor (riskBuffer)
   const sliderColor = useMemo(() => {
-    if (!autoSupplyCollateral) return 'hsl(var(--muted-foreground))';
     if (riskBuffer >= 2.5) return '#10b981'; // green
     if (riskBuffer >= 2.0) return '#3b82f6'; // blue
     if (riskBuffer >= 1.5) return '#eab308'; // yellow
     return '#ef4444'; // red
-  }, [riskBuffer, autoSupplyCollateral]);
+  }, [riskBuffer]);
 
   const fetchVaultCandidates = useCallback(async () => {
     try {
@@ -475,7 +474,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
             minHF={sliderMinHF}
             currentHF={undefined}
             sliderRangeColor={sliderColor}
-            disabled={!autoSupplyCollateral}
+            inputDisabled={!autoSupplyCollateral}
             showButton={autoSupplyCollateral}
             actionButtonLabel={getButtonText()}
             onConfirm={handleQuickMint}
@@ -562,7 +561,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
 
           {/* Transaction Fee */}
           <div className="text-sm text-muted-foreground">
-            Transaction Fee: {formatUSD(totalFees, 2)} USDST ({transactionCount} {transactionCount === 1 ? 'voucher' : 'vouchers'})
+            Transaction Fee: {formatUSD(totalFees, 2)} USDST
           </div>
 
           {/* Rewards Display */}

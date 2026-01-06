@@ -26,7 +26,9 @@ interface LoanFormProps {
   currentHF?: number; // Current position health factor
   sliderRangeColor?: string; // Custom color for slider range bar
   
-  disabled?: boolean;
+  disabled?: boolean; // Disables both input and slider
+  inputDisabled?: boolean; // Disables only the input (overrides disabled for input)
+  sliderDisabled?: boolean; // Disables only the slider (overrides disabled for slider)
   
   // Optional button props - if provided, button renders inside form
   actionButtonLabel?: string;
@@ -50,6 +52,8 @@ const LoanForm: React.FC<LoanFormProps> = ({
   currentHF,
   sliderRangeColor,
   disabled = false,
+  inputDisabled,
+  sliderDisabled,
   actionButtonLabel = 'Confirm Mint',
   onConfirm,
   isProcessing = false,
@@ -81,7 +85,7 @@ const LoanForm: React.FC<LoanFormProps> = ({
             label="Mint Amount"
             placeholder="0"
             unit="USDST"
-            disabled={disabled}
+            disabled={inputDisabled ?? disabled}
           />
 
           {/* Health Factor Slider */}
@@ -90,7 +94,7 @@ const LoanForm: React.FC<LoanFormProps> = ({
             onChange={onRiskBufferChange}
             minHF={minHF}
             currentHF={currentHF}
-            disabled={disabled}
+            disabled={sliderDisabled ?? disabled}
             rangeColor={sliderRangeColor}
           />
 

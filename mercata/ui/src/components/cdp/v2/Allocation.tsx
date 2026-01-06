@@ -10,6 +10,7 @@ import type { PlanItem } from '@/services/cdpTypes';
 import type { VaultCandidate } from '@/services/MintService';
 import { formatPercentage, getAssetColor } from '@/utils/loanUtils';
 import { useTokenContext } from '@/context/TokenContext';
+import { formatNumberWithCommas, parseCommaNumber } from '@/utils/numberUtils';
 
 interface AllocationProps {
   optimalAllocations: PlanItem[];
@@ -32,7 +33,7 @@ const Allocation: React.FC<AllocationProps> = ({
   const [displayMode, setDisplayMode] = useState<'USD' | 'WAD'>('WAD');
   const { earningAssets, inactiveTokens } = useTokenContext();
 
-  // Store raw input strings
+  // Store canonical WAD values (always in token amounts)
   const [depositInputs, setDepositInputs] = useState<Record<string, string>>({});
   const [mintInputs, setMintInputs] = useState<Record<string, string>>({});
 
@@ -42,10 +43,40 @@ const Allocation: React.FC<AllocationProps> = ({
     return c ? parseFloat(formatUnits(c.oraclePrice, 18)) : 0;
   };
 
-  // Parse input to number
+  // Parse input to number (handles commas)
   const toNumber = (input: string): number => {
-    const num = parseFloat(input || '0');
+    const cleaned = parseCommaNumber(input || '0');
+    const num = parseFloat(cleaned);
     return isNaN(num) ? 0 : num;
+  };
+
+  // Convert WAD token amount to USD for display
+  const convertToUSD = (wadAmount: string, assetAddress: string): string => {
+    if (!wadAmount || wadAmount === '0') return '';
+    const tokenAmount = toNumber(wadAmount);
+    const price = getPrice(assetAddress);
+    const usdValue = tokenAmount * price;
+    return usdValue > 0 ? formatNumberWithCommas(usdValue.toFixed(2)) : '';
+  };
+
+  // Convert USD display value to WAD token amount
+  const convertFromUSD = (usdValue: string, assetAddress: string): string => {
+    if (!usdValue || usdValue === '0') return '';
+    const cleaned = parseCommaNumber(usdValue);
+    const usd = toNumber(cleaned);
+    const price = getPrice(assetAddress);
+    const tokenAmount = price > 0 ? usd / price : 0;
+    return tokenAmount > 0 ? String(tokenAmount) : '';
+  };
+
+  // Get display value based on mode
+  const getDisplayValue = (wadAmount: string, assetAddress: string, isDeposit: boolean): string => {
+    if (displayMode === 'USD' && isDeposit) {
+      // Convert deposit amounts using token price
+      return convertToUSD(wadAmount, assetAddress);
+    }
+    // Mint amounts are USDST ($1 each), format with commas but no conversion
+    return formatNumberWithCommas(wadAmount);
   };
 
   // Get token amount from input (converts USD to token if needed)
@@ -116,17 +147,25 @@ const Allocation: React.FC<AllocationProps> = ({
   };
 
   const handleDepositChange = (assetAddress: string, value: string) => {
-    setDepositInputs(prev => ({ ...prev, [assetAddress]: value }));
+    // Parse commas and convert from display format to canonical WAD format
+    const cleanValue = parseCommaNumber(value);
+    const canonicalValue = displayMode === 'USD' ? convertFromUSD(value, assetAddress) : cleanValue;
+    setDepositInputs(prev => ({ ...prev, [assetAddress]: canonicalValue }));
+    
     if (!autoSupplyCollateral && onDepositAmountChange) {
-      const tokenAmt = getTokenAmount(value, assetAddress);
+      const tokenAmt = toNumber(canonicalValue);
       onDepositAmountChange(assetAddress, String(tokenAmt));
     }
   };
 
   const handleMintChange = (assetAddress: string, value: string) => {
-    setMintInputs(prev => ({ ...prev, [assetAddress]: value }));
+    // Mint amounts are USDST, which = $1, so no conversion needed
+    // Parse commas before storing
+    const cleanValue = parseCommaNumber(value);
+    setMintInputs(prev => ({ ...prev, [assetAddress]: cleanValue }));
+    
     if (!autoSupplyCollateral && onMintAmountChange) {
-      onMintAmountChange(assetAddress, value);
+      onMintAmountChange(assetAddress, cleanValue);
     }
   };
 
@@ -151,17 +190,23 @@ const Allocation: React.FC<AllocationProps> = ({
           >
             <Label className="text-sm font-medium cursor-pointer">Vault Breakdown</Label>
             <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setDisplayMode(prev => prev === 'USD' ? 'WAD' : 'USD');
-                }}
-                className="h-6 px-2 text-xs"
-              >
-                {displayMode}
-              </Button>
+              {isOpen && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    setDisplayMode(prev => prev === 'USD' ? 'WAD' : 'USD');
+                  }}
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                  }}
+                  className="h-6 px-2 text-xs"
+                >
+                  {displayMode}
+                </Button>
+              )}
               {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </div>
           </Button>
@@ -215,7 +260,7 @@ const Allocation: React.FC<AllocationProps> = ({
                     <div className="text-muted-foreground">{formatPercentage(stabilityFeeRate)}</div>
                     <div>
                       <Input
-                        value={depositInputs[candidate.assetAddress] || ''}
+                        value={getDisplayValue(depositInputs[candidate.assetAddress] || '', candidate.assetAddress, true)}
                         onChange={(e) => handleDepositChange(candidate.assetAddress, e.target.value)}
                         placeholder="0"
                         className="h-8 text-xs"
@@ -225,7 +270,7 @@ const Allocation: React.FC<AllocationProps> = ({
                     {showMintAmounts && (
                       <div>
                         <Input
-                          value={mintInputs[candidate.assetAddress] || ''}
+                          value={getDisplayValue(mintInputs[candidate.assetAddress] || '', candidate.assetAddress, false)}
                           onChange={(e) => handleMintChange(candidate.assetAddress, e.target.value)}
                           placeholder="0"
                           className="h-8 text-xs"
