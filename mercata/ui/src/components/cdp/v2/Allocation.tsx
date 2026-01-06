@@ -92,7 +92,11 @@ const Allocation: React.FC<AllocationProps> = ({
         }
         const alloc = optimalAllocations.find(a => a.assetAddress === c.assetAddress);
         const depositStr = (alloc?.depositAmount ?? '').trim();
-        newCanonical[c.assetAddress] = depositStr === '' || depositStr === '0' ? '' : depositStr;
+        
+        // Filter out any zero values (0, 0.0, 0.00, etc)
+        const depositNum = parseFloat(depositStr);
+        const canonicalVal = depositStr && depositNum > 0 ? depositStr : '';
+        newCanonical[c.assetAddress] = canonicalVal;
       });
       return newCanonical;
     });
@@ -107,7 +111,11 @@ const Allocation: React.FC<AllocationProps> = ({
         }
         const alloc = optimalAllocations.find(a => a.assetAddress === c.assetAddress);
         const depositStr = (alloc?.depositAmount ?? '').trim();
-        const canonicalVal = depositStr === '' || depositStr === '0' ? '' : depositStr;
+        
+        // Filter out any zero values (0, 0.0, 0.00, etc)
+        const depositNum = parseFloat(depositStr);
+        const canonicalVal = depositStr && depositNum > 0 ? depositStr : '';
+        
         if (displayMode === 'USD' && canonicalVal) {
           newDisplay[c.assetAddress] = wadToUSD(canonicalVal, c.assetAddress);
         } else {
@@ -128,13 +136,19 @@ const Allocation: React.FC<AllocationProps> = ({
         const alloc = optimalAllocations.find(a => a.assetAddress === c.assetAddress);
         let mintStr = (alloc?.mintAmount ?? '').trim();
         
-        // Format to 2 decimal places in USD mode (USDST = $1, no conversion needed)
-        if (displayMode === 'USD' && mintStr && mintStr !== '0') {
-          const mintNum = toNumber(mintStr);
-          mintStr = mintNum > 0 ? mintNum.toFixed(2) : '';
+        // Filter out any zero values (0, 0.0, 0.00, etc)
+        const mintNum = parseFloat(mintStr);
+        if (!mintStr || mintNum <= 0) {
+          newMints[c.assetAddress] = '';
+          return;
         }
         
-        newMints[c.assetAddress] = mintStr === '' || mintStr === '0' ? '' : mintStr;
+        // Format to 2 decimal places in USD mode (USDST = $1, no conversion needed)
+        if (displayMode === 'USD') {
+          mintStr = mintNum.toFixed(2);
+        }
+        
+        newMints[c.assetAddress] = mintStr;
       });
       return newMints;
     });

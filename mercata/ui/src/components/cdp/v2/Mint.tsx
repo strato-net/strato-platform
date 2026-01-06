@@ -30,7 +30,9 @@ import {
   calculateAvailableToMint,
   calculateWeightedAverageAPR,
   calculateSliderMinHFFromPercentages,
+  calculatePositionMetrics,
 } from '@/utils/loanUtils';
+import { formatWeiToDecimalHP } from '@/utils/numberUtils';
 
 interface MintProps {
   onSuccess?: () => void;
@@ -57,6 +59,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   }>>([]);
   const [progressError, setProgressError] = useState<string | undefined>();
   const [autoSupplyCollateral, setAutoSupplyCollateral] = useState(true);
+  const [currentPositionHF, setCurrentPositionHF] = useState<number | undefined>(undefined);
 
   const { fetchAllPrices } = useOracleContext();
   const { toast } = useToast();
@@ -98,6 +101,29 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
       .catch(() => setError('Could not load CDP data'))
       .finally(() => setLoading(false));
   }, [fetchAllPrices, refreshTrigger]);
+
+  // Fetch current position and calculate health factor (same as DebtPosition.tsx)
+  useEffect(() => {
+    const fetchCurrentPosition = async () => {
+      try {
+        const positions = await cdpService.getVaults();
+        const { overallHealthFactor } = calculatePositionMetrics(
+          positions.map(pos => ({
+            debtAmount: pos.debtAmount,
+            collateralValueUSD: pos.collateralValueUSD,
+            stabilityFeeRate: pos.stabilityFeeRate,
+            liquidationRatio: pos.liquidationRatio,
+            collateralizationRatio: pos.collateralizationRatio,
+          })),
+          formatWeiToDecimalHP
+        );
+        setCurrentPositionHF(overallHealthFactor === Infinity ? undefined : overallHealthFactor);
+      } catch {
+        setCurrentPositionHF(undefined);
+      }
+    };
+    fetchCurrentPosition();
+  }, [refreshTrigger]);
 
   const mintAmount = useMemo(() => {
     const parsed = parseFloat((mintAmountInput || '').replace(/,/g, ''));
@@ -255,15 +281,19 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     try {
       // Use the exact displayed allocations - no recalculation to avoid precision drift
       const transactions: Array<{ type: 'deposit' | 'mint'; asset: string; amount: string; symbol: string }> = [];
+      
       for (const allocation of optimalAllocations) {
         // Check if amount strings are non-zero
         // depositAmount and mintAmount are already formatted decimal strings from the plan
-        const hasDeposit = allocation.depositAmount && parseFloat(allocation.depositAmount) > 0;
-        const hasMint = allocation.mintAmount && parseFloat(allocation.mintAmount) > 0;
+        const depositNum = parseFloat(allocation.depositAmount || '0');
+        const mintNum = parseFloat(allocation.mintAmount || '0');
+        const hasDeposit = allocation.depositAmount && depositNum > 0;
+        const hasMint = allocation.mintAmount && mintNum > 0;
         
         if (hasDeposit) {
           transactions.push({ type: 'deposit', asset: allocation.assetAddress, amount: allocation.depositAmount, symbol: allocation.symbol });
         }
+        
         if (hasMint) {
           transactions.push({ type: 'mint', asset: allocation.assetAddress, amount: allocation.mintAmount, symbol: allocation.symbol });
         }
@@ -353,7 +383,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
 
       if (allSuccessful) setCurrentProgressStep('complete');
       await Promise.all([fetchVaultCandidates(), fetchAllPrices()]);
-      setMintAmountInput('10');
+      setMintAmountInput('');
       setIsMaxMode(false);
       if (onSuccess) onSuccess();
     } catch {
@@ -476,7 +506,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
             riskBuffer={riskBuffer}
             onRiskBufferChange={handleRiskBufferChange}
             minHF={sliderMinHF}
-            currentHF={undefined}
+            currentHF={currentPositionHF}
             sliderRangeColor={sliderColor}
             inputDisabled={!autoSupplyCollateral}
             showButton={autoSupplyCollateral}
