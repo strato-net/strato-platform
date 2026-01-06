@@ -121,6 +121,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   const [debtFloorHit, setDebtFloorHit] = useState(false);
   const [debtCeilingHit, setDebtCeilingHit] = useState(false);
   const [hasLowHF, setHasLowHF] = useState(false);
+  const [exceedsBalance, setExceedsBalance] = useState(false);
 
   // Compute fresh allocations when auto-supply is enabled
   useEffect(() => {
@@ -441,6 +442,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     if (optimalAllocations.length === 0 && debtFloorHit) return 'Debt Floor: Increase Mint Amount';
     if (optimalAllocations.length === 0 && totalHeadroomWei <= 0n) return 'Vaults at Capacity: Move Risk Slider to the right';
     if (optimalAllocations.length === 0) return 'No vaults available';
+    if (exceedsBalance && !autoSupplyCollateral) return 'Deposit exceeds available balance';
     if (hasLowHF && !autoSupplyCollateral) return `Health Factor below ${riskBuffer.toFixed(2)}: Adjust allocations or move Risk Slider`;
     return 'Confirm Mint';
   };
@@ -481,7 +483,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
             actionButtonLabel={getButtonText()}
             onConfirm={handleQuickMint}
             isProcessing={transactionLoading}
-            buttonDisabled={(mintAmount <= 0 && !isMaxMode) || optimalAllocations.length === 0 || exceedsMaxCollateral || shouldLockInput}
+            buttonDisabled={(mintAmount <= 0 && !isMaxMode) || optimalAllocations.length === 0 || exceedsMaxCollateral || shouldLockInput || hasLowHF || exceedsBalance}
           />
 
           {/* Auto Supply Collateral */}
@@ -540,6 +542,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
                 onMintAmountChange={handleAllocationMintChange}
                 targetHF={riskBuffer}
                 onHFValidationChange={setHasLowHF}
+                onBalanceExceededChange={setExceedsBalance}
               />
               {/* Warning for partial allocation due to debt constraints */}
               {(debtFloorHit || debtCeilingHit) && (
@@ -549,13 +552,22 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
                   </p>
                 </div>
               )}
+              {/* Warning for deposit exceeding available balance */}
+              {exceedsBalance && !autoSupplyCollateral && (
+                <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                  <p className="text-sm font-semibold text-red-800 dark:text-red-200 mb-2">Deposit Exceeds Available Balance</p>
+                  <p className="text-xs text-red-700 dark:text-red-300">
+                    One or more vaults have a deposit amount that exceeds your available balance. Please reduce the deposit amounts.
+                  </p>
+                </div>
+              )}
             </>
           )}
 
           {/* Confirm Button - only shown when auto supply is unchecked */}
           {!autoSupplyCollateral && (
             <Button
-              disabled={(mintAmount <= 0 && !isMaxMode) || optimalAllocations.length === 0 || transactionLoading || exceedsMaxCollateral || shouldLockInput || hasLowHF}
+              disabled={(mintAmount <= 0 && !isMaxMode) || optimalAllocations.length === 0 || transactionLoading || exceedsMaxCollateral || shouldLockInput || hasLowHF || exceedsBalance}
               onClick={handleQuickMint}
               className="w-full"
             >

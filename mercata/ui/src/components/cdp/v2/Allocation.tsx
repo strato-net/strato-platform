@@ -20,6 +20,7 @@ interface AllocationProps {
   autoSupplyCollateral?: boolean;
   targetHF?: number; // Target HF from slider (riskBuffer)
   onHFValidationChange?: (hasLowHF: boolean) => void; // Callback when HF validation changes
+  onBalanceExceededChange?: (exceedsBalance: boolean) => void; // Callback when deposit exceeds balance
 }
 
 const Allocation: React.FC<AllocationProps> = ({
@@ -31,6 +32,7 @@ const Allocation: React.FC<AllocationProps> = ({
   autoSupplyCollateral = true,
   targetHF,
   onHFValidationChange,
+  onBalanceExceededChange,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [displayMode, setDisplayMode] = useState<'USD' | 'WAD'>('WAD');
@@ -134,6 +136,35 @@ const Allocation: React.FC<AllocationProps> = ({
     
     onHFValidationChange(hasLowHF);
   }, [depositInputs, mintInputs, vaultCandidates, targetHF, autoSupplyCollateral, onHFValidationChange]);
+
+  // Check for deposits exceeding available balance and notify parent
+  useEffect(() => {
+    if (!onBalanceExceededChange || autoSupplyCollateral) {
+      return;
+    }
+
+    let exceedsBalance = false;
+    for (const candidate of vaultCandidates) {
+      const depositInput = depositInputs[candidate.assetAddress] || '';
+      const depositAmt = toNumber(depositInput);
+      
+      // Skip validation for vaults with empty or zero deposit
+      if (!depositInput || depositInput.trim() === '' || depositAmt === 0) {
+        continue;
+      }
+      
+      // Get available balance (potentialCollateral is in native asset units)
+      const decimals = candidate.assetScale.toString().length - 1;
+      const availableBalance = parseFloat(formatUnits(candidate.potentialCollateral, decimals));
+      
+      if (depositAmt > availableBalance) {
+        exceedsBalance = true;
+        break;
+      }
+    }
+    
+    onBalanceExceededChange(exceedsBalance);
+  }, [depositInputs, vaultCandidates, autoSupplyCollateral, onBalanceExceededChange]);
 
   // Calculate HF for a vault - matches VaultsList formula: HF = CR / LT
   const calculateHF = (candidate: VaultCandidate, depositAmt: number, mintAmt: number): string => {
@@ -274,6 +305,11 @@ const Allocation: React.FC<AllocationProps> = ({
                   mintInput && mintInput.trim() !== '' && mintAmt > 0 &&
                   hfNum !== Infinity && !isNaN(hfNum) && hfNum < targetHF;
 
+                // Check if deposit exceeds available balance
+                const decimals = candidate.assetScale.toString().length - 1;
+                const availableBalance = parseFloat(formatUnits(candidate.potentialCollateral, decimals));
+                const exceedsBalance = !autoSupplyCollateral && depositAmt > 0 && depositAmt > availableBalance;
+
                 return (
                   <div key={candidate.assetAddress} className={`grid gap-2 items-center text-sm ${getGridClass()}`}>
                     <div className="flex items-center gap-2">
@@ -298,7 +334,7 @@ const Allocation: React.FC<AllocationProps> = ({
                         value={getDisplayValue(depositInputs[candidate.assetAddress] || '', candidate.assetAddress, true)}
                         onChange={(e) => handleDepositChange(candidate.assetAddress, e.target.value)}
                         placeholder="0"
-                        className={`h-8 text-xs ${displayMode === 'USD' ? 'pl-5' : ''} ${hasLowHF ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                        className={`h-8 text-xs ${displayMode === 'USD' ? 'pl-5' : ''} ${hasLowHF || exceedsBalance ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                         disabled={autoSupplyCollateral}
                       />
                     </div>
@@ -308,7 +344,7 @@ const Allocation: React.FC<AllocationProps> = ({
                           value={getDisplayValue(mintInputs[candidate.assetAddress] || '', candidate.assetAddress, false)}
                           onChange={(e) => handleMintChange(candidate.assetAddress, e.target.value)}
                           placeholder="0"
-                          className={`h-8 text-xs ${hasLowHF ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                          className={`h-8 text-xs ${hasLowHF || exceedsBalance ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                           disabled={autoSupplyCollateral}
                         />
                       </div>
