@@ -222,33 +222,38 @@ const Allocation: React.FC<AllocationProps> = ({
   }, [depositCanonical, mintInputs, vaultCandidates, targetHF, autoSupplyCollateral, onHFValidationChange]);
 
   // Check for deposits exceeding available balance and notify parent
+  // TEMPORARILY DISABLED FOR TESTING - allows submitting transactions that will fail
   useEffect(() => {
     if (!onBalanceExceededChange || autoSupplyCollateral) {
       return;
     }
 
-    let exceedsBalance = false;
-    for (const candidate of vaultCandidates) {
-      // Use canonical token amounts for balance check
-      const canonicalDeposit = depositCanonical[candidate.assetAddress] || '';
-      const depositAmt = toNumber(canonicalDeposit);
-      
-      // Skip validation for vaults with empty or zero deposit
-      if (!canonicalDeposit || canonicalDeposit.trim() === '' || depositAmt === 0) {
-        continue;
-      }
-      
-      // Get available balance (potentialCollateral is in native asset units)
-      const decimals = candidate.assetScale.toString().length - 1;
-      const availableBalance = parseFloat(formatUnits(candidate.potentialCollateral, decimals));
-      
-      if (depositAmt > availableBalance) {
-        exceedsBalance = true;
-        break;
-      }
-    }
+    // TEMPORARILY DISABLED: Always report no balance exceeded
+    onBalanceExceededChange(false);
     
-    onBalanceExceededChange(exceedsBalance);
+    // Original balance check logic (commented out):
+    // let exceedsBalance = false;
+    // for (const candidate of vaultCandidates) {
+    //   // Use canonical token amounts for balance check
+    //   const canonicalDeposit = depositCanonical[candidate.assetAddress] || '';
+    //   const depositAmt = toNumber(canonicalDeposit);
+    //   
+    //   // Skip validation for vaults with empty or zero deposit
+    //   if (!canonicalDeposit || canonicalDeposit.trim() === '' || depositAmt === 0) {
+    //     continue;
+    //   }
+    //   
+    //   // Get available balance (potentialCollateral is in native asset units)
+    //   const decimals = candidate.assetScale.toString().length - 1;
+    //   const availableBalance = parseFloat(formatUnits(candidate.potentialCollateral, decimals));
+    //   
+    //   if (depositAmt > availableBalance) {
+    //     exceedsBalance = true;
+    //     break;
+    //   }
+    // }
+    // 
+    // onBalanceExceededChange(exceedsBalance);
   }, [depositCanonical, vaultCandidates, autoSupplyCollateral, onBalanceExceededChange]);
 
   // Calculate HF for a vault - matches VaultsList formula: HF = CR / LT
@@ -282,7 +287,7 @@ const Allocation: React.FC<AllocationProps> = ({
       if (!isFinite(hf) || isNaN(hf)) return '-';
       if (hf >= 999) return '∞';
       return hf.toFixed(2);
-    } catch {
+          } catch {
       return '-';
     }
   };
@@ -332,31 +337,31 @@ const Allocation: React.FC<AllocationProps> = ({
             variant="ghost"
             className="w-full flex items-center justify-between p-3 rounded-md border border-border hover:bg-muted/80"
           >
-            <Label className="text-sm font-medium cursor-pointer">Vault Breakdown</Label>
+              <Label className="text-sm font-medium cursor-pointer">Vault Breakdown</Label>
             <div className="flex items-center gap-2">
               {isOpen && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
                     e.preventDefault();
                     setDisplayMode(prev => prev === 'USD' ? 'WAD' : 'USD');
                   }}
                   onPointerDown={(e) => {
                     e.stopPropagation();
-                  }}
-                  className="h-6 px-2 text-xs"
-                >
+                }}
+                className="h-6 px-2 text-xs"
+              >
                   {displayMode}
-                </Button>
+              </Button>
               )}
               {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </div>
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <div className="mt-2 pl-3 pt-3 pb-3 border border-border rounded-md bg-muted/50 space-y-3">
+          <div className="mt-2 px-3 pt-3 pb-3 border border-border rounded-md bg-muted/50 space-y-3">
             <div className="space-y-2">
               <div className={`grid gap-2 text-xs font-medium text-muted-foreground pb-2 border-b border-border ${getGridClass()}`}>
                 <div>Asset</div>
@@ -395,9 +400,12 @@ const Allocation: React.FC<AllocationProps> = ({
                   hfNum !== Infinity && !isNaN(hfNum) && hfNum < targetHF;
 
                 // Check if deposit exceeds available balance
-                const decimals = candidate.assetScale.toString().length - 1;
-                const availableBalance = parseFloat(formatUnits(candidate.potentialCollateral, decimals));
-                const exceedsBalance = !autoSupplyCollateral && depositAmt > 0 && depositAmt > availableBalance;
+                // TEMPORARILY DISABLED FOR TESTING - always set to false
+                const exceedsBalance = false;
+                // Original balance check logic (commented out):
+                // const decimals = candidate.assetScale.toString().length - 1;
+                // const availableBalance = parseFloat(formatUnits(candidate.potentialCollateral, decimals));
+                // const exceedsBalance = !autoSupplyCollateral && depositAmt > 0 && depositAmt > availableBalance;
 
                 return (
                   <div key={candidate.assetAddress} className={`grid gap-2 items-center text-sm ${getGridClass()}`}>
@@ -405,12 +413,12 @@ const Allocation: React.FC<AllocationProps> = ({
                       {tokenImage ? (
                         <img src={tokenImage} alt={candidate.symbol} className="w-6 h-6 rounded-full object-cover" />
                       ) : (
-                        <div
-                          className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold text-white"
+                      <div
+                        className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold text-white"
                           style={{ backgroundColor: getAssetColor(candidate.symbol) }}
-                        >
-                          {candidate.symbol.slice(0, 2)}
-                        </div>
+                      >
+                        {candidate.symbol.slice(0, 2)}
+                      </div>
                       )}
                       <span className="font-medium">{candidate.symbol}</span>
                     </div>

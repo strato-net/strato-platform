@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { Modal } from "antd";
-import { CheckCircle2, Loader2, Clock, AlertCircle } from "lucide-react";
+import { CheckCircle2, Loader2, Clock, AlertCircle, Ban } from "lucide-react";
 
 export type MintStep = 
   | "depositing"
@@ -34,6 +34,19 @@ const MintProgressModal: React.FC<MintProgressModalProps> = ({
 }) => {
   const [collapsedTxs, setCollapsedTxs] = useState<Set<number>>(new Set());
 
+  // Determine if a transaction was skipped (marked as error with "Skipped" message)
+  const hasError = currentStep === "error";
+  const errorIndex = transactions.findIndex(tx => tx.status === "error" && tx.error && !tx.error.includes("Skipped"));
+  const isSkipped = (tx: MintTransaction) => tx.status === "error" && tx.error && tx.error.includes("Skipped");
+
+  // Transaction summary for error state
+  const summary = useMemo(() => {
+    const completed = transactions.filter(tx => tx.status === "completed").length;
+    const failed = transactions.filter(tx => tx.status === "error" && !isSkipped(tx)).length;
+    const skipped = transactions.filter(tx => isSkipped(tx)).length;
+    return { completed, failed, skipped, total: transactions.length };
+  }, [transactions]);
+
   // Auto-collapse completed transactions
   useEffect(() => {
     const newCollapsed = new Set<number>();
@@ -52,10 +65,29 @@ const MintProgressModal: React.FC<MintProgressModalProps> = ({
     if (tx.status === "processing") {
       return <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />;
     }
+    if (isSkipped(tx)) {
+      return <Ban className="w-5 h-5 text-gray-400" />;
+    }
     if (tx.status === "error") {
       return <AlertCircle className="w-5 h-5 text-red-500" />;
     }
     return <Clock className="w-5 h-5 text-muted-foreground" />;
+  };
+
+  const getStatusBadge = (tx: MintTransaction) => {
+    if (tx.status === "completed") {
+      return <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-500 font-medium">Completed</span>;
+    }
+    if (tx.status === "processing") {
+      return <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-500 font-medium">In Progress</span>;
+    }
+    if (isSkipped(tx)) {
+      return <span className="text-xs px-2 py-0.5 rounded-full bg-gray-500/20 text-gray-400 font-medium">Cancelled</span>;
+    }
+    if (tx.status === "error") {
+      return <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-500 font-medium">Failed</span>;
+    }
+    return <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-medium">Pending</span>;
   };
 
   const canClose = currentStep === "complete" || currentStep === "error";
@@ -115,30 +147,13 @@ const MintProgressModal: React.FC<MintProgressModalProps> = ({
       className="[&_.ant-modal-content]:rounded-xl [&_.ant-modal-content]:bg-card [&_.ant-modal-content]:text-foreground [&_.ant-modal-header]:border-b [&_.ant-modal-header]:border-border [&_.ant-modal-header]:bg-card [&_.ant-modal-body]:p-6 [&_.ant-modal-body]:text-foreground [&_.ant-modal-title]:text-foreground [&_.ant-modal-footer]:bg-card [&_.ant-modal-footer]:border-border [&_.ant-modal-close]:text-muted-foreground"
     >
       <div className="space-y-6">
-        {error && (
-          <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
-            <p className="text-sm text-red-500">{error}</p>
-          </div>
-        )}
-
-        {currentStep !== "error" && currentStep !== "complete" && (
-          <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-            <p className="text-sm text-blue-500">{getStepDescription()}</p>
-          </div>
-        )}
-
-        {currentStep === "complete" && (
-          <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
-            <p className="text-sm text-green-500">{getStepDescription()}</p>
-          </div>
-        )}
-
         <div className="space-y-2">
           {transactions.map((tx, index) => {
             const isCollapsed = collapsedTxs.has(index);
             const isCompleted = tx.status === "completed";
             const isProcessing = tx.status === "processing";
-            const isError = tx.status === "error";
+            const isError = tx.status === "error" && !isSkipped(tx);
+            const txIsSkipped = isSkipped(tx);
 
             return (
               <div
@@ -150,6 +165,8 @@ const MintProgressModal: React.FC<MintProgressModalProps> = ({
                     ? "bg-green-500/10 border border-green-500/30"
                     : isError
                     ? "bg-red-500/10 border border-red-500/30"
+                    : txIsSkipped
+                    ? "bg-gray-500/5 border border-gray-500/20 opacity-60"
                     : "bg-muted/30 border border-border"
                 }`}
               >
@@ -183,15 +200,15 @@ const MintProgressModal: React.FC<MintProgressModalProps> = ({
                               ? "text-green-500"
                               : isError
                               ? "text-red-500"
+                              : txIsSkipped
+                              ? "text-gray-400 line-through"
                               : "text-muted-foreground"
                           }`}
                         >
                           {tx.type === "deposit" ? "Deposit" : "Mint"} {tx.symbol}
                         </h4>
                         <div className="flex items-center gap-2">
-                          {isProcessing && (
-                            <span className="text-xs text-blue-500 font-medium">In Progress</span>
-                          )}
+                          {getStatusBadge(tx)}
                           {isCompleted && (
                             <button
                               onClick={() => setCollapsedTxs(prev => new Set(prev).add(index))}
@@ -210,6 +227,8 @@ const MintProgressModal: React.FC<MintProgressModalProps> = ({
                             ? "text-green-500/80"
                             : isError
                             ? "text-red-500/80"
+                            : txIsSkipped
+                            ? "text-gray-400"
                             : "text-muted-foreground"
                         }`}
                       >
@@ -227,6 +246,11 @@ const MintProgressModal: React.FC<MintProgressModalProps> = ({
                       {tx.error && (
                         <div className="mt-2">
                           <p className="text-xs text-red-500">{tx.error}</p>
+                        </div>
+                      )}
+                      {txIsSkipped && (
+                        <div className="mt-2">
+                          <p className="text-xs text-gray-400">This transaction was not executed due to a prior failure.</p>
                         </div>
                       )}
                     </div>

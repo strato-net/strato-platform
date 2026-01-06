@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -280,19 +279,23 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     
     try {
       // Use the exact displayed allocations - no recalculation to avoid precision drift
+      // Build transactions in execution order: all deposits first, then all mints
       const transactions: Array<{ type: 'deposit' | 'mint'; asset: string; amount: string; symbol: string }> = [];
       
+      // First, add all deposits
       for (const allocation of optimalAllocations) {
-        // Check if amount strings are non-zero
-        // depositAmount and mintAmount are already formatted decimal strings from the plan
         const depositNum = parseFloat(allocation.depositAmount || '0');
-        const mintNum = parseFloat(allocation.mintAmount || '0');
         const hasDeposit = allocation.depositAmount && depositNum > 0;
-        const hasMint = allocation.mintAmount && mintNum > 0;
         
         if (hasDeposit) {
           transactions.push({ type: 'deposit', asset: allocation.assetAddress, amount: allocation.depositAmount, symbol: allocation.symbol });
         }
+      }
+      
+      // Then, add all mints
+      for (const allocation of optimalAllocations) {
+        const mintNum = parseFloat(allocation.mintAmount || '0');
+        const hasMint = allocation.mintAmount && mintNum > 0;
         
         if (hasMint) {
           transactions.push({ type: 'mint', asset: allocation.assetAddress, amount: allocation.mintAmount, symbol: allocation.symbol });
@@ -302,7 +305,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
       setProgressTransactions(transactions.map(tx => ({
         symbol: tx.symbol,
         type: tx.type,
-        amount: tx.amount + (tx.type === 'mint' ? ' USDST' : ` ${tx.symbol}`),
+        amount: tx.amount,
         status: 'pending' as const,
       })));
 
@@ -326,6 +329,12 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
             setProgressTransactions(prev => {
               const updated = [...prev];
               updated[currentTxIndex] = { ...updated[currentTxIndex], status: 'error', error: `Deposit failed: ${result.status}` };
+              // Mark all remaining pending transactions as cancelled
+              for (let i = currentTxIndex + 1; i < updated.length; i++) {
+                if (updated[i].status === 'pending') {
+                  updated[i] = { ...updated[i], status: 'error' as const, error: 'Skipped due to prior failure' };
+                }
+              }
               return updated;
             });
             throw new Error(`Deposit failed for ${tx.symbol}: ${result.status}`);
@@ -337,6 +346,20 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
             return updated;
           });
         } catch (err) {
+          // If transaction was processing and failed, mark it as error and cancel remaining
+          setProgressTransactions(prev => {
+            const updated = [...prev];
+            if (updated[currentTxIndex]?.status === 'processing') {
+              updated[currentTxIndex] = { ...updated[currentTxIndex], status: 'error', error: err instanceof Error ? err.message : 'Deposit transaction failed' };
+            }
+            // Mark all remaining pending transactions as cancelled
+            for (let i = currentTxIndex + 1; i < updated.length; i++) {
+              if (updated[i].status === 'pending') {
+                updated[i] = { ...updated[i], status: 'error' as const, error: 'Skipped due to prior failure' };
+              }
+            }
+            return updated;
+          });
           setProgressError(err instanceof Error ? err.message : 'Deposit transaction failed');
           setCurrentProgressStep('error');
           throw err;
@@ -363,6 +386,12 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
             setProgressTransactions(prev => {
               const updated = [...prev];
               updated[currentTxIndex] = { ...updated[currentTxIndex], status: 'error', error: `Mint failed: ${result.status}` };
+              // Mark all remaining pending transactions as cancelled
+              for (let i = currentTxIndex + 1; i < updated.length; i++) {
+                if (updated[i].status === 'pending') {
+                  updated[i] = { ...updated[i], status: 'error' as const, error: 'Skipped due to prior failure' };
+                }
+              }
               return updated;
             });
             throw new Error(`Mint failed for ${tx.symbol}: ${result.status}`);
@@ -374,6 +403,20 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
             return updated;
           });
         } catch (err) {
+          // If transaction was processing and failed, mark it as error and cancel remaining
+          setProgressTransactions(prev => {
+            const updated = [...prev];
+            if (updated[currentTxIndex]?.status === 'processing') {
+              updated[currentTxIndex] = { ...updated[currentTxIndex], status: 'error', error: err instanceof Error ? err.message : 'Mint transaction failed' };
+            }
+            // Mark all remaining pending transactions as cancelled
+            for (let i = currentTxIndex + 1; i < updated.length; i++) {
+              if (updated[i].status === 'pending') {
+                updated[i] = { ...updated[i], status: 'error' as const, error: 'Skipped due to prior failure' };
+              }
+            }
+            return updated;
+          });
           setProgressError(err instanceof Error ? err.message : 'Mint transaction failed');
           setCurrentProgressStep('error');
           throw err;
@@ -484,14 +527,6 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
           {/* Header */}
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold">Mint against collateral (CDP)</h2>
-            <Select defaultValue="quick-mint">
-              <SelectTrigger className="w-[140px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="quick-mint">Quick Mint</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
 
           {/* Loan Form */}
@@ -538,7 +573,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
             </div>
           ) : mintAmount <= 0 && !isMaxMode ? (
             <div className="p-3 rounded-md bg-muted border border-border text-center">
-              <p className="text-sm text-muted-foreground">Enter a mint amount and select a risk value to see your optimal mint plan</p>
+              {/* <p className="text-sm text-muted-foreground">Enter a mint amount and select a risk value to see your optimal mint plan</p> */}
             </div>
           ) : exceedsMaxCollateral ? (
             <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
@@ -607,7 +642,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
 
           {/* Transaction Fee */}
           <div className="text-sm text-muted-foreground">
-            Transaction Fee: {formatUSD(totalFees, 2)} USDST
+            Transaction Fee: {formatUSD(totalFees, 2)} USDST ({Math.round(totalFees * 100)} vouchers)
           </div>
 
           {/* Rewards Display */}
