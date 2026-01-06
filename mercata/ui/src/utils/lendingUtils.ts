@@ -271,13 +271,23 @@ export const calculateHFSliderExtrema = (
   return { min: centCeil(minHF), max: centFloor(maxHF) };
 };
 
-const determineErrorMessage = (
+export const determineErrorMessage = (
   borrowAmount: Number,
-  requestedHealthFactor: Number,
-  loanData: NewLoanData,
-  collaterals: CollateralData[]
+  maxAtRequestedHF: Number,
+  maxAtMinHF: Number
 ) : string => {
-  return ""; //TODO: Implement this
+  // Check if borrow amount exceeds maximum at requested health factor
+  if (borrowAmount > maxAtRequestedHF) {
+    // If even at minimum health factor the max is still too low, don't suggest increasing risk
+    if (borrowAmount > maxAtMinHF) {
+      return "Borrow amount exceeds the maximum at this health factor.\nConsider bridging in more collateral.";
+    }
+    
+    // Otherwise, suggest increasing risk level as an option
+    return "Borrow amount exceeds the maximum at this health factor.\nConsider bridging in more collateral, or increase risk level.";
+  }
+  
+  return "";
 };
 
 export const calculateBorrowTxFee = (collateralCount: number): { fee: number, voucher: number } =>
