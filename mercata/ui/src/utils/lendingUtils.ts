@@ -226,10 +226,18 @@ export const calculateAvailableToBorrowUSD = (
   newCollateral: Map<CollateralData, bigint>,
 ): Number => {
   const targetHFRaw = BigInt(Math.round(Number(healthFactor) * 1e18));
+  if (targetHFRaw <= 0n) return 0;
 
   let totalCollateralValueUSD = BigInt(loanData?.totalCollateralValueUSD ?? "0"); // supplied collat, LT weighted
-  for (const [collat, amount] of newCollateral.entries()) { // Add new collateral value (LT weighted)
-    totalCollateralValueUSD += (BigInt(collat.liquidationThreshold) * amount) / 10000n;
+  
+  // Add new collateral value (LT weighted): (amount * price * LT) / (decimals * 10000)
+  for (const [collat, amount] of newCollateral.entries()) {
+    const price = BigInt(collat.assetPrice ?? "0");
+    const lt = BigInt(collat.liquidationThreshold ?? "0");
+    const decimals = BigInt(10) ** BigInt(collat.customDecimals ?? 18);
+    if (price > 0n && lt > 0n) {
+      totalCollateralValueUSD += (amount * price * lt) / (decimals * 10000n);
+    }
   }
 
   const currentDebtUSD = BigInt(loanData?.totalAmountOwed ?? "0");
@@ -286,7 +294,7 @@ const calculateAdditionalCollateralAmountFromValue = (
   return (collateralValueUSD * 10n ** 18n) / price;
 };
 
-const recommendCollateralToSupply = (
+export const recommendCollateralToSupply = (
   loanData: NewLoanData,
   healthFactor: Number,
   borrowAmountUSD: Number,
@@ -369,7 +377,7 @@ const calculateMinimumLTV = (collaterals: CollateralData[]) : bigint => {
   return collaterals.map(c => BigInt(c.ltv ?? "0")).reduce((a, b) => a < b ? a : b);
 };
 
-const calculateAdditionalValueNeeded = (
+export const calculateAdditionalValueNeeded = (
   collaterals: CollateralData[],
   borrowAmount: Number,
   loanData: NewLoanData,
