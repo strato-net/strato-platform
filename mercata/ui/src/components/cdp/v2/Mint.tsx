@@ -120,6 +120,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   const [customAllocations, setCustomAllocations] = useState<PlanItem[]>([]);
   const [debtFloorHit, setDebtFloorHit] = useState(false);
   const [debtCeilingHit, setDebtCeilingHit] = useState(false);
+  const [hasLowHF, setHasLowHF] = useState(false);
 
   // Compute fresh allocations when auto-supply is enabled
   useEffect(() => {
@@ -440,6 +441,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     if (optimalAllocations.length === 0 && debtFloorHit) return 'Debt Floor: Increase Mint Amount';
     if (optimalAllocations.length === 0 && totalHeadroomWei <= 0n) return 'Vaults at Capacity: Move Risk Slider to the right';
     if (optimalAllocations.length === 0) return 'No vaults available';
+    if (hasLowHF && !autoSupplyCollateral) return `Health Factor below ${riskBuffer.toFixed(2)}x: Adjust allocations or move Risk Slider`;
     return 'Confirm Mint';
   };
 
@@ -536,6 +538,8 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
                 autoSupplyCollateral={autoSupplyCollateral}
                 onDepositAmountChange={handleAllocationDepositChange}
                 onMintAmountChange={handleAllocationMintChange}
+                targetHF={riskBuffer}
+                onHFValidationChange={setHasLowHF}
               />
               {/* Warning for partial allocation due to debt constraints */}
               {(debtFloorHit || debtCeilingHit) && (
@@ -551,7 +555,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
           {/* Confirm Button - only shown when auto supply is unchecked */}
           {!autoSupplyCollateral && (
             <Button
-              disabled={(mintAmount <= 0 && !isMaxMode) || optimalAllocations.length === 0 || transactionLoading || exceedsMaxCollateral || shouldLockInput}
+              disabled={(mintAmount <= 0 && !isMaxMode) || optimalAllocations.length === 0 || transactionLoading || exceedsMaxCollateral || shouldLockInput || hasLowHF}
               onClick={handleQuickMint}
               className="w-full"
             >

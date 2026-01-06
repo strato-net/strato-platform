@@ -19,6 +19,8 @@ interface AllocationProps {
   onDepositAmountChange?: (assetAddress: string, amount: string) => void;
   onMintAmountChange?: (assetAddress: string, amount: string) => void;
   autoSupplyCollateral?: boolean;
+  targetHF?: number; // Target HF from slider (riskBuffer)
+  onHFValidationChange?: (hasLowHF: boolean) => void; // Callback when HF validation changes
 }
 
 const Allocation: React.FC<AllocationProps> = ({
@@ -28,6 +30,8 @@ const Allocation: React.FC<AllocationProps> = ({
   onDepositAmountChange,
   onMintAmountChange,
   autoSupplyCollateral = true,
+  targetHF,
+  onHFValidationChange,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [displayMode, setDisplayMode] = useState<'USD' | 'WAD'>('WAD');
@@ -109,6 +113,45 @@ const Allocation: React.FC<AllocationProps> = ({
     setDepositInputs(newDeposits);
     setMintInputs(newMints);
   }, [optimalAllocations, vaultCandidates]);
+
+  // Check for low HF and notify parent
+  useEffect(() => {
+    if (!onHFValidationChange || autoSupplyCollateral || targetHF === undefined) {
+      return;
+    }
+
+    let hasLowHF = false;
+    for (const candidate of vaultCandidates) {
+      const mintInput = mintInputs[candidate.assetAddress] || '';
+      const mintAmt = toNumber(mintInput);
+      
+      // Skip validation for vaults with empty or zero mint amount
+      if (!mintInput || mintInput.trim() === '' || mintAmt === 0) {
+        continue;
+      }
+      
+      // Inline getTokenAmount logic to avoid dependency issues
+      const depositInput = depositInputs[candidate.assetAddress] || '';
+      const depositNum = toNumber(depositInput);
+      const depositAmt = displayMode === 'USD' 
+        ? (() => {
+            const c = vaultCandidates.find(v => v.assetAddress === candidate.assetAddress);
+            const price = c ? parseFloat(formatUnits(c.oraclePrice, 18)) : 0;
+            return price > 0 ? depositNum / price : 0;
+          })()
+        : depositNum;
+      
+      const hf = calculateHF(candidate, depositAmt, mintAmt);
+      const hfNum = parseFloat(hf);
+      
+      if (hfNum !== Infinity && !isNaN(hfNum) && hfNum < targetHF) {
+        hasLowHF = true;
+        break;
+      }
+    }
+    
+    onHFValidationChange(hasLowHF);
+  }, [depositInputs, mintInputs, vaultCandidates, targetHF, autoSupplyCollateral, onHFValidationChange, displayMode]);
 
   // Calculate HF for a vault - matches VaultsList formula: HF = CR / LT
   const calculateHF = (candidate: VaultCandidate, depositAmt: number, mintAmt: number): string => {
@@ -233,7 +276,8 @@ const Allocation: React.FC<AllocationProps> = ({
                 const tokenImage = token?.images?.[0]?.value;
 
                 const depositAmt = getTokenAmount(depositInputs[candidate.assetAddress] || '', candidate.assetAddress);
-                const mintAmt = toNumber(mintInputs[candidate.assetAddress] || '');
+                const mintInput = mintInputs[candidate.assetAddress] || '';
+                const mintAmt = toNumber(mintInput);
                 const hf = calculateHF(candidate, depositAmt, mintAmt);
                 const hfNum = parseFloat(hf);
                 const hfColor = isNaN(hfNum) || hf === '∞' 
@@ -241,6 +285,11 @@ const Allocation: React.FC<AllocationProps> = ({
                   : hfNum >= 2.0 ? 'text-green-600' 
                   : hfNum >= 1.5 ? 'text-yellow-600' 
                   : 'text-red-600';
+                
+                // Check if HF is below target (only when auto-supply is off, targetHF is provided, and mint amount is not empty/zero)
+                const hasLowHF = !autoSupplyCollateral && targetHF !== undefined && 
+                  mintInput && mintInput.trim() !== '' && mintAmt > 0 &&
+                  hfNum !== Infinity && !isNaN(hfNum) && hfNum < targetHF;
 
                 return (
                   <div key={candidate.assetAddress} className={`grid gap-2 items-center text-sm ${getGridClass()}`}>
@@ -263,7 +312,7 @@ const Allocation: React.FC<AllocationProps> = ({
                         value={getDisplayValue(depositInputs[candidate.assetAddress] || '', candidate.assetAddress, true)}
                         onChange={(e) => handleDepositChange(candidate.assetAddress, e.target.value)}
                         placeholder="0"
-                        className="h-8 text-xs"
+                        className={`h-8 text-xs ${hasLowHF ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                         disabled={autoSupplyCollateral}
                       />
                     </div>
@@ -273,7 +322,7 @@ const Allocation: React.FC<AllocationProps> = ({
                           value={getDisplayValue(mintInputs[candidate.assetAddress] || '', candidate.assetAddress, false)}
                           onChange={(e) => handleMintChange(candidate.assetAddress, e.target.value)}
                           placeholder="0"
-                          className="h-8 text-xs"
+                          className={`h-8 text-xs ${hasLowHF ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                           disabled={autoSupplyCollateral}
                         />
                       </div>
