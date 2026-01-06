@@ -246,9 +246,12 @@ export const calculateAvailableToBorrowUSD = (
   const maxDebtForTargetHF = (totalCollateralValueUSD * 10n ** 18n) / targetHFRaw;
 
   // Available to borrow = maxDebt - currentDebt (clamped to 0)
-  return maxDebtForTargetHF > currentDebtUSD
-    ? centFloor(Number((maxDebtForTargetHF - currentDebtUSD) / 10n ** 18n))
-    : 0.00;
+  // Floor to cents in BigInt space to avoid precision loss
+  if (maxDebtForTargetHF <= currentDebtUSD) return 0.00;
+  const centsInWei = 10n ** 16n; // 0.01 USD = 1e16 wei
+  const availableWei = (maxDebtForTargetHF - currentDebtUSD) / centsInWei * centsInWei;
+  const flooredToCentsWei = (availableWei / centsInWei) * centsInWei; // BigInt division truncates (floors)
+  return Number(flooredToCentsWei) / 1e18;
 };
 
 export const calculateHFSliderExtrema = (
