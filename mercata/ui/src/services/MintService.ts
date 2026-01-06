@@ -13,6 +13,7 @@ export interface VaultCandidateAPI {
   symbol: string;
   assetScale: string;
   minCR: string;
+  liquidationRatio: string;
   stabilityFeeRate: string;
   oraclePrice: string;
   currentCollateral: string;
@@ -30,6 +31,7 @@ export function apiToVaultCandidate(api: VaultCandidateAPI): VaultCandidate {
     symbol: api.symbol,
     assetScale: BigInt(api.assetScale),
     minCR: BigInt(api.minCR),
+    liquidationRatio: BigInt(api.liquidationRatio),
     stabilityFeeRate: BigInt(api.stabilityFeeRate),
     oraclePrice: BigInt(api.oraclePrice),
     currentCollateral: BigInt(api.currentCollateral),
@@ -48,7 +50,8 @@ export interface VaultCandidate {
   assetAddress: string;
   symbol: string;                 // Asset symbol (e.g., "ETH", "WBTC")
   assetScale: bigint;             // 10^decimals (e.g., 1e18 for 18-decimal assets)
-  minCR: bigint;                  // WAD format (1.5e18 = 150% CR)
+  minCR: bigint;                  // WAD format (1.5e18 = 150% CR) - min CR for user actions
+  liquidationRatio: bigint;       // WAD format (1.5e18 = 150%) - liquidation threshold for HF calc
   stabilityFeeRate: bigint;       // Per-second rate
   oraclePrice: bigint;            // Price per unit in USDST (18 decimals)
   currentCollateral: bigint;      // User's current collateral (native asset units)

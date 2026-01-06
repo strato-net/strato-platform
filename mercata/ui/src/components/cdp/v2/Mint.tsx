@@ -105,30 +105,6 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     return isFinite(parsed) && parsed > 0 ? parsed : 0;
   }, [mintAmountInput]);
 
-  // When auto-supply is checked and mint amount or risk buffer changes, fetch fresh allocations
-  useEffect(() => {
-    if (!autoSupplyCollateral) return;
-    if (vaultCandidates.length === 0) return;
-    
-    // Fetch fresh vault candidates to get latest balances and prices
-    const fetchFreshAllocations = async () => {
-      try {
-        await fetchAllPrices();
-        const { existingVaults, potentialVaults } = await cdpService.getVaultCandidates();
-        setVaultCandidates([...existingVaults, ...potentialVaults]);
-      } catch (error) {
-        // Silently fail - allocations will use existing candidates
-        console.error('Failed to fetch fresh allocations:', error);
-      }
-    };
-
-    // Only fetch if we have a valid mint amount or are in max mode
-    if (mintAmount > 0 || isMaxMode) {
-      fetchFreshAllocations();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mintAmount, riskBuffer, autoSupplyCollateral, isMaxMode, fetchAllPrices]);
-
   const mintAmountWei = useMemo(() => parseInputToWei(mintAmountInput), [mintAmountInput]);
 
   const maxAllocations = useMemo<PlanItem[]>(() => {
@@ -143,6 +119,8 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
 
   // Store allocations - updated by auto-supply or manual edits
   const [customAllocations, setCustomAllocations] = useState<PlanItem[]>([]);
+  const [debtFloorHit, setDebtFloorHit] = useState(false);
+  const [debtCeilingHit, setDebtCeilingHit] = useState(false);
 
   // Compute fresh allocations when auto-supply is enabled
   useEffect(() => {
@@ -150,11 +128,15 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     
     if (isMaxMode) {
       setCustomAllocations(maxAllocations);
+      setDebtFloorHit(false);
+      setDebtCeilingHit(false);
       return;
     }
     
     if (mintAmountWei <= 0n || vaultCandidates.length === 0) {
       setCustomAllocations([]);
+      setDebtFloorHit(false);
+      setDebtCeilingHit(false);
       return;
     }
     
@@ -162,8 +144,12 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
       const result = getOptimalAllocations(mintAmountWei, riskBuffer, vaultCandidates);
       const allocations = convertAllocationsToPlanItems(result.allocations, vaultCandidates);
       setCustomAllocations(allocations);
+      setDebtFloorHit(result.debtFloorHit);
+      setDebtCeilingHit(result.debtCeilingHit);
     } catch {
       setCustomAllocations([]);
+      setDebtFloorHit(false);
+      setDebtCeilingHit(false);
     }
   }, [mintAmountWei, riskBuffer, vaultCandidates, isMaxMode, maxAllocations, autoSupplyCollateral]);
 
@@ -181,6 +167,10 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   const availableToMint = useMemo(() => 
     calculateAvailableToMint(totalMaxMintWei),
   [totalMaxMintWei]);
+
+  // Edge case flags
+  const shouldLockInput = maxAllocations.length === 0 || totalMaxMintWei === 0n;
+  const exceedsMaxCollateral = !isMaxMode && mintAmountWei > 0n && mintAmountWei > totalHeadroomWei;
 
   // When MAX mode is enabled and slider changes, update the mint amount input
   useEffect(() => {
@@ -262,26 +252,18 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     setProgressError(undefined);
     
     try {
-      await fetchAllPrices();
-      const { existingVaults, potentialVaults } = await cdpService.getVaultCandidates();
-      const freshCandidates = [...existingVaults, ...potentialVaults];
-      
-      let freshAllocations: PlanItem[];
-      if (isMaxMode) {
-        const maxResult = getMaxAllocations(freshCandidates, riskBuffer);
-        freshAllocations = convertAllocationsToPlanItems(maxResult, freshCandidates);
-      } else {
-        const freshTargetMintUSD = parseUnits(mintAmount.toFixed(18), 18);
-        const result = getOptimalAllocations(freshTargetMintUSD, riskBuffer, freshCandidates);
-        freshAllocations = convertAllocationsToPlanItems(result.allocations, freshCandidates);
-      }
-
+      // Use the exact displayed allocations - no recalculation to avoid precision drift
       const transactions: Array<{ type: 'deposit' | 'mint'; asset: string; amount: string; symbol: string }> = [];
-      for (const allocation of freshAllocations) {
-        if (parseFloat(allocation.depositAmount || '0') > 0) {
+      for (const allocation of optimalAllocations) {
+        // Check if amount strings are non-zero
+        // depositAmount and mintAmount are already formatted decimal strings from the plan
+        const hasDeposit = allocation.depositAmount && parseFloat(allocation.depositAmount) > 0;
+        const hasMint = allocation.mintAmount && parseFloat(allocation.mintAmount) > 0;
+        
+        if (hasDeposit) {
           transactions.push({ type: 'deposit', asset: allocation.assetAddress, amount: allocation.depositAmount, symbol: allocation.symbol });
         }
-        if (parseFloat(allocation.mintAmount || '0') > 0) {
+        if (hasMint) {
           transactions.push({ type: 'mint', asset: allocation.assetAddress, amount: allocation.mintAmount, symbol: allocation.symbol });
         }
       }
@@ -289,7 +271,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
       setProgressTransactions(transactions.map(tx => ({
         symbol: tx.symbol,
         type: tx.type,
-        amount: formatUSD(parseFloat(tx.amount), tx.type === 'deposit' ? 4 : 2),
+        amount: tx.amount + (tx.type === 'mint' ? ' USDST' : ` ${tx.symbol}`),
         status: 'pending' as const,
       })));
 
@@ -323,7 +305,6 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
             updated[currentTxIndex] = { ...updated[currentTxIndex], status: 'completed', hash: result.hash };
             return updated;
           });
-          await fetchAllPrices();
         } catch (err) {
           setProgressError(err instanceof Error ? err.message : 'Deposit transaction failed');
           setCurrentProgressStep('error');
@@ -343,24 +324,8 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
         });
 
         try {
-          const maxMintResult = await cdpService.getMaxMint(tx.asset);
-          const maxMintableWei = BigInt(maxMintResult.maxAmount);
-          const plannedMintWei = parseUnits(tx.amount, 18);
-          const safeMaxMintableWei = (maxMintableWei * (BPS_SCALE - SAFETY_BUFFER_BPS)) / BPS_SCALE;
-
-          if (plannedMintWei > safeMaxMintableWei) {
-            if (safeMaxMintableWei <= 0n) {
-              setProgressTransactions(prev => {
-                const updated = [...prev];
-                updated[currentTxIndex] = { ...updated[currentTxIndex], status: 'error', error: 'Insufficient collateral after deposits' };
-                return updated;
-              });
-              currentTxIndex++;
-              continue;
-            }
-            tx.amount = formatUnits(safeMaxMintableWei, 18);
-          }
-
+          // Execute with exact planned amount (no safety check adjustment)
+          // The plan is already calculated with proper constraints
           const result = await cdpService.mint(tx.asset, tx.amount);
           if (result.status.toLowerCase() !== 'success') {
             allSuccessful = false;
@@ -395,7 +360,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     } finally {
       setTransactionLoading(false);
     }
-  }, [mintAmount, optimalAllocations, fetchVaultCandidates, fetchAllPrices, onSuccess, riskBuffer, isMaxMode]);
+  }, [mintAmount, optimalAllocations, fetchVaultCandidates, fetchAllPrices, onSuccess]);
 
   // Find CDP activity for rewards display
   const cdpActivity = useMemo(() => {
@@ -468,6 +433,17 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     });
   }, [vaultCandidates]);
 
+  const getButtonText = () => {
+    if (transactionLoading) return 'Processing...';
+    if (shouldLockInput) return 'Insufficient Collateral: Move Risk Slider to the right';
+    if (mintAmount <= 0 && !isMaxMode) return 'Enter mint amount';
+    if (exceedsMaxCollateral) return 'Insufficient Collateral: Decrease Mint Amount or move Risk Slider to the right';
+    if (optimalAllocations.length === 0 && debtFloorHit) return 'Debt Floor: Increase Mint Amount';
+    if (optimalAllocations.length === 0 && totalHeadroomWei <= 0n) return 'Vaults at Capacity: Move Risk Slider to the right';
+    if (optimalAllocations.length === 0) return 'No vaults available';
+    return 'Confirm Mint';
+  };
+
   return (
     <>
       <Card>
@@ -501,9 +477,10 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
             sliderRangeColor={sliderColor}
             disabled={!autoSupplyCollateral}
             showButton={autoSupplyCollateral}
-            actionButtonLabel="Confirm Mint"
+            actionButtonLabel={getButtonText()}
             onConfirm={handleQuickMint}
             isProcessing={transactionLoading}
+            buttonDisabled={(mintAmount <= 0 && !isMaxMode) || optimalAllocations.length === 0 || exceedsMaxCollateral || shouldLockInput}
           />
 
           {/* Auto Supply Collateral */}
@@ -514,28 +491,72 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
               onCheckedChange={(checked) => setAutoSupplyCollateral(checked === true)}
             />
             <Label htmlFor="auto-supply" className="text-sm cursor-pointer">
-              Automatically supply collateral (if needed)
+              Automatically allocate across vaults
             </Label>
           </div>
 
-          {/* Allocation Section */}
-          <Allocation
-            optimalAllocations={optimalAllocations}
-            vaultCandidates={vaultCandidates}
-            showMintAmounts={true}
-            autoSupplyCollateral={autoSupplyCollateral}
-            onDepositAmountChange={handleAllocationDepositChange}
-            onMintAmountChange={handleAllocationMintChange}
-          />
+          {/* Status Messages and Allocation Section */}
+          {shouldLockInput ? (
+            <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+              <p className="text-sm font-semibold text-red-800 dark:text-red-200 mb-2">Insufficient Collateral</p>
+              <p className="text-xs text-red-700 dark:text-red-300">
+                Zero USDST can be minted with your current asset balances and selected Risk value. Try moving the Risk Slider to the right to increase headroom.
+              </p>
+            </div>
+          ) : mintAmount <= 0 && !isMaxMode ? (
+            <div className="p-3 rounded-md bg-muted border border-border text-center">
+              <p className="text-sm text-muted-foreground">Enter a mint amount and select a risk value to see your optimal mint plan</p>
+            </div>
+          ) : exceedsMaxCollateral ? (
+            <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+              <p className="text-sm font-semibold text-red-800 dark:text-red-200 mb-2">Insufficient Collateral</p>
+              <p className="text-xs text-red-700 dark:text-red-300">
+                The requested mint amount exceeds your maximum borrowing capacity ({availableToMint} USDST). Try decreasing the mint amount or moving the Risk Slider to the right.
+              </p>
+            </div>
+          ) : optimalAllocations.length === 0 ? (
+            <div className="p-3 rounded-md bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
+              <p className="text-sm font-semibold text-yellow-800 dark:text-yellow-200 mb-2">
+                {debtFloorHit ? 'Debt floor prevents allocation' : totalHeadroomWei <= 0n ? 'Vaults at capacity for current risk value' : 'No suitable vaults found'}
+              </p>
+              <p className="text-xs text-yellow-700 dark:text-yellow-300">
+                {debtFloorHit
+                  ? 'Each vault requires a minimum debt amount. Try increasing your mint amount or use a different vault.'
+                  : totalHeadroomWei <= 0n
+                  ? 'Your vaults have reached their borrowing limit at the current risk value. Try moving the Risk Slider to the right to allow more borrowing.'
+                  : 'No vaults are available for minting at this time.'}
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Allocation Section - only shown when there's a valid allocation */}
+              <Allocation
+                optimalAllocations={optimalAllocations}
+                vaultCandidates={vaultCandidates}
+                showMintAmounts={true}
+                autoSupplyCollateral={autoSupplyCollateral}
+                onDepositAmountChange={handleAllocationDepositChange}
+                onMintAmountChange={handleAllocationMintChange}
+              />
+              {/* Warning for partial allocation due to debt constraints */}
+              {(debtFloorHit || debtCeilingHit) && (
+                <div className="p-3 rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                  <p className="text-xs text-amber-800 dark:text-amber-200">
+                    ⚠️ One or more vaults have hit a debt {debtFloorHit && debtCeilingHit ? 'floor/ceiling' : debtFloorHit ? 'floor' : 'ceiling'}. Effective mint amount may be lower than requested.
+                  </p>
+                </div>
+              )}
+            </>
+          )}
 
           {/* Confirm Button - only shown when auto supply is unchecked */}
           {!autoSupplyCollateral && (
             <Button
-              disabled={optimalAllocations.length === 0 || transactionLoading}
+              disabled={(mintAmount <= 0 && !isMaxMode) || optimalAllocations.length === 0 || transactionLoading || exceedsMaxCollateral || shouldLockInput}
               onClick={handleQuickMint}
               className="w-full"
             >
-              {transactionLoading ? 'Processing...' : 'Confirm Mint'}
+              {getButtonText()}
             </Button>
           )}
 

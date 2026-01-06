@@ -88,16 +88,16 @@ export function convertAllocationsToPlanItems(
 // Fee calculation utilities
 export const calculateTransactionCount = (optimalAllocations: PlanItem[]): number => {
   return optimalAllocations.reduce((count, a) => {
-    const hasDeposit = parseFloat(a.depositAmount || '0') > 0;
-    const hasMint = parseFloat(a.mintAmount || '0') > 0;
+    const hasDeposit = a.depositAmount && a.depositAmount !== '0' && parseFloat(a.depositAmount) > 0;
+    const hasMint = a.mintAmount && a.mintAmount !== '0' && parseFloat(a.mintAmount) > 0;
     return count + (hasDeposit ? 1 : 0) + (hasMint ? 1 : 0);
   }, 0);
 };
 
 export const calculateTotalFees = (optimalAllocations: PlanItem[]): number => {
   return optimalAllocations.reduce((fees, a) => {
-    const hasDeposit = parseFloat(a.depositAmount || '0') > 0;
-    const hasMint = parseFloat(a.mintAmount || '0') > 0;
+    const hasDeposit = a.depositAmount && a.depositAmount !== '0' && parseFloat(a.depositAmount) > 0;
+    const hasMint = a.mintAmount && a.mintAmount !== '0' && parseFloat(a.mintAmount) > 0;
     return fees + (hasDeposit ? DEPOSIT_FEE_USDST : 0) + (hasMint ? MINT_FEE_USDST : 0);
   }, 0);
 };
@@ -247,14 +247,11 @@ const WAD = 10n ** 18n;
  * 
  * Formula: minHF = max(minCR across all vaults) / max(liquidationRatio across all vaults)
  * 
- * @param vaultCandidates - Array of vault candidates with minCR in WAD format
- * @param liquidationRatios - Array of liquidation ratios as percentages (e.g., 133 for 133%)
- *                           OR a single default value if all vaults use the same LT
+ * @param vaultCandidates - Array of vault candidates with minCR and liquidationRatio in WAD format
  * @returns Minimum health factor for slider (typically around 1.0-1.5)
  */
 export const calculateSliderMinHF = (
-  vaultCandidates: VaultCandidate[],
-  liquidationRatios: number[] | number
+  vaultCandidates: VaultCandidate[]
 ): number => {
   if (vaultCandidates.length === 0) return 1.0;
   
@@ -262,10 +259,9 @@ export const calculateSliderMinHF = (
   const maxMinCRWad = vaultCandidates.reduce((max, v) => v.minCR > max ? v.minCR : max, 0n);
   const maxMinCRPercent = Number(maxMinCRWad) / Number(WAD) * 100; // Convert to percentage
   
-  // Find max liquidation ratio
-  const maxLT = Array.isArray(liquidationRatios)
-    ? Math.max(...liquidationRatios)
-    : liquidationRatios;
+  // Find max liquidation ratio from all vault candidates (liquidationRatio is in WAD format)
+  const maxLRWad = vaultCandidates.reduce((max, v) => v.liquidationRatio > max ? v.liquidationRatio : max, 0n);
+  const maxLT = Number(maxLRWad) / Number(WAD) * 100; // Convert to percentage
   
   console.log('[calculateSliderMinHF] Vault candidates:', vaultCandidates.length);
   console.log('[calculateSliderMinHF] max(minCR) across all vaults:', maxMinCRPercent, '%');

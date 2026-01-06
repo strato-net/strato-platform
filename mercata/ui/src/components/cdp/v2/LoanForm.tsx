@@ -33,6 +33,7 @@ interface LoanFormProps {
   onConfirm?: () => void;
   isProcessing?: boolean;
   showButton?: boolean;
+  buttonDisabled?: boolean;
 }
 
 const LoanForm: React.FC<LoanFormProps> = ({
@@ -53,6 +54,7 @@ const LoanForm: React.FC<LoanFormProps> = ({
   onConfirm,
   isProcessing = false,
   showButton = false,
+  buttonDisabled,
 }) => {
 
   return (
@@ -95,7 +97,7 @@ const LoanForm: React.FC<LoanFormProps> = ({
           {/* Confirm Button - only shown when showButton is true */}
           {showButton && onConfirm && (
             <Button
-              disabled={disabled || isProcessing}
+              disabled={(buttonDisabled ?? disabled) || isProcessing}
               onClick={onConfirm}
               className="w-full"
             >

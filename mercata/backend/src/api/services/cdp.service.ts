@@ -318,7 +318,8 @@ export interface RefinedVaultCandidate {
   assetAddress: string;
   symbol: string;                 // Asset symbol (e.g., "ETH", "WBTC")
   assetScale: string;             // 10^decimals as string (e.g., "1000000000000000000" for 18-decimal assets)
-  minCR: string;                  // WAD format as string (1.5e18 = 150% CR)
+  minCR: string;                  // WAD format as string (1.5e18 = 150% CR) - min CR for user actions
+  liquidationRatio: string;       // WAD format as string (1.5e18 = 150%) - liquidation threshold for HF calc
   stabilityFeeRate: string;       // Per-second rate as string (RAY format)
   oraclePrice: string;            // Price per unit in USDST as string (18 decimals)
   currentCollateral: string;      // User's current collateral as string (native asset units)
@@ -550,6 +551,9 @@ export const getVaultCandidates = async (
     // asset.minCR is a percentage (e.g., 150 for 150%), convert to decimal then WAD
     // Formula: (percentage / 100) * WAD = (percentage * WAD) / 100
     const minCRWad = (BigInt(Math.floor(asset.minCR)) * WAD) / 100n;
+    
+    // Convert liquidationRatio from percentage to WAD format (same as minCR)
+    const liquidationRatioWad = (BigInt(Math.floor(asset.liquidationRatio)) * WAD) / 100n;
 
     // Calculate assetScale from unitScale (unitScale is already 10^decimals)
     const assetScale = unitScale;
@@ -565,6 +569,7 @@ export const getVaultCandidates = async (
       symbol: asset.symbol,
       assetScale: assetScale.toString(),
       minCR: minCRWad.toString(),
+      liquidationRatio: liquidationRatioWad.toString(),
       stabilityFeeRate: stabilityFeeRateRay.toString(),
       oraclePrice: oraclePrice.toString(),
       currentCollateral: (existing?.collateralAmount ?? "0"),

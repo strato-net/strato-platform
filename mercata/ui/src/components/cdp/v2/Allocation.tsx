@@ -4,8 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronUp, ChevronDown } from 'lucide-react';
-import { formatUnits } from 'ethers';
-import { formatNumberWithCommas } from '@/utils/numberUtils';
+import { formatUnits, parseUnits } from 'ethers';
 import { convertStabilityFeeRateToAnnualPercentage } from '@/services/cdpUtils';
 import type { PlanItem } from '@/services/cdpTypes';
 import type { VaultCandidate } from '@/services/MintService';
@@ -30,125 +29,116 @@ const Allocation: React.FC<AllocationProps> = ({
   autoSupplyCollateral = true,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [depositInputs, setDepositInputs] = useState<Record<string, string>>({});
-  const [mintInputs, setMintInputs] = useState<Record<string, string>>({});
-  const [displayMode, setDisplayMode] = useState<'USD' | 'WAD'>('USD');
+  const [displayMode, setDisplayMode] = useState<'USD' | 'WAD'>('WAD');
   const { earningAssets, inactiveTokens } = useTokenContext();
 
-  // Helper: get oracle price for an asset
+  // Store raw input strings
+  const [depositInputs, setDepositInputs] = useState<Record<string, string>>({});
+  const [mintInputs, setMintInputs] = useState<Record<string, string>>({});
+
+  // Get oracle price for an asset
   const getPrice = (assetAddress: string): number => {
     const c = vaultCandidates.find(v => v.assetAddress === assetAddress);
     return c ? parseFloat(formatUnits(c.oraclePrice, 18)) : 0;
   };
 
-  // Format a token amount for display
-  const formatDeposit = (assetAddress: string, tokenAmount: number, mode: 'USD' | 'WAD'): string => {
-    if (tokenAmount === 0) return '';
-    if (mode === 'USD') {
+  // Parse input to number
+  const toNumber = (input: string): number => {
+    const num = parseFloat(input || '0');
+    return isNaN(num) ? 0 : num;
+  };
+
+  // Get token amount from input (converts USD to token if needed)
+  const getTokenAmount = (input: string, assetAddress: string): number => {
+    const num = toNumber(input);
+    if (displayMode === 'USD') {
       const price = getPrice(assetAddress);
-      return '$' + formatNumberWithCommas((tokenAmount * price).toFixed(2));
+      return price > 0 ? num / price : 0;
     }
-    return formatNumberWithCommas(tokenAmount.toString());
+    return num;
   };
 
-  // Format a USDST amount for display
-  const formatMint = (usdstAmount: number, mode: 'USD' | 'WAD'): string => {
-    if (usdstAmount === 0) return '';
-    if (mode === 'USD') {
-      return '$' + formatNumberWithCommas(usdstAmount.toFixed(2));
-    }
-    return formatNumberWithCommas(usdstAmount.toString());
-  };
-
-  // Parse display value to token amount
-  const parseDepositToToken = (assetAddress: string, displayValue: string, mode: 'USD' | 'WAD'): number => {
-    const cleanValue = displayValue.replace(/[$,]/g, '');
-    const numVal = parseFloat(cleanValue);
-    if (isNaN(numVal)) return 0;
-    
-    if (mode === 'USD') {
-      const price = getPrice(assetAddress);
-      return price > 0 ? numVal / price : 0;
-    }
-    return numVal;
-  };
-
-  // Parse display value to USDST amount
-  const parseMintToUsdst = (displayValue: string): number => {
-    const cleanValue = displayValue.replace(/[$,]/g, '');
-    const numVal = parseFloat(cleanValue);
-    return isNaN(numVal) ? 0 : numVal;
-  };
-
-  // Populate inputs from optimalAllocations (only when allocations change)
+  // Sync from optimalAllocations when they change
   useEffect(() => {
-    const deposits: Record<string, string> = {};
-    const mints: Record<string, string> = {};
+    const newDeposits: Record<string, string> = {};
+    const newMints: Record<string, string> = {};
 
-    optimalAllocations.forEach(alloc => {
-      const depositAmt = parseFloat(alloc.depositAmount || '0');
-      const mintAmt = parseFloat(alloc.mintAmount || '0');
-
-      deposits[alloc.assetAddress] = formatDeposit(alloc.assetAddress, depositAmt, displayMode);
-      mints[alloc.assetAddress] = formatMint(mintAmt, displayMode);
-    });
-
-    // Initialize empty fields for all vault candidates
     vaultCandidates.forEach(c => {
-      if (deposits[c.assetAddress] === undefined) deposits[c.assetAddress] = '';
-      if (mints[c.assetAddress] === undefined) mints[c.assetAddress] = '';
+      const alloc = optimalAllocations.find(a => a.assetAddress === c.assetAddress);
+      // IMPORTANT: keep the exact decimal strings from the plan.
+      // parseFloat/String round-tripping here causes precision drift and results in the
+      // tx execution plan (modal) differing from what the table displays.
+      const depositStr = (alloc?.depositAmount ?? '').trim();
+      const mintStr = (alloc?.mintAmount ?? '').trim();
+
+      newDeposits[c.assetAddress] = depositStr === '' || depositStr === '0' ? '' : depositStr;
+      newMints[c.assetAddress] = mintStr === '' || mintStr === '0' ? '' : mintStr;
     });
 
-    setDepositInputs(deposits);
-    setMintInputs(mints);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setDepositInputs(newDeposits);
+    setMintInputs(newMints);
   }, [optimalAllocations, vaultCandidates]);
 
-  // Handle displayMode toggle - convert current values, don't re-read from allocations
-  const handleDisplayModeToggle = () => {
-    const oldMode = displayMode;
-    const newMode = oldMode === 'USD' ? 'WAD' : 'USD';
-    setDisplayMode(newMode);
+  // Calculate HF for a vault - matches VaultsList formula: HF = CR / LT
+  const calculateHF = (candidate: VaultCandidate, depositAmt: number, mintAmt: number): string => {
+    try {
+      const decimals = candidate.assetScale.toString().length - 1;
+      const depositWei = depositAmt > 0 ? parseUnits(String(depositAmt), decimals) : 0n;
+      const mintWei = mintAmt > 0 ? parseUnits(String(mintAmt), 18) : 0n;
 
-    // Convert current deposit values to new format
-    setDepositInputs(prev => {
-      const converted: Record<string, string> = {};
-      Object.entries(prev).forEach(([addr, val]) => {
-        const tokenAmount = parseDepositToToken(addr, val, oldMode);
-        converted[addr] = formatDeposit(addr, tokenAmount, newMode);
-      });
-      return converted;
-    });
+      const totalCollateral = candidate.currentCollateral + depositWei;
+      const totalDebt = candidate.currentDebt + mintWei;
 
-    // Convert current mint values to new format
-    setMintInputs(prev => {
-      const converted: Record<string, string> = {};
-      Object.entries(prev).forEach(([addr, val]) => {
-        const usdstAmount = parseMintToUsdst(val);
-        converted[addr] = formatMint(usdstAmount, newMode);
-      });
-      return converted;
-    });
+      if (totalDebt <= 0n) return '∞';
+
+      // Calculate collateral value in USD (18 decimals)
+      const collateralValueUSD = (totalCollateral * candidate.oraclePrice) / candidate.assetScale;
+      
+      // Convert to numbers for percentage calculation
+      const collateralUSD = parseFloat(formatUnits(collateralValueUSD, 18));
+      const debtUSD = parseFloat(formatUnits(totalDebt, 18));
+
+      // CR = (collateralUSD / debtUSD) * 100 (as percentage, e.g., 200 for 200%)
+      const cr = (collateralUSD / debtUSD) * 100;
+      
+      // LT = liquidationRatio converted from WAD to percentage (e.g., 1.5e18 -> 150)
+      const lt = parseFloat(formatUnits(candidate.liquidationRatio, 18)) * 100;
+
+      // HF = CR / LT (same as VaultsList)
+      const hf = cr / lt;
+
+      if (!isFinite(hf) || isNaN(hf)) return '-';
+      if (hf >= 999) return '∞';
+      return hf.toFixed(2);
+    } catch {
+      return '-';
+    }
   };
 
-  // Handle deposit input change
   const handleDepositChange = (assetAddress: string, value: string) => {
     setDepositInputs(prev => ({ ...prev, [assetAddress]: value }));
-    
     if (!autoSupplyCollateral && onDepositAmountChange) {
-      const tokenAmount = parseDepositToToken(assetAddress, value, displayMode);
-      onDepositAmountChange(assetAddress, tokenAmount.toString());
+      const tokenAmt = getTokenAmount(value, assetAddress);
+      onDepositAmountChange(assetAddress, String(tokenAmt));
     }
   };
 
-  // Handle mint input change
   const handleMintChange = (assetAddress: string, value: string) => {
     setMintInputs(prev => ({ ...prev, [assetAddress]: value }));
-    
     if (!autoSupplyCollateral && onMintAmountChange) {
-      const usdstAmount = parseMintToUsdst(value);
-      onMintAmountChange(assetAddress, usdstAmount.toString());
+      onMintAmountChange(assetAddress, value);
     }
+  };
+
+  const getGridClass = () => {
+    if (showMintAmounts) {
+      return !autoSupplyCollateral 
+        ? 'grid-cols-[minmax(100px,auto)_minmax(80px,auto)_1fr_1fr_minmax(60px,auto)]' 
+        : 'grid-cols-[minmax(120px,auto)_minmax(100px,auto)_1fr_1fr]';
+    }
+    return !autoSupplyCollateral 
+      ? 'grid-cols-[minmax(100px,auto)_minmax(80px,auto)_1fr_minmax(60px,auto)]' 
+      : 'grid-cols-[minmax(120px,auto)_minmax(100px,auto)_1fr]';
   };
 
   return (
@@ -166,7 +156,7 @@ const Allocation: React.FC<AllocationProps> = ({
                 size="sm"
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleDisplayModeToggle();
+                  setDisplayMode(prev => prev === 'USD' ? 'WAD' : 'USD');
                 }}
                 className="h-6 px-2 text-xs"
               >
@@ -179,11 +169,12 @@ const Allocation: React.FC<AllocationProps> = ({
         <CollapsibleContent>
           <div className="mt-2 pl-3 pt-3 pb-3 border border-border rounded-md bg-muted/50 space-y-3">
             <div className="space-y-2">
-              <div className={`grid gap-2 text-xs font-medium text-muted-foreground pb-2 border-b border-border ${showMintAmounts ? 'grid-cols-[minmax(120px,auto)_minmax(100px,auto)_1fr_1fr]' : 'grid-cols-[minmax(120px,auto)_minmax(100px,auto)_1fr]'}`}>
+              <div className={`grid gap-2 text-xs font-medium text-muted-foreground pb-2 border-b border-border ${getGridClass()}`}>
                 <div>Asset</div>
                 <div>Stability Fee</div>
-                <div>Deposit</div>
-                {showMintAmounts && <div>Mint</div>}
+                <div>Deposit{displayMode === 'USD' ? ' ($)' : ''}</div>
+                {showMintAmounts && <div>Mint{displayMode === 'USD' ? ' ($)' : ''}</div>}
+                {!autoSupplyCollateral && <div className="text-right pr-3">HF</div>}
               </div>
               {vaultCandidates.map((candidate) => {
                 const allocation = optimalAllocations.find(a => a.assetAddress === candidate.assetAddress);
@@ -191,21 +182,26 @@ const Allocation: React.FC<AllocationProps> = ({
                   ? allocation.stabilityFeeRate 
                   : convertStabilityFeeRateToAnnualPercentage(candidate.stabilityFeeRate);
                 
-                // Find token image from earningAssets or inactiveTokens
                 const token = [...earningAssets, ...inactiveTokens].find(
                   t => t.address?.toLowerCase() === candidate.assetAddress?.toLowerCase()
                 );
                 const tokenImage = token?.images?.[0]?.value;
 
+                const depositAmt = getTokenAmount(depositInputs[candidate.assetAddress] || '', candidate.assetAddress);
+                const mintAmt = toNumber(mintInputs[candidate.assetAddress] || '');
+                const hf = calculateHF(candidate, depositAmt, mintAmt);
+                const hfNum = parseFloat(hf);
+                const hfColor = isNaN(hfNum) || hf === '∞' 
+                  ? 'text-green-600' 
+                  : hfNum >= 2.0 ? 'text-green-600' 
+                  : hfNum >= 1.5 ? 'text-yellow-600' 
+                  : 'text-red-600';
+
                 return (
-                  <div key={candidate.assetAddress} className={`grid gap-2 items-center text-sm ${showMintAmounts ? 'grid-cols-[minmax(120px,auto)_minmax(100px,auto)_1fr_1fr]' : 'grid-cols-[minmax(120px,auto)_minmax(100px,auto)_1fr]'}`}>
+                  <div key={candidate.assetAddress} className={`grid gap-2 items-center text-sm ${getGridClass()}`}>
                     <div className="flex items-center gap-2">
                       {tokenImage ? (
-                        <img
-                          src={tokenImage}
-                          alt={candidate.symbol}
-                          className="w-6 h-6 rounded-full object-cover"
-                        />
+                        <img src={tokenImage} alt={candidate.symbol} className="w-6 h-6 rounded-full object-cover" />
                       ) : (
                         <div
                           className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold text-white"
@@ -216,9 +212,7 @@ const Allocation: React.FC<AllocationProps> = ({
                       )}
                       <span className="font-medium">{candidate.symbol}</span>
                     </div>
-                    <div className="text-muted-foreground">
-                      {formatPercentage(stabilityFeeRate)}
-                    </div>
+                    <div className="text-muted-foreground">{formatPercentage(stabilityFeeRate)}</div>
                     <div>
                       <Input
                         value={depositInputs[candidate.assetAddress] || ''}
@@ -239,13 +233,14 @@ const Allocation: React.FC<AllocationProps> = ({
                         />
                       </div>
                     )}
+                    {!autoSupplyCollateral && (
+                      <div className={`font-medium text-right pr-3 ${hfColor}`}>{hf}</div>
+                    )}
                   </div>
                 );
               })}
               {vaultCandidates.length === 0 && (
-                <div className="text-sm text-muted-foreground text-center py-2">
-                  No vault candidates available
-                </div>
+                <div className="text-sm text-muted-foreground text-center py-2">No vault candidates available</div>
               )}
             </div>
           </div>
