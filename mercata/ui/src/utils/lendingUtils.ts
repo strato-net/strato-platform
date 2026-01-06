@@ -381,20 +381,34 @@ export const calculateAdditionalValueNeeded = (
   collaterals: CollateralData[],
   borrowAmount: Number,
   loanData: NewLoanData,
+  targetHealthFactor: Number,
 ) : Number => {
-  const minLTV = calculateMinimumLTV(collaterals);
-  if (minLTV === 0n) return 0; // careful with this
+  if (collaterals.length === 0) return 0;
+  
+  // Find minimum LT (strictest for achieving target HF)
+  const minLT = collaterals
+    .map(c => BigInt(c.liquidationThreshold ?? "0"))
+    .reduce((a, b) => a < b ? a : b);
+  if (minLT === 0n) return 0;
 
-  const totalDebtAfterBorrow = BigInt(loanData.totalAmountOwed) + BigInt(Math.round(Number(borrowAmount) * 1e18));
-  const currentBorrowingPowerUSD = BigInt(loanData.totalBorrowingPowerUSD ?? "0");
+  const targetHFRaw = BigInt(Math.round(Number(targetHealthFactor) * 1e18));
+  const currentLTCollateral = BigInt(loanData.totalCollateralValueUSD ?? "0");
+  const currentDebt = BigInt(loanData.totalAmountOwed ?? "0");
+  const newBorrow = BigInt(Math.round(Number(borrowAmount) * 1e18));
+  
+  const newDebt = currentDebt + newBorrow;
+  if (newDebt === 0n) return 0;
 
-  // Borrowing power (LTV-weighted) must be >= total debt to borrow
-  if (currentBorrowingPowerUSD >= totalDebtAfterBorrow) return 0;
-
-  const additionalPowerNeeded = totalDebtAfterBorrow - currentBorrowingPowerUSD;
-
-  // Convert borrowing power to collateral value using minLTV, so it's sufficient regardless of asset chosen
-  const additionalValueNeeded = (additionalPowerNeeded * 10000n) / minLTV;
+  // Required LT-weighted collateral for target HF (+ 1 for floor safety)
+  const requiredLTCollateral = (targetHFRaw * newDebt) / (10n ** 18n) + 1n;
+  
+  if (currentLTCollateral >= requiredLTCollateral) return 0;
+  
+  const neededLTValue = requiredLTCollateral - currentLTCollateral;
+  
+  // Convert LT-weighted value to raw value using minLT
+  // LT_value = raw_value * LT / 10000, so raw_value = LT_value * 10000 / LT
+  const additionalValueNeeded = (neededLTValue * 10000n) / minLT;
 
   return Number(additionalValueNeeded) / 1e18;
 };
