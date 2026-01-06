@@ -21,6 +21,7 @@ import { useLendingContext } from "@/context/LendingContext";
 import { handleAmountInputChange } from "@/utils/transferValidation";
 import { UserRewardsData } from "@/services/rewardsService";
 import { CompactRewardsDisplay } from "../rewards/CompactRewardsDisplay";
+import BorrowProgressModal, { BorrowStep } from "./BorrowProgressModal";
 
 interface BorrowFormProps {
   loans: NewLoanData | null;
@@ -43,7 +44,9 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
   const [autoSupplyCollateral, setAutoSupplyCollateral] = useState<boolean>(true);
   const [isCollateralExpanded, setIsCollateralExpanded] = useState<boolean>(false);
   const [customCollateralValues, setCustomCollateralValues] = useState<Map<string, string>>(new Map());
-  const { borrowMax } = useLendingContext();
+  const [progressModalOpen, setProgressModalOpen] = useState(false);
+  const [borrowSteps, setBorrowSteps] = useState<BorrowStep[]>([]);
+  const { borrowMax, supplyCollateral } = useLendingContext();
 
   // Calculate slider extrema based on collateral configs
   const sliderExtrema = useMemo(() => {
@@ -210,24 +213,98 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
   };
 
   const handleBorrow = async () => {
+    // Build steps array
+    const steps: BorrowStep[] = [];
+    
+    // Add collateral supply steps if we have collateral to supply
+    if (collateralTableData.length > 0) {
+      for (const item of collateralTableData) {
+        const decimals = item.collateral.customDecimals ?? 18;
+        const formattedAmount = formatUnits(item.amount, decimals);
+        steps.push({
+          id: `supply-${item.collateral.address}`,
+          label: `Supply ${item.collateral._symbol}`,
+          status: "pending",
+          asset: item.collateral,
+          amount: formattedAmount,
+        });
+      }
+    }
+    
+    // Add borrow step
     const maxWei = BigInt(maxAmount);
     const wei = safeParseUnits(borrowAmount || "0", 18);
-
-    // If at or within 1 wei of the max available, route via parent as 'ALL' to use on-chain borrowMax and parent UX
-    if (maxWei > 0n && (wei >= maxWei || (maxWei > 0n && wei >= (maxWei - 1n)))) {
-      onBorrow('ALL');
+    const isMaxBorrow = maxWei > 0n && (wei >= maxWei || (maxWei > 0n && wei >= (maxWei - 1n)));
+    
+    steps.push({
+      id: "borrow",
+      label: isMaxBorrow ? "Borrow Max USDST" : `Borrow ${borrowAmount} USDST`,
+      status: "pending",
+    });
+    
+    // Initialize modal
+    setBorrowSteps(steps);
+    setProgressModalOpen(true);
+    
+    try {
+      // Execute collateral supplies first
+      for (const item of collateralTableData) {
+        const stepId = `supply-${item.collateral.address}`;
+        
+        // Update step to processing
+        setBorrowSteps(prev => prev.map(s => 
+          s.id === stepId ? { ...s, status: "processing" } : s
+        ));
+        
+        try {
+          await supplyCollateral({
+            asset: item.collateral.address,
+            amount: item.amount.toString(),
+          });
+          
+          // Mark as completed
+          setBorrowSteps(prev => prev.map(s => 
+            s.id === stepId ? { ...s, status: "completed" } : s
+          ));
+        } catch (error: any) {
+          // Mark as error
+          setBorrowSteps(prev => prev.map(s => 
+            s.id === stepId ? { 
+              ...s, 
+              status: "error",
+              error: error.message || "Supply failed"
+            } : s
+          ));
+          throw error; // Stop execution on error
+        }
+      }
+      
+      // Execute borrow step
+      setBorrowSteps(prev => prev.map(s => 
+        s.id === "borrow" ? { ...s, status: "processing" } : s
+      ));
+      
+      if (isMaxBorrow) {
+        await onBorrow('ALL');
+      } else {
+        await onBorrow(borrowAmount);
+      }
+      
+      // Mark borrow as completed
+      setBorrowSteps(prev => prev.map(s => 
+        s.id === "borrow" ? { ...s, status: "completed" } : s
+      ));
+      
+      // Reset form after successful completion
       setBorrowAmount("");
       setBorrowAmountError("");
       setFeeError("");
       handlePollingUpdate("");
-      return;
+      
+    } catch (error: any) {
+      // Error already handled in individual steps
+      console.error("Borrow process failed:", error);
     }
-
-    onBorrow(borrowAmount);
-    setBorrowAmount("");
-    setBorrowAmountError("");
-    setFeeError("");
-    handlePollingUpdate("");
   };
 
   // Handle slider change - convert position to HF value
@@ -362,6 +439,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
           !!feeError ||
           safeParseUnits(borrowAmount || "0") <= 0n ||
           borrowLoading ||
+          progressModalOpen ||
           safeParseUnits(borrowAmount || "0") > BigInt(maxAmount)
         }
         className="w-full"
@@ -524,6 +602,16 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
 
         return null;
       })()}
+
+      {/* Borrow Progress Modal */}
+      <BorrowProgressModal
+        open={progressModalOpen}
+        steps={borrowSteps}
+        onClose={() => {
+          setProgressModalOpen(false);
+          setBorrowSteps([]);
+        }}
+      />
     </div>
   );
 };
