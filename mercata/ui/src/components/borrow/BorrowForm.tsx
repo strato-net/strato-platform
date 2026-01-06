@@ -371,7 +371,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
         <h3 className="text-lg font-semibold">Borrow USDST</h3>
         <div className="flex justify-between text-sm">
           <span className="text-muted-foreground">Available to Borrow</span>
-          <span className="font-medium">USDST {Number(availableToBorrow).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+          <span className="font-medium">USDST {Number(availableToBorrow).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
         </div>
         <div className="flex justify-between text-sm">
           <span className="text-muted-foreground">Interest Rate</span>
