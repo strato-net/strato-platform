@@ -6,7 +6,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { HelpCircle, ChevronDown, ChevronUp } from "lucide-react";
-import { BORROW_FEE } from "@/lib/constants";
 import { safeParseUnits, addCommasToInput, formatUnits } from "@/utils/numberUtils";
 import { NewLoanData, CollateralData } from "@/interface";
 import { 
@@ -14,7 +13,8 @@ import {
   calculateHFSliderExtrema, 
   calculateAfterBorrowHealthFactor,
   recommendCollateralToSupply,
-  calculateAdditionalValueNeeded
+  calculateAdditionalValueNeeded,
+  calculateBorrowTxFee
 } from "@/utils/lendingUtils";
 import { getRiskLabel } from "@/utils/loanUtils";
 import { useLendingContext } from "@/context/LendingContext";
@@ -72,22 +72,10 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
     return calculateAvailableToBorrowUSD(loans, targetHealthFactor, potentialCollateral);
   }, [loans, targetHealthFactor, collateralInfo]);
 
-  // Calculate the max amount considering fees
+  // Max borrowable amount in wei
   const maxAmount = useMemo(() => {
-    const availableWei = BigInt(Math.round(Number(availableToBorrow) * 1e18));
-    const feeWei = safeParseUnits(BORROW_FEE, 18);
-    const voucherBal = BigInt(voucherBalance || 0);
-    const usdstBal = safeParseUnits(usdstBalance || "0", 18);
-    
-    // Check if user can cover fee with vouchers or USDST
-    const canCoverFee = voucherBal >= feeWei * 100n || usdstBal >= feeWei;
-    if (!canCoverFee) {
-      setFeeError("Insufficient balance to cover transaction fee");
-      return "0";
-    }
-    setFeeError("");
-    return availableWei.toString();
-  }, [availableToBorrow, voucherBalance, usdstBalance]);
+    return BigInt(Math.round(Number(availableToBorrow) * 1e18)).toString();
+  }, [availableToBorrow]);
 
   // Current health factor display
   const currentHF = useMemo(() => {
@@ -159,6 +147,27 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
     const needed = calculateAdditionalValueNeeded(collateralInfo, parseFloat(borrowAmount || "0"), loans);
     return Number(needed);
   }, [autoSupplyCollateral, totalCollateralValue, loans, collateralInfo, borrowAmount]);
+
+  // Calculate transaction fee based on number of collateral assets being supplied
+  const txFee = useMemo(() => {
+    const collateralCount = collateralTableData.length;
+    return calculateBorrowTxFee(collateralCount);
+  }, [collateralTableData]);
+
+  // Check if user can afford the transaction fee (separate from borrow amount)
+  const canAffordFee = useMemo(() => {
+    const feeWei = safeParseUnits(txFee.fee.toString(), 18);
+    const voucherBal = BigInt(voucherBalance || 0);
+    const usdstBal = safeParseUnits(usdstBalance || "0", 18);
+    
+    const canCover = voucherBal >= BigInt(txFee.voucher) || usdstBal >= feeWei;
+    if (!canCover) {
+      setFeeError("Insufficient balance to cover transaction fee");
+    } else {
+      setFeeError("");
+    }
+    return canCover;
+  }, [txFee, voucherBalance, usdstBalance]);
 
   // Handle checkbox change - expand when unchecked
   const handleAutoSupplyChange = (checked: boolean) => {
@@ -475,6 +484,15 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
         </CollapsibleContent>
       </Collapsible>
 
+      {/* Transaction Fee */}
+      <div className="flex justify-between text-sm">
+        <span className="text-muted-foreground underline cursor-help" title="Fee paid to process this transaction">Transaction Fee</span>
+        <span className="font-medium">{txFee.fee.toFixed(2)} USDST ({txFee.voucher} vouchers)</span>
+      </div>
+      {feeError && (
+        <p className="text-yellow-600 text-sm">{feeError}</p>
+      )}
+
       {/* Rewards Display */}
       <CompactRewardsDisplay
         userRewards={userRewards}
@@ -482,15 +500,6 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
         inputAmount={borrowAmount}
         actionLabel="Borrow"
       />
-
-      {/* Transaction Fee */}
-      <div className="flex justify-between text-sm">
-        <span className="text-muted-foreground underline cursor-help" title="Fee paid to process this transaction">Transaction Fee</span>
-        <span className="font-medium">{BORROW_FEE} USDST ({parseFloat(BORROW_FEE) * 100} vouchers)</span>
-      </div>
-      {feeError && (
-        <p className="text-yellow-600 text-sm">{feeError}</p>
-      )}
 
       {/* Conditional Warning Messages */}
       {(() => {
