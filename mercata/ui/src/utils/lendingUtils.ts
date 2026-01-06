@@ -280,11 +280,11 @@ const determineErrorMessage = (
   return ""; //TODO: Implement this
 };
 
-const calculateBorrowTxFee = (collateralCount: number): { fee: Number, voucher: Number } =>
+export const calculateBorrowTxFee = (collateralCount: number): { fee: number, voucher: number } =>
 {
     const fee = collateralCount * parseFloat(SUPPLY_COLLATERAL_FEE) + parseFloat(BORROW_FEE);
     const voucher = Math.round(fee * 100);
-    return { fee, voucher }; // TODO verify no rounding issues, voucher is int
+    return { fee, voucher };
 };
 
 const calculateAdditionalCollateralAmountFromValue = (
