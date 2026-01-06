@@ -15,7 +15,8 @@ import {
   recommendCollateralToSupply,
   calculateAdditionalValueNeeded,
   calculateBorrowTxFee,
-  determineErrorMessage
+  determineErrorMessage,
+  calculateAdditionalCollateralAmountFromValue
 } from "@/utils/lendingUtils";
 import { getRiskLabel } from "@/utils/loanUtils";
 import { useLendingContext } from "@/context/LendingContext";
@@ -122,7 +123,8 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
       // If custom mode, use custom value if set
       if (!autoSupplyCollateral && customCollateralValues.has(collateral.address)) {
         const customValue = parseFloat(customCollateralValues.get(collateral.address) || "0");
-        const customAmount = price > 0n ? BigInt(Math.round(customValue * 1e18)) * decimals / price : 0n;
+        const customValueWei = BigInt(Math.round(customValue * 1e18));
+        const customAmount = calculateAdditionalCollateralAmountFromValue(customValueWei, price, decimals);
         data.push({ collateral, amount: customAmount, valueUSD: customValue });
       } else {
         data.push({ collateral, amount, valueUSD });
@@ -461,7 +463,9 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
       </TooltipProvider>
 
       {/* Warning Message Box - Above Borrow Button */}
-      {afterBorrowHF !== null && Number(afterBorrowHF) < 1.6 && (
+      {afterBorrowHF !== null && Number(afterBorrowHF) < 1.6 // Low Health Factor Warning
+       && !customBorrowError // Don't show if overlarge borrow error is already displayed
+       && (
         <div className={`p-4 border rounded-lg ${
           Number(afterBorrowHF) < 1.3
             ? "bg-red-500/10 dark:bg-red-500/20 border-red-500/30"
