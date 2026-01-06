@@ -6,7 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { HelpCircle, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
-import { safeParseUnits, addCommasToInput, formatUnits } from "@/utils/numberUtils";
+import { safeParseUnits, addCommasToInput, formatUnits, formatBalance } from "@/utils/numberUtils";
 import { NewLoanData, CollateralData } from "@/interface";
 import { 
   calculateAvailableToBorrowUSD, 
@@ -553,6 +553,17 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
           )}
         </CollapsibleTrigger>
         <CollapsibleContent className="px-4 pb-4">
+          <style>{`
+            /* Hide number input spinner arrows */
+            .collateral-value-input[type="number"]::-webkit-outer-spin-button,
+            .collateral-value-input[type="number"]::-webkit-inner-spin-button {
+              -webkit-appearance: none;
+              margin: 0;
+            }
+            .collateral-value-input[type="number"] {
+              -moz-appearance: textfield;
+            }
+          `}</style>
           {/* Total Value Header */}
           <div className="text-sm font-medium mb-3 pt-2 border-t">
             Total Value of Collateral: ${totalCollateralValue.toFixed(0)}
@@ -560,66 +571,76 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
 
           {/* Collateral Table */}
           {collateralTableData.length > 0 ? (
-            <div className="space-y-1">
-              {/* Table Header */}
-              <div className="grid grid-cols-3 gap-4 text-xs text-muted-foreground pb-2">
-                <span>Asset</span>
-                <span className="text-center">Amount</span>
-                <span className="text-right">Value</span>
-              </div>
+            <TooltipProvider>
+              <div className="space-y-1">
+                {/* Table Header */}
+                <div className="grid grid-cols-3 gap-4 text-xs text-muted-foreground pb-2">
+                  <span>Asset</span>
+                  <span className="text-center">Amount</span>
+                  <span className="text-right">Value</span>
+                </div>
 
-              {/* Table Rows */}
-              {collateralTableData.map((item) => {
-                const decimals = item.collateral.customDecimals ?? 18;
-                const formattedAmount = Number(item.amount) / Math.pow(10, decimals);
-                const tokenImage = item.collateral.images?.[0]?.value;
+                {/* Table Rows */}
+                {collateralTableData.map((item) => {
+                  const decimals = item.collateral.customDecimals ?? 18;
+                  const fullAmount = formatBalance(item.amount, undefined, decimals, 2);
+                  const displayAmount = formatBalance(item.amount, undefined, decimals, 0, 4);
+                  const tokenImage = item.collateral.images?.[0]?.value;
 
-                return (
-                  <div
-                    key={item.collateral.address}
-                    className="grid grid-cols-3 gap-4 items-center py-2 text-sm"
-                  >
-                    {/* Asset */}
-                    <div className="flex items-center gap-2">
-                      {tokenImage ? (
-                        <img
-                          src={tokenImage}
-                          alt={item.collateral._symbol}
-                          className="w-5 h-5 rounded-full"
-                        />
+                  return (
+                    <div
+                      key={item.collateral.address}
+                      className="grid grid-cols-3 gap-4 items-center py-2 text-sm"
+                    >
+                      {/* Asset */}
+                      <div className="flex items-center gap-2">
+                        {tokenImage ? (
+                          <img
+                            src={tokenImage}
+                            alt={item.collateral._symbol}
+                            className="w-5 h-5 rounded-full"
+                          />
+                        ) : (
+                          <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-xs">
+                            {item.collateral._symbol?.charAt(0) || '?'}
+                          </div>
+                        )}
+                        <span className="font-medium">{item.collateral._symbol}</span>
+                      </div>
+
+                      {/* Amount */}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="text-center tabular-nums cursor-help">
+                            {displayAmount}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{fullAmount}</p>
+                        </TooltipContent>
+                      </Tooltip>
+
+                      {/* Value */}
+                      {autoSupplyCollateral ? (
+                        <span className="text-right tabular-nums">
+                          ${item.valueUSD.toFixed(2)}
+                        </span>
                       ) : (
-                        <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-xs">
-                          {item.collateral._symbol?.charAt(0) || '?'}
+                        <div className="flex items-center justify-end gap-1">
+                          <span className="text-muted-foreground">$</span>
+                          <Input
+                            type="number"
+                            value={customCollateralValues.get(item.collateral.address) || item.valueUSD.toFixed(2)}
+                            onChange={(e) => handleCustomValueChange(item.collateral.address, e.target.value)}
+                            className="collateral-value-input w-20 h-7 text-right text-sm px-2"
+                          />
                         </div>
                       )}
-                      <span className="font-medium">{item.collateral._symbol}</span>
                     </div>
-
-                    {/* Amount */}
-                    <span className="text-center tabular-nums">
-                      {formattedAmount.toFixed(4)}
-                    </span>
-
-                    {/* Value */}
-                    {autoSupplyCollateral ? (
-                      <span className="text-right tabular-nums">
-                        ${item.valueUSD.toFixed(0)}
-                      </span>
-                    ) : (
-                      <div className="flex items-center justify-end gap-1">
-                        <span className="text-muted-foreground">$</span>
-                        <Input
-                          type="number"
-                          value={customCollateralValues.get(item.collateral.address) || item.valueUSD.toFixed(0)}
-                          onChange={(e) => handleCustomValueChange(item.collateral.address, e.target.value)}
-                          className="w-20 h-7 text-right text-sm px-2"
-                        />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            </TooltipProvider>
           ) : (
             <p className="text-sm text-muted-foreground py-2">
               {borrowAmount && parseFloat(borrowAmount) > 0
