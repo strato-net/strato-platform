@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -38,9 +38,14 @@ const Allocation: React.FC<AllocationProps> = ({
   const [displayMode, setDisplayMode] = useState<'USD' | 'WAD'>('WAD');
   const { earningAssets, inactiveTokens } = useTokenContext();
 
-  // Store canonical WAD values (always in token amounts)
-  const [depositInputs, setDepositInputs] = useState<Record<string, string>>({});
+  // Store display values (what the user sees/types - may be USD or WAD depending on mode)
+  const [depositDisplayInputs, setDepositDisplayInputs] = useState<Record<string, string>>({});
   const [mintInputs, setMintInputs] = useState<Record<string, string>>({});
+  // Store canonical WAD values for deposits (token amounts, not USD)
+  const [depositCanonical, setDepositCanonical] = useState<Record<string, string>>({});
+  
+  // Track which input is currently being edited (to prevent sync overwriting user input)
+  const editingInputRef = useRef<string | null>(null);
 
   // Get oracle price for an asset
   const getPrice = (assetAddress: string): number => {
@@ -55,55 +60,120 @@ const Allocation: React.FC<AllocationProps> = ({
     return isNaN(num) ? 0 : num;
   };
 
-  // Convert WAD token amount to USD for display
-  const convertToUSD = (wadAmount: string, assetAddress: string): string => {
+  // Convert WAD token amount to USD
+  const wadToUSD = (wadAmount: string, assetAddress: string): string => {
     if (!wadAmount || wadAmount === '0') return '';
     const tokenAmount = toNumber(wadAmount);
     const price = getPrice(assetAddress);
     const usdValue = tokenAmount * price;
-    return usdValue > 0 ? formatNumberWithCommas(usdValue.toFixed(2)) : '';
+    return usdValue > 0 ? usdValue.toFixed(2) : '';
   };
 
-  // Convert USD display value to WAD token amount
-  const convertFromUSD = (usdValue: string, assetAddress: string): string => {
+  // Convert USD to WAD token amount
+  const usdToWad = (usdValue: string, assetAddress: string): string => {
     if (!usdValue || usdValue === '0') return '';
-    const cleaned = parseCommaNumber(usdValue);
-    const usd = toNumber(cleaned);
+    const usd = toNumber(usdValue);
     const price = getPrice(assetAddress);
     const tokenAmount = price > 0 ? usd / price : 0;
     return tokenAmount > 0 ? String(tokenAmount) : '';
   };
 
-  // Get display value based on mode
-  const getDisplayValue = (wadAmount: string, assetAddress: string, isDeposit: boolean): string => {
-    if (displayMode === 'USD' && isDeposit) {
-      // Convert deposit amounts using token price
-      return convertToUSD(wadAmount, assetAddress);
-    }
-    // Mint amounts are USDST ($1 each), format with commas but no conversion
-    return formatNumberWithCommas(wadAmount);
-  };
-
   // Sync from optimalAllocations when they change
   useEffect(() => {
-    const newDeposits: Record<string, string> = {};
-    const newMints: Record<string, string> = {};
-
-    vaultCandidates.forEach(c => {
-      const alloc = optimalAllocations.find(a => a.assetAddress === c.assetAddress);
-      // IMPORTANT: keep the exact decimal strings from the plan.
-      // parseFloat/String round-tripping here causes precision drift and results in the
-      // tx execution plan (modal) differing from what the table displays.
-      const depositStr = (alloc?.depositAmount ?? '').trim();
-      const mintStr = (alloc?.mintAmount ?? '').trim();
-
-      newDeposits[c.assetAddress] = depositStr === '' || depositStr === '0' ? '' : depositStr;
-      newMints[c.assetAddress] = mintStr === '' || mintStr === '0' ? '' : mintStr;
+    const editingKey = editingInputRef.current;
+    
+    setDepositCanonical(prev => {
+      const newCanonical: Record<string, string> = {};
+      vaultCandidates.forEach(c => {
+        // Skip updating the input being edited
+        if (editingKey === `deposit-${c.assetAddress}`) {
+          newCanonical[c.assetAddress] = prev[c.assetAddress] || '';
+          return;
+        }
+        const alloc = optimalAllocations.find(a => a.assetAddress === c.assetAddress);
+        const depositStr = (alloc?.depositAmount ?? '').trim();
+        newCanonical[c.assetAddress] = depositStr === '' || depositStr === '0' ? '' : depositStr;
+      });
+      return newCanonical;
     });
 
-    setDepositInputs(newDeposits);
-    setMintInputs(newMints);
+    setDepositDisplayInputs(prev => {
+      const newDisplay: Record<string, string> = {};
+      vaultCandidates.forEach(c => {
+        // Skip updating the input being edited
+        if (editingKey === `deposit-${c.assetAddress}`) {
+          newDisplay[c.assetAddress] = prev[c.assetAddress] || '';
+          return;
+        }
+        const alloc = optimalAllocations.find(a => a.assetAddress === c.assetAddress);
+        const depositStr = (alloc?.depositAmount ?? '').trim();
+        const canonicalVal = depositStr === '' || depositStr === '0' ? '' : depositStr;
+        if (displayMode === 'USD' && canonicalVal) {
+          newDisplay[c.assetAddress] = wadToUSD(canonicalVal, c.assetAddress);
+        } else {
+          newDisplay[c.assetAddress] = canonicalVal;
+        }
+      });
+      return newDisplay;
+    });
+
+    setMintInputs(prev => {
+      const newMints: Record<string, string> = {};
+      vaultCandidates.forEach(c => {
+        // Skip updating the input being edited
+        if (editingKey === `mint-${c.assetAddress}`) {
+          newMints[c.assetAddress] = prev[c.assetAddress] || '';
+          return;
+        }
+        const alloc = optimalAllocations.find(a => a.assetAddress === c.assetAddress);
+        let mintStr = (alloc?.mintAmount ?? '').trim();
+        
+        // Format to 2 decimal places in USD mode (USDST = $1, no conversion needed)
+        if (displayMode === 'USD' && mintStr && mintStr !== '0') {
+          const mintNum = toNumber(mintStr);
+          mintStr = mintNum > 0 ? mintNum.toFixed(2) : '';
+        }
+        
+        newMints[c.assetAddress] = mintStr === '' || mintStr === '0' ? '' : mintStr;
+      });
+      return newMints;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [optimalAllocations, vaultCandidates]);
+
+  // When display mode changes, convert existing display values
+  useEffect(() => {
+    const newDisplay: Record<string, string> = {};
+    
+    vaultCandidates.forEach(c => {
+      const canonical = depositCanonical[c.assetAddress] || '';
+      if (displayMode === 'USD' && canonical) {
+        newDisplay[c.assetAddress] = wadToUSD(canonical, c.assetAddress);
+      } else {
+        newDisplay[c.assetAddress] = canonical;
+      }
+    });
+    
+    setDepositDisplayInputs(newDisplay);
+
+    // Format mint amounts for display mode
+    setMintInputs(prev => {
+      const newMints: Record<string, string> = {};
+      vaultCandidates.forEach(c => {
+        let mintStr = prev[c.assetAddress] || '';
+        
+        // Format to 2 decimal places in USD mode (USDST = $1, no conversion needed)
+        if (displayMode === 'USD' && mintStr && mintStr !== '0') {
+          const mintNum = toNumber(mintStr);
+          mintStr = mintNum > 0 ? mintNum.toFixed(2) : '';
+        }
+        
+        newMints[c.assetAddress] = mintStr;
+      });
+      return newMints;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayMode]);
 
   // Check for low HF and notify parent
   useEffect(() => {
@@ -121,9 +191,9 @@ const Allocation: React.FC<AllocationProps> = ({
         continue;
       }
       
-      // depositInputs stores raw token amounts, use them directly for HF calculation
-      const depositInput = depositInputs[candidate.assetAddress] || '';
-      const depositAmt = toNumber(depositInput);
+      // Use canonical token amounts for HF calculation
+      const canonicalDeposit = depositCanonical[candidate.assetAddress] || '';
+      const depositAmt = toNumber(canonicalDeposit);
       
       const hf = calculateHF(candidate, depositAmt, mintAmt);
       const hfNum = parseFloat(hf);
@@ -135,7 +205,7 @@ const Allocation: React.FC<AllocationProps> = ({
     }
     
     onHFValidationChange(hasLowHF);
-  }, [depositInputs, mintInputs, vaultCandidates, targetHF, autoSupplyCollateral, onHFValidationChange]);
+  }, [depositCanonical, mintInputs, vaultCandidates, targetHF, autoSupplyCollateral, onHFValidationChange]);
 
   // Check for deposits exceeding available balance and notify parent
   useEffect(() => {
@@ -145,11 +215,12 @@ const Allocation: React.FC<AllocationProps> = ({
 
     let exceedsBalance = false;
     for (const candidate of vaultCandidates) {
-      const depositInput = depositInputs[candidate.assetAddress] || '';
-      const depositAmt = toNumber(depositInput);
+      // Use canonical token amounts for balance check
+      const canonicalDeposit = depositCanonical[candidate.assetAddress] || '';
+      const depositAmt = toNumber(canonicalDeposit);
       
       // Skip validation for vaults with empty or zero deposit
-      if (!depositInput || depositInput.trim() === '' || depositAmt === 0) {
+      if (!canonicalDeposit || canonicalDeposit.trim() === '' || depositAmt === 0) {
         continue;
       }
       
@@ -164,7 +235,7 @@ const Allocation: React.FC<AllocationProps> = ({
     }
     
     onBalanceExceededChange(exceedsBalance);
-  }, [depositInputs, vaultCandidates, autoSupplyCollateral, onBalanceExceededChange]);
+  }, [depositCanonical, vaultCandidates, autoSupplyCollateral, onBalanceExceededChange]);
 
   // Calculate HF for a vault - matches VaultsList formula: HF = CR / LT
   const calculateHF = (candidate: VaultCandidate, depositAmt: number, mintAmt: number): string => {
@@ -203,10 +274,13 @@ const Allocation: React.FC<AllocationProps> = ({
   };
 
   const handleDepositChange = (assetAddress: string, value: string) => {
-    // Parse commas and convert from display format to canonical WAD format
+    // Store the display value as-is (what the user types)
+    setDepositDisplayInputs(prev => ({ ...prev, [assetAddress]: value }));
+    
+    // Calculate and store canonical WAD value
     const cleanValue = parseCommaNumber(value);
-    const canonicalValue = displayMode === 'USD' ? convertFromUSD(value, assetAddress) : cleanValue;
-    setDepositInputs(prev => ({ ...prev, [assetAddress]: canonicalValue }));
+    const canonicalValue = displayMode === 'USD' ? usdToWad(cleanValue, assetAddress) : cleanValue;
+    setDepositCanonical(prev => ({ ...prev, [assetAddress]: canonicalValue }));
     
     if (!autoSupplyCollateral && onDepositAmountChange) {
       const tokenAmt = toNumber(canonicalValue);
@@ -288,8 +362,9 @@ const Allocation: React.FC<AllocationProps> = ({
                 );
                 const tokenImage = token?.images?.[0]?.value;
 
-                // depositInputs stores raw token amounts, so use them directly for HF calculation
-                const depositAmt = toNumber(depositInputs[candidate.assetAddress] || '');
+                // Use canonical (WAD) values for calculations
+                const canonicalDeposit = depositCanonical[candidate.assetAddress] || '';
+                const depositAmt = toNumber(canonicalDeposit);
                 const mintInput = mintInputs[candidate.assetAddress] || '';
                 const mintAmt = toNumber(mintInput);
                 const hf = calculateHF(candidate, depositAmt, mintAmt);
@@ -331,20 +406,27 @@ const Allocation: React.FC<AllocationProps> = ({
                         <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">$</span>
                       )}
                       <Input
-                        value={getDisplayValue(depositInputs[candidate.assetAddress] || '', candidate.assetAddress, true)}
+                        value={depositDisplayInputs[candidate.assetAddress] || ''}
                         onChange={(e) => handleDepositChange(candidate.assetAddress, e.target.value)}
+                        onFocus={() => { editingInputRef.current = `deposit-${candidate.assetAddress}`; }}
+                        onBlur={() => { editingInputRef.current = null; }}
                         placeholder="0"
                         className={`h-8 text-xs ${displayMode === 'USD' ? 'pl-5' : ''} ${hasLowHF || exceedsBalance ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                         disabled={autoSupplyCollateral}
                       />
                     </div>
                     {showMintAmounts && (
-                      <div>
+                      <div className="relative">
+                        {displayMode === 'USD' && (
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">$</span>
+                        )}
                         <Input
-                          value={getDisplayValue(mintInputs[candidate.assetAddress] || '', candidate.assetAddress, false)}
+                          value={mintInputs[candidate.assetAddress] || ''}
                           onChange={(e) => handleMintChange(candidate.assetAddress, e.target.value)}
+                          onFocus={() => { editingInputRef.current = `mint-${candidate.assetAddress}`; }}
+                          onBlur={() => { editingInputRef.current = null; }}
                           placeholder="0"
-                          className={`h-8 text-xs ${hasLowHF || exceedsBalance ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                          className={`h-8 text-xs ${displayMode === 'USD' ? 'pl-5' : ''} ${hasLowHF || exceedsBalance ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                           disabled={autoSupplyCollateral}
                         />
                       </div>
