@@ -5,7 +5,7 @@ import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { HelpCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { HelpCircle, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
 import { safeParseUnits, addCommasToInput, formatUnits } from "@/utils/numberUtils";
 import { NewLoanData, CollateralData } from "@/interface";
 import { 
@@ -459,6 +459,30 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
           </div>
         </div>
       </TooltipProvider>
+
+      {/* Warning Message Box - Above Borrow Button */}
+      {afterBorrowHF !== null && Number(afterBorrowHF) < 1.6 && (
+        <div className={`p-4 border rounded-lg ${
+          Number(afterBorrowHF) < 1.3
+            ? "bg-red-500/10 dark:bg-red-500/20 border-red-500/30"
+            : "bg-yellow-500/10 dark:bg-yellow-500/20 border-yellow-500/30"
+        }`}>
+          <div className="flex items-start gap-2">
+            <AlertTriangle className={`h-5 w-5 flex-shrink-0 mt-0.5 ${
+              Number(afterBorrowHF) < 1.3
+                ? "text-red-600 dark:text-red-400"
+                : "text-yellow-600 dark:text-yellow-400"
+            }`} />
+            <p className={`text-sm whitespace-pre-line ${
+              Number(afterBorrowHF) < 1.3
+                ? "text-red-800 dark:text-red-200"
+                : "text-yellow-800 dark:text-yellow-200"
+            }`}>
+              Caution: Borrowing at this risk level can result in liquidation if the collateral drops in value.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Error Message Box - Above Borrow Button */}
       {customBorrowError && (
