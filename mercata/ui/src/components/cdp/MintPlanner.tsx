@@ -9,7 +9,7 @@ import { Slider } from "@/components/ui/slider";
 import { ChevronDown, ChevronLeft, ChevronRight, Info } from "lucide-react";
 import { useOracleContext } from "@/context/OracleContext";
 import { cdpService } from "@/services/cdpService";
-import { getOptimalAllocations, computeTotalHeadroom, getMaxAllocations, type VaultCandidate } from "@/services/mintPlanService";
+import { getOptimalAllocations, computeTotalHeadroom, getMaxAllocations, type VaultCandidate } from "@/services/MintService";
 import type { PlanItem } from "@/services/cdpTypes";
 import {
   SECONDS_PER_DAY,

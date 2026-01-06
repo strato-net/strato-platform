@@ -8,6 +8,7 @@ interface HFSliderProps {
   minHF?: number; // Minimum health factor threshold, calculated as max(minCR) / max(LT) from all vaults
   currentHF?: number; // Current position health factor (for display)
   disabled?: boolean;
+  rangeColor?: string; // Custom color for the slider range bar
 }
 
 /**
@@ -31,6 +32,7 @@ const HFSlider: React.FC<HFSliderProps> = ({
   minHF = 1.0,
   currentHF,
   disabled = false,
+  rangeColor,
 }) => {
   // Slider bounds: 3.0 at left, minHF at right
   const hfMin = Math.round(minHF * 100) / 100;
@@ -53,6 +55,14 @@ const HFSlider: React.FC<HFSliderProps> = ({
   
   const riskLevel = getRiskLevel(clampedValue);
   
+  // Compute range color based on HF if not provided
+  const computedRangeColor = rangeColor ?? (
+    clampedValue >= 2.5 ? '#10b981' : // green
+    clampedValue >= 2.0 ? '#3b82f6' : // blue
+    clampedValue >= 1.5 ? '#eab308' : // yellow
+    '#ef4444' // red
+  );
+  
   // Format number
   const formatNumber = (num: number, decimals: number = 2): string => {
     if (isNaN(num)) return '0';
@@ -73,6 +83,9 @@ const HFSlider: React.FC<HFSliderProps> = ({
 
   return (
     <TooltipProvider>
+      <style>{`
+        .hf-slider-range { background-color: ${computedRangeColor} !important; transition: background-color 0.2s ease; }
+      `}</style>
       <div className="space-y-2">
         {/* Header: Label with Tooltip and Value/Risk Level */}
         <div className="flex items-center justify-between">
@@ -109,6 +122,7 @@ const HFSlider: React.FC<HFSliderProps> = ({
           onValueChange={handleSliderChange}
           disabled={disabled}
           className="w-full"
+          rangeClassName="hf-slider-range"
         />
       
         {/* Slider End Labels */}

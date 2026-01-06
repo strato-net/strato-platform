@@ -7,8 +7,8 @@ import type {
   BadDebt,
   JuniorNote,
 } from "./cdpTypes";
-import type { VaultCandidateAPI } from "./mintPlanService";
-import { apiToVaultCandidate, type VaultCandidate } from "./mintPlanService";
+import type { VaultCandidateAPI } from "./MintService";
+import { apiToVaultCandidate, type VaultCandidate } from "./MintService";
 
 export type {
   VaultData,

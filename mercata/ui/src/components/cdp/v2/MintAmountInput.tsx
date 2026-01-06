@@ -12,6 +12,7 @@ interface MintAmountInputProps {
   label?: string;
   placeholder?: string;
   unit?: string;
+  disabled?: boolean;
 }
 
 const MintAmountInput: React.FC<MintAmountInputProps> = ({
@@ -22,6 +23,7 @@ const MintAmountInput: React.FC<MintAmountInputProps> = ({
   label = 'Mint Amount',
   placeholder = '0',
   unit = 'USDST',
+  disabled = false,
 }) => {
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const rawValue = e.target.value;
@@ -64,6 +66,7 @@ const MintAmountInput: React.FC<MintAmountInputProps> = ({
           onChange={handleInputChange}
           placeholder={placeholder}
           inputMode="decimal"
+          disabled={disabled}
           className={`pr-20 ${isMaxMode ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 border-blue-300 dark:border-blue-800' : ''}`}
         />
         <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
@@ -73,6 +76,7 @@ const MintAmountInput: React.FC<MintAmountInputProps> = ({
             size="sm"
             className={`h-6 px-2 text-xs font-medium ${isMaxMode ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'text-primary hover:text-primary/80'}`}
             onClick={onMaxClick}
+            disabled={disabled}
           >
             MAX
           </Button>

@@ -3,12 +3,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import MintAmountInput from './MintAmountInput';
 import HFSlider from './HFSlider';
-import { formatUSD, formatPercentage } from '@/utils/loanUtils';
+import { formatPercentage } from '@/utils/loanUtils';
 
 interface LoanFormProps {
   // Label configuration
   availableLabel?: string; // e.g., "Available to Mint" or "Available to Borrow"
-  actionButtonLabel?: string; // e.g., "Confirm Mint" or "Confirm Borrow"
   
   // Data
   availableAmount: string; // Formatted available amount
@@ -25,16 +24,20 @@ interface LoanFormProps {
   onRiskBufferChange: (value: number) => void;
   minHF?: number; // Minimum health factor for slider bounds
   currentHF?: number; // Current position health factor
+  sliderRangeColor?: string; // Custom color for slider range bar
   
-  // Action
-  onConfirm: () => void;
-  isProcessing?: boolean;
   disabled?: boolean;
+  
+  // Optional button props - if provided, button renders inside form
+  actionButtonLabel?: string;
+  onConfirm?: () => void;
+  isProcessing?: boolean;
+  showButton?: boolean;
+  buttonDisabled?: boolean;
 }
 
 const LoanForm: React.FC<LoanFormProps> = ({
   availableLabel = 'Available to Mint',
-  actionButtonLabel = 'Confirm Mint',
   availableAmount,
   averageStabilityFee,
   mintAmountInput,
@@ -45,18 +48,17 @@ const LoanForm: React.FC<LoanFormProps> = ({
   onRiskBufferChange,
   minHF,
   currentHF,
+  sliderRangeColor,
+  disabled = false,
+  actionButtonLabel = 'Confirm Mint',
   onConfirm,
   isProcessing = false,
-  disabled = false,
+  showButton = false,
+  buttonDisabled,
 }) => {
 
   return (
-    <>
-      <style>{`
-        .risk-slider-track { background-color: hsl(var(--secondary)) !important; }
-        .risk-slider-range { background-color: var(--risk-slider-color, #10b981) !important; transition: background-color 0.2s ease; }
-      `}</style>
-      <Card>
+    <Card>
         <CardContent className="pt-6 space-y-6">
           {/* Available to Mint/Borrow */}
           <div className="space-y-2">
@@ -79,6 +81,7 @@ const LoanForm: React.FC<LoanFormProps> = ({
             label="Mint Amount"
             placeholder="0"
             unit="USDST"
+            disabled={disabled}
           />
 
           {/* Health Factor Slider */}
@@ -88,19 +91,21 @@ const LoanForm: React.FC<LoanFormProps> = ({
             minHF={minHF}
             currentHF={currentHF}
             disabled={disabled}
+            rangeColor={sliderRangeColor}
           />
 
-          {/* Confirm Button */}
-          <Button
-            disabled={disabled || isProcessing}
-            onClick={onConfirm}
-            className="w-full"
-          >
-            {isProcessing ? 'Processing...' : actionButtonLabel}
-          </Button>
+          {/* Confirm Button - only shown when showButton is true */}
+          {showButton && onConfirm && (
+            <Button
+              disabled={(buttonDisabled ?? disabled) || isProcessing}
+              onClick={onConfirm}
+              className="w-full"
+            >
+              {isProcessing ? 'Processing...' : actionButtonLabel}
+            </Button>
+          )}
         </CardContent>
       </Card>
-    </>
   );
 };
 

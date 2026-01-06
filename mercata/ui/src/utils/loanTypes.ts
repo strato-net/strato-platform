@@ -1,5 +1,5 @@
 import type { PlanItem } from '@/services/cdpTypes';
-import type { VaultCandidate } from '@/services/mintPlanService';
+import type { VaultCandidate } from '@/services/MintService';
 
 // Transaction types
 export type TransactionType = 'deposit' | 'mint' | 'withdraw' | 'repay';

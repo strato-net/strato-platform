@@ -13,6 +13,7 @@ export interface VaultCandidateAPI {
   symbol: string;
   assetScale: string;
   minCR: string;
+  liquidationRatio: string;
   stabilityFeeRate: string;
   oraclePrice: string;
   currentCollateral: string;
@@ -30,6 +31,7 @@ export function apiToVaultCandidate(api: VaultCandidateAPI): VaultCandidate {
     symbol: api.symbol,
     assetScale: BigInt(api.assetScale),
     minCR: BigInt(api.minCR),
+    liquidationRatio: BigInt(api.liquidationRatio),
     stabilityFeeRate: BigInt(api.stabilityFeeRate),
     oraclePrice: BigInt(api.oraclePrice),
     currentCollateral: BigInt(api.currentCollateral),
@@ -48,7 +50,8 @@ export interface VaultCandidate {
   assetAddress: string;
   symbol: string;                 // Asset symbol (e.g., "ETH", "WBTC")
   assetScale: bigint;             // 10^decimals (e.g., 1e18 for 18-decimal assets)
-  minCR: bigint;                  // WAD format (1.5e18 = 150% CR)
+  minCR: bigint;                  // WAD format (1.5e18 = 150% CR) - min CR for user actions
+  liquidationRatio: bigint;       // WAD format (1.5e18 = 150%) - liquidation threshold for HF calc
   stabilityFeeRate: bigint;       // Per-second rate
   oraclePrice: bigint;            // Price per unit in USDST (18 decimals)
   currentCollateral: bigint;      // User's current collateral (native asset units)
@@ -148,31 +151,84 @@ export function computeTotalHeadroom(
   return totalHeadroom;
 }
 
-  // Helper to sort candidates by stability fee rate, then by existing collateral, then by headroom
-  const sortCandidates = (candidates: VaultCandidate[], riskBuffer: number): VaultCandidate[] => {
-    const sortedCandidates = [...candidates].sort((a, b) => {
-      // Primary: sort by stability fee rate (ascending - lower fee first)
-      if (a.stabilityFeeRate < b.stabilityFeeRate) return -1;
-      if (a.stabilityFeeRate > b.stabilityFeeRate) return 1;
+// Compute borrowing power: maxMintable at targetCR given collateral and current debt
+function computeBorrowingPower(
+  totalCollateral: bigint,
+  currentDebt: bigint,
+  oraclePrice: bigint,
+  assetScale: bigint,
+  targetCR: bigint
+): bigint {
+  const collateralValue = computeCollateralUSD(totalCollateral, oraclePrice, assetScale);
+  const maxDebt = (collateralValue * WAD) / targetCR;
+  return maxDebt > currentDebt ? maxDebt - currentDebt : 0n;
+}
+
+// Sort candidates: existing vaults first (by borrowing power), then potential vaults (by borrowing power)
+const sortCandidates = (candidates: VaultCandidate[], riskBuffer: number): VaultCandidate[] => {
+  // Separate existing vaults (have currentCollateral or currentDebt) from potential vaults
+  const existingVaults: VaultCandidate[] = [];
+  const potentialVaults: VaultCandidate[] = [];
   
-      // First tie-breaker: prioritize vaults with existing collateral
-      const hasCollateralA = a.currentCollateral > 0n;
-      const hasCollateralB = b.currentCollateral > 0n;
-      if (hasCollateralA && !hasCollateralB) return -1;
-      if (!hasCollateralA && hasCollateralB) return 1;
+  for (const c of candidates) {
+    if (c.currentCollateral > 0n || c.currentDebt > 0n) {
+      existingVaults.push(c);
+    } else if (c.potentialCollateral > 0n) {
+      potentialVaults.push(c);
+    }
+  }
   
-      // Second tie-breaker: sort by headroom (descending - more headroom first)
-      const targetCRA = computeTargetCRWadFromRiskBuffer(a.minCR, riskBuffer);
-      const targetCRB = computeTargetCRWadFromRiskBuffer(b.minCR, riskBuffer);
-      const headroomA = computeHeadroom(a, targetCRA);
-      const headroomB = computeHeadroom(b, targetCRB);
+  // Sort existing vaults by borrowing power (descending)
+  // Borrowing power = (currentCollateral + potentialCollateral) value / targetCR - currentDebt
+  existingVaults.sort((a, b) => {
+    const targetCRA = computeTargetCRWadFromRiskBuffer(a.minCR, riskBuffer);
+    const targetCRB = computeTargetCRWadFromRiskBuffer(b.minCR, riskBuffer);
+    const bpA = computeBorrowingPower(
+      a.currentCollateral + a.potentialCollateral,
+      a.currentDebt,
+      a.oraclePrice,
+      a.assetScale,
+      targetCRA
+    );
+    const bpB = computeBorrowingPower(
+      b.currentCollateral + b.potentialCollateral,
+      b.currentDebt,
+      b.oraclePrice,
+      b.assetScale,
+      targetCRB
+    );
+    if (bpA > bpB) return -1;
+    if (bpA < bpB) return 1;
+    return 0;
+  });
   
-      if (headroomA > headroomB) return -1;
-      if (headroomA < headroomB) return 1;
-      return 0;
-    });
-    return sortedCandidates;
-  };
+  // Sort potential vaults by borrowing power (descending)
+  // Borrowing power = potentialCollateral value / targetCR (no current debt)
+  potentialVaults.sort((a, b) => {
+    const targetCRA = computeTargetCRWadFromRiskBuffer(a.minCR, riskBuffer);
+    const targetCRB = computeTargetCRWadFromRiskBuffer(b.minCR, riskBuffer);
+    const bpA = computeBorrowingPower(
+      a.potentialCollateral,
+      0n,
+      a.oraclePrice,
+      a.assetScale,
+      targetCRA
+    );
+    const bpB = computeBorrowingPower(
+      b.potentialCollateral,
+      0n,
+      b.oraclePrice,
+      b.assetScale,
+      targetCRB
+    );
+    if (bpA > bpB) return -1;
+    if (bpA < bpB) return 1;
+    return 0;
+  });
+  
+  // Concat: existing vaults first, then potential vaults
+  return [...existingVaults, ...potentialVaults];
+};
 
 interface Allocations {
   allocations: Allocation[];
