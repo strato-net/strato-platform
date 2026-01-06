@@ -249,7 +249,17 @@ export const calculateHFSliderExtrema = (
   DEFAULT_MAX_HEALTH_FACTOR: Number = 3.00,
 ) : { min: Number, max: Number } => {
   const minHF = Math.min(...collaterals.map(c => Number(BigInt(c.liquidationThreshold))/Number(BigInt(c.ltv))));
-  const maxHF = Math.max(+DEFAULT_MAX_HEALTH_FACTOR, loanData.healthFactor);
+  
+  // Check if there's no loan (no debt)
+  const hasLoan = BigInt(loanData?.totalAmountOwed ?? "0") > 1n;
+  const currentHF = loanData?.healthFactor ?? 0;
+  const isInfiniteHF = !isFinite(currentHF) || currentHF >= 999999;
+  
+  // If no loan, max is DEFAULT_MAX_HEALTH_FACTOR; otherwise use max of default and current HF
+  const maxHF = hasLoan && !isInfiniteHF
+    ? Math.max(+DEFAULT_MAX_HEALTH_FACTOR, currentHF)
+    : +DEFAULT_MAX_HEALTH_FACTOR;
+  
   return { min: centCeil(minHF), max: centFloor(maxHF) };
 };
 
