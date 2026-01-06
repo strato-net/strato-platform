@@ -232,13 +232,9 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
     }
     
     // Add borrow step
-    const maxWei = BigInt(maxAmount);
-    const wei = safeParseUnits(borrowAmount || "0", 18);
-    const isMaxBorrow = maxWei > 0n && (wei >= maxWei || (maxWei > 0n && wei >= (maxWei - 1n)));
-    
     steps.push({
       id: "borrow",
-      label: isMaxBorrow ? "Borrow Max USDST" : `Borrow ${borrowAmount} USDST`,
+      label: `Borrow ${borrowAmount} USDST`,
       status: "pending",
     });
     
@@ -284,11 +280,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
         s.id === "borrow" ? { ...s, status: "processing" } : s
       ));
       
-      if (isMaxBorrow) {
-        await onBorrow('ALL');
-      } else {
-        await onBorrow(borrowAmount);
-      }
+      await onBorrow(borrowAmount);
       
       // Mark borrow as completed
       setBorrowSteps(prev => prev.map(s => 
