@@ -142,9 +142,9 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
     if (autoSupplyCollateral) {
       return totalCollateralValue;
     }
-    // In custom mode, calculate what's needed using minLTV
+    // In custom mode, calculate what's needed to achieve target HF using strictest LT
     if (!loans || !collateralInfo || collateralInfo.length === 0) return 0;
-    const needed = calculateAdditionalValueNeeded(collateralInfo, parseFloat(borrowAmount || "0"), loans);
+    const needed = calculateAdditionalValueNeeded(collateralInfo, parseFloat(borrowAmount || "0"), loans, targetHealthFactor);
     return Number(needed);
   }, [autoSupplyCollateral, totalCollateralValue, loans, collateralInfo, borrowAmount]);
 
