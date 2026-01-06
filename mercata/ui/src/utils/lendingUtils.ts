@@ -300,11 +300,13 @@ export const calculateBorrowTxFee = (collateralCount: number): { fee: number, vo
     return { fee, voucher };
 };
 
-const calculateAdditionalCollateralAmountFromValue = (
+export const calculateAdditionalCollateralAmountFromValue = (
   collateralValueUSD: bigint,
   price: bigint,
+  decimals: bigint,
 ): bigint => {
-  return (collateralValueUSD * 10n ** 18n) / price;
+  if (price === 0n) return 0n;
+  return (collateralValueUSD * decimals) / price;
 };
 
 export const recommendCollateralToSupply = (
