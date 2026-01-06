@@ -146,7 +146,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
     if (!loans || !collateralInfo || collateralInfo.length === 0) return 0;
     const needed = calculateAdditionalValueNeeded(collateralInfo, parseFloat(borrowAmount || "0"), loans, targetHealthFactor);
     return Number(needed);
-  }, [autoSupplyCollateral, totalCollateralValue, loans, collateralInfo, borrowAmount]);
+  }, [autoSupplyCollateral, totalCollateralValue, loans, collateralInfo, borrowAmount, targetHealthFactor]);
 
   // Calculate transaction fee based on number of collateral assets being supplied
   const txFee = useMemo(() => {
