@@ -135,11 +135,15 @@ newtype AccessToken = AccessToken { getAccessToken :: Maybe Text }
 
 instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m, Accessible VaultData m) => HasVault (ReaderT AccessToken m) where
   sign msgHash = do
-    AccessToken jwtToken <- ask
-    blocVaultWrapper $ postSignature jwtToken (V.MsgHash msgHash)
+    AccessToken mJwtToken <- ask
+    case mJwtToken of
+      Just jwtToken -> blocVaultWrapper $ postSignature (Just jwtToken) (V.MsgHash msgHash)
+      Nothing -> throwIO . UserError $ "Cannot call Vault without a JWT"
   getPub = do
-    AccessToken jwtToken <- ask
-    fmap V.unPubKey . blocVaultWrapper $ getKey jwtToken Nothing
+    AccessToken mJwtToken <- ask
+    case mJwtToken of
+      Just jwtToken -> fmap V.unPubKey . blocVaultWrapper $ getKey (Just jwtToken) Nothing
+      Nothing -> throwIO . UserError $ "Cannot call Vault without a JWT"
   getShared _ = error "getShared ReaderT VaultData: unimplemented"
 
 fullServer ::

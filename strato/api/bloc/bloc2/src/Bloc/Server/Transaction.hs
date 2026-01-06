@@ -76,6 +76,7 @@ import Data.Source.Map
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Time.Clock
+import Data.Traversable (for)
 import qualified Data.Vector as V
 import Handlers.AccountInfo
 import Handlers.Storage
@@ -124,14 +125,13 @@ postBlocTransactionBody (PostBlocTransactionRequest mAddr txList txParams msrcs)
     TRANSFER -> do
       txs' <- mapM fromTransfer txs
       let ts = map (\(TransferPayload t x m) -> SendTransaction t (mergeTxParams x txParams) m) txs'
-      txsWithParams <- genNonces (Don't CacheNonce) addr sendtransactionTxParams ts
+      txsWithParams <- genNonces (Don't CacheNonce) (Just addr) sendtransactionTxParams ts
       txs'' <-
         mapM
           ( \(SendTransaction toAddr params _) -> do
               let header =
                     TransactionHeader
                       (Just toAddr)
-                      addr
                       Nothing
                       Nothing
                       []
@@ -163,7 +163,7 @@ postBlocTransactionBody (PostBlocTransactionRequest mAddr txList txParams msrcs)
                     Nothing
               )
               ps
-      txsWithParams <- genNonces (Don't CacheNonce) addr uploadlistcontractTxParams mapUploadList
+      txsWithParams <- genNonces (Don't CacheNonce) (Just addr) uploadlistcontractTxParams mapUploadList
       forStateT Map.empty txsWithParams $
         \(UploadListContract name srcs args params _) -> do
           (src, contract) <- do
@@ -181,7 +181,6 @@ postBlocTransactionBody (PostBlocTransactionRequest mAddr txList txParams msrcs)
           tx <- lift . signAndPrepare addr $
               TransactionHeader
                 Nothing
-                addr
                 Nothing
                 (Just name)
                 argsAsSource
@@ -192,7 +191,7 @@ postBlocTransactionBody (PostBlocTransactionRequest mAddr txList txParams msrcs)
     FUNCTION -> do
       p <- mapM fromFunction txs
       let mapMethodCalls = map (\(FunctionPayload a m r x md) -> MethodCall a m r (mergeTxParams x txParams) md) p
-      txsWithParams <- genNonces (Don't CacheNonce) addr methodcallTxParams mapMethodCalls
+      txsWithParams <- genNonces (Don't CacheNonce) (Just addr) methodcallTxParams mapMethodCalls
       forStateT Map.empty txsWithParams $
         \MethodCall{..} -> do
           mContract <- use $ at methodcallContractAddress
@@ -214,7 +213,6 @@ postBlocTransactionBody (PostBlocTransactionRequest mAddr txList txParams msrcs)
           tx <- lift . signAndPrepare addr $
             TransactionHeader
               (Just methodcallContractAddress)
-              addr
               (Just methodcallMethodName)
               Nothing
               argsAsSource
@@ -244,8 +242,7 @@ postBlocTransactionUnsigned ::
     A.Selectable Address AddressState m,
     A.Selectable Keccak256 SourceMap m,
     HasCodeDB m,
-    HasBlocEnv m,
-    HasVault m
+    HasBlocEnv m
   ) =>
   -- | SolidVM transactions
   PostBlocTransactionRequest ->
@@ -253,20 +250,16 @@ postBlocTransactionUnsigned ::
   m [BlocTransactionUnsignedResult]
 postBlocTransactionUnsigned (PostBlocTransactionRequest _ [] _ _) = return []
 postBlocTransactionUnsigned (PostBlocTransactionRequest mAddr txList txParams msrcs) = do
-  addr <- case mAddr of -- This is just to get the user's nonce if they didn't supply one
-    Nothing -> fromPublicKey <$> getPub
-    Just addr' -> return addr'
   fmap join . forM txList $ \tx -> case transactionType tx of
     TRANSFER -> do
       tx' <- fromTransfer tx
       let t = (\(TransferPayload t' x m) -> SendTransaction t' (mergeTxParams x txParams) m) tx'
-      txsWithParams <- genNonces (Don't CacheNonce) addr sendtransactionTxParams [t]
+      txsWithParams <- genNonces (Don't CacheNonce) mAddr sendtransactionTxParams [t]
       mapM
         ( \(SendTransaction toAddr params _) -> do
             let header =
                   TransactionHeader
                     (Just toAddr)
-                    addr
                     Nothing
                     Nothing
                     []
@@ -296,7 +289,7 @@ postBlocTransactionUnsigned (PostBlocTransactionRequest mAddr txList txParams ms
                   Nothing
             )
               ps
-      txsWithParams <- genNonces (Don't CacheNonce) addr uploadlistcontractTxParams [upload]
+      txsWithParams <- genNonces (Don't CacheNonce) mAddr uploadlistcontractTxParams [upload]
       forStateT Map.empty txsWithParams $
         \(UploadListContract name srcs args params _) -> do
           (src, contract) <- do
@@ -314,7 +307,6 @@ postBlocTransactionUnsigned (PostBlocTransactionRequest mAddr txList txParams ms
           lift . prepareUnsignedRawTx name argsAsSource $
               TransactionHeader
                 Nothing
-                addr
                 Nothing
                 (Just name)
                 argsAsSource
@@ -324,7 +316,7 @@ postBlocTransactionUnsigned (PostBlocTransactionRequest mAddr txList txParams ms
     FUNCTION -> do
       p <- fromFunction tx
       let mapMethodCalls = (\(FunctionPayload a m r x md) -> MethodCall a m r (mergeTxParams x txParams) md) p
-      txsWithParams <- genNonces (Don't CacheNonce) addr methodcallTxParams [mapMethodCalls]
+      txsWithParams <- genNonces (Don't CacheNonce) mAddr methodcallTxParams [mapMethodCalls]
       forStateT Map.empty txsWithParams $
         \MethodCall{..} -> do
           mContract <- use $ at methodcallContractAddress
@@ -346,7 +338,6 @@ postBlocTransactionUnsigned (PostBlocTransactionRequest mAddr txList txParams ms
           lift . prepareUnsignedRawTx methodcallMethodName argsAsSource $
             TransactionHeader
               (Just methodcallContractAddress)
-              addr
               (Just methodcallMethodName)
               Nothing
               argsAsSource
@@ -666,7 +657,6 @@ callSignature unsigned = do
 
 data TransactionHeader = TransactionHeader
   { transactionheaderToAddr :: Maybe Address,
-    transactionheaderFromAddr :: Address,
     transactionheaderFuncName :: Maybe Text,
     transactionheaderContractName :: Maybe Text,
     transactionheaderArgs :: [Text],
@@ -720,7 +710,6 @@ postUsersSend' cacheNonce TransferParameters {..} = do
     signAndPrepare fromAddress $
       TransactionHeader
         (Just toAddress)
-        fromAddress
         Nothing
         Nothing
         []
@@ -765,7 +754,6 @@ postUsersContractSolidVM' cacheNonce ContractParameters {..} = do
     signAndPrepare fromAddr $
       TransactionHeader
         Nothing
-        fromAddr
         Nothing
         (Just $ Text.pack _contractName)
         argsAsSource
@@ -798,7 +786,7 @@ postUsersUploadListSolidVM' ::
   m [BlocTransactionResult]
 postUsersUploadListSolidVM' cacheNonce ContractListParameters {..} = do
   txSizeLimit <- fmap txSizeLimit getBlocEnv
-  txsWithParams <- genNonces cacheNonce fromAddr uploadlistcontractTxParams contracts
+  txsWithParams <- genNonces cacheNonce (Just fromAddr) uploadlistcontractTxParams contracts
   namesTxs <- forStateT Map.empty txsWithParams $
     \(UploadListContract name srcs args params _) -> do
       (src, contract) <- do
@@ -817,7 +805,6 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters {..} = do
         lift . signAndPrepare fromAddr $
           TransactionHeader
             Nothing
-            fromAddr
             Nothing
             (Just name)
             argsAsSource
@@ -847,7 +834,7 @@ postUsersSendList' ::
   TransferListParameters ->
   m [BlocTransactionResult]
 postUsersSendList' cacheNonce TransferListParameters {..} = do
-  txsWithParams <- genNonces cacheNonce fromAddr sendtransactionTxParams txs
+  txsWithParams <- genNonces cacheNonce (Just fromAddr) sendtransactionTxParams txs
   txSizeLimit <- fmap txSizeLimit getBlocEnv
   txs'' <-
     mapM
@@ -855,7 +842,6 @@ postUsersSendList' cacheNonce TransferListParameters {..} = do
           let header =
                 TransactionHeader
                   (Just toAddr)
-                  fromAddr
                   Nothing
                   Nothing
                   []
@@ -889,7 +875,7 @@ postUsersContractMethodList' cacheNonce FunctionListParameters {..} = do
   if null txs
     then return []
     else do
-      txsWithParams <- genNonces cacheNonce fromAddr methodcallTxParams txs
+      txsWithParams <- genNonces cacheNonce (Just fromAddr) methodcallTxParams txs
       txSizeLimit <- fmap txSizeLimit getBlocEnv
       txsFuncNames <- forStateT Map.empty txsWithParams $
         \(MethodCall {..}) -> do
@@ -912,7 +898,6 @@ postUsersContractMethodList' cacheNonce FunctionListParameters {..} = do
           tx <- lift . signAndPrepare fromAddr $
             TransactionHeader
               (Just methodcallContractAddress)
-              fromAddr
               (Just methodcallMethodName)
               Nothing
               argsAsSource
@@ -972,7 +957,6 @@ postUsersContractMethod' cacheNonce FunctionParameters {..} = do
     signAndPrepare fromAddr $
       TransactionHeader
         (Just contractAddr)
-        fromAddr
         (Just funcName)
         Nothing
         argsAsSource
@@ -1143,56 +1127,64 @@ genNonces :: forall a m.
   , Show a
   ) =>
   Should CacheNonce ->
-  Address ->
+  Maybe Address ->
   Lens' a (Maybe TxParams) ->
   [a] ->
   m [a]
 genNonces cacheNonce fromAddr l items = do
-  let cacheKey :: Address
+  let cacheKey :: Maybe Address
       cacheKey = fromAddr
       viewNonce :: a -> Maybe Nonce
       viewNonce = txparamsNonce <=< view l
 
   nonceCache <- fmap globalNonceCounter getBlocEnv
   now <- liftIO $ getTime Monotonic
-  cachedItem <- case cacheNonce of
-                  Do CacheNonce -> atomically $ cacheLookup nonceCache now cacheKey
-                  Don't CacheNonce -> pure $ Nothing
+  cachedItem <- case (cacheNonce, cacheKey) of
+    (Do CacheNonce, Just ck) -> atomically $ cacheLookup nonceCache now ck
+    _ -> pure $ Nothing
 
   (sNonce :: Maybe Nonce) <-
-    case cachedItem of
-      Nothing -> fmap Just $ getAccountNonce fromAddr
-      Just val -> return $ Just val
+    case (cachedItem, fromAddr) of
+      (Nothing, Just fAddr) -> fmap Just $ getAccountNonce fAddr
+      _ -> return cachedItem
 
-  liftIO . atomically $ do
+  eNonce <- liftIO . atomically $ do
       let noncesInUse = S.fromList $ mapMaybe (viewNonce) items
       now' <- Cache.nowSTM
-      nonce <-
+      eNonce' <-
         if S.size noncesInUse == length items
           then
-            pure . Nonce . error $
+            pure . Left . Text.pack $
               "internal error: unused nonce when already specified " ++ show items
           else do
-            mmNonce <- cacheLookup nonceCache now' fromAddr
+            mmNonce <- maybe (pure Nothing) (cacheLookup nonceCache now') $ fromAddr
             let mNonce = case cacheNonce of
                   Do CacheNonce -> mmNonce
                   Don't CacheNonce -> Nothing
-            pure . fromMaybe 0 $ liftA2 max mNonce sNonce <|> mNonce <|> sNonce
-      let txs = runIdentity . forStateT nonce items $ \a -> do
-            let params' = fromMaybe emptyTxParams (a ^. l)
-            newNonce <- case txparamsNonce params' of
-              Just v -> return v
-              Nothing -> do
-                whileM $ do
-                  inUse <- gets (`S.member` noncesInUse)
-                  when inUse $ id += 1
-                  return inUse
-                id <<+= 1
-            return $ (l .~ Just params' {txparamsNonce = Just newNonce}) a
-          newCachedNonce = 1 + getMax (foldMap (Max . fromMaybe 0 . viewNonce) txs)
-          expTime = (now' +) <$> Cache.defaultExpiration nonceCache
-      Cache.insertSTM fromAddr newCachedNonce nonceCache expTime
-      pure txs
+                err = Left "Must supply a sender address or a transaction nonce when posting transactions"
+            pure . maybe err Right $ liftA2 max mNonce sNonce <|> mNonce <|> sNonce
+      for eNonce' $ \nonce -> do
+        let txs = runIdentity . forStateT nonce items $ \a -> do
+              let params' = fromMaybe emptyTxParams (a ^. l)
+              newNonce <- case txparamsNonce params' of
+                Just v -> return v
+                Nothing -> do
+                  whileM $ do
+                    inUse <- gets (`S.member` noncesInUse)
+                    when inUse $ id += 1
+                    return inUse
+                  id <<+= 1
+              return $ (l .~ Just params' {txparamsNonce = Just newNonce}) a
+            newCachedNonce = 1 + getMax (foldMap (Max . fromMaybe 0 . viewNonce) txs)
+            expTime = (now' +) <$> Cache.defaultExpiration nonceCache
+        case fromAddr of
+          Just fAddr -> Cache.insertSTM fAddr newCachedNonce nonceCache expTime
+          Nothing -> pure ()
+        pure txs
+  
+  case eNonce of
+    Left e -> throwIO (UserError e)
+    Right r -> pure r
 
 getAccountNonce ::
   ( MonadIO m
