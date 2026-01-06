@@ -442,27 +442,29 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
         Borrow
       </Button>
 
-      {/* Auto Supply Collateral Checkbox */}
-      <div className="flex items-center space-x-2">
-        <Checkbox
-          id="auto-supply"
-          checked={autoSupplyCollateral}
-          onCheckedChange={handleAutoSupplyChange}
-        />
-        <label
-          htmlFor="auto-supply"
-          className="text-sm text-muted-foreground cursor-pointer select-none"
-        >
-          Automatically supply collateral (if needed)
-        </label>
-      </div>
+      {/* Auto Supply Collateral Checkbox and Dropdown - Only show when collateral is needed */}
+      {collateralTableData.length > 0 && (
+        <>
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="auto-supply"
+              checked={autoSupplyCollateral}
+              onCheckedChange={handleAutoSupplyChange}
+            />
+            <label
+              htmlFor="auto-supply"
+              className="text-sm text-muted-foreground cursor-pointer select-none"
+            >
+              Automatically supply collateral (if needed)
+            </label>
+          </div>
 
-      {/* Additional Collateral Needed Dropdown */}
-      <Collapsible
-        open={isCollateralExpanded}
-        onOpenChange={setIsCollateralExpanded}
-        className="border rounded-lg"
-      >
+          {/* Additional Collateral Needed Dropdown */}
+          <Collapsible
+            open={isCollateralExpanded}
+            onOpenChange={setIsCollateralExpanded}
+            className="border rounded-lg"
+          >
         <CollapsibleTrigger className="flex items-center justify-between w-full px-4 py-3 text-sm font-medium hover:bg-muted/50 transition-colors">
           <span>
             Additional Collateral Needed{' '}
@@ -553,6 +555,8 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
           )}
         </CollapsibleContent>
       </Collapsible>
+        </>
+      )}
 
       {/* Transaction Fee */}
       <div className="flex justify-between text-sm">
