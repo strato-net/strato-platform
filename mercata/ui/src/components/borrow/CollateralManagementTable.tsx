@@ -8,7 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { HelpCircle, ArrowUpCircle, ArrowDownCircle, PauseCircle } from "lucide-react";
 import { formatBalance } from "@/utils/numberUtils";
 import { CollateralData, NewLoanData } from "@/interface";
@@ -66,6 +66,37 @@ const InfoTooltip = ({ children, content }: { children: React.ReactNode; content
   );
 };
 
+// Helper function to format token amount with tooltip
+const TokenAmountDisplay = ({ amount, decimals }: { amount: bigint; decimals: number }) => {
+  if (amount <= 1n) {
+    return <div className="font-medium">0</div>;
+  }
+  
+  const fullAmount = formatBalance(amount, undefined, decimals, 2);
+  const displayAmount = formatBalance(amount, undefined, decimals, 0, 4);
+  
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="font-medium cursor-help">{displayAmount}</div>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>{fullAmount}</p>
+      </TooltipContent>
+    </Tooltip>
+  );
+};
+
+// Helper function to format USD value (no tooltip, 2 decimals)
+const USDValueDisplay = ({ value }: { value: bigint }) => {
+  if (value <= 1n) {
+    return <div className="text-xs text-muted-foreground">$0.00</div>;
+  }
+  
+  const displayValue = formatBalance(value, undefined, 18, 0, 2);
+  return <div className="text-xs text-muted-foreground">${displayValue}</div>;
+};
+
 const CollateralManagementTable = ({
   collateralInfo,
   loadingCollateral,
@@ -83,9 +114,10 @@ const CollateralManagementTable = ({
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
+        <TooltipProvider>
+          <Table>
+            <TableHeader>
+              <TableRow>
               <TableHead>Asset</TableHead>
               <TableHead>
                 <InfoTooltip content="Loan-to-Value ratio: Maximum percentage of collateral value you can borrow against. Higher LTV means more borrowing power but higher risk.">
@@ -97,10 +129,10 @@ const CollateralManagementTable = ({
                   LT
                 </InfoTooltip>
               </TableHead>
-              <TableHead className="text-right">Supply</TableHead>
-              <TableHead className="text-right">Withdraw</TableHead>
-            </TableRow>
-          </TableHeader>
+                <TableHead className="text-right">Supply</TableHead>
+                <TableHead className="text-right">Withdraw</TableHead>
+              </TableRow>
+            </TableHeader>
           <TableBody>
             {loadingCollateral ? (
               <TableRow>
@@ -149,10 +181,11 @@ const CollateralManagementTable = ({
                     <TableCell>
                       <div className="flex items-center justify-end gap-4">
                         <div className="text-right">
-                          <div className="font-medium">{(() => { try { const v = BigInt(asset?.userBalance || 0); return formatBalance(v <= 1n ? 0n : v, undefined, asset?.customDecimals ?? 18, 2); } catch { return formatBalance(0n, undefined, asset?.customDecimals ?? 18, 2); } })()}</div>
-                          <div className="text-xs text-muted-foreground">
-                            ${(() => { try { const v = BigInt(asset?.userBalanceValue || 0); return formatBalance(v <= 1n ? 0n : v, undefined, 18, 1, 2); } catch { return formatBalance(0n, undefined, 18, 1, 2); } })()}
-                          </div>
+                          <TokenAmountDisplay 
+                            amount={BigInt(asset?.userBalance || 0)} 
+                            decimals={asset?.customDecimals ?? 18} 
+                          />
+                          <USDValueDisplay value={BigInt(asset?.userBalanceValue || 0)} />
                         </div>
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -174,12 +207,11 @@ const CollateralManagementTable = ({
                     <TableCell>
                       <div className="flex items-center justify-end gap-4">
                         <div className="text-right">
-                          <div className="font-medium">
-                            {(() => { try { const v = BigInt(asset?.collateralizedAmount || 0); return formatBalance(v <= 1n ? 0n : v, undefined, asset?.customDecimals ?? 18, 2); } catch { return formatBalance(0n, undefined, asset?.customDecimals ?? 18, 2); } })()}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {(() => { try { const v = BigInt(asset?.collateralizedAmountValue || 0); return formatBalance(v <= 1n ? 0n : v, undefined, 18, 1, 2, true); } catch { return formatBalance(0n, undefined, 18, 1, 2, true); } })()}
-                          </div>
+                          <TokenAmountDisplay 
+                            amount={BigInt(asset?.collateralizedAmount || 0)} 
+                            decimals={asset?.customDecimals ?? 18} 
+                          />
+                          <USDValueDisplay value={BigInt(asset?.collateralizedAmountValue || 0)} />
                         </div>
                         {(() => {
                           const maxWithdrawAmount = getMaxSafeWithdrawAmount(asset, loans);
@@ -235,8 +267,9 @@ const CollateralManagementTable = ({
                 </TableCell>
               </TableRow>
             )}
-          </TableBody>
-        </Table>
+            </TableBody>
+          </Table>
+        </TooltipProvider>
       </CardContent>
     </Card>
   );
