@@ -82,16 +82,6 @@ const Allocation: React.FC<AllocationProps> = ({
     return formatNumberWithCommas(wadAmount);
   };
 
-  // Get token amount from input (converts USD to token if needed)
-  const getTokenAmount = (input: string, assetAddress: string): number => {
-    const num = toNumber(input);
-    if (displayMode === 'USD') {
-      const price = getPrice(assetAddress);
-      return price > 0 ? num / price : 0;
-    }
-    return num;
-  };
-
   // Sync from optimalAllocations when they change
   useEffect(() => {
     const newDeposits: Record<string, string> = {};
@@ -129,16 +119,9 @@ const Allocation: React.FC<AllocationProps> = ({
         continue;
       }
       
-      // Inline getTokenAmount logic to avoid dependency issues
+      // depositInputs stores raw token amounts, use them directly for HF calculation
       const depositInput = depositInputs[candidate.assetAddress] || '';
-      const depositNum = toNumber(depositInput);
-      const depositAmt = displayMode === 'USD' 
-        ? (() => {
-            const c = vaultCandidates.find(v => v.assetAddress === candidate.assetAddress);
-            const price = c ? parseFloat(formatUnits(c.oraclePrice, 18)) : 0;
-            return price > 0 ? depositNum / price : 0;
-          })()
-        : depositNum;
+      const depositAmt = toNumber(depositInput);
       
       const hf = calculateHF(candidate, depositAmt, mintAmt);
       const hfNum = parseFloat(hf);
@@ -150,7 +133,7 @@ const Allocation: React.FC<AllocationProps> = ({
     }
     
     onHFValidationChange(hasLowHF);
-  }, [depositInputs, mintInputs, vaultCandidates, targetHF, autoSupplyCollateral, onHFValidationChange, displayMode]);
+  }, [depositInputs, mintInputs, vaultCandidates, targetHF, autoSupplyCollateral, onHFValidationChange]);
 
   // Calculate HF for a vault - matches VaultsList formula: HF = CR / LT
   const calculateHF = (candidate: VaultCandidate, depositAmt: number, mintAmt: number): string => {
@@ -259,8 +242,8 @@ const Allocation: React.FC<AllocationProps> = ({
               <div className={`grid gap-2 text-xs font-medium text-muted-foreground pb-2 border-b border-border ${getGridClass()}`}>
                 <div>Asset</div>
                 <div>Stability Fee</div>
-                <div>Deposit{displayMode === 'USD' ? ' ($)' : ''}</div>
-                {showMintAmounts && <div>Mint{displayMode === 'USD' ? ' ($)' : ''}</div>}
+                <div>Deposit</div>
+                {showMintAmounts && <div>Mint</div>}
                 {!autoSupplyCollateral && <div className="text-right pr-3">HF</div>}
               </div>
               {vaultCandidates.map((candidate) => {
@@ -274,7 +257,8 @@ const Allocation: React.FC<AllocationProps> = ({
                 );
                 const tokenImage = token?.images?.[0]?.value;
 
-                const depositAmt = getTokenAmount(depositInputs[candidate.assetAddress] || '', candidate.assetAddress);
+                // depositInputs stores raw token amounts, so use them directly for HF calculation
+                const depositAmt = toNumber(depositInputs[candidate.assetAddress] || '');
                 const mintInput = mintInputs[candidate.assetAddress] || '';
                 const mintAmt = toNumber(mintInput);
                 const hf = calculateHF(candidate, depositAmt, mintAmt);
@@ -306,12 +290,15 @@ const Allocation: React.FC<AllocationProps> = ({
                       <span className="font-medium">{candidate.symbol}</span>
                     </div>
                     <div className="text-muted-foreground">{formatPercentage(stabilityFeeRate)}</div>
-                    <div>
+                    <div className="relative">
+                      {displayMode === 'USD' && (
+                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">$</span>
+                      )}
                       <Input
                         value={getDisplayValue(depositInputs[candidate.assetAddress] || '', candidate.assetAddress, true)}
                         onChange={(e) => handleDepositChange(candidate.assetAddress, e.target.value)}
                         placeholder="0"
-                        className={`h-8 text-xs ${hasLowHF ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                        className={`h-8 text-xs ${displayMode === 'USD' ? 'pl-5' : ''} ${hasLowHF ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                         disabled={autoSupplyCollateral}
                       />
                     </div>
