@@ -220,7 +220,7 @@ const centCeil = (value: Number): Number => {
 };
 
 // Return the maximum amount that can be borrowed with the given health factor
-const calculateAvailableToBorrowUSD = (
+export const calculateAvailableToBorrowUSD = (
   loanData: NewLoanData,
   healthFactor: Number,
   newCollateral: Map<CollateralData, bigint>,
@@ -243,7 +243,7 @@ const calculateAvailableToBorrowUSD = (
     : 0.00;
 };
 
-const calculateHFSliderExtrema = (
+export const calculateHFSliderExtrema = (
   loanData: NewLoanData,
   collaterals: CollateralData[],
   DEFAULT_MAX_HEALTH_FACTOR: Number = 3.00,
@@ -381,7 +381,7 @@ const calculateAdditionalValueNeeded = (
   return Number(additionalValueNeeded) / 1e18;
 };
 
-const calculateAfterBorrowHealthFactor = (
+export const calculateAfterBorrowHealthFactor = (
   loanData: NewLoanData,
   borrowAmount: Number,
   newCollateralSupplied: Map<CollateralData, bigint>
