@@ -277,18 +277,18 @@ const Borrow = () => {
               </CardContent>
             </Card>
 
-            {/* Right Column - Your Position */}
-            <div>
+            {/* Right Column - Your Position and Collateral Management */}
+            <div className="space-y-6">
               <PositionSection loanData={loans} userCollaterals={collateralInfo} />
+              <CollateralManagementTable
+                collateralInfo={collateralInfo}
+                loadingCollateral={loadingCollateral}
+                loans={loans}
+                onSupply={handleSupply}
+                onWithdraw={handleWithdraw}
+              />
             </div>
           </div>
-          <CollateralManagementTable
-            collateralInfo={collateralInfo}
-            loadingCollateral={loadingCollateral}
-            loans={loans}
-            onSupply={handleSupply}
-            onWithdraw={handleWithdraw}
-          />
         </main>
       </div>
 
