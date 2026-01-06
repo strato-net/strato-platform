@@ -87,7 +87,7 @@ export function getMaxAllocations(
       continue;
     }
 
-    const targetCR = computeTargetCRWadFromRiskBuffer(candidate.minCR, riskBuffer);
+    const targetCR = computeTargetCRWadFromRiskBuffer(candidate.minCR, riskBuffer, candidate.liquidationRatio);
     const headroom = computeHeadroom(candidate, targetCR);
     
     if (headroom <= 0n) continue;
@@ -143,7 +143,7 @@ export function computeTotalHeadroom(
   for (const candidate of candidates) {
     if ((candidate.potentialCollateral <= 0n && candidate.currentCollateral <= 0n) || candidate.oraclePrice <= 0n) continue;
 
-    const targetCR = computeTargetCRWadFromRiskBuffer(candidate.minCR, riskBuffer);
+    const targetCR = computeTargetCRWadFromRiskBuffer(candidate.minCR, riskBuffer, candidate.liquidationRatio);
     const headroom = computeHeadroom(candidate, targetCR);
     totalHeadroom += headroom;
   }
@@ -181,8 +181,8 @@ const sortCandidates = (candidates: VaultCandidate[], riskBuffer: number): Vault
   // Sort existing vaults by borrowing power (descending)
   // Borrowing power = (currentCollateral + potentialCollateral) value / targetCR - currentDebt
   existingVaults.sort((a, b) => {
-    const targetCRA = computeTargetCRWadFromRiskBuffer(a.minCR, riskBuffer);
-    const targetCRB = computeTargetCRWadFromRiskBuffer(b.minCR, riskBuffer);
+    const targetCRA = computeTargetCRWadFromRiskBuffer(a.minCR, riskBuffer, a.liquidationRatio);
+    const targetCRB = computeTargetCRWadFromRiskBuffer(b.minCR, riskBuffer, b.liquidationRatio);
     const bpA = computeBorrowingPower(
       a.currentCollateral + a.potentialCollateral,
       a.currentDebt,
@@ -205,8 +205,8 @@ const sortCandidates = (candidates: VaultCandidate[], riskBuffer: number): Vault
   // Sort potential vaults by borrowing power (descending)
   // Borrowing power = potentialCollateral value / targetCR (no current debt)
   potentialVaults.sort((a, b) => {
-    const targetCRA = computeTargetCRWadFromRiskBuffer(a.minCR, riskBuffer);
-    const targetCRB = computeTargetCRWadFromRiskBuffer(b.minCR, riskBuffer);
+    const targetCRA = computeTargetCRWadFromRiskBuffer(a.minCR, riskBuffer, a.liquidationRatio);
+    const targetCRB = computeTargetCRWadFromRiskBuffer(b.minCR, riskBuffer, b.liquidationRatio);
     const bpA = computeBorrowingPower(
       a.potentialCollateral,
       0n,
@@ -268,7 +268,7 @@ export function getOptimalAllocations(
       continue;
     }
 
-    const targetCR = computeTargetCRWadFromRiskBuffer(candidate.minCR, riskBuffer);
+    const targetCR = computeTargetCRWadFromRiskBuffer(candidate.minCR, riskBuffer, candidate.liquidationRatio);
     const currentGlobalDebt = globalDebtByAsset.get(candidate.assetAddress) ?? candidate.globalDebt;
     const result = allocate(candidate, remainingMint, targetCR, currentGlobalDebt, false);
     

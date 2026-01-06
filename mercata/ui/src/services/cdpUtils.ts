@@ -146,13 +146,35 @@ export const USDST_ADDRESS = "937efa7e3a77e20bbdbd7c0d32b6514f368c1010";
 // ============================================================================
 
 /**
- * Compute target collateralization ratio (CR) from minimum CR and risk buffer
+ * Compute target collateralization ratio (CR) from liquidation ratio and target HF (riskBuffer)
+ * This ensures the resulting HF matches the slider value.
+ * 
+ * Formula: targetCR = liquidationRatio * targetHF
+ * Result: HF = CR / liquidationRatio = targetHF ✓
+ * 
+ * We also ensure targetCR >= minCR to pass on-chain validation.
+ * 
  * @param minCRWad - Minimum CR in WAD format (e.g., 200% = 2e18)
- * @param riskBuffer - Risk buffer to apply (e.g., 1.2 for 20% buffer)
+ * @param riskBuffer - Target health factor (e.g., 1.13 for HF of 1.13)
+ * @param liquidationRatioWad - Liquidation ratio in WAD format (optional, for backward compat)
  * @returns Target CR in WAD format
  */
-export function computeTargetCRWadFromRiskBuffer(minCRWad: bigint, riskBuffer: number): bigint {
+export function computeTargetCRWadFromRiskBuffer(
+  minCRWad: bigint, 
+  riskBuffer: number,
+  liquidationRatioWad?: bigint
+): bigint {
   const riskBufferWad = BigInt(Math.floor(riskBuffer * 1000));
+  
+  // If liquidationRatio provided, compute CR to achieve target HF
+  // targetCR = liquidationRatio * targetHF, but must be >= minCR
+  if (liquidationRatioWad !== undefined && liquidationRatioWad > 0n) {
+    const targetCRFromHF = (liquidationRatioWad * riskBufferWad) / 1000n;
+    // Ensure we don't go below minCR (would fail on-chain)
+    return targetCRFromHF > minCRWad ? targetCRFromHF : minCRWad;
+  }
+  
+  // Fallback to old behavior if liquidationRatio not provided
   return (minCRWad * riskBufferWad) / 1000n;
 }
 
