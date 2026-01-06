@@ -419,7 +419,6 @@ export const getLendingProtocolRevenue = async (
       storageByTimestamp.set(timestamp, { reservesAccrued, safetyShareBps });
     });
     
-    console.log(storageByTimestamp);
     // Process swept treasury events
     interface SweptEvent { amount: bigint; timestamp: number; }
     
@@ -470,7 +469,7 @@ export const getLendingProtocolRevenue = async (
     // Get token symbol
     const tokenInfo = await getTokenInfo(accessToken, borrowableAsset);
     
-    // Build result in same format as before
+    // Build result in same format
     const buildByAsset = (revenue: bigint): RevenueByAsset[] => {
       if (revenue <= 0n) return [];
       return [{
