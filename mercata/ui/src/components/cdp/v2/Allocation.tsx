@@ -5,10 +5,9 @@ import { Label } from '@/components/ui/label';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 import { formatUnits, parseUnits } from 'ethers';
-import { convertStabilityFeeRateToAnnualPercentage } from '@/services/cdpUtils';
 import type { PlanItem } from '@/services/cdpTypes';
 import type { VaultCandidate } from '@/services/MintService';
-import { formatPercentage, getAssetColor } from '@/utils/loanUtils';
+import { formatPercentage, getAssetColor, convertStabilityFeeRateToAnnualPercentage } from '@/utils/loanUtils';
 import { useTokenContext } from '@/context/TokenContext';
 import { formatNumberWithCommas, parseCommaNumber } from '@/utils/numberUtils';
 

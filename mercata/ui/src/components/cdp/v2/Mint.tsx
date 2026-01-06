@@ -441,7 +441,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     if (optimalAllocations.length === 0 && debtFloorHit) return 'Debt Floor: Increase Mint Amount';
     if (optimalAllocations.length === 0 && totalHeadroomWei <= 0n) return 'Vaults at Capacity: Move Risk Slider to the right';
     if (optimalAllocations.length === 0) return 'No vaults available';
-    if (hasLowHF && !autoSupplyCollateral) return `Health Factor below ${riskBuffer.toFixed(2)}x: Adjust allocations or move Risk Slider`;
+    if (hasLowHF && !autoSupplyCollateral) return `Health Factor below ${riskBuffer.toFixed(2)}: Adjust allocations or move Risk Slider`;
     return 'Confirm Mint';
   };
 

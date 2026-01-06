@@ -2,13 +2,158 @@ import { formatUnits, parseUnits } from 'ethers';
 import { formatNumberWithCommas } from '@/utils/numberUtils';
 import type { PlanItem } from '@/services/cdpTypes';
 import type { VaultCandidate } from '@/services/MintService';
-import { convertStabilityFeeRateToAnnualPercentage } from '@/services/cdpUtils';
 
+// ============================================================================
 // Constants
+// ============================================================================
+
+// Fixed-point arithmetic constants
+export const RAY = 10n ** 27n;
+export const WAD = 10n ** 18n;
+export const INF = 2n ** 255n;
+
+// Fee constants
 export const DEPOSIT_FEE_USDST = 0.02;
 export const MINT_FEE_USDST = 0.01;
 export const SAFETY_BUFFER_BPS = 5n;
 export const BPS_SCALE = 10000n;
+
+// Time constants
+export const SECONDS_PER_YEAR = 31536000n;
+
+// ============================================================================
+// Stability Fee Rate Conversion
+// ============================================================================
+
+/**
+ * Fixed-point exponentiation (matches contract's _rpow)
+ * Computes x^n in RAY precision
+ */
+function rpow(x: bigint, n: bigint, ray: bigint = RAY): bigint {
+  let z = n % 2n !== 0n ? x : ray;
+  let xCopy = x;
+  let nCopy = n;
+  for (nCopy = nCopy / 2n; nCopy !== 0n; nCopy = nCopy / 2n) {
+    xCopy = (xCopy * xCopy) / ray;
+    if (nCopy % 2n !== 0n) {
+      z = (z * xCopy) / ray;
+    }
+  }
+  return z;
+}
+
+/**
+ * Convert per-second RAY rate to annual percentage
+ * @param stabilityFeeRateRay - Per-second rate in RAY format
+ * @returns Annual percentage (e.g., 2.8 for 2.8% APR)
+ */
+export function convertStabilityFeeRateToAnnualPercentage(stabilityFeeRateRay: bigint): number {
+  if (stabilityFeeRateRay <= RAY) return 0;
+  
+  const MAX_REASONABLE_RATE = RAY + (RAY / 300000n);
+  const cappedRate = stabilityFeeRateRay > MAX_REASONABLE_RATE ? MAX_REASONABLE_RATE : stabilityFeeRateRay;
+  
+  const annualFactorRay = rpow(cappedRate, SECONDS_PER_YEAR);
+  const factorMinusOne = annualFactorRay - RAY;
+  const integerPart = factorMinusOne / RAY;
+  const remainder = factorMinusOne % RAY;
+  const PRECISION_SCALE = BigInt(1e18);
+  const fractionalPart = (remainder * PRECISION_SCALE) / RAY;
+  const annualPercentage = (Number(integerPart) + Number(fractionalPart) / Number(PRECISION_SCALE)) * 100;
+  
+  return isFinite(annualPercentage) ? annualPercentage : 0;
+}
+
+// ============================================================================
+// Target CR and HF Calculations
+// ============================================================================
+
+/**
+ * Compute target collateralization ratio (CR) from target health factor
+ * 
+ * Formula: targetCR = liquidationRatio * targetHF
+ * Result: HF = CR / liquidationRatio = targetHF ✓
+ * 
+ * Ensures targetCR >= minCR to pass on-chain validation.
+ * 
+ * @param minCRWad - Minimum CR in WAD format (e.g., 1.5e18 for 150%)
+ * @param targetHF - Target health factor (e.g., 1.13)
+ * @param liquidationRatioWad - Liquidation ratio in WAD format (e.g., 1.33e18 for 133%)
+ * @returns Target CR in WAD format
+ */
+export function computeTargetCRFromHF(
+  minCRWad: bigint, 
+  targetHF: number,
+  liquidationRatioWad: bigint
+): bigint {
+  const targetHFScaled = BigInt(Math.floor(targetHF * 1000));
+  
+  // targetCR = liquidationRatio * targetHF
+  const targetCRFromHF = (liquidationRatioWad * targetHFScaled) / 1000n;
+  
+  // Ensure we don't go below minCR (would fail on-chain)
+  return targetCRFromHF > minCRWad ? targetCRFromHF : minCRWad;
+}
+
+// ============================================================================
+// Collateral Calculations
+// ============================================================================
+
+/**
+ * Compute collateral value in USD
+ * @param collateralAmount - Collateral amount in native units
+ * @param oraclePrice - Oracle price (18 decimals)
+ * @param assetScale - Asset scale (10^decimals, e.g., 1e18 for 18-decimal tokens)
+ * @returns Collateral value in USD (18 decimals)
+ */
+export function computeCollateralValueUSD(
+  collateralAmount: bigint,
+  oraclePrice: bigint,
+  assetScale: bigint
+): bigint {
+  if (assetScale === 0n) return 0n;
+  return (collateralAmount * oraclePrice) / assetScale;
+}
+
+/**
+ * Compute required collateral amount for a given debt and target CR
+ * @param debtUSD - Debt amount in USD (18 decimals)
+ * @param targetCRWad - Target collateralization ratio in WAD format
+ * @param oraclePrice - Oracle price (18 decimals)
+ * @param assetScale - Asset scale (10^decimals)
+ * @returns Required collateral amount in native units
+ */
+export function computeRequiredCollateralForCR(
+  debtUSD: bigint,
+  targetCRWad: bigint,
+  oraclePrice: bigint,
+  assetScale: bigint
+): bigint {
+  if (oraclePrice === 0n) return 0n;
+  const collateralUSDRequired = (debtUSD * targetCRWad) / WAD;
+  return (collateralUSDRequired * assetScale) / oraclePrice;
+}
+
+/**
+ * Compute maximum mintable debt for given collateral at target HF
+ * @param collateralAmount - Collateral amount in native units
+ * @param oraclePrice - Oracle price (18 decimals)
+ * @param assetScale - Asset scale (10^decimals)
+ * @param targetCRWad - Target CR in WAD format
+ * @param currentDebt - Current debt (18 decimals)
+ * @returns Maximum additional mintable debt (18 decimals)
+ */
+export function computeMaxMintableDebt(
+  collateralAmount: bigint,
+  oraclePrice: bigint,
+  assetScale: bigint,
+  targetCRWad: bigint,
+  currentDebt: bigint
+): bigint {
+  const collateralValueUSD = computeCollateralValueUSD(collateralAmount, oraclePrice, assetScale);
+  const maxDebt = (collateralValueUSD * WAD) / targetCRWad;
+  return maxDebt > currentDebt ? maxDebt - currentDebt : 0n;
+}
 
 // Formatting utilities
 export const formatUSD = (value: number, decimals = 2): string =>
@@ -239,8 +384,9 @@ export const getAssetColor = (symbol: string): string => {
   return colors[symbol] || '#6b7280'; // default gray
 };
 
-// Health Factor slider utilities
-const WAD = 10n ** 18n;
+// ============================================================================
+// Health Factor Slider Utilities
+// ============================================================================
 
 /**
  * Calculate the minimum health factor for the HF slider based on vault data
