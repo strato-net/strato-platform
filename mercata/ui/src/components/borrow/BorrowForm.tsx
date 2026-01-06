@@ -14,7 +14,8 @@ import {
   calculateAfterBorrowHealthFactor,
   recommendCollateralToSupply,
   calculateAdditionalValueNeeded,
-  calculateBorrowTxFee
+  calculateBorrowTxFee,
+  determineErrorMessage
 } from "@/utils/lendingUtils";
 import { getRiskLabel } from "@/utils/loanUtils";
 import { useLendingContext } from "@/context/LendingContext";
@@ -39,6 +40,7 @@ interface BorrowFormProps {
 const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalance, collateralInfo, startPolling, stopPolling, userRewards, rewardsLoading }: BorrowFormProps) => {
   const [borrowAmount, setBorrowAmount] = useState<string>("");
   const [borrowAmountError, setBorrowAmountError] = useState<string>("");
+  const [customBorrowError, setCustomBorrowError] = useState<string>("");
   const [feeError, setFeeError] = useState<string>("");
   const [targetHealthFactor, setTargetHealthFactor] = useState<number>(2.10);
   const [autoSupplyCollateral, setAutoSupplyCollateral] = useState<boolean>(true);
@@ -56,24 +58,32 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
     return calculateHFSliderExtrema(loans, collateralInfo);
   }, [loans, collateralInfo]);
 
-  // Calculate available to borrow based on current health factor setting
-  // Includes all available collateral balances (max potential borrowing power)
-  const availableToBorrow = useMemo(() => {
-    if (!loans) return 0;
-    
-    // Build collateral map from all available user balances
-    const potentialCollateral = new Map<CollateralData, bigint>();
+  // Build collateral map from all available user balances (reused for calculations)
+  const potentialCollateral = useMemo(() => {
+    const map = new Map<CollateralData, bigint>();
     if (collateralInfo) {
       for (const collateral of collateralInfo) {
         const balance = BigInt(collateral.userBalance ?? "0");
         if (balance > 0n) {
-          potentialCollateral.set(collateral, balance);
+          map.set(collateral, balance);
         }
       }
     }
-    
+    return map;
+  }, [collateralInfo]);
+
+  // Calculate available to borrow based on current health factor setting
+  // Includes all available collateral balances (max potential borrowing power)
+  const availableToBorrow = useMemo(() => {
+    if (!loans) return 0;
     return calculateAvailableToBorrowUSD(loans, targetHealthFactor, potentialCollateral);
-  }, [loans, targetHealthFactor, collateralInfo]);
+  }, [loans, targetHealthFactor, potentialCollateral]);
+
+  // Calculate maximum borrowable at minimum health factor (riskier)
+  const maxAtMinHF = useMemo(() => {
+    if (!loans) return 0;
+    return calculateAvailableToBorrowUSD(loans, sliderExtrema.min, potentialCollateral);
+  }, [loans, sliderExtrema.min, potentialCollateral]);
 
   // Max borrowable amount in wei
   const maxAmount = useMemo(() => {
@@ -171,6 +181,36 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
     }
     return canCover;
   }, [txFee, voucherBalance, usdstBalance]);
+
+  // Update custom error message when borrow amount exceeds maximum at selected health factor
+  useEffect(() => {
+    if (!borrowAmount || !loans) {
+      setCustomBorrowError("");
+      return;
+    }
+
+    const cleanedInput = borrowAmount.replace(/,/g, "");
+    const borrowAmountNum = parseFloat(cleanedInput);
+    if (isNaN(borrowAmountNum) || borrowAmountNum <= 0) {
+      setCustomBorrowError("");
+      return;
+    }
+
+    const borrowAmountWei = safeParseUnits(cleanedInput, 18);
+    const maxAmountWei = BigInt(maxAmount);
+    
+    // Only set custom error if amount exceeds maximum
+    if (borrowAmountWei > maxAmountWei) {
+      const errorMsg = determineErrorMessage(
+        borrowAmountNum,
+        availableToBorrow,
+        maxAtMinHF
+      );
+      setCustomBorrowError(errorMsg);
+    } else {
+      setCustomBorrowError("");
+    }
+  }, [borrowAmount, loans, maxAmount, availableToBorrow, maxAtMinHF]);
 
   // Handle checkbox change - expand when unchecked
   const handleAutoSupplyChange = (checked: boolean) => {
@@ -290,6 +330,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
       // Reset form after successful completion
       setBorrowAmount("");
       setBorrowAmountError("");
+      setCustomBorrowError("");
       setFeeError("");
       handlePollingUpdate("");
       
@@ -370,9 +411,6 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
             MAX
           </Button>
         </div>
-        {borrowAmountError && (
-          <p className="text-red-600 text-sm">{borrowAmountError}</p>
-        )}
       </div>
 
       {/* Health Factor Slider */}
@@ -416,11 +454,18 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
             <span className="font-medium tabular-nums">
               {currentHF === null ? 'No Loan' : currentHF.toFixed(2)}
               {' → '}
-              {afterBorrowHF !== null ? afterBorrowHF.toFixed(2) : (borrowAmount ? targetHealthFactor.toFixed(2) : '-')}
+              {afterBorrowHF && !customBorrowError ? afterBorrowHF.toFixed(2) : '-'}
             </span>
           </div>
         </div>
       </TooltipProvider>
+
+      {/* Error Message Box - Above Borrow Button */}
+      {customBorrowError && (
+        <div className="p-4 bg-red-500/10 dark:bg-red-500/20 border border-red-500/30 rounded-lg">
+          <p className="text-red-800 dark:text-red-200 text-sm whitespace-pre-line">{customBorrowError}</p>
+        </div>
+      )}
 
       {/* Borrow Button */}
       <Button
@@ -428,6 +473,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
         disabled={
           !borrowAmount ||
           !!borrowAmountError ||
+          !!customBorrowError ||
           !!feeError ||
           safeParseUnits(borrowAmount || "0") <= 0n ||
           borrowLoading ||
@@ -443,7 +489,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
       </Button>
 
       {/* Auto Supply Collateral Checkbox and Dropdown - Only show when collateral is needed */}
-      {collateralTableData.length > 0 && (
+      {collateralTableData.length > 0 && !customBorrowError && (
         <>
           <div className="flex items-center space-x-2">
             <Checkbox
