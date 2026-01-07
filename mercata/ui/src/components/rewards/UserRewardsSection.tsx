@@ -14,6 +14,7 @@ import { Loader2, Coins, TrendingUp, Info, Clock, Star } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { useUser } from "@/context/UserContext";
+import { useAuthAction } from "@/hooks/useAuthAction";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatDistanceToNow } from "date-fns";
 
@@ -30,6 +31,7 @@ export const UserRewardsSection = ({
 }: UserRewardsSectionProps) => {
   const { toast } = useToast();
   const { userAddress } = useUser();
+  const { canPerformAction } = useAuthAction();
   const [claimingActivityIds, setClaimingActivityIds] = useState<number[]>([]);
   const [isClaimingAll, setIsClaimingAll] = useState(false);
 
@@ -242,7 +244,7 @@ export const UserRewardsSection = ({
             </div>
             <Button
               onClick={handleClaimAll}
-              disabled={!hasClaimable || isClaimingAll || !userAddress}
+              disabled={!canPerformAction || !hasClaimable || isClaimingAll || !userAddress}
               size="lg"
             >
               {isClaimingAll ? (

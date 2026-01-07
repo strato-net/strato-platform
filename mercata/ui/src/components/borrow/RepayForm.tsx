@@ -9,6 +9,7 @@ import RiskLevelProgress from "@/components/ui/RiskLevelProgress";
 import HealthImpactDisplay from "@/components/ui/HealthImpactDisplay";
 import PercentageButtons from "../ui/PercentageButtons";
 import { computeMaxTransferable, handleAmountInputChange } from "@/utils/transferValidation";
+import { useAuthAction } from "@/hooks/useAuthAction";
 
 interface RepayFormProps {
   loans: NewLoanData | null;
@@ -19,6 +20,7 @@ interface RepayFormProps {
 }
 
 const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance }: RepayFormProps) => {
+  const { canPerformAction } = useAuthAction();
   const [repayAmount, setRepayAmount] = useState<string>("");
   const [repayAmountError, setRepayAmountError] = useState<string>("");
   const [feeError, setFeeError] = useState<string>("");
@@ -217,6 +219,7 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance 
       <Button
         onClick={handleRepay}
         disabled={
+          !canPerformAction ||
           repayLoading ||
           !repayAmount ||
           !!feeError ||

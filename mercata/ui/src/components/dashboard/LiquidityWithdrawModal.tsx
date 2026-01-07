@@ -13,6 +13,8 @@ import {
 import { useForm } from "react-hook-form";
 import { useToast } from '@/hooks/use-toast';
 import { useSwapContext } from '@/context/SwapContext';
+import { useUser } from '@/context/UserContext';
+import { useAuthAction } from '@/hooks/useAuthAction';
 import { WITHDRAW_FEE, rewardsEnabled } from "@/lib/constants";
 import { Pool } from '@/interface';
 import { safeParseUnits, formatWeiAmount, formatUnits } from '@/utils/numberUtils';
@@ -88,6 +90,7 @@ const LiquidityWithdrawModal = ({
   }, [selectedPool]);
 
   const { removeLiquidity: removeLiquidityContext } = useSwapContext();
+  const { canPerformAction } = useAuthAction();
   const removeLiquidity = removeLiquidityContext as (params: {
     poolAddress: string;
     lpTokenAmount: string;
@@ -358,6 +361,7 @@ const LiquidityWithdrawModal = ({
           <div className="pt-2">
             <Button
               disabled={
+                !canPerformAction ||
                 withdrawLoading ||
                 !withdrawPercent ||
                 !!withdrawPercentError ||

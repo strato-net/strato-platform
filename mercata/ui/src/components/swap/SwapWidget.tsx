@@ -8,6 +8,7 @@ import {
 import { ArrowDownUp, Check, ChevronDown, HelpCircle } from "lucide-react";
 import { Pool, SwapToken } from "@/interface";
 import { useUser } from "@/context/UserContext";
+import { useAuthAction } from "@/hooks/useAuthAction";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { useLendingContext } from "@/context/LendingContext";
@@ -508,6 +509,7 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
     [pairableTokens, fromAsset?.address]
   );
   const { userAddress } = useUser();
+  const { canPerformAction } = useAuthAction();
   const { fetchTokens } = useUserTokens();
   const { usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
   const { refreshLoans, refreshCollateral } = useLendingContext();
@@ -826,6 +828,9 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
   // VALIDATION HELPERS
   // ========================================================================
   const isSwapDisabled = useCallback(() => {
+    // Require login
+    if (!canPerformAction) return true;
+    
     // Basic validations
     if (!fromAmount || !toAmount || !fromAsset || !toAsset) {
       return true;

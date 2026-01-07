@@ -230,6 +230,8 @@ const Borrow = () => {
             </div>
           </div>
 
+          {/* Collateral Management Table (hidden on mobile) */}
+          <div className="hidden md:block">
           <CollateralManagementTable
             collateralInfo={collateralInfo}
             loadingCollateral={loadingCollateral}
@@ -237,6 +239,7 @@ const Borrow = () => {
             onSupply={handleSupply}
             onWithdraw={handleWithdraw}
           />
+          </div>
         </main>
       </div>
 

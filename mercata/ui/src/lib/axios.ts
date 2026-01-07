@@ -92,17 +92,7 @@ api.interceptors.response.use(
       });
     }
     
-    if (error.response?.status === 401 && url !== '/user/me') {
-      toast({
-        title: "Session Expired",
-        description: "Redirecting to login...",
-        variant: "destructive",
-      });
-      setTimeout(() => {
-        const theme = localStorage.getItem('theme') || 'light';
-        window.location.href = `/login?theme=${theme}`;
-      }, 1500);
-    }
+    // 401 errors are expected for non-logged users browsing - no redirect
     return Promise.reject(error);
   }
 );

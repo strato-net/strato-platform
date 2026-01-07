@@ -19,6 +19,7 @@ import {
   computeMaxTransferable,
 } from "@/utils/transferValidation";
 import { useTokenContext } from "@/context/TokenContext";
+import { useAuthAction } from "@/hooks/useAuthAction";
 import {
   NATIVE_TOKEN_ADDRESS,
   BRIDGE_MODE_LABELS,
@@ -39,6 +40,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false }) => {
   const { toast } = useToast();
   const { usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
   const { userAddress } = useUser();
+  const { canPerformAction } = useAuthAction();
 
   const {
     requestWithdrawal: bridgeOutAPI,
@@ -137,6 +139,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false }) => {
 
   const isButtonDisabled = useMemo(
     () =>
+      !canPerformAction ||
       isLoading ||
       !hasValidAmount ||
       !selectedToken ||
@@ -144,6 +147,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false }) => {
       !currentNetwork ||
       isBalanceLoading,
     [
+      canPerformAction,
       isLoading,
       hasValidAmount,
       selectedToken,

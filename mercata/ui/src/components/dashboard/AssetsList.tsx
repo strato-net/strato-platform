@@ -65,26 +65,26 @@ const AssetsList = ({
             <span className="font-bold">Earning Assets</span>
           </div>
         )}
-        <div className="w-full overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
-          <table style={{ minWidth: '700px', width: '100%' }}>
+        <div className="w-full md:overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <table className="w-full md:min-w-[700px]">
             <thead>
               <tr className="bg-muted/50">
-                <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4 min-w-[140px]">
+                <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
                   Asset
                 </th>
-                <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4 min-w-[80px]">
+                <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
                   Price
                 </th>
-                <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4 min-w-[80px]">
+                <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
                   Change
                 </th>
-                <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4 min-w-[100px]">
+                <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
                   Balance
                 </th>
-                <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4 min-w-[100px]">
+                <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
                   Collateral Balance
                 </th>
-                <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4 min-w-[100px]">
+                <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
                   Value
                 </th>
               </tr>
@@ -155,14 +155,14 @@ const AssetsList = ({
                           </div>
                         </div>
                       </td>
-                      <td className="py-4 px-4 whitespace-nowrap text-right">
+                      <td className="hidden md:table-cell py-4 px-4 whitespace-nowrap text-right">
                         <p className="font-medium text-foreground">
                           {!asset?.price
                             ? "-"
                             : formatBalance(asset.price, undefined, 18, 2, 2, true)}
                         </p>
                       </td>
-                      <td className="py-4 px-4 whitespace-nowrap text-right">
+                      <td className="hidden md:table-cell py-4 px-4 whitespace-nowrap text-right">
                         <div
                           className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                             (asset as any)?.["change"] >= 0
@@ -184,7 +184,7 @@ const AssetsList = ({
                             : formatBalance(asset.balance, undefined, 18,1, 4)}
                         </p>
                       </td>
-                      <td className="py-4 px-4 whitespace-nowrap text-right">
+                      <td className="hidden md:table-cell py-4 px-4 whitespace-nowrap text-right">
                         <p className="font-medium text-foreground">
                           {!asset?.collateralBalance || asset.collateralBalance === "0"
                             ? "-"

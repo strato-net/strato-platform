@@ -2,6 +2,7 @@ import { formatUnits } from "ethers";
 import { CircleArrowDown, CircleArrowUp, Clock, Shield, HelpCircle } from "lucide-react";
 import { useSafetyContext } from "@/context/SafetyContext";
 import { useUser } from "@/context/UserContext";
+import { useAuthAction } from "@/hooks/useAuthAction";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 
 const SafetyModuleSection = () => {
   const { userAddress } = useUser();
+  const { canPerformAction } = useAuthAction();
   const { activeTokens: tokens, loading: tokensLoading, fetchTokens } = useUserTokens();
   const { fetchUsdstBalance, usdstBalance, approveToken } = useTokenContext();
   const {
@@ -248,7 +250,7 @@ const SafetyModuleSection = () => {
                     <Button
                       onClick={handleStakeAction}
                       className="bg-strato-blue hover:bg-strato-blue/90 w-full sm:w-28 hidden sm:flex sm:items-center sm:justify-center"
-                      disabled={tokensLoading || isProcessing || !isStakeAmountValid()}
+                      disabled={!canPerformAction || tokensLoading || isProcessing || !isStakeAmountValid()}
                     >
                       {isProcessing ? (
                         "Processing..."

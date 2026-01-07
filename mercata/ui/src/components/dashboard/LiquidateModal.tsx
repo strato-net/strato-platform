@@ -8,6 +8,7 @@ import { LiquidationEntry } from '@/context/LiquidationContext';
 import TokenIcon from '@/components/ui/TokenIcon';
 import PercentageButtons from '@/components/ui/PercentageButtons';
 import { useLiquidationContext } from '@/context/LiquidationContext';
+import { useAuthAction } from '@/hooks/useAuthAction';
 import { parseUnits, formatUnits } from 'ethers';
 
 interface LiquidateModalProps {
@@ -83,6 +84,7 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
 
   const { toast } = useToast();
   const { executeLiquidation } = useLiquidationContext();
+  const { canPerformAction } = useAuthAction();
 
   // Guard – nothing to render if data missing
   if (!loan || !collateral) return null;
@@ -281,7 +283,7 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
           <Button 
             variant="destructive" 
             onClick={handleConfirm} 
-            disabled={repayEth <= 0}
+            disabled={!canPerformAction || repayEth <= 0}
             className="px-6"
           >
             Confirm Liquidation

@@ -41,6 +41,7 @@ import { ensureHexPrefix, formatBalance, safeParseUnits, formatUnits } from "@/u
 import { handleAmountInputChange } from "@/utils/transferValidation";
 import { useBridgeContext } from "@/context/BridgeContext";
 import { useUser } from "@/context/UserContext";
+import { useAuthAction } from "@/hooks/useAuthAction";
 import { useTokenContext } from "@/context/TokenContext";
 import { useLendingContext } from "@/context/LendingContext";
 import BridgeWalletStatus from "./BridgeWalletStatus";
@@ -64,6 +65,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false }) => {
   const { signTypedDataAsync } = useSignTypedData();
   const { toast } = useToast();
   const { userAddress } = useUser();
+  const { canPerformAction } = useAuthAction();
   const { fetchUsdstBalance } = useTokenContext();
   const { liquidityInfo } = useLendingContext();
   const {
@@ -190,6 +192,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false }) => {
 
   const isButtonDisabled = useMemo(
     () =>
+      !canPerformAction ||
       isLoading ||
       !hasValidAmount ||
       !selectedToken ||
@@ -199,6 +202,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false }) => {
       isBalanceLoading ||
       !isTokenPermitted,
     [
+      canPerformAction,
       isLoading,
       hasValidAmount,
       selectedToken,

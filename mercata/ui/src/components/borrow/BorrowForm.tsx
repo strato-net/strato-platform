@@ -9,6 +9,7 @@ import RiskLevelProgress from "@/components/ui/RiskLevelProgress";
 import HealthImpactDisplay from "@/components/ui/HealthImpactDisplay";
 import PercentageButtons from "../ui/PercentageButtons";
 import { useLendingContext } from "@/context/LendingContext";
+import { useAuthAction } from "@/hooks/useAuthAction";
 import { computeMaxTransferable, handleAmountInputChange } from "@/utils/transferValidation";
 import { UserRewardsData } from "@/services/rewardsService";
 import { CompactRewardsDisplay } from "../rewards/CompactRewardsDisplay";
@@ -27,6 +28,7 @@ interface BorrowFormProps {
 }
 
 const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalance, collateralInfo, startPolling, stopPolling, userRewards, rewardsLoading }: BorrowFormProps) => {
+  const { canPerformAction } = useAuthAction();
   const [borrowAmount, setBorrowAmount] = useState<string>("");
   const [borrowAmountError, setBorrowAmountError] = useState<string>("");
   const [feeError, setFeeError] = useState<string>("");
@@ -202,6 +204,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
       <Button
         onClick={handleBorrow}
         disabled={
+          !canPerformAction ||
           !borrowAmount ||
           !!borrowAmountError ||
           !!feeError ||

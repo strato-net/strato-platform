@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { formatUnits } from 'viem';
 import { Token, EarningAsset } from '@mercata/shared-types';
+import { useUser } from '@/context/UserContext';
 
 interface UseNetBalanceProps {
   tokens: EarningAsset[];
@@ -22,6 +23,9 @@ export const useNetBalance = ({
   loans,
   totalCDPDebt,
 }: UseNetBalanceProps): NetBalanceResult => {
+  const { userAddress } = useUser();
+  const isLoggedIn = !!userAddress;
+
   const [result, setResult] = useState<NetBalanceResult>({
     netBalance: 0,
     cataBalance: 0,
@@ -33,6 +37,17 @@ export const useNetBalance = ({
   const calculationAttempted = useRef(false);
 
   useEffect(() => {
+    // If user is not logged in, immediately return 0 values without loading
+    if (!isLoggedIn) {
+      setResult({
+        netBalance: 0,
+        cataBalance: 0,
+        totalBorrowed: 0,
+        isLoading: false
+      });
+      return;
+    }
+
     const isTokensLoaded = Array.isArray(tokens);
     const isLoansLoaded = loans !== undefined;
     const isTotalCDPDebtLoaded = totalCDPDebt !== undefined;
@@ -114,7 +129,7 @@ export const useNetBalance = ({
       isLoading: false
     });
 
-  }, [tokens, cataToken, loans, totalCDPDebt]);
+  }, [tokens, cataToken, loans, totalCDPDebt, isLoggedIn]);
 
   return result;
 };

@@ -19,6 +19,7 @@ import {
 import RiskLevelProgress from "@/components/ui/RiskLevelProgress";
 import HealthImpactDisplay from "@/components/ui/HealthImpactDisplay";
 import { computeMaxTransferable, handleAmountInputChange } from "@/utils/transferValidation";
+import { useAuthAction } from "@/hooks/useAuthAction";
 
 type ModalType = "supply" | "withdraw";
 
@@ -47,6 +48,7 @@ const CollateralModal = ({
   voucherBalance,
   transactionFee,
 }: CollateralModalProps) => {
+  const { canPerformAction } = useAuthAction();
   const [amount, setAmount] = useState<string>("");
   const [amountError, setAmountError] = useState<string>("");
   const [feeError, setFeeError] = useState<string>("");
@@ -194,6 +196,7 @@ const CollateralModal = ({
 
   const isDisabled = () => {
     return (
+      !canPerformAction ||
       safeParseUnits(amount || "0") === 0n ||
       loading ||
       !isAmountValid() ||

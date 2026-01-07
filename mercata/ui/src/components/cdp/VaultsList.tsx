@@ -9,6 +9,7 @@ import { MoreVertical, Loader2 } from "lucide-react";
 import { cdpService, VaultData, TransactionResponse } from "@/services/cdpService";
 import { useToast } from "@/hooks/use-toast";
 import { useUserTokens } from "@/context/UserTokensContext";
+import { useAuthAction } from "@/hooks/useAuthAction";
 import { useTokenContext } from "@/context/TokenContext";
 import { useOracleContext } from "@/context/OracleContext";
 import { formatWeiToDecimalHP, formatNumber, formatDecimalToWeiHP } from "@/utils/numberUtils";
@@ -47,6 +48,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const { activeTokens, fetchTokens } = useUserTokens();
+  const { canPerformAction } = useAuthAction();
   const { fetchUsdstBalance } = useTokenContext();
   const { getPrice } = useOracleContext();
   

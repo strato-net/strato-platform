@@ -7,6 +7,7 @@ import { RefreshCw } from "lucide-react";
 import { cdpService, AssetConfig } from "@/services/cdpService";
 import { useToast } from "@/hooks/use-toast";
 import { useUserTokens } from "@/context/UserTokensContext";
+import { useAuthAction } from "@/hooks/useAuthAction";
 import { formatBalance as formatBalanceUtil, formatWeiToDecimalHP, formatNumber, formatDecimalToWeiHP } from "@/utils/numberUtils";
 import { usdstAddress } from "@/lib/constants";
 
@@ -26,6 +27,7 @@ const OpenJuniorNoteWidget: React.FC<OpenJuniorNoteWidgetProps> = ({ onSuccess, 
   const [isMaxEnabled, setIsMaxEnabled] = useState(false);
   const { toast } = useToast();
   const { activeTokens } = useUserTokens();
+  const { canPerformAction } = useAuthAction();
 
   // Get user's USDST balance
   const getUsdstBalance = useCallback((): string => {
@@ -427,6 +429,7 @@ const OpenJuniorNoteWidget: React.FC<OpenJuniorNoteWidgetProps> = ({ onSuccess, 
           className="w-full" 
           onClick={handleOpenJuniorNote}
           disabled={
+            !canPerformAction ||
             loading || 
             !selectedAsset || 
             parseFloat(burnAmount || "0") <= 0 || 

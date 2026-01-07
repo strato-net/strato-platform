@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Token } from "@/interface";
 
 import { useUser } from "@/context/UserContext";
+import { useAuthAction } from "@/hooks/useAuthAction";
 import { useTokenContext } from "@/context/TokenContext";
 import { useToast } from "@/hooks/use-toast";
 import { usdstAddress, TRANSFER_FEE } from "@/lib/constants";
@@ -24,6 +25,7 @@ import { sortTokensCompareFn } from "@/lib/tokenPriority";
 
 const Transfer = () => {
   const { userAddress } = useUser();
+  const { canPerformAction } = useAuthAction();
   const { usdstBalance, voucherBalance, fetchUsdstBalance, loadingUsdstBalance, getTransferableTokens, transferToken } = useTokenContext();
   const { toast } = useToast();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -301,6 +303,7 @@ const Transfer = () => {
               className="w-full"
               onClick={() => setShowConfirmModal(true)}
               disabled={
+                !canPerformAction ||
                 !fromAsset ||
                 !recipient ||
                 !fromAmount ||

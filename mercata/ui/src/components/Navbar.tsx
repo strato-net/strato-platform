@@ -59,6 +59,14 @@ const Navbar = () => {
               Launch App
             </Link>
             )}
+            {!isLoggedIn && !loading && (
+              <button 
+                onClick={() => window.location.href = `/login?theme=${resolvedTheme || 'light'}&register=true`}
+                className="px-4 py-2 rounded-full text-sm font-medium transition-colors bg-strato-blue text-white hover:bg-strato-blue/90"
+              >
+                Register
+              </button>
+            )}
             <button 
               onClick={handleAuthClick}
               disabled={loading}
@@ -106,6 +114,14 @@ const Navbar = () => {
                 >
                   Launch App
                 </Link>
+              )}
+              {!isLoggedIn && !loading && (
+                <button 
+                  onClick={() => window.location.href = `/login?theme=${resolvedTheme || 'light'}&register=true`}
+                  className="block text-center w-full px-4 py-2 rounded-full text-sm font-medium transition-colors bg-strato-blue text-white hover:bg-strato-blue/90"
+                >
+                  Register
+                </button>
               )}
               <button 
                 onClick={handleAuthClick}

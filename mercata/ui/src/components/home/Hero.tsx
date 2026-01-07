@@ -23,13 +23,13 @@ const Hero = () => {
       <section className="pt-20 lg:pt-24 overflow-hidden">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="relative rounded-3xl overflow-hidden">
-            {/* Background Image */}
-            <div
-              className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-              style={{
-                backgroundImage: `url(${backgroundImage})`
-              }}
-            />
+      {/* Background Image */}
+      <div
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{
+          backgroundImage: `url(${backgroundImage})`
+        }}
+      />
             
             <div className="relative z-10 p-8 sm:p-12 lg:p-16 min-h-[400px] lg:min-h-[500px] flex flex-col justify-center">
               {/* Badge */}
@@ -43,17 +43,17 @@ const Hero = () => {
                 <span className="text-foreground">Where Stability</span>
                 <br />
                 <span className="text-strato-lightblue">Meets Opportunity</span>
-              </h1>
+          </h1>
               
               {/* Description */}
               <p className="text-lg text-muted-foreground mb-8 max-w-md leading-relaxed animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200">
-                Diverse asset classes, one platform. From crypto to precious metals to tokenized securities—investing made simple for everyone.
-              </p>
+            Diverse asset classes, one platform. From crypto to precious metals to tokenized securities—investing made simple for everyone.
+          </p>
               
               {/* CTA Buttons */}
               <div className="flex flex-col sm:flex-row gap-4 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
-                <Link
-                  to="/dashboard"
+            <Link
+              to="/dashboard"
                   className="group inline-flex items-center justify-center gap-2 bg-strato-lightblue hover:bg-strato-blue text-white px-6 py-3 rounded-lg font-medium transition-all duration-300 shadow-lg hover:shadow-xl"
                 >
                   Get Started
@@ -64,11 +64,11 @@ const Hero = () => {
                   className="inline-flex items-center justify-center gap-2 bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700 text-foreground px-6 py-3 rounded-lg font-medium border border-border transition-all duration-300"
                 >
                   Explore Stats
-                </Link>
-              </div>
-            </div>
+            </Link>
           </div>
         </div>
+      </div>
+    </div>
       </section>
 
       {/* Trust Indicators */}

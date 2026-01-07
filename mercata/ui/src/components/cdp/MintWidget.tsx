@@ -6,6 +6,7 @@ import CRSlider from "./CRSlider";
 import { cdpService, AssetConfig, TransactionResponse } from "@/services/cdpService";
 import { useToast } from "@/hooks/use-toast";
 import { useUserTokens } from "@/context/UserTokensContext";
+import { useAuthAction } from "@/hooks/useAuthAction";
 import { useTokenContext } from "@/context/TokenContext";
 import { formatBalance as formatBalanceUtil, formatWeiToDecimalHP, formatNumber, formatDecimalToWeiHP } from "@/utils/numberUtils";
 import { api } from "@/lib/axios";
@@ -35,6 +36,7 @@ const MintWidget: React.FC<MintWidgetProps> = ({ onSuccess, title = "Mint Agains
   const { toast } = useToast();
   const { activeTokens, fetchTokens } = useUserTokens();
   const { fetchUsdstBalance } = useTokenContext();
+  const { canPerformAction } = useAuthAction();
   const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
   const borrowRate = depositAsset?.stabilityFeeRate || 5.54;
@@ -292,8 +294,8 @@ const MintWidget: React.FC<MintWidgetProps> = ({ onSuccess, title = "Mint Agains
         await getMaxBorrowable();
       } catch (error) {
         console.log("No existing vault found for asset:", depositAsset.symbol);
-        setExistingVaultCollateral("?");
-        setExistingVaultDebt("?");
+        setExistingVaultCollateral("0");
+        setExistingVaultDebt("0");
         setIsAssetPaused(false);
         setMaxBorrowableUSD(0);
       }
@@ -939,6 +941,7 @@ const MintWidget: React.FC<MintWidgetProps> = ({ onSuccess, title = "Mint Agains
         className="w-full" 
         onClick={handleCreateVault}
         disabled={
+          !canPerformAction ||
           loading || 
           maxBorrowLoading ||
           !depositAsset || 

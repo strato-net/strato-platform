@@ -105,9 +105,7 @@ const DashboardSidebar = () => {
     <aside className="hidden md:flex flex-col fixed left-0 top-0 h-screen w-[250px] bg-sidebar-background border-r border-sidebar-border z-40">
       {/* Logo */}
       <div className="p-5 border-b border-sidebar-border">
-        <Link to="/">
-          <img src={resolvedTheme === 'dark' ? STRATOLOGODARK : STRATOLOGO} alt="STRATO" className="h-10" />
-        </Link>
+        <img src={resolvedTheme === 'dark' ? STRATOLOGODARK : STRATOLOGO} alt="STRATO" className="h-10" />
       </div>
 
       <nav className="flex-1 py-4 px-3 overflow-y-auto">

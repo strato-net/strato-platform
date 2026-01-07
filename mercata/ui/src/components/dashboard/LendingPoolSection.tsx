@@ -1,6 +1,7 @@
 import { formatUnits } from "ethers";
 import { CircleArrowDown, CircleArrowUp, HelpCircle, PauseCircle } from "lucide-react";
 import { useLendingContext } from "@/context/LendingContext";
+import { useAuthAction } from "@/hooks/useAuthAction";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useTokenContext } from "@/context/TokenContext";
@@ -19,6 +20,7 @@ import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 
 const LendingPoolSection = () => {
   const { userAddress } = useUser();
+  const { canPerformAction } = useAuthAction();
   const { activeTokens: tokens, loading, fetchTokens } = useUserTokens();
   const { fetchUsdstBalance } = useTokenContext();
   const {
@@ -190,7 +192,7 @@ const LendingPoolSection = () => {
                     <Button
                       onClick={() => handleLiquidityAction("deposit")}
                       className="bg-strato-blue hover:bg-strato-blue/90 w-full sm:w-28 hidden sm:flex sm:items-center sm:justify-center"
-                      disabled={loading || isProcessing || !isDepositAmountValid()}
+                      disabled={!canPerformAction || loading || isProcessing || !isDepositAmountValid()}
                     >
                       {isProcessing ? (
                         "Processing..."
@@ -339,6 +341,7 @@ const LendingPoolSection = () => {
                             variant="outline"
                             className="border-strato-blue text-strato-blue hover:bg-strato-blue/10 w-full"
                             disabled={
+                              !canPerformAction ||
                               loadingLiquidity ||
                               isProcessing ||
                               !isWithdrawAmountValid() ||

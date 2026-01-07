@@ -27,9 +27,9 @@ const SwapAsset = () => {
             </div>
           </div>
           
-          {/* Separate Swap History Section - Full Width */}
-          <div className="mt-6 md:mt-8 max-w-6xl mx-auto">
-            <div className="bg-card shadow-sm rounded-none md:rounded-xl p-3 md:p-6 border-y md:border border-border">
+          {/* Separate Swap History Section - Full Width (hidden on mobile) */}
+          <div className="hidden md:block mt-6 md:mt-8 max-w-6xl mx-auto">
+            <div className="bg-card shadow-sm rounded-xl p-6 border border-border">
               <SwapHistory />
             </div>
           </div>

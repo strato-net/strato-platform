@@ -9,6 +9,7 @@ import BorrowingSection from "../components/dashboard/BorrowingSection";
 import { Wallet, Coins, Shield, Banknote, Loader2, Trophy, Send, ArrowRightLeft, Landmark } from "lucide-react";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
+import { useAuthAction } from "@/hooks/useAuthAction";
 import { usePendingRewards } from "@/hooks/usePendingRewards";
 import { useSearchParams, useNavigate, useLocation } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -34,6 +35,7 @@ const Dashboard = () => {
   const location = useLocation();
   const { toast } = useToast();
   const { userAddress } = useUser();
+  const { canPerformAction } = useAuthAction();
   const {
     earningAssets,
     getEarningAssets,
@@ -364,7 +366,7 @@ const Dashboard = () => {
                   value={`${parseFloat(pendingRewards).toLocaleString("en-US", { maximumFractionDigits: 2 })} CATA`}
                   icon={isClaiming ? <Loader2 className="text-white animate-spin" size={16} /> : <Banknote className="text-white" size={16} />}
                   color={parseFloat(pendingRewards) > 0 ? "bg-green-500" : "bg-muted-foreground"}
-                  onClick={parseFloat(pendingRewards) > 0 && !isClaiming ? handleClaimRewards : undefined}
+                  onClick={canPerformAction && parseFloat(pendingRewards) > 0 && !isClaiming ? handleClaimRewards : undefined}
                   tooltip={isClaiming ? "Processing claim..." : (parseFloat(pendingRewards) > 0 ? "Click to claim your rewards" : undefined)}
                 />
               </div>

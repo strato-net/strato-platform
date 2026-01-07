@@ -5,6 +5,7 @@ import { RefreshCw } from "lucide-react";
 import { cdpService, JuniorNote as JuniorNoteType } from "@/services/cdpService";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/context/UserContext";
+import { useAuthAction } from "@/hooks/useAuthAction";
 import { formatWeiToDecimalHP, formatNumber } from "@/utils/numberUtils";
 import CopyableHash from "../common/CopyableHash";
 
@@ -24,6 +25,7 @@ const JuniorNote: React.FC<JuniorNoteProps> = ({ refreshTrigger, onNoteActionSuc
   const [refreshing, setRefreshing] = useState(false);
   const { toast } = useToast();
   const { userAddress } = useUser();
+  const { canPerformAction } = useAuthAction();
   
   // State for showing claim button
   const [showClaimButton, setShowClaimButton] = useState<boolean>(false);
@@ -244,7 +246,7 @@ const JuniorNote: React.FC<JuniorNoteProps> = ({ refreshTrigger, onNoteActionSuc
             <Button 
               className="w-full" 
               onClick={handleClaimAction}
-              disabled={actionLoading || isGlobalPaused}
+              disabled={!canPerformAction || actionLoading || isGlobalPaused}
             >
               {actionLoading 
                 ? "Claiming..." 

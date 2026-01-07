@@ -6,6 +6,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import { cdpService, VaultData, AssetConfig, TransactionResponse } from "@/services/cdpService";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/context/UserContext";
+import { useAuthAction } from "@/hooks/useAuthAction";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { formatWeiToDecimalHP, formatNumber } from "@/utils/numberUtils";
@@ -34,6 +35,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
   const [isGlobalPaused, setIsGlobalPaused] = useState<boolean>(false);
   const { toast } = useToast();
   const { userAddress } = useUser();
+  const { canPerformAction } = useAuthAction();
   const { fetchTokens } = useUserTokens();
   const { fetchUsdstBalance, usdstBalance } = useTokenContext();
 
@@ -484,7 +486,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
                           <Button 
                             className="w-full h-8 text-xs bg-red-600 hover:bg-red-700 text-white"
                             onClick={() => handleLiquidate(vault, vaultKey)}
-                            disabled={isLiquidating || !liquidationAmount || isAmountExceedsMax(vaultKey) || isUsdstBalanceInsufficient()}
+                            disabled={!canPerformAction || isLiquidating || !liquidationAmount || isAmountExceedsMax(vaultKey) || isUsdstBalanceInsufficient()}
                           >
                             {isLiquidating ? "Liquidating..." : "Liquidate"}
                           </Button>
@@ -553,7 +555,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
                               <Button 
                                 className="bg-red-600 hover:bg-red-700 text-white"
                                 onClick={() => handleLiquidate(vault, vaultKey)}
-                                disabled={isLiquidating || !liquidationAmount || isAmountExceedsMax(vaultKey) || isUsdstBalanceInsufficient()}
+                                disabled={!canPerformAction || isLiquidating || !liquidationAmount || isAmountExceedsMax(vaultKey) || isUsdstBalanceInsufficient()}
                               >
                                 {isLiquidating ? "Liquidating..." : "Liquidate"}
                               </Button>

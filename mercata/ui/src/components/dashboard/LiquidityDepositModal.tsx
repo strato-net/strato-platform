@@ -14,6 +14,7 @@ import {
 import { useForm } from "react-hook-form";
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/context/UserContext';
+import { useAuthAction } from '@/hooks/useAuthAction';
 import { formatUnits } from 'ethers';
 import { useSwapContext } from '@/context/SwapContext';
 import { usdstAddress, DEPOSIT_FEE, rewardsEnabled } from "@/lib/constants";
@@ -68,6 +69,7 @@ const LiquidityDepositModal = ({
   const { addLiquidityDualToken, addLiquiditySingleToken, getPoolByAddress, fetchTokenBalances, fetchPools } = useSwapContext();
   const { toast } = useToast();
   const { userAddress } = useUser();
+  const { canPerformAction } = useAuthAction();
   const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
   const form = useForm<DepositFormValues>({
@@ -380,7 +382,7 @@ const LiquidityDepositModal = ({
   };
 
   const isConfirmButtonDisabled = () => {
-    if (depositLoading) return true;
+    if (!canPerformAction || depositLoading) return true;
     
     // Check USDST + voucher balance for transaction fee
     const feeAmount = safeParseUnits(DEPOSIT_FEE, 18);
