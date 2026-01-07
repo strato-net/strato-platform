@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 import { formatUnits, parseUnits } from 'ethers';
+import { NumericFormat } from 'react-number-format';
 import type { PlanItem } from '@/services/cdpTypes';
 import type { VaultCandidate } from '@/services/MintService';
 import { formatPercentage, getAssetColor, convertStabilityFeeRateToAnnualPercentage } from '@/utils/loanUtils';
@@ -39,6 +40,11 @@ const Allocation: React.FC<AllocationProps> = ({
   const [isOpen, setIsOpen] = useState(!autoSupplyCollateral);
   const [displayMode, setDisplayMode] = useState<'USD' | 'WAD'>('WAD');
   const { earningAssets, inactiveTokens } = useTokenContext();
+
+  // Expand vault breakdown when auto-allocate is unchecked, close when checked
+  useEffect(() => {
+    setIsOpen(!autoSupplyCollateral);
+  }, [autoSupplyCollateral]);
 
   // Store display values (what the user sees/types - may be USD or WAD depending on mode)
   const [depositDisplayInputs, setDepositDisplayInputs] = useState<Record<string, string>>({});
@@ -376,13 +382,14 @@ const Allocation: React.FC<AllocationProps> = ({
       if (!isFinite(hf) || isNaN(hf)) return '-';
       if (hf >= 999) return '∞';
       return hf.toFixed(2);
-    } catch {
+          } catch {
       return '-';
     }
   };
 
-  const handleDepositChange = (assetAddress: string, value: string, e?: React.ChangeEvent<HTMLInputElement>) => {
-    if (value === "") {
+  const handleDepositChange = (assetAddress: string, floatValue: number | undefined, formattedValue: string) => {
+    // Handle empty input
+    if (floatValue === undefined || formattedValue === '') {
       setDepositDisplayInputs(prev => ({ ...prev, [assetAddress]: '' }));
       setDepositCanonical(prev => ({ ...prev, [assetAddress]: '' }));
       if (!autoSupplyCollateral && onDepositAmountChange) {
@@ -391,42 +398,24 @@ const Allocation: React.FC<AllocationProps> = ({
       return;
     }
 
-    const cursorPosition = e?.target?.selectionStart || 0;
-    const beforeCursor = value.substring(0, cursorPosition);
-    const beforeCursorNoCommas = parseCommaNumber(beforeCursor);
-    const parsed = parseCommaNumber(value);
+    // Store the formatted display value
+    setDepositDisplayInputs(prev => ({ ...prev, [assetAddress]: formattedValue }));
     
-    // Only allow valid decimal number patterns
-    if (parsed === "" || parsed === "." || /^\d*\.?\d*$/.test(parsed)) {
-      const formatted = formatNumberWithCommas(parsed);
-      setDepositDisplayInputs(prev => ({ ...prev, [assetAddress]: formatted }));
-      
-      // Calculate and store canonical WAD value
-      const canonicalValue = displayMode === 'USD' ? usdToWad(parsed, assetAddress) : parsed;
-      setDepositCanonical(prev => ({ ...prev, [assetAddress]: canonicalValue }));
-      
-      if (!autoSupplyCollateral && onDepositAmountChange) {
-        const tokenAmt = toNumber(canonicalValue);
-        onDepositAmountChange(assetAddress, String(tokenAmt));
-      }
-      
-      // Restore cursor position after formatting
-      if (e?.target) {
-        setTimeout(() => {
-          let unformattedPos = 0;
-          let formattedPos = 0;
-          while (formattedPos < formatted.length && unformattedPos < beforeCursorNoCommas.length) {
-            if (formatted[formattedPos] !== ",") unformattedPos++;
-            formattedPos++;
-          }
-          e.target.setSelectionRange(formattedPos, formattedPos);
-        }, 0);
-      }
+    // Calculate and store canonical WAD value
+    // floatValue is the numeric value without commas
+    const valueStr = String(floatValue);
+    const canonicalValue = displayMode === 'USD' ? usdToWad(valueStr, assetAddress) : valueStr;
+    setDepositCanonical(prev => ({ ...prev, [assetAddress]: canonicalValue }));
+    
+    if (!autoSupplyCollateral && onDepositAmountChange) {
+      const tokenAmt = toNumber(canonicalValue);
+      onDepositAmountChange(assetAddress, String(tokenAmt));
     }
   };
 
-  const handleMintChange = (assetAddress: string, value: string, e?: React.ChangeEvent<HTMLInputElement>) => {
-    if (value === "") {
+  const handleMintChange = (assetAddress: string, floatValue: number | undefined, formattedValue: string) => {
+    // Handle empty input
+    if (floatValue === undefined || formattedValue === '') {
       setMintInputs(prev => ({ ...prev, [assetAddress]: '' }));
       if (!autoSupplyCollateral && onMintAmountChange) {
         onMintAmountChange(assetAddress, '0');
@@ -434,32 +423,12 @@ const Allocation: React.FC<AllocationProps> = ({
       return;
     }
 
-    const cursorPosition = e?.target?.selectionStart || 0;
-    const beforeCursor = value.substring(0, cursorPosition);
-    const beforeCursorNoCommas = parseCommaNumber(beforeCursor);
-    const parsed = parseCommaNumber(value);
+    // Store the formatted display value
+    setMintInputs(prev => ({ ...prev, [assetAddress]: formattedValue }));
     
-    // Only allow valid decimal number patterns
-    if (parsed === "" || parsed === "." || /^\d*\.?\d*$/.test(parsed)) {
-      const formatted = formatNumberWithCommas(parsed);
-      setMintInputs(prev => ({ ...prev, [assetAddress]: formatted }));
-      
-      if (!autoSupplyCollateral && onMintAmountChange) {
-        onMintAmountChange(assetAddress, parsed);
-      }
-      
-      // Restore cursor position after formatting
-      if (e?.target) {
-        setTimeout(() => {
-          let unformattedPos = 0;
-          let formattedPos = 0;
-          while (formattedPos < formatted.length && unformattedPos < beforeCursorNoCommas.length) {
-            if (formatted[formattedPos] !== ",") unformattedPos++;
-            formattedPos++;
-          }
-          e.target.setSelectionRange(formattedPos, formattedPos);
-        }, 0);
-      }
+    if (!autoSupplyCollateral && onMintAmountChange) {
+      // floatValue is the numeric value without commas
+      onMintAmountChange(assetAddress, String(floatValue));
     }
   };
 
@@ -568,13 +537,17 @@ const Allocation: React.FC<AllocationProps> = ({
                     <div className="text-muted-foreground">{formatPercentage(stabilityFeeRate)}</div>
                     <div className="relative">
                       {displayMode === 'USD' && (
-                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">$</span>
+                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none z-10">$</span>
                       )}
-                      <Input
+                      <NumericFormat
                         value={depositDisplayInputs[candidate.assetAddress] || ''}
-                        onChange={(e) => handleDepositChange(candidate.assetAddress, e.target.value, e)}
+                        onValueChange={(values) => handleDepositChange(candidate.assetAddress, values.floatValue, values.formattedValue)}
                         onFocus={() => { editingInputRef.current = `deposit-${candidate.assetAddress}`; }}
                         onBlur={() => { editingInputRef.current = null; }}
+                        thousandSeparator=","
+                        allowNegative={false}
+                        decimalScale={displayMode === 'USD' ? 2 : undefined}
+                        customInput={Input}
                         placeholder="0"
                         className={`h-8 text-xs ${displayMode === 'USD' ? 'pl-5' : ''} ${hasLowHF || exceedsBalance ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                         disabled={autoSupplyCollateral}
@@ -583,13 +556,17 @@ const Allocation: React.FC<AllocationProps> = ({
                     {showMintAmounts && (
                       <div className="relative">
                         {displayMode === 'USD' && (
-                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">$</span>
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none z-10">$</span>
                         )}
-                        <Input
+                        <NumericFormat
                           value={mintInputs[candidate.assetAddress] || ''}
-                          onChange={(e) => handleMintChange(candidate.assetAddress, e.target.value, e)}
+                          onValueChange={(values) => handleMintChange(candidate.assetAddress, values.floatValue, values.formattedValue)}
                           onFocus={() => { editingInputRef.current = `mint-${candidate.assetAddress}`; }}
                           onBlur={() => { editingInputRef.current = null; }}
+                          thousandSeparator=","
+                          allowNegative={false}
+                          decimalScale={displayMode === 'USD' ? 2 : undefined}
+                          customInput={Input}
                           placeholder="0"
                           className={`h-8 text-xs ${displayMode === 'USD' ? 'pl-5' : ''} ${hasLowHF || exceedsBalance ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                           disabled={autoSupplyCollateral}

@@ -583,10 +583,6 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
                 Zero USDST can be minted with your current asset balances and selected Risk value. Try moving the Risk Slider to the right to increase headroom.
               </p>
             </div>
-          ) : mintAmount <= 0 && !isMaxMode && (autoSupplyCollateral || parseFloat(availableToMint.replace(/,/g, '')) <= 0) ? (
-            <div className="p-3 rounded-md bg-muted border border-border text-center">
-              {/* <p className="text-sm text-muted-foreground">Enter a mint amount and select a risk value to see your optimal mint plan</p> */}
-            </div>
           ) : exceedsMaxCollateral ? (
             <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
               <p className="text-sm font-semibold text-red-800 dark:text-red-200 mb-2">Insufficient Collateral</p>
@@ -594,7 +590,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
                 The requested mint amount exceeds your maximum borrowing capacity ({availableToMint} USDST). Try decreasing the mint amount or moving the Risk Slider to the right.
               </p>
             </div>
-          ) : optimalAllocations.length === 0 && (autoSupplyCollateral || parseFloat(availableToMint.replace(/,/g, '')) <= 0) ? (
+          ) : optimalAllocations.length === 0 && parseFloat(availableToMint.replace(/,/g, '')) <= 0 ? (
             <div className="p-3 rounded-md bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
               <p className="text-sm font-semibold text-yellow-800 dark:text-yellow-200 mb-2">
                 {debtFloorHit ? 'Debt floor prevents allocation' : totalHeadroomWei <= 0n ? 'Vaults at capacity for current risk value' : 'No suitable vaults found'}

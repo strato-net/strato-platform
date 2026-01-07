@@ -73,7 +73,7 @@ const DebtPosition: React.FC<DebtPositionProps> = ({ refreshTrigger }) => {
             </span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Health Factor</span>
+            <span className="text-sm text-muted-foreground">Average Health Factor</span>
             <span className="text-sm font-semibold">
               {overallHealthFactor === Infinity ? 'No Position' : formatNumber(overallHealthFactor, 2)}
             </span>
