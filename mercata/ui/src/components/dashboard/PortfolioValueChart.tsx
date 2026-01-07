@@ -54,18 +54,38 @@ const calculateTimeRangeHours = (data: PortfolioDataPoint[]): number => {
 };
 
 // Calculate percentage change
-const calculateChange = (data: PortfolioDataPoint[]): { value: number; isPositive: boolean } => {
-  if (data.length < 2) return { value: 0, isPositive: true };
+const calculateChange = (data: PortfolioDataPoint[]): { percentage: number | null; amount: number; isPositive: boolean } => {
+  if (data.length < 2) return { percentage: null, amount: 0, isPositive: true };
   
   const first = data[0].balance;
   const last = data[data.length - 1].balance;
-  if (first === 0) return { value: 0, isPositive: true };
-  const change = ((last - first) / first) * 100;
+  const changeAmount = last - first;
   
   return {
-    value: Math.abs(change),
-    isPositive: change >= 0
+    percentage: first === 0 ? null : Math.abs((changeAmount / first) * 100),
+    amount: Math.abs(changeAmount),
+    isPositive: changeAmount >= 0
   };
+};
+
+const getChangeText = (hasData: boolean, tabType: TabType, change: { percentage: number | null; amount: number; isPositive: boolean }): string => {
+  if (!hasData) return '—';
+  let txt: string = '';
+  const twoDigits = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
+  const amt: string = change.amount.toLocaleString('en-US', twoDigits);
+  const pct: string = change.percentage?.toLocaleString('en-US', twoDigits);
+  switch (tabType) {
+    case 'rewards':
+      txt = `${amt} Reward Points`; break;
+    case 'borrowed':
+      txt = `${amt} USDST`; break;
+    case 'netBalance':
+      txt = `$${amt}`; break;
+    default:
+      txt = `${amt}`; break;
+  }
+  if (change.percentage !== null) txt += ` (${pct}%)`;
+  return txt;
 };
 
 const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({ 
@@ -125,7 +145,7 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
     if (!hasData) {
       return { 
         currentValue: propCurrentValue || 0, 
-        change: { value: 0, isPositive: true }, 
+        change: { percentage: 0, amount: 0, isPositive: true }, 
         yAxisDomain: [0, 100],
         scale: { divisor: 1, suffix: '' }
       };
@@ -175,7 +195,7 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
                 `${currentValue.toLocaleString('en-US', { 
                   minimumFractionDigits: 2, 
                   maximumFractionDigits: 2 
-                })} Reward Points`
+                })} Claimed Reward Points`
               ) : tabType === 'borrowed' ? (
                 `${currentValue.toLocaleString('en-US', { 
                   minimumFractionDigits: 2, 
@@ -190,7 +210,7 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
             </div>
             <div className={`flex items-center gap-1 text-sm ${tabType === 'rewards' ? 'text-purple-500' : tabType === 'borrowed' ? 'text-orange-500' : change.isPositive ? 'text-green-500' : 'text-red-500'}`}>
               {change.isPositive ? <TrendingUp size={16} color={getColorScheme(tabType).positive} /> : <TrendingDown size={16} color={getColorScheme(tabType).negative}/>}
-              <span>{hasData ? `${change.value.toFixed(2)}%` : '—'}</span>
+              <span>{getChangeText(hasData, tabType, change)}</span>
             </div>
           </div>
         </div>
@@ -238,7 +258,7 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
                         const formatted = scaledValue >= 1 ? scaledValue.toFixed(1) : scaledValue.toFixed(2);
                         
                         if (tabType === 'rewards') {
-                          return `CATA ${formatted}${scale.suffix}`;
+                          return `Points ${formatted}${scale.suffix}`;
                         } else if (tabType === 'borrowed') {
                           return `USDST ${formatted}${scale.suffix}`;
                         } else {

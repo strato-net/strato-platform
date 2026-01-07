@@ -10,6 +10,7 @@ Fetches asset prices from multiple sources and pushes them to the STRATO blockch
 - **Automatic Retry**: All API calls retry twice on failure
 - **Health Monitoring**: Service marks itself unhealthy on persistent failures
 - **Balance Checks**: Validates USDST balance before transactions
+- **Transaction Metrics**: Records transaction timing data to AWS CloudWatch (optional)
 
 ## Environment Variables
 
@@ -26,6 +27,7 @@ OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata/.well-kno
 # API Keys
 ALCHEMY_API_KEY=your-alchemy-key
 COINMARKETCAP_API_KEY=your-coinmarketcap-key
+COINGECKO_API_KEY=your-coingecko-api-key
 METALS_DEV_API_KEY=your-metals-dev-key
 METALS_API_API_KEY=your-metals-api-key
 
@@ -35,11 +37,17 @@ CRON_SCHEDULE="0 */15 * * * *"
 # Token Configuration (Optional)
 USDST_ADDRESS=86a5ae535ded415203c3e27d654f9a1d454c553b  # USDST contract address
 GAS_FEE_USDST=1  # Gas fee in USDST (0.01 = 1, default: 1)
+
+# AWS Configuration (for CloudWatch Metrics - Optional)
+# Leave CLOUDWATCH_NAMESPACE empty to disable metrics
+AWS_REGION=us-east-1
+CLOUDWATCH_NAMESPACE=Testnet/Oracle/Transactions
 ```
 
 ## Development
 
 ```bash
+npm install
 npm run build
 npm run dev
 ```

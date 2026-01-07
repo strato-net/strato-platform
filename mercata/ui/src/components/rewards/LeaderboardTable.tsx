@@ -9,6 +9,7 @@ import CopyButton from "@/components/ui/copy";
 import { Badge } from "@/components/ui/badge";
 import { useMemo } from "react";
 import { useUser } from "@/context/UserContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface LeaderboardTableProps {
   entries?: LeaderboardEntry[];
@@ -36,9 +37,10 @@ export const LeaderboardTable = ({
   limit = 10, 
   currentPage = 1, 
   loading = false, 
-  onPageChange 
+  onPageChange
 }: LeaderboardTableProps) => {
   const { userAddress } = useUser();
+  const isMobile = useIsMobile();
   
   const columns: ColumnsType<LeaderboardEntry> = useMemo(() => [
     {
@@ -106,10 +108,8 @@ export const LeaderboardTable = ({
     <div className="ant-table-themed">
       <Card>
         <CardHeader>
-          <div>
-            <CardTitle>Top Reward Earners</CardTitle>
-            <CardDescription>Leaderboard ranked by highest total rewards</CardDescription>
-          </div>
+          <CardTitle>Top Reward Earners</CardTitle>
+          <CardDescription>Leaderboard ranked by highest total rewards</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="rounded-md border border-border overflow-hidden">
@@ -118,18 +118,20 @@ export const LeaderboardTable = ({
               dataSource={entries}
               rowKey="address"
               loading={loading}
+              scroll={isMobile ? { x: 'max-content' } : undefined}
               pagination={{
                 current: currentPage,
                 pageSize: limit,
                 total: total,
                 showSizeChanger: false,
-                showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} entries`,
+                showTotal: isMobile ? undefined : (total, range) => `${range[0]}-${range[1]} of ${total} entries`,
                 onChange: (page) => {
                   if (onPageChange && !loading) {
                     onPageChange(page);
                   }
                 },
                 className: "mt-4",
+                simple: isMobile,
               }}
               locale={{
                 emptyText: (

@@ -36,5 +36,20 @@
     "timestamp": "timestamp",
     "batchMode": true,
     "apiKeyEnvVar": "METALS_API_API_KEY"
+  },
+  "CoinGecko": {
+    "url": "https://pro-api.coingecko.com/api/v3/simple/price",
+    "params": "x_cg_pro_api_key,ids,vs_currencies=usd,include_last_updated_at=true",
+    "parse": "{id}.usd",
+    "timestamp": "{id}.last_updated_at",
+    "batchMode": true,
+    "apiKeyEnvVar": "COINGECKO_API_KEY",
+    "symbolMapping": {
+      "ETH": "ethereum",
+      "WBTC": "wrapped-bitcoin",
+      "PAXG": "pax-gold",
+      "XAUT": "tether-gold",
+      "KAG": "kinesis-silver"
+    }
   }
 } 
