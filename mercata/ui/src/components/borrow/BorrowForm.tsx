@@ -606,8 +606,8 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
                 {/* Table Rows */}
                 {collateralTableData.map((item) => {
                   const decimals = item.collateral.customDecimals ?? 18;
-                  const fullAmount = formatBalance(item.amount, undefined, decimals, 2);
-                  const displayAmount = formatBalance(item.amount, undefined, decimals, 0, 4);
+                  const fullAmount = item.amount === 0n ? "0" : formatBalance(item.amount, undefined, decimals, 2);
+                  const displayAmount = item.amount === 0n ? "0" : formatBalance(item.amount, undefined, decimals, 0, 4);
                   const tokenImage = item.collateral.images?.[0]?.value;
 
                   return (
