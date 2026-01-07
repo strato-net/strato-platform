@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { Modal } from "antd";
 import { CheckCircle2, Loader2, Clock, AlertCircle, Ban } from "lucide-react";
+import { formatNumberWithCommas, parseCommaNumber } from "@/utils/numberUtils";
 
 export type MintStep = 
   | "depositing"
@@ -233,8 +234,8 @@ const MintProgressModal: React.FC<MintProgressModalProps> = ({
                         }`}
                       >
                         {tx.type === "deposit" 
-                          ? `Deposit ${tx.amount} ${tx.symbol}`
-                          : `Mint ${tx.amount} USDST from ${tx.symbol}`}
+                          ? `Deposit ${formatNumberWithCommas(tx.amount)} ${tx.symbol}`
+                          : `Mint ${formatNumberWithCommas(tx.amount)} USDST from ${tx.symbol}`}
                       </p>
                       {tx.hash && (
                         <div className="mt-2">
