@@ -113,26 +113,39 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
   const collateralTableData = useMemo(() => {
     const data: Array<{ collateral: CollateralData; amount: bigint; valueUSD: number }> = [];
     
-    for (const [collateral, amount] of recommendedCollateral.entries()) {
-      if (amount <= 0n) continue;
-      
-      const price = BigInt(collateral.assetPrice ?? "0");
-      const decimals = BigInt(10) ** BigInt(collateral.customDecimals ?? 18);
-      const valueUSD = Number((amount * price) / decimals) / 1e18;
-      
-      // If custom mode, use custom value if set
-      if (!autoSupplyCollateral && customCollateralValues.has(collateral.address)) {
-        const customValue = parseFloat(customCollateralValues.get(collateral.address) || "0");
-        const customValueWei = BigInt(Math.round(customValue * 1e18));
-        const customAmount = calculateAdditionalCollateralAmountFromValue(customValueWei, price, decimals);
-        data.push({ collateral, amount: customAmount, valueUSD: customValue });
-      } else {
+    if (autoSupplyCollateral) {
+      // In auto mode, only show recommended collateral with amount > 0
+      for (const [collateral, amount] of recommendedCollateral.entries()) {
+        if (amount <= 0n) continue;
+        
+        const price = BigInt(collateral.assetPrice ?? "0");
+        const decimals = BigInt(10) ** BigInt(collateral.customDecimals ?? 18);
+        const valueUSD = Number((amount * price) / decimals) / 1e18;
         data.push({ collateral, amount, valueUSD });
+      }
+    } else {
+      // In custom mode, show ALL collateral assets the user possesses
+      for (const [collateral] of potentialCollateral.entries()) {
+        const price = BigInt(collateral.assetPrice ?? "0");
+        const decimals = BigInt(10) ** BigInt(collateral.customDecimals ?? 18);
+        
+        // Use custom value if set, otherwise check if in recommendation
+        if (customCollateralValues.has(collateral.address)) {
+          const customValue = parseFloat(customCollateralValues.get(collateral.address) || "0");
+          const customValueWei = BigInt(Math.round(customValue * 1e18));
+          const customAmount = calculateAdditionalCollateralAmountFromValue(customValueWei, price, decimals);
+          data.push({ collateral, amount: customAmount, valueUSD: customValue });
+        } else {
+          // Fallback to recommended amount or 0
+          const recommendedAmount = recommendedCollateral.get(collateral) ?? 0n;
+          const valueUSD = Number((recommendedAmount * price) / decimals) / 1e18;
+          data.push({ collateral, amount: recommendedAmount, valueUSD });
+        }
       }
     }
     
     return data;
-  }, [recommendedCollateral, autoSupplyCollateral, customCollateralValues]);
+  }, [recommendedCollateral, autoSupplyCollateral, customCollateralValues, potentialCollateral]);
 
   // Total value of collateral in table
   const totalCollateralValue = useMemo(() => {
@@ -219,10 +232,20 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
     setAutoSupplyCollateral(checked);
     if (!checked) {
       setIsCollateralExpanded(true);
-      // Initialize custom values from recommended
+      // Initialize custom values from ALL user-possessed collateral assets
+      // Assets in recommendation get their recommended value, others get 0
       const initialCustomValues = new Map<string, string>();
-      for (const item of collateralTableData) {
-        initialCustomValues.set(item.collateral.address, item.valueUSD.toFixed(2));
+      for (const [collateral] of potentialCollateral.entries()) {
+        const recommendedAmount = recommendedCollateral.get(collateral);
+        if (recommendedAmount && recommendedAmount > 0n) {
+          const price = BigInt(collateral.assetPrice ?? "0");
+          const decimals = BigInt(10) ** BigInt(collateral.customDecimals ?? 18);
+          const valueUSD = Number((recommendedAmount * price) / decimals) / 1e18;
+          initialCustomValues.set(collateral.address, valueUSD.toFixed(2));
+        } else {
+          // Not in recommendation - initialize to zero
+          initialCustomValues.set(collateral.address, "0.00");
+        }
       }
       setCustomCollateralValues(initialCustomValues);
     }
