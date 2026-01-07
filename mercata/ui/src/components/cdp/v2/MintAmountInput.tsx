@@ -1,14 +1,15 @@
-import React, { useCallback } from 'react';
+import React from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { formatNumberWithCommas, parseCommaNumber } from '@/utils/numberUtils';
+import { NumericFormat } from 'react-number-format';
 
 interface MintAmountInputProps {
   value: string;
   onChange: (value: string) => void;
   onMaxClick: () => void;
   isMaxMode: boolean;
+  exceedsMax?: boolean; // Whether value exceeds maximum available
   label?: string;
   placeholder?: string;
   unit?: string;
@@ -21,55 +22,44 @@ const MintAmountInput: React.FC<MintAmountInputProps> = ({
   onChange,
   onMaxClick,
   isMaxMode,
+  exceedsMax = false,
   label = 'Mint Amount',
   placeholder = '0',
   unit = 'USDST',
   disabled = false,
   maxDisabled = false,
 }) => {
-  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const rawValue = e.target.value;
-    const cursorPosition = e.target.selectionStart || 0;
-    
-    if (rawValue === '') {
+  const handleValueChange = (values: { floatValue: number | undefined; formattedValue: string }) => {
+    // If empty or undefined, pass empty string
+    if (values.floatValue === undefined || values.formattedValue === '') {
       onChange('');
       return;
     }
     
-    const beforeCursor = rawValue.substring(0, cursorPosition);
-    const beforeCursorNoCommas = parseCommaNumber(beforeCursor);
-    const parsed = parseCommaNumber(rawValue);
-    
-    if (parsed === '' || parsed === '.' || /^\d*\.?\d*$/.test(parsed)) {
-      const formatted = formatNumberWithCommas(parsed);
-      onChange(formatted);
-      
-      setTimeout(() => {
-        const input = e.target;
-        if (input) {
-          let unformattedPos = 0;
-          let formattedPos = 0;
-          while (formattedPos < formatted.length && unformattedPos < beforeCursorNoCommas.length) {
-            if (formatted[formattedPos] !== ',') unformattedPos++;
-            formattedPos++;
-          }
-          input.setSelectionRange(formattedPos, formattedPos);
-        }
-      }, 0);
-    }
-  }, [onChange]);
+    // Pass the formatted value (with commas) to parent
+    onChange(values.formattedValue);
+  };
 
   return (
     <div className="space-y-2">
       <Label className="text-sm font-medium">{label}</Label>
       <div className="relative">
-        <Input
+        <NumericFormat
           value={value}
-          onChange={handleInputChange}
+          onValueChange={handleValueChange}
+          thousandSeparator=","
+          allowNegative={false}
+          customInput={Input}
           placeholder={placeholder}
           inputMode="decimal"
           disabled={disabled}
-          className={`pr-20 ${isMaxMode ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 border-blue-300 dark:border-blue-800' : ''}`}
+          className={`pr-20 ${
+            exceedsMax 
+              ? 'border-red-500 focus-visible:ring-red-500 text-red-600 dark:text-red-400' 
+              : isMaxMode 
+              ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 border-blue-300 dark:border-blue-800' 
+              : ''
+          }`}
         />
         <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
           <span className="text-muted-foreground text-sm">{unit}</span>

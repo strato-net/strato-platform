@@ -1,12 +1,14 @@
 import React from "react";
 import { Slider } from "@/components/ui/slider";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { HelpCircle } from "lucide-react";
 
 interface HFSliderProps {
   value: number; // Current slider value (target minimum HF)
   onChange: (hf: number) => void; // Called when slider value changes
   minHF?: number; // Minimum health factor threshold, calculated as max(minCR) / max(LT) from all vaults
   currentHF?: number; // Current position health factor (for display)
+  averageVaultHealth?: string | null; // Average health factor across all vaults in breakdown
   disabled?: boolean;
   rangeColor?: string; // Custom color for the slider range bar
 }
@@ -31,6 +33,7 @@ const HFSlider: React.FC<HFSliderProps> = ({
   onChange,
   minHF = 1.0,
   currentHF,
+  averageVaultHealth,
   disabled = false,
   rangeColor,
 }) => {
@@ -99,10 +102,7 @@ const HFSlider: React.FC<HFSliderProps> = ({
             <TooltipTrigger asChild>
               <div className="flex items-center gap-2 cursor-help">
                 <span className="text-base font-bold">Health Factor</span>
-                <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <circle cx="12" cy="12" r="10" strokeWidth="2"/>
-                  <path strokeWidth="2" d="M12 16v-4M12 8h.01"/>
-                </svg>
+                <HelpCircle className="w-4 h-4 text-muted-foreground" />
               </div>
             </TooltipTrigger>
             <TooltipContent>
@@ -145,7 +145,7 @@ const HFSlider: React.FC<HFSliderProps> = ({
           <span className={`font-medium tabular-nums ${disabled ? 'text-muted-foreground' : 'text-blue-600'}`}>
             {currentHF === 0 || currentHF === undefined ? 'No Position' : currentHF >= 999999 ? '∞' : formatNumber(currentHF, 2)}
             {' → '}
-            {formatNumber(clampedValue, 2)}
+            {averageVaultHealth || formatNumber(clampedValue, 2)}
           </span>
         </div>
       </div>

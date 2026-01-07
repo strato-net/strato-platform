@@ -23,6 +23,7 @@ interface AllocationProps {
   onHFValidationChange?: (hasLowHF: boolean) => void; // Callback when HF validation changes
   onBalanceExceededChange?: (exceedsBalance: boolean) => void; // Callback when deposit exceeds balance
   onTotalManualMintChange?: (totalMint: string) => void; // Callback with total mint from all vaults in manual mode
+  onAverageVaultHealthChange?: (averageHF: string | null) => void; // Callback with average vault health
 }
 
 const Allocation: React.FC<AllocationProps> = ({
@@ -36,6 +37,7 @@ const Allocation: React.FC<AllocationProps> = ({
   onHFValidationChange,
   onBalanceExceededChange,
   onTotalManualMintChange,
+  onAverageVaultHealthChange,
 }) => {
   const [isOpen, setIsOpen] = useState(!autoSupplyCollateral);
   const [displayMode, setDisplayMode] = useState<'USD' | 'WAD'>('WAD');
@@ -82,6 +84,42 @@ const Allocation: React.FC<AllocationProps> = ({
     
     const minHF = minCRPercent / ltPercent;
     return Math.round(minHF * 100) / 100; // Round to 2 decimal places
+  }, []);
+
+  // Calculate HF for a vault - matches VaultsList formula: HF = CR / LT
+  const calculateHF = useCallback((candidate: VaultCandidate, depositAmt: number, mintAmt: number): string => {
+    try {
+      const decimals = candidate.assetScale.toString().length - 1;
+      const depositWei = depositAmt > 0 ? parseUnits(String(depositAmt), decimals) : 0n;
+      const mintWei = mintAmt > 0 ? parseUnits(String(mintAmt), 18) : 0n;
+
+      const totalCollateral = candidate.currentCollateral + depositWei;
+      const totalDebt = candidate.currentDebt + mintWei;
+
+      if (totalDebt <= 0n) return '∞';
+
+      // Calculate collateral value in USD (18 decimals)
+      const collateralValueUSD = (totalCollateral * candidate.oraclePrice) / candidate.assetScale;
+      
+      // Convert to numbers for percentage calculation
+      const collateralUSD = parseFloat(formatUnits(collateralValueUSD, 18));
+      const debtUSD = parseFloat(formatUnits(totalDebt, 18));
+
+      // CR = (collateralUSD / debtUSD) * 100 (as percentage, e.g., 200 for 200%)
+      const cr = (collateralUSD / debtUSD) * 100;
+      
+      // LT = liquidationRatio converted from WAD to percentage (e.g., 1.5e18 -> 150)
+      const lt = parseFloat(formatUnits(candidate.liquidationRatio, 18)) * 100;
+
+      // HF = CR / LT (same as VaultsList)
+      const hf = cr / lt;
+
+      if (!isFinite(hf) || isNaN(hf)) return '-';
+      if (hf >= 999) return '∞';
+      return hf.toFixed(2);
+    } catch {
+      return '-';
+    }
   }, []);
 
   // Convert WAD token amount to USD
@@ -302,7 +340,7 @@ const Allocation: React.FC<AllocationProps> = ({
     }
     
     onHFValidationChange(hasLowHF);
-  }, [depositCanonical, mintInputs, vaultCandidates, autoSupplyCollateral, onHFValidationChange, toNumber, calculateVaultMinHF]);
+  }, [depositCanonical, mintInputs, vaultCandidates, autoSupplyCollateral, onHFValidationChange, toNumber, calculateVaultMinHF, calculateHF]);
 
   // Check for deposits exceeding available balance and notify parent
   useEffect(() => {
@@ -351,41 +389,47 @@ const Allocation: React.FC<AllocationProps> = ({
     onTotalManualMintChange(totalMint > 0 ? String(totalMint) : '0');
   }, [mintInputs, vaultCandidates, autoSupplyCollateral, onTotalManualMintChange, toNumber]);
 
-  // Calculate HF for a vault - matches VaultsList formula: HF = CR / LT
-  const calculateHF = (candidate: VaultCandidate, depositAmt: number, mintAmt: number): string => {
-    try {
-      const decimals = candidate.assetScale.toString().length - 1;
-      const depositWei = depositAmt > 0 ? parseUnits(String(depositAmt), decimals) : 0n;
-      const mintWei = mintAmt > 0 ? parseUnits(String(mintAmt), 18) : 0n;
+  // Calculate average HF across all vaults in the breakdown
+  const averageVaultHealth = React.useMemo(() => {
+    if (vaultCandidates.length === 0) return null;
 
-      const totalCollateral = candidate.currentCollateral + depositWei;
-      const totalDebt = candidate.currentDebt + mintWei;
-
-      if (totalDebt <= 0n) return '∞';
-
-      // Calculate collateral value in USD (18 decimals)
-      const collateralValueUSD = (totalCollateral * candidate.oraclePrice) / candidate.assetScale;
+    const hfValues: number[] = [];
+    
+    for (const candidate of vaultCandidates) {
+      const canonicalDeposit = depositCanonical[candidate.assetAddress] || '';
+      const depositAmt = toNumber(canonicalDeposit);
+      const mintInput = mintInputs[candidate.assetAddress] || '';
+      const mintAmt = toNumber(mintInput);
       
-      // Convert to numbers for percentage calculation
-      const collateralUSD = parseFloat(formatUnits(collateralValueUSD, 18));
-      const debtUSD = parseFloat(formatUnits(totalDebt, 18));
-
-      // CR = (collateralUSD / debtUSD) * 100 (as percentage, e.g., 200 for 200%)
-      const cr = (collateralUSD / debtUSD) * 100;
+      const hfStr = calculateHF(candidate, depositAmt, mintAmt);
       
-      // LT = liquidationRatio converted from WAD to percentage (e.g., 1.5e18 -> 150)
-      const lt = parseFloat(formatUnits(candidate.liquidationRatio, 18)) * 100;
-
-      // HF = CR / LT (same as VaultsList)
-      const hf = cr / lt;
-
-      if (!isFinite(hf) || isNaN(hf)) return '-';
-      if (hf >= 999) return '∞';
-      return hf.toFixed(2);
-          } catch {
-      return '-';
+      // Skip infinite or invalid values
+      if (hfStr !== '∞' && hfStr !== '-') {
+        const hfNum = parseFloat(hfStr);
+        if (isFinite(hfNum) && !isNaN(hfNum)) {
+          hfValues.push(hfNum);
+        }
+      }
     }
-  };
+
+    if (hfValues.length === 0) return null;
+
+    const average = hfValues.reduce((sum, hf) => sum + hf, 0) / hfValues.length;
+    return average.toFixed(2);
+  }, [vaultCandidates, depositCanonical, mintInputs, calculateHF, toNumber]);
+
+  // Notify parent component when average vault health changes
+  // Only update when auto-supply is enabled (auto-allocate mode)
+  useEffect(() => {
+    if (onAverageVaultHealthChange) {
+      if (autoSupplyCollateral) {
+        onAverageVaultHealthChange(averageVaultHealth);
+      } else {
+        // In manual mode, don't update average vault health
+        onAverageVaultHealthChange(null);
+      }
+    }
+  }, [averageVaultHealth, autoSupplyCollateral, onAverageVaultHealthChange]);
 
   const handleDepositChange = (assetAddress: string, floatValue: number | undefined, formattedValue: string) => {
     // Handle empty input
@@ -584,9 +628,9 @@ const Allocation: React.FC<AllocationProps> = ({
               )}
             </div>
 
-            {/* Total Mint Amount - only shown in manual mode when breakdown is expanded */}
+            {/* Summary section - only shown in manual mode when breakdown is expanded */}
             {!autoSupplyCollateral && (
-              <div className="pt-2 border-t border-border">
+              <div className="pt-2 border-t border-border space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-muted-foreground">Total Mint Amount:</span>
                   <span className="text-sm font-bold tabular-nums">
@@ -598,6 +642,14 @@ const Allocation: React.FC<AllocationProps> = ({
                     )} USDST
                   </span>
                 </div>
+                {averageVaultHealth && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-muted-foreground">Average Vault Health:</span>
+                    <span className="text-sm font-bold tabular-nums">
+                      {averageVaultHealth}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </div>
