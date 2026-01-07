@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -34,7 +34,7 @@ const Allocation: React.FC<AllocationProps> = ({
   onHFValidationChange,
   onBalanceExceededChange,
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(!autoSupplyCollateral);
   const [displayMode, setDisplayMode] = useState<'USD' | 'WAD'>('WAD');
   const { earningAssets, inactiveTokens } = useTokenContext();
 
@@ -54,11 +54,11 @@ const Allocation: React.FC<AllocationProps> = ({
   };
 
   // Parse input to number (handles commas)
-  const toNumber = (input: string): number => {
+  const toNumber = useCallback((input: string): number => {
     const cleaned = parseCommaNumber(input || '0');
     const num = parseFloat(cleaned);
     return isNaN(num) ? 0 : num;
-  };
+  }, []);
 
   // Convert WAD token amount to USD
   const wadToUSD = (wadAmount: string, assetAddress: string): string => {
@@ -219,42 +219,37 @@ const Allocation: React.FC<AllocationProps> = ({
     }
     
     onHFValidationChange(hasLowHF);
-  }, [depositCanonical, mintInputs, vaultCandidates, targetHF, autoSupplyCollateral, onHFValidationChange]);
+  }, [depositCanonical, mintInputs, vaultCandidates, targetHF, autoSupplyCollateral, onHFValidationChange, toNumber]);
 
   // Check for deposits exceeding available balance and notify parent
-  // TEMPORARILY DISABLED FOR TESTING - allows submitting transactions that will fail
   useEffect(() => {
     if (!onBalanceExceededChange || autoSupplyCollateral) {
       return;
     }
 
-    // TEMPORARILY DISABLED: Always report no balance exceeded
-    onBalanceExceededChange(false);
+    let exceedsBalance = false;
+    for (const candidate of vaultCandidates) {
+      // Use canonical token amounts for balance check
+      const canonicalDeposit = depositCanonical[candidate.assetAddress] || '';
+      const depositAmt = toNumber(canonicalDeposit);
+      
+      // Skip validation for vaults with empty or zero deposit
+      if (!canonicalDeposit || canonicalDeposit.trim() === '' || depositAmt === 0) {
+        continue;
+      }
+      
+      // Get available balance (potentialCollateral is in native asset units)
+      const decimals = candidate.assetScale.toString().length - 1;
+      const availableBalance = parseFloat(formatUnits(candidate.potentialCollateral, decimals));
+      
+      if (depositAmt > availableBalance) {
+        exceedsBalance = true;
+        break;
+      }
+    }
     
-    // Original balance check logic (commented out):
-    // let exceedsBalance = false;
-    // for (const candidate of vaultCandidates) {
-    //   // Use canonical token amounts for balance check
-    //   const canonicalDeposit = depositCanonical[candidate.assetAddress] || '';
-    //   const depositAmt = toNumber(canonicalDeposit);
-    //   
-    //   // Skip validation for vaults with empty or zero deposit
-    //   if (!canonicalDeposit || canonicalDeposit.trim() === '' || depositAmt === 0) {
-    //     continue;
-    //   }
-    //   
-    //   // Get available balance (potentialCollateral is in native asset units)
-    //   const decimals = candidate.assetScale.toString().length - 1;
-    //   const availableBalance = parseFloat(formatUnits(candidate.potentialCollateral, decimals));
-    //   
-    //   if (depositAmt > availableBalance) {
-    //     exceedsBalance = true;
-    //     break;
-    //   }
-    // }
-    // 
-    // onBalanceExceededChange(exceedsBalance);
-  }, [depositCanonical, vaultCandidates, autoSupplyCollateral, onBalanceExceededChange]);
+    onBalanceExceededChange(exceedsBalance);
+  }, [depositCanonical, vaultCandidates, autoSupplyCollateral, onBalanceExceededChange, toNumber]);
 
   // Calculate HF for a vault - matches VaultsList formula: HF = CR / LT
   const calculateHF = (candidate: VaultCandidate, depositAmt: number, mintAmt: number): string => {
@@ -400,12 +395,9 @@ const Allocation: React.FC<AllocationProps> = ({
                   hfNum !== Infinity && !isNaN(hfNum) && hfNum < targetHF;
 
                 // Check if deposit exceeds available balance
-                // TEMPORARILY DISABLED FOR TESTING - always set to false
-                const exceedsBalance = false;
-                // Original balance check logic (commented out):
-                // const decimals = candidate.assetScale.toString().length - 1;
-                // const availableBalance = parseFloat(formatUnits(candidate.potentialCollateral, decimals));
-                // const exceedsBalance = !autoSupplyCollateral && depositAmt > 0 && depositAmt > availableBalance;
+                const decimals = candidate.assetScale.toString().length - 1;
+                const availableBalance = parseFloat(formatUnits(candidate.potentialCollateral, decimals));
+                const exceedsBalance = !autoSupplyCollateral && depositAmt > 0 && depositAmt > availableBalance;
 
                 return (
                   <div key={candidate.assetAddress} className={`grid gap-2 items-center text-sm ${getGridClass()}`}>

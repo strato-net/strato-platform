@@ -150,7 +150,13 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
 
   // Compute fresh allocations when auto-supply is enabled
   useEffect(() => {
-    if (!autoSupplyCollateral) return;
+    if (!autoSupplyCollateral) {
+      // Manual mode: provide empty allocations for all vault candidates
+      setCustomAllocations([]);
+      setDebtFloorHit(false);
+      setDebtCeilingHit(false);
+      return;
+    }
     
     if (isMaxMode) {
       setCustomAllocations(maxAllocations);
@@ -571,7 +577,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
                 Zero USDST can be minted with your current asset balances and selected Risk value. Try moving the Risk Slider to the right to increase headroom.
               </p>
             </div>
-          ) : mintAmount <= 0 && !isMaxMode ? (
+          ) : mintAmount <= 0 && !isMaxMode && (autoSupplyCollateral || parseFloat(availableToMint.replace(/,/g, '')) <= 0) ? (
             <div className="p-3 rounded-md bg-muted border border-border text-center">
               {/* <p className="text-sm text-muted-foreground">Enter a mint amount and select a risk value to see your optimal mint plan</p> */}
             </div>
@@ -582,7 +588,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
                 The requested mint amount exceeds your maximum borrowing capacity ({availableToMint} USDST). Try decreasing the mint amount or moving the Risk Slider to the right.
               </p>
             </div>
-          ) : optimalAllocations.length === 0 ? (
+          ) : optimalAllocations.length === 0 && (autoSupplyCollateral || parseFloat(availableToMint.replace(/,/g, '')) <= 0) ? (
             <div className="p-3 rounded-md bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
               <p className="text-sm font-semibold text-yellow-800 dark:text-yellow-200 mb-2">
                 {debtFloorHit ? 'Debt floor prevents allocation' : totalHeadroomWei <= 0n ? 'Vaults at capacity for current risk value' : 'No suitable vaults found'}
@@ -597,7 +603,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
             </div>
           ) : (
             <>
-              {/* Allocation Section - only shown when there's a valid allocation */}
+              {/* Allocation Section - shown when there's a valid allocation OR when auto-supply is off and available to mint > 0 */}
               <Allocation
                 optimalAllocations={optimalAllocations}
                 vaultCandidates={vaultCandidates}

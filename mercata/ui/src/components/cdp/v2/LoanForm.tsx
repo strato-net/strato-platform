@@ -86,6 +86,7 @@ const LoanForm: React.FC<LoanFormProps> = ({
             placeholder="0"
             unit="USDST"
             disabled={inputDisabled ?? disabled}
+            maxDisabled={!availableAmount || availableAmount === '0' || availableAmount === '0.00' || parseFloat(availableAmount.replace(/,/g, '')) <= 0}
           />
 
           {/* Health Factor Slider */}
