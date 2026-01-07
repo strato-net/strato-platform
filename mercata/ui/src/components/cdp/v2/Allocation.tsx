@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,6 +21,7 @@ interface AllocationProps {
   targetHF?: number; // Target HF from slider (riskBuffer)
   onHFValidationChange?: (hasLowHF: boolean) => void; // Callback when HF validation changes
   onBalanceExceededChange?: (exceedsBalance: boolean) => void; // Callback when deposit exceeds balance
+  onTotalManualMintChange?: (totalMint: string) => void; // Callback with total mint from all vaults in manual mode
 }
 
 const Allocation: React.FC<AllocationProps> = ({
@@ -33,8 +34,9 @@ const Allocation: React.FC<AllocationProps> = ({
   targetHF,
   onHFValidationChange,
   onBalanceExceededChange,
+  onTotalManualMintChange,
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(!autoSupplyCollateral);
   const [displayMode, setDisplayMode] = useState<'USD' | 'WAD'>('WAD');
   const { earningAssets, inactiveTokens } = useTokenContext();
 
@@ -54,11 +56,27 @@ const Allocation: React.FC<AllocationProps> = ({
   };
 
   // Parse input to number (handles commas)
-  const toNumber = (input: string): number => {
+  const toNumber = useCallback((input: string): number => {
     const cleaned = parseCommaNumber(input || '0');
     const num = parseFloat(cleaned);
     return isNaN(num) ? 0 : num;
-  };
+  }, []);
+
+  // Calculate minimum HF for a specific vault based on its minCR and liquidationRatio
+  // Data flow: Blockchain (CDPEngine.collateralConfigs) → Backend (Cirrus) → Frontend (VaultCandidate)
+  // Each vault has its own minCR constraint from the blockchain - no defaults or hardcoded values
+  const calculateVaultMinHF = useCallback((candidate: VaultCandidate): number => {
+    // minHF = minCR / liquidationRatio (both in WAD format from blockchain)
+    // e.g., if minCR = 1.5e18 (150%) and liquidationRatio = 1.33e18 (133%)
+    // then minHF = 150 / 133 = 1.13
+    const minCRPercent = parseFloat(formatUnits(candidate.minCR, 18)) * 100;
+    const ltPercent = parseFloat(formatUnits(candidate.liquidationRatio, 18)) * 100;
+    
+    if (ltPercent <= 0) return 1.0;
+    
+    const minHF = minCRPercent / ltPercent;
+    return Math.round(minHF * 100) / 100; // Round to 2 decimal places
+  }, []);
 
   // Convert WAD token amount to USD
   const wadToUSD = (wadAmount: string, assetAddress: string): string => {
@@ -189,9 +207,9 @@ const Allocation: React.FC<AllocationProps> = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayMode]);
 
-  // Check for low HF and notify parent
+  // Check for low HF and notify parent - now checks each vault against its own minimum HF
   useEffect(() => {
-    if (!onHFValidationChange || autoSupplyCollateral || targetHF === undefined) {
+    if (!onHFValidationChange || autoSupplyCollateral) {
       return;
     }
 
@@ -212,49 +230,65 @@ const Allocation: React.FC<AllocationProps> = ({
       const hf = calculateHF(candidate, depositAmt, mintAmt);
       const hfNum = parseFloat(hf);
       
-      if (hfNum !== Infinity && !isNaN(hfNum) && hfNum < targetHF) {
+      // Calculate this vault's minimum HF based on its specific minCR and liquidationRatio
+      const vaultMinHF = calculateVaultMinHF(candidate);
+      
+      // Check if HF is below this vault's minimum (not the global slider value)
+      if (hfNum !== Infinity && !isNaN(hfNum) && hfNum < vaultMinHF) {
         hasLowHF = true;
         break;
       }
     }
     
     onHFValidationChange(hasLowHF);
-  }, [depositCanonical, mintInputs, vaultCandidates, targetHF, autoSupplyCollateral, onHFValidationChange]);
+  }, [depositCanonical, mintInputs, vaultCandidates, autoSupplyCollateral, onHFValidationChange, toNumber, calculateVaultMinHF]);
 
   // Check for deposits exceeding available balance and notify parent
-  // TEMPORARILY DISABLED FOR TESTING - allows submitting transactions that will fail
   useEffect(() => {
     if (!onBalanceExceededChange || autoSupplyCollateral) {
       return;
     }
 
-    // TEMPORARILY DISABLED: Always report no balance exceeded
-    onBalanceExceededChange(false);
+    let exceedsBalance = false;
+    for (const candidate of vaultCandidates) {
+      // Use canonical token amounts for balance check
+      const canonicalDeposit = depositCanonical[candidate.assetAddress] || '';
+      const depositAmt = toNumber(canonicalDeposit);
+      
+      // Skip validation for vaults with empty or zero deposit
+      if (!canonicalDeposit || canonicalDeposit.trim() === '' || depositAmt === 0) {
+        continue;
+      }
+      
+      // Get available balance (potentialCollateral is in native asset units)
+      const decimals = candidate.assetScale.toString().length - 1;
+      const availableBalance = parseFloat(formatUnits(candidate.potentialCollateral, decimals));
+      
+      if (depositAmt > availableBalance) {
+        exceedsBalance = true;
+        break;
+      }
+    }
     
-    // Original balance check logic (commented out):
-    // let exceedsBalance = false;
-    // for (const candidate of vaultCandidates) {
-    //   // Use canonical token amounts for balance check
-    //   const canonicalDeposit = depositCanonical[candidate.assetAddress] || '';
-    //   const depositAmt = toNumber(canonicalDeposit);
-    //   
-    //   // Skip validation for vaults with empty or zero deposit
-    //   if (!canonicalDeposit || canonicalDeposit.trim() === '' || depositAmt === 0) {
-    //     continue;
-    //   }
-    //   
-    //   // Get available balance (potentialCollateral is in native asset units)
-    //   const decimals = candidate.assetScale.toString().length - 1;
-    //   const availableBalance = parseFloat(formatUnits(candidate.potentialCollateral, decimals));
-    //   
-    //   if (depositAmt > availableBalance) {
-    //     exceedsBalance = true;
-    //     break;
-    //   }
-    // }
-    // 
-    // onBalanceExceededChange(exceedsBalance);
-  }, [depositCanonical, vaultCandidates, autoSupplyCollateral, onBalanceExceededChange]);
+    onBalanceExceededChange(exceedsBalance);
+  }, [depositCanonical, vaultCandidates, autoSupplyCollateral, onBalanceExceededChange, toNumber]);
+
+  // Calculate total mint amount from all vaults in manual mode and notify parent
+  useEffect(() => {
+    if (!onTotalManualMintChange || autoSupplyCollateral) {
+      return;
+    }
+
+    let totalMint = 0;
+    for (const candidate of vaultCandidates) {
+      const mintInput = mintInputs[candidate.assetAddress] || '';
+      const mintAmt = toNumber(mintInput);
+      totalMint += mintAmt;
+    }
+    
+    // Return as string with exact precision
+    onTotalManualMintChange(totalMint > 0 ? String(totalMint) : '0');
+  }, [mintInputs, vaultCandidates, autoSupplyCollateral, onTotalManualMintChange, toNumber]);
 
   // Calculate HF for a vault - matches VaultsList formula: HF = CR / LT
   const calculateHF = (candidate: VaultCandidate, depositAmt: number, mintAmt: number): string => {
@@ -287,7 +321,7 @@ const Allocation: React.FC<AllocationProps> = ({
       if (!isFinite(hf) || isNaN(hf)) return '-';
       if (hf >= 999) return '∞';
       return hf.toFixed(2);
-          } catch {
+    } catch {
       return '-';
     }
   };
@@ -394,18 +428,16 @@ const Allocation: React.FC<AllocationProps> = ({
                   : hfNum >= 1.5 ? 'text-yellow-600' 
                   : 'text-red-600';
                 
-                // Check if HF is below target (only when auto-supply is off, targetHF is provided, and mint amount is not empty/zero)
-                const hasLowHF = !autoSupplyCollateral && targetHF !== undefined && 
+                // Check if HF is below this vault's minimum HF (only when auto-supply is off and mint amount is not empty/zero)
+                const vaultMinHF = calculateVaultMinHF(candidate);
+                const hasLowHF = !autoSupplyCollateral && 
                   mintInput && mintInput.trim() !== '' && mintAmt > 0 &&
-                  hfNum !== Infinity && !isNaN(hfNum) && hfNum < targetHF;
+                  hfNum !== Infinity && !isNaN(hfNum) && hfNum < vaultMinHF;
 
                 // Check if deposit exceeds available balance
-                // TEMPORARILY DISABLED FOR TESTING - always set to false
-                const exceedsBalance = false;
-                // Original balance check logic (commented out):
-                // const decimals = candidate.assetScale.toString().length - 1;
-                // const availableBalance = parseFloat(formatUnits(candidate.potentialCollateral, decimals));
-                // const exceedsBalance = !autoSupplyCollateral && depositAmt > 0 && depositAmt > availableBalance;
+                const decimals = candidate.assetScale.toString().length - 1;
+                const availableBalance = parseFloat(formatUnits(candidate.potentialCollateral, decimals));
+                const exceedsBalance = !autoSupplyCollateral && depositAmt > 0 && depositAmt > availableBalance;
 
                 return (
                   <div key={candidate.assetAddress} className={`grid gap-2 items-center text-sm ${getGridClass()}`}>
@@ -463,6 +495,23 @@ const Allocation: React.FC<AllocationProps> = ({
                 <div className="text-sm text-muted-foreground text-center py-2">No vault candidates available</div>
               )}
             </div>
+
+            {/* Total Mint Amount - only shown in manual mode when breakdown is expanded */}
+            {!autoSupplyCollateral && (
+              <div className="pt-2 border-t border-border">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-muted-foreground">Total Mint Amount:</span>
+                  <span className="text-sm font-bold tabular-nums">
+                    {formatNumberWithCommas(
+                      vaultCandidates.reduce((sum, candidate) => {
+                        const mintInput = mintInputs[candidate.assetAddress] || '';
+                        return sum + toNumber(mintInput);
+                      }, 0).toFixed(2)
+                    )} USDST
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
         </CollapsibleContent>
       </Collapsible>

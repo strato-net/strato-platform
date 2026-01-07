@@ -56,12 +56,14 @@ const HFSlider: React.FC<HFSliderProps> = ({
   const riskLevel = getRiskLevel(clampedValue);
   
   // Compute range color based on HF if not provided
-  const computedRangeColor = rangeColor ?? (
-    clampedValue >= 2.5 ? '#10b981' : // green
-    clampedValue >= 2.0 ? '#3b82f6' : // blue
-    clampedValue >= 1.5 ? '#eab308' : // yellow
-    '#ef4444' // red
-  );
+  const computedRangeColor = disabled 
+    ? '#9ca3af' // grey when disabled
+    : rangeColor ?? (
+      clampedValue >= 2.5 ? '#10b981' : // green
+      clampedValue >= 2.0 ? '#3b82f6' : // blue
+      clampedValue >= 1.5 ? '#eab308' : // yellow
+      '#ef4444' // red
+    );
   
   // Format number
   const formatNumber = (num: number, decimals: number = 2): string => {
@@ -85,6 +87,10 @@ const HFSlider: React.FC<HFSliderProps> = ({
     <TooltipProvider>
       <style>{`
         .hf-slider-range { background-color: ${computedRangeColor} !important; transition: background-color 0.2s ease; }
+        ${disabled ? `
+          .hf-slider-disabled [role="slider"] { border-color: #9ca3af !important; }
+          .hf-slider-disabled button[role="slider"] { border-color: #9ca3af !important; }
+        ` : ''}
       `}</style>
       <div className="space-y-2">
         {/* Header: Label with Tooltip and Value/Risk Level */}
@@ -108,8 +114,8 @@ const HFSlider: React.FC<HFSliderProps> = ({
           
           {/* Risk Level and Value */}
           <div className="flex items-baseline gap-3">
-            <span className={`text-lg font-medium ${riskLevel.color}`}>{riskLevel.label}</span>
-            <span className="text-2xl font-bold tabular-nums">{formatNumber(clampedValue, 2)}</span>
+            <span className={`text-lg font-medium ${disabled ? 'text-muted-foreground' : riskLevel.color}`}>{riskLevel.label}</span>
+            <span className={`text-2xl font-bold tabular-nums ${disabled ? 'text-muted-foreground' : ''}`}>{formatNumber(clampedValue, 2)}</span>
           </div>
         </div>
       
@@ -121,7 +127,7 @@ const HFSlider: React.FC<HFSliderProps> = ({
           step={0.01} 
           onValueChange={handleSliderChange}
           disabled={disabled}
-          className="w-full"
+          className={`w-full ${disabled ? 'hf-slider-disabled' : ''}`}
           rangeClassName="hf-slider-range"
         />
       
@@ -134,7 +140,7 @@ const HFSlider: React.FC<HFSliderProps> = ({
         {/* Current Position Health */}
         <div className="text-sm text-muted-foreground flex items-center justify-between">
           <span>Current Position Health</span>
-          <span className="text-blue-600 font-medium tabular-nums">
+          <span className={`font-medium tabular-nums ${disabled ? 'text-muted-foreground' : 'text-blue-600'}`}>
             {currentHF === 0 || currentHF === undefined ? 'No Position' : currentHF >= 999999 ? '∞' : formatNumber(currentHF, 2)}
             {' → '}
             {formatNumber(clampedValue, 2)}
