@@ -59,3 +59,8 @@ docker-compose.oracle.yml
 
 /app
 /mynode/
+
+# Griphook MCP
+/griphook/node_modules
+/griphook/dist
+/griphook/.turbo
