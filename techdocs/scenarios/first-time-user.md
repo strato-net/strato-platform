@@ -208,7 +208,7 @@ Get your crypto onto STRATO and borrow USDST to start using DeFi.
 - ✅ Swap USDST for other tokens
 - ✅ Provide liquidity and earn fees
 - ✅ Keep borrowing against collateral
-- ✅ Earn CATA rewards
+- ✅ Earn Reward Points
 
 ---
 
@@ -226,7 +226,7 @@ Get your crypto onto STRATO and borrow USDST to start using DeFi.
 **[Provide Liquidity →](../guides/liquidity.md)**
 - Use your USDST to provide liquidity
 - Earn 8-15% APR in trading fees
-- Plus CATA rewards
+- Plus Reward Points
 
 ### Option C: Expand Your Position
 
@@ -299,7 +299,7 @@ Only if you maintain health factor above 1.0:
 
 ### "What if I need to exit completely?"
 
-See **[Exit Strategy Guide →](exit-strategy.md)**
+See **[Withdrawals Guide →](withdrawals.md)**
 
 ---
 

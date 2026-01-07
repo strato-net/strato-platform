@@ -545,7 +545,7 @@ ETH must rise > 3.75% to cover interest costs
 ## Next Steps
 
 - **[Risk Management](risk-hedging.md)** - Hedge leveraged positions
-- **[Exit Strategy](exit-strategy.md)** - Close quickly if needed
+- **[Exit Strategy](withdrawals.md)** - Close quickly if needed
 
 ### Need Help?
 

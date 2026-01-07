@@ -703,7 +703,7 @@ Yes! Same concept:
 3. **Learn more:**
    - [Borrow Guide](../guides/borrow.md) - Detailed borrowing mechanics
    - [Swap Guide](../guides/swap.md) - How to swap efficiently
-   - [Exit Strategy](exit-strategy.md) - How to unwind safely
+   - [Exit Strategy](withdrawals.md) - How to unwind safely
 
 ---
 

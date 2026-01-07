@@ -467,7 +467,7 @@ async function getPendingRewards(userAddress) {
 
 // Usage
 const pending = await getPendingRewards(wallet.address);
-console.log('Pending CATA:', pending);
+console.log('Pending Reward Points:', pending);
 ```
 
 ---

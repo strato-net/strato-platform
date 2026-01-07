@@ -543,7 +543,7 @@ If you need more USDST and have room:
 
 - **[Provide Liquidity](liquidity.md)** - Earn fees with your USDST
 - **[Swap Tokens](swap.md)** - Trade for other assets
-- **[Earn Rewards](rewards.md)** - Claim CATA rewards for minting
+- **[Earn Rewards](rewards.md)** - Claim Reward Points for minting
 
 ### Learn More
 

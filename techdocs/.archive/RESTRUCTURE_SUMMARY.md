@@ -158,11 +158,11 @@ techdocs/
 - Security best practices
 
 ### 6. `/techdocs/guides/rewards.md`
-**Purpose:** Complete guide to CATA rewards
+**Purpose:** Complete guide to Reward Points
 **Content:**
-- How to earn CATA
+- How to earn Reward Points
 - Claiming rewards
-- What to do with CATA
+- What to do with Reward Points
 - Maximizing rewards
 - Understanding reward seasons
 

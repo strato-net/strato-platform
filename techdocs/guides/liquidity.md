@@ -22,7 +22,7 @@ Earn fees by providing liquidity to STRATO's decentralized exchange pools.
 5. Remove liquidity (anytime)
 
 **Time needed:** 5 minutes  
-**Potential earnings:** ~8-15% APR (fees + CATA rewards)  
+**Potential earnings:** ~8-15% APR (fees + Reward Points)  
 **Total gas cost:** ~$0.30
 
 ---
@@ -50,7 +50,7 @@ Earn fees by providing liquidity to STRATO's decentralized exchange pools.
 ✅ Added: 1 ETH + 3,000 USDC to pool
 ✅ Received: LP tokens (representing your 0.5% share)
 ✅ Earning: ~$2/day in fees (12% APR)
-✅ Plus: CATA rewards
+✅ Plus: Reward Points
 ```
 
 **Your position:**
@@ -68,11 +68,11 @@ Earn fees by providing liquidity to STRATO's decentralized exchange pools.
 - Deposit token pairs into liquidity pools (e.g., ETH + USDC)
 - Earn trading fees from every swap that uses your pool
 - Receive LP (Liquidity Provider) tokens representing your share
-- Plus earn CATA rewards
+- Plus earn Reward Points
 
 **Why provide liquidity?**
 - **Passive income**: Earn from trading fees (typically 0.3% per trade)
-- **CATA rewards**: Bonus rewards for liquidity providers
+- **Reward Points**: Bonus rewards for liquidity providers
 - **Support ecosystem**: Enable trading for others
 - **Capital efficiency**: Put idle assets to work
 
@@ -199,9 +199,9 @@ Check:
 - Daily fees: $1,000,000 × 0.3% = $3,000
 - Your share: $3,000 × 1% = $30/day
 
-### CATA Rewards
+### Reward Points
 
-Additional rewards in CATA tokens:
+Additional rewards in Reward Points:
 
 - Distributed to select pools
 - Varies by pool and season
@@ -271,7 +271,7 @@ Tokens (including earned fees) return to your wallet.
 1. **Choose stable pairs**: USDC-USDST has minimal IL
 2. **Earn fees to offset**: High-volume pools compensate with fees
 3. **Long-term provide**: Price often reverts, making loss "impermanent"
-4. **CATA rewards**: Additional rewards can exceed IL
+4. **Reward Points**: Additional rewards can exceed IL
 
 !!! note "IL is Impermanent"
     Loss only realizes if you withdraw. If prices revert, the "loss" disappears. Plus trading fees and rewards often exceed IL.
@@ -287,7 +287,7 @@ Tokens (including earned fees) return to your wallet.
 - ✅ High trading volume (more fees earned)
 - ✅ Deep liquidity (lower IL from your deposits)
 - ✅ Verified tokens (avoid scams)
-- ✅ CATA reward incentives
+- ✅ Reward Points incentives
 
 **Avoid pools with**:
 
@@ -306,7 +306,7 @@ Tokens (including earned fees) return to your wallet.
 **Higher IL but profitable**:
 
 - High-volume pairs (fees offset IL)
-- Pools with CATA rewards
+- Pools with Reward Points
 - Long-term positions (price reverts)
 
 ### Position Management
@@ -314,7 +314,7 @@ Tokens (including earned fees) return to your wallet.
 - [ ] Monitor positions weekly
 - [ ] Check if fees exceed IL
 - [ ] Rebalance between pools based on APR
-- [ ] Claim CATA rewards regularly
+- [ ] Claim Reward Points regularly
 - [ ] Withdraw if IL becomes too large
 
 ---
@@ -334,7 +334,7 @@ Total trading volume in last 24 hours. Higher = more fees earned.
 Estimated yearly returns from:
 
 - Trading fees
-- CATA rewards
+- Reward Points
 
 **Example**: 25% APR on $10,000 = ~$2,500/year
 
@@ -359,7 +359,7 @@ Maximize returns by:
 
 1. Choose highest APR pools
 2. Reinvest earned fees (compound)
-3. Claim and reinvest CATA rewards
+3. Claim and reinvest Reward Points
 4. Rotate to best-performing pools
 
 ### Range Orders (Concentrated Liquidity)
@@ -451,7 +451,7 @@ If you need to exit quickly:
 
 Maximize earnings:
 
-→ **[Rewards Guide](rewards.md)** - Learn to claim CATA rewards
+→ **[Rewards Guide](rewards.md)** - Learn to claim Reward Points
 
 ### Optimize Your Portfolio
 

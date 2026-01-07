@@ -142,7 +142,7 @@ Status: At minimum - risky!
 - Collateral for other DeFi operations
 - Bridge out for USD on other chains
 
-## CATA
+## Reward Points
 
 **Definition:** STRATO's governance and rewards token.
 
@@ -332,14 +332,14 @@ STRATO supports various tokens for trading, lending, and collateral.
 
 ### Governance
 
-**CATA**:
+**Reward Points**:
 
 - STRATO governance token (described above)
 - Earned through DeFi activities
 - Used for voting and governance
 
 !!! tip "Getting Tokens"
-    Most tokens are obtained by **[bridging from Ethereum](guides/bridge.md)**. USDST and CATA are earned/minted on STRATO directly.
+    Most tokens are obtained by **[bridging from Ethereum](guides/bridge.md)**. USDST and Reward Points are earned/minted on STRATO directly.
 
 ## Next Steps
 

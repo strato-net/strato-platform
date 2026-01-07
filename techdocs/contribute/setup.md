@@ -487,12 +487,15 @@ Now that you have STRATO running locally:
 
 1. **Understand the architecture** → Read [Architecture](architecture.md)
 2. **Choose your focus area:**
-   - [Blockchain Core](blockchain/overview.md) (Haskell)
-   - [Smart Contracts](contracts/overview.md) (Solidity)
-   - [Backend API](backend/overview.md) (Node.js/TypeScript)
-   - [Frontend UI](frontend/overview.md) (React/TypeScript)
-   - [Services](services/bridge.md) (Background services)
+   - **Blockchain Core** - Haskell codebase (`strato/`)
+   - **Smart Contracts** - Solidity contracts (`mercata/contracts/`)
+   - **Backend API** - Node.js/TypeScript (`mercata/backend/`)
+   - **Frontend UI** - React/TypeScript (`mercata/ui/`)
+   - **Services** - Background services (`mercata/services/`)
 3. **Make your first contribution** → Read [Contributing Guidelines](contributing.md)
+
+!!! note "Component Guides Coming Soon"
+    Detailed guides for each component area will be added in future updates.
 
 ---
 

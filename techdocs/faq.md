@@ -260,9 +260,9 @@ Slippage is the difference between expected and actual trade price.
 
 ## Rewards
 
-### How do I earn CATA rewards?
+### How do I earn Reward Points?
 
-Earn CATA by:
+Earn Reward Points by:
 
 - Supplying collateral to lending pool
 - Borrowing USDST
@@ -276,12 +276,12 @@ See **[Rewards Guide](guides/rewards.md)** for details.
 
 Rewards accrue continuously and can be claimed at any time. Check the **Rewards** section in the app to see your pending rewards.
 
-### What can I do with CATA tokens?
+### What can I do with Reward Points?
 
 - **Trade**: Swap for other tokens
 - **Hold**: Store value
 - **Governance**: Vote on protocol changes (coming soon)
-- **Earn more**: Provide CATA liquidity
+- **Earn more**: Provide Reward Point liquidity
 
 ---
 

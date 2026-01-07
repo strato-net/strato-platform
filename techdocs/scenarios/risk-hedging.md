@@ -466,7 +466,7 @@ Buffer = (Target drop% × Collateral value) - Available borrowing room
 ## Next Steps
 
 - **[Portfolio Rebalancing](portfolio-rebalancing.md)** - Diversify risk
-- **[Exit Strategy](exit-strategy.md)** - When hedges fail
+- **[Exit Strategy](withdrawals.md)** - When hedges fail
 - **[Safety Guide](../safety.md)** - Comprehensive risk overview
 
 ### Need Help?

@@ -211,7 +211,7 @@ Before committing large amounts:
     - **[Swap Tokens](guides/swap.md)** - Exchange assets instantly
     - **[Provide Liquidity](guides/liquidity.md)** - Earn fees as a liquidity provider
     - **[Bridge Assets](guides/bridge.md)** - Move assets cross-chain
-    - **[Earn Rewards](guides/rewards.md)** - Claim CATA token rewards
+    - **[Earn Rewards](guides/rewards.md)** - Claim Reward Points token rewards
 
 ---
 

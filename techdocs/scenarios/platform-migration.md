@@ -17,7 +17,7 @@ Move your positions from Aave, Compound, MakerDAO, or other platforms to STRATO.
 - Separate systems: Lending (CollateralVault) and CDP (CDPVault)
 - Built-in DEX for swaps
 - Cross-chain bridge
-- CATA rewards
+- Reward Points
 
 **Expected savings:** $500-2,000/year on typical $20k position
 
@@ -226,7 +226,7 @@ If you need USDC instead of USDST:
 | **Gas Costs** | $20-50 | $20-50 | $30-60 | < $0.10 |
 | **CDP System** | ❌ | ❌ | ❌ | ✅ |
 | **Built-in DEX** | ❌ | ❌ | ❌ | ✅ |
-| **Rewards** | AAVE | COMP | ❌ | CATA |
+| **Rewards** | AAVE | COMP | ❌ | Reward Points |
 | **CDP Available** | ❌ | ❌ | ✅ | ✅ |
 | **Flash Loans** | ✅ | ❌ | ❌ | Coming |
 | **Mobile App** | ✅ | ❌ | ❌ | ✅ |
@@ -470,7 +470,7 @@ Break-even: 1 month
 ### Explore STRATO Features
 
 - **[Provide Liquidity](../guides/liquidity.md)** - Earn trading fees
-- **[Earn Rewards](../guides/rewards.md)** - Claim CATA tokens
+- **[Earn Rewards](../guides/rewards.md)** - Claim Reward Points
 - **[Swap Tokens](../guides/swap.md)** - Built-in DEX
 
 ### Stay Updated
@@ -505,7 +505,7 @@ Break-even: 1 month
 **Yes:**
 
 - Claim all rewards before closing
-- But STRATO offers CATA rewards
+- But STRATO offers Reward Points
 - Compare total APY including rewards
 
 ### "Can I migrate during high volatility?"
@@ -526,7 +526,7 @@ Break-even: 1 month
 - ✅ Lower interest rates
 - ✅ Dramatically lower gas costs
 - ✅ Additional features (DEX, Bridge, CDP)
-- ✅ CATA rewards
+- ✅ Reward Points
 
 **Migration costs:**
 

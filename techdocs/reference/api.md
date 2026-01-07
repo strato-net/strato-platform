@@ -458,7 +458,7 @@ POST /rewards/claim
 Authorization: Bearer {token}
 ```
 
-Claims all unclaimed CATA rewards.
+Claims all unclaimed Reward Points.
 
 #### Get Claim History
 

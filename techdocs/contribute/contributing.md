@@ -24,11 +24,11 @@ Read the [Architecture Guide](architecture.md) to understand how components work
 
 Pick the area you want to work on:
 
-- [Blockchain Core](blockchain/overview.md) - Haskell
-- [Smart Contracts](contracts/overview.md) - Solidity
-- [Backend API](backend/overview.md) - Node.js/TypeScript
-- [Frontend UI](frontend/overview.md) - React/TypeScript
-- [Services](services/bridge.md) - Background services
+- **Blockchain Core** - Haskell (`strato/`)
+- **Smart Contracts** - Solidity (`mercata/contracts/`)
+- **Backend API** - Node.js/TypeScript (`mercata/backend/`)
+- **Frontend UI** - React/TypeScript (`mercata/ui/`)
+- **Services** - Background services (`mercata/services/`)
 
 ---
 
@@ -93,12 +93,9 @@ git checkout -b feature/your-feature-name
 
 ### 4. Make Your Changes
 
-**Follow component-specific guides:**
+**Component-specific guidelines:**
 
-- [Blockchain Development](blockchain/development.md)
-- [Contract Development](contracts/development.md)
-- [Backend Development](backend/development.md)
-- [Frontend Development](frontend/development.md)
+See the [Architecture Guide](architecture.md) for details on each component's structure and technology stack.
 
 **General guidelines:**
 
@@ -542,6 +539,4 @@ Your contributions make STRATO better for everyone. We appreciate your time and 
 
 - [Setup](setup.md) - Get started
 - [Architecture](architecture.md) - Understand the system
-- [Component Guides](blockchain/overview.md) - Deep dives
-- [Testing](testing.md) - Testing strategies
 

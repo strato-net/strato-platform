@@ -175,9 +175,9 @@ Both reduce your received amount.
 
 For optimal prices, swaps may route through multiple pools:
 
-**Example**: ETH → CATA
-- **Direct route**: ETH → CATA (if pool exists)
-- **Routed**: ETH → USDC → CATA (better price through two swaps)
+**Example**: ETH → Reward Points
+- **Direct route**: ETH → Reward Points (if pool exists)
+- **Routed**: ETH → USDC → Reward Points (better price through two swaps)
 
 The app automatically finds the best route.
 
@@ -326,7 +326,7 @@ Earn from other traders' swaps:
 
 - **[Borrow USDST](borrow.md)** - Get liquidity against collateral
 - **[Mint via CDP](mint-cdp.md)** - Create USDST efficiently
-- **[Earn Rewards](rewards.md)** - Claim CATA tokens
+- **[Earn Rewards](rewards.md)** - Claim Reward Points
 
 ---
 

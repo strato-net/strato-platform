@@ -516,7 +516,7 @@ async function getRewardsBalance() {
 
   const { unclaimed, activities } = response.data;
 
-  console.log('Unclaimed CATA:', unclaimed);
+  console.log('Unclaimed Reward Points:', unclaimed);
   console.log('Breakdown by activity:', activities);
 
   return response.data;

@@ -13,7 +13,7 @@
 
 ### 2. Renamed File References
 **Problem:** 6 files referencing old `emergency-exit.md` filename
-**Fix:** Updated all references to `exit-strategy.md`
+**Fix:** Updated all references to `withdrawals.md`
 - capital-efficiency.md
 - first-time-user.md
 - leverage-long.md

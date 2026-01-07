@@ -410,7 +410,7 @@ Don't need to repay all at once:
 
 - **[Provide Liquidity](liquidity.md)** - Earn fees on your USDST
 - **[Swap Tokens](swap.md)** - Trade for other assets
-- **[Earn Rewards](rewards.md)** - Claim CATA rewards
+- **[Earn Rewards](rewards.md)** - Claim Reward Points
 
 ### Learn More
 

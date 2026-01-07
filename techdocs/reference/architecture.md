@@ -44,7 +44,7 @@ High-level overview of the STRATO platform architecture.
 - Liquidity (pool management)
 - Lending (supply/borrow)
 - CDP (mint USDST)
-- Rewards (CATA accrual/claiming)
+- Rewards (Reward Points accrual/claiming)
 
 ### 2. Backend
 

@@ -198,7 +198,7 @@ Safety buffer: $5,000
 | USDST-USDC LP fees | $12,000 | 10% | $1,200 |
 | ETH-USDT LP fees | $6,000 | 15% | $900 |
 | Supply APY | $5,000 | 3% | $150 |
-| CATA rewards | All activities | Est | $800 |
+| Reward Points | All activities | Est | $800 |
 | **Total Income** | | | **$3,050** |
 
 ### Annual Costs
@@ -436,7 +436,7 @@ Return on capital: 4.6% on $50k
 |--------|--------|
 | Starting value | $75,000 |
 | LP fees earned | $2,100 |
-| CATA rewards | $800 |
+| Reward Points | $800 |
 | Interest paid | -$600 |
 | ETH/BTC appreciation | +$8,500 |
 | **Ending value** | **$85,800** |
@@ -544,7 +544,7 @@ Return on capital: 4.6% on $50k
 
 ### Complete Exit
 
-**See:** [Exit Strategy Guide](exit-strategy.md)
+**See:** [Withdrawals Guide](withdrawals.md)
 
 **Order:**
 

@@ -22,7 +22,7 @@ Use borrowed/minted USDST to provide liquidity and earn multiple income streams.
 **Income sources:**
 
 1. ✅ Trading fees from liquidity (example: 8-12% APR)
-2. ✅ CATA rewards for all activities (varies)
+2. ✅ Reward Points for all activities (varies)
 3. ✅ Keep your original collateral (potential appreciation)
 
 **Net result (example):** Earn ~10-15% APR while keeping your ETH
@@ -41,14 +41,14 @@ Use borrowed/minted USDST to provide liquidity and earn multiple income streams.
 1. Supply 10 ETH as collateral
 2. Borrow 10,000 USDST against it
 3. Provide sUSDSST-USDST liquidity
-4. Earn fees + CATA rewards
+4. Earn fees + Reward Points
 5. Net yield: ~10% annually
 
 **Expected returns:**
 
 - Interest cost: -5% on $10k = -$500/year
 - Liquidity fees: +10% on $10k = +$1,000/year
-- CATA rewards: +$500/year (estimated)
+- Reward Points: +$500/year (estimated)
 - **Net: +$1,000/year (~10% on $10k position)**
 - **Plus:** Keep 10 ETH exposure
 
@@ -145,7 +145,7 @@ Ready for liquidity
 
    - APR: Example 10% (fees - varies by volume)
    - Volume: Check current 24h volume
-   - CATA rewards: Active
+   - Reward Points: Active
 4. Enter amounts:
 
    - USDST: **5,000**
@@ -158,7 +158,7 @@ Ready for liquidity
 Liquidity provided: $10,000
 Pool share: varies
 Earning: ~$3/day in fees (example)
-Plus: CATA rewards
+Plus: Reward Points
 Plus: sUSDSST earns Sky savings rate while in pool
 ```
 
@@ -175,7 +175,7 @@ Plus: sUSDSST earns Sky savings rate while in pool
 **Income streams:**
 
 1. **Trading fees:** ~$3/day = $1,095/year
-2. **CATA rewards:** ~$1-2/day = $500/year
+2. **Reward Points:** ~$1-2/day = $500/year
 3. **Total income:** ~$1,600/year
 
 **Costs:**
@@ -198,7 +198,7 @@ Plus: sUSDSST earns Sky savings rate while in pool
 | Source | Amount | Calculation |
 |--------|--------|-------------|
 | LP fees (10% APR) | $1,000/year | $10k × 10% |
-| CATA rewards | $500/year | Estimated |
+| Reward Points | $500/year | Estimated |
 | **Total Income** | **$1,500/year** | |
 
 ### Costs
@@ -265,7 +265,7 @@ Return on total position: 3.2% APR (plus ETH exposure)
 
 - Your sUSDSST in the pool continues earning Sky's savings rate
 - This provides additional yield on top of trading fees
-- Triple yield: trading fees + CATA rewards + Sky savings rate
+- Triple yield: trading fees + Reward Points + Sky savings rate
 
 **If using volatile pairs (e.g., USDST-ETHST):**
 
@@ -277,8 +277,8 @@ Return on total position: 3.2% APR (plus ETH exposure)
 
 **Weekly routine:**
 
-1. Claim CATA rewards
-2. Swap CATA → USDST
+1. Claim Reward Points
+2. Swap Reward Points → USDST
 3. Convert half to sUSDSST via swap
 4. Add both to liquidity pool
 5. Increases your earning power
@@ -356,10 +356,10 @@ Return on total position: 3.2% APR (plus ETH exposure)
 
 4. **Claim final rewards:**
 
-   - Claim remaining CATA
+   - Claim remaining Reward Points
    - Swap or hold
 
-**See:** [Exit Strategy Guide](exit-strategy.md)
+**See:** [Withdrawals Guide](withdrawals.md)
 
 ---
 
@@ -408,7 +408,7 @@ Return on total position: 3.2% APR (plus ETH exposure)
 | ETH collateral | 10 ETH (same) |
 | Debt owed | 10,042 USDST (+$42 interest) |
 | LP value | $10,025 (fees earned) |
-| CATA earned | 50 tokens ($100 value) |
+| Reward Points earned | 50 tokens ($100 value) |
 | **Net profit** | $83 for the month |
 
 **Annualized:** $83 × 12 = $996/year (~3.3% yield)

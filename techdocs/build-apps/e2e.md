@@ -14,7 +14,7 @@ Build an app that helps users earn yield through lending and liquidity provision
 2. Supplies ETH as collateral
 3. Borrows USDST
 4. Provides USDST-USDC liquidity
-5. Earns trading fees + CATA rewards
+5. Earns trading fees + Reward Points
 
 ### Implementation
 

@@ -41,7 +41,7 @@ Regularly deposit and invest fixed amounts into STRATO, regardless of price.
 - Total invested: $12,000
 - ETH accumulated: ~4-5 ETH (depending on prices)
 - Liquidity provided: $6,000 in USDST pools
-- Rewards earned: ~$500-800 in CATA + fees
+- Rewards earned: ~$500-800 in Reward Points + fees
 
 ---
 
@@ -64,7 +64,7 @@ Regularly deposit and invest fixed amounts into STRATO, regardless of price.
 Collateral: 0.167 ETH ($500)
 Liquidity: $500 USDST-USDC
 Total value: $1,000
-Earning: LP fees + CATA rewards
+Earning: LP fees + Reward Points
 ```
 
 ---
@@ -381,7 +381,7 @@ Earning: LP fees + CATA rewards
 | Total invested | $18,000 |
 | ETH accumulated | 6.8 ETH |
 | LP value | $9,000 |
-| CATA rewards | $800 |
+| Reward Points | $800 |
 | LP fees earned | $1,200 |
 | **Total value** | $28,400 |
 | **Profit** | **$10,400 (58%)** |

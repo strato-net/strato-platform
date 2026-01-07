@@ -168,13 +168,15 @@ Full-stack DeFi application built on top of STRATO blockchain.
    - Deposit/withdrawal workflows
 
 5. **Rewards** (`Rewards/`)
-   - `Rewards.sol` - CATA token distribution
-   - Activity-based incentives
+   - `Rewards.sol` - Incentives controller for distributing Reward Points
+   - Tracks user activities (borrowing, liquidity, swaps, etc.)
+   - Calculates and distributes rewards based on emission rates
+   - Activity-based incentive system
 
 6. **Tokens** (`Tokens/`)
-   - `USDST.sol` - Stablecoin
-   - `CATA.sol` - Governance/rewards token
-   - Wrapped assets (ETHST, WBTCST, etc.)
+   - `Token.sol` - Base token implementation
+   - `TokenFactory.sol` - Token creation (USDST, Reward Points, wrapped assets)
+   - `TokenMetadata.sol` - Token metadata management
 
 **Build:**
 
@@ -519,11 +521,13 @@ npm run dev              # Start dev server
 
 ### Choose Your Focus Area
 
-1. **Blockchain Core** → Read [Blockchain Development](blockchain/overview.md)
-2. **Smart Contracts** → Read [Contract Development](contracts/overview.md)
-3. **Backend API** → Read [Backend Development](backend/overview.md)
-4. **Frontend UI** → Read [Frontend Development](frontend/overview.md)
-5. **Services** → Read [Services Documentation](services/bridge.md)
+Detailed component-specific guides are coming soon. For now, see:
+
+1. **Blockchain Core** - Haskell codebase (`strato/core/`, `strato/api/`)
+2. **Smart Contracts** - Solidity contracts (`mercata/contracts/`)
+3. **Backend API** - Node.js/TypeScript (`mercata/backend/`)
+4. **Frontend UI** - React/TypeScript (`mercata/ui/`)
+5. **Services** - Background services (`mercata/services/`)
 
 ### General Workflow
 

@@ -34,7 +34,7 @@ Welcome to STRATO - a blockchain platform optimized for decentralized finance (D
 - **[Multi-Asset Strategy](scenarios/multi-asset-strategy.md)** - Complex multi-collateral positions
 - **[Collateral Optimization](scenarios/collateral-optimization.md)** - Dynamic rebalancing
 - **[Arbitrage & Market Making](scenarios/arbitrage-market-making.md)** - Active trading
-- **[Exit Strategy](scenarios/exit-strategy.md)** - Safely close all positions
+- **[Withdrawals](scenarios/withdrawals.md)** - Withdraw assets from STRATO
 
 ### Feature Guides
 
@@ -45,7 +45,7 @@ Welcome to STRATO - a blockchain platform optimized for decentralized finance (D
 - **[Swap Tokens](guides/swap.md)** - Trade on the DEX
 - **[Provide Liquidity](guides/liquidity.md)** - Earn trading fees
 - **[Bridge Assets](guides/bridge.md)** - Cross-chain transfers
-- **[Manage Rewards](guides/rewards.md)** - Claim CATA tokens
+- **[Manage Rewards](guides/rewards.md)** - Claim Reward Points
 
 ### Essential Knowledge
 
