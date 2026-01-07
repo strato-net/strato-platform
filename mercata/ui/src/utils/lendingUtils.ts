@@ -303,10 +303,26 @@ export const calculateBorrowTxFee = (collateralCount: number): { fee: number, vo
 export const calculateAdditionalCollateralAmountFromValue = (
   collateralValueUSD: bigint,
   price: bigint,
-  decimals: bigint,
+  decimals: bigint, // i.e. 10n**18n, not 18n
 ): bigint => {
   if (price === 0n) return 0n;
   return (collateralValueUSD * decimals) / price;
+};
+
+/**
+ * Calculates the max dollar value that the user can supply of the asset
+ * @param balance - user's wei balance of the asset
+ * @param price - asset price in USD, such as 21200000000000000000n for $21.20
+ * @param decimals - asset decimals, such as 10n**18n for 18 decimals
+ * @returns the maxmimum value in USD that the user can supply, such as 3400000000000000000n for $3.40
+ * @throws if decimals is 0n
+ */
+export const calculateMaxCollateralValueFromBalance = (
+  balance: bigint,
+  price: bigint,
+  decimals: bigint, // i.e. 10n**18n, not 18n
+): bigint => {
+  return (balance * price) / decimals;
 };
 
 export const recommendCollateralToSupply = (
