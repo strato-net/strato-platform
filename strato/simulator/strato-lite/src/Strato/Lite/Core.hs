@@ -85,7 +85,7 @@ import qualified Control.Monad.Trans.State as StateT
 import Data.Conduit.TMChan
 import Data.Conduit.TQueue hiding (newTQueueIO)
 import Data.Default
-import Data.Foldable (for_, toList, traverse_)
+import Data.Foldable (toList, traverse_)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import Data.Maybe (fromMaybe)

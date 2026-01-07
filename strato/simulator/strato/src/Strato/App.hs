@@ -20,7 +20,6 @@ import Frontend.Pages.App.Sidebar
 import Frontend.Pages.App.Swap
 import Frontend.Pages.App.Transfer
 import Frontend.Pages.BitcoinBridge.Bridge
-import Frontend.Pages.BitcoinBridge.Navbar
 import Frontend.Pages.BitcoinBridge.Overview
 import Frontend.Pages.BitcoinBridge.RPCPanel
 import Frontend.Pages.SMD.Blocks (blocksWidget)
@@ -81,7 +80,6 @@ mainWidget = do
         SMDContractEditor -> elClass "div" "content" $ el "h2" $ text "Contract Editor"
       pure ()
     RouteBridge br -> elClass "div" "column-layout-below-top-tabs" $ do
-      bridgeNavbar $ bridgeTabs br
       let whiteBg = elAttr "div" ("style" =: "background-color: #f8f8ff;")
       case br of
         BridgeOverview -> elClass "div" "content" $ whiteBg $ overviewTabWidget appStateDyn
