@@ -79,15 +79,18 @@ const Allocation: React.FC<AllocationProps> = ({
   }, []);
 
   // Convert WAD token amount to USD
-  const wadToUSD = (wadAmount: string, assetAddress: string): string => {
+  // roundForDisplay: true in auto mode (2 decimal places), false in manual mode (no rounding)
+  const wadToUSD = (wadAmount: string, assetAddress: string, roundForDisplay: boolean = true): string => {
     if (!wadAmount || wadAmount === '0') return '';
     const tokenAmount = toNumber(wadAmount);
     const price = getPrice(assetAddress);
     const usdValue = tokenAmount * price;
-    return usdValue > 0 ? usdValue.toFixed(2) : '';
+    if (usdValue <= 0) return '';
+    const formatted = roundForDisplay ? usdValue.toFixed(2) : String(usdValue);
+    return formatNumberWithCommas(formatted);
   };
 
-  // Convert USD to WAD token amount
+  // Convert USD to WAD token amount (never rounds - preserves full precision)
   const usdToWad = (usdValue: string, assetAddress: string): string => {
     if (!usdValue || usdValue === '0') return '';
     const usd = toNumber(usdValue);
@@ -97,14 +100,16 @@ const Allocation: React.FC<AllocationProps> = ({
   };
 
   // Sync from optimalAllocations when they change
+  // This always uses the canonical WAD values from optimalAllocations
   useEffect(() => {
     const editingKey = editingInputRef.current;
     
+    // Update canonical deposit values from optimalAllocations
     setDepositCanonical(prev => {
       const newCanonical: Record<string, string> = {};
       vaultCandidates.forEach(c => {
-        // Skip updating the input being edited
-        if (editingKey === `deposit-${c.assetAddress}`) {
+        // Skip updating the input being edited (only in manual mode)
+        if (!autoSupplyCollateral && editingKey === `deposit-${c.assetAddress}`) {
           newCanonical[c.assetAddress] = prev[c.assetAddress] || '';
           return;
         }
@@ -119,11 +124,12 @@ const Allocation: React.FC<AllocationProps> = ({
       return newCanonical;
     });
 
+    // Update display deposit values from optimalAllocations (with rounding in auto mode)
     setDepositDisplayInputs(prev => {
       const newDisplay: Record<string, string> = {};
       vaultCandidates.forEach(c => {
-        // Skip updating the input being edited
-        if (editingKey === `deposit-${c.assetAddress}`) {
+        // Skip updating the input being edited (only in manual mode)
+        if (!autoSupplyCollateral && editingKey === `deposit-${c.assetAddress}`) {
           newDisplay[c.assetAddress] = prev[c.assetAddress] || '';
           return;
         }
@@ -135,24 +141,29 @@ const Allocation: React.FC<AllocationProps> = ({
         const canonicalVal = depositStr && depositNum > 0 ? depositStr : '';
         
         if (displayMode === 'USD' && canonicalVal) {
-          newDisplay[c.assetAddress] = wadToUSD(canonicalVal, c.assetAddress);
+          // In auto mode, round to 2 decimal places; in manual mode, no rounding
+          newDisplay[c.assetAddress] = wadToUSD(canonicalVal, c.assetAddress, autoSupplyCollateral);
+        } else if (canonicalVal) {
+          // WAD mode: format with commas
+          newDisplay[c.assetAddress] = formatNumberWithCommas(canonicalVal);
         } else {
-          newDisplay[c.assetAddress] = canonicalVal;
+          newDisplay[c.assetAddress] = '';
         }
       });
       return newDisplay;
     });
 
+    // Update mint inputs from optimalAllocations (with rounding in auto mode)
     setMintInputs(prev => {
       const newMints: Record<string, string> = {};
       vaultCandidates.forEach(c => {
-        // Skip updating the input being edited
-        if (editingKey === `mint-${c.assetAddress}`) {
+        // Skip updating the input being edited (only in manual mode)
+        if (!autoSupplyCollateral && editingKey === `mint-${c.assetAddress}`) {
           newMints[c.assetAddress] = prev[c.assetAddress] || '';
           return;
         }
         const alloc = optimalAllocations.find(a => a.assetAddress === c.assetAddress);
-        let mintStr = (alloc?.mintAmount ?? '').trim();
+        const mintStr = (alloc?.mintAmount ?? '').trim();
         
         // Filter out any zero values (0, 0.0, 0.00, etc)
         const mintNum = parseFloat(mintStr);
@@ -161,49 +172,93 @@ const Allocation: React.FC<AllocationProps> = ({
           return;
         }
         
-        // Format to 2 decimal places in USD mode (USDST = $1, no conversion needed)
-        if (displayMode === 'USD') {
-          mintStr = mintNum.toFixed(2);
+        // In auto mode, format to 2 decimal places in USD mode
+        // In manual mode, no rounding - preserve full precision
+        // Always format with commas for display
+        if (displayMode === 'USD' && autoSupplyCollateral) {
+          newMints[c.assetAddress] = formatNumberWithCommas(mintNum.toFixed(2));
+        } else {
+          newMints[c.assetAddress] = formatNumberWithCommas(mintStr);
         }
-        
-        newMints[c.assetAddress] = mintStr;
       });
       return newMints;
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [optimalAllocations, vaultCandidates]);
+  }, [optimalAllocations, vaultCandidates, autoSupplyCollateral]);
 
-  // When display mode changes, convert existing display values
+  // When display mode changes, handle conversion based on auto/manual mode
   useEffect(() => {
-    const newDisplay: Record<string, string> = {};
-    
-    vaultCandidates.forEach(c => {
-      const canonical = depositCanonical[c.assetAddress] || '';
-      if (displayMode === 'USD' && canonical) {
-        newDisplay[c.assetAddress] = wadToUSD(canonical, c.assetAddress);
-      } else {
-        newDisplay[c.assetAddress] = canonical;
-      }
-    });
-    
-    setDepositDisplayInputs(newDisplay);
+    if (autoSupplyCollateral) {
+      // AUTO MODE: Convert from optimal allocation amounts (canonical) to display
+      // This ensures we always use the original allocation values, not derived ones
+      const newDisplay: Record<string, string> = {};
+      
+      vaultCandidates.forEach(c => {
+        const alloc = optimalAllocations.find(a => a.assetAddress === c.assetAddress);
+        const depositStr = (alloc?.depositAmount ?? '').trim();
+        const depositNum = parseFloat(depositStr);
+        const canonicalVal = depositStr && depositNum > 0 ? depositStr : '';
+        
+        if (displayMode === 'USD' && canonicalVal) {
+          newDisplay[c.assetAddress] = wadToUSD(canonicalVal, c.assetAddress, true); // Round for display (includes commas)
+        } else if (canonicalVal) {
+          newDisplay[c.assetAddress] = formatNumberWithCommas(canonicalVal); // WAD with commas
+        } else {
+          newDisplay[c.assetAddress] = '';
+        }
+      });
+      
+      setDepositDisplayInputs(newDisplay);
 
-    // Format mint amounts for display mode
-    setMintInputs(prev => {
+      // Convert mint amounts from optimal allocation
       const newMints: Record<string, string> = {};
       vaultCandidates.forEach(c => {
-        let mintStr = prev[c.assetAddress] || '';
+        const alloc = optimalAllocations.find(a => a.assetAddress === c.assetAddress);
+        const mintStr = (alloc?.mintAmount ?? '').trim();
+        const mintNum = parseFloat(mintStr);
         
-        // Format to 2 decimal places in USD mode (USDST = $1, no conversion needed)
-        if (displayMode === 'USD' && mintStr && mintStr !== '0') {
-          const mintNum = toNumber(mintStr);
-          mintStr = mintNum > 0 ? mintNum.toFixed(2) : '';
+        if (!mintStr || mintNum <= 0) {
+          newMints[c.assetAddress] = '';
+          return;
         }
         
-        newMints[c.assetAddress] = mintStr;
+        // Round to 2 decimal places in USD mode, always format with commas
+        if (displayMode === 'USD') {
+          newMints[c.assetAddress] = formatNumberWithCommas(mintNum.toFixed(2));
+        } else {
+          newMints[c.assetAddress] = formatNumberWithCommas(mintStr);
+        }
       });
-      return newMints;
-    });
+      setMintInputs(newMints);
+    } else {
+      // MANUAL MODE: Convert from current input values directly (no rounding)
+      const newDepositDisplay: Record<string, string> = {};
+      
+      vaultCandidates.forEach(c => {
+        const currentDisplay = depositDisplayInputs[c.assetAddress] || '';
+        if (!currentDisplay) {
+          newDepositDisplay[c.assetAddress] = '';
+          return;
+        }
+        
+        if (displayMode === 'USD') {
+          // Converting WAD to USD - use canonical value (includes commas)
+          const canonical = depositCanonical[c.assetAddress] || '';
+          newDepositDisplay[c.assetAddress] = canonical ? wadToUSD(canonical, c.assetAddress, false) : '';
+        } else {
+          // Converting USD to WAD - convert from current display value
+          const wadValue = usdToWad(currentDisplay, c.assetAddress);
+          newDepositDisplay[c.assetAddress] = wadValue ? formatNumberWithCommas(wadValue) : '';
+          // Also update canonical to match (without commas)
+          setDepositCanonical(prev => ({ ...prev, [c.assetAddress]: wadValue }));
+        }
+      });
+      
+      setDepositDisplayInputs(newDepositDisplay);
+
+      // For mint amounts (USDST = $1), no conversion needed
+      // In manual mode, no rounding - keep current values (they should already be formatted)
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayMode]);
 
@@ -326,29 +381,85 @@ const Allocation: React.FC<AllocationProps> = ({
     }
   };
 
-  const handleDepositChange = (assetAddress: string, value: string) => {
-    // Store the display value as-is (what the user types)
-    setDepositDisplayInputs(prev => ({ ...prev, [assetAddress]: value }));
+  const handleDepositChange = (assetAddress: string, value: string, e?: React.ChangeEvent<HTMLInputElement>) => {
+    if (value === "") {
+      setDepositDisplayInputs(prev => ({ ...prev, [assetAddress]: '' }));
+      setDepositCanonical(prev => ({ ...prev, [assetAddress]: '' }));
+      if (!autoSupplyCollateral && onDepositAmountChange) {
+        onDepositAmountChange(assetAddress, '0');
+      }
+      return;
+    }
+
+    const cursorPosition = e?.target?.selectionStart || 0;
+    const beforeCursor = value.substring(0, cursorPosition);
+    const beforeCursorNoCommas = parseCommaNumber(beforeCursor);
+    const parsed = parseCommaNumber(value);
     
-    // Calculate and store canonical WAD value
-    const cleanValue = parseCommaNumber(value);
-    const canonicalValue = displayMode === 'USD' ? usdToWad(cleanValue, assetAddress) : cleanValue;
-    setDepositCanonical(prev => ({ ...prev, [assetAddress]: canonicalValue }));
-    
-    if (!autoSupplyCollateral && onDepositAmountChange) {
-      const tokenAmt = toNumber(canonicalValue);
-      onDepositAmountChange(assetAddress, String(tokenAmt));
+    // Only allow valid decimal number patterns
+    if (parsed === "" || parsed === "." || /^\d*\.?\d*$/.test(parsed)) {
+      const formatted = formatNumberWithCommas(parsed);
+      setDepositDisplayInputs(prev => ({ ...prev, [assetAddress]: formatted }));
+      
+      // Calculate and store canonical WAD value
+      const canonicalValue = displayMode === 'USD' ? usdToWad(parsed, assetAddress) : parsed;
+      setDepositCanonical(prev => ({ ...prev, [assetAddress]: canonicalValue }));
+      
+      if (!autoSupplyCollateral && onDepositAmountChange) {
+        const tokenAmt = toNumber(canonicalValue);
+        onDepositAmountChange(assetAddress, String(tokenAmt));
+      }
+      
+      // Restore cursor position after formatting
+      if (e?.target) {
+        setTimeout(() => {
+          let unformattedPos = 0;
+          let formattedPos = 0;
+          while (formattedPos < formatted.length && unformattedPos < beforeCursorNoCommas.length) {
+            if (formatted[formattedPos] !== ",") unformattedPos++;
+            formattedPos++;
+          }
+          e.target.setSelectionRange(formattedPos, formattedPos);
+        }, 0);
+      }
     }
   };
 
-  const handleMintChange = (assetAddress: string, value: string) => {
-    // Mint amounts are USDST, which = $1, so no conversion needed
-    // Parse commas before storing
-    const cleanValue = parseCommaNumber(value);
-    setMintInputs(prev => ({ ...prev, [assetAddress]: cleanValue }));
+  const handleMintChange = (assetAddress: string, value: string, e?: React.ChangeEvent<HTMLInputElement>) => {
+    if (value === "") {
+      setMintInputs(prev => ({ ...prev, [assetAddress]: '' }));
+      if (!autoSupplyCollateral && onMintAmountChange) {
+        onMintAmountChange(assetAddress, '0');
+      }
+      return;
+    }
+
+    const cursorPosition = e?.target?.selectionStart || 0;
+    const beforeCursor = value.substring(0, cursorPosition);
+    const beforeCursorNoCommas = parseCommaNumber(beforeCursor);
+    const parsed = parseCommaNumber(value);
     
-    if (!autoSupplyCollateral && onMintAmountChange) {
-      onMintAmountChange(assetAddress, cleanValue);
+    // Only allow valid decimal number patterns
+    if (parsed === "" || parsed === "." || /^\d*\.?\d*$/.test(parsed)) {
+      const formatted = formatNumberWithCommas(parsed);
+      setMintInputs(prev => ({ ...prev, [assetAddress]: formatted }));
+      
+      if (!autoSupplyCollateral && onMintAmountChange) {
+        onMintAmountChange(assetAddress, parsed);
+      }
+      
+      // Restore cursor position after formatting
+      if (e?.target) {
+        setTimeout(() => {
+          let unformattedPos = 0;
+          let formattedPos = 0;
+          while (formattedPos < formatted.length && unformattedPos < beforeCursorNoCommas.length) {
+            if (formatted[formattedPos] !== ",") unformattedPos++;
+            formattedPos++;
+          }
+          e.target.setSelectionRange(formattedPos, formattedPos);
+        }, 0);
+      }
     }
   };
 
@@ -461,7 +572,7 @@ const Allocation: React.FC<AllocationProps> = ({
                       )}
                       <Input
                         value={depositDisplayInputs[candidate.assetAddress] || ''}
-                        onChange={(e) => handleDepositChange(candidate.assetAddress, e.target.value)}
+                        onChange={(e) => handleDepositChange(candidate.assetAddress, e.target.value, e)}
                         onFocus={() => { editingInputRef.current = `deposit-${candidate.assetAddress}`; }}
                         onBlur={() => { editingInputRef.current = null; }}
                         placeholder="0"
@@ -476,7 +587,7 @@ const Allocation: React.FC<AllocationProps> = ({
                         )}
                         <Input
                           value={mintInputs[candidate.assetAddress] || ''}
-                          onChange={(e) => handleMintChange(candidate.assetAddress, e.target.value)}
+                          onChange={(e) => handleMintChange(candidate.assetAddress, e.target.value, e)}
                           onFocus={() => { editingInputRef.current = `mint-${candidate.assetAddress}`; }}
                           onBlur={() => { editingInputRef.current = null; }}
                           placeholder="0"
