@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -30,7 +29,9 @@ import {
   calculateAvailableToMint,
   calculateWeightedAverageAPR,
   calculateSliderMinHFFromPercentages,
+  calculatePositionMetrics,
 } from '@/utils/loanUtils';
+import { formatWeiToDecimalHP } from '@/utils/numberUtils';
 
 interface MintProps {
   onSuccess?: () => void;
@@ -38,7 +39,7 @@ interface MintProps {
 }
 
 const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
-  const [mintAmountInput, setMintAmountInput] = useState('10');
+  const [mintAmountInput, setMintAmountInput] = useState('');
   const [riskBuffer, setRiskBuffer] = useState(2.1);
   const [isMaxMode, setIsMaxMode] = useState(false);
   const [vaultCandidates, setVaultCandidates] = useState<VaultCandidate[]>([]);
@@ -57,6 +58,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   }>>([]);
   const [progressError, setProgressError] = useState<string | undefined>();
   const [autoSupplyCollateral, setAutoSupplyCollateral] = useState(true);
+  const [currentPositionHF, setCurrentPositionHF] = useState<number | undefined>(undefined);
 
   const { fetchAllPrices } = useOracleContext();
   const { toast } = useToast();
@@ -72,12 +74,11 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
 
   // Calculate slider color based on health factor (riskBuffer)
   const sliderColor = useMemo(() => {
-    if (!autoSupplyCollateral) return 'hsl(var(--muted-foreground))';
     if (riskBuffer >= 2.5) return '#10b981'; // green
     if (riskBuffer >= 2.0) return '#3b82f6'; // blue
     if (riskBuffer >= 1.5) return '#eab308'; // yellow
     return '#ef4444'; // red
-  }, [riskBuffer, autoSupplyCollateral]);
+  }, [riskBuffer]);
 
   const fetchVaultCandidates = useCallback(async () => {
     try {
@@ -100,6 +101,29 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
       .finally(() => setLoading(false));
   }, [fetchAllPrices, refreshTrigger]);
 
+  // Fetch current position and calculate health factor (same as DebtPosition.tsx)
+  useEffect(() => {
+    const fetchCurrentPosition = async () => {
+      try {
+        const positions = await cdpService.getVaults();
+        const { overallHealthFactor } = calculatePositionMetrics(
+          positions.map(pos => ({
+            debtAmount: pos.debtAmount,
+            collateralValueUSD: pos.collateralValueUSD,
+            stabilityFeeRate: pos.stabilityFeeRate,
+            liquidationRatio: pos.liquidationRatio,
+            collateralizationRatio: pos.collateralizationRatio,
+          })),
+          formatWeiToDecimalHP
+        );
+        setCurrentPositionHF(overallHealthFactor === Infinity ? undefined : overallHealthFactor);
+      } catch {
+        setCurrentPositionHF(undefined);
+      }
+    };
+    fetchCurrentPosition();
+  }, [refreshTrigger]);
+
   const mintAmount = useMemo(() => {
     const parsed = parseFloat((mintAmountInput || '').replace(/,/g, ''));
     return isFinite(parsed) && parsed > 0 ? parsed : 0;
@@ -121,6 +145,8 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   const [customAllocations, setCustomAllocations] = useState<PlanItem[]>([]);
   const [debtFloorHit, setDebtFloorHit] = useState(false);
   const [debtCeilingHit, setDebtCeilingHit] = useState(false);
+  const [hasLowHF, setHasLowHF] = useState(false);
+  const [exceedsBalance, setExceedsBalance] = useState(false);
 
   // Compute fresh allocations when auto-supply is enabled
   useEffect(() => {
@@ -253,16 +279,24 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     
     try {
       // Use the exact displayed allocations - no recalculation to avoid precision drift
+      // Build transactions in execution order: all deposits first, then all mints
       const transactions: Array<{ type: 'deposit' | 'mint'; asset: string; amount: string; symbol: string }> = [];
+      
+      // First, add all deposits
       for (const allocation of optimalAllocations) {
-        // Check if amount strings are non-zero
-        // depositAmount and mintAmount are already formatted decimal strings from the plan
-        const hasDeposit = allocation.depositAmount && parseFloat(allocation.depositAmount) > 0;
-        const hasMint = allocation.mintAmount && parseFloat(allocation.mintAmount) > 0;
+        const depositNum = parseFloat(allocation.depositAmount || '0');
+        const hasDeposit = allocation.depositAmount && depositNum > 0;
         
         if (hasDeposit) {
           transactions.push({ type: 'deposit', asset: allocation.assetAddress, amount: allocation.depositAmount, symbol: allocation.symbol });
         }
+      }
+      
+      // Then, add all mints
+      for (const allocation of optimalAllocations) {
+        const mintNum = parseFloat(allocation.mintAmount || '0');
+        const hasMint = allocation.mintAmount && mintNum > 0;
+        
         if (hasMint) {
           transactions.push({ type: 'mint', asset: allocation.assetAddress, amount: allocation.mintAmount, symbol: allocation.symbol });
         }
@@ -271,7 +305,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
       setProgressTransactions(transactions.map(tx => ({
         symbol: tx.symbol,
         type: tx.type,
-        amount: tx.amount + (tx.type === 'mint' ? ' USDST' : ` ${tx.symbol}`),
+        amount: tx.amount,
         status: 'pending' as const,
       })));
 
@@ -295,6 +329,12 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
             setProgressTransactions(prev => {
               const updated = [...prev];
               updated[currentTxIndex] = { ...updated[currentTxIndex], status: 'error', error: `Deposit failed: ${result.status}` };
+              // Mark all remaining pending transactions as cancelled
+              for (let i = currentTxIndex + 1; i < updated.length; i++) {
+                if (updated[i].status === 'pending') {
+                  updated[i] = { ...updated[i], status: 'error' as const, error: 'Skipped due to prior failure' };
+                }
+              }
               return updated;
             });
             throw new Error(`Deposit failed for ${tx.symbol}: ${result.status}`);
@@ -306,6 +346,20 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
             return updated;
           });
         } catch (err) {
+          // If transaction was processing and failed, mark it as error and cancel remaining
+          setProgressTransactions(prev => {
+            const updated = [...prev];
+            if (updated[currentTxIndex]?.status === 'processing') {
+              updated[currentTxIndex] = { ...updated[currentTxIndex], status: 'error', error: err instanceof Error ? err.message : 'Deposit transaction failed' };
+            }
+            // Mark all remaining pending transactions as cancelled
+            for (let i = currentTxIndex + 1; i < updated.length; i++) {
+              if (updated[i].status === 'pending') {
+                updated[i] = { ...updated[i], status: 'error' as const, error: 'Skipped due to prior failure' };
+              }
+            }
+            return updated;
+          });
           setProgressError(err instanceof Error ? err.message : 'Deposit transaction failed');
           setCurrentProgressStep('error');
           throw err;
@@ -332,6 +386,12 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
             setProgressTransactions(prev => {
               const updated = [...prev];
               updated[currentTxIndex] = { ...updated[currentTxIndex], status: 'error', error: `Mint failed: ${result.status}` };
+              // Mark all remaining pending transactions as cancelled
+              for (let i = currentTxIndex + 1; i < updated.length; i++) {
+                if (updated[i].status === 'pending') {
+                  updated[i] = { ...updated[i], status: 'error' as const, error: 'Skipped due to prior failure' };
+                }
+              }
               return updated;
             });
             throw new Error(`Mint failed for ${tx.symbol}: ${result.status}`);
@@ -343,6 +403,20 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
             return updated;
           });
         } catch (err) {
+          // If transaction was processing and failed, mark it as error and cancel remaining
+          setProgressTransactions(prev => {
+            const updated = [...prev];
+            if (updated[currentTxIndex]?.status === 'processing') {
+              updated[currentTxIndex] = { ...updated[currentTxIndex], status: 'error', error: err instanceof Error ? err.message : 'Mint transaction failed' };
+            }
+            // Mark all remaining pending transactions as cancelled
+            for (let i = currentTxIndex + 1; i < updated.length; i++) {
+              if (updated[i].status === 'pending') {
+                updated[i] = { ...updated[i], status: 'error' as const, error: 'Skipped due to prior failure' };
+              }
+            }
+            return updated;
+          });
           setProgressError(err instanceof Error ? err.message : 'Mint transaction failed');
           setCurrentProgressStep('error');
           throw err;
@@ -352,7 +426,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
 
       if (allSuccessful) setCurrentProgressStep('complete');
       await Promise.all([fetchVaultCandidates(), fetchAllPrices()]);
-      setMintAmountInput('10');
+      setMintAmountInput('');
       setIsMaxMode(false);
       if (onSuccess) onSuccess();
     } catch {
@@ -441,6 +515,8 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     if (optimalAllocations.length === 0 && debtFloorHit) return 'Debt Floor: Increase Mint Amount';
     if (optimalAllocations.length === 0 && totalHeadroomWei <= 0n) return 'Vaults at Capacity: Move Risk Slider to the right';
     if (optimalAllocations.length === 0) return 'No vaults available';
+    if (exceedsBalance && !autoSupplyCollateral) return 'Deposit exceeds available balance';
+    if (hasLowHF && !autoSupplyCollateral) return `Health Factor below ${riskBuffer.toFixed(2)}: Adjust allocations or move Risk Slider`;
     return 'Confirm Mint';
   };
 
@@ -451,14 +527,6 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
           {/* Header */}
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold">Mint against collateral (CDP)</h2>
-            <Select defaultValue="quick-mint">
-              <SelectTrigger className="w-[140px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="quick-mint">Quick Mint</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
 
           {/* Loan Form */}
@@ -473,14 +541,14 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
             riskBuffer={riskBuffer}
             onRiskBufferChange={handleRiskBufferChange}
             minHF={sliderMinHF}
-            currentHF={undefined}
+            currentHF={currentPositionHF}
             sliderRangeColor={sliderColor}
-            disabled={!autoSupplyCollateral}
+            inputDisabled={!autoSupplyCollateral}
             showButton={autoSupplyCollateral}
             actionButtonLabel={getButtonText()}
             onConfirm={handleQuickMint}
             isProcessing={transactionLoading}
-            buttonDisabled={(mintAmount <= 0 && !isMaxMode) || optimalAllocations.length === 0 || exceedsMaxCollateral || shouldLockInput}
+            buttonDisabled={(mintAmount <= 0 && !isMaxMode) || optimalAllocations.length === 0 || exceedsMaxCollateral || shouldLockInput || hasLowHF || exceedsBalance}
           />
 
           {/* Auto Supply Collateral */}
@@ -505,7 +573,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
             </div>
           ) : mintAmount <= 0 && !isMaxMode ? (
             <div className="p-3 rounded-md bg-muted border border-border text-center">
-              <p className="text-sm text-muted-foreground">Enter a mint amount and select a risk value to see your optimal mint plan</p>
+              {/* <p className="text-sm text-muted-foreground">Enter a mint amount and select a risk value to see your optimal mint plan</p> */}
             </div>
           ) : exceedsMaxCollateral ? (
             <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
@@ -537,6 +605,9 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
                 autoSupplyCollateral={autoSupplyCollateral}
                 onDepositAmountChange={handleAllocationDepositChange}
                 onMintAmountChange={handleAllocationMintChange}
+                targetHF={riskBuffer}
+                onHFValidationChange={setHasLowHF}
+                onBalanceExceededChange={setExceedsBalance}
               />
               {/* Warning for partial allocation due to debt constraints */}
               {(debtFloorHit || debtCeilingHit) && (
@@ -546,13 +617,22 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
                   </p>
                 </div>
               )}
+              {/* Warning for deposit exceeding available balance */}
+              {exceedsBalance && !autoSupplyCollateral && (
+                <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                  <p className="text-sm font-semibold text-red-800 dark:text-red-200 mb-2">Deposit Exceeds Available Balance</p>
+                  <p className="text-xs text-red-700 dark:text-red-300">
+                    One or more vaults have a deposit amount that exceeds your available balance. Please reduce the deposit amounts.
+                  </p>
+                </div>
+              )}
             </>
           )}
 
           {/* Confirm Button - only shown when auto supply is unchecked */}
           {!autoSupplyCollateral && (
             <Button
-              disabled={(mintAmount <= 0 && !isMaxMode) || optimalAllocations.length === 0 || transactionLoading || exceedsMaxCollateral || shouldLockInput}
+              disabled={(mintAmount <= 0 && !isMaxMode) || optimalAllocations.length === 0 || transactionLoading || exceedsMaxCollateral || shouldLockInput || hasLowHF || exceedsBalance}
               onClick={handleQuickMint}
               className="w-full"
             >
@@ -562,7 +642,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
 
           {/* Transaction Fee */}
           <div className="text-sm text-muted-foreground">
-            Transaction Fee: {formatUSD(totalFees, 2)} USDST ({transactionCount} {transactionCount === 1 ? 'voucher' : 'vouchers'})
+            Transaction Fee: {formatUSD(totalFees, 2)} USDST ({Math.round(totalFees * 100)} vouchers)
           </div>
 
           {/* Rewards Display */}
