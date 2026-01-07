@@ -61,12 +61,12 @@ export const LendingProvider = ({
   children: React.ReactNode;
 }) => {
   const [loans, setLoans] = useState<NewLoanData>();
-  const [loadingLoans, setLoadingLoans] = useState(true);
+  const [loadingLoans, setLoadingLoans] = useState(false);
 
   const [liquidityInfo, setLiquidityInfo] = useState<LiquidityData>()
-  const [loadingLiquidity, setLoadingLiquidity] = useState(true);
+  const [loadingLiquidity, setLoadingLiquidity] = useState(false);
   const [collateralInfo, setCollateralInfo] = useState<CollateralData[]>()
-  const [loadingCollateral, setLoadingCollateral] = useState(true)
+  const [loadingCollateral, setLoadingCollateral] = useState(false)
   const [loading, setLoading] = useState(false);
 
   // Access authentication status
@@ -77,7 +77,10 @@ export const LendingProvider = ({
   const loansAbortControllerRef = useRef<AbortController | null>(null);
 
   const fetchLiquidityInfo = useCallback(async (signal?: AbortSignal) => {
-    if (!isLoggedIn) return;
+    if (!isLoggedIn) {
+      setLoadingLiquidity(false);
+      return;
+    }
     setLoadingLiquidity(true);
     try {
       const res = await api.get<LiquidityData>("/lending/liquidity", {
@@ -94,7 +97,10 @@ export const LendingProvider = ({
   }, [isLoggedIn]);
 
   const fetchCollateralInfo = useCallback(async (signal?: AbortSignal) => {
-    if (!isLoggedIn) return;
+    if (!isLoggedIn) {
+      setLoadingCollateral(false);
+      return;
+    }
     try {
       setLoadingCollateral(true);
       const res = await api.get<CollateralData[]>("/lending/collateral", {
@@ -111,6 +117,11 @@ export const LendingProvider = ({
   }, [isLoggedIn]); 
 
   const fetchLoans = useCallback(async (showLoading: boolean = false) => {
+    if (!isLoggedIn) {
+      setLoadingLoans(false);
+      return;
+    }
+    
     if (loansAbortControllerRef.current) {
       loansAbortControllerRef.current.abort();
     }

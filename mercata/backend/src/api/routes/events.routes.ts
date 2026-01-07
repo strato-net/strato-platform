@@ -75,4 +75,29 @@ router.get("/", authHandler.authorizeRequest(), EventsController.getEvents);
  */
 router.get("/contracts", authHandler.authorizeRequest(), EventsController.getContractInfo);
 
+/**
+ * @openapi
+ * /events/activities:
+ *   get:
+ *     summary: Get user activities (deposits, swaps, borrows, etc.)
+ *     tags: [Events]
+ *     parameters:
+ *       - name: userAddress
+ *         in: query
+ *         description: Filter by user address (for My Activity)
+ *       - name: type
+ *         in: query
+ *         description: Filter by activity type
+ *       - name: limit
+ *         in: query
+ *         description: Maximum results
+ *       - name: offset
+ *         in: query
+ *         description: Pagination offset
+ *     responses:
+ *       200:
+ *         description: Activity list
+ */
+router.get("/activities", authHandler.authorizeRequest(), EventsController.getActivities);
+
 export default router;

@@ -719,7 +719,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false }) => {
         disabled={isButtonDisabled}
         className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
         >
-        {isLoading ? "Processing..." : isSaving && autoDeposit ? "1. Bridge In" : "Deposit"}
+        {isLoading ? "Processing..." : "Deposit and Earn"}
         </Button>
 
       <AdvancedOptionsDropdown

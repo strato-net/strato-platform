@@ -45,10 +45,10 @@ interface VaultsListProps {
  */
 const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSuccess }) => {
   const [positions, setPositions] = useState<VaultData[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const { activeTokens, fetchTokens } = useUserTokens();
-  const { canPerformAction } = useAuthAction();
+  const { canPerformAction, isLoggedIn } = useAuthAction();
   const { fetchUsdstBalance } = useTokenContext();
   const { getPrice } = useOracleContext();
   
@@ -65,6 +65,11 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
   // Fetch positions from backend
   useEffect(() => {
     const fetchPositions = async () => {
+      if (!isLoggedIn) {
+        setPositions([]);
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       try {
         const fetchedPositions = await cdpService.getVaults();
@@ -121,7 +126,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
     };
 
     fetchPositions();
-  }, [toast, refreshTrigger]);
+  }, [toast, refreshTrigger, isLoggedIn]);
 
   // Handle dropdown action selection
   const handleActionSelect = (asset: string, action: 'deposit' | 'withdraw' | 'borrow' | 'repay') => {

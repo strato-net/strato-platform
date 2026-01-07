@@ -36,7 +36,7 @@ import { useUser } from "@/context/UserContext";
 
 const ActivityFeedList = () => {
   const [events, setEvents] = useState<Event[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [error, setError] = useState<string | null>(null);
@@ -97,6 +97,8 @@ const ActivityFeedList = () => {
   useEffect(() => {
     const fetchEvents = async () => {
       if (!isLoggedIn) {
+        setLoading(false);
+        setEvents([]);
         return;
       }
       
