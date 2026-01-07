@@ -281,9 +281,12 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
     // Build steps array
     const steps: BorrowStep[] = [];
     
+    // Filter to only collateral with non-zero amounts
+    const collateralToSupply = collateralTableData.filter(item => item.amount > 0n);
+    
     // Add collateral supply steps if we have collateral to supply
-    if (collateralTableData.length > 0) {
-      for (const item of collateralTableData) {
+    if (collateralToSupply.length > 0) {
+      for (const item of collateralToSupply) {
         const decimals = item.collateral.customDecimals ?? 18;
         const formattedAmount = formatUnits(item.amount, decimals);
         steps.push({
@@ -309,7 +312,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
     
     try {
       // Execute collateral supplies first
-      for (const item of collateralTableData) {
+      for (const item of collateralToSupply) {
         const stepId = `supply-${item.collateral.address}`;
         
         // Update step to processing
@@ -473,9 +476,9 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
             <span>Riskier</span>
           </div>
 
-          {/* Current Loans Health: Before => After */}
+          {/* Health Impact: Before => After */}
           <div className="flex justify-between items-center text-sm border-t pt-3">
-            <span className="text-muted-foreground">Current Loans Health</span>
+            <span className="text-muted-foreground">Health Impact</span>
             <span className="font-medium tabular-nums">
               {currentHF === null ? 'No Loan' : currentHF.toFixed(2)}
               {' → '}
@@ -552,7 +555,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
               htmlFor="auto-supply"
               className="text-sm text-muted-foreground cursor-pointer select-none"
             >
-              Automatically supply collateral (if needed)
+              Automatically supply collateral
             </label>
           </div>
 
