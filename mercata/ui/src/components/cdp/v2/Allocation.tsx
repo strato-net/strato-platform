@@ -390,6 +390,7 @@ const Allocation: React.FC<AllocationProps> = ({
   }, [mintInputs, vaultCandidates, autoSupplyCollateral, onTotalManualMintChange, toNumber]);
 
   // Calculate average HF across all vaults in the breakdown
+  // Excludes vaults with zero debt (currentDebt + mintAmt = 0)
   const averageVaultHealth = React.useMemo(() => {
     if (vaultCandidates.length === 0) return null;
 
@@ -400,6 +401,13 @@ const Allocation: React.FC<AllocationProps> = ({
       const depositAmt = toNumber(canonicalDeposit);
       const mintInput = mintInputs[candidate.assetAddress] || '';
       const mintAmt = toNumber(mintInput);
+      
+      // Calculate total debt for this vault (existing + new mint)
+      const mintWei = mintAmt > 0 ? parseUnits(String(mintAmt), 18) : 0n;
+      const totalDebt = candidate.currentDebt + mintWei;
+      
+      // Skip vaults with zero debt
+      if (totalDebt <= 0n) continue;
       
       const hfStr = calculateHF(candidate, depositAmt, mintAmt);
       
