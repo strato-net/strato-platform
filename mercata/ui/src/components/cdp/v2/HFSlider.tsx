@@ -136,10 +136,12 @@ const HFSlider: React.FC<HFSliderProps> = ({
           <span className="text-muted-foreground">Safer</span>
           <span className="text-muted-foreground">Riskier</span>
         </div>
+
+        <div className="h-1 bg-transparent" />
         
-        {/* Current Position Health */}
+        {/* Average Vault Health */}
         <div className="text-sm text-muted-foreground flex items-center justify-between">
-          <span>Current Position Health</span>
+          <span>Average Vault Health</span>
           <span className={`font-medium tabular-nums ${disabled ? 'text-muted-foreground' : 'text-blue-600'}`}>
             {currentHF === 0 || currentHF === undefined ? 'No Position' : currentHF >= 999999 ? '∞' : formatNumber(currentHF, 2)}
             {' → '}
