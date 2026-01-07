@@ -683,14 +683,6 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
           );
         }
 
-        if (isZeroAvailable) {
-          return (
-            <p className="text-muted-foreground text-sm mt-2">
-              You currently have no available borrowing power. Supply collateral to enable borrowing.
-            </p>
-          );
-        }
-
         return null;
       })()}
 
