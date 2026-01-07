@@ -266,7 +266,7 @@ postBlocTransactionUnsigned (PostBlocTransactionRequest mAddr txList txParams ms
                     "mercata"
                     (fromMaybe emptyTxParams params)
                     (Just $ Code "")
-            prepareUnsignedRawTx "" [] header
+            prepareUnsignedRawTx [] header
         )
         txsWithParams
     CONTRACT -> do
@@ -304,7 +304,7 @@ postBlocTransactionUnsigned (PostBlocTransactionRequest mAddr txList txParams ms
               xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) $ _constructor contract
           argsAsSource <- lift $ constructArgValuesAndSource (Just args) xabiArgs
 
-          lift . prepareUnsignedRawTx name argsAsSource $
+          lift . prepareUnsignedRawTx argsAsSource $
               TransactionHeader
                 Nothing
                 Nothing
@@ -335,7 +335,7 @@ postBlocTransactionUnsigned (PostBlocTransactionRequest mAddr txList txParams ms
           let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
               xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) . Map.lookup (Text.unpack methodcallMethodName) $ contract ^. functions
           argsAsSource <- lift $ constructArgValuesAndSource (Just methodcallArgs) xabiArgs
-          lift . prepareUnsignedRawTx methodcallMethodName argsAsSource $
+          lift . prepareUnsignedRawTx argsAsSource $
             TransactionHeader
               (Just methodcallContractAddress)
               (Just methodcallMethodName)
@@ -1010,10 +1010,10 @@ preparePostTx time _ tx =
 preparePostUnsignedRawTx ::
   UTCTime ->
   Transaction ->
-  Text ->
   [Text] ->
+  Maybe Code ->
   UnsignedRawTransaction'
-preparePostUnsignedRawTx time tx contractName' args =
+preparePostUnsignedRawTx time tx args mCode =
   UnsignedRawTransaction' $
     RawTransaction
       time
@@ -1021,11 +1021,11 @@ preparePostUnsignedRawTx time tx contractName' args =
       (fromIntegral nonce')
       (fromIntegral gasLimit)
       (Just toAddr)
-      (Just $ transactionFuncName tx)
-      (Just contractName')
+      (maybe (Just $ transactionFuncName tx) (const Nothing) mCode)
+      (transactionContractName tx <$ mCode)
       args
       network
-      (Just $ transactionCode tx)
+      mCode
       0
       0
       0
@@ -1050,16 +1050,18 @@ signAndPrepare from th = do
 
 prepareUnsignedRawTx ::
   (MonadIO m, HasBlocEnv m) =>
-  Text ->
   [Text] ->
   TransactionHeader ->
   m BlocTransactionUnsignedResult
-prepareUnsignedRawTx contractName' args th = do
+prepareUnsignedRawTx args th = do
   gasLimit <- fmap gasLimit getBlocEnv
   time <- liftIO getCurrentTime
   let unsigned = prepareUnsignedTx gasLimit th
       msgHash = unsafeCreateKeccak256FromByteString $ keccak256ToByteString $ partialTransactionHash unsigned
-      unsignedRawTx = preparePostUnsignedRawTx time unsigned contractName' args
+      mCode = case transactionheaderToAddr th of
+        Nothing -> Just $ transactionCode unsigned
+        Just _ -> Nothing
+      unsignedRawTx = preparePostUnsignedRawTx time unsigned args mCode
   pure $ BlocTransactionUnsignedResult msgHash (Just unsignedRawTx)
 
 constructArgValuesAndSource ::

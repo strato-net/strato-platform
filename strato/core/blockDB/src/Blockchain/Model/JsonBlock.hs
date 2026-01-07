@@ -150,8 +150,8 @@ instance ToJSON UnsignedRawTransaction' where
       [ "nonce" .= rawTransactionNonce,
         "gasLimit" .= rawTransactionGasLimit,
         "to" .= rawTransactionToAddress,
-        "contractName" .= rawTransactionContractName,
-        "functionName" .= rawTransactionFuncName,
+        "cName" .= rawTransactionContractName,
+        "funcName" .= rawTransactionFuncName,
         "args" .= rawTransactionArgs,
         "network" .= rawTransactionNetwork,
         "code" .= rawTransactionCode
@@ -164,7 +164,7 @@ instance FromJSON UnsignedRawTransaction' where
     gasLimit <- t .:? "gasLimit" .!= 0
     toAddr <- t .:? "to"
     funcName <- t .:? "funcName"
-    contractName <- t .:? "contractName"
+    contractName <- t .:? "cName"
     args <- t .: "args"
     network <- t .: "network"
     code <- t .:? "code"
