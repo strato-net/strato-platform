@@ -66,7 +66,8 @@ export const getPools = async (
     })
   ]);
 
-  const validatedPools = poolData as RawGetPool[];
+  // Filter out pools with null lpToken to prevent crashes
+  const validatedPools = (poolData as RawGetPool[]).filter(pool => pool.lpToken);
   const validatedFactory = factoryData[0] as RawPoolFactory;
   const tokenAddresses = extractTokenAddresses(validatedPools);
   const priceMap = await getOraclePrices(accessToken, {
@@ -91,6 +92,7 @@ export const getPools = async (
     stakedBalanceMap = new Map<string, string>();
     await Promise.all(
       validatedPools.map(async (pool) => {
+        if (!pool.lpToken) return; // Skip if lpToken is null
         const poolIdx = lpTokenToPoolIdx.get(pool.lpToken.address);
         if (poolIdx !== undefined) {
           const stakedBalance = await getStakedBalance(

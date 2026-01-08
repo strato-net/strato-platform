@@ -9,33 +9,6 @@ export interface EventsFilters {
   transaction_sender?: string;
 }
 
-export interface ActivityItem {
-  id: string;
-  type: string;
-  title: string;
-  description: string;
-  fromAddress: string;
-  amount: string;
-  token: string;
-  timestamp: string;
-  contractName: string;
-  eventName: string;
-}
-
-export interface ActivitiesResponse {
-  activities: ActivityItem[];
-  total: number;
-  limit: number;
-  offset: number;
-}
-
-export interface ActivitiesFilters {
-  userAddress?: string;
-  type?: string;
-  limit?: number;
-  offset?: number;
-}
-
 export const activityFeedApi = {
   /**
    * Fetch blockchain events with pagination and filters
@@ -74,21 +47,5 @@ export const activityFeedApi = {
     );
     
     return { contractNames, eventNames };
-  },
-
-  /**
-   * Fetch user activities (deposits, swaps, borrows, etc.)
-   */
-  getActivities: async (filters: ActivitiesFilters = {}): Promise<ActivitiesResponse> => {
-    const params = new URLSearchParams();
-    if (filters.userAddress) params.append('userAddress', filters.userAddress);
-    if (filters.type) params.append('type', filters.type);
-    if (filters.limit) params.append('limit', filters.limit.toString());
-    if (filters.offset) params.append('offset', filters.offset.toString());
-
-    const response = await api.get(`/events/activities?${params.toString()}`);
-    return response.data as ActivitiesResponse;
   }
 };
-
- 

@@ -26,11 +26,17 @@ const SwapPoolsSection = () => {
   const { fetchPools, getPoolByAddress } = useSwapContext();
   const { fetchUsdstBalance, usdstBalance, voucherBalance } = useTokenContext();
   const { userAddress } = useUser();
+  const isLoggedIn = !!userAddress;
   const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
   useEffect(() => {
+    if (!isLoggedIn) {
+      setPools([]);
+      setLoading(false);
+      return;
+    }
     fetchAndEnrichPools();
-  }, [fetchPools]);
+  }, [fetchPools, isLoggedIn]);
 
   useEffect(() => {
     fetchUsdstBalance();

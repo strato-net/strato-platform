@@ -941,7 +941,7 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
           <div className="flex justify-between">
             <span className="text-muted-foreground">Exchange Rate</span>
             {!exchangeRate ? (
-              <LoadingSpinner />
+              canPerformAction && poolLoading ? <LoadingSpinner /> : <span className="text-muted-foreground">—</span>
             ) : (
               <span className="font-medium text-foreground">
                 1 {fromAsset?._symbol || ""} ≈ {exchangeRate} ({oracleExchangeRate}*) {toAsset?._symbol || ""}

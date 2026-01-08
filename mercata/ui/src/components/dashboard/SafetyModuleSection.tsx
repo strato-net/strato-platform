@@ -19,6 +19,7 @@ import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 
 const SafetyModuleSection = () => {
   const { userAddress } = useUser();
+  const isLoggedIn = !!userAddress;
   const { canPerformAction } = useAuthAction();
   const { activeTokens: tokens, loading: tokensLoading, fetchTokens } = useUserTokens();
   const { fetchUsdstBalance, usdstBalance, approveToken } = useTokenContext();
@@ -48,12 +49,13 @@ const SafetyModuleSection = () => {
 
   // Fetch on mount, with abort controller
   useEffect(() => {
+    if (!isLoggedIn) return;
     const abortController = new AbortController();
     refreshData(abortController.signal);
     return () => {
       abortController.abort();
     };
-  }, []);
+  }, [isLoggedIn]);
 
   // usdstBalance is now coming directly from useUserTokens() context
 

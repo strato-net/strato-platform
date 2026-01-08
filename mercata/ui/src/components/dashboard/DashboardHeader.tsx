@@ -22,7 +22,7 @@ const GRADIENT_BUTTON_CLASS = "w-full bg-gradient-to-r from-[#1f1f5f] via-[#293b
 
 const DashboardHeader = ({ title }: DashboardHeaderProps) => {
   const { userAddress, userName, logout } = useUser();
-  const { canPerformAction, redirectToLogin, redirectToRegister } = useAuthAction();
+  const { canPerformAction, redirectToLogin } = useAuthAction();
   const { isTestnet } = useNetwork();
   const { resolvedTheme } = useTheme();
   const { address: walletAddress, isConnected } = useAccount();

@@ -47,6 +47,11 @@ export const LiquidationProvider = ({ children }: { children: ReactNode }) => {
   const { isLoggedIn } = useUser();
 
   const fetchLiquidatable = useCallback(async (signal?: AbortSignal) => {
+    if (!isLoggedIn) {
+      setLiquidatable([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -58,9 +63,14 @@ export const LiquidationProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isLoggedIn]);
 
   const fetchWatchlist = useCallback(async (signal?: AbortSignal) => {
+    if (!isLoggedIn) {
+      setWatchlist([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -72,7 +82,7 @@ export const LiquidationProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isLoggedIn]);
 
   const refreshData = useCallback(async () => {
     await Promise.all([

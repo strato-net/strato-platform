@@ -151,7 +151,7 @@ export const LendingProvider = ({
       setLoadingLoans(false);
       }
     }
-  }, []);
+  }, [isLoggedIn]);
 
   const setPrice = async (payload: { token: string; price: string }): Promise<void> => {
     const weiPrice = safeParseUnits(payload.price, 18).toString();

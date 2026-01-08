@@ -80,12 +80,13 @@ const addLPTokenPrices = async (
   });
 
   poolData.forEach((pool: any) => {
+    if (!pool.lpToken) return; // Skip if lpToken is null
     const lpTokenPrice = calculateLPTokenPrice(
       pool.tokenABalance || "0",
       pool.tokenBBalance || "0",
       priceMap.get(pool.tokenA) || "0",
       priceMap.get(pool.tokenB) || "0",
-      pool.lpToken._totalSupply
+      pool?.lpToken?.['_totalSupply'] || "0"
     );
     priceMap.set(pool.lpToken.address, lpTokenPrice);
   });

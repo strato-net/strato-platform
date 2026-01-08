@@ -5,14 +5,6 @@ import type {
   EventResponse,
   ContractInfoResponse,
 } from "@mercata/shared-types";
-import {
-  ACTIVITY_EVENTS,
-  EVENT_TYPE_MAP,
-  transformEvent,
-  extractTokenAddresses,
-  ActivityItem,
-} from "./activity.helpers";
-import { getTokenMetadata } from "../helpers/cirrusHelpers";
 
 export const getEvents = async (
   accessToken: string,
@@ -76,64 +68,4 @@ export const getContractInfo = async (
       .map(([name, events]) => ({ name, events: [...events].sort() }))
       .sort((a, b) => a.name.localeCompare(b.name)),
   };
-};
-
-// ─────────────── Activities API ───────────────
-
-interface ActivitiesResponse {
-  activities: ActivityItem[];
-  total: number;
-  limit: number;
-  offset: number;
-}
-
-export const getActivities = async (
-  accessToken: string,
-  filters: { userAddress?: string; type?: string; limit?: number; offset?: number } = {}
-): Promise<ActivitiesResponse> => {
-  const { userAddress, type, limit = 50, offset = 0 } = filters;
-
-  const params: Record<string, string> = {
-    select: `*,storage!inner(contract!inner(contract_name))`,
-    order: "block_timestamp.desc",
-    limit: String(limit),
-    offset: String(offset),
-    event_name: `in.(${ACTIVITY_EVENTS.join(",")})`,
-  };
-
-  // Filter by user address
-  if (userAddress) {
-    params.transaction_sender = `eq.${userAddress}`;
-  }
-
-  // Filter by activity type
-  if (type && type !== "all") {
-    const eventNames = Object.entries(EVENT_TYPE_MAP)
-      .filter(([_, t]) => t === type)
-      .map(([name]) => name);
-    if (eventNames.length > 0) {
-      params.event_name = `in.(${eventNames.join(",")})`;
-    }
-  }
-
-  // Get count and data in parallel
-  const { limit: _l, offset: _o, order: _ord, ...countBase } = params;
-  const countParams = { ...countBase, select: "count()" };
-
-  const [countRes, dataRes] = await Promise.all([
-    cirrus.get(accessToken, `/${constants.Event}`, { params: countParams }),
-    cirrus.get(accessToken, `/${constants.Event}`, { params }),
-  ]);
-
-  const total = countRes.data?.[0]?.count || 0;
-  const events = dataRes.data || [];
-
-  // Extract token addresses and fetch their symbols
-  const tokenAddresses = extractTokenAddresses(events);
-  const tokenMap = await getTokenMetadata(accessToken, tokenAddresses);
-
-  // Transform events with token symbol lookup
-  const activities = events.map((event: any) => transformEvent(event, tokenMap));
-
-  return { activities, total, limit, offset };
 };

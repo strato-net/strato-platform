@@ -9,15 +9,10 @@ export const useAuthAction = () => {
     window.location.href = `/login?theme=${resolvedTheme || 'light'}`;
   };
   
-  const redirectToRegister = () => {
-    window.location.href = `/login?theme=${resolvedTheme || 'light'}&register=true`;
-  };
-  
   return {
     isLoggedIn,
     canPerformAction: isLoggedIn,
     redirectToLogin,
-    redirectToRegister,
   };
 };
 

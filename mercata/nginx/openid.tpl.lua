@@ -12,13 +12,9 @@ local verify_opts = {
   accept_unsupported_alg = false
 }
 
--- Build authorization params for Keycloak (theme + registration)
-local theme, register = ngx.var.arg_theme, ngx.var.arg_register
-local auth_params = ((theme == "dark" or theme == "light") or register == "true") and {} or nil
-if auth_params then
-  if theme == "dark" or theme == "light" then auth_params.theme = theme end
-  if register == "true" then auth_params.prompt = "create" end
-end
+-- Capture theme param from URL to pass to Keycloak
+local theme = ngx.var.arg_theme
+local auth_params = (theme == "dark" or theme == "light") and { theme = theme } or nil
 
 local authenticate_opts = {
   redirect_uri = "/auth/openidc/return",
