@@ -86,14 +86,11 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
           }
         }
       } else {
-        // User session expired - if they were logged in, redirect to hero page
+        // User session expired - clean up state (redirect handled by axios interceptor)
         if (userAddress) {
           localStorage.removeItem("user");
           setUserAddress(null);
           setIsAdmin(false);
-          // Redirect to hero page when session expires for previously logged-in users
-          window.location.href = '/';
-          return;
         }
       }
     } catch (error) {

@@ -92,7 +92,25 @@ api.interceptors.response.use(
       });
     }
     
-    // 401 errors are expected for non-logged users browsing - no redirect
+    // Handle 401 errors - distinguish between logged-in user (session expired) vs non-logged user (browsing)
+    if (error.response?.status === 401) {
+      // Check if user WAS logged in by looking at localStorage
+      const storedUser = localStorage.getItem("user");
+      if (storedUser) {
+        // User was logged in but session expired - redirect to hero page
+        localStorage.removeItem("user");
+        toast({
+          title: "Session Expired",
+          description: "Your session has expired. Redirecting...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 1000);
+      }
+      // If no stored user, this is a non-logged user browsing - silently reject
+    }
+    
     return Promise.reject(error);
   }
 );

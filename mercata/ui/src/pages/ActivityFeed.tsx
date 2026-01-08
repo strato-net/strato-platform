@@ -10,7 +10,7 @@ import { Activity } from "lucide-react";
 type ActivityTab = "my-activity" | "all-activity" | "blockchain-events";
 
 const ActivityFeed = () => {
-  const [activeTab, setActiveTab] = useState<ActivityTab>("blockchain-events");
+  const [activeTab, setActiveTab] = useState<ActivityTab>("my-activity");
 
   useEffect(() => {
     document.title = "Activity | STRATO";
