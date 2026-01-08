@@ -8,13 +8,16 @@ Complete workflow examples for building on STRATO.
 
 Build an app that helps users earn yield through lending and liquidity provision.
 
-### User Flow
+!!! note "Prerequisites"
+    This example assumes the user already has ETHST (bridged from Ethereum) and a connected wallet with initialized provider.
 
-1. User connects wallet
-2. Supplies ETH as collateral
-3. Borrows USDST
-4. Provides USDST-USDC liquidity
-5. Earns trading fees + Reward Points
+### Integration Flow
+
+1. Supply ETHST as collateral to Lending Pool
+2. Borrow USDST against collateral
+3. Swap USDST → sUSDSST
+4. Provide sUSDSST-USDST liquidity
+5. Earn trading fees + Reward Points
 
 ### Implementation
 
@@ -32,39 +35,39 @@ class YieldFarmingApp {
     this.rewards = new ethers.Contract(REWARDS, REWARDS_ABI, wallet);
   }
   
-  async executeStrategy(ethAmount) {
+  async executeStrategy(ethstAmount) {
     console.log('Starting yield farming strategy...');
     
-    // 1. Supply collateral
-    await this.supplyCollateral(ethAmount);
+    // 1. Supply ETHST collateral
+    await this.supplyCollateral(ethstAmount);
     
     // 2. Borrow USDST (50% of collateral value)
-    const borrowAmount = ethAmount * 3000n * 50n / 100n; // Assume $3k ETH
+    const borrowAmount = ethstAmount * 3000n * 50n / 100n; // Assume $3k ETHST
     await this.borrowUSDST(borrowAmount);
     
-    // 3. Swap half to USDC
-    const swapAmount = borrowAmount / 2n;
-    await this.swapToUSDC(swapAmount);
+    // 3. Swap USDST → sUSDSST (Sky USD Savings)
+    await this.swapToSUSDSST(borrowAmount);
     
-    // 4. Provide liquidity
-    await this.provideLiquidity(swapAmount, swapAmount);
+    // 4. Provide sUSDSST-USDST liquidity
+    const halfAmount = borrowAmount / 2n;
+    await this.provideLiquidity(halfAmount, halfAmount);
     
     // 5. Track position
     return await this.getPositionSummary();
   }
   
   async supplyCollateral(amount) {
-    const ethToken = new ethers.Contract(ETH_TOKEN, ERC20_ABI, this.wallet);
+    const ethst = new ethers.Contract(ETHST_TOKEN, ERC20_ABI, this.wallet);
     
     // Approve
-    let tx = await ethToken.approve(LENDING_POOL, amount);
+    let tx = await ethst.approve(LENDING_POOL, amount);
     await tx.wait();
     
     // Supply
-    tx = await this.lendingPool.supplyCollateral(ETH_TOKEN, amount);
+    tx = await this.lendingPool.supplyCollateral(ETHST_TOKEN, amount);
     await tx.wait();
     
-    console.log('✅ Supplied', ethers.formatEther(amount), 'ETH');
+    console.log('✅ Supplied', ethers.formatEther(amount), 'ETHST');
   }
   
   async borrowUSDST(amount) {
@@ -74,15 +77,15 @@ class YieldFarmingApp {
     console.log('✅ Borrowed', ethers.formatEther(amount), 'USDST');
   }
   
-  async swapToUSDC(amount) {
+  async swapToSUSDSST(amount) {
     const usdst = new ethers.Contract(USDST_TOKEN, ERC20_ABI, this.wallet);
     
     // Approve
     let tx = await usdst.approve(ROUTER, amount);
     await tx.wait();
     
-    // Swap
-    const path = [USDST_TOKEN, USDC_TOKEN];
+    // Swap USDST → sUSDSST
+    const path = [USDST_TOKEN, SUSDST_TOKEN];
     const deadline = Math.floor(Date.now() / 1000) + 1200;
     
     tx = await this.router.swapExactTokensForTokens(
@@ -94,32 +97,32 @@ class YieldFarmingApp {
     );
     await tx.wait();
     
-    console.log('✅ Swapped', ethers.formatEther(amount), 'USDST → USDC');
+    console.log('✅ Swapped', ethers.formatEther(amount), 'USDST → sUSDSST');
   }
   
-  async provideLiquidity(usdstAmount, usdcAmount) {
+  async provideLiquidity(susdsstAmount, usdstAmount) {
+    const susdst = new ethers.Contract(SUSDST_TOKEN, ERC20_ABI, this.wallet);
     const usdst = new ethers.Contract(USDST_TOKEN, ERC20_ABI, this.wallet);
-    const usdc = new ethers.Contract(USDC_TOKEN, ERC20_ABI, this.wallet);
     
-    // Approve both
+    // Approve both tokens
+    await (await susdst.approve(ROUTER, susdsstAmount)).wait();
     await (await usdst.approve(ROUTER, usdstAmount)).wait();
-    await (await usdc.approve(ROUTER, usdcAmount)).wait();
     
-    // Add liquidity
+    // Add liquidity to sUSDSST-USDST pool
     const deadline = Math.floor(Date.now() / 1000) + 1200;
     const tx = await this.router.addLiquidity(
+      SUSDST_TOKEN,
       USDST_TOKEN,
-      USDC_TOKEN,
+      susdsstAmount,
       usdstAmount,
-      usdcAmount,
-      usdstAmount * 95n / 100n, // 5% slippage
-      usdcAmount * 95n / 100n,
+      susdsstAmount * 95n / 100n, // 5% slippage
+      usdstAmount * 95n / 100n,
       this.wallet.address,
       deadline
     );
     await tx.wait();
     
-    console.log('✅ Provided liquidity');
+    console.log('✅ Provided liquidity to sUSDSST-USDST pool');
   }
   
   async getPositionSummary() {
@@ -226,7 +229,7 @@ class PortfolioDashboard {
     const pending = await rewards.pendingRewards(this.userAddress);
     
     return {
-      cata: ethers.formatEther(pending)
+      rewardPoints: ethers.formatEther(pending)
     };
   }
   
