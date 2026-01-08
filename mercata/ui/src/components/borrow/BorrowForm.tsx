@@ -18,7 +18,8 @@ import {
   determineErrorMessage,
   calculateAdditionalCollateralAmountFromValue,
   sortCollateralAssets,
-  calculateMaxCollateralValueFromBalance
+  calculateMaxCollateralValueFromBalance,
+  centCeil
 } from "@/utils/lendingUtils";
 import { getRiskLabel } from "@/utils/loanUtils";
 import { useLendingContext } from "@/context/LendingContext";
@@ -207,6 +208,13 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
     const needed = calculateAdditionalValueNeeded(collateralInfo, parseFloat(borrowAmount || "0"), loans, targetHealthFactor);
     return Number(needed);
   }, [autoSupplyCollateral, totalCollateralValue, loans, collateralInfo, borrowAmount, targetHealthFactor]);
+
+  // Check if sufficient collateral is supplied in custom mode
+  const hasInsufficientCollateral = useMemo(() => {
+    if (autoSupplyCollateral) return false; // Only check in custom mode
+    if (!borrowAmount || parseFloat(borrowAmount) <= 0) return false; // No validation needed if no borrow amount
+    return totalCollateralValue < additionalCollateralNeededValue;
+  }, [autoSupplyCollateral, totalCollateralValue, additionalCollateralNeededValue, borrowAmount]);
 
   // Calculate transaction fee based on number of collateral assets being supplied
   const txFee = useMemo(() => {
@@ -565,7 +573,8 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
           borrowLoading ||
           progressModalOpen ||
           safeParseUnits(borrowAmount || "0") > BigInt(maxAmount) ||
-          hasExceededMaxCollateralValue
+          hasExceededMaxCollateralValue ||
+          hasInsufficientCollateral
         }
         className="w-full"
       >
@@ -602,7 +611,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
           <span>
             Additional Collateral Needed{' '}
             <span className="text-muted-foreground font-normal">
-              (Value: ${additionalCollateralNeededValue.toFixed(0)})
+              (Value: ${additionalCollateralNeededValue.toFixed(2)})
             </span>
           </span>
           {isCollateralExpanded ? (
@@ -625,7 +634,12 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
           `}</style>
           {/* Total Value Header */}
           <div className="text-sm font-medium mb-3 pt-2 border-t">
-            Total Value of Collateral: ${totalCollateralValue.toFixed(0)}
+            Total Value of Collateral: ${totalCollateralValue.toFixed(2)}
+            {hasInsufficientCollateral && (
+              <span className="text-yellow-600 dark:text-yellow-400 ml-2">
+                (${centCeil(additionalCollateralNeededValue - totalCollateralValue).toFixed(2)} more needed)
+              </span>
+            )}
           </div>
 
           {/* Collateral Table */}

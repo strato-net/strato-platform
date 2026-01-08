@@ -215,7 +215,7 @@ const centFloor = (value: Number): Number => {
   return Math.floor(+value * 100) / 100;
 };
 
-const centCeil = (value: Number): Number => {
+export const centCeil = (value: Number): Number => {
   return Math.ceil(+value * 100) / 100;
 };
 
