@@ -386,7 +386,7 @@ export const recommendCollateralToSupply = (
   return result;
 };
 
-const sortCollateralAssets = (
+export const sortCollateralAssets = (
   collaterals: CollateralData[],
   DO_IGNORE_ONE_WEI: boolean = true,
 ) : void => {
