@@ -16,7 +16,8 @@ import {
   calculateAdditionalValueNeeded,
   calculateBorrowTxFee,
   determineErrorMessage,
-  calculateAdditionalCollateralAmountFromValue
+  calculateAdditionalCollateralAmountFromValue,
+  sortCollateralAssets
 } from "@/utils/lendingUtils";
 import { getRiskLabel } from "@/utils/loanUtils";
 import { useLendingContext } from "@/context/LendingContext";
@@ -125,7 +126,11 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
       }
     } else {
       // In custom mode, show ALL collateral assets the user possesses
-      for (const [collateral] of potentialCollateral.entries()) {
+      // Extract collaterals into array, sort them, then build data array in sorted order
+      const collateralsArray = Array.from(potentialCollateral.keys());
+      sortCollateralAssets(collateralsArray);
+      
+      for (const collateral of collateralsArray) {
         const price = BigInt(collateral.assetPrice ?? "0");
         const decimals = BigInt(10) ** BigInt(collateral.customDecimals ?? 18);
         
