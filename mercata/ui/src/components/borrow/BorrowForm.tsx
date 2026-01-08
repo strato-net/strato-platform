@@ -17,7 +17,8 @@ import {
   calculateBorrowTxFee,
   determineErrorMessage,
   calculateAdditionalCollateralAmountFromValue,
-  sortCollateralAssets
+  sortCollateralAssets,
+  calculateMaxCollateralValueFromBalance
 } from "@/utils/lendingUtils";
 import { getRiskLabel } from "@/utils/loanUtils";
 import { useLendingContext } from "@/context/LendingContext";
@@ -156,6 +157,32 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
   const totalCollateralValue = useMemo(() => {
     return collateralTableData.reduce((sum, item) => sum + item.valueUSD, 0);
   }, [collateralTableData]);
+
+  // Map of collateral addresses to whether their value exceeds maximum
+  const collateralExceedsMaxMap = useMemo(() => {
+    const map = new Map<string, boolean>();
+    if (autoSupplyCollateral) return map; // Only check in custom mode
+    
+    for (const item of collateralTableData) {
+      const balance = BigInt(item.collateral.userBalance ?? "0");
+      const price = BigInt(item.collateral.assetPrice ?? "0");
+      const decimals = BigInt(10) ** BigInt(item.collateral.customDecimals ?? 18);
+      const maxValueWei = calculateMaxCollateralValueFromBalance(balance, price, decimals);
+      const maxValueUSD = Number(maxValueWei) / 1e18;
+      
+      map.set(item.collateral.address, item.valueUSD > maxValueUSD);
+    }
+    
+    return map;
+  }, [autoSupplyCollateral, collateralTableData]);
+
+  // Check if any custom collateral values exceed their maximum
+  const hasExceededMaxCollateralValue = useMemo(() => {
+    for (const exceedsMax of collateralExceedsMaxMap.values()) {
+      if (exceedsMax) return true;
+    }
+    return false;
+  }, [collateralExceedsMaxMap]);
 
   // Calculate after-borrow health factor (includes new collateral being supplied)
   const afterBorrowHF = useMemo(() => {
@@ -537,7 +564,8 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
           safeParseUnits(borrowAmount || "0") <= 0n ||
           borrowLoading ||
           progressModalOpen ||
-          safeParseUnits(borrowAmount || "0") > BigInt(maxAmount)
+          safeParseUnits(borrowAmount || "0") > BigInt(maxAmount) ||
+          hasExceededMaxCollateralValue
         }
         className="w-full"
       >
@@ -663,7 +691,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
                             type="number"
                             value={customCollateralValues.get(item.collateral.address) || item.valueUSD.toFixed(2)}
                             onChange={(e) => handleCustomValueChange(item.collateral.address, e.target.value)}
-                            className="collateral-value-input w-20 h-7 text-right text-sm px-2"
+                            className={`collateral-value-input w-20 h-7 text-right text-sm px-2 ${collateralExceedsMaxMap.get(item.collateral.address) ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                           />
                         </div>
                       )}
