@@ -12,12 +12,14 @@ interface LoanFormProps {
   // Data
   availableAmount: string; // Formatted available amount
   averageStabilityFee: number;
+  averageVaultHealth?: string | null; // Average health factor across all vaults
   
   // Mint amount state
   mintAmountInput: string;
   onMintAmountChange: (value: string) => void;
   onMaxClick: () => void;
   isMaxMode: boolean;
+  exceedsMaxMint?: boolean; // Whether input exceeds max available to mint
   
   // Health factor state
   riskBuffer: number;
@@ -42,10 +44,12 @@ const LoanForm: React.FC<LoanFormProps> = ({
   availableLabel = 'Available to Mint',
   availableAmount,
   averageStabilityFee,
+  averageVaultHealth,
   mintAmountInput,
   onMintAmountChange,
   onMaxClick,
   isMaxMode,
+  exceedsMaxMint = false,
   riskBuffer,
   onRiskBufferChange,
   minHF,
@@ -82,6 +86,7 @@ const LoanForm: React.FC<LoanFormProps> = ({
             onChange={onMintAmountChange}
             onMaxClick={onMaxClick}
             isMaxMode={isMaxMode}
+            exceedsMax={exceedsMaxMint}
             label="Mint Amount"
             placeholder="0"
             unit="USDST"
@@ -95,6 +100,7 @@ const LoanForm: React.FC<LoanFormProps> = ({
             onChange={onRiskBufferChange}
             minHF={minHF}
             currentHF={currentHF}
+            averageVaultHealth={averageVaultHealth}
             disabled={sliderDisabled ?? disabled}
             rangeColor={sliderRangeColor}
           />

@@ -148,6 +148,8 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   const [hasLowHF, setHasLowHF] = useState(false);
   const [exceedsBalance, setExceedsBalance] = useState(false);
   const [totalManualMint, setTotalManualMint] = useState('0');
+  const [averageVaultHealth, setAverageVaultHealth] = useState<string | null>(null);
+  const [exceedsMaxMint, setExceedsMaxMint] = useState(false);
 
   // Compute fresh allocations when auto-supply is enabled
   useEffect(() => {
@@ -221,47 +223,6 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   const totalFees = useMemo(() => 
     calculateTotalFees(optimalAllocations),
   [optimalAllocations]);
-
-  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const rawValue = e.target.value;
-    const cursorPosition = e.target.selectionStart || 0;
-    
-    if (rawValue === '') {
-      setMintAmountInput('');
-      setIsMaxMode(false);
-      return;
-    }
-    
-    const beforeCursor = rawValue.substring(0, cursorPosition);
-    const beforeCursorNoCommas = parseCommaNumber(beforeCursor);
-    const parsed = parseCommaNumber(rawValue);
-    
-    if (parsed === '' || parsed === '.' || /^\d*\.?\d*$/.test(parsed)) {
-      const formatted = formatNumberWithCommas(parsed);
-      setMintAmountInput(formatted);
-      
-      if (totalMaxMintWei > 0n) {
-        const maxMint = formatUnits(totalMaxMintWei, 18).replace(/\.?0+$/, '');
-        const normalizedInput = parsed.replace(/\.?0+$/, '');
-        setIsMaxMode(normalizedInput === maxMint.replace(/\.?0+$/, ''));
-      } else {
-        setIsMaxMode(false);
-      }
-      
-      setTimeout(() => {
-        const input = e.target;
-        if (input) {
-          let unformattedPos = 0;
-          let formattedPos = 0;
-          while (formattedPos < formatted.length && unformattedPos < beforeCursorNoCommas.length) {
-            if (formatted[formattedPos] !== ',') unformattedPos++;
-            formattedPos++;
-          }
-          input.setSelectionRange(formattedPos, formattedPos);
-        }
-      }, 0);
-    }
-  }, [totalMaxMintWei]);
 
   const handleMaxClick = useCallback(() => {
     if (isMaxMode) {
@@ -449,9 +410,38 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     });
   }, [userRewards]);
 
-  const handleMintAmountChange = useCallback((value: string) => {
-    setMintAmountInput(value);
-  }, []);
+  const handleMintAmountChange = useCallback((formattedValue: string) => {
+    if (formattedValue === '') {
+      setMintAmountInput('');
+      setIsMaxMode(false);
+      setExceedsMaxMint(false);
+      return;
+    }
+    
+    // Store the formatted value (with commas)
+    setMintAmountInput(formattedValue);
+    
+    // Parse to get raw value for comparison
+    const parsed = parseCommaNumber(formattedValue);
+    const inputAmount = parseFloat(parsed);
+    
+    // Check if input matches or exceeds max available to mint
+    if (totalMaxMintWei > 0n) {
+      const maxMint = formatUnits(totalMaxMintWei, 18);
+      const maxMintNum = parseFloat(maxMint);
+      const normalizedInput = parsed.replace(/\.?0+$/, '');
+      const normalizedMax = maxMint.replace(/\.?0+$/, '');
+      
+      // Set MAX mode if values match
+      setIsMaxMode(normalizedInput === normalizedMax);
+      
+      // Check if input exceeds max
+      setExceedsMaxMint(!isNaN(inputAmount) && inputAmount > maxMintNum);
+    } else {
+      setIsMaxMode(false);
+      setExceedsMaxMint(false);
+    }
+  }, [totalMaxMintWei]);
 
   const handleRiskBufferChange = useCallback((value: number) => {
     setRiskBuffer(value);
@@ -544,6 +534,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
             onMintAmountChange={handleMintAmountChange}
             onMaxClick={handleMaxClick}
             isMaxMode={isMaxMode}
+            exceedsMaxMint={exceedsMaxMint}
             riskBuffer={riskBuffer}
             onRiskBufferChange={handleRiskBufferChange}
             minHF={sliderMinHF}
@@ -551,6 +542,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
             sliderRangeColor={sliderColor}
             inputDisabled={!autoSupplyCollateral}
             sliderDisabled={!autoSupplyCollateral}
+            averageVaultHealth={averageVaultHealth}
             showButton={autoSupplyCollateral}
             actionButtonLabel={getButtonText()}
             onConfirm={handleQuickMint}
@@ -617,6 +609,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
                 onHFValidationChange={setHasLowHF}
                 onBalanceExceededChange={setExceedsBalance}
                 onTotalManualMintChange={setTotalManualMint}
+                onAverageVaultHealthChange={setAverageVaultHealth}
               />
               {/* Warning for partial allocation due to debt constraints */}
               {(debtFloorHit || debtCeilingHit) && (
