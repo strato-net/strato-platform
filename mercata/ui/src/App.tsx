@@ -23,7 +23,7 @@ import AssetDetail from "./pages/AssetDetail";
 import Advanced from "./pages/Advanced";
 import ActivityFeed from "./pages/ActivityFeed";
 import NotFound from "./pages/NotFound";
-import MercataStats from "./pages/MercataStats";
+import StratoStats from "./pages/StratoStats";
 import Rewards from "./pages/Rewards";
 
 // Import dashboard components
@@ -223,7 +223,7 @@ const App = () => {
                                   path="/dashboard/stats"
                                   element={
                                     <ProtectedRoute>
-                                        <MercataStats />
+                                        <StratoStats />
                                         </ProtectedRoute>
                                       }
                                     />
