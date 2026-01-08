@@ -1,6 +1,6 @@
-# Platform Overview
+# Building Apps on STRATO
 
-Welcome! This guide helps you understand STRATO and how to integrate your application with it.
+Welcome! This guide helps you build external applications that integrate with your STRATO deployment.
 
 ## What is STRATO?
 
@@ -12,154 +12,296 @@ Welcome! This guide helps you understand STRATO and how to integrate your applic
 - **Rich API layer** (REST + JSON-RPC)
 - **Indexed data** (Cirrus for fast queries)
 
-**Why build on STRATO:**
+**Why build apps on STRATO:**
 
 - **Lower costs** - Cheaper than Ethereum mainnet
 - **Faster UX** - ~1-2 second finality
 - **Full-stack APIs** - No need for own indexer
 - **Active DeFi** - Lending, swaps, CDP ecosystem
 
-## Integration Overview
+## Important: STRATO is NOT a Public Blockchain
 
-### Architecture Layers
+Unlike Ethereum or other public blockchains, **STRATO is infrastructure you deploy and run yourself**.
 
-```mermaid
-graph TD
-    A[Your Application] --> B[App API REST]
-    A --> C[Core Platform API]
-    A --> D[Cirrus PostgreSQL]
+To build applications on STRATO, you must:
+
+1. ✅ **Deploy STRATO** - Install and run on your infrastructure
+2. ✅ **Connect to your deployment** - Your own STRATO instance URL
+3. ✅ **Examples use localhost** - For local development
+
+**Your STRATO deployment can be:**
+
+- **Local development** - `http://localhost:8080` (for testing)
+- **Cloud deployment** - `https://your-strato.example.com`
+- **Private network** - `http://10.0.0.5:8080` (internal)
+
+!!! warning "No Public RPC Endpoints"
+    STRATO does not provide public RPC endpoints like `https://mainnet.infura.io`. You must deploy your own STRATO instance. The examples use `localhost` for development, but replace with your actual deployment URL.
+
+---
+
+## How to Build Apps on STRATO
+
+!!! danger "Important: ethers.js Does NOT Work"
+    Unlike Ethereum, you CANNOT use ethers.js or web3.js directly with STRATO.
     
-    B --> E[High-level DeFi ops<br/>Lending, CDP, Swaps, etc.]
-    C --> F[Direct blockchain access<br/>Transactions, Contracts]
-    D --> G[Indexed blockchain data<br/>Fast queries, Analytics]
-    
-    style A fill:#e3f2fd
-    style B fill:#c8e6c9
-    style C fill:#fff9c4
-    style D fill:#ffccbc
-```
+    **You must use STRATO's REST APIs.**
 
-### When to Use What
+### The STRATO Stack
 
-| Layer | Use Cases | Best For |
-|-------|-----------|----------|
-| **App API** | User operations, wallets, DeFi actions | Easy integration, business logic |
-| **Core Platform API** | Custom contracts, raw transactions | Full control, advanced use cases |
-| **Cirrus** | Analytics, reporting, historical queries | Fast queries, SQL-like access |
+**STRATO provides multiple APIs:**
+
+| API | Endpoint | Purpose |
+|-----|----------|---------|
+| **STRATO API** | `/strato/v2.3` | Transaction submission, account management |
+| **Cirrus** | `/cirrus/search` | Indexed blockchain data (PostgreSQL) |
+| **BLOC** | `/bloc/v2.2` | Block and transaction queries |
+| **ETH JSON-RPC** | `/strato-api/eth/v1.2` | Limited Ethereum compatibility |
+
+!!! tip "Reference Implementation"
+    The **mercata** app (in `mercata/` folder) is the complete reference implementation showing how to build apps on STRATO.
+
+---
 
 ## Prerequisites
 
-### Technical Requirements
+### 1. STRATO Deployment (Required)
+
+!!! danger "Critical Prerequisite"
+    **You MUST have a STRATO deployment before building apps.**
+    
+    STRATO is not a public blockchain. You need your own instance (local, cloud, or private network).
+
+**Deployment Options:**
+
+- **Local Development** - Install on your machine → [Setup Guide](../contribute/setup.md)
+- **Cloud Deployment** - Deploy to AWS, GCP, Azure, etc.
+- **Managed Instance** - Contact STRATO team for hosted options
+
+**For local development:**
+
+```bash
+cd strato-platform
+./start my_node_name
+```
+
+**Your STRATO instance will be available at:**
+
+- **Local**: `http://localhost:8080` (development)
+- **Remote**: `https://your-strato.example.com` (production)
+- **Private**: `http://10.0.0.5:8080` (internal network)
+
+**Example URLs in this guide use `localhost` - replace with your actual deployment URL.**
+
+!!! tip "Examples Use Localhost"
+    All code examples use `http://localhost:8080` for local development. Replace with your actual STRATO deployment URL (e.g., `https://your-strato.example.com`).
+
+### 2. Technical Requirements (for Your App)
 
 **You should have:**
 
-- **JavaScript/TypeScript** - For API integration
-- **Web3 fundamentals** - Transactions, gas, signing
-- **Node.js 18+** - Or Python 3.9+, Go 1.19+, etc.
-- **REST APIs** - Basic understanding
+- **Node.js 18+** - For backend development
+- **TypeScript** - Recommended for type safety
+- **HTTP client** - axios, fetch, or similar
+- **OAuth 2.0** - For authentication
 
-**Optional but helpful:**
+**Not needed:**
 
-- **Solidity** - For smart contract development
-- **Docker** - For local testing
-- **ethers.js or web3.js** - Prior experience
+- ~~ethers.js~~ - Does not work with STRATO
+- ~~web3.js~~ - Does not work with STRATO
 
-### STRATO Account
-
-**Testnet** (recommended for development):
-
-- Contact STRATO team for testnet credentials
-- Or use testnet faucet for free tokens
-- Test safely without risk
-
-**Mainnet** (for production):
-
-- Create account via STRATO UI
-- Fund with bridged assets
-- Request API key for higher rate limits
-
-### API Access
-
-**Base URLs:**
-
-- **Production API** - `https://app.strato.nexus/api`
-- **Production Node** - `https://app.strato.nexus/strato-api`
-- **Testnet API** - `https://buildtest.mercata-testnet.blockapps.net/api`
-- **Testnet Node** - `https://buildtest.mercata-testnet.blockapps.net/strato-api`
-
-**Authentication:**
-
-- **OAuth 2.0** - For user operations
-- **API keys** - For admin/service operations
-- **Public** - No auth for read-only endpoints
-
-**Rate Limits:**
-
-- **Authenticated** - 1,000 requests/minute
-- **Public** - 100 requests/minute
-- **WebSocket** - 50 subscriptions per connection
+---
 
 ## Quick Start
 
-### 1. Set Up Environment
+!!! warning "Prerequisites"
+    Before following this guide, make sure:
+    
+    1. ✅ STRATO is deployed (see [Setup Guide](../contribute/setup.md))
+    2. ✅ Your STRATO node is running
+    3. ✅ You can access your STRATO instance
+
+### 1. Set Up Your App Environment
 
 ```bash
-# Create project
-mkdir strato-integration && cd strato-integration
+# Create your app project (separate from STRATO)
+mkdir my-strato-app
+cd my-strato-app
 npm init -y
 
 # Install dependencies
-npm install axios ethers
-
-# Create config
-cat > config.js << EOF
-export const CONFIG = {
-  // Production
-  API_BASE_URL: 'https://app.strato.nexus/api',
-  
-  // Or use Testnet for development
-  // API_BASE_URL: 'https://buildtest.mercata-testnet.blockapps.net/api'
-};
-EOF
+npm install axios dotenv
 ```
 
-### 2. Test Authentication
+Create `.env`:
 
-```javascript
-const axios = require('axios');
+```bash
+# Your STRATO deployment
+NODE_URL=http://localhost:8080
 
-// Get OAuth token from Keycloak (for service accounts)
-async function getAccessToken() {
+# OAuth credentials (get from your STRATO deployment)
+OAUTH_CLIENT_ID=your_client_id
+OAUTH_CLIENT_SECRET=your_client_secret
+OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata
+```
+
+### 2. Create API Client
+
+```typescript
+// src/config.ts
+import axios, { AxiosInstance } from 'axios';
+
+const NODE_URL = process.env.NODE_URL || 'http://localhost:8080';
+
+const createApiClient = (baseURL: string): AxiosInstance => {
+  return axios.create({
+    baseURL,
+    headers: { 'Content-Type': 'application/json' },
+    timeout: 60_000,
+  });
+};
+
+// STRATO API clients
+export const strato = createApiClient(`${NODE_URL}/strato/v2.3`);
+export const cirrus = createApiClient(`${NODE_URL}/cirrus/search`);
+export const bloc = createApiClient(`${NODE_URL}/bloc/v2.2`);
+```
+
+### 3. Get OAuth Token
+
+```typescript
+// src/auth.ts
+import axios from 'axios';
+
+const OAUTH_DISCOVERY_URL = process.env.OAUTH_DISCOVERY_URL!;
+const CLIENT_ID = process.env.OAUTH_CLIENT_ID!;
+const CLIENT_SECRET = process.env.OAUTH_CLIENT_SECRET!;
+
+let tokenEndpoint: string;
+
+// Initialize: fetch OAuth configuration
+export async function initAuth() {
+  const { data } = await axios.get(`${OAUTH_DISCOVERY_URL}/.well-known/openid-configuration`);
+  tokenEndpoint = data.token_endpoint;
+}
+
+// Get service token (for backend apps)
+export async function getAccessToken(): Promise<string> {
   const response = await axios.post(
-    'https://keycloak.blockapps.net/auth/realms/mercata/protocol/openid-connect/token',
+    tokenEndpoint,
     new URLSearchParams({
       grant_type: 'client_credentials',
-      client_id: process.env.OAUTH_CLIENT_ID,
-      client_secret: process.env.OAUTH_CLIENT_SECRET
+      client_id: CLIENT_ID,
+      client_secret: CLIENT_SECRET,
     }),
     {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
     }
   );
+  
   return response.data.access_token;
 }
-
-// Test
-const token = await login('testuser', 'testpass');
-console.log('Logged in:', token);
 ```
 
-### 3. Make Your First API Call
+### 4. Build Your First Transaction
 
-```javascript
-// Get user's tokens
-const tokens = await axios.get(`${BASE_URL}/tokens/v2`, {
-  headers: { 'Authorization': `Bearer ${token}` },
-  params: { status: 'neq.2', limit: 10 }
-});
+```typescript
+// src/transactions.ts
+import { strato, cirrus, bloc } from './config';
 
-console.log('User tokens:', tokens.data);
+interface FunctionInput {
+  contractName: string;
+  contractAddress: string;
+  method: string;
+  args: Record<string, any>;
+}
+
+// Build transaction
+export async function buildFunctionTx(inputs: FunctionInput | FunctionInput[]) {
+  const inputArray = Array.isArray(inputs) ? inputs : [inputs];
+  
+  const txs = inputArray.map(input => ({
+    type: 'FUNCTION',
+    payload: {
+      contractName: input.contractName,
+      contractAddress: input.contractAddress,
+      method: input.method,
+      args: input.args,
+    },
+  }));
+  
+  return {
+    txs,
+    txParams: {
+      gasLimit: 32_100_000_000,
+      gasPrice: 1,
+    },
+  };
+}
+
+// Submit transaction
+export async function submitTransaction(accessToken: string, tx: any) {
+  const response = await strato.post(
+    '/transaction/parallel?resolve=true',
+    tx,
+    {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    }
+  );
+  
+  return response.data;
+}
+
+// Query data from Cirrus
+export async function queryTokens(accessToken: string) {
+  const response = await cirrus.get('/Token', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    params: {
+      select: 'address,_name,_symbol,_totalSupply::text',
+      limit: 10
+    }
+  });
+  
+  return response.data;
+}
 ```
+
+### 5. Complete Example: Transfer Tokens
+
+```typescript
+// src/example.ts
+import { initAuth, getAccessToken } from './auth';
+import { buildFunctionTx, submitTransaction, queryTokens } from './transactions';
+
+async function transferTokens() {
+  // 1. Initialize auth
+  await initAuth();
+  const accessToken = await getAccessToken();
+  
+  // 2. Query available tokens
+  const tokens = await queryTokens(accessToken);
+  console.log('Available tokens:', tokens);
+  
+  // 3. Build transfer transaction
+  const tx = await buildFunctionTx({
+    contractName: 'Token',
+    contractAddress: '0x1234...', // Your token address
+    method: 'transfer',
+    args: {
+      to: '0x5678...',
+      value: '1000000000000000000' // 1 token (18 decimals)
+    }
+  });
+  
+  // 4. Submit transaction
+  const result = await submitTransaction(accessToken, tx);
+  console.log('Transaction result:', result);
+}
+
+transferTokens().catch(console.error);
+```
+
+---
 
 ## Core Integration Guide
 
@@ -167,7 +309,7 @@ console.log('User tokens:', tokens.data);
 
 For a comprehensive walkthrough with code examples for all operations:
 
-→ **[API Integration Guide](e2e.md)**
+→ **[API Integration Guide](integration.md)**
 
 **Covers:**
 
@@ -179,136 +321,103 @@ For a comprehensive walkthrough with code examples for all operations:
 - CDP vault management
 - Rewards tracking
 
+---
+
 ## Key Concepts
 
-### Authentication Flow
-
-OAuth 2.0 with access/refresh tokens:
-
-```javascript
-// 1. Login → get access token + refresh token
-// 2. Use access token for API calls
-// 3. Refresh when expired (auto-retry on 401)
-```
-
-### Transaction Lifecycle
+### Transaction Flow
 
 ```
-1. Prepare transaction
-2. Approve token spending (if ERC20)
-3. Submit main transaction
-4. Wait for confirmation (~5-10 sec)
+1. Get OAuth token
+2. Build transaction using buildFunctionTx()
+3. Submit to /strato/v2.3/transaction/parallel
+4. Wait for confirmation
 5. Verify success
 ```
 
-### Big Number Handling
+### Querying Data
 
-```javascript
-// ❌ WRONG
-const amount = 1.5 * 1e18;  // Precision loss!
+**Use Cirrus (indexed PostgreSQL) for fast queries:**
 
-// ✅ CORRECT
-const amount = BigInt(15) * BigInt(10 ** 17);
+```typescript
+// Get all tokens
+const tokens = await cirrus.get('/Token', {
+  headers: { Authorization: `Bearer ${token}` }
+});
+
+// Get user balance
+const balance = await cirrus.get('/Token-_balances', {
+  headers: { Authorization: `Bearer ${token}` },
+  params: {
+    address: 'eq.0x...', // Token address
+    key: 'eq.0x...',     // User address
+    select: 'value::text'
+  }
+});
 ```
 
 ### Error Handling
 
-```javascript
-// Handle 401 (auth expired) → refresh token → retry
-// Handle 429 (rate limit) → backoff → retry
-// Handle 500 (server error) → exponential backoff
+```typescript
+try {
+  const result = await submitTransaction(token, tx);
+} catch (error) {
+  if (error.response?.status === 401) {
+    // Token expired - refresh
+  } else if (error.response?.status === 400) {
+    // Transaction failed - check error message
+    console.error('Transaction error:', error.response.data);
+  }
+}
 ```
 
-## Development Workflow
-
-### 1. Test on Testnet
-
-- Use free test tokens
-- No real value at risk
-- Same API as production
-- Iterate quickly
-
-### 2. Write Tests
-
-```javascript
-// Unit tests for calculations
-// Integration tests for API flows
-// End-to-end tests for complete workflows
-```
-
-### 3. Monitor and Debug
-
-```javascript
-// Log API responses
-// Track rate limit headers
-// Monitor transaction status
-// Set up error alerts
-```
-
-### 4. Deploy to Production
-
-```javascript
-// Switch to mainnet URLs
-// Use production API keys
-// Enable monitoring and logging
-// Have rollback plan ready
-```
-
-## Security Best Practices
-
-### API Key Management
-
-```javascript
-// ❌ WRONG - Hardcoded
-const API_KEY = "sk_live_abc123";
-
-// ✅ CORRECT - Environment variables
-const API_KEY = process.env.STRATO_API_KEY;
-```
-
-### Input Validation
-
-```javascript
-// Validate addresses (40 hex characters)
-// Validate amounts (positive, reasonable)
-// Sanitize user input
-// Check transaction parameters
-```
-
-### Transaction Verification
-
-```javascript
-// Verify transaction confirmed
-// Check from/to addresses match expected
-// Validate amounts transferred
-// Handle failures gracefully
-```
+---
 
 ## Common Integration Patterns
 
-### Pattern 1: Wallet Dashboard
+### Pattern 1: Backend with STRATO APIs
 
-Fetch all user data in parallel for fast loading.
+**Architecture:**
+```
+Frontend → Your Backend → STRATO APIs → Blockchain
+```
 
-### Pattern 2: Liquidation Bot
+**Best for:**
+- Complex business logic
+- Multi-user applications
+- Server-side authentication
 
-Monitor positions via WebSocket, execute liquidations when profitable.
+**Example: mercata app** (`mercata/backend/`)
 
-### Pattern 3: Analytics Dashboard
+### Pattern 2: Microservice Integration
 
-Query Cirrus directly for historical data and trends.
+**Architecture:**
+```
+Your Service → STRATO APIs → Blockchain
+```
+
+**Best for:**
+- Event-driven workflows
+- Automated processes
+- Backend services
+
+---
 
 ## Resources
 
 ### Documentation
-- **[API Reference](../reference/api.md)** - Complete API documentation
-- **[Core Platform API](../reference/strato-node-api.md)** - Direct blockchain access
-- **[Architecture](../reference/architecture.md)** - System design and components
 
-### Code Examples
-- **GitHub**: [Provide repo link with examples]
-- **SDK**: [NPM package if available]
-- **Boilerplates**: [Starter templates]
+- **[API Integration Guide](integration.md)** - Complete walkthrough
+- **[Quick Reference](quick-reference.md)** - Code snippets
+- **[E2E Examples](e2e.md)** - Full example flows
+- **[Contract Addresses](contract-addresses.md)** - Find deployed contracts
+
+### Reference Implementation
+
+- **mercata app** - `strato-platform/mercata/` folder
+  - **Backend** - `mercata/backend/` - Shows STRATO API usage
+  - **Frontend** - `mercata/ui/` - React app
+  - **Contracts** - `mercata/contracts/` - Solidity contracts
 
 ### Support
 
@@ -318,17 +427,18 @@ We're here to help! Reach out through any of these channels:
 - **Support**: [support.blockapps.net](https://support.blockapps.net)
 - **Telegram**: [t.me/strato_net](https://t.me/strato_net)
 
+---
+
 ## Next Steps
 
 ### Ready to Build?
 
-→ **[Integration Guide](integration.md)**
+→ **[Quick Start Guide](quickstart.md)**
 
-Complete walkthrough with code examples for auth, tokens, bridge, swaps, lending, CDP, and rewards.
+Complete walkthrough with code examples for auth, transactions, and queries.
 
 ### Need Reference Docs?
 
-- **[Interactive API (Swagger UI)](../reference/interactive-api.md)** - Explore and test the API interactively
-- **[API Overview](../reference/api.md)** - High-level API documentation
-- **[API Cheat Sheet](quick-reference.md)** - Code snippets for common operations
-
+- **[API Integration Guide](integration.md)** - Complete integration walkthrough
+- **[Interactive API (Swagger)](../reference/interactive-api.md)** - Explore the API
+- **[Quick Reference](quick-reference.md)** - Code snippets for common operations

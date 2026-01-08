@@ -1,6 +1,26 @@
 # End-to-End Integration Examples
 
-Complete workflow examples for building on STRATO.
+Complete workflow examples for building on STRATO using REST APIs.
+
+!!! danger "Important: ethers.js Does NOT Work"
+    **You CANNOT use ethers.js or web3.js with STRATO.**
+    
+    Use STRATO REST APIs: `/strato/v2.3`, `/cirrus/search`, `/bloc/v2.2`
+
+!!! danger "Prerequisites"
+    **These examples assume you have access to a STRATO deployment.**
+    
+    - **Local dev?** → [Setup Guide](../contribute/setup.md), then `./start my_node_name`
+    - **Remote deployment?** → Get your STRATO URL from DevOps
+    - **Examples use localhost** - Replace with your actual STRATO URL
+    
+    **All examples connect to your STRATO deployment:**
+    
+    ```typescript
+    const NODE_URL = process.env.NODE_URL || 'http://localhost:8080';
+    const strato = createApiClient(`${NODE_URL}/strato/v2.3`);
+    const cirrus = createApiClient(`${NODE_URL}/cirrus/search`);
+    ```
 
 ---
 
@@ -8,10 +28,7 @@ Complete workflow examples for building on STRATO.
 
 Build an app that helps users earn yield through lending and liquidity provision.
 
-!!! note "Prerequisites"
-    This example assumes the user already has ETHST (bridged from Ethereum) and a connected wallet with initialized provider.
-
-### Integration Flow
+### User Flow
 
 1. Supply ETHST as collateral to Lending Pool
 2. Borrow USDST against collateral
@@ -21,125 +38,269 @@ Build an app that helps users earn yield through lending and liquidity provision
 
 ### Implementation
 
-```javascript
-const { ethers } = require('ethers');
+```typescript
+import { strato, cirrus, bloc } from './config';
+import { getAccessToken } from './auth';
+
+interface FunctionInput {
+  contractName: string;
+  contractAddress: string;
+  method: string;
+  args: Record<string, any>;
+}
+
+function buildFunctionTx(inputs: FunctionInput | FunctionInput[]) {
+  const inputArray = Array.isArray(inputs) ? inputs : [inputs];
+  
+  const txs = inputArray.map(input => ({
+    type: 'FUNCTION',
+    payload: {
+      contractName: input.contractName,
+      contractAddress: input.contractAddress,
+      method: input.method,
+      args: input.args,
+    },
+  }));
+  
+  return {
+    txs,
+    txParams: {
+      gasLimit: 32_100_000_000,
+      gasPrice: 1,
+    },
+  };
+}
+
+async function submitTransaction(accessToken: string, tx: any) {
+  const response = await strato.post(
+    '/transaction/parallel?resolve=true',
+    tx,
+    {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    }
+  );
+  
+  return response.data;
+}
 
 class YieldFarmingApp {
-  constructor(provider, wallet) {
-    this.provider = provider;
-    this.wallet = wallet;
-    
-    // Initialize contracts
-    this.lendingPool = new ethers.Contract(LENDING_POOL, LENDING_POOL_ABI, wallet);
-    this.router = new ethers.Contract(ROUTER, ROUTER_ABI, wallet);
-    this.rewards = new ethers.Contract(REWARDS, REWARDS_ABI, wallet);
+  private accessToken: string;
+  private userAddress: string;
+  
+  constructor(accessToken: string, userAddress: string) {
+    this.accessToken = accessToken;
+    this.userAddress = userAddress;
   }
   
-  async executeStrategy(ethstAmount) {
+  async executeStrategy(ethstAmount: string) {
     console.log('Starting yield farming strategy...');
     
     // 1. Supply ETHST collateral
     await this.supplyCollateral(ethstAmount);
     
     // 2. Borrow USDST (50% of collateral value)
-    const borrowAmount = ethstAmount * 3000n * 50n / 100n; // Assume $3k ETHST
+    const ethPrice = await this.getETHPrice();
+    const borrowAmount = (BigInt(ethstAmount) * BigInt(ethPrice) * 50n / 100n).toString();
     await this.borrowUSDST(borrowAmount);
     
-    // 3. Swap USDST → sUSDSST (Sky USD Savings)
+    // 3. Swap USDST → sUSDSST
     await this.swapToSUSDSST(borrowAmount);
     
-    // 4. Provide sUSDSST-USDST liquidity
-    const halfAmount = borrowAmount / 2n;
+    // 4. Provide liquidity
+    const halfAmount = (BigInt(borrowAmount) / 2n).toString();
     await this.provideLiquidity(halfAmount, halfAmount);
     
-    // 5. Track position
+    // 5. Get position summary
     return await this.getPositionSummary();
   }
   
-  async supplyCollateral(amount) {
-    const ethst = new ethers.Contract(ETHST_TOKEN, ERC20_ABI, this.wallet);
+  async supplyCollateral(amount: string) {
+    const LENDING_POOL = await this.getLendingPoolAddress();
+    const ETHST_TOKEN = await this.getTokenAddress('ETHST');
     
-    // Approve
-    let tx = await ethst.approve(LENDING_POOL, amount);
-    await tx.wait();
+    const tx = buildFunctionTx([
+      {
+        contractName: 'Token',
+        contractAddress: ETHST_TOKEN,
+        method: 'approve',
+        args: { spender: LENDING_POOL, value: amount }
+      },
+      {
+        contractName: 'LendingPool',
+        contractAddress: LENDING_POOL,
+        method: 'supplyCollateral',
+        args: { asset: ETHST_TOKEN, amount }
+      }
+    ]);
     
-    // Supply
-    tx = await this.lendingPool.supplyCollateral(ETHST_TOKEN, amount);
-    await tx.wait();
-    
-    console.log('✅ Supplied', ethers.formatEther(amount), 'ETHST');
+    await submitTransaction(this.accessToken, tx);
+    console.log('✅ Supplied collateral');
   }
   
-  async borrowUSDST(amount) {
-    const tx = await this.lendingPool.borrow(USDST_TOKEN, amount);
-    await tx.wait();
+  async borrowUSDST(amount: string) {
+    const LENDING_POOL = await this.getLendingPoolAddress();
+    const USDST_TOKEN = await this.getTokenAddress('USDST');
     
-    console.log('✅ Borrowed', ethers.formatEther(amount), 'USDST');
+    const tx = buildFunctionTx({
+      contractName: 'LendingPool',
+      contractAddress: LENDING_POOL,
+      method: 'borrow',
+      args: { asset: USDST_TOKEN, amount }
+    });
+    
+    await submitTransaction(this.accessToken, tx);
+    console.log('✅ Borrowed USDST');
   }
   
-  async swapToSUSDSST(amount) {
-    const usdst = new ethers.Contract(USDST_TOKEN, ERC20_ABI, this.wallet);
+  async swapToSUSDSST(amount: string) {
+    const ROUTER = await this.getRouterAddress();
+    const USDST_TOKEN = await this.getTokenAddress('USDST');
+    const SUSDST_TOKEN = await this.getTokenAddress('sUSDSST');
     
-    // Approve
-    let tx = await usdst.approve(ROUTER, amount);
-    await tx.wait();
+    const tx = buildFunctionTx([
+      {
+        contractName: 'Token',
+        contractAddress: USDST_TOKEN,
+        method: 'approve',
+        args: { spender: ROUTER, value: amount }
+      },
+      {
+        contractName: 'Router',
+        contractAddress: ROUTER,
+        method: 'swapExactTokensForTokens',
+        args: {
+          amountIn: amount,
+          amountOutMin: (BigInt(amount) * 995n / 1000n).toString(), // 0.5% slippage
+          path: [USDST_TOKEN, SUSDST_TOKEN],
+          to: this.userAddress,
+          deadline: Math.floor(Date.now() / 1000) + 1200
+        }
+      }
+    ]);
     
-    // Swap USDST → sUSDSST
-    const path = [USDST_TOKEN, SUSDST_TOKEN];
-    const deadline = Math.floor(Date.now() / 1000) + 1200;
-    
-    tx = await this.router.swapExactTokensForTokens(
-      amount,
-      amount * 995n / 1000n, // 0.5% slippage
-      path,
-      this.wallet.address,
-      deadline
-    );
-    await tx.wait();
-    
-    console.log('✅ Swapped', ethers.formatEther(amount), 'USDST → sUSDSST');
+    await submitTransaction(this.accessToken, tx);
+    console.log('✅ Swapped to sUSDSST');
   }
   
-  async provideLiquidity(susdsstAmount, usdstAmount) {
-    const susdst = new ethers.Contract(SUSDST_TOKEN, ERC20_ABI, this.wallet);
-    const usdst = new ethers.Contract(USDST_TOKEN, ERC20_ABI, this.wallet);
+  async provideLiquidity(amountA: string, amountB: string) {
+    const ROUTER = await this.getRouterAddress();
+    const USDST_TOKEN = await this.getTokenAddress('USDST');
+    const SUSDST_TOKEN = await this.getTokenAddress('sUSDSST');
     
-    // Approve both tokens
-    await (await susdst.approve(ROUTER, susdsstAmount)).wait();
-    await (await usdst.approve(ROUTER, usdstAmount)).wait();
+    const tx = buildFunctionTx([
+      {
+        contractName: 'Token',
+        contractAddress: USDST_TOKEN,
+        method: 'approve',
+        args: { spender: ROUTER, value: amountA }
+      },
+      {
+        contractName: 'Token',
+        contractAddress: SUSDST_TOKEN,
+        method: 'approve',
+        args: { spender: ROUTER, value: amountB }
+      },
+      {
+        contractName: 'Router',
+        contractAddress: ROUTER,
+        method: 'addLiquidity',
+        args: {
+          tokenA: USDST_TOKEN,
+          tokenB: SUSDST_TOKEN,
+          amountADesired: amountA,
+          amountBDesired: amountB,
+          amountAMin: (BigInt(amountA) * 95n / 100n).toString(),
+          amountBMin: (BigInt(amountB) * 95n / 100n).toString(),
+          to: this.userAddress,
+          deadline: Math.floor(Date.now() / 1000) + 1200
+        }
+      }
+    ]);
     
-    // Add liquidity to sUSDSST-USDST pool
-    const deadline = Math.floor(Date.now() / 1000) + 1200;
-    const tx = await this.router.addLiquidity(
-      SUSDST_TOKEN,
-      USDST_TOKEN,
-      susdsstAmount,
-      usdstAmount,
-      susdsstAmount * 95n / 100n, // 5% slippage
-      usdstAmount * 95n / 100n,
-      this.wallet.address,
-      deadline
-    );
-    await tx.wait();
-    
-    console.log('✅ Provided liquidity to sUSDSST-USDST pool');
+    await submitTransaction(this.accessToken, tx);
+    console.log('✅ Provided liquidity');
   }
   
   async getPositionSummary() {
-    const hf = await this.lendingPool.getHealthFactor(this.wallet.address);
-    const pending = await this.rewards.pendingRewards(this.wallet.address);
+    // Query user's positions from Cirrus
+    const collateral = await this.getUserCollateral();
+    const debt = await this.getUserDebt();
+    const lpTokens = await this.getUserLPTokens();
     
     return {
-      healthFactor: ethers.formatEther(hf),
-      pendingRewards: ethers.formatEther(pending)
+      collateral,
+      debt,
+      lpTokens,
+      healthFactor: await this.calculateHealthFactor()
     };
+  }
+  
+  // Helper methods
+  async getLendingPoolAddress(): Promise<string> {
+    const response = await cirrus.get('/LendingRegistry', {
+      headers: { Authorization: `Bearer ${this.accessToken}` },
+      params: {
+        address: 'eq.0000000000000000000000000000000000001007',
+        select: 'lendingPool'
+      }
+    });
+    return response.data[0].lendingPool;
+  }
+  
+  async getTokenAddress(symbol: string): Promise<string> {
+    const response = await cirrus.get('/Token', {
+      headers: { Authorization: `Bearer ${this.accessToken}` },
+      params: {
+        _symbol: `eq.${symbol}`,
+        select: 'address'
+      }
+    });
+    return response.data[0].address;
+  }
+  
+  async getRouterAddress(): Promise<string> {
+    // Router address from pool factory
+    return '0x...'; // Get from your deployment
+  }
+  
+  async getETHPrice(): Promise<number> {
+    // Get from price oracle
+    return 3000; // $3000 per ETH
+  }
+  
+  async getUserCollateral() {
+    // Query from Cirrus
+    return {};
+  }
+  
+  async getUserDebt() {
+    // Query from Cirrus
+    return {};
+  }
+  
+  async getUserLPTokens() {
+    // Query from Cirrus
+    return {};
+  }
+  
+  async calculateHealthFactor() {
+    // Calculate from collateral and debt
+    return 2.5;
   }
 }
 
 // Usage
-const app = new YieldFarmingApp(provider, wallet);
-const result = await app.executeStrategy(ethers.parseEther('5.0'));
-console.log('Position:', result);
+async function main() {
+  const accessToken = await getAccessToken();
+  const userAddress = '0x...'; // Your address
+  
+  const app = new YieldFarmingApp(accessToken, userAddress);
+  const result = await app.executeStrategy('1000000000000000000'); // 1 ETHST
+  
+  console.log('Position summary:', result);
+}
+
+main().catch(console.error);
 ```
 
 ---
@@ -148,15 +309,21 @@ console.log('Position:', result);
 
 Build a dashboard showing user's complete DeFi position.
 
-```javascript
+### Implementation
+
+```typescript
 class PortfolioDashboard {
-  constructor(provider, userAddress) {
-    this.provider = provider;
+  private accessToken: string;
+  private userAddress: string;
+  
+  constructor(accessToken: string, userAddress: string) {
+    this.accessToken = accessToken;
     this.userAddress = userAddress;
   }
   
   async getCompletePortfolio() {
-    const [lending, cdp, liquidity, rewards] = await Promise.all([
+    const [tokens, lending, cdp, liquidity, rewards] = await Promise.all([
+      this.getTokenBalances(),
       this.getLendingPosition(),
       this.getCDPPosition(),
       this.getLiquidityPositions(),
@@ -164,172 +331,404 @@ class PortfolioDashboard {
     ]);
     
     return {
+      tokens,
       lending,
       cdp,
       liquidity,
       rewards,
-      totalValue: this.calculateTotalValue(lending, cdp, liquidity)
+      totalValue: await this.calculateTotalValue()
     };
   }
   
-  async getLendingPosition() {
-    const pool = new ethers.Contract(LENDING_POOL, LENDING_POOL_ABI, this.provider);
+  async getTokenBalances() {
+    const response = await cirrus.get('/Token-_balances', {
+      headers: { Authorization: `Bearer ${this.accessToken}` },
+      params: {
+        key: `eq.${this.userAddress}`,
+        select: 'address,value::text'
+      }
+    });
     
-    const [collateral, debt, , , , hf] = await pool.getUserAccountData(this.userAddress);
+    // Enrich with token metadata
+    const balances = response.data;
+    const enriched = await Promise.all(
+      balances.map(async (b: any) => {
+        const token = await this.getTokenMetadata(b.address);
+        return {
+          ...token,
+          balance: b.value
+        };
+      })
+    );
+    
+    return enriched;
+  }
+  
+  async getLendingPosition() {
+    const COLLATERAL_VAULT = await this.getCollateralVaultAddress();
+    
+    const collateral = await cirrus.get('/CollateralVault-userCollaterals', {
+      headers: { Authorization: `Bearer ${this.accessToken}` },
+      params: {
+        address: `eq.${COLLATERAL_VAULT}`,
+        key: `eq.${this.userAddress}`,
+        select: 'key2,value::text'
+      }
+    });
+    
+    const debt = await cirrus.get('/LendingPool-userDebts', {
+      headers: { Authorization: `Bearer ${this.accessToken}` },
+      params: {
+        key: `eq.${this.userAddress}`,
+        select: 'key2,value::text'
+      }
+    });
     
     return {
-      collateral: ethers.formatEther(collateral),
-      debt: ethers.formatEther(debt),
-      healthFactor: ethers.formatEther(hf)
+      collateral: collateral.data,
+      debt: debt.data
     };
   }
   
   async getCDPPosition() {
-    const cdp = new ethers.Contract(CDP_ENGINE, CDP_ENGINE_ABI, this.provider);
+    const CDP_VAULT = await this.getCDPVaultAddress();
     
-    const [collateral, debt, cr] = await cdp.getVault(this.userAddress);
+    const collateral = await cirrus.get('/CDPVault-userCollaterals', {
+      headers: { Authorization: `Bearer ${this.accessToken}` },
+      params: {
+        address: `eq.${CDP_VAULT}`,
+        key: `eq.${this.userAddress}`,
+        select: 'key2,value::text'
+      }
+    });
+    
+    const debt = await cirrus.get('/CDPEngine-userDebts', {
+      headers: { Authorization: `Bearer ${this.accessToken}` },
+      params: {
+        key: `eq.${this.userAddress}`,
+        select: 'key2,value::text'
+      }
+    });
     
     return {
-      collateral: ethers.formatEther(collateral),
-      debt: ethers.formatEther(debt),
-      collateralizationRatio: ethers.formatUnits(cr, 2)
+      collateral: collateral.data,
+      debt: debt.data
     };
   }
   
   async getLiquidityPositions() {
-    // Query all pairs user has LP tokens in
-    const factory = new ethers.Contract(FACTORY, FACTORY_ABI, this.provider);
-    const pairs = await this.getUserPairs(factory);
-    
-    const positions = [];
-    for (const pairAddress of pairs) {
-      const pair = new ethers.Contract(pairAddress, PAIR_ABI, this.provider);
-      const balance = await pair.balanceOf(this.userAddress);
-      
-      if (balance > 0n) {
-        const [token0, token1] = await Promise.all([
-          pair.token0(),
-          pair.token1()
-        ]);
-        
-        positions.push({
-          pair: pairAddress,
-          token0,
-          token1,
-          lpBalance: ethers.formatEther(balance)
-        });
+    // Get all pools
+    const pools = await cirrus.get('/Pool', {
+      headers: { Authorization: `Bearer ${this.accessToken}` },
+      params: {
+        select: 'address,_token0,_token1'
       }
-    }
+    });
     
-    return positions;
+    // Get user's LP token balances
+    const lpBalances = await Promise.all(
+      pools.data.map(async (pool: any) => {
+        const balance = await cirrus.get('/Pool-_balances', {
+          headers: { Authorization: `Bearer ${this.accessToken}` },
+          params: {
+            address: `eq.${pool.address}`,
+            key: `eq.${this.userAddress}`,
+            select: 'value::text'
+          }
+        });
+        
+        return {
+          pool: pool.address,
+          token0: pool._token0,
+          token1: pool._token1,
+          lpBalance: balance.data[0]?.value || '0'
+        };
+      })
+    );
+    
+    return lpBalances.filter(b => BigInt(b.lpBalance) > 0n);
   }
   
   async getRewards() {
-    const rewards = new ethers.Contract(REWARDS, REWARDS_ABI, this.provider);
-    const pending = await rewards.pendingRewards(this.userAddress);
+    const REWARDS_ADDRESS = await this.getRewardsAddress();
     
-    return {
-      rewardPoints: ethers.formatEther(pending)
-    };
+    const response = await cirrus.get('/Rewards-userInfo', {
+      headers: { Authorization: `Bearer ${this.accessToken}` },
+      params: {
+        address: `eq.${REWARDS_ADDRESS}`,
+        key: `eq.${this.userAddress}`,
+        select: '*'
+      }
+    });
+    
+    return response.data;
   }
   
-  calculateTotalValue(lending, cdp, liquidity) {
-    // Simplified - in production, fetch prices and calculate properly
-    return {
-      totalCollateral: parseFloat(lending.collateral) + parseFloat(cdp.collateral),
-      totalDebt: parseFloat(lending.debt) + parseFloat(cdp.debt)
-    };
+  async calculateTotalValue() {
+    // Calculate total portfolio value in USD
+    return 0;
+  }
+  
+  // Helper methods
+  async getTokenMetadata(address: string) {
+    const response = await cirrus.get('/Token', {
+      headers: { Authorization: `Bearer ${this.accessToken}` },
+      params: {
+        address: `eq.${address}`,
+        select: '_name,_symbol,_decimals'
+      }
+    });
+    return response.data[0];
+  }
+  
+  async getCollateralVaultAddress(): Promise<string> {
+    const response = await cirrus.get('/LendingRegistry', {
+      headers: { Authorization: `Bearer ${this.accessToken}` },
+      params: {
+        address: 'eq.0000000000000000000000000000000000001007',
+        select: 'collateralVault'
+      }
+    });
+    return response.data[0].collateralVault;
+  }
+  
+  async getCDPVaultAddress(): Promise<string> {
+    const response = await cirrus.get('/CDPRegistry', {
+      headers: { Authorization: `Bearer ${this.accessToken}` },
+      params: {
+        address: 'eq.0000000000000000000000000000000000001012',
+        select: 'cdpVault'
+      }
+    });
+    return response.data[0].cdpVault;
+  }
+  
+  async getRewardsAddress(): Promise<string> {
+    return '0x...'; // Get from your deployment
   }
 }
 
 // Usage
-const dashboard = new PortfolioDashboard(provider, userAddress);
-const portfolio = await dashboard.getCompletePortfolio();
-console.log(JSON.stringify(portfolio, null, 2));
+async function main() {
+  const accessToken = await getAccessToken();
+  const userAddress = '0x...';
+  
+  const dashboard = new PortfolioDashboard(accessToken, userAddress);
+  const portfolio = await dashboard.getCompletePortfolio();
+  
+  console.log('Complete portfolio:', JSON.stringify(portfolio, null, 2));
+}
+
+main().catch(console.error);
 ```
 
 ---
 
-## Example 3: Risk Monitor
+## Example 3: Liquidation Bot
 
-Monitor health factors and send alerts.
+Monitor positions and execute liquidations when profitable.
 
-```javascript
-class RiskMonitor {
-  constructor(provider, addresses) {
-    this.provider = provider;
-    this.addresses = addresses; // Array of addresses to monitor
-    this.pool = new ethers.Contract(LENDING_POOL, LENDING_POOL_ABI, provider);
+### Implementation
+
+```typescript
+class LiquidationBot {
+  private accessToken: string;
+  private botAddress: string;
+  
+  constructor(accessToken: string, botAddress: string) {
+    this.accessToken = accessToken;
+    this.botAddress = botAddress;
   }
   
-  async checkAllPositions() {
-    const alerts = [];
+  async start() {
+    console.log('Starting liquidation bot...');
     
-    for (const address of this.addresses) {
-      const hf = await this.pool.getHealthFactor(address);
-      const hfValue = parseFloat(ethers.formatEther(hf));
-      
-      if (hfValue < 1.5) {
-        alerts.push({
-          address,
-          healthFactor: hfValue,
-          severity: hfValue < 1.1 ? 'CRITICAL' : 'WARNING'
+    while (true) {
+      try {
+        // 1. Find unhealthy positions
+        const targets = await this.findLiquidationTargets();
+        
+        // 2. Execute liquidations
+        for (const target of targets) {
+          await this.liquidate(target);
+        }
+        
+        // Wait 10 seconds before next check
+        await new Promise(resolve => setTimeout(resolve, 10000));
+        
+      } catch (error) {
+        console.error('Bot error:', error);
+        await new Promise(resolve => setTimeout(resolve, 30000));
+      }
+    }
+  }
+  
+  async findLiquidationTargets() {
+    // Query all users with debt
+    const users = await cirrus.get('/LendingPool-userDebts', {
+      headers: { Authorization: `Bearer ${this.accessToken}` },
+      params: {
+        select: 'key,key2,value::text',
+        value: 'gt.0'
+      }
+    });
+    
+    // Check health factor for each
+    const targets = [];
+    for (const user of users.data) {
+      const healthFactor = await this.calculateHealthFactor(user.key);
+      if (healthFactor < 1.0) {
+        targets.push({
+          user: user.key,
+          asset: user.key2,
+          debt: user.value,
+          healthFactor
         });
       }
     }
     
-    if (alerts.length > 0) {
-      await this.sendAlerts(alerts);
-    }
+    return targets;
+  }
+  
+  async liquidate(target: any) {
+    console.log(`Liquidating ${target.user}...`);
     
-    return alerts;
-  }
-  
-  async sendAlerts(alerts) {
-    for (const alert of alerts) {
-      console.log(`⚠️  ${alert.severity}: Address ${alert.address} HF: ${alert.healthFactor}`);
-      
-      // Send email/telegram/etc
-      if (alert.severity === 'CRITICAL') {
-        await this.sendNotification(alert);
+    const LENDING_POOL = await this.getLendingPoolAddress();
+    
+    const tx = buildFunctionTx({
+      contractName: 'LendingPool',
+      contractAddress: LENDING_POOL,
+      method: 'liquidationCall',
+      args: {
+        collateralAsset: target.asset,
+        debtAsset: target.asset,
+        user: target.user,
+        debtToCover: target.debt,
+        receiveAToken: false
       }
-    }
+    });
+    
+    await submitTransaction(this.accessToken, tx);
+    console.log('✅ Liquidation successful');
   }
   
-  startMonitoring(intervalMs = 60000) {
-    console.log('Starting risk monitor...');
-    setInterval(() => this.checkAllPositions(), intervalMs);
+  async calculateHealthFactor(userAddress: string): Promise<number> {
+    // Get collateral and debt
+    // Calculate health factor
+    return 1.5;
+  }
+  
+  async getLendingPoolAddress(): Promise<string> {
+    const response = await cirrus.get('/LendingRegistry', {
+      headers: { Authorization: `Bearer ${this.accessToken}` },
+      params: {
+        address: 'eq.0000000000000000000000000000000000001007',
+        select: 'lendingPool'
+      }
+    });
+    return response.data[0].lendingPool;
   }
 }
 
 // Usage
-const monitor = new RiskMonitor(provider, ['0xUser1...', '0xUser2...']);
-monitor.startMonitoring();
+async function main() {
+  const accessToken = await getAccessToken();
+  const botAddress = '0x...';
+  
+  const bot = new LiquidationBot(accessToken, botAddress);
+  await bot.start();
+}
+
+main().catch(console.error);
 ```
 
 ---
 
-## More Examples
+## Best Practices
 
-### Quick References
+### 1. Error Handling
 
-- **[Quick Start](quickstart.md)** - 5-minute integration
-- **[Quick Reference](quick-reference.md)** - Common operations
-- **[Contract Addresses](contract-addresses.md)** - Deployed contracts
+```typescript
+try {
+  const result = await submitTransaction(accessToken, tx);
+} catch (error: any) {
+  if (error.response?.status === 400) {
+    // Transaction failed - parse error message
+    console.error('Transaction failed:', error.response.data);
+  } else if (error.response?.status === 401) {
+    // Token expired - refresh
+    accessToken = await getAccessToken();
+  }
+}
+```
 
-### API Documentation
+### 2. Rate Limiting
 
-- **[Borrow Guide](../guides/borrow.md)** - Lending pool integration
-- **[CDP Guide](../guides/mint-cdp.md)** - CDP engine integration
-- **[Swap](../guides/swap.md)** & **[Liquidity](../guides/liquidity.md)** - DEX integration
-- **[Bridge Guide](../guides/bridge.md)** - Cross-chain bridge integration
-- **[Rewards Guide](../guides/rewards.md)** - Rewards distribution
-- **[API Overview](../reference/api.md)** - General API patterns
+```typescript
+class RateLimiter {
+  private queue: Array<() => Promise<any>> = [];
+  private processing = false;
+  
+  async add<T>(fn: () => Promise<T>): Promise<T> {
+    return new Promise((resolve, reject) => {
+      this.queue.push(async () => {
+        try {
+          const result = await fn();
+          resolve(result);
+        } catch (error) {
+          reject(error);
+        }
+      });
+      
+      this.process();
+    });
+  }
+  
+  private async process() {
+    if (this.processing || this.queue.length === 0) return;
+    
+    this.processing = true;
+    const fn = this.queue.shift()!;
+    
+    await fn();
+    await new Promise(resolve => setTimeout(resolve, 100)); // 100ms delay
+    
+    this.processing = false;
+    this.process();
+  }
+}
+```
+
+### 3. Batch Operations
+
+```typescript
+async function batchQuery(
+  accessToken: string,
+  queries: Array<{ table: string; params: any }>
+) {
+  const promises = queries.map(({ table, params }) =>
+    cirrus.get(`/${table}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      params
+    })
+  );
+  
+  return await Promise.all(promises);
+}
+```
 
 ---
 
-## Get Help
+## Next Steps
 
-- **Support**: [support.blockapps.net](https://support.blockapps.net)
-- **Telegram**: [t.me/strato_net](https://t.me/strato_net)
-- **Docs**: [docs.strato.nexus](https://docs.strato.nexus)
+- **[Quick Start](quickstart.md)** - Build your first app
+- **[API Integration](integration.md)** - Complete integration guide
+- **[Quick Reference](quick-reference.md)** - Code snippets
+
+### Study the Reference Implementation
+
+The **mercata app** (`strato-platform/mercata/`) is the complete reference:
+
+- **Backend** - `mercata/backend/src/`
+- **Services** - `mercata/backend/src/api/services/`
+- **Helpers** - `mercata/backend/src/api/helpers/`

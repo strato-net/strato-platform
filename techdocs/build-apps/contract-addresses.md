@@ -1,427 +1,370 @@
 # Contract Reference
 
-Deployed contracts and addresses for STRATO platform.
+Find deployed contracts and addresses for your STRATO deployment.
 
-!!! tip "Get Addresses Dynamically"
-    Contract addresses are **not hardcoded** in documentation. Fetch them dynamically from the backend or blockchain to ensure accuracy.
+!!! danger "STRATO Deployment Required"
+    **Contract addresses are specific to YOUR STRATO deployment.**
+    
+    - **Local dev?** → [Setup Guide](../contribute/setup.md)
+    - **Remote?** → Get addresses from DevOps or deployment logs
+    - **Examples use localhost** - Replace with your actual STRATO URL
+
+!!! tip "Query Dynamically"
+    Contract addresses are **not hardcoded** in documentation. Always fetch them dynamically from Cirrus or registries to ensure accuracy.
 
 ---
 
 ## How to Get Contract Addresses
 
-### Method 1: Via Backend Services (Recommended)
+### Method 1: Query Cirrus (Recommended)
 
-Contract addresses are managed via backend environment variables and accessible through internal services:
+Use Cirrus to query all deployed contracts:
 
-```javascript
-// The backend exposes registries that contain all contract addresses
+```typescript
+import { cirrus } from './config';
 
-// Example: Get Lending contracts
-const response = await axios.get(`${BASE_URL}/lending/registry`, {
-  headers: { 'Authorization': `Bearer ${accessToken}` }
-});
+// Get all contracts
+async function getAllContracts(accessToken: string) {
+  const response = await cirrus.get('/Contract', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    params: {
+      select: 'address,name',
+      limit: 100
+    }
+  });
+  
+  return response.data;
+}
 
-const {
-  lendingPool,
-  collateralVault,
-  priceOracle,
-  liquidityPool
-} = response.data;
+// Get specific contract by name
+async function getContractByName(accessToken: string, name: string) {
+  const response = await cirrus.get('/Contract', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    params: {
+      name: `eq.${name}`,
+      select: 'address'
+    }
+  });
+  
+  return response.data[0]?.address;
+}
 
-console.log('Lending Pool:', lendingPool.address);
-console.log('Collateral Vault:', collateralVault.address);
-
-// Example: Get CDP contracts
-const cdpResponse = await axios.get(`${BASE_URL}/cdp/registry`, {
-  headers: { 'Authorization': `Bearer ${accessToken}` }
-});
-
-const {
-  cdpEngine,
-  cdpVault,
-  usdst
-} = cdpResponse.data;
-
-console.log('CDP Engine:', cdpEngine.address);
-console.log('USDST Token:', usdst);
+// Example usage
+const accessToken = await getAccessToken();
+const contracts = await getAllContracts(accessToken);
+console.log('Deployed contracts:', contracts);
 ```
 
-### Method 2: From Environment Variables
+### Method 2: Use Registries
 
-Contract addresses are configured via environment variables in the backend:
+Contract registries have **fixed addresses** and contain references to other contracts:
+
+```typescript
+// Fixed registry addresses (same across all STRATO deployments)
+const REGISTRIES = {
+  LENDING_REGISTRY: '0000000000000000000000000000000000001007',
+  CDP_REGISTRY: '0000000000000000000000000000000000001012',
+  POOL_FACTORY: '000000000000000000000000000000000000100a',
+  TOKEN_FACTORY: '000000000000000000000000000000000000100b',
+  ADMIN_REGISTRY: '000000000000000000000000000000000000100c',
+  MERCATA_BRIDGE: '0000000000000000000000000000000000001008',
+  POOL_CONFIGURATOR: '0000000000000000000000000000000000001006',
+  VOUCHER: '000000000000000000000000000000000000100e',
+  REWARDS_CHEF: '000000000000000000000000000000000000101f',
+};
+
+// Get lending contracts from registry
+async function getLendingContracts(accessToken: string) {
+  const response = await cirrus.get('/LendingRegistry', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    params: {
+      address: `eq.${REGISTRIES.LENDING_REGISTRY}`,
+      select: 'lendingPool,collateralVault,priceOracle,liquidityPool'
+    }
+  });
+  
+  return response.data[0];
+}
+
+// Get CDP contracts from registry
+async function getCDPContracts(accessToken: string) {
+  const response = await cirrus.get('/CDPRegistry', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    params: {
+      address: `eq.${REGISTRIES.CDP_REGISTRY}`,
+      select: 'cdpEngine,cdpVault,usdst'
+    }
+  });
+  
+  return response.data[0];
+}
+
+// Example usage
+const lending = await getLendingContracts(accessToken);
+console.log('Lending Pool:', lending.lendingPool);
+console.log('Collateral Vault:', lending.collateralVault);
+console.log('Price Oracle:', lending.priceOracle);
+
+const cdp = await getCDPContracts(accessToken);
+console.log('CDP Engine:', cdp.cdpEngine);
+console.log('CDP Vault:', cdp.cdpVault);
+console.log('USDST Token:', cdp.usdst);
+```
+
+### Method 3: Environment Variables
+
+For backend apps, store addresses in environment variables:
 
 ```bash
-# Core Registry Contracts
+# .env
 LENDING_REGISTRY=0000000000000000000000000000000000001007
 CDP_REGISTRY=0000000000000000000000000000000000001012
-
-# Factory Contracts
 POOL_FACTORY=000000000000000000000000000000000000100a
 TOKEN_FACTORY=000000000000000000000000000000000000100b
-
-# System Contracts
 ADMIN_REGISTRY=000000000000000000000000000000000000100c
 MERCATA_BRIDGE=0000000000000000000000000000000000001008
-REWARDS_CHEF=000000000000000000000000000000000000101f
-POOL_CONFIGURATOR=0000000000000000000000000000000000001006
 VOUCHER_CONTRACT_ADDRESS=000000000000000000000000000000000000100e
+REWARDS_CHEF=000000000000000000000000000000000000101f
 ```
 
-### Method 3: Query Blockchain Directly
-
-```javascript
-const { ethers } = require('ethers');
-
-const provider = new ethers.JsonRpcProvider(
-  'https://app.strato.nexus/strato-api/eth/v1.2'
-);
-
-// Query LendingRegistry to get all lending contracts
-const LENDING_REGISTRY = '0000000000000000000000000000000000001007';
-const registryABI = [
-  'function lendingPool() view returns (address)',
-  'function collateralVault() view returns (address)',
-  'function priceOracle() view returns (address)'
-];
-
-const registry = new ethers.Contract(LENDING_REGISTRY, registryABI, provider);
-
-const lendingPool = await registry.lendingPool();
-const collateralVault = await registry.collateralVault();
-const priceOracle = await registry.priceOracle();
-
-console.log('Lending Pool:', lendingPool);
-console.log('Collateral Vault:', collateralVault);
-console.log('Price Oracle:', priceOracle);
-```
-
----
-
-## Core Registry Addresses
-
-These **registry contracts** are the entry points to discover all other contracts:
-
-### Mainnet & Testnet
-
-| Registry | Address | Description |
-|----------|---------|-------------|
-| **LendingRegistry** | `0000000000000000000000000000000000001007` | Entry point for all lending contracts |
-| **CDPRegistry** | `0000000000000000000000000000000000001012` | Entry point for all CDP contracts |
-| **PoolFactory** | `000000000000000000000000000000000000100a` | AMM pool factory |
-| **TokenFactory** | `000000000000000000000000000000000000100b` | Token creation factory |
-| **AdminRegistry** | `000000000000000000000000000000000000100c` | Admin permissions |
-| **Bridge** | `0000000000000000000000000000000000001008` | Cross-chain bridge |
-| **RewardsChef** | `000000000000000000000000000000000000101f` | Rewards distribution |
-
-!!! info "Registry Pattern"
-    STRATO uses the **registry pattern** where top-level contracts point to all deployed contracts. Query registries to get current addresses instead of hardcoding them.
-
----
-
-## Network Details
-
-### STRATO Mainnet
-
-```javascript
-{
-  chainId: ..., // Check with team
-  name: 'STRATO',
-  rpcUrls: ['https://app.strato.nexus/strato-api/eth/v1.2'],
-  blockExplorerUrls: ['https://explorer.strato.nexus'],
-  nativeCurrency: {
-    name: 'Ethereum',
-    symbol: 'ETH',
-    decimals: 18
-  }
-}
-```
-
-### STRATO Testnet (Buildtest)
-
-```javascript
-{
-  chainId: ..., // Check with team
-  name: 'STRATO Testnet',
-  rpcUrls: ['https://buildtest.mercata-testnet.blockapps.net/strato-api/eth/v1.2'],
-  blockExplorerUrls: ['https://buildtest-explorer.mercata-testnet.blockapps.net'],
-  nativeCurrency: {
-    name: 'Ethereum',
-    symbol: 'ETH',
-    decimals: 18
-  }
-}
+```typescript
+// src/config.ts
+export const CONTRACTS = {
+  LENDING_REGISTRY: process.env.LENDING_REGISTRY || '0000000000000000000000000000000000001007',
+  CDP_REGISTRY: process.env.CDP_REGISTRY || '0000000000000000000000000000000000001012',
+  // ... etc
+};
 ```
 
 ---
 
 ## Contract Verification
 
-All contracts are verified on the block explorer. You can:
+All contracts are verified on the STRATO Management Dashboard (SMD). You can:
 
 1. **View source code** - See contract implementation
 2. **Read contract** - Call view functions
 3. **Write contract** - Execute transactions
 4. **View events** - Monitor contract activity
 
-**Example:**
+**Access SMD (Block Explorer):**
+
 ```
-https://explorer.strato.nexus/address/0x.../contracts
-```
+# Local development
+http://localhost:8080/smd/
 
----
+# Remote deployment
+https://your-strato.example.com/smd/
 
-## ABIs
-
-### Download ABIs
-
-Get the latest ABIs from:
-
-- **GitHub**: [github.com/blockapps/strato-contracts](https://github.com/blockapps/strato-contracts)
-- **NPM**: `npm install @blockapps/strato-contracts`
-- **API**: `GET https://app.strato.nexus/api/contracts/abis`
-
-### Use in Code
-
-```javascript
-// Option 1: From NPM package
-const { LendingPoolABI } = require('@blockapps/strato-contracts');
-
-// Option 2: Fetch from API
-const response = await fetch('https://app.strato.nexus/api/contracts/abis');
-const abis = await response.json();
-
-// Option 3: Use human-readable ABI (ethers.js)
-const abi = [
-  'function borrow(address asset, uint256 amount)',
-  'function getHealthFactor(address user) view returns (uint256)'
-];
+# View specific contract
+http://localhost:8080/smd/address/0x.../contracts
 ```
 
 ---
 
-## Complete Usage Example
+## Complete Example: Get All Addresses
 
-```javascript
-const { ethers } = require('ethers');
-const axios = require('axios');
+```typescript
+import { cirrus } from './config';
+import { getAccessToken } from './auth';
 
-const BASE_URL = 'https://app.strato.nexus/api';
-const RPC_URL = 'https://app.strato.nexus/strato-api/eth/v1.2';
+interface ContractAddresses {
+  // Core registries
+  lendingRegistry: string;
+  cdpRegistry: string;
+  poolFactory: string;
+  tokenFactory: string;
+  adminRegistry: string;
+  bridge: string;
+  
+  // Lending contracts
+  lendingPool?: string;
+  collateralVault?: string;
+  priceOracle?: string;
+  
+  // CDP contracts
+  cdpEngine?: string;
+  cdpVault?: string;
+  usdst?: string;
+  
+  // Tokens
+  tokens?: Array<{ address: string; name: string; symbol: string }>;
+}
 
-// Step 1: Get contract addresses dynamically
-async function getContractAddresses(accessToken) {
-  const [lending, cdp] = await Promise.all([
-    axios.get(`${BASE_URL}/lending/registry`, {
-      headers: { 'Authorization': `Bearer ${accessToken}` }
-    }),
-    axios.get(`${BASE_URL}/cdp/registry`, {
-      headers: { 'Authorization': `Bearer ${accessToken}` }
-    })
-  ]);
-
+async function getAllContractAddresses(): Promise<ContractAddresses> {
+  const accessToken = await getAccessToken();
+  
+  // Fixed registry addresses
+  const REGISTRIES = {
+    lendingRegistry: '0000000000000000000000000000000000001007',
+    cdpRegistry: '0000000000000000000000000000000000001012',
+    poolFactory: '000000000000000000000000000000000000100a',
+    tokenFactory: '000000000000000000000000000000000000100b',
+    adminRegistry: '000000000000000000000000000000000000100c',
+    bridge: '0000000000000000000000000000000000001008',
+  };
+  
+  // Query lending contracts
+  const lendingResponse = await cirrus.get('/LendingRegistry', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    params: {
+      address: `eq.${REGISTRIES.lendingRegistry}`,
+      select: 'lendingPool,collateralVault,priceOracle'
+    }
+  });
+  
+  // Query CDP contracts
+  const cdpResponse = await cirrus.get('/CDPRegistry', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    params: {
+      address: `eq.${REGISTRIES.cdpRegistry}`,
+      select: 'cdpEngine,cdpVault,usdst'
+    }
+  });
+  
+  // Query all tokens
+  const tokensResponse = await cirrus.get('/Token', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    params: {
+      select: 'address,_name,_symbol',
+      limit: 100
+    }
+  });
+  
   return {
-    lendingPool: lending.data.lendingPool.address,
-    collateralVault: lending.data.collateralVault.address,
-    cdpEngine: cdp.data.cdpEngine.address,
-    usdst: cdp.data.usdst
+    ...REGISTRIES,
+    ...lendingResponse.data[0],
+    ...cdpResponse.data[0],
+    tokens: tokensResponse.data,
   };
 }
 
-// Step 2: Setup provider and wallet
-const provider = new ethers.JsonRpcProvider(RPC_URL);
-const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
-
-// Step 3: Get addresses and create contract instance
-const addresses = await getContractAddresses(accessToken);
-
-const lendingPool = new ethers.Contract(
-  addresses.lendingPool,
-  [
-    'function borrow(address asset, uint256 amount) returns (bool)',
-    'function getHealthFactor(address user) view returns (uint256)'
-  ],
-  wallet
-);
-
-// Step 4: Interact with contract
-const tx = await lendingPool.borrow(
-  addresses.usdst,
-  ethers.parseEther('1000')
-);
-await tx.wait();
-
-console.log('Borrowed 1000 USDST');
-console.log('Transaction:', tx.hash);
+// Usage
+const addresses = await getAllContractAddresses();
+console.log('All contract addresses:', addresses);
 ```
 
 ---
 
-## Security Notes
+## Network Configuration
 
-### Official Sources Only
+Add STRATO to wallet or app:
 
-**Always verify addresses from official sources:**
+```typescript
+const STRATO_NETWORK = {
+  chainId: '0x...', // Get from your deployment
+  chainName: 'STRATO',
+  rpcUrls: ['http://localhost:8080/strato-api/eth/v1.2'], // Replace with your STRATO URL
+  blockExplorerUrls: ['http://localhost:8080/smd'], // Replace with your STRATO URL
+  nativeCurrency: {
+    name: 'USDST',
+    symbol: 'USDST',
+    decimals: 18
+  }
+};
+```
 
-- ✅ Official docs: [docs.strato.nexus](https://docs.strato.nexus)
-- ✅ GitHub: [github.com/blockapps](https://github.com/blockapps)
-- ✅ Block explorer: [explorer.strato.nexus](https://explorer.strato.nexus)
+---
+
+## Common Contract Patterns
+
+### Pattern: Get Token Address by Symbol
+
+```typescript
+async function getTokenBySymbol(accessToken: string, symbol: string) {
+  const response = await cirrus.get('/Token', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    params: {
+      _symbol: `eq.${symbol}`,
+      select: 'address,_name,_symbol'
+    }
+  });
+  
+  return response.data[0];
+}
+
+// Example
+const ethst = await getTokenBySymbol(accessToken, 'ETHST');
+console.log('ETHST address:', ethst.address);
+```
+
+### Pattern: Get All Pools
+
+```typescript
+async function getAllPools(accessToken: string) {
+  const POOL_FACTORY = '000000000000000000000000000000000000100a';
+  
+  const response = await cirrus.get('/Pool', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    params: {
+      select: 'address,_token0,_token1,_reserve0,_reserve1',
+      limit: 100
+    }
+  });
+  
+  return response.data;
+}
+```
+
+### Pattern: Get User Collateral
+
+```typescript
+async function getUserCollateral(
+  accessToken: string,
+  collateralVaultAddress: string,
+  userAddress: string
+) {
+  const response = await cirrus.get('/CollateralVault-userCollaterals', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    params: {
+      address: `eq.${collateralVaultAddress}`,
+      key: `eq.${userAddress}`,
+      select: 'key2,value::text'
+    }
+  });
+  
+  return response.data;
+}
+```
+
+---
+
+## Security Best Practices
+
+### Always Verify
+
+- ✅ Block explorer (SMD): `{your-strato-url}/smd/` (e.g., `http://localhost:8080/smd/`)
+- ✅ Query Cirrus for contract code
+- ✅ Check contract name matches expected
 
 ### Never Trust
 
-**Do NOT trust addresses from:**
+- ❌ Hardcoded addresses from unknown sources
+- ❌ Addresses from untrusted APIs
+- ❌ Addresses without verification
 
-- ❌ Random websites
-- ❌ Telegram or social media DMs
-- ❌ Unverified sources
-- ❌ Social media posts
-
-### Verify on Explorer
+### Verify on SMD (Block Explorer)
 
 Before using any contract:
 
-1. Check it's verified on explorer
+1. Check it's verified on SMD: `{your-strato-url}/smd/`
 2. Read the source code
 3. Confirm it matches expected functionality
-4. Check deployment date and deployer
 
 ---
 
-## Contract Upgrades
+## Reference Implementation
 
-**Important:** Some contracts are upgradeable (proxy pattern).
+The **mercata backend** shows how to manage contract addresses:
 
-### Check Current Implementation
-
-```javascript
-// For proxy contracts
-const proxyABI = [
-  'function implementation() view returns (address)'
-];
-
-const proxy = new ethers.Contract(PROXY_ADDRESS, proxyABI, provider);
-const implAddress = await proxy.implementation();
-console.log('Current implementation:', implAddress);
-```
-
-### Subscribe to Upgrade Notifications
-
-- **Documentation**: [docs.strato.nexus](https://docs.strato.nexus)
-- **Telegram**: [t.me/strato_net](https://t.me/strato_net)
-- **Support**: [support.blockapps.net](https://support.blockapps.net)
-
----
-
-## Emergency Contacts
-
-### Security Issues
-
-If you discover a security vulnerability:
-
-- **Email**: security@blockapps.net
-
-**Do NOT:**
-
-- Publicly disclose vulnerabilities
-- Exploit them
-- Discuss in public channels
-
----
-
-## Version History
-
-| Date | Version | Changes |
-|------|---------|---------|
-| 2024-01 | v1.0 | Initial mainnet deployment |
-| 2024-03 | v1.1 | Added rewards system |
-| 2024-06 | v1.2 | CDP integration |
-| 2024-09 | v1.3 | Bridge launch |
-
----
-
-## All Contract Discovery Methods
-
-### Lending Contracts
-
-```javascript
-// Get from /lending/registry endpoint
-const response = await axios.get(`${BASE_URL}/lending/registry`, {
-  headers: { 'Authorization': `Bearer ${accessToken}` }
-});
-
-// Available addresses:
-// - lendingPool.address
-// - collateralVault.address  
-// - liquidityPool.address
-// - oracle.address (priceOracle)
-```
-
-### CDP Contracts
-
-```javascript
-// Get from /cdp/registry endpoint
-const response = await axios.get(`${BASE_URL}/cdp/registry`, {
-  headers: { 'Authorization': `Bearer ${accessToken}` }
-});
-
-// Available addresses:
-// - cdpEngine.address
-// - cdpVault.address
-// - usdst (USDST token address)
-// - tokenFactory
-// - feeCollector
-```
-
-### Token Addresses
-
-```javascript
-// Get all tokens with their addresses
-const response = await axios.get(`${BASE_URL}/tokens/v2`, {
-  params: { status: 'neq.2', limit: 50 },
-  headers: { 'Authorization': `Bearer ${accessToken}` }
-});
-
-const tokens = response.data.map(token => ({
-  symbol: token._symbol,
-  address: token.address,
-  decimals: token.customDecimals
-}));
-
-// Find specific token
-const usdst = tokens.find(t => t.symbol === 'USDST');
-const weth = tokens.find(t => t.symbol === 'WETH');
-```
-
-### Swap Pool Addresses
-
-```javascript
-// Get all AMM pools
-const response = await axios.get(`${BASE_URL}/swap-pools`, {
-  headers: { 'Authorization': `Bearer ${accessToken}` }
-});
-
-// Available data:
-// - poolAddress
-// - tokenA, tokenB (token addresses)
-// - reserves (tokenABalance, tokenBBalance)
-// - lpToken (LP token address)
-```
+- **Config** - `mercata/backend/src/config/config.ts` - Environment variables
+- **Constants** - `mercata/backend/src/config/constants.ts` - Contract definitions
+- **Helpers** - `mercata/backend/src/api/helpers/` - Registry queries
 
 ---
 
 ## Next Steps
 
-- **[Quick Start](quickstart.md)** - Start building
-- **[Quick Reference](quick-reference.md)** - Common operations
-- **[Integration Guide](integration.md)** - Complete tutorial
-- **[E2E Examples](e2e.md)** - Full workflows
-
-### Get Help
-
-- **Support**: [support.blockapps.net](https://support.blockapps.net)
-- **Telegram**: [t.me/strato_net](https://t.me/strato_net)
-- **Docs**: [docs.strato.nexus](https://docs.strato.nexus)
-
----
-
-> **Note:** Contact the STRATO team to get the actual deployed addresses. This page will be updated with real addresses once available.
-
+- **[Quick Start](quickstart.md)** - Build your first transaction
+- **[API Integration](integration.md)** - Complete integration guide
+- **[Quick Reference](quick-reference.md)** - Code snippets

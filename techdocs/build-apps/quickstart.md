@@ -1,15 +1,37 @@
 # Developer Quick Start
 
-Get up and running with STRATO in 5 minutes.
+Build your first app on STRATO in 10 minutes using STRATO's REST APIs.
+
+!!! danger "Critical: ethers.js Does NOT Work"
+    **You CANNOT use ethers.js or web3.js with STRATO.**
+    
+    You must use STRATO's REST APIs (`/strato/v2.3`, `/cirrus/search`).
+
+!!! danger "Prerequisites"
+    **You MUST have a STRATO deployment before starting this guide.**
+    
+    - **Local dev?** → Install locally: [Setup Guide](../contribute/setup.md), then `./start my_node_name`
+    - **Remote deployment?** → Get your STRATO URL from your DevOps team
+    - **Examples use localhost** - Replace with your actual STRATO URL
 
 ---
 
-## 1. Setup (2 minutes)
+## 1. Setup (3 minutes)
+
+### Create Your App Project
+
+```bash
+# Create app directory (OUTSIDE strato-platform/)
+mkdir my-strato-app
+cd my-strato-app
+npm init -y
+```
 
 ### Install Dependencies
 
 ```bash
-npm install ethers dotenv
+npm install axios dotenv typescript @types/node
+npm install --save-dev ts-node
 ```
 
 ### Environment Variables
@@ -17,252 +39,553 @@ npm install ethers dotenv
 Create `.env`:
 
 ```bash
-# STRATO RPC
-RPC_URL=https://app.strato.nexus/strato-api/eth/v1.2
+# Your STRATO deployment URL
+NODE_URL=http://localhost:8080
 
-# Your wallet private key (NEVER commit this!)
-PRIVATE_KEY=your_private_key_here
+# OAuth credentials (required for authentication)
+OAUTH_CLIENT_ID=your_client_id_here
+OAUTH_CLIENT_SECRET=your_client_secret_here
+OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata
+```
 
-# App API (optional, for higher-level DeFi operations)
-APP_API=https://app.strato.nexus/api
+!!! tip "Get OAuth Credentials"
+    Contact STRATO support to get OAuth credentials for your deployment.
+
+### TypeScript Configuration
+
+Create `tsconfig.json`:
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "lib": ["ES2020"],
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules"]
+}
 ```
 
 ---
 
-## 2. Connect to STRATO (1 minute)
+## 2. Create STRATO API Client (2 minutes)
 
-```javascript
-require('dotenv').config();
-const { ethers } = require('ethers');
+Create `src/config.ts`:
 
-// Connect to STRATO
-const provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
+```typescript
+import axios, { AxiosInstance } from 'axios';
 
-// Create wallet
-const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+const NODE_URL = process.env.NODE_URL || 'http://localhost:8080';
 
-console.log('Connected! Address:', wallet.address);
-
-// Check balance
-const balance = await provider.getBalance(wallet.address);
-console.log('Balance:', ethers.formatEther(balance), 'ETH');
-```
-
----
-
-## 3. Your First Transaction (2 minutes)
-
-### Example: Supply Collateral to Lending Pool
-
-```javascript
-const { ethers } = require('ethers');
-
-// Contract addresses (mainnet)
-const LENDING_POOL = '0x...'; // LendingPool address
-const ETH_TOKEN = '0x...';     // WETH address
-
-// ABIs (simplified)
-const ERC20_ABI = [
-  'function approve(address spender, uint256 amount) returns (bool)',
-  'function balanceOf(address owner) view returns (uint256)'
-];
-
-const LENDING_POOL_ABI = [
-  'function supplyCollateral(address asset, uint256 amount)'
-];
-
-async function supplyCollateral() {
-  // Connect
-  const provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
-  const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
-  
-  // Contract instances
-  const ethToken = new ethers.Contract(ETH_TOKEN, ERC20_ABI, wallet);
-  const lendingPool = new ethers.Contract(LENDING_POOL, LENDING_POOL_ABI, wallet);
-  
-  // Amount to supply (1 ETH)
-  const amount = ethers.parseEther('1.0');
-  
-  // Step 1: Approve
-  console.log('Approving...');
-  const approveTx = await ethToken.approve(LENDING_POOL, amount);
-  await approveTx.wait();
-  console.log('✅ Approved');
-  
-  // Step 2: Supply
-  console.log('Supplying collateral...');
-  const supplyTx = await lendingPool.supplyCollateral(ETH_TOKEN, amount);
-  await supplyTx.wait();
-  console.log('✅ Supplied 1 ETH as collateral');
+// Helper to create API client with auth
+function createApiClient(baseURL: string): AxiosInstance {
+  return axios.create({
+    baseURL,
+    headers: { 'Content-Type': 'application/json' },
+    timeout: 60_000,
+  });
 }
 
-supplyCollateral().catch(console.error);
-```
-
-**Result:**
-```
-Approving...
-✅ Approved
-Supplying collateral...
-✅ Supplied 1 ETH as collateral
+// STRATO API clients
+export const strato = createApiClient(`${NODE_URL}/strato/v2.3`);
+export const cirrus = createApiClient(`${NODE_URL}/cirrus/search`);
+export const bloc = createApiClient(`${NODE_URL}/bloc/v2.2`);
 ```
 
 ---
 
-## Next Steps
+## 3. Implement OAuth Authentication (2 minutes)
 
-### Learn More
+Create `src/auth.ts`:
 
-- **[Contract Addresses](contract-addresses.md)** - All deployed contracts
-- **[API Integration Guide](integration.md)** - Complete walkthrough
-- **[Quick Reference](quick-reference.md)** - Common operations
-- **[E2E Examples](e2e.md)** - Full example flows
+```typescript
+import axios from 'axios';
+import dotenv from 'dotenv';
 
-### Common Operations
+dotenv.config();
 
-- **[Borrow USDST](quick-reference.md#lending-operations)** - Get liquidity
-- **[Swap Tokens](quick-reference.md#swap-operations)** - Trade on DEX
-- **[Provide Liquidity](quick-reference.md#liquidity-operations)** - Earn fees
-- **[Bridge Assets](quick-reference.md#bridge-operations)** - Cross-chain transfers
+const OAUTH_DISCOVERY_URL = process.env.OAUTH_DISCOVERY_URL!;
+const CLIENT_ID = process.env.OAUTH_CLIENT_ID!;
+const CLIENT_SECRET = process.env.OAUTH_CLIENT_SECRET!;
 
-### Get Help
+let tokenEndpoint: string;
 
-- **[API Reference](../reference/api.md)** - Full API docs
-- **Support**: [support.blockapps.net](https://support.blockapps.net)
-- **Telegram**: [t.me/strato_net](https://t.me/strato_net)
+// Initialize OAuth configuration
+export async function initAuth(): Promise<void> {
+  const { data } = await axios.get(
+    `${OAUTH_DISCOVERY_URL}/.well-known/openid-configuration`
+  );
+  tokenEndpoint = data.token_endpoint;
+}
+
+// Get access token (for backend apps)
+export async function getAccessToken(): Promise<string> {
+  const response = await axios.post(
+    tokenEndpoint,
+    new URLSearchParams({
+      grant_type: 'client_credentials',
+      client_id: CLIENT_ID,
+      client_secret: CLIENT_SECRET,
+    }),
+    {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    }
+  );
+  
+  return response.data.access_token;
+}
+```
 
 ---
 
-## Complete Example: Borrow USDST
+## 4. Your First Transaction (3 minutes)
 
-```javascript
-const { ethers } = require('ethers');
-require('dotenv').config();
+Create `src/example.ts`:
 
-// Contract addresses
-const LENDING_POOL = '0x...';
-const COLLATERAL_VAULT = '0x...';
-const ETH_TOKEN = '0x...';
-const USDST_TOKEN = '0x...';
+```typescript
+import { strato, cirrus } from './config';
+import { initAuth, getAccessToken } from './auth';
 
-// ABIs
-const ERC20_ABI = ['function approve(address,uint256) returns(bool)'];
-const VAULT_ABI = ['function addCollateral(address,uint256)'];
-const POOL_ABI = ['function borrow(address,uint256)'];
+interface FunctionInput {
+  contractName: string;
+  contractAddress: string;
+  method: string;
+  args: Record<string, any>;
+}
 
-async function borrowUSDST() {
-  // Setup
-  const provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
-  const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+// Build transaction (STRATO format)
+function buildFunctionTx(inputs: FunctionInput | FunctionInput[]) {
+  const inputArray = Array.isArray(inputs) ? inputs : [inputs];
   
-  const ethToken = new ethers.Contract(ETH_TOKEN, ERC20_ABI, wallet);
-  const vault = new ethers.Contract(COLLATERAL_VAULT, VAULT_ABI, wallet);
-  const pool = new ethers.Contract(LENDING_POOL, POOL_ABI, wallet);
+  const txs = inputArray.map(input => ({
+    type: 'FUNCTION',
+    payload: {
+      contractName: input.contractName,
+      contractAddress: input.contractAddress,
+      method: input.method,
+      args: input.args,
+    },
+  }));
   
-  // Amounts
-  const collateralAmount = ethers.parseEther('1.0');  // 1 ETH
-  const borrowAmount = ethers.parseEther('500');       // 500 USDST
+  return {
+    txs,
+    txParams: {
+      gasLimit: 32_100_000_000,
+      gasPrice: 1,
+    },
+  };
+}
+
+// Submit transaction to STRATO
+async function submitTransaction(accessToken: string, tx: any) {
+  const response = await strato.post(
+    '/transaction/parallel?resolve=true',
+    tx,
+    {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    }
+  );
   
+  return response.data;
+}
+
+// Query data from Cirrus (indexed blockchain data)
+async function queryTokens(accessToken: string) {
+  const response = await cirrus.get('/Token', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    params: {
+      select: 'address,_name,_symbol',
+      limit: 10
+    }
+  });
+  
+  return response.data;
+}
+
+// Example: Transfer tokens
+async function transferTokens() {
   try {
-    // 1. Approve ETH to vault
-    console.log('1. Approving ETH...');
-    let tx = await ethToken.approve(COLLATERAL_VAULT, collateralAmount);
-    await tx.wait();
-    console.log('   ✅ Approved');
+    // 1. Initialize auth
+    await initAuth();
+    const accessToken = await getAccessToken();
+    console.log('✅ Authenticated');
     
-    // 2. Add collateral
-    console.log('2. Adding collateral...');
-    tx = await vault.addCollateral(ETH_TOKEN, collateralAmount);
-    await tx.wait();
-    console.log('   ✅ Added 1 ETH collateral');
+    // 2. Query available tokens
+    const tokens = await queryTokens(accessToken);
+    console.log('✅ Found', tokens.length, 'tokens');
+    console.log('  First token:', tokens[0]);
     
-    // 3. Borrow USDST
-    console.log('3. Borrowing USDST...');
-    tx = await pool.borrow(USDST_TOKEN, borrowAmount);
-    await tx.wait();
-    console.log('   ✅ Borrowed 500 USDST');
+    // 3. Build transfer transaction
+    const tx = buildFunctionTx({
+      contractName: 'Token',
+      contractAddress: tokens[0].address, // Use first token
+      method: 'transfer',
+      args: {
+        to: '0x1234567890123456789012345678901234567890',
+        value: '1000000000000000000' // 1 token (18 decimals)
+      }
+    });
     
-    console.log('\n✅ Success! Check your wallet for USDST.');
+    console.log('✅ Transaction built');
     
-  } catch (error) {
+    // 4. Submit transaction
+    const result = await submitTransaction(accessToken, tx);
+    console.log('✅ Transaction submitted');
+    console.log('  Hash:', result[0].hash);
+    console.log('  Status:', result[0].status);
+    
+  } catch (error: any) {
     console.error('❌ Error:', error.message);
+    if (error.response) {
+      console.error('  Response:', error.response.data);
+    }
   }
 }
 
-borrowUSDST();
+// Run example
+transferTokens();
+```
+
+### Run It
+
+```bash
+npx ts-node src/example.ts
+```
+
+**Expected output:**
+
+```
+✅ Authenticated
+✅ Found 15 tokens
+  First token: { address: '0x...', _name: 'USD Token', _symbol: 'USDST' }
+✅ Transaction built
+✅ Transaction submitted
+  Hash: 0xabc123...
+  Status: Success
+```
+
+---
+
+## Complete Example: Supply Collateral to Lending Pool
+
+This example shows a more complex multi-step transaction:
+
+Create `src/lending-example.ts`:
+
+```typescript
+import { strato, cirrus } from './config';
+import { initAuth, getAccessToken } from './auth';
+
+interface FunctionInput {
+  contractName: string;
+  contractAddress: string;
+  method: string;
+  args: Record<string, any>;
+}
+
+function buildFunctionTx(inputs: FunctionInput | FunctionInput[]) {
+  const inputArray = Array.isArray(inputs) ? inputs : [inputs];
+  
+  const txs = inputArray.map(input => ({
+    type: 'FUNCTION',
+    payload: {
+      contractName: input.contractName,
+      contractAddress: input.contractAddress,
+      method: input.method,
+      args: input.args,
+    },
+  }));
+  
+  return {
+    txs,
+    txParams: {
+      gasLimit: 32_100_000_000,
+      gasPrice: 1,
+    },
+  };
+}
+
+async function submitTransaction(accessToken: string, tx: any) {
+  const response = await strato.post(
+    '/transaction/parallel?resolve=true',
+    tx,
+    {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    }
+  );
+  
+  return response.data;
+}
+
+// Get lending pool address from registry
+async function getLendingPoolAddress(accessToken: string): Promise<string> {
+  const LENDING_REGISTRY = '0000000000000000000000000000000000001007';
+  
+  const response = await cirrus.get('/LendingRegistry', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    params: {
+      address: `eq.${LENDING_REGISTRY}`,
+      select: 'lendingPool'
+    }
+  });
+  
+  return response.data[0].lendingPool;
+}
+
+async function supplyCollateral() {
+  try {
+    // 1. Auth
+    await initAuth();
+    const accessToken = await getAccessToken();
+    console.log('✅ Authenticated');
+    
+    // 2. Get contract addresses
+    const lendingPoolAddress = await getLendingPoolAddress(accessToken);
+    const ETHST_TOKEN = '0x...'; // Get from your deployment
+    
+    console.log('✅ Got lending pool address:', lendingPoolAddress);
+    
+    // 3. Build multi-step transaction (approve + supply)
+    const amount = '1000000000000000000'; // 1 ETHST
+    
+    const tx = buildFunctionTx([
+      // Step 1: Approve
+      {
+        contractName: 'Token',
+        contractAddress: ETHST_TOKEN,
+        method: 'approve',
+        args: {
+          spender: lendingPoolAddress,
+          value: amount
+        }
+      },
+      // Step 2: Supply collateral
+      {
+        contractName: 'LendingPool',
+        contractAddress: lendingPoolAddress,
+        method: 'supplyCollateral',
+        args: {
+          asset: ETHST_TOKEN,
+          amount: amount
+        }
+      }
+    ]);
+    
+    console.log('✅ Built 2-step transaction (approve + supply)');
+    
+    // 4. Submit
+    const result = await submitTransaction(accessToken, tx);
+    console.log('✅ Transaction submitted');
+    console.log('  Hash:', result[0].hash);
+    console.log('  Status:', result[0].status);
+    
+  } catch (error: any) {
+    console.error('❌ Error:', error.message);
+    if (error.response) {
+      console.error('  Response:', error.response.data);
+    }
+  }
+}
+
+supplyCollateral();
+```
+
+---
+
+## Finding Contract Addresses
+
+### Method 1: Query Cirrus
+
+```typescript
+// Get all deployed contracts
+async function getAllContracts(accessToken: string) {
+  const response = await cirrus.get('/Contract', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    params: {
+      select: 'address,name',
+      limit: 100
+    }
+  });
+  
+  return response.data;
+}
+
+// Get specific contract by name
+async function getContractByName(accessToken: string, name: string) {
+  const response = await cirrus.get('/Contract', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    params: {
+      name: `eq.${name}`,
+      select: 'address'
+    }
+  });
+  
+  return response.data[0]?.address;
+}
+```
+
+### Method 2: Use Registries
+
+```typescript
+// Contract registries with fixed addresses
+const REGISTRIES = {
+  LENDING_REGISTRY: '0000000000000000000000000000000000001007',
+  CDP_REGISTRY: '0000000000000000000000000000000000001012',
+  POOL_FACTORY: '000000000000000000000000000000000000100a',
+  TOKEN_FACTORY: '000000000000000000000000000000000000100b',
+};
+
+// Get lending contracts
+async function getLendingContracts(accessToken: string) {
+  const response = await cirrus.get('/LendingRegistry', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    params: {
+      address: `eq.${REGISTRIES.LENDING_REGISTRY}`,
+      select: 'lendingPool,collateralVault,priceOracle'
+    }
+  });
+  
+  return response.data[0];
+}
+```
+
+---
+
+## Development Checklist
+
+Before building your app:
+
+- [ ] STRATO is deployed (local, cloud, or private network)
+- [ ] You can access your STRATO instance
+- [ ] You have OAuth credentials
+- [ ] Your `.env` is configured
+- [ ] You're using STRATO REST APIs (NOT ethers.js)
+- [ ] You understand buildFunctionTx() pattern
+
+---
+
+## Common Patterns
+
+### Pattern: Query Balance
+
+```typescript
+async function getTokenBalance(
+  accessToken: string,
+  tokenAddress: string,
+  userAddress: string
+) {
+  const response = await cirrus.get('/Token-_balances', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    params: {
+      address: `eq.${tokenAddress}`,
+      key: `eq.${userAddress}`,
+      select: 'value::text'
+    }
+  });
+  
+  return BigInt(response.data[0]?.value || '0');
+}
+```
+
+### Pattern: Multi-Step Transaction
+
+```typescript
+// Example: Approve + Swap
+const tx = buildFunctionTx([
+  {
+    contractName: 'Token',
+    contractAddress: TOKEN_A,
+    method: 'approve',
+    args: { spender: ROUTER, value: amount }
+  },
+  {
+    contractName: 'Router',
+    contractAddress: ROUTER,
+    method: 'swap',
+    args: { tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: amount }
+  }
+]);
+```
+
+### Pattern: Wait for Transaction
+
+```typescript
+async function waitForTransaction(accessToken: string, txHash: string) {
+  while (true) {
+    const response = await bloc.post(
+      '/transactions/results',
+      [txHash],
+      {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      }
+    );
+    
+    const result = response.data[0];
+    if (result.status !== 'Pending') {
+      return result;
+    }
+    
+    // Wait 2 seconds before checking again
+    await new Promise(resolve => setTimeout(resolve, 2000));
+  }
+}
 ```
 
 ---
 
 ## Debugging Tips
 
-### Check Transaction Status
+### Enable Request Logging
 
-```javascript
-const receipt = await tx.wait();
-console.log('Status:', receipt.status); // 1 = success, 0 = failed
-console.log('Gas used:', receipt.gasUsed.toString());
-console.log('Block:', receipt.blockNumber);
+```typescript
+strato.interceptors.request.use(request => {
+  console.log('→ Request:', request.method?.toUpperCase(), request.url);
+  return request;
+});
+
+strato.interceptors.response.use(response => {
+  console.log('← Response:', response.status, response.statusText);
+  return response;
+});
 ```
 
-### Handle Errors
+### Check Transaction Error
 
-```javascript
+```typescript
 try {
-  const tx = await contract.someFunction();
-  await tx.wait();
-} catch (error) {
-  if (error.code === 'INSUFFICIENT_FUNDS') {
-    console.error('Not enough gas');
-  } else if (error.code === 'UNPREDICTABLE_GAS_LIMIT') {
-    console.error('Transaction will likely fail');
-  } else {
-    console.error('Error:', error.message);
+  const result = await submitTransaction(accessToken, tx);
+} catch (error: any) {
+  if (error.response?.status === 400) {
+    console.error('Transaction failed:', error.response.data);
+    // Common issues:
+    // - Insufficient balance
+    // - Not approved
+    // - Invalid parameters
   }
 }
 ```
-
-### Estimate Gas Before Sending
-
-```javascript
-try {
-  const gasEstimate = await contract.someFunction.estimateGas(param1, param2);
-  console.log('Estimated gas:', gasEstimate.toString());
-  
-  // Now send with confidence
-  const tx = await contract.someFunction(param1, param2, {
-    gasLimit: gasEstimate * 120n / 100n // Add 20% buffer
-  });
-} catch (error) {
-  console.error('This transaction would fail:', error);
-}
-```
-
----
-
-## Production Checklist
-
-Before going live:
-
-- [ ] Never commit private keys
-- [ ] Use environment variables for secrets
-- [ ] Test on testnet first
-- [ ] Implement proper error handling
-- [ ] Add transaction retry logic
-- [ ] Monitor gas prices
-- [ ] Set reasonable timeouts
-- [ ] Log all transactions
-- [ ] Implement rate limiting
-- [ ] Add health checks
 
 ---
 
 ## Next Steps
 
-**Ready to build!** 🚀
+**You now understand the basics!** 🚀
 
-- **[Interactive API Reference](../reference/interactive-api.md)** - Explore the complete API with Swagger UI
-- **[Quick Reference](quick-reference.md)** - Code snippets for all operations
-- **[API Integration Guide](integration.md)** - Complete integration walkthrough
+- **[API Integration Guide](integration.md)** - Complete walkthrough with all operations
+- **[Quick Reference](quick-reference.md)** - Code snippets for common operations
 - **[E2E Examples](e2e.md)** - Full end-to-end integration examples
 
+### Study the Reference Implementation
+
+The **mercata app** (`strato-platform/mercata/`) is the complete reference:
+
+- **Backend** - `mercata/backend/src/` - Shows all STRATO API patterns
+- **Transaction Builder** - `mercata/backend/src/utils/txBuilder.ts`
+- **Transaction Helper** - `mercata/backend/src/utils/txHelper.ts`
+- **API Clients** - `mercata/backend/src/utils/mercataApiHelper.ts`
