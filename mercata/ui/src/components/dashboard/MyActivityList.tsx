@@ -16,7 +16,6 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { RefreshCw, ExternalLink, Shield, ArrowUpRight, ArrowDownLeft, Home, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { activityFeedApi, ActivityItem } from "@/lib/activityFeed";
 import { useUser } from "@/context/UserContext";
 
@@ -193,13 +192,11 @@ const MyActivityList = () => {
 
   return (
     <div>
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3 mb-6">
-        <Button variant="outline" size="icon" className="h-10 w-10" onClick={fetchActivities} disabled={isLoading}>
-          <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-        </Button>
+      {/* Filters - matching Lovable design */}
+      <div className="flex items-center gap-3 mb-6">
         <Select value={typeFilter} onValueChange={setTypeFilter}>
-          <SelectTrigger className="w-[130px] h-10">
+          <SelectTrigger className="w-[140px] h-10">
+            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} onClick={(e) => { e.stopPropagation(); fetchActivities(); }} />
             <SelectValue placeholder="All types" />
           </SelectTrigger>
           <SelectContent>
@@ -241,32 +238,30 @@ const MyActivityList = () => {
             return (
               <Card key={activity.id} className="hover:shadow-md transition-shadow border">
                 <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-start gap-3 min-w-0 flex-1">
-                      <div className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center ${config.bgColor} ${config.iconColor}`}>
-                        {config.icon}
+                  <div className="flex items-start gap-3">
+                    <div className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center ${config.bgColor} ${config.iconColor}`}>
+                      {config.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="font-semibold text-foreground text-sm sm:text-base truncate">{activity.title}</h3>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <span className={`font-semibold text-sm sm:text-base whitespace-nowrap ${isPositive ? "text-emerald-500 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>
+                            {isPositive ? "+" : "-"}{activity.amount} {activity.token}
+                          </span>
+                          <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                        </div>
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <h3 className="font-semibold text-foreground text-base">{activity.title}</h3>
-                        <p className="text-sm text-muted-foreground">{activity.description}</p>
+                      <p className="text-xs sm:text-sm text-muted-foreground truncate">{activity.description}</p>
+                      <div className="flex items-center justify-between gap-2 mt-0.5">
                         {activity.fromAddress && (
-                          <p className="text-sm">
+                          <p className="text-xs sm:text-sm">
                             <span className="text-muted-foreground">From </span>
-                            <span className="text-amber-500 dark:text-amber-400 font-medium cursor-pointer hover:underline">
-                              {formatAddress(activity.fromAddress)}
-                            </span>
+                            <span className="text-amber-500 dark:text-amber-400 font-medium">{formatAddress(activity.fromAddress)}</span>
                           </p>
                         )}
+                        <p className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">{formatDate(activity.timestamp)}</p>
                       </div>
-                    </div>
-                    <div className="flex-shrink-0 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <span className={`font-semibold text-base ${isPositive ? "text-emerald-500 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>
-                          {isPositive ? "+" : "-"}{activity.amount} {activity.token}
-                        </span>
-                        <ExternalLink className="h-4 w-4 text-muted-foreground ml-1" />
-                      </div>
-                      <p className="text-sm text-muted-foreground mt-1">{formatDate(activity.timestamp)}</p>
                     </div>
                   </div>
                 </CardContent>
