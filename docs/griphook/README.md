@@ -13,10 +13,10 @@ Griphook provides a bridge between AI assistants (like Claude) and the STRATO De
 
 ## Key Features
 
-### Authentication
-- **BlockApps OAuth** - Automatic token acquisition using username/password credentials
-- **Token Caching** - Tokens are cached and refreshed automatically before expiration
-- **OpenID Connect** - Discovery-based configuration for flexible deployment
+### Authentication (3 modes)
+- **Browser Login** (recommended) - Run `griphook login` for interactive OAuth via browser
+- **Password Mode** (legacy) - Automatic token acquisition using environment variables
+- **Token Mode** - Set `STRATO_ACCESS_TOKEN` for pre-authenticated scenarios
 
 ### Transports
 - **Stdio** - Default transport for Claude Code and other MCP-aware CLI clients
@@ -44,7 +44,13 @@ Griphook provides a bridge between AI assistants (like Claude) and the STRATO De
 ```bash
 cd griphook
 npm install
-npm run dev
+npm run build
+
+# Authenticate via browser (recommended)
+npm run login
+
+# Start the server
+npm start
 ```
 
 See [Setup](setup.md) for detailed configuration instructions.
@@ -58,19 +64,19 @@ Add to your MCP configuration:
   "mcpServers": {
     "griphook": {
       "command": "node",
-      "args": ["/path/to/griphook/dist/server.js"],
+      "args": ["/path/to/griphook/dist/cli.js", "serve"],
       "env": {
-        "BLOCKAPPS_USERNAME": "your-username",
-        "BLOCKAPPS_PASSWORD": "your-password",
         "OAUTH_CLIENT_ID": "your-client-id",
         "OAUTH_CLIENT_SECRET": "your-client-secret",
-        "OPENID_DISCOVERY_URL": "https://keycloak.example.com/auth/realms/mercata/.well-known/openid-configuration",
+        "OPENID_DISCOVERY_URL": "https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration",
         "STRATO_API_BASE_URL": "https://your-strato-instance/api"
       }
     }
   }
 }
 ```
+
+Note: Run `griphook login` first to authenticate. Credentials are stored in `~/.griphook/credentials.json`.
 
 ### HTTP Transport
 When enabled (default), Griphook listens on `http://127.0.0.1:3005/mcp` with SSE at `/mcp/events`.

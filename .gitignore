@@ -65,4 +65,4 @@ docker-compose.oracle.yml
 /griphook/dist
 /griphook/.turbo
 /griphook/.env
-/griphook/.env.*
+!/griphook/.env.sample

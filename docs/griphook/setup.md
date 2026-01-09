@@ -1,38 +1,88 @@
 # Setup & Configuration
 
-This guide covers installation, environment variables, and running Griphook.
+This guide covers installation, authentication, and running Griphook.
 
 ## Prerequisites
 
 - Node.js 18+
 - npm or yarn
 - Access to a STRATO deployment
-- BlockApps OAuth credentials
+- BlockApps account (for OAuth authentication)
 
 ## Installation
 
 ```bash
 cd griphook
 npm install
+npm run build
 ```
+
+## Authentication
+
+Griphook supports three authentication modes (checked in this priority order):
+
+### 1. Token Mode (Highest Priority)
+Set `STRATO_ACCESS_TOKEN` with a pre-obtained access token:
+```bash
+export STRATO_ACCESS_TOKEN="eyJhbGciOiJSUzI1NiIs..."
+npm start
+```
+
+### 2. Password Mode (Legacy)
+Set all OAuth environment variables for automatic token acquisition:
+```bash
+export BLOCKAPPS_USERNAME="user@example.com"
+export BLOCKAPPS_PASSWORD="yourpassword"
+export OAUTH_CLIENT_ID="your-client-id"
+export OAUTH_CLIENT_SECRET="your-client-secret"
+export OPENID_DISCOVERY_URL="https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration"
+npm start
+```
+
+### 3. Browser Mode (Recommended)
+Interactive OAuth login via browser - no password stored in environment:
+
+```bash
+# Set OAuth client configuration
+export OAUTH_CLIENT_ID="your-client-id"
+export OAUTH_CLIENT_SECRET="your-client-secret"
+export OPENID_DISCOVERY_URL="https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration"
+export STRATO_API_BASE_URL="https://your-strato-instance/api"
+
+# Login via browser (opens browser for OAuth)
+npm run login
+
+# Start the server
+npm start
+```
+
+Credentials are stored securely in `~/.griphook/credentials.json` and automatically refreshed.
+
+**CLI Commands:**
+| Command | Description |
+|---------|-------------|
+| `npm run login` | Authenticate via browser |
+| `npm run logout` | Clear stored credentials |
+| `npm run status` | Check authentication status |
 
 ## Environment Variables
 
-### Required (Authentication)
+### OAuth Configuration
 
-These variables are required for Griphook to authenticate with the STRATO backend:
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `OAUTH_CLIENT_ID` | OAuth 2.0 client ID | `localhost` |
+| `OAUTH_CLIENT_SECRET` | OAuth 2.0 client secret | `client-secret-value` |
+| `OPENID_DISCOVERY_URL` | OpenID Connect discovery endpoint | `https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration` |
+
+### Password Mode (Legacy)
 
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `BLOCKAPPS_USERNAME` | BlockApps account username | `user@example.com` |
 | `BLOCKAPPS_PASSWORD` | BlockApps account password | `secretpassword` |
-| `OAUTH_CLIENT_ID` | OAuth 2.0 client ID | `strato-client` |
-| `OAUTH_CLIENT_SECRET` | OAuth 2.0 client secret | `client-secret-value` |
-| `OPENID_DISCOVERY_URL` | OpenID Connect discovery endpoint | `https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration` |
 
-### Optional (STRATO Backend)
-
-Configure the STRATO backend connection:
+### STRATO Backend
 
 | Variable | Description | Default |
 |----------|-------------|---------|
@@ -40,9 +90,7 @@ Configure the STRATO backend connection:
 | `STRATO_API_BASE_URL` | STRATO API base URL | `http://localhost:3001/api` |
 | `STRATO_HTTP_TIMEOUT_MS` | HTTP request timeout in milliseconds | `15000` |
 
-### Optional (Griphook Server)
-
-Configure the Griphook MCP server itself:
+### Griphook Server
 
 | Variable | Description | Default |
 |----------|-------------|---------|
@@ -93,28 +141,25 @@ GRIPHOOK_HTTP_ENABLED=false npm start
 
 ## Example Configurations
 
-### Local Development
+### Browser Auth (Recommended)
 ```bash
-export BLOCKAPPS_USERNAME="dev@example.com"
-export BLOCKAPPS_PASSWORD="devpassword"
-export OAUTH_CLIENT_ID="strato-dev"
-export OAUTH_CLIENT_SECRET="dev-secret"
-export OPENID_DISCOVERY_URL="http://localhost:8080/auth/realms/dev/.well-known/openid-configuration"
-export STRATO_API_BASE_URL="http://localhost:3001/api"
+export OAUTH_CLIENT_ID="localhost"
+export OAUTH_CLIENT_SECRET="your-client-secret"
+export OPENID_DISCOVERY_URL="https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration"
+export STRATO_API_BASE_URL="https://buildtest.mercata-testnet.blockapps.net/api"
 
-npm run dev
+npm run login   # One-time browser authentication
+npm start       # Start the server
 ```
 
-### Production (Helium Testnet)
+### Password Auth (Legacy)
 ```bash
 export BLOCKAPPS_USERNAME="user@company.com"
 export BLOCKAPPS_PASSWORD="$VAULT_PASSWORD"
 export OAUTH_CLIENT_ID="production-client"
 export OAUTH_CLIENT_SECRET="$VAULT_CLIENT_SECRET"
 export OPENID_DISCOVERY_URL="https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration"
-export STRATO_API_BASE_URL="https://helium.blockapps.net/api"
-export GRIPHOOK_HTTP_HOST="0.0.0.0"
-export GRIPHOOK_HTTP_PORT="8080"
+export STRATO_API_BASE_URL="https://your-strato-instance/api"
 
 npm start
 ```
@@ -127,38 +172,45 @@ Add to `~/.claude/claude_code_config.json` or project `.mcp.json`:
   "mcpServers": {
     "griphook": {
       "command": "node",
-      "args": ["/absolute/path/to/griphook/dist/server.js"],
+      "args": ["/absolute/path/to/griphook/dist/cli.js", "serve"],
       "env": {
-        "BLOCKAPPS_USERNAME": "your-username",
-        "BLOCKAPPS_PASSWORD": "your-password",
         "OAUTH_CLIENT_ID": "your-client-id",
         "OAUTH_CLIENT_SECRET": "your-client-secret",
         "OPENID_DISCOVERY_URL": "https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration",
-        "STRATO_API_BASE_URL": "https://helium.blockapps.net/api"
+        "STRATO_API_BASE_URL": "https://your-strato-instance/api"
       }
     }
   }
 }
 ```
 
+Note: Run `npm run login` in the griphook directory first to authenticate.
+
 ## Authentication Flow
 
-Griphook handles OAuth automatically:
+### Browser Mode
+1. User runs `npm run login`
+2. Griphook starts local callback server on port 8085
+3. Browser opens to Keycloak login page
+4. User authenticates in browser
+5. Keycloak redirects to local callback with auth code
+6. Griphook exchanges code for tokens using PKCE
+7. Tokens saved to `~/.griphook/credentials.json`
+8. Subsequent API calls use stored tokens (auto-refreshed)
 
+### Password Mode
 1. On first API request, discovers token endpoint from `OPENID_DISCOVERY_URL`
 2. Acquires access token using Resource Owner Password Credentials grant
 3. Caches token until 2 minutes before expiration
 4. Automatically refreshes expired tokens
 
-You do not need to manage tokens manually - all MCP tool calls are authenticated transparently.
-
 ## Troubleshooting
 
-### Missing Environment Variable Error
+### Browser Login Issues
 ```
-Error: Missing required environment variable: BLOCKAPPS_USERNAME
+Error: OPENID_DISCOVERY_URL environment variable is required
 ```
-Ensure all required environment variables are set before starting.
+Set the required OAuth environment variables before running login.
 
 ### OAuth Token Failure
 ```
@@ -167,6 +219,14 @@ Error: Failed to acquire access token
 - Verify credentials are correct
 - Check `OPENID_DISCOVERY_URL` is accessible
 - Ensure client ID/secret match the OAuth provider configuration
+
+### 403 Forbidden Errors
+```
+Request failed with status code 403
+```
+- Token may have expired - run `npm run login` again
+- Verify `STRATO_API_BASE_URL` matches the realm used for authentication
+- Check that the OAuth client is authorized for the target STRATO instance
 
 ### Connection Refused
 ```
