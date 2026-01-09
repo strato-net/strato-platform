@@ -533,12 +533,13 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
       {/* Warning Message Box - Above Borrow Button */}
       {targetHealthFactor < 1.6 && !customBorrowError && (
         <div className="p-4 border rounded-lg bg-red-500/10 dark:bg-red-500/20 border-red-500/30">
-          <div className="flex items-start gap-2">
-            <AlertTriangle className="h-5 w-5 flex-shrink-0 mt-0.5 text-red-600 dark:text-red-400" />
-            <p className="text-sm whitespace-pre-line text-red-800 dark:text-red-200">
-              Caution: Borrowing at this risk level can result in liquidation if the collateral drops in value.
-            </p>
+          <div className="flex items-start gap-2 mb-2">
+            <AlertTriangle className="h-5 w-5 flex-shrink-0 text-red-600 dark:text-red-400" />
+            <p className="text-sm font-semibold text-red-800 dark:text-red-200">High Risk Warning</p>
           </div>
+          <p className="text-sm whitespace-pre-line text-red-800 dark:text-red-200">
+            Borrowing at this risk level can result in liquidation if the collateral drops in value.
+          </p>
         </div>
       )}
 
