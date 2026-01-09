@@ -11,7 +11,7 @@ function buildServer(config: ReturnType<typeof loadConfig>) {
   const instructions = [
     "Griphook MCP server exposes the STRATO web app backend. Authentication uses BlockApps OAuth credentials (BLOCKAPPS_USERNAME, BLOCKAPPS_PASSWORD).",
     `API base: ${config.apiBaseUrl}. Override with STRATO_API_BASE_URL.`,
-    "Use strato.api-request for arbitrary endpoints; domain tools (strato.tokens, strato.swap, strato.lending, strato.cdp, strato.bridge, strato.rewards, strato.admin, strato.events, strato.protocol-fees, strato.rpc) provide common workflows.",
+    "Domain tools: strato.tokens, strato.swap, strato.lending, strato.cdp, strato.bridge, strato.rewards, strato.admin, strato.events, strato.protocol-fees, strato.rpc.",
     `HTTP transport: ${config.http.enabled ? `POST ${config.http.host}:${config.http.port}${config.http.path}` : "disabled (set GRIPHOOK_HTTP_ENABLED=true)"}.`,
   ].join("\n");
 

@@ -25,7 +25,6 @@ Griphook provides a bridge between AI assistants (like Claude) and the STRATO De
 ### Tool Categories
 | Category | Tools | Description |
 |----------|-------|-------------|
-| **Core** | 1 | Raw API access to any endpoint |
 | **Data Snapshots** | 10 | Aggregate views of tokens, swap, lending, CDP, bridge, rewards, admin, events, fees, RPC |
 | **Swap Actions** | 5 | Pool creation, liquidity management, swap execution |
 | **Token Actions** | 5 | Create, transfer, approve, transferFrom, set status |

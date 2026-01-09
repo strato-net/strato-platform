@@ -42,7 +42,6 @@ Transports:
   - `GRIPHOOK_HTTP_SSE_PATH` (default {path}/events)
 
 Tools:
-- `strato.api-request` – raw HTTP call to any endpoint
 - Domain snapshots: `strato.tokens`, `strato.swap`, `strato.lending`, `strato.cdp`, `strato.bridge`, `strato.rewards`, `strato.admin`, `strato.events`, `strato.protocol-fees`, `strato.rpc`
 - Swap actions: `strato.swap.create-pool`, `strato.swap.add-liquidity`, `strato.swap.add-liquidity-single`, `strato.swap.remove-liquidity`, `strato.swap.execute`
 - Token actions: `strato.tokens.create`, `strato.tokens.transfer`, `strato.tokens.approve`, `strato.tokens.transfer-from`, `strato.tokens.set-status`

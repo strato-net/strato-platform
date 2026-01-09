@@ -22,7 +22,6 @@ function buildEnum<T extends string>(values: readonly [T, ...T[]], description?:
 }
 
 export function registerTools(server: McpServer, client: GriphookClient, config: GriphookConfig) {
-  registerApiRequestTool(server, client);
   registerTokensSnapshot(server, client);
   registerSwapSnapshot(server, client);
   registerLendingSnapshot(server, client);
@@ -43,40 +42,21 @@ export function registerTools(server: McpServer, client: GriphookClient, config:
   registerOracleActions(server, client);
 }
 
-function registerApiRequestTool(server: McpServer, client: GriphookClient) {
-  const apiRequestSchema = z.object({
-    method: buildEnum<HttpMethod>(["get", "post", "put", "patch", "delete"] as const),
-    path: z.string().describe("Path relative to the API base, e.g. /tokens or tokens/v2/earning-assets"),
-    query: z.record(z.string(), z.any()).optional().describe("Optional query parameters"),
-    body: z.any().optional().describe("Optional JSON payload"),
-    headers: z.record(z.string(), z.string()).optional().describe("Additional headers to send"),
-  });
-  type ApiRequestArgs = z.infer<typeof apiRequestSchema>;
-
-  server.registerTool(
-    "strato.api-request",
-    {
-      title: "Raw Strato API call",
-      description: "Call any Strato backend endpoint with an arbitrary method, path, query, and body.",
-      inputSchema: apiRequestSchema,
-    },
-    async (input: ApiRequestArgs) => {
-      const data = await client.request(input.method, input.path, {
-        params: input.query,
-        data: input.body,
-        headers: input.headers,
-      });
-      return toContent(data, `Response from ${input.method.toUpperCase()} ${input.path}`);
-    },
-  );
+// Helper to safely fetch an endpoint, returning undefined on error
+async function safeFetch<T>(client: GriphookClient, method: HttpMethod, path: string, options?: Parameters<typeof client.request>[2]): Promise<T | undefined> {
+  try {
+    return await client.request<T>(method, path, options);
+  } catch {
+    return undefined;
+  }
 }
 
 function registerTokensSnapshot(server: McpServer, client: GriphookClient) {
   const tokensSchema = z.object({
     status: z.string().optional().describe("Optional status filter, e.g. eq.2"),
     includeStats: z.boolean().default(false),
-    includeEarningAssets: z.boolean().default(true),
-    includeBalances: z.boolean().default(true),
+    includeEarningAssets: z.boolean().default(false),
+    includeBalances: z.boolean().default(false),
     tokenAddress: z.string().optional().describe("When set, fetch this specific token and balance history"),
     poolAddress: z.string().optional().describe("When set, fetch pool price history for this swap pool"),
   });
@@ -90,53 +70,46 @@ function registerTokensSnapshot(server: McpServer, client: GriphookClient) {
       inputSchema: tokensSchema,
     },
     async ({ status, includeStats, includeEarningAssets, includeBalances, tokenAddress, poolAddress }: TokensArgs) => {
-      const tasks: Promise<unknown>[] = [];
       const result: Record<string, unknown> = {};
 
-      tasks.push(
-        client
-          .request("get", "/tokens", { params: status ? { status } : undefined })
-          .then((data) => (result.tokens = data)),
-      );
+      // Always fetch tokens (primary endpoint)
+      result.tokens = await client.request("get", "/tokens", { params: status ? { status } : undefined });
+
+      // Optional endpoints - fetch in parallel, ignore errors
+      const optionalTasks: Promise<void>[] = [];
 
       if (includeBalances) {
-        tasks.push(
-          client.request("get", "/tokens/balance").then((data) => (result.balances = data)),
-        );
-        tasks.push(
-          client.request("get", "/vouchers/balance").then((data) => (result.voucherBalance = data)),
+        optionalTasks.push(
+          safeFetch(client, "get", "/tokens/balance").then((data) => { if (data) result.balances = data; }),
+          safeFetch(client, "get", "/vouchers/balance").then((data) => { if (data) result.voucherBalance = data; }),
         );
       }
 
       if (includeStats) {
-        tasks.push(
-          client.request("get", "/tokens/stats").then((data) => (result.stats = data)),
+        optionalTasks.push(
+          safeFetch(client, "get", "/tokens/stats").then((data) => { if (data) result.stats = data; }),
         );
       }
 
       if (includeEarningAssets) {
-        tasks.push(
-          client.request("get", "/tokens/v2/earning-assets").then((data) => (result.earningAssets = data)),
+        optionalTasks.push(
+          safeFetch(client, "get", "/tokens/v2/earning-assets").then((data) => { if (data) result.earningAssets = data; }),
         );
       }
 
       if (tokenAddress) {
-        tasks.push(
-          client
-            .request("get", `/tokens/v2/balance-history/${tokenAddress}`)
-            .then((data) => (result.balanceHistory = data)),
+        optionalTasks.push(
+          safeFetch(client, "get", `/tokens/v2/balance-history/${tokenAddress}`).then((data) => { if (data) result.balanceHistory = data; }),
         );
       }
 
       if (poolAddress) {
-        tasks.push(
-          client
-            .request("get", `/tokens/v2/pool-price-history/${poolAddress}`)
-            .then((data) => (result.poolPriceHistory = data)),
+        optionalTasks.push(
+          safeFetch(client, "get", `/tokens/v2/pool-price-history/${poolAddress}`).then((data) => { if (data) result.poolPriceHistory = data; }),
         );
       }
 
-      await Promise.all(tasks);
+      await Promise.all(optionalTasks);
       return toContent(result, "Token snapshot");
     },
   );
@@ -163,54 +136,50 @@ function registerSwapSnapshot(server: McpServer, client: GriphookClient) {
     },
     async ({ tokenA, tokenB, poolAddress, includePositions, includeHistory, historyLimit, historyPage }: SwapArgs) => {
       const result: Record<string, unknown> = {};
-      const tasks: Promise<unknown>[] = [];
+      const optionalTasks: Promise<void>[] = [];
 
-      tasks.push(
-        client.request("get", "/swap-pools").then((data) => (result.pools = data)),
-      );
-      tasks.push(
-        client.request("get", "/swap-pools/tokens").then((data) => (result.swappableTokens = data)),
+      // Primary swap pool endpoints
+      optionalTasks.push(
+        safeFetch(client, "get", "/swap-pools").then((data) => { if (data) result.pools = data; }),
+        safeFetch(client, "get", "/swap-pools/tokens").then((data) => { if (data) result.swappableTokens = data; }),
       );
 
       if (tokenA) {
-        tasks.push(
-          client.request("get", `/swap-pools/tokens/${tokenA}`).then((data) => (result.pairableTokens = data)),
+        optionalTasks.push(
+          safeFetch(client, "get", `/swap-pools/tokens/${tokenA}`).then((data) => { if (data) result.pairableTokens = data; }),
         );
       }
 
       if (tokenA && tokenB) {
-        tasks.push(
-          client
-            .request("get", `/swap-pools/${tokenA}/${tokenB}`)
-            .then((data) => (result.poolsForPair = data)),
+        optionalTasks.push(
+          safeFetch(client, "get", `/swap-pools/${tokenA}/${tokenB}`).then((data) => { if (data) result.poolsForPair = data; }),
         );
       }
 
       if (poolAddress) {
-        tasks.push(
-          client.request("get", `/swap-pools/${poolAddress}`).then((data) => (result.pool = data)),
+        optionalTasks.push(
+          safeFetch(client, "get", `/swap-pools/${poolAddress}`).then((data) => { if (data) result.pool = data; }),
         );
         if (includeHistory) {
-          tasks.push(
-            client
-              .request("get", `/swap-history/${poolAddress}`, {
-                params: {
-                  limit: historyLimit,
-                  page: historyPage,
-                },
-              })
-              .then((data) => (result.history = data)),
+          optionalTasks.push(
+            safeFetch(client, "get", `/swap-history/${poolAddress}`, {
+              params: { limit: historyLimit, page: historyPage },
+            }).then((data) => { if (data) result.history = data; }),
           );
         }
       }
 
       if (includePositions) {
-        tasks.push(
-          client.request("get", "/swap-pools/positions").then((data) => (result.lpPositions = data)),
+        optionalTasks.push(
+          safeFetch(client, "get", "/swap-pools/positions").then((data) => { if (data) result.lpPositions = data; }),
         );
       }
 
-      await Promise.all(tasks);
+      await Promise.all(optionalTasks);
+
+      if (Object.keys(result).length === 0) {
+        return toContent({ error: "Swap endpoints not available on this node" }, "Swap data");
+      }
       return toContent(result, "Swap data");
     },
   );
@@ -330,30 +299,35 @@ function registerLendingSnapshot(server: McpServer, client: GriphookClient) {
     },
     async ({ includeInterest, includeNearUnhealthy }: LendingArgs) => {
       const result: Record<string, unknown> = {};
-      const tasks: Promise<unknown>[] = [];
+      const optionalTasks: Promise<void>[] = [];
 
-      tasks.push(client.request("get", "/lending/pools").then((data) => (result.pools = data)));
-      tasks.push(client.request("get", "/lending/liquidity").then((data) => (result.liquidity = data)));
-      tasks.push(client.request("get", "/lending/collateral").then((data) => (result.collateral = data)));
-      tasks.push(client.request("get", "/lending/loans").then((data) => (result.loans = data)));
-      tasks.push(client.request("get", "/lending/liquidate").then((data) => (result.liquidatable = data)));
-      tasks.push(client.request("get", "/lending/safety/info").then((data) => (result.safety = data)));
+      // Primary lending endpoints
+      optionalTasks.push(
+        safeFetch(client, "get", "/lending/pools").then((data) => { if (data) result.pools = data; }),
+        safeFetch(client, "get", "/lending/liquidity").then((data) => { if (data) result.liquidity = data; }),
+        safeFetch(client, "get", "/lending/collateral").then((data) => { if (data) result.collateral = data; }),
+        safeFetch(client, "get", "/lending/loans").then((data) => { if (data) result.loans = data; }),
+        safeFetch(client, "get", "/lending/liquidate").then((data) => { if (data) result.liquidatable = data; }),
+        safeFetch(client, "get", "/lending/safety/info").then((data) => { if (data) result.safety = data; }),
+      );
 
       if (includeNearUnhealthy) {
-        tasks.push(
-          client
-            .request("get", "/lending/liquidate/near-unhealthy", { params: { margin: 0.2 } })
-            .then((data) => (result.nearUnhealthy = data)),
+        optionalTasks.push(
+          safeFetch(client, "get", "/lending/liquidate/near-unhealthy", { params: { margin: 0.2 } }).then((data) => { if (data) result.nearUnhealthy = data; }),
         );
       }
 
       if (includeInterest) {
-        tasks.push(
-          client.request("get", "/lending/interest").then((data) => (result.interest = data)),
+        optionalTasks.push(
+          safeFetch(client, "get", "/lending/interest").then((data) => { if (data) result.interest = data; }),
         );
       }
 
-      await Promise.all(tasks);
+      await Promise.all(optionalTasks);
+
+      if (Object.keys(result).length === 0) {
+        return toContent({ error: "Lending endpoints not available on this node" }, "Lending data");
+      }
       return toContent(result, "Lending data");
     },
   );
@@ -362,7 +336,7 @@ function registerLendingSnapshot(server: McpServer, client: GriphookClient) {
 function registerCdpSnapshot(server: McpServer, client: GriphookClient) {
   const cdpSchema = z.object({
     asset: z.string().optional().describe("Specific asset address to inspect config and vault"),
-    includeStats: z.boolean().default(true),
+    includeStats: z.boolean().default(false),
     includeInterest: z.boolean().default(false),
   });
   type CdpArgs = z.infer<typeof cdpSchema>;
@@ -376,33 +350,40 @@ function registerCdpSnapshot(server: McpServer, client: GriphookClient) {
     },
     async ({ asset, includeStats, includeInterest }: CdpArgs) => {
       const result: Record<string, unknown> = {};
-      const tasks: Promise<unknown>[] = [];
+      const optionalTasks: Promise<void>[] = [];
 
-      tasks.push(client.request("get", "/cdp/vaults").then((data) => (result.vaults = data)));
-      tasks.push(client.request("get", "/cdp/assets").then((data) => (result.assets = data)));
-      tasks.push(client.request("get", "/cdp/bad-debt").then((data) => (result.badDebt = data)));
+      // Primary CDP endpoints
+      optionalTasks.push(
+        safeFetch(client, "get", "/cdp/vaults").then((data) => { if (data) result.vaults = data; }),
+        safeFetch(client, "get", "/cdp/assets").then((data) => { if (data) result.assets = data; }),
+        safeFetch(client, "get", "/cdp/bad-debt").then((data) => { if (data) result.badDebt = data; }),
+      );
 
       if (asset) {
-        tasks.push(
-          client.request("get", `/cdp/vaults/${asset}`).then((data) => (result.vault = data)),
-        );
-        tasks.push(
-          client.request("get", `/cdp/config/${asset}`).then((data) => (result.assetConfig = data)),
-        );
-        tasks.push(
-          client.request("post", "/cdp/asset-debt-info", { data: { asset } }).then((data) => (result.assetDebt = data)),
+        optionalTasks.push(
+          safeFetch(client, "get", `/cdp/vaults/${asset}`).then((data) => { if (data) result.vault = data; }),
+          safeFetch(client, "get", `/cdp/config/${asset}`).then((data) => { if (data) result.assetConfig = data; }),
+          safeFetch(client, "post", "/cdp/asset-debt-info", { data: { asset } }).then((data) => { if (data) result.assetDebt = data; }),
         );
       }
 
       if (includeStats) {
-        tasks.push(client.request("get", "/cdp/stats").then((data) => (result.stats = data)));
+        optionalTasks.push(
+          safeFetch(client, "get", "/cdp/stats").then((data) => { if (data) result.stats = data; }),
+        );
       }
 
       if (includeInterest) {
-        tasks.push(client.request("get", "/cdp/interest").then((data) => (result.interest = data)));
+        optionalTasks.push(
+          safeFetch(client, "get", "/cdp/interest").then((data) => { if (data) result.interest = data; }),
+        );
       }
 
-      await Promise.all(tasks);
+      await Promise.all(optionalTasks);
+
+      if (Object.keys(result).length === 0) {
+        return toContent({ error: "CDP endpoints not available on this node" }, "CDP data");
+      }
       return toContent(result, "CDP data");
     },
   );
@@ -415,7 +396,7 @@ function registerBridgeData(server: McpServer, client: GriphookClient) {
     limit: z.number().int().optional(),
     offset: z.number().int().optional(),
     context: z.string().optional().describe("Pass 'admin' to include admin context transactions"),
-    includeSummary: z.boolean().default(true),
+    includeSummary: z.boolean().default(false),
   });
   type BridgeArgs = z.infer<typeof bridgeSchema>;
 
@@ -428,39 +409,38 @@ function registerBridgeData(server: McpServer, client: GriphookClient) {
     },
     async ({ chainId, txType, limit, offset, context, includeSummary }: BridgeArgs) => {
       const result: Record<string, unknown> = {};
-      const tasks: Promise<unknown>[] = [];
+      const optionalTasks: Promise<void>[] = [];
 
-      tasks.push(client.request("get", "/bridge/networkConfigs").then((data) => (result.networks = data)));
+      // Primary bridge endpoint
+      optionalTasks.push(
+        safeFetch(client, "get", "/bridge/networkConfigs").then((data) => { if (data) result.networks = data; }),
+      );
 
       if (chainId) {
-        tasks.push(
-          client
-            .request("get", `/bridge/bridgeableTokens/${chainId}`)
-            .then((data) => (result.bridgeableTokens = data)),
+        optionalTasks.push(
+          safeFetch(client, "get", `/bridge/bridgeableTokens/${chainId}`).then((data) => { if (data) result.bridgeableTokens = data; }),
         );
       }
 
       if (txType) {
-        tasks.push(
-          client
-            .request("get", `/bridge/transactions/${txType}`, {
-              params: {
-                limit,
-                offset,
-                context,
-              },
-            })
-            .then((data) => (result.transactions = data)),
+        optionalTasks.push(
+          safeFetch(client, "get", `/bridge/transactions/${txType}`, {
+            params: { limit, offset, context },
+          }).then((data) => { if (data) result.transactions = data; }),
         );
       }
 
       if (includeSummary) {
-        tasks.push(
-          client.request("get", "/bridge/withdrawalSummary").then((data) => (result.withdrawalSummary = data)),
+        optionalTasks.push(
+          safeFetch(client, "get", "/bridge/withdrawalSummary").then((data) => { if (data) result.withdrawalSummary = data; }),
         );
       }
 
-      await Promise.all(tasks);
+      await Promise.all(optionalTasks);
+
+      if (Object.keys(result).length === 0) {
+        return toContent({ error: "Bridge endpoints not available on this node" }, "Bridge data");
+      }
       return toContent(result, "Bridge data");
     },
   );
@@ -484,30 +464,33 @@ function registerRewardsData(server: McpServer, client: GriphookClient) {
     },
     async ({ userAddress, includeLeaderboard, leaderboardLimit, leaderboardOffset }: RewardsArgs) => {
       const result: Record<string, unknown> = {};
-      const tasks: Promise<unknown>[] = [];
+      const optionalTasks: Promise<void>[] = [];
 
-      tasks.push(client.request("get", "/rewards/pending").then((data) => (result.pending = data)));
-      tasks.push(client.request("get", "/rewards/overview").then((data) => (result.overview = data)));
-      tasks.push(client.request("get", "/rewards/activities").then((data) => (result.activities = data)));
-      tasks.push(client.request("get", "/rewards/pools").then((data) => (result.pools = data)));
+      // Primary rewards endpoints
+      optionalTasks.push(
+        safeFetch(client, "get", "/rewards/pools").then((data) => { if (data) result.pools = data; }),
+        safeFetch(client, "get", "/rewards/pending").then((data) => { if (data) result.pending = data; }),
+        safeFetch(client, "get", "/rewards/overview").then((data) => { if (data) result.overview = data; }),
+        safeFetch(client, "get", "/rewards/activities").then((data) => { if (data) result.activities = data; }),
+      );
 
       if (userAddress) {
-        tasks.push(
-          client
-            .request("get", `/rewards/activities/${userAddress}`)
-            .then((data) => (result.userActivities = data)),
+        optionalTasks.push(
+          safeFetch(client, "get", `/rewards/activities/${userAddress}`).then((data) => { if (data) result.userActivities = data; }),
         );
       }
 
       if (includeLeaderboard) {
-        tasks.push(
-          client
-            .request("get", "/rewards/leaderboard", { params: { limit: leaderboardLimit, offset: leaderboardOffset } })
-            .then((data) => (result.leaderboard = data)),
+        optionalTasks.push(
+          safeFetch(client, "get", "/rewards/leaderboard", { params: { limit: leaderboardLimit, offset: leaderboardOffset } }).then((data) => { if (data) result.leaderboard = data; }),
         );
       }
 
-      await Promise.all(tasks);
+      await Promise.all(optionalTasks);
+
+      if (Object.keys(result).length === 0) {
+        return toContent({ error: "Rewards endpoints not available on this node" }, "Rewards data");
+      }
       return toContent(result, "Rewards data");
     },
   );
@@ -530,33 +513,38 @@ function registerAdminData(server: McpServer, client: GriphookClient) {
     },
     async ({ search, contractAddress, includeConfig }: AdminArgs) => {
       const result: Record<string, unknown> = {};
-      const tasks: Promise<unknown>[] = [];
+      const optionalTasks: Promise<void>[] = [];
 
-      tasks.push(client.request("get", "/user/me").then((data) => (result.me = data)));
-      tasks.push(client.request("get", "/user/admin").then((data) => (result.admins = data)));
-      tasks.push(client.request("get", "/user/admin/issues").then((data) => (result.openIssues = data)));
+      // Primary admin endpoints
+      optionalTasks.push(
+        safeFetch(client, "get", "/user/me").then((data) => { if (data) result.me = data; }),
+        safeFetch(client, "get", "/user/admin").then((data) => { if (data) result.admins = data; }),
+        safeFetch(client, "get", "/user/admin/issues").then((data) => { if (data) result.openIssues = data; }),
+      );
 
       if (search) {
-        tasks.push(
-          client
-            .request("get", "/user/admin/contract/search", { params: { search } })
-            .then((data) => (result.searchResults = data)),
+        optionalTasks.push(
+          safeFetch(client, "get", "/user/admin/contract/search", { params: { search } }).then((data) => { if (data) result.searchResults = data; }),
         );
       }
 
       if (contractAddress) {
-        tasks.push(
-          client
-            .request("get", "/user/admin/contract/details", { params: { address: contractAddress } })
-            .then((data) => (result.contractDetails = data)),
+        optionalTasks.push(
+          safeFetch(client, "get", "/user/admin/contract/details", { params: { address: contractAddress } }).then((data) => { if (data) result.contractDetails = data; }),
         );
       }
 
       if (includeConfig) {
-        tasks.push(client.request("get", "/config").then((data) => (result.config = data)));
+        optionalTasks.push(
+          safeFetch(client, "get", "/config").then((data) => { if (data) result.config = data; }),
+        );
       }
 
-      await Promise.all(tasks);
+      await Promise.all(optionalTasks);
+
+      if (Object.keys(result).length === 0) {
+        return toContent({ error: "Admin endpoints not available on this node" }, "Admin data");
+      }
       return toContent(result, "Admin data");
     },
   );

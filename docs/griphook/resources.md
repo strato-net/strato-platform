@@ -66,14 +66,12 @@ The config resource includes:
   - OpenID discovery URL
   - HTTP timeout setting
 
-- **Required Environment Variables**
-  - `BLOCKAPPS_USERNAME`
-  - `BLOCKAPPS_PASSWORD`
-  - `OAUTH_CLIENT_ID`
-  - `OAUTH_CLIENT_SECRET`
-  - `OPENID_DISCOVERY_URL`
+- **Authentication Modes**
+  - Browser login (recommended): Run `griphook login` to authenticate
+  - Password mode (legacy): Set all OAuth environment variables
+  - Token mode: Set `STRATO_ACCESS_TOKEN` directly
 
-- **Optional Environment Variables**
+- **Environment Variables**
   - `STRATO_NODE_URL`
   - `STRATO_API_BASE_URL`
   - `STRATO_HTTP_TIMEOUT_MS`
@@ -131,6 +129,6 @@ console.log(result.contents[0].text);
 | Checking current configuration | Resource: `strato://resources/config` |
 | Fetching live token data | Tool: `strato.tokens` |
 | Executing a swap | Tool: `strato.swap.execute` |
-| Making an arbitrary API call | Tool: `strato.api-request` |
+| Querying lending positions | Tool: `strato.lending` |
 
 Resources are static documentation; tools interact with the live STRATO backend.

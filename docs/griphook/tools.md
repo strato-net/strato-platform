@@ -2,30 +2,6 @@
 
 Complete reference for all Griphook MCP tools. Tools are organized by category.
 
-## Core
-
-### strato.api-request
-Raw HTTP call to any STRATO backend endpoint.
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `method` | `"get" \| "post" \| "put" \| "patch" \| "delete"` | Yes | HTTP method |
-| `path` | `string` | Yes | Path relative to API base (e.g., `/tokens`) |
-| `query` | `object` | No | Query parameters |
-| `body` | `any` | No | JSON request body |
-| `headers` | `object` | No | Additional HTTP headers |
-
-**Example:**
-```json
-{
-  "method": "get",
-  "path": "/tokens",
-  "query": { "status": "eq.2" }
-}
-```
-
----
-
 ## Data Snapshots
 
 Aggregate views that fetch multiple related endpoints in a single call.
