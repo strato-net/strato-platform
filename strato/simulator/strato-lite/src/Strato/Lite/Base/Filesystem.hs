@@ -21,7 +21,6 @@
 module Strato.Lite.Base.Filesystem where
 
 import BlockApps.Logging
-import BlockApps.Solidity.Value as V
 import Blockchain.Context hiding (actionTimestamp, blockHeaders, remainingBlockHeaders)
 import Blockchain.Data.Block
 import Blockchain.Data.BlockDB
@@ -43,7 +42,6 @@ import Blockchain.Model.SyncTask
 import Blockchain.Model.WrappedBlock
 import qualified Blockchain.Sequencer.DB.DependentBlockDB as DBDB
 import Blockchain.Slipstream.OutputData
-import Blockchain.Slipstream.QueryFormatHelper
 import Blockchain.Strato.Indexer.IContext (API (..), IndexerException (..), P2P (..))
 import Blockchain.Strato.Discovery.ContextLite (UDPPacket(..))
 import Blockchain.Strato.Discovery.Data.MemPeerDB
@@ -86,6 +84,7 @@ import Network.Socket
 import qualified Network.Socket.ByteString as NB
 import Network.Wai.Handler.Warp.Internal
 import Strato.Lite.Base
+import Strato.Lite.Base.Utils
 import UnliftIO
 import Prelude hiding (round)
 
@@ -115,6 +114,11 @@ data FilesystemPeer = FilesystemPeer
   }
 
 makeLenses ''FilesystemPeer
+
+instance StratoPeer FilesystemPeer where
+  cirrusPool = _cirrusSqlPool . _filesystemDBs
+  ethPool    = _ethSqlPool . _filesystemDBs
+  peerMap    = _filesystemPeerMap
 
 type FilesystemM = ReaderT FilesystemPeer BaseM
 
@@ -211,65 +215,6 @@ instance {-# OVERLAPPING #-} (MonadUnliftIO m, MonadLogger m) => (FilesystemT m)
         traverse_ ($logErrorS "slipstream/error") $ T.lines cmd
       )
 
-sqlTypeSQLite :: SqlType -> T.Text
-sqlTypeSQLite SqlBool      = "bool"
-sqlTypeSQLite SqlDecimal   = "decimal"
-sqlTypeSQLite SqlText      = "text"
-sqlTypeSQLite SqlJsonb     = "jsonb"
-sqlTypeSQLite SqlTimestamp = "text"
-sqlTypeSQLite SqlSerial    = ""
-
-slipstreamQuerySQLite :: SlipstreamQuery -> Maybe T.Text
-slipstreamQuerySQLite (CreateTable tableName cols pk mTC _) = Just $ T.concat
-  [ "CREATE TABLE IF NOT EXISTS "
-  , tableNameToDoubleQuoteText tableName
-  , " ("
-  , csv $ (\(c,t) -> wrapEscapeDouble c <> " " <> sqlTypeSQLite t) <$> cols
-  , case pk of
-      [] -> ""
-      _ -> ",\n  PRIMARY KEY " <> wrapAndEscapeDouble pk
-  , case mTC of
-      Just (Unique n uc) -> T.concat
-        [ ", CONSTRAINT "
-        , wrapEscapeDouble n
-        , " UNIQUE "
-        , uc
-        ]
-      _ -> ""
-  , ");"
-  ]
-slipstreamQuerySQLite InsertTable{..} = Just $ T.concat
-  [ "INSERT "
-  , case onConflict of
-      Just DoNothing -> "OR IGNORE "
-      Just OnConflict{} -> "OR REPLACE "
-      _ -> ""
-  , "INTO "
-  , tableNameToDoubleQuoteText tableName
-  , " "
-  , wrapAndEscapeDouble $ fst <$> tableColumns
-  , "\n  VALUES "
-  , csv $ wrapParens . csv . map
-      (\((_,t),v) -> fromMaybe "NULL" $ valueToSQLiteText t =<< v)
-      . zip tableColumns
-      <$> values
-  ]
-slipstreamQuerySQLite _ = Nothing
-
-valueToSQLiteText :: SqlType -> Value -> Maybe T.Text
-valueToSQLiteText t v = case t of
-  SqlJsonb -> (\w -> "jsonb(" <> wrapEscapeSingle w <> ")") <$> w'
-  _ -> wrapEscapeSingle <$> valueToSQLText' True v
-  where v' = valueToSQLText' True v
-        w' = (\w -> case v of
-            SimpleValue ValueString{} -> wrapEscapeDouble w
-            SimpleValue ValueBytes{} -> wrapEscapeDouble w
-            SimpleValue ValueAddress{} -> wrapEscapeDouble w
-            ValueContract{} -> wrapEscapeDouble w
-            ValueArraySentinel _ -> "\"\""
-            _ -> w
-          ) <$> v'
-
 lookupLDB :: (MonadIO m, Binary k, Binary v) => (r -> LDB.DB) -> k -> ReaderT r m (Maybe v)
 lookupLDB getDB k = do
   db <- asks getDB
@@ -337,12 +282,6 @@ instance {-# OVERLAPPING #-} MonadIO m => (Keccak256 `A.Alters` DBDB.DependentBl
   lookup _ = lookupLDB $ DBDB.getDependentBlockDB . _dependentBlockDB . _filesystemDBs
   insert _ = insertLDB $ DBDB.getDependentBlockDB . _dependentBlockDB . _filesystemDBs
   delete _ = deleteLDB $ DBDB.getDependentBlockDB . _dependentBlockDB . _filesystemDBs
-
-updateSyncStatus' :: MonadIO m => FilesystemT m ()
-updateSyncStatus' = do
-  nodeNumber <- bestBlockNumber <$> Mod.get (Mod.Proxy @BestBlock)
-  worldNumber <- bestBlockNumber . unWorldBestBlock <$> Mod.get (Mod.Proxy @WorldBestBlock)
-  Mod.put (Mod.Proxy @SyncStatus) $ SyncStatus (nodeNumber >= worldNumber)
 
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Modifiable WorldBestBlock (FilesystemT m) where
   get _ = fromMaybe def <$> lookupLDB (_kvDB . _filesystemDBs) (encodeUtf8 "world_best_block")

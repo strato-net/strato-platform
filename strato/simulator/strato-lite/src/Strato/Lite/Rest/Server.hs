@@ -39,7 +39,9 @@ import qualified Data.Text as T
 import SQLM
 import Servant
 import Servant.Client
+import Strato.Lite.Base
 import Strato.Lite.Base.Filesystem
+import Strato.Lite.Base.Memory
 import Strato.Lite.Base.Simulator
 import Strato.Lite.Cirrus
 import Strato.Lite.Core
@@ -72,8 +74,8 @@ getPeers mgr label = do
     Nothing -> return []
     Just (peer,_) -> do
       simCtx <- liftIO . atomically . readTVar $ peer ^. simulatorPeerContext
-      peerMap <- liftIO . readIORef . stringPPeerMap $ simCtx ^. simulatorContextPeerMap
-      let peers = map (\(Host h) -> h) . M.keys $ peerMap
+      peerMap' <- liftIO . readIORef . stringPPeerMap $ simCtx ^. simulatorContextPeerMap
+      let peers = map (\(Host h) -> h) . M.keys $ peerMap'
       pure peers
 
 postAddNode :: NetworkManager -> T.Text -> AddNodeParams -> Handler Bool
@@ -133,11 +135,11 @@ multinodeServer mgr blocEnv urlMap nodeLabel = hoistServer (Proxy :: Proxy Combi
 cirrusClient :: Client ClientM CirrusAPI
 cirrusClient = client (Proxy @CirrusAPI)
 
-cirrusHandler :: MonadIO m => FilesystemPeer -> T.Text -> m Value
-cirrusHandler fPeer tableName = liftIO $ queryCirrus (fPeer ^. filesystemDBs . cirrusSqlPool) tableName
+cirrusHandler :: (MonadIO m, StratoPeer p) => p -> T.Text -> m Value
+cirrusHandler peer tableName = liftIO $ queryCirrus (cirrusPool peer) tableName
 
-singleNodeRestServer :: FilesystemPeer -> CorePeer -> BlocEnv -> UrlMap -> Server (CombinedAPI :<|> CirrusAPI)
-singleNodeRestServer fPeer cPeer blocEnv urlMap = hoistServer (Proxy :: Proxy (CombinedAPI :<|> CirrusAPI)) (convertErrors runM) ((coreApiServer :<|> bloc) :<|> cirrusHandler fPeer)
+filesystemNodeRestServer :: FilesystemPeer -> CorePeer -> BlocEnv -> UrlMap -> Server (CombinedAPI :<|> CirrusAPI)
+filesystemNodeRestServer fPeer cPeer blocEnv urlMap = hoistServer (Proxy :: Proxy (CombinedAPI :<|> CirrusAPI)) (convertErrors runM) ((coreApiServer :<|> bloc) :<|> cirrusHandler fPeer)
   where
     convertErrors r x = Handler $ do
           y <- liftIO . try . r $ x `catch` handleRuntimeError `catch` handleApiError
@@ -152,6 +154,25 @@ singleNodeRestServer fPeer cPeer blocEnv urlMap = hoistServer (Proxy :: Proxy (C
         . runMemPeerDBMUsingEnv (fPeer ^. filesystemPeerMap)
         . flip runReaderT (SQLDB . _ethSqlPool $ _filesystemDBs fPeer)
         . flip runReaderT fPeer
+        . flip runReaderT cPeer
+        $ f
+
+memoryNodeRestServer :: MemoryPeer -> CorePeer -> BlocEnv -> UrlMap -> Server (CombinedAPI :<|> CirrusAPI)
+memoryNodeRestServer mPeer cPeer blocEnv urlMap = hoistServer (Proxy :: Proxy (CombinedAPI :<|> CirrusAPI)) (convertErrors runM) ((coreApiServer :<|> bloc) :<|> cirrusHandler mPeer)
+  where
+    convertErrors r x = Handler $ do
+          y <- liftIO . try . r $ x `catch` handleRuntimeError `catch` handleApiError
+          case y of
+            Right a -> pure a
+            Left e -> throwE $ apiErrorToServantErr e
+    runM f = do
+      runLoggingT
+        . runResourceT
+        . flip runReaderT blocEnv
+        . flip runReaderT urlMap
+        . runMemPeerDBMUsingEnv (mPeer ^. memoryPeerMap)
+        . flip runReaderT (SQLDB . _memEthSqlPool $ _memoryDBs mPeer)
+        . flip runReaderT mPeer
         . flip runReaderT cPeer
         $ f
 

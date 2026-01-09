@@ -17,19 +17,14 @@
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Strato.Lite.Filesystem where
+module Strato.Lite.Memory where
 
 import BlockApps.Logging
 import Blockchain.Data.BlockDB ()
 import qualified Blockchain.Data.DataDefs as DataDefs
 import Blockchain.Data.GenesisInfo
-import Blockchain.Database.MerklePatricia.MPDB
-import Blockchain.DB.BlockSummaryDB
-import Blockchain.DB.CodeDB
-import Blockchain.DB.HashDB
 import Blockchain.Init.Generator (createGenesisInfo)
 import Blockchain.Network
-import Blockchain.Sequencer.DB.DependentBlockDB (DependentBlockDB(..))
 import Blockchain.Strato.Discovery.Data.MemPeerDB
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Discovery.UDPServer (connectMe)
@@ -44,14 +39,12 @@ import qualified Data.Map.Strict as M
 import Data.Pool (withResource)
 import Data.Text (Text)
 import qualified Data.Text as T
-import qualified Database.LevelDB as LDB
 import qualified Database.Persist.Sqlite as Lite
-import Executable.EVMFlags
 import Executable.EthDiscoverySetup (setupSQL)
 import GHC.Conc (retry)
 import Network.Socket as S
 import Strato.Lite.Base
-import Strato.Lite.Base.Filesystem
+import Strato.Lite.Base.Memory
 import Strato.Lite.Core
 import Strato.Lite.PEM
 import Strato.Lite.Utils
@@ -60,7 +53,7 @@ import System.FilePath
 import UnliftIO
 import Prelude hiding (round)
 
-createFilesystemPeerAndCorePeer ::
+createMemoryPeerAndCorePeer ::
   String ->
   PrivateKey ->
   Text ->
@@ -69,41 +62,41 @@ createFilesystemPeerAndCorePeer ::
   Host ->
   Bool ->
   Socket ->
-  FilesystemDBs ->
+  MemoryDBs ->
   (Text -> LoggingT IO () -> IO ()) ->
-  IO (FilesystemPeer, CorePeer)
-createFilesystemPeerAndCorePeer network' privKey name tcpPort udpPort myHost valBehav sock fsDBs logF = do
+  IO (MemoryPeer, CorePeer)
+createMemoryPeerAndCorePeer network' privKey name tcpPort udpPort myHost valBehav sock fsDBs logF = do
   bootNodes <- maybe [] (Host . T.pack . webAddress <$>) <$> getParams network'
   createGenesisInfo network'
   genesisInfo <- getGenesisInfo
-  fsPeer <- createFilesystemPeerIO privKey tcpPort udpPort sock myHost bootNodes fsDBs
+  fsPeer <- createMemoryPeerIO privKey tcpPort udpPort sock myHost bootNodes fsDBs
   corePeer <- createCorePeer network' (T.unpack name) genesisInfo valBehav logF
   pure (fsPeer, corePeer)
 
-hoistFilesystem :: FilesystemPeer -> (forall a. FilesystemT (ReaderT MemPeerDBEnv BaseM) a -> BaseM a)
-hoistFilesystem p f = runReaderT (runReaderT f p) (_filesystemPeerMap p)
+hoistMemory :: MemoryPeer -> (forall a. MemoryT (ReaderT MemPeerDBEnv BaseM) a -> BaseM a)
+hoistMemory p f = runReaderT (runReaderT f p) (_memoryPeerMap p)
 
-runFilesystemNode
-  :: FilesystemPeer
+runMemoryNode
+  :: MemoryPeer
   -> CorePeer
   -> IO [Async ()]
-runFilesystemNode p c = runNode (hoistFilesystem p) (\f ->
+runMemoryNode p c = runNode (hoistMemory p) (\f ->
   bracket
-    (connectMe $ _filesystemPeerUDPPort p)
+    (connectMe $ _memoryPeerUDPPort p)
     (\s -> liftIO $ S.close s >> putStrLn "Closed UDP socket")
-    (\s -> local (filesystemPeerUDPSocket .~ s) f)) c
+    (\s -> local (memoryPeerUDPSocket .~ s) f)) c
 
-wipeFilesystemNode ::
+wipeMemoryNode ::
   MonadIO m =>
   FilePath ->
   String ->
   String ->
   m ()
-wipeFilesystemNode dir' network' name = do
+wipeMemoryNode dir' network' name = do
   dir <- getNodeDirectory dir' network' name
   liftIO $ removeDirectoryRecursive dir
 
-createFilesystemNode ::
+createMemoryNode ::
   MonadResource m =>
   FilePath ->
   String ->
@@ -113,8 +106,8 @@ createFilesystemNode ::
   UDPPort ->
   Host ->
   Bool ->
-  m (FilesystemPeer, CorePeer)
-createFilesystemNode dir' network' privKeyFile name tcpPort udpPort myHost valBehav = do
+  m (MemoryPeer, CorePeer)
+createMemoryNode dir' network' privKeyFile name tcpPort udpPort myHost valBehav = do
   dir <- getNodeDirectory dir' network' $ T.unpack name
   logsMapVar <- atomically $ newTVar M.empty
   let logsDir = getLogsDirectory dir
@@ -157,31 +150,24 @@ createFilesystemNode dir' network' privKeyFile name tcpPort udpPort myHost valBe
       Lite.runMigration DataDefs.migrateAuto
       -- Lite.runMigration DataDefs.indexAll
     setupSQL Nothing c
-  let ldbOptions =
-        LDB.defaultOptions
-          { LDB.createIfMissing = True,
-            LDB.cacheSize = flags_ldbCacheSize,
-            LDB.blockSize = flags_ldbBlockSize
-          }
-  let openDB base = LDB.open base ldbOptions
-  sdb <- openDB "state"
-  hdb <- openDB "hash"
-  cdb <- openDB "code"
-  bsdb <- openDB "block_summary"
-  dbdb <- openDB "dependent_blocks"
-  cbdb <- openDB "canonical_blocks"
-  bdb <- openDB "blocks"
-  kvdb <- openDB "kvs"
-  let fsDBs = FilesystemDBs
-        { _stateDB = StateDB sdb
-        , _hashDB = HashDB hdb
-        , _codeDB = CodeDB cdb
-        , _blockSummaryDB = BlockSummaryDB bsdb
-        , _dependentBlockDB = DependentBlockDB dbdb
-        , _canonicalDB = cbdb
-        , _blockDB = bdb
-        , _kvDB = kvdb
-        , _ethSqlPool = ethPool'
-        , _cirrusSqlPool = cirrusPool'
+  sdb <- atomically $ newTVar M.empty
+  hdb <- atomically $ newTVar M.empty
+  cdb <- atomically $ newTVar M.empty
+  bsdb <- atomically $ newTVar M.empty
+  dbdb <- atomically $ newTVar M.empty
+  cbdb <- atomically $ newTVar M.empty
+  bdb <- atomically $ newTVar M.empty
+  kvdb <- atomically $ newTVar M.empty
+  let fsDBs = MemoryDBs
+        { _memStateDB = sdb
+        , _memHashDB = hdb
+        , _memCodeDB = cdb
+        , _memBlockSummaryDB = bsdb
+        , _memDependentBlockDB = dbdb
+        , _memCanonicalDB = cbdb
+        , _memBlockDB = bdb
+        , _memKVDB = kvdb
+        , _memEthSqlPool = ethPool'
+        , _memCirrusSqlPool = cirrusPool'
         }
-  liftIO $ createFilesystemPeerAndCorePeer network' privKey name tcpPort udpPort myHost valBehav (error "socket not initialized") fsDBs logF
+  liftIO $ createMemoryPeerAndCorePeer network' privKey name tcpPort udpPort myHost valBehav (error "socket not initialized") fsDBs logF

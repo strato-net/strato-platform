@@ -22,7 +22,9 @@ import Common.API
 import Control.Monad (unless, when)
 import Control.Monad.Trans.Resource
 import Crypto.Random.Entropy
+import Data.Bifunctor (first)
 import qualified Data.Binary as Binary
+import Data.Bool (bool)
 import qualified Data.Cache as Cache
 import Data.FileEmbed
 import Data.Foldable (traverse_)
@@ -44,9 +46,12 @@ import Reflex.Dom.Core
 import Servant as Servant
 import qualified Strato.App as App
 import Strato.Lite.Base.Filesystem
+import Strato.Lite.Base.Memory
 import Strato.Lite.Core
 import Strato.Lite.Filesystem
+import Strato.Lite.Memory
 import Strato.Lite.Rest.Server
+import Strato.Lite.Utils
 import Strato.Options
 import System.Clock
 import UnliftIO
@@ -96,13 +101,13 @@ runStrato runUI = do
   -- createHaskoinMultiSigScript
   runLoggingT . runResourceT $ do
     if flags_logs /= ""
-      then getFilesystemLogs flags_directory flags_network flags_username flags_logs flags_tail
+      then getLogs flags_directory flags_network flags_username flags_logs flags_tail
       else runStratoNode runUI
 
 runStratoNode :: (JSM () -> IO ()) -> ResourceT (LoggingT IO) ()
 runStratoNode runUI = do
   when (flags_wipe || flags_resync) $ do
-    catch (wipeFilesystemNode flags_directory flags_network flags_username)
+    catch ((bool wipeFilesystemNode wipeMemoryNode flags_in_memory) flags_directory flags_network flags_username)
           (\(_ :: SomeException) -> pure ())
     liftIO . putStrLn $ concat
       [ "Node "
@@ -112,7 +117,17 @@ runStratoNode runUI = do
       , " successfully wiped"
       ]
   unless flags_wipe $ do
-    (f,c) <- createFilesystemNode
+    (f,c) <- if flags_in_memory
+      then first Right <$> createMemoryNode
+               flags_directory
+               flags_network
+               flags_private_key
+               (T.pack flags_username)
+               (TCPPort flags_listen)
+               (UDPPort flags_listen)
+               (Host $ T.pack flags_address)
+               True
+      else first Left <$> createFilesystemNode
                flags_directory
                flags_network
                flags_private_key
@@ -133,9 +148,9 @@ runStratoNode runUI = do
               gasLimit = 10000000,
               stateFetchLimit = stateFetchLimit',
               globalNonceCounter = nonceCache,
-              nodePubKey = S.derivePublicKey $ _filesystemPeerPrivKey f
+              nodePubKey = S.derivePublicKey $ either _filesystemPeerPrivKey _memoryPeerPrivKey f
             }
-    as <- liftIO $ runFilesystemNode f c
+    as <- liftIO $ (either runFilesystemNode runMemoryNode) f c
     a <- liftIO . async $ Wai.run flags_backend_port $
       app f c env M.empty
     let finalize = do
@@ -147,11 +162,11 @@ runStratoNode runUI = do
 runStratoUI :: (JSM () -> IO ()) -> IO ()
 runStratoUI runUI = runUI $ mainWidgetWithHead header App.mainWidget
 
-fullServer :: FilesystemPeer -> CorePeer -> BlocEnv -> UrlMap -> Server (BitcoinBridgeAPI :<|> MercataAPI :<|> (CombinedAPI :<|> CirrusAPI))
-fullServer f c blocEnv urlMap = bitcoinBridgeServer :<|> mercataServer :<|> (singleNodeRestServer f c blocEnv urlMap)
+fullServer :: Either FilesystemPeer MemoryPeer -> CorePeer -> BlocEnv -> UrlMap -> Server (BitcoinBridgeAPI :<|> MercataAPI :<|> (CombinedAPI :<|> CirrusAPI))
+fullServer f c blocEnv urlMap = bitcoinBridgeServer :<|> mercataServer :<|> ((either filesystemNodeRestServer memoryNodeRestServer f) c blocEnv urlMap)
 
 api :: Proxy (BitcoinBridgeAPI :<|> MercataAPI :<|> (CombinedAPI :<|> CirrusAPI))
 api = Proxy
 
-app :: FilesystemPeer -> CorePeer -> BlocEnv -> UrlMap -> Application
+app :: Either FilesystemPeer MemoryPeer -> CorePeer -> BlocEnv -> UrlMap -> Application
 app f c blocEnv urlMap = serve api $ fullServer f c blocEnv urlMap

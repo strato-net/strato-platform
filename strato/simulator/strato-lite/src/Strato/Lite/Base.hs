@@ -19,6 +19,7 @@ import Blockchain.Model.WrappedBlock
 import qualified Blockchain.Sequencer.DB.DependentBlockDB as DBDB
 import Blockchain.Slipstream.OutputData
 import Blockchain.Strato.Discovery.ContextLite (MonadDiscovery)
+import Blockchain.Strato.Discovery.Data.MemPeerDB
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Indexer.IContext (API (..), P2P (..))
 import Blockchain.Strato.Model.Host
@@ -34,6 +35,7 @@ import Core.API
 import Crypto.Types.PubKey.ECC
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.NibbleString as N
+import qualified Database.Persist.Sql as SQL
 import Prelude hiding (round)
 import Prometheus
 
@@ -99,3 +101,8 @@ type MonadBaseAPI m = ( -- GetLastBlocks m
                       Mod.Accessible TransactionCount m
                       , HasSyncDB m
                       )
+
+class StratoPeer p where
+  cirrusPool :: p -> SQL.ConnectionPool
+  ethPool    :: p -> SQL.ConnectionPool
+  peerMap    :: p -> MemPeerDBEnv

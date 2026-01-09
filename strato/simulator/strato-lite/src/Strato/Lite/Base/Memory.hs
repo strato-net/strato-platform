@@ -1,0 +1,427 @@
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PackageImports #-}
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
+module Strato.Lite.Base.Memory where
+
+import BlockApps.Logging
+import Blockchain.Context hiding (actionTimestamp, blockHeaders, remainingBlockHeaders)
+import Blockchain.Data.Block
+import Blockchain.Data.BlockDB
+import Blockchain.Data.BlockHeader
+import Blockchain.Data.BlockSummary
+import qualified Blockchain.Data.DataDefs as DataDefs
+import Blockchain.Data.Transaction
+import Blockchain.Data.TransactionResult
+import qualified Blockchain.Database.MerklePatricia as MP
+import Blockchain.P2PUtil (sockAddrToIP)
+import Blockchain.DBM
+import Blockchain.DB.ChainDB
+import Blockchain.DB.CodeDB
+import Blockchain.DB.SQLDB
+import Blockchain.Model.SyncState
+import Blockchain.Model.SyncTask
+import Blockchain.Model.WrappedBlock
+import qualified Blockchain.Sequencer.DB.DependentBlockDB as DBDB
+import Blockchain.Slipstream.OutputData
+import Blockchain.Strato.Indexer.IContext (API (..), IndexerException (..), P2P (..))
+import Blockchain.Strato.Discovery.ContextLite (UDPPacket(..))
+import Blockchain.Strato.Discovery.Data.MemPeerDB
+import Blockchain.Strato.Discovery.Data.Peer
+import Blockchain.Strato.Model.Host
+import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.Secp256k1
+import Blockchain.Strato.Model.Validator
+import Blockchain.Strato.StateDiff (StateDiff)
+import Blockchain.Strato.StateDiff.Database (commitSqlDiffs)
+import Blockchain.SyncDB
+import Conduit
+import Control.Lens hiding (Context, view)
+import Control.Monad (void)
+import qualified Control.Monad.Change.Alter as A
+import qualified Control.Monad.Change.Modify as Mod
+import Control.Monad.Composable.Base
+import Control.Monad.Reader
+import qualified Control.Monad.State as State
+import Core.API
+import Data.Binary
+import Data.ByteString (ByteString)
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Lazy as BL
+import Data.Conduit.Network
+import Data.Default
+import Data.Foldable (for_, traverse_)
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as M
+import Data.List (foldl', sortOn)
+import qualified Data.NibbleString as N
+-- import Data.Ord (Down(..))
+import qualified Data.Text as T
+import Data.Text.Encoding (encodeUtf8)
+import Data.Time.Clock (addUTCTime, getCurrentTime)
+import qualified Database.Persist.Sql as SQL
+import Debugger (SourceMap(..))
+import Network.Socket
+import qualified Network.Socket.ByteString as NB
+import Network.Wai.Handler.Warp.Internal
+import Strato.Lite.Base
+import Strato.Lite.Base.Utils
+import UnliftIO
+import Prelude hiding (round)
+
+data MemoryDBs = MemoryDBs
+  { _memStateDB :: TVar (Map MP.StateRoot MP.NodeData)
+  , _memHashDB :: TVar (Map N.NibbleString N.NibbleString)
+  , _memCodeDB :: TVar (Map Keccak256 DBCode)
+  , _memBlockSummaryDB :: TVar (Map Keccak256 BlockSummary)
+  , _memDependentBlockDB :: TVar (Map Keccak256 DBDB.DependentBlockEntry)
+  , _memCanonicalDB      :: TVar (Map Integer Keccak256)
+  , _memBlockDB :: TVar (Map Keccak256 OutputBlock)
+  , _memKVDB :: TVar (Map ByteString ByteString)
+  , _memEthSqlPool :: SQL.ConnectionPool
+  , _memCirrusSqlPool :: SQL.ConnectionPool
+  }
+
+makeLenses ''MemoryDBs
+
+data MemoryPeer = MemoryPeer
+  { _memoryPeerPrivKey     :: PrivateKey
+  , _memoryPeerTCPPort     :: TCPPort
+  , _memoryPeerUDPPort     :: UDPPort
+  , _memoryPeerUDPSocket   :: Socket
+  , _memoryPeerMap         :: MemPeerDBEnv
+  , _memoryPeerSyncTasks   :: TVar [SyncTask]
+  , _memoryDBs             :: MemoryDBs
+  }
+
+makeLenses ''MemoryPeer
+
+instance StratoPeer MemoryPeer where
+  cirrusPool = _memCirrusSqlPool . _memoryDBs
+  ethPool    = _memEthSqlPool . _memoryDBs
+  peerMap    = _memoryPeerMap
+
+type MemoryM = ReaderT MemoryPeer BaseM
+
+type MemoryT m = ReaderT MemoryPeer m
+
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible PublicKey (MemoryT m) where
+  access _ = derivePublicKey <$> asks _memoryPeerPrivKey
+
+instance {-# OVERLAPPING #-} MonadIO m => HasVault (MemoryT m) where
+  sign bs = do
+    pk <- asks _memoryPeerPrivKey
+    return $ signMsg pk bs
+  getPub = do
+    pk <- asks _memoryPeerPrivKey
+    return $ derivePublicKey pk
+  getShared pub = do
+    pk <- asks _memoryPeerPrivKey
+    return $ deriveSharedKey pk pub
+
+instance {-# OVERLAPPING #-} MonadUnliftIO m => RunsClient (MemoryT m) where
+  runClientConnection (Host ip) (TCPPort p) sSource handler = do
+    let peerAddress = BC.pack $ T.unpack ip
+    runGeneralTCPClient (clientSettings p peerAddress) $ \app -> do
+      let pSource = appSource app
+          pSink = appSink app
+          conduits = P2pConduits pSource pSink sSource
+      handler conduits
+
+instance {-# OVERLAPPING #-} MonadIO m => RunsServer (MemoryT m) where
+  runServer (TCPPort listenPort) runner handler = do
+    let settings = setAfterBind setSocketCloseOnExec $ serverSettings listenPort "*"
+    runGeneralTCPServer settings $ \app -> runner $ \sSource -> do
+      let pSource = appSource app
+          pSink = appSink app
+          conduits = P2pConduits pSource pSink sSource
+          ip = Host . T.pack . sockAddrToIP $ appSockAddr app
+      handler conduits ip
+
+instance {-# OVERLAPPING #-} MonadIO m => A.Replaceable SockAddr B.ByteString (MemoryT m) where
+  replace _ addr packet = do
+    sock' <- asks _memoryPeerUDPSocket
+    liftIO $ catch
+      (void $ NB.sendTo sock' packet addr)
+      (\(err :: IOError) -> runLoggingT . $logErrorS "NB.sendTo" . T.pack $ "Could not send data to " <> show addr <> "; got error: " <> show err)
+
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Awaitable UDPPacket (MemoryT m) where
+  await = do
+    s <- asks _memoryPeerUDPSocket
+    fmap (fmap UDPPacket) . liftIO . timeout 10000000 $ NB.recvFrom s 80000
+
+createMemoryPeer ::
+  PrivateKey ->
+  TCPPort ->
+  UDPPort ->
+  Socket ->
+  MemPeerDBEnv ->
+  MemoryDBs ->
+  STM MemoryPeer
+createMemoryPeer p t u s m d = flip (MemoryPeer p t u s m) d <$> newTVar []
+
+createMemoryPeerIO ::
+  PrivateKey ->
+  TCPPort ->
+  UDPPort ->
+  Socket ->
+  Host ->
+  [Host] ->
+  MemoryDBs ->
+  IO MemoryPeer
+createMemoryPeerIO p t u s h bs d = do
+  m <- createMemPeerDBEnv h (buildPeer . (\b -> (Nothing, b, 30303)) <$> bs)
+  atomically $ createMemoryPeer p t u s m d
+
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible TCPPort (MemoryT m) where
+  access _ = asks _memoryPeerTCPPort
+
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible UDPPort (MemoryT m) where
+  access _ = asks _memoryPeerUDPPort
+
+instance {-# OVERLAPPING #-} MonadUnliftIO m => (MemoryT m) `Mod.Yields` DataDefs.TransactionResult where
+  yield = void . putTransactionResults . (:[])
+
+instance {-# OVERLAPPING #-} (MonadUnliftIO m, MonadLogger m) => (MemoryT m) `Mod.Outputs` StateDiff where
+  output = commitSqlDiffs
+
+instance {-# OVERLAPPING #-} (MonadUnliftIO m, MonadLogger m) => (MemoryT m) `Mod.Outputs` SlipstreamQuery where
+  output slipstreamQuery = for_ (slipstreamQuerySQLite slipstreamQuery) $ \cmd -> do
+    pool <- asks $ _memCirrusSqlPool . _memoryDBs
+    traverse_ ($logDebugS ("slipstream/cmds")) $ T.lines cmd
+    flip SQL.runSqlPool pool $ catch
+      (void $ SQL.rawExecute (T.intercalate " " (T.lines cmd)) [])
+      (\(e :: SomeException) -> do
+        $logErrorS "slipstream/error" . T.pack $ show e
+        traverse_ ($logErrorS "slipstream/error") $ T.lines cmd
+      )
+
+lookupMemDB :: (MonadIO m, Ord k) => (r -> TVar (Map k v)) -> k -> ReaderT r m (Maybe v)
+lookupMemDB getDB k = do
+  db <- asks getDB
+  M.lookup k <$> atomically (readTVar db)
+
+insertMemDB :: (MonadIO m, Ord k) => (r -> TVar (Map k v)) -> k -> v -> ReaderT r m ()
+insertMemDB getDB k v = do
+  db <- asks getDB
+  atomically . modifyTVar db $ M.insert k v
+
+deleteMemDB :: (MonadIO m, Ord k) => (r -> TVar (Map k v)) -> k -> ReaderT r m ()
+deleteMemDB getDB k = do
+  db <- asks getDB
+  atomically . modifyTVar db $ M.delete k
+
+instance {-# OVERLAPPING #-} MonadIO m => (Keccak256 `A.Alters` OutputBlock) (MemoryT m) where
+  lookup _ = lookupMemDB $ _memBlockDB . _memoryDBs
+  insert _ = insertMemDB $ _memBlockDB . _memoryDBs
+  delete _ = deleteMemDB $ _memBlockDB . _memoryDBs
+
+instance {-# OVERLAPPING #-} MonadIO m => AccessibleEnv SQLDB (MemoryT m) where
+  accessEnv = asks $ SQLDB . _memEthSqlPool . _memoryDBs
+
+instance {-# OVERLAPPING #-} MonadIO m => AccessibleEnv CirrusDB (MemoryT m) where
+  accessEnv = asks $ CirrusDB . _memCirrusSqlPool . _memoryDBs
+
+instance {-# OVERLAPPING #-} MonadUnliftIO m => (Keccak256 `A.Selectable` SourceMap) (MemoryT m) where
+  select _ = getCodeFromPostgres
+
+instance {-# OVERLAPPING #-} MonadUnliftIO m => (Keccak256 `A.Alters` API OutputTx) (MemoryT m) where
+  lookup _ _ = liftIO . throwIO $ Lookup "API" "Keccak256" "OutputTx"
+  delete _ _ = liftIO . throwIO $ Delete "API" "Keccak256" "OutputTx"
+  insert _ _ (API OutputTx {..}) = void $ insertTX Log otOrigin Nothing [otBaseTx]
+
+instance {-# OVERLAPPING #-} MonadUnliftIO m => (Keccak256 `A.Alters` API OutputBlock) (MemoryT m) where
+  lookup _ _ = liftIO . throwIO $ Lookup "API" "Keccak256" "OutputBlock"
+  delete _ _ = liftIO . throwIO $ Delete "API" "Keccak256" "OutputBlock"
+  insert _ _ (API ob) = void $ putBlocks [outputBlockToBlockRetainPayloads ob] False
+  insertMany _ =
+    void
+      . flip putBlocks False
+      . map (outputBlockToBlockRetainPayloads . unAPI)
+      . M.elems
+
+instance {-# OVERLAPPING #-} MonadIO m => (Keccak256 `A.Alters` P2P OutputBlock) (MemoryT m) where
+  lookup _ k         = fmap P2P <$> lookupMemDB (_memBlockDB . _memoryDBs) k
+  insert _ k (P2P v) = do
+    insertMemDB (_memBlockDB . _memoryDBs) k v
+    insertMemDB (_memCanonicalDB . _memoryDBs) (number $ obBlockData v) k
+    txCount <- maybe 0 (decode . BL.fromStrict) <$> lookupMemDB (_memKVDB . _memoryDBs) (encodeUtf8 "transaction_count")
+    insertMemDB (_memKVDB . _memoryDBs) (encodeUtf8 "transaction_count") (BL.toStrict . encode $ txCount + length (obReceiptTransactions v))
+    let bsb = BestSequencedBlock
+                (headerHash $ obBlockData v)
+                (number $ obBlockData v)
+                (getBlockValidators $ obBlockData v)
+    insertMemDB (_memKVDB . _memoryDBs) (encodeUtf8 "best_sequenced_block") $ BL.toStrict $ encode bsb
+    updateSyncStatus'
+  delete _ k         = deleteMemDB (_memBlockDB . _memoryDBs) k
+
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Modifiable (P2P BestBlock) (MemoryT m) where
+  get _ = liftIO . throwIO $ Lookup "P2P" "()" "BestBlock"
+  put _ = insertMemDB (_memKVDB . _memoryDBs) (encodeUtf8 "best_block") . BL.toStrict . encode . unP2P
+
+instance {-# OVERLAPPING #-} MonadIO m => (Keccak256 `A.Alters` DBDB.DependentBlockEntry) (MemoryT m) where
+  lookup _ = lookupMemDB $ _memDependentBlockDB . _memoryDBs
+  insert _ = insertMemDB $ _memDependentBlockDB . _memoryDBs
+  delete _ = deleteMemDB $ _memDependentBlockDB . _memoryDBs
+
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Modifiable WorldBestBlock (MemoryT m) where
+  get _ = maybe def (decode . BL.fromStrict) <$> lookupMemDB (_memKVDB . _memoryDBs) (encodeUtf8 "world_best_block")
+  put _ v = do
+    insertMemDB (_memKVDB . _memoryDBs) (encodeUtf8 "world_best_block") $ BL.toStrict $ encode v
+    updateSyncStatus'
+
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible (Maybe WorldBestBlock) (MemoryT m) where
+  access _ = fmap (decode . BL.fromStrict) <$> lookupMemDB (_memKVDB . _memoryDBs) (encodeUtf8 "world_best_block")
+
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Modifiable BestBlock (MemoryT m) where
+  get _ = maybe def (decode . BL.fromStrict) <$> lookupMemDB (_memKVDB . _memoryDBs) (encodeUtf8 "best_block")
+  put _ v = do
+    insertMemDB (_memKVDB . _memoryDBs) (encodeUtf8 "best_block") $ BL.toStrict $ encode v
+    updateSyncStatus'
+
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible (Maybe BestBlock) (MemoryT m) where
+  access _ = fmap (decode . BL.fromStrict) <$> lookupMemDB (_memKVDB . _memoryDBs) (encodeUtf8 "best_block")
+
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Modifiable BestSequencedBlock (MemoryT m) where
+  get _ = maybe def (decode . BL.fromStrict) <$> lookupMemDB (_memKVDB . _memoryDBs) (encodeUtf8 "best_sequenced_block")
+  put _ _ = pure () -- do
+    -- insertMemDB (_memKVDB . _memoryDBs) (encodeUtf8 "best_sequenced_block") v
+    -- updateSyncStatus'
+
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible (Maybe BestSequencedBlock) (MemoryT m) where
+  access _ = fmap (decode . BL.fromStrict) <$> lookupMemDB (_memKVDB . _memoryDBs) (encodeUtf8 "best_sequenced_block")
+
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible [Validator] (MemoryT m) where
+  access _ = maybe [] (bestSequencedBlockValidators . decode . BL.fromStrict) <$> lookupMemDB (_memKVDB . _memoryDBs) (encodeUtf8 "best_sequenced_block")
+
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Modifiable SyncStatus (MemoryT m) where
+  get _ = SyncStatus . maybe False (decode . BL.fromStrict) <$> lookupMemDB (_memKVDB . _memoryDBs) (encodeUtf8 "sync_status")
+  put _ = insertMemDB (_memKVDB . _memoryDBs) (encodeUtf8 "sync_status") . BL.toStrict . encode . unSyncStatus
+
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible (Maybe SyncStatus) (MemoryT m) where
+  access _ = fmap (SyncStatus . (decode . BL.fromStrict)) <$> lookupMemDB (_memKVDB . _memoryDBs) (encodeUtf8 "sync_status")
+
+instance {-# OVERLAPPING #-} MonadIO m => A.Selectable Integer (Canonical BlockHeader) (MemoryT m) where
+  select _ i = lookupMemDB (_memCanonicalDB . _memoryDBs) i >>= \case
+    Nothing -> pure Nothing
+    Just (bh :: Keccak256) -> fmap (Canonical . obBlockData) <$> lookupMemDB (_memBlockDB . _memoryDBs) bh
+
+instance {-# OVERLAPPING #-} MonadIO m => A.Replaceable Integer (Canonical BlockHeader) (MemoryT m) where
+  replace _ i (Canonical b) = insertMemDB (_memCanonicalDB . _memoryDBs) i (headerHash b)
+
+-- instance {-# OVERLAPPING #-} MonadIO m => GetLastBlocks (MemoryT m) where
+--   getLastBlocks n = do
+--     BestBlock _ i <- Mod.get (Mod.Proxy @BestBlock)
+--     hashes :: [Keccak256] <- catMaybes <$> traverse (lookupMemDB $ _memCanonicalDB . _memoryDBs) [(max 0 (i-n))..i]
+--     obs <- A.lookupMany (A.Proxy @OutputBlock) hashes
+--     pure . map (outputBlockToBlock . snd) . sortOn (Down . fst) $ M.toList obs
+--
+-- instance {-# OVERLAPPING #-} MonadIO m => GetLastTransactions (MemoryT m) where
+--   getLastTransactions _ n = do
+--     BestBlock _ i <- Mod.get (Mod.Proxy @BestBlock)
+--     now <- liftIO getCurrentTime
+--     let go :: Integer -> [(Integer, OutputTx)] -> Integer -> MemoryT m [(Integer, OutputTx)]
+--         go l ts j
+--           | j <= 0 = pure ts
+--           | otherwise = lookupMemDB (_memCanonicalDB . _memoryDBs) j >>= \case
+--               Nothing -> go l ts (j - 1)
+--               Just (bh :: Keccak256) -> A.lookup (A.Proxy @OutputBlock) bh >>= \case
+--                 Nothing -> go l ts (j - 1)
+--                 Just ob -> let !l' = l + fromIntegral (length (obReceiptTransactions ob))
+--                                ts' = ts ++ ((number $ obBlockData ob,) <$> reverse (obReceiptTransactions ob))
+--                             in if l' >= n then pure $ take (fromIntegral n) ts' else go l' ts' (j - 1)
+--         toRawTx blkNum OutputTx{..} = txAndTime2RawTX otOrigin otBaseTx blkNum now
+--     map (uncurry toRawTx) <$> go 0 [] i
+
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible TransactionCount (MemoryT m) where
+  access _ = TransactionCount . maybe 0 (decode . BL.fromStrict) <$> lookupMemDB (_memKVDB . _memoryDBs) (encodeUtf8 "transaction_count")
+
+instance {-# OVERLAPPING #-} MonadIO m => State.MonadState [SyncTask] (MemoryT m) where
+  state f =
+    asks _memoryPeerSyncTasks >>= \tasks -> liftIO . atomically $ do
+      s <- readTVar tasks
+      let (a, s') = f s
+      writeTVar tasks s'
+      pure a
+
+instance {-# OVERLAPPING #-} MonadIO m => HasSyncDB (MemoryT m) where
+  clearAllSyncTasks host = State.modify' $ filter (\(SyncTask _ _ h _) -> h /= host)
+  getCurrentSyncTask host = do
+    let assignedByHost (SyncTask _ _ h s) = h == host && s == Assigned
+    tasks <- filter assignedByHost <$> State.get
+    case tasks of
+      [t] -> pure $ Just t
+      [] -> pure Nothing
+      _ -> error $ "multiple sync tasks found in call to getCurrentSyncTask:\n" ++ unlines (show <$> tasks)
+  getNewSyncTask "127.0.0.1" _ = pure Nothing
+  getNewSyncTask host _ = do -- TODO: Figure out what highestBlockNum (second parameter) is used for
+    now <- liftIO getCurrentTime
+    let oneMinuteAgo = addUTCTime (-60) now
+    unsortedTasks <- State.get
+    let sortedTasks = sortOn (\(SyncTask _ t _ _) -> t) unsortedTasks
+        foldTasks (Nothing, tasks) st@(SyncTask i t _ s) =
+          if t < oneMinuteAgo && s /= Finished
+            then let newTask = SyncTask i now host s
+                  in (Just newTask, newTask:tasks)
+            else (Nothing, st:tasks)
+        foldTasks (newTask, tasks) st = (newTask, st:tasks)
+        (mNewTask, updatedTasks) = foldl' foldTasks (Nothing, []) sortedTasks
+    case mNewTask of
+      Nothing -> do
+        let newTask = SyncTask (maximum (0:((\(SyncTask i _ _ _) -> i + 1) <$> updatedTasks))) now host Assigned
+        State.put $ newTask : updatedTasks
+        pure $ Just newTask
+      Just newTask -> do
+        State.put updatedTasks
+        pure $ Just newTask
+  setSyncTaskFinished host = State.modify' $ map (\st@(SyncTask i t h _) -> if h == host then SyncTask i t h Finished else st)
+  setSyncTaskNotReady host = State.modify' $ map (\st@(SyncTask i t h s) -> if h == host && s == Assigned then SyncTask i t h NotReady else st)
+
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Modifiable BlockHashRoot (MemoryT m) where
+  get _ = BlockHashRoot . maybe def (decode . BL.fromStrict) <$> lookupMemDB (_memKVDB . _memoryDBs) (encodeUtf8 "block_hash_root")
+  put _ = insertMemDB (_memKVDB . _memoryDBs) (encodeUtf8 "block_hash_root") . BL.toStrict . encode . unBlockHashRoot
+
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Modifiable GenesisRoot (MemoryT m) where
+  get _ = GenesisRoot . maybe def (decode . BL.fromStrict) <$> lookupMemDB (_memKVDB . _memoryDBs) (encodeUtf8 "genesis_root")
+  put _ = insertMemDB (_memKVDB . _memoryDBs) (encodeUtf8 "genesis_root") . BL.toStrict . encode . unGenesisRoot
+
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Modifiable BestBlockRoot (MemoryT m) where
+  get _ = BestBlockRoot . maybe def (decode . BL.fromStrict) <$> lookupMemDB (_memKVDB . _memoryDBs) (encodeUtf8 "best_block_root")
+  put _ = insertMemDB (_memKVDB . _memoryDBs) (encodeUtf8 "best_block_root") . BL.toStrict . encode . unBestBlockRoot
+
+instance {-# OVERLAPPING #-} MonadIO m => (MP.StateRoot `A.Alters` MP.NodeData) (MemoryT m) where
+  lookup _ = lookupMemDB . asks $ _memStateDB . _memoryDBs
+  insert _ = insertMemDB . asks $ _memStateDB . _memoryDBs
+  delete _ = deleteMemDB . asks $ _memStateDB . _memoryDBs
+
+instance {-# OVERLAPPING #-} MonadIO m => (Keccak256 `A.Alters` DBCode) (MemoryT m) where
+  lookup _ = lookupMemDB $ _memCodeDB . _memoryDBs
+  insert _ = insertMemDB $ _memCodeDB . _memoryDBs
+  delete _ = deleteMemDB $ _memCodeDB . _memoryDBs
+
+instance {-# OVERLAPPING #-} MonadIO m => (N.NibbleString `A.Alters` N.NibbleString) (MemoryT m) where
+  lookup _ = lookupMemDB . asks $ _memHashDB . _memoryDBs
+  insert _ = insertMemDB . asks $ _memHashDB . _memoryDBs
+  delete _ = deleteMemDB . asks $ _memHashDB . _memoryDBs
+
+instance {-# OVERLAPPING #-} MonadIO m => (Keccak256 `A.Alters` BlockSummary) (MemoryT m) where
+  lookup _ = lookupMemDB . asks $ _memBlockSummaryDB . _memoryDBs
+  insert _ = insertMemDB . asks $ _memBlockSummaryDB . _memoryDBs
+  delete _ = deleteMemDB . asks $ _memBlockSummaryDB . _memoryDBs
