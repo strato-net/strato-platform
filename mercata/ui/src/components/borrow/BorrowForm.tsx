@@ -18,7 +18,7 @@ import {
   determineErrorMessage,
   calculateAdditionalCollateralAmountFromValue,
   sortCollateralAssets,
-  calculateMaxCollateralValueFromBalance,
+  calculateMaxCollateralValueUSDCentFloored,
   centCeil
 } from "@/utils/lendingUtils";
 import { getRiskLabel } from "@/utils/loanUtils";
@@ -165,11 +165,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
     if (autoSupplyCollateral) return map; // Only check in custom mode
     
     for (const item of collateralTableData) {
-      const balance = BigInt(item.collateral.userBalance ?? "0");
-      const price = BigInt(item.collateral.assetPrice ?? "0");
-      const decimals = BigInt(10) ** BigInt(item.collateral.customDecimals ?? 18);
-      const maxValueWei = calculateMaxCollateralValueFromBalance(balance, price, decimals);
-      const maxValueUSD = Number(maxValueWei) / 1e18;
+      const maxValueUSD = calculateMaxCollateralValueUSDCentFloored(item.collateral);
       
       map.set(item.collateral.address, item.valueUSD > maxValueUSD);
     }
@@ -296,6 +292,12 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
     const newValues = new Map(customCollateralValues);
     newValues.set(address, value);
     setCustomCollateralValues(newValues);
+  };
+
+  // Handle clicking available value to fill max
+  const handleFillAddCollatMaxValue = (collateral: CollateralData) => {
+    const maxValueUSD = calculateMaxCollateralValueUSDCentFloored(collateral);
+    handleCustomValueChange(collateral.address, maxValueUSD.toFixed(2));
   };
 
   // Get risk indicator color and label
@@ -647,10 +649,11 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
             <TooltipProvider>
               <div className="space-y-1">
                 {/* Table Header */}
-                <div className="grid grid-cols-3 gap-4 text-xs text-muted-foreground pb-2">
+                <div className="grid grid-cols-4 gap-4 text-xs text-muted-foreground pb-2">
                   <span>Asset</span>
                   <span className="text-center">Amount</span>
                   <span className="text-right">Value</span>
+                  <span className="text-right">Available</span>
                 </div>
 
                 {/* Table Rows */}
@@ -659,11 +662,13 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
                   const fullAmount = item.amount === 0n ? "0" : formatBalance(item.amount, undefined, decimals, 2);
                   const displayAmount = item.amount === 0n ? "0" : formatBalance(item.amount, undefined, decimals, 0, 4);
                   const tokenImage = item.collateral.images?.[0]?.value;
+                  
+                  const maxValueUSD = calculateMaxCollateralValueUSDCentFloored(item.collateral);
 
                   return (
                     <div
                       key={item.collateral.address}
-                      className="grid grid-cols-3 gap-4 items-center py-2 text-sm"
+                      className="grid grid-cols-4 gap-4 items-center py-2 text-sm"
                     >
                       {/* Asset */}
                       <div className="flex items-center gap-2">
@@ -708,6 +713,21 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
                             className={`collateral-value-input w-20 h-7 text-right text-sm px-2 ${collateralExceedsMaxMap.get(item.collateral.address) ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                           />
                         </div>
+                      )}
+
+                      {/* Available */}
+                      {autoSupplyCollateral ? (
+                        <span className="text-right tabular-nums text-muted-foreground">
+                          ${maxValueUSD.toFixed(2)}
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleFillAddCollatMaxValue(item.collateral)}
+                          className="text-right tabular-nums text-muted-foreground underline cursor-pointer hover:text-foreground transition-colors"
+                        >
+                          ${maxValueUSD.toFixed(2)}
+                        </button>
                       )}
                     </div>
                   );
