@@ -64,3 +64,5 @@ docker-compose.oracle.yml
 /griphook/node_modules
 /griphook/dist
 /griphook/.turbo
+/griphook/.env
+/griphook/.env.*

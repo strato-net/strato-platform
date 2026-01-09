@@ -1,5 +1,11 @@
 import axios from "axios";
 import { OAuthConfig } from "./config.js";
+import {
+  loadCredentials,
+  saveCredentials,
+  refreshAccessToken,
+  StoredCredentials,
+} from "./login.js";
 
 interface OpenIdConfiguration {
   token_endpoint: string;
@@ -11,6 +17,7 @@ interface TokenResponse {
   access_token: string;
   expires_in: number;
   refresh_token?: string;
+  refresh_expires_in?: number;
   token_type: string;
 }
 
@@ -21,14 +28,38 @@ interface CachedToken {
 
 const TOKEN_REFRESH_BUFFER_MS = 120 * 1000; // Refresh 2 minutes before expiry
 
+export type AuthMode = "browser" | "password" | "token";
+
 export class OAuthClient {
-  private config: OAuthConfig;
+  private config: OAuthConfig | null;
   private cachedToken: CachedToken | null = null;
   private tokenEndpoint: string | null = null;
   private pendingTokenRequest: Promise<string> | null = null;
+  private authMode: AuthMode;
+  private storedCredentials: StoredCredentials | null = null;
 
-  constructor(config: OAuthConfig) {
+  constructor(config: OAuthConfig | null, authMode: AuthMode = "browser") {
     this.config = config;
+    this.authMode = authMode;
+
+    // For browser mode, load stored credentials
+    if (authMode === "browser") {
+      this.storedCredentials = loadCredentials();
+    }
+  }
+
+  /**
+   * Get the current authentication mode
+   */
+  getAuthMode(): AuthMode {
+    return this.authMode;
+  }
+
+  /**
+   * Check if browser login credentials are available
+   */
+  hasBrowserCredentials(): boolean {
+    return this.storedCredentials !== null;
   }
 
   async getAccessToken(): Promise<string> {
@@ -52,6 +83,87 @@ export class OAuthClient {
   }
 
   private async fetchNewToken(): Promise<string> {
+    switch (this.authMode) {
+      case "browser":
+        return this.fetchTokenFromBrowserCredentials();
+      case "password":
+        return this.fetchTokenWithPassword();
+      case "token":
+        return this.fetchTokenFromEnv();
+      default:
+        throw new Error(`Unknown auth mode: ${this.authMode}`);
+    }
+  }
+
+  /**
+   * Browser mode: use stored refresh token to get new access token
+   */
+  private async fetchTokenFromBrowserCredentials(): Promise<string> {
+    if (!this.storedCredentials) {
+      throw new Error(
+        "Not logged in. Run 'griphook login' to authenticate, or set BLOCKAPPS_USERNAME/BLOCKAPPS_PASSWORD for password mode."
+      );
+    }
+
+    const now = Date.now();
+
+    // Check if access token is still valid
+    if (now < this.storedCredentials.expiresAt - TOKEN_REFRESH_BUFFER_MS) {
+      this.cachedToken = {
+        accessToken: this.storedCredentials.accessToken,
+        expiresAt: this.storedCredentials.expiresAt,
+      };
+      return this.storedCredentials.accessToken;
+    }
+
+    // Check if refresh token is still valid
+    if (now >= this.storedCredentials.refreshExpiresAt) {
+      throw new Error(
+        "Session expired. Run 'griphook login' to re-authenticate."
+      );
+    }
+
+    // Refresh the access token
+    try {
+      const tokens = await refreshAccessToken(
+        this.storedCredentials.openIdDiscoveryUrl,
+        this.storedCredentials.clientId,
+        this.storedCredentials.refreshToken
+      );
+
+      // Update stored credentials
+      this.storedCredentials = {
+        ...this.storedCredentials,
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token,
+        expiresAt: Date.now() + tokens.expires_in * 1000,
+        refreshExpiresAt: Date.now() + (tokens.refresh_expires_in || 86400) * 1000,
+      };
+
+      // Save updated credentials
+      saveCredentials(this.storedCredentials);
+
+      this.cachedToken = {
+        accessToken: tokens.access_token,
+        expiresAt: this.storedCredentials.expiresAt,
+      };
+
+      return tokens.access_token;
+    } catch (err) {
+      throw new Error(
+        `Failed to refresh token: ${err instanceof Error ? err.message : err}. Run 'griphook login' to re-authenticate.`
+      );
+    }
+  }
+
+  /**
+   * Password mode: use Resource Owner Password Credentials grant (legacy)
+   */
+  private async fetchTokenWithPassword(): Promise<string> {
+    if (!this.config) {
+      throw new Error("OAuth configuration not provided for password mode");
+    }
+
     const tokenEndpoint = await this.getTokenEndpoint();
 
     const params = new URLSearchParams({
@@ -89,9 +201,31 @@ export class OAuthClient {
     }
   }
 
+  /**
+   * Token mode: use pre-provided access token from environment
+   */
+  private async fetchTokenFromEnv(): Promise<string> {
+    const token = process.env.STRATO_ACCESS_TOKEN;
+    if (!token) {
+      throw new Error("STRATO_ACCESS_TOKEN environment variable not set");
+    }
+
+    // We don't know when this token expires, so set a reasonable default
+    this.cachedToken = {
+      accessToken: token,
+      expiresAt: Date.now() + 3600 * 1000, // Assume 1 hour validity
+    };
+
+    return token;
+  }
+
   private async getTokenEndpoint(): Promise<string> {
     if (this.tokenEndpoint) {
       return this.tokenEndpoint;
+    }
+
+    if (!this.config?.openIdDiscoveryUrl) {
+      throw new Error("OpenID discovery URL not configured");
     }
 
     try {
@@ -126,4 +260,22 @@ export class OAuthClient {
   clearCache(): void {
     this.cachedToken = null;
   }
+}
+
+/**
+ * Determine the appropriate auth mode based on available configuration
+ */
+export function detectAuthMode(): AuthMode {
+  // If access token is directly provided, use token mode
+  if (process.env.STRATO_ACCESS_TOKEN) {
+    return "token";
+  }
+
+  // If username/password provided, use password mode (legacy)
+  if (process.env.BLOCKAPPS_USERNAME && process.env.BLOCKAPPS_PASSWORD) {
+    return "password";
+  }
+
+  // Default to browser mode (uses stored credentials from 'griphook login')
+  return "browser";
 }

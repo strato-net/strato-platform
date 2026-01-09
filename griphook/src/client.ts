@@ -1,7 +1,7 @@
 import axios, { AxiosInstance, AxiosError, Method } from "axios";
 import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import { GriphookConfig } from "./config.js";
-import { OAuthClient } from "./auth.js";
+import { OAuthClient, detectAuthMode } from "./auth.js";
 
 export type HttpMethod = "get" | "post" | "put" | "patch" | "delete";
 
@@ -10,7 +10,8 @@ export class GriphookClient {
   private oauth: OAuthClient;
 
   constructor(config: GriphookConfig) {
-    this.oauth = new OAuthClient(config.oauth);
+    const authMode = detectAuthMode();
+    this.oauth = new OAuthClient(config.oauth, authMode);
     this.http = axios.create({
       baseURL: config.apiBaseUrl,
       timeout: config.timeoutMs,
@@ -49,6 +50,13 @@ export class GriphookClient {
    */
   async getUsername(): Promise<string> {
     return this.oauth.getUsername();
+  }
+
+  /**
+   * Get the current authentication mode
+   */
+  getAuthMode(): string {
+    return this.oauth.getAuthMode();
   }
 
   private formatAxiosError(err: unknown): string {

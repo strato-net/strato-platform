@@ -60,7 +60,7 @@ async function startHttpServer(config: ReturnType<typeof loadConfig>) {
   };
 }
 
-async function start() {
+export async function start() {
   const config = loadConfig();
   const closers: Array<() => Promise<void>> = [];
 

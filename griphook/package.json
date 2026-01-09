@@ -3,11 +3,17 @@
   "version": "0.1.0",
   "description": "Griphook MCP server exposing STRATO web app functionality over the Model Context Protocol.",
   "main": "dist/server.js",
+  "bin": {
+    "griphook": "dist/cli.js"
+  },
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsx src/server.ts",
-    "start": "node dist/server.js"
+    "start": "node dist/server.js",
+    "login": "tsx src/cli.ts login",
+    "logout": "tsx src/cli.ts logout",
+    "status": "tsx src/cli.ts status"
   },
   "keywords": [
     "mcp",
@@ -20,6 +26,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.25.2",
     "axios": "^1.13.2",
+    "open": "^10.1.0",
     "zod": "^4.3.5"
   },
   "devDependencies": {

@@ -77,21 +77,24 @@ Config & Health
 `;
 
 export function buildConfigDoc(config: GriphookConfig): string {
+  const authInfo = config.oauth
+    ? `- Auth mode: password (legacy)
+- OAuth username: ${config.oauth.username}
+- OAuth client ID: ${config.oauth.clientId}
+- OpenID discovery: ${config.oauth.openIdDiscoveryUrl}`
+    : `- Auth mode: browser (run 'griphook login' to authenticate)`;
+
   return `# Griphook configuration
 
 - Node URL: ${config.nodeUrl}
 - API base: ${config.apiBaseUrl}
-- OAuth username: ${config.oauth.username}
-- OAuth client ID: ${config.oauth.clientId}
-- OpenID discovery: ${config.oauth.openIdDiscoveryUrl}
+${authInfo}
 - HTTP timeout: ${config.timeoutMs}ms
 
-Required environment variables:
-- BLOCKAPPS_USERNAME – BlockApps username
-- BLOCKAPPS_PASSWORD – BlockApps password
-- OAUTH_CLIENT_ID – OAuth client ID
-- OAUTH_CLIENT_SECRET – OAuth client secret
-- OPENID_DISCOVERY_URL – OpenID Connect discovery endpoint
+Authentication modes:
+1. Browser login (recommended): Run 'griphook login' to authenticate via browser
+2. Password mode (legacy): Set BLOCKAPPS_USERNAME, BLOCKAPPS_PASSWORD, OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET, OPENID_DISCOVERY_URL
+3. Token mode: Set STRATO_ACCESS_TOKEN with a pre-obtained access token
 
 Optional environment variables:
 - STRATO_NODE_URL (default http://localhost)

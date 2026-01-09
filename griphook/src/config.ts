@@ -9,7 +9,7 @@ export type OAuthConfig = {
 export type GriphookConfig = {
   nodeUrl: string;
   apiBaseUrl: string;
-  oauth: OAuthConfig;
+  oauth: OAuthConfig | null;
   timeoutMs: number;
   http: {
     enabled: boolean;
@@ -40,12 +40,23 @@ function normalizePath(value: string): string {
   return value.startsWith("/") ? value : `/${value}`;
 }
 
-function requireEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(`Missing required environment variable: ${name}`);
+/**
+ * Load OAuth configuration if all required environment variables are present.
+ * Returns null if password-based OAuth is not configured.
+ */
+function loadOAuthConfig(): OAuthConfig | null {
+  const username = process.env.BLOCKAPPS_USERNAME;
+  const password = process.env.BLOCKAPPS_PASSWORD;
+  const clientId = process.env.OAUTH_CLIENT_ID;
+  const clientSecret = process.env.OAUTH_CLIENT_SECRET;
+  const openIdDiscoveryUrl = process.env.OPENID_DISCOVERY_URL;
+
+  // All must be present for password-based OAuth
+  if (username && password && clientId && clientSecret && openIdDiscoveryUrl) {
+    return { username, password, clientId, clientSecret, openIdDiscoveryUrl };
   }
-  return value;
+
+  return null;
 }
 
 export function loadConfig(): GriphookConfig {
@@ -60,13 +71,7 @@ export function loadConfig(): GriphookConfig {
   return {
     nodeUrl,
     apiBaseUrl,
-    oauth: {
-      username: requireEnv("BLOCKAPPS_USERNAME"),
-      password: requireEnv("BLOCKAPPS_PASSWORD"),
-      clientId: requireEnv("OAUTH_CLIENT_ID"),
-      clientSecret: requireEnv("OAUTH_CLIENT_SECRET"),
-      openIdDiscoveryUrl: requireEnv("OPENID_DISCOVERY_URL"),
-    },
+    oauth: loadOAuthConfig(),
     timeoutMs: Number.isFinite(timeoutEnv) ? timeoutEnv : 15000,
     http: {
       enabled: parseBoolean(process.env.GRIPHOOK_HTTP_ENABLED, true),
