@@ -53,7 +53,7 @@ Earn and claim Reward Points for participating in STRATO DeFi.
 
 **Step 3: Use Your Reward Points**
 - **Option A:** Hold for potential appreciation
-- **Option B:** Swap for USDC (instant $300)
+- **Option B:** Swap for USDCST (instant $300)
 - **Option C:** Provide Reward Point liquidity (earn more fees)
 
 **Your earnings:**
@@ -216,7 +216,7 @@ Ensure you have:
 ### Option 2: Swap for Other Tokens
 
 1. Go to **Swap** section
-2. Select Reward Points → USDC (or other token)
+2. Select Reward Points → USDCST (or other token)
 3. Execute swap
 4. Take profits or reinvest
 

@@ -23,9 +23,9 @@ Combine different assets, both systems (Lending + CDP), and multiple income stre
 
 **Your starting capital:**
 
-- 5 ETH ($15,000)
-- 0.5 BTC ($25,000)
-- 10,000 USDC ($10,000)
+- 5 ETHST ($15,000)
+- 0.5 WBTCST ($25,000)
+- 10,000 USDCST ($10,000)
 - **Total:** $50,000
 
 **Your goal:**
@@ -48,28 +48,28 @@ Combine different assets, both systems (Lending + CDP), and multiple income stre
 
 **Supply each asset type:**
 
-1. **Supply 5 ETH:**
+1. **Supply 5 ETHST:**
 
    - Go to **Borrow** (sidebar)
-   - In table, find ETH → Click **"Supply"**
+   - In table, find ETHST → Click **"Supply"**
    - Enter: 5.0, Click **"Supply"** (~$0.10 gas)
 
-2. **Supply 0.5 BTC:**
+2. **Supply 0.5 WBTCST:**
 
-   - In table, find BTC → Click **"Supply"**
+   - In table, find WBTCST → Click **"Supply"**
    - Enter: 0.5, Click **"Supply"** (~$0.10 gas)
 
-3. **Supply 10,000 USDC:**
+3. **Supply 10,000 USDCST:**
 
-   - In table, find USDC → Click **"Supply"**
+   - In table, find USDCST → Click **"Supply"**
    - Enter: 10,000, Click **"Supply"** (~$0.10 gas)
 
 **Result:**
 ```
 ✅ Total collateral: $50,000
-- ETH: $15,000 (30%)
-- BTC: $25,000 (50%)
-- USDC: $10,000 (20%)
+- ETHST: $15,000 (30%)
+- WBTCST: $25,000 (50%)
+- USDCST: $10,000 (20%)
 
 ✅ Can borrow: Up to $37,500 (75% LTV)
 ```
@@ -118,16 +118,16 @@ Combine different assets, both systems (Lending + CDP), and multiple income stre
 
 **Strategy A: Liquidity Provision (60% of capital)**
 
-1. **USDST-USDC Pool ($12,000):**
+1. **USDST-USDCST Pool ($12,000):**
 
-   - Provide 6,000 USDST + 6,000 USDC
+   - Provide 6,000 USDST + 6,000 USDCST
    - Expected APR: 10% = $1,200/year
    - Low risk (stable-stable pair)
 
-2. **ETH-USDT Pool ($6,000):**
+2. **ETHST-USDTST Pool ($6,000):**
 
-   - Swap 2,000 USDST → 0.67 ETH
-   - Provide 0.67 ETH + 2,000 USDT
+   - Swap 2,000 USDST → 0.67 ETHST
+   - Provide 0.67 ETHST + 2,000 USDTST
    - Expected APR: 15% = $900/year
    - Moderate risk (IL possible)
 
@@ -151,8 +151,8 @@ Combine different assets, both systems (Lending + CDP), and multiple income stre
 ```
 ✅ Deployed capital:
 
-- LP (USDST-USDC): $12,000
-- LP (ETH-USDT): $6,000
+- LP (USDST-USDCST): $12,000
+- LP (ETHST-USDTST): $6,000
 - Supplied USDST: $5,000
 - Safety buffer: $5,000
 Total: $28,000 deployed
@@ -166,9 +166,9 @@ Total: $28,000 deployed
 
 **Collateral (in vault):**
 ```
-5 ETH: $15,000 (30%)
-0.5 BTC: $25,000 (50%)
-10,000 USDC: $10,000 (20%)
+5 ETHST: $15,000 (30%)
+0.5 WBTCST: $25,000 (50%)
+10,000 USDCST: $10,000 (20%)
 Total: $50,000
 ```
 
@@ -181,8 +181,8 @@ Total: 23,000 USDST
 
 **Deployed:**
 ```
-USDST-USDC LP: $12,000 (10% APR)
-ETH-USDT LP: $6,000 (15% APR)
+USDST-USDCST LP: $12,000 (10% APR)
+ETHST-USDTST LP: $6,000 (15% APR)
 Supplied USDST: $5,000 (3% APR)
 Safety buffer: $5,000
 ```
@@ -195,8 +195,8 @@ Safety buffer: $5,000
 
 | Source | Amount | APR | Annual Income |
 |--------|--------|-----|---------------|
-| USDST-USDC LP fees | $12,000 | 10% | $1,200 |
-| ETH-USDT LP fees | $6,000 | 15% | $900 |
+| USDST-USDCST LP fees | $12,000 | 10% | $1,200 |
+| ETHST-USDTST LP fees | $6,000 | 15% | $900 |
 | Supply APY | $5,000 | 3% | $150 |
 | Reward Points | All activities | Est | $800 |
 | **Total Income** | | | **$3,050** |
@@ -220,7 +220,7 @@ Net profit: $2,300
 Return on capital: 4.6% on $50k
 ```
 
-**Plus:** Keep exposure to ETH and BTC appreciation!
+**Plus:** Keep exposure to ETHST and WBTCST appreciation!
 
 ---
 
@@ -231,7 +231,7 @@ Return on capital: 4.6% on $50k
 **Collateral:**
 
 - 3 different assets
-- Mix of volatile (ETH, BTC) and stable (USDC)
+- Mix of volatile (ETHST, WBTCST) and stable (USDCST)
 - Correlation: Partially hedged
 
 **Income:**
@@ -250,8 +250,8 @@ Return on capital: 4.6% on $50k
 
 **Safe price drops:**
 
-- ETH/BTC can drop ~20-25%
-- USDC stable
+- ETHST/WBTCST can drop ~20-25%
+- USDCST stable
 - Before liquidation risk
 
 **Mitigation:**
@@ -283,7 +283,7 @@ Return on capital: 4.6% on $50k
 **If ETH/BTC drop to 45%:**
 
 1. Remove some stable collateral
-2. Swap to ETH/BTC
+2. Swap to ETHST/WBTCST
 3. Supply back as collateral
 4. Maintain target allocation
 
@@ -315,12 +315,12 @@ Return on capital: 4.6% on $50k
 
 **Switch LP positions based on APRs:**
 
-**Current:** USDST-USDC at 10% APR
+**Current:** USDST-USDCST at 10% APR
 
-**If USDC-DAI pool offers 15%:**
+**If USDST-USDTST pool offers 15%:**
 
-1. Remove from USDST-USDC
-2. Swap to USDC-DAI
+1. Remove from USDST-USDCST
+2. Swap to USDST-USDTST
 3. Provide liquidity there
 4. Extra $600/year
 
@@ -338,15 +338,15 @@ Return on capital: 4.6% on $50k
 
 **Example:**
 
-- ETH up 50%: Unrealized gain
-- BTC down 20%: Can harvest loss
+- ETHST up 50%: Unrealized gain
+- WBTCST down 20%: Can harvest loss
 
 **Strategy:**
 
-1. Withdraw BTC collateral
-2. Sell for USDC (realize loss)
-3. Buy back BTC after 30 days (avoid wash sale)
-4. Offset ETH gains with BTC loss
+1. Withdraw WBTCST collateral
+2. Sell for USDCST (realize loss)
+3. Buy back WBTCST after 30 days (avoid wash sale)
+4. Offset ETHST gains with WBTCST loss
 
 **Consult tax professional**
 
@@ -360,8 +360,7 @@ Return on capital: 4.6% on $50k
 
 1. **Current:** $50k collateral, $23k debt (46% LTV)
 2. **Borrow more:** Additional $10k
-3. **Swap:** To ETH + BTC
-4. **Supply:** As additional collateral
+3. **Swap:** To ETHST + WBTCST 4. **Supply:** As additional collateral
 5. **Result:** $60k collateral, $33k debt (55% LTV)
 
 **Increases:**
@@ -387,7 +386,7 @@ Return on capital: 4.6% on $50k
 
 - [ ] Check Health Factor (keep > 1.3)
 - [ ] Check CDP CR (keep > 200%)
-- [ ] Review ETH/BTC prices vs alerts
+- [ ] Review ETHST/WBTCST prices vs alerts
 - [ ] Check LP positions (any IL?)
 - [ ] Claim pending rewards
 - [ ] Review pool APRs (any better options?)
@@ -419,7 +418,7 @@ Return on capital: 4.6% on $50k
 **Background:**
 
 - $75k portfolio
-- 8 ETH + 1 BTC + $15k USDC
+- 8 ETHST + 1 WBTCST + $15k USDCST
 - Ran for 6 months
 
 **His strategy:**
@@ -511,7 +510,7 @@ Return on capital: 4.6% on $50k
 
 **Add:**
 
-- More asset types (MATIC, AVAX, etc.)
+- More asset types (GOLDST, SILVST, etc.)
 - More LP positions (5-7 pools)
 - Cross-platform strategies
 - Professional tax software

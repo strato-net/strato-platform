@@ -14,13 +14,13 @@ Create USDST stablecoin by depositing collateral into a CDP (Collateralized Debt
 
 **Your situation:**
 
-- You have: 1 ETH in your wallet
-- ETH price: $3,000
+- You have: 1 ETHST in your wallet
+- ETHST price: $3,000
 - You need: $1,000 USDST long-term
 
 **What you'll do:**
 
-1. Deposit 1 ETH into CDP vault
+1. Deposit 1 ETHST into CDP vault
 2. Mint 1,000 USDST
 3. Use your USDST
 4. Burn USDST to repay (anytime)
@@ -63,7 +63,7 @@ Create USDST stablecoin by depositing collateral into a CDP (Collateralized Debt
 
 **What you have:**
 
-- 1 ETH worth $3,000
+- 1 ETHST worth $3,000
 
 **In the app:**
 
@@ -79,15 +79,15 @@ Create USDST stablecoin by depositing collateral into a CDP (Collateralized Debt
 
 **Result:**
 ```
-✅ Deposited: 1 ETH ($3,000) into CDP vault
+✅ Deposited: 1 ETHST ($3,000) into CDP vault
 ✅ Can mint up to: $2,000 USDST (150% min CR)
 ✅ Collateralization Ratio: N/A (no debt yet)
 ```
 
 **Your wallet:**
 
-- Before: 1 ETH
-- After: 0 ETH (moved to CDP vault)
+- Before: 1 ETHST
+- After: 0 ETHST (moved to CDP vault)
 
 ---
 
@@ -120,7 +120,7 @@ Create USDST stablecoin by depositing collateral into a CDP (Collateralized Debt
 
 **Your position now:**
 
-- Collateral: 1 ETH ($3,000)
+- Collateral: 1 ETHST ($3,000)
 - Debt: 1,000 USDST
 - Collateralization Ratio (CR): 300%
 - Min required CR: 150%
@@ -194,7 +194,7 @@ You now have 1,000 USDST to use for:
 
 **Your position:**
 
-- Collateral: 1 ETH (still in vault)
+- Collateral: 1 ETHST (still in vault)
 - Debt: 0 USDST
 - CR: No debt
 - You can now withdraw collateral
@@ -213,7 +213,7 @@ You now have 1,000 USDST to use for:
 
 **Result:**
 ```
-✅ Withdrawn: 1 ETH to your wallet
+✅ Withdrawn: 1 ETHST to your wallet
 ✅ Vault closed
 ```
 
@@ -222,13 +222,13 @@ You now have 1,000 USDST to use for:
 - You minted: 1,000 USDST
 - You burned: 1,002 USDST
 - Total cost: $2 stability fee + $0.30 gas = **$2.30 total**
-- You still have: 1 ETH (same as you started)
+- You still have: 1 ETHST (same as you started)
 
 ---
 
 ## What If Prices Change?
 
-### Scenario: ETH Drops to $2,200
+### Scenario: ETHST Drops to $2,200
 
 **What happens:**
 
@@ -239,10 +239,10 @@ You now have 1,000 USDST to use for:
 **What to do:**
 
 - **Option 1: Monitor** - Still above 150% minimum
-- **Option 2: Add collateral** - Deposit more ETH to increase CR
+- **Option 2: Add collateral** - Deposit more ETHST to increase CR
 - **Option 3: Burn some debt** - Burn 200 USDST to boost CR
 
-### Scenario: ETH Drops to $1,600 (Danger!)
+### Scenario: ETHST Drops to $1,600 (Danger!)
 
 **What happens:**
 
@@ -254,7 +254,7 @@ You now have 1,000 USDST to use for:
 
 - CR below 150% = **you can be liquidated**
 - Liquidators can take your collateral + 5-10% penalty
-- You lose ETH value beyond your debt
+- You lose ETHST value beyond your debt
 
 **What to do immediately:**
 
@@ -319,7 +319,7 @@ If you need more USDST and have room:
 
 **Example:**
 
-- ETH Vault: 2 ETH deposited, 2,000 USDST minted
+- ETHST Vault: 2 ETHST deposited, 2,000 USDST minted
 - WBTC Vault: 0.1 WBTC deposited, 3,000 USDST minted
 
 **Each vault:**
@@ -466,7 +466,7 @@ If you need more USDST and have room:
 
 **CDP:**
 
-- Collateral: 5 ETH ($10,000)
+- Collateral: 5 ETHST ($10,000)
 - Minted: 5,000 USDST
 - CR: 200%
 - Stability fee: 2.5% annually
@@ -474,7 +474,7 @@ If you need more USDST and have room:
 
 **Lending:**
 
-- Collateral: 5 ETH ($10,000)
+- Collateral: 5 ETHST ($10,000)
 - Borrowed: 5,000 USDST
 - Health Factor: 1.2
 - Interest: 5% annually
@@ -514,21 +514,21 @@ If you need more USDST and have room:
 
 **Conservative (Recommended):**
 
-- Deposit: 2 ETH ($6,000)
+- Deposit: 2 ETHST ($6,000)
 - Mint: 2,000 USDST
 - CR: 300%
 - Very safe ✓
 
 **Moderate:**
 
-- Deposit: 1.5 ETH ($4,500)
+- Deposit: 1.5 ETHST ($4,500)
 - Mint: 2,000 USDST
 - CR: 225%
 - Safe with buffer
 
 **Aggressive (Not Recommended):**
 
-- Deposit: 1.2 ETH ($3,600)
+- Deposit: 1.2 ETHST ($3,600)
 - Mint: 2,000 USDST
 - CR: 180%
 - Risky - small price drop = danger

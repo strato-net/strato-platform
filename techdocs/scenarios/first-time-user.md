@@ -100,7 +100,7 @@ Get your crypto onto STRATO and borrow USDST to start using DeFi.
 **Solution:** Quick borrow to get gas fees
 
 1. **Go to Borrow page** (in sidebar)
-2. **Try to supply ETH as collateral:**
+2. **Try to supply ETHST as collateral:**
 
    - In the Collateral Management table, find **ETHST**
    - Click the **"Supply"** button
@@ -113,7 +113,7 @@ Get your crypto onto STRATO and borrow USDST to start using DeFi.
 - Request USDST from faucet (if testnet)
 - OR get from a friend
 - OR use the app's "Get Gas" feature if available
-- OR bridge in USDC first, swap for USDST
+- OR bridge in USDC first, swap USDCST for USDST
 
 **For this guide, assume you got 10 USDST for fees.**
 
@@ -123,7 +123,7 @@ Get your crypto onto STRATO and borrow USDST to start using DeFi.
 
 **Now you have gas, let's continue:**
 
-**Step 1: Supply ETH**
+**Step 1: Supply ETHST**
 
 1. Go to **Borrow** (sidebar)
 2. **In the Collateral Management table**, find **ETHST**
@@ -254,7 +254,7 @@ Get your crypto onto STRATO and borrow USDST to start using DeFi.
 2. See your health factor
 3. Keep it above 2.0
 
-**If ETH price drops:**
+**If ETHST price drops:**
 
 - Health factor decreases
 - Add more collateral or repay debt
@@ -281,7 +281,7 @@ Get your crypto onto STRATO and borrow USDST to start using DeFi.
 
 ## Common Questions
 
-### "How do I get more ETH on STRATO?"
+### "How do I get more ETHST on STRATO?"
 
 Bridge more from Ethereum:
 
@@ -289,7 +289,7 @@ Bridge more from Ethereum:
 2. Bridge additional ETH
 3. Supply as collateral
 
-### "Can I withdraw my ETH?"
+### "Can I withdraw my ETHST?"
 
 Only if you maintain health factor above 1.0:
 
@@ -329,7 +329,7 @@ See **[Withdrawals Guide →](withdrawals.md)**
 
 **If health factor drops below 2.0:**
 
-1. Check ETH price movement
+1. Check ETHST price movement
 2. Add more collateral or repay debt
 3. Don't ignore yellow/red warnings
 

@@ -136,7 +136,7 @@ Health Factor = (Collateral Value × Liquidation Threshold) / Borrowed Amount
 
 **Example**: You deposit $10,000 ETH (80% liquidation threshold), borrow $5,000 USDST
 - Health Factor = ($10,000 × 0.8) / $5,000 = 1.6
-- Safe, but watch ETH price
+- Safe, but watch ETHST price
 
 ### What is Collateralization Ratio (CDP)?
 
@@ -175,7 +175,7 @@ Liquidation Price = (Borrowed Amount) / (Collateral Amount × Liquidation Thresh
 
 **Example**: 1 ETH collateral, $2,400 borrowed, 80% liquidation threshold
 - Liquidation Price = $2,400 / (1 × 0.8) = $3,000
-- If ETH drops to $3,000, you'll be liquidated
+- If ETHST drops to $3,000, you'll be liquidated
 
 **Use the app's calculator** for accurate real-time calculations with multiple assets.
 
@@ -205,10 +205,10 @@ Your CDP ratio depends on:
 
 **Example comparing equivalent positions:**
 
-- **Lending**: 10 ETH deposited → Borrow $18,750 → HF = 1.07
-- **CDP equivalent**: 10 ETH deposited → Mint $18,750 → CR = 160%
+- **Lending**: 10 ETHST deposited → Borrow $18,750 → HF = 1.07
+- **CDP equivalent**: 10 ETHST deposited → Mint $18,750 → CR = 160%
 
-But these would require **separate 10 ETH deposits** (20 ETH total) since the vaults are separate.
+But these would require **separate 10 ETHST deposits** (20 ETHST total) since the vaults are separate.
 
 ---
 
@@ -220,7 +220,7 @@ Impermanent loss occurs when you provide liquidity and token prices diverge from
 
 **Example**:
 
-- Deposit 1 ETH ($3,000) + 3,000 USDC
+- Deposit 1 ETHST ($3,000) + 3,000 USDCST
 - ETH doubles to $6,000
 - Pool auto-rebalances: you now have 0.707 ETH + 4,242 USDC
 - Pool value: $8,485

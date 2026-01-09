@@ -19,21 +19,21 @@ Use stablecoins and diversification to hedge against collateral price drops whil
 
 ---
 
-## Complete Example: Hedge 10 ETH Position
+## Complete Example: Hedge 10 ETHST Position
 
 **Your situation:**
 
-- Collateral: 10 ETH ($30,000)
+- Collateral: 10 ETHST ($30,000)
 - Borrowed: 16,000 USDST
 - Health Factor: 1.5
-- **Problem:** Worried about ETH crash
+- **Problem:** Worried about ETHST crash
 
 **The hedge:**
 
 1. Mint additional USDST via CDP
 2. Swap portion to stablecoins
 3. Hold as safety buffer
-4. If ETH drops: Use stables to add collateral
+4. If ETHST drops: Use stables to add collateral
 
 **Time needed:** 10 minutes  
 **Cost:** ~$0.50 gas + swap fees
@@ -45,7 +45,7 @@ Use stablecoins and diversification to hedge against collateral price drops whil
 ### Primary Risks
 
 **1. Collateral Volatility**
-- ETH drops 30% → Health factor plummets
+- ETHST drops 30% → Health factor plummets
 - Risk: Liquidation
 
 **2. Interest Rate Changes**
@@ -70,12 +70,12 @@ Use stablecoins and diversification to hedge against collateral price drops whil
 
 **Starting:**
 
-- 10 ETH ($30,000) = 100% volatile
+- 10 ETHST ($30,000) = 100% volatile
 
 **Target:**
 
-- 6 ETH ($18,000) = 60% volatile
-- 12,000 USDC ($12,000) = 40% stable
+- 6 ETHST ($18,000) = 60% volatile
+- 12,000 USDCST ($12,000) = 40% stable
 
 **Steps:**
 
@@ -86,50 +86,49 @@ Use stablecoins and diversification to hedge against collateral price drops whil
 
 2. **Swap to stablecoins:**
 
-   - Swap 6,000 USDST → USDC
+   - Swap 6,000 USDST → USDCST
    - Cost: ~$18 (0.3% fee)
 
-3. **Supply USDC as collateral:**
+3. **Supply USDCST as collateral:**
 
-   - Add 6,000 USDC to collateral
+   - Add 6,000 USDCST to collateral
    - Now have mixed collateral
 
 4. **Optional - Remove some ETH:**
 
-   - Withdraw 2 ETH
-   - Sell or hold separately
-   - Keep 8 ETH + 6,000 USDC collateral
+   - Withdraw 2 ETHST    - Sell or hold separately
+   - Keep 8 ETHST + 6,000 USDCST collateral
 
 **Result:**
 ```
 Before:
 
-- 10 ETH collateral
+- 10 ETHST collateral
 - 16,000 USDST debt
 - HF: 1.5
-- Risk: High (100% ETH exposure)
+- Risk: High (100% ETHST exposure)
 
 After:
 
-- 8 ETH + 6,000 USDC collateral
+- 8 ETHST + 6,000 USDCST collateral
 - 22,000 USDST debt (16k original + 6k new)
 - HF: 1.09
-- Risk: Lower (60% ETH, 40% stable)
+- Risk: Lower (60% ETHST, 40% stable)
 ```
 
 ### Impact Analysis
 
-**If ETH drops 25%:**
+**If ETHST drops 25%:**
 
 **Without hedge:**
 
-- Collateral: $22,500 (10 ETH @ $2,250)
+- Collateral: $22,500 (10 ETHST @ $2,250)
 - Debt: 16,000
 - HF: 1.12 (safe)
 
 **With hedge:**
 
-- Collateral: $24,000 (8 ETH @ $2,250 + 6k USDC)
+- Collateral: $24,000 (8 ETHST @ $2,250 + 6k USDCST)
 - Debt: 22,000
 - HF: 0.87 (liquidated!)
 
@@ -147,32 +146,31 @@ After:
 
 1. **Mint USDST via CDP:**
 
-   - Use 10 ETH collateral
+   - Use 10 ETHST collateral
    - Mint 7,000 USDST
    - CR: 286% (safe)
 
 2. **Swap to stablecoins:**
 
-   - Swap to 7,000 USDC
-   - Hold in wallet (NOT as collateral)
+   - Swap to 7,000 USDCST    - Hold in wallet (NOT as collateral)
 
 3. **Keep borrowing position:**
 
-   - 10 ETH collateral
+   - 10 ETHST collateral
    - 16,000 borrowed + 7,000 minted = 23,000 debt
    - HF: 1.04 (safe with buffer ready!)
 
 **Result:**
 ```
-Collateral: 10 ETH ($30,000)
+Collateral: 10 ETHST ($30,000)
 Debt: 23,000 USDST
 HF: 1.04
-Safety buffer: 7,000 USDC in wallet
+Safety buffer: 7,000 USDCST in wallet
 ```
 
 ### Using the Safety Buffer
 
-**If ETH drops 25% ($3,000 → $2,250):**
+**If ETHST drops 25% ($3,000 → $2,250):**
 
 1. **Without buffer:**
 
@@ -182,10 +180,10 @@ Safety buffer: 7,000 USDC in wallet
 
 2. **With buffer:**
 
-   - Use 7,000 USDC from wallet
-   - Swap → 3.11 ETH (at $2,250)
+   - Use 7,000 USDCST from wallet
+   - Swap → 3.11 ETHST (at $2,250)
    - Supply as collateral
-   - New collateral: 13.11 ETH ($29,498)
+   - New collateral: 13.11 ETHST ($29,498)
    - HF: 1.03 ✅ Saved!
 
 **The buffer saved you from liquidation**
@@ -198,17 +196,17 @@ Safety buffer: 7,000 USDC in wallet
 
 ### Concept
 
-- Long ETH (via collateral)
-- Short ETH (via perps or options)
+- Long ETHST (via collateral)
+- Short ETHST (via perps or options)
 - Net: Zero price exposure
 - Earn: Lending/LP fees minus short costs
 
 **Implementation on STRATO:**
 
-1. **Supply 10 ETH collateral**
+1. **Supply 10 ETHST collateral**
 2. **Borrow USDST against it**
-3. **Short ETH on another platform** (e.g., dYdX, GMX)
-4. **Net exposure:** Zero ETH price risk
+3. **Short ETHST on another platform** (e.g., dYdX, GMX)
+4. **Net exposure:** Zero ETHST price risk
 
 **Pros:**
 
@@ -234,7 +232,7 @@ Safety buffer: 7,000 USDC in wallet
 ### Phase 1: Normal Market
 
 ```
-Collateral: 10 ETH
+Collateral: 10 ETHST
 Debt: 15,000 USDST
 HF: 1.2
 Risk: Moderate
@@ -249,7 +247,7 @@ Risk: Moderate
 3. Cost: Interest stops on repaid amount
 
 ```
-Collateral: 10 ETH
+Collateral: 10 ETHST
 Debt: 12,000 USDST
 HF: 1.4
 Risk: Lower
@@ -264,7 +262,7 @@ Risk: Lower
 3. Very safe from liquidation
 
 ```
-Collateral: 10 ETH
+Collateral: 10 ETHST
 Debt: 7,000 USDST
 HF: 2.57
 Risk: Very low
@@ -331,28 +329,27 @@ Risk: Very low
 
 **May 2022:**
 
-- Collateral: 10 ETH @ $3,000 = $30k
+- Collateral: 10 ETHST @ $3,000 = $30k
 - Debt: 15,000 USDST
 - HF: 1.2
 
 **Bob's action:** Implemented Safety Buffer
 - Minted 5,000 USDST via CDP
-- Swapped to USDC
-- Held as emergency fund
+- Swapped to USDCST - Held as emergency fund
 
 **November 2022:**
 
-- ETH crashed to $1,200 (-60%)
+- ETHST crashed to $1,200 (-60%)
 - Collateral now: $12,000
 - Debt: 20,000 (15k + 5k minted)
 - HF: Would be 0.36 → LIQUIDATED
 
 **Bob's response:**
 
-- Used 5,000 USDC buffer
-- Bought 4.16 ETH @ $1,200
+- Used 5,000 USDCST buffer
+- Bought 4.16 ETHST @ $1,200
 - Added to collateral
-- New collateral: 14.16 ETH @ $1,200 = $17k
+- New collateral: 14.16 ETHST @ $1,200 = $17k
 - New HF: 0.51 (still liquidated!)
 
 **Bob needed more buffer!**
@@ -406,8 +403,8 @@ Buffer = (Target drop% × Collateral value) - Available borrowing room
 
 1. **Price-triggered repayments:**
 
-   - If ETH < $2,700: Auto-repay 2k USDST
-   - If ETH < $2,400: Auto-repay another 3k
+   - If ETHST < $2,700: Auto-repay 2k USDST
+   - If ETHST < $2,400: Auto-repay another 3k
    - Requires keeper bots or limit orders
 
 2. **Dynamic collateral ratios:**
@@ -431,7 +428,7 @@ Buffer = (Target drop% × Collateral value) - Available borrowing room
 ### Market Signals
 
 - [ ] VIX > 30 (high volatility)
-- [ ] ETH drops > 10% in 24 hours
+- [ ] ETHST drops > 10% in 24 hours
 - [ ] Liquidations spiking across DeFi
 - [ ] Macro uncertainty (Fed meetings, etc.)
 - [ ] Funding rates extremely negative/positive

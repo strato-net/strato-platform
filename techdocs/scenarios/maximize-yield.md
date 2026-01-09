@@ -25,20 +25,20 @@ Use borrowed/minted USDST to provide liquidity and earn multiple income streams.
 2. ✅ Reward Points for all activities (varies)
 3. ✅ Keep your original collateral (potential appreciation)
 
-**Net result (example):** Earn ~10-15% APR while keeping your ETH
+**Net result (example):** Earn ~10-15% APR while keeping your ETHST
 
 ---
 
-## Complete Example: 10 ETH Position
+## Complete Example: 10 ETHST Position
 
 **Your situation:**
 
-- You have: 10 ETH ($30,000)
+- You have: 10 ETHST ($30,000)
 - You want: Maximum yield
 
 **The play:**
 
-1. Supply 10 ETH as collateral
+1. Supply 10 ETHST as collateral
 2. Borrow 10,000 USDST against it
 3. Provide sUSDSST-USDST liquidity
 4. Earn fees + Reward Points
@@ -50,7 +50,7 @@ Use borrowed/minted USDST to provide liquidity and earn multiple income streams.
 - Liquidity fees: +10% on $10k = +$1,000/year
 - Reward Points: +$500/year (estimated)
 - **Net: +$1,000/year (~10% on $10k position)**
-- **Plus:** Keep 10 ETH exposure
+- **Plus:** Keep 10 ETHST exposure
 
 ---
 
@@ -59,14 +59,14 @@ Use borrowed/minted USDST to provide liquidity and earn multiple income streams.
 ### Step 1: Supply Collateral (2 min)
 
 1. Go to **Borrow** (sidebar)
-2. In Collateral Management table, find **ETH** → Click **"Supply"**
+2. In Collateral Management table, find **ETHST** → Click **"Supply"**
 3. Enter amount: **10.0**
 4. Click **"Supply"** (approval happens automatically)
 5. Gas: ~$0.10
 
 **Result:**
 ```
-Collateral: 10 ETH ($30,000)
+Collateral: 10 ETHST ($30,000)
 Can borrow: Up to $22,500 (75% LTV)
 ```
 
@@ -168,7 +168,7 @@ Plus: sUSDSST earns Sky savings rate while in pool
 
 **Assets:**
 
-- Original: 10 ETH (as collateral)
+- Original: 10 ETHST (as collateral)
 - Borrowed: 10,000 USDST (5k in LP as USDST, ~5k in LP as sUSDSST)
 - Liquidity: $10k sUSDSST-USDST LP tokens
 
@@ -186,7 +186,7 @@ Plus: sUSDSST earns Sky savings rate while in pool
 
 **Plus:**
 
-- Keep 10 ETH exposure (if ETH appreciates 20%, you earn $6k more)
+- Keep 10 ETHST exposure (if ETHST appreciates 20%, you earn $6k more)
 - Compounding if you reinvest rewards
 
 ---
@@ -217,7 +217,7 @@ Net = Income - Cost
     = $950/year
 
 Return on borrowed capital: 9.5% APR
-Return on total position: 3.2% APR (plus ETH exposure)
+Return on total position: 3.2% APR (plus ETHST exposure)
 ```
 
 ---
@@ -229,18 +229,18 @@ Return on total position: 3.2% APR (plus ETH exposure)
 **Your HF starts at 2.4:**
 
 - Very safe with large buffer
-- If ETH drops 15% to $2,550: HF drops to ~2.04 (still safe)
-- If ETH drops 30% to $2,100: HF drops to ~1.68 (getting lower)
-- If ETH drops 50% to $1,500: HF drops to ~1.20 (risky)
+- If ETHST drops 15% to $2,550: HF drops to ~2.04 (still safe)
+- If ETHST drops 30% to $2,100: HF drops to ~1.68 (getting lower)
+- If ETHST drops 50% to $1,500: HF drops to ~1.20 (risky)
 
 **Liquidation occurs when HF < 1.0:**
 
 - With $10k debt and 80% liquidation threshold
-- Liquidation at ETH < $1,250 (58% drop from $3,000)
+- Liquidation at ETHST < $1,250 (58% drop from $3,000)
 
 **Actions:**
 
-- Set price alert at $2,100 ETH (30% drop)
+- Set price alert at $2,100 ETHST (30% drop)
 - If triggered, add collateral or repay debt
 - Keep HF above 1.5 at minimum for safety
 
@@ -293,11 +293,11 @@ Return on total position: 3.2% APR (plus ETH exposure)
 
 ## Advanced: Scale Up
 
-### 20 ETH Position
+### 20 ETHST Position
 
 **Double everything:**
 
-- Collateral: 20 ETH ($60k)
+- Collateral: 20 ETHST ($60k)
 - Borrow: 20,000 USDST
 - Liquidity: $20k
 - Health Factor: 2.4 (same safety)
@@ -306,7 +306,7 @@ Return on total position: 3.2% APR (plus ETH exposure)
 
 - ~$1,900/year (scales linearly)
 - ~3.2% on $60k position
-- Plus 20 ETH exposure
+- Plus 20 ETHST exposure
 
 ### Using CDP Instead
 
@@ -329,7 +329,7 @@ Return on total position: 3.2% APR (plus ETH exposure)
 
 **Exit if:**
 
-- ETH price dropping significantly
+- ETHST price dropping significantly
 - Pool fees decrease below interest cost
 - Better opportunities elsewhere
 - Need capital for other uses
@@ -351,7 +351,7 @@ Return on total position: 3.2% APR (plus ETH exposure)
 
 3. **Withdraw collateral:**
 
-   - Withdraw your 10 ETH
+   - Withdraw your 10 ETHST
    - Return to wallet
 
 4. **Claim final rewards:**
@@ -385,7 +385,7 @@ Return on total position: 3.2% APR (plus ETH exposure)
 **Advanced:**
 
 - Borrow USDST
-- Swap to more ETH
+- Swap to more ETHST
 - Supply as collateral
 - Borrow more USDST
 - Repeat 2-3 times
@@ -397,7 +397,7 @@ Return on total position: 3.2% APR (plus ETH exposure)
 
 **Starting position:**
 
-- 10 ETH supplied
+- 10 ETHST supplied
 - 10k USDST borrowed
 - $10k in sUSDSST-USDST LP
 
@@ -405,7 +405,7 @@ Return on total position: 3.2% APR (plus ETH exposure)
 
 | Metric | Amount |
 |--------|--------|
-| ETH collateral | 10 ETH (same) |
+| ETHST collateral | 10 ETHST (same) |
 | Debt owed | 10,042 USDST (+$42 interest) |
 | LP value | $10,025 (fees earned) |
 | Reward Points earned | 50 tokens ($100 value) |
@@ -413,7 +413,7 @@ Return on total position: 3.2% APR (plus ETH exposure)
 
 **Annualized:** $83 × 12 = $996/year (~3.3% yield)
 
-**Plus:** If ETH appreciated 10% → +$3,000 gain
+**Plus:** If ETHST appreciated 10% → +$3,000 gain
 
 ---
 

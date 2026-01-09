@@ -10,7 +10,7 @@ Move your positions from Aave, Compound, MakerDAO, or other platforms to STRATO.
 
 - Lower interest rates (2.5-5% vs 5-15% elsewhere)
 - Cheaper gas fees (< $0.10 vs $20-50 on Ethereum)
-- No ETH gas for transactions (USDST-based)
+- No ETHST gas for transactions (USDST-based)
 
 **Additional features:**
 
@@ -27,8 +27,8 @@ Move your positions from Aave, Compound, MakerDAO, or other platforms to STRATO.
 
 **Your current Aave position:**
 
-- Supplied: 10 ETH collateral on Ethereum
-- Borrowed: 15,000 USDC
+- Supplied: 10 ETH collateral on Ethereum (Aave)
+- Borrowed: 15,000 USDC on Ethereum (Aave)
 - Health Factor: 1.6
 - Annual interest: ~$1,200 (8% on borrowed amount)
 
@@ -82,8 +82,8 @@ Move your positions from Aave, Compound, MakerDAO, or other platforms to STRATO.
 1. Go to **Aave** → **Dashboard**
 2. Note your metrics:
 
-   - Collateral: 10 ETH
-   - Borrowed: 15,000 USDC
+   - Collateral: 10 ETH (on Aave/Ethereum)
+   - Borrowed: 15,000 USDC (on Aave/Ethereum)
    - Health Factor: 1.6
    - Accrued interest: Check total owed
 
@@ -91,9 +91,9 @@ Move your positions from Aave, Compound, MakerDAO, or other platforms to STRATO.
 
 **Options to get USDC:**
 
-- A) Use USDC you already have
+- A) Use USDCST you already have
 - B) Bridge USDC from another chain
-- C) Sell some ETH collateral first
+- C) Sell some ETHST collateral first
 - D) Add new funds
 
 **For this example: Use existing USDC**
@@ -107,8 +107,7 @@ Move your positions from Aave, Compound, MakerDAO, or other platforms to STRATO.
 
 **Result:**
 ```
-✅ Repaid: 15,000 USDC
-✅ Health Factor: N/A (no debt)
+✅ Repaid: 15,000 USDCST ✅ Health Factor: N/A (no debt)
 ✅ Ethereum gas paid: ~$30
 ```
 
@@ -122,7 +121,7 @@ Move your positions from Aave, Compound, MakerDAO, or other platforms to STRATO.
 
 **Result:**
 ```
-✅ Withdrawn: 10 ETH to wallet
+✅ Withdrawn: 10 ETHST to wallet
 ✅ Aave position: Closed
 ✅ Total Ethereum gas: ~$45-65
 ```
@@ -165,13 +164,13 @@ If you want to recreate borrowing position:
 **Step 1: Supply Collateral**
 
 1. Go to **Borrow** (in sidebar)
-2. In Collateral Management table, find **ETH** → Click **"Supply"**
+2. In Collateral Management table, find **ETHST** → Click **"Supply"**
 3. Enter amount: **10.0**
 4. Click **"Supply"** (~$0.10 gas in USDST, approval automatic)
 
 **Result:**
 ```
-✅ Collateral: 10 ETH ($30,000)
+✅ Collateral: 10 ETHST ($30,000)
 ✅ Can borrow: Up to $22,500 (75% LTV)
 ```
 
@@ -191,9 +190,9 @@ If you want to recreate borrowing position:
 
 **Step 3: Optional - Swap to USDC**
 
-If you need USDC instead of USDST:
+If you need USDCST instead of USDST:
 
-1. Swap 15,000 USDST → USDC (~0.3% fee)
+1. Swap 15,000 USDST → USDCST (~0.3% fee)
 2. Now you have same asset as before
 
 ---
@@ -204,8 +203,8 @@ If you need USDC instead of USDST:
 
 | Metric | Aave (Ethereum) | STRATO |
 |--------|-----------------|---------|
-| **Collateral** | 10 ETH | 10 ETH |
-| **Borrowed** | 15,000 USDC | 15,000 USDST |
+| **Collateral** | 10 ETHST | 10 ETHST |
+| **Borrowed** | 15,000 USDCST | 15,000 USDST |
 | **Health Factor** | 1.5 | 1.5 |
 | **Interest Rate** | ~8% | ~5% |
 | **Annual Interest** | $1,200 | $750 |
@@ -434,14 +433,14 @@ Break-even: 1 month
 
 **Starting Position (Aave):**
 
-- 5 ETH collateral
-- 7,500 USDC borrowed
+- 5 ETHST collateral
+- 7,500 USDCST borrowed
 - 8% interest = $600/year
 - Monthly Ethereum gas: ~$50
 
 **After Migration (STRATO):**
 
-- 5 ETH collateral
+- 5 ETHST collateral
 - 7,500 USDST borrowed
 - 5% interest = $375/year
 - Monthly STRATO gas: ~$1

@@ -19,18 +19,18 @@ Rebalance your collateral mix while maintaining active positions on STRATO.
 
 ---
 
-## Complete Example: ETH → Multi-Asset Portfolio
+## Complete Example: ETHST → Multi-Asset Portfolio
 
 **Your starting position:**
 
-- Collateral: 10 ETH ($30,000) - 100% ETH exposure
+- Collateral: 10 ETHST ($30,000) - 100% ETHST exposure
 - Debt: 10,000 USDST borrowed
 - Health Factor: 2.4
-- Risk: High correlation to ETH price
+- Risk: High correlation to ETHST price
 
 **Your goal:**
 
-- Diversify to: 70% ETH, 20% BTC, 10% stablecoins
+- Diversify to: 70% ETHST, 20% WBTCST, 10% stablecoins
 - Maintain same debt
 - Improve risk profile
 - Keep positions open
@@ -49,7 +49,7 @@ Rebalance your collateral mix while maintaining active positions on STRATO.
 1. Go to **Borrow** (in sidebar)
 2. Review:
 
-   - Collateral: 10 ETH ($30,000)
+   - Collateral: 10 ETHST ($30,000)
    - Debt: 10,000 USDST
    - Health Factor: 2.4
    - Max borrow: $18,000 (75% LTV)
@@ -69,94 +69,93 @@ Available room: $8,000
 
 **Target portfolio:**
 
-- ETH: 70% = $21,000 = 7 ETH
-- BTC: 20% = $6,000 = 0.12 BTC (at $50k/BTC)
-- Stablecoins: 10% = $3,000 = 3,000 USDC
+- ETH: 70% = $21,000 = 7 ETHST
+- BTC: 20% = $6,000 = 0.12 WBTCST (at $50k/BTC)
+- Stablecoins: 10% = $3,000 = 3,000 USDCST
 
 **What needs to change:**
 ```
 Current:
 
-- ETH: 10 ($30k)
-- BTC: 0
-- USDC: 0
+- ETHST: 10 ($30k)
+- WBTCST: 0
+- USDCST: 0
 
 Target:
 
-- ETH: 7 ($21k)
-- BTC: 0.12 ($6k)
-- USDC: 3,000 ($3k)
+- ETHST: 7 ($21k)
+- WBTCST: 0.12 ($6k)
+- USDCST: 3,000 ($3k)
 
 Action needed:
 
-- Withdraw: 3 ETH
-- Swap: 3 ETH → 0.12 BTC + 3k USDC
-- Supply: BTC + USDC as collateral
+- Withdraw: 3 ETHST
+- Swap: 3 ETHST → 0.12 WBTCST + 3k USDCST
+- Supply: WBTCST + USDCST as collateral
 ```
 
 ---
 
-### Step 3: Withdraw ETH (2 min)
+### Step 3: Withdraw ETHST (2 min)
 
-**Withdraw some ETH to rebalance:**
+**Withdraw some ETHST to rebalance:**
 
 1. Go to **Borrow** (in sidebar)
-2. In Collateral Management table, find **ETH** → Click **"Withdraw"**
+2. In Collateral Management table, find **ETHST** → Click **"Withdraw"**
 3. Enter amount: **3.0**
 4. Check impact:
 
-   - New collateral: 7 ETH ($21,000)
+   - New collateral: 7 ETHST ($21,000)
    - Health Factor: 1.68 ✅ (still safe)
 5. Click **"Withdraw"** (~$0.10 gas)
 
 **Result:**
 ```
-✅ Collateral: 7 ETH ($21,000)
+✅ Collateral: 7 ETHST ($21,000)
 ✅ Debt: 10,000 USDST (unchanged)
 ✅ Health Factor: 1.68 (safe)
-✅ Wallet: +3 ETH
-```
+✅ Wallet: +3 ETHST ```
 
 ---
 
-### Step 4: Swap ETH → BTC (3 min)
+### Step 4: Swap ETHST → WBTCST (3 min)
 
-**Convert ETH to BTC:**
+**Convert ETHST to BTC:**
 
 1. Go to **Swap Assets**
 2. From: **ETH** → Amount: **2.0**
 3. To: **WBTCST**
 4. Review:
 
-   - Receive: ~0.12 BTC (after 0.3% fee)
+   - Receive: ~0.12 WBTCST (after 0.3% fee)
    - Value: ~$6,000
    - Price impact: < 1%
 5. Click **"Swap"** (~$0.10 gas)
 
 **Result:**
 ```
-✅ Wallet: +0.12 BTC ($6,000)
-✅ Remaining: 1 ETH
+✅ Wallet: +0.12 WBTCST ($6,000)
+✅ Remaining: 1 ETHST
 ```
 
 ---
 
-### Step 5: Swap ETH → USDC (3 min)
+### Step 5: Swap ETHST → USDCST (3 min)
 
-**Convert remaining ETH to USDC:**
+**Convert remaining ETHST to USDCST:**
 
 1. Go to **Swap Assets**
-2. From: **ETH** → Amount: **1.0**
-3. To: **USDC**
+2. From: **ETHST** → Amount: **1.0**
+3. To: **USDCST**
 4. Review:
 
-   - Receive: ~$2,991 USDC (after 0.3% fee)
+   - Receive: ~$2,991 USDCST (after 0.3% fee)
    - Price impact: < 1%
 5. Click **"Swap"** (~$0.10 gas)
 
 **Result:**
 ```
-✅ Wallet: +2,991 USDC
+✅ Wallet: +2,991 USDCST
 ✅ Ready to supply as collateral
 ```
 
@@ -164,16 +163,16 @@ Action needed:
 
 ### Step 6: Supply New Collateral (4 min)
 
-**Add BTC collateral:**
+**Add WBTCST collateral:**
 
 1. Go to **Borrow** (in sidebar)
 2. In Collateral Management table, find **WBTCST** → Click **"Supply"**
 3. Enter amount: **0.12**
 4. Click **"Supply"** (~$0.10 gas, approval automatic)
 
-**Add USDC collateral:**
+**Add USDCST collateral:**
 
-1. In Collateral Management table, find **USDC** → Click **"Supply"**
+1. In Collateral Management table, find **USDCST** → Click **"Supply"**
 2. Enter amount: **2,991**
 3. Click **"Supply"** (~$0.10 gas, approval automatic)
 
@@ -181,9 +180,9 @@ Action needed:
 ```
 ✅ New collateral composition:
 
-- 7 ETH ($21,000) = 70%
-- 0.12 BTC ($6,000) = 20%
-- 2,991 USDC ($3,000) = 10%
+- 7 ETHST ($21,000) = 70%
+- 0.12 WBTCST ($6,000) = 20%
+- 2,991 USDCST ($3,000) = 10%
 Total: $30,000 (same value)
 
 ✅ Total debt: 10,000 USDST (unchanged)
@@ -197,20 +196,19 @@ Total: $30,000 (same value)
 ### Before Rebalancing
 
 ```
-Collateral: 10 ETH ($30k)
+Collateral: 10 ETHST ($30k)
 Debt: 10,000 USDST
 HF: 2.4
-Risk: 100% correlated to ETH
-```
+Risk: 100% correlated to ETHST ```
 
 ### After Rebalancing
 
 ```
 Collateral:
 
-- 7 ETH ($21k) = 70%
-- 0.12 BTC ($6k) = 20%
-- 2,991 USDC ($3k) = 10%
+- 7 ETHST ($21k) = 70%
+- 0.12 WBTCST ($6k) = 20%
+- 2,991 USDCST ($3k) = 10%
 Total: $30,000
 
 Debt: 10,000 USDST (unchanged)
@@ -226,25 +224,25 @@ Risk: Diversified across 3 assets
 
 **Before:**
 
-- ETH drops 20% → Collateral = $24k → HF = 1.92 (moderate)
+- ETHST drops 20% → Collateral = $24k → HF = 1.92 (moderate)
 - Single point of failure
 
 **After:**
 
-- ETH drops 20% → Only affects 70% of collateral
-- BTC, USDC unaffected (or inverse correlation)
-- Collateral = $26.8k ($21k→$16.8k ETH, $6k BTC, $3k USDC)
+- ETHST drops 20% → Only affects 70% of collateral
+- WBTCST, USDCST unaffected (or inverse correlation)
+- Collateral = $26.8k ($21k→$16.8k ETHST, $6k WBTCST, $3k USDCST)
 - HF = 2.14 (safe)
 
-**Improvement:** ~11% better HF in ETH crash scenario
+**Improvement:** ~11% better HF in ETHST crash scenario
 
 ### Trade-offs
 
 **Pros ✅:**
 
 - Lower concentration risk
-- Better stability in ETH crashes
-- USDC portion is uncorrelated
+- Better stability in ETHST crashes
+- USDCST portion is uncorrelated
 - Easier to manage volatility
 - Same HF maintained (2.4)
 - No additional debt or interest costs
@@ -253,7 +251,7 @@ Risk: Diversified across 3 assets
 
 - More assets to monitor
 - Swap fees (~$0.60)
-- Slightly less ETH exposure (if ETH pumps)
+- Slightly less ETHST exposure (if ETHST pumps)
 
 ---
 
@@ -263,13 +261,13 @@ Risk: Diversified across 3 assets
 
 **For even more diversification:**
 
-- Withdraw 5 ETH (not 3)
-- Target: 50% ETH, 30% BTC, 20% USDC
-- Swap 5 ETH → 0.2 BTC + 6k USDC
+- Withdraw 5 ETHST (not 3)
+- Target: 50% ETHST, 30% WBTCST, 20% USDCST
+- Swap 5 ETHST → 0.2 WBTCST + 6k USDCST
 
 **Result:**
 
-- Collateral: $30k (5 ETH, 0.2 BTC, 6k USDC)
+- Collateral: $30k (5 ETHST, 0.2 WBTCST, 6k USDCST)
 - Debt: $10k (unchanged)
 - HF: 2.4 (same safety)
 - More diversification
@@ -288,8 +286,8 @@ Risk: Diversified across 3 assets
 
 **Wait for optimal conditions:**
 
-- When ETH pumps: Sell high
-- When BTC dips: Buy low
+- When ETHST pumps: Sell high
+- When WBTCST dips: Buy low
 - Use limit orders (if available)
 - Maximize rebalancing profit
 
@@ -299,11 +297,11 @@ Risk: Diversified across 3 assets
 
 | Action | Cost |
 |--------|------|
-| Withdraw 3 ETH | $0.10 |
-| Swap 2 ETH → BTC | $18 (0.3% of $6k) |
-| Swap 1 ETH → USDC | $9 (0.3% of $3k) |
-| Supply BTC collateral | $0.10 |
-| Supply USDC collateral | $0.10 |
+| Withdraw 3 ETHST | $0.10 |
+| Swap 2 ETHST → WBTCST | $18 (0.3% of $6k) |
+| Swap 1 ETHST → USDCST | $9 (0.3% of $3k) |
+| Supply WBTCST collateral | $0.10 |
+| Supply USDCST collateral | $0.10 |
 | **Total** | **~$27.40** |
 
 **No additional debt costs:**
@@ -320,9 +318,9 @@ Risk: Diversified across 3 assets
 
 **Track all assets:**
 
-1. ETH price movements
-2. BTC price movements
-3. USDC stays at $1
+1. ETHST price movements
+2. WBTCST price movements
+3. USDCST stays at $1
 4. Combined Health Factor
 
 **Set alerts:**
@@ -354,11 +352,11 @@ Risk: Diversified across 3 assets
 
 - ETH: ~70% annual volatility
 - BTC: ~60% annual volatility
-- USDC: ~0% volatility
+- USDCST: ~0% volatility
 
 **Risk-weighted allocation:**
 
-- USDC: 40% (stable, high weight)
+- USDCST: 40% (stable, high weight)
 - BTC: 35% (moderate volatility)
 - ETH: 25% (high volatility, lower weight)
 
@@ -387,13 +385,13 @@ Risk: Diversified across 3 assets
 
 **Starting position:**
 
-- 10 ETH collateral
+- 10 ETHST collateral
 - 10k USDST debt
 - HF: 2.4
 
 **After rebalancing:**
 
-- 7 ETH + 0.12 BTC + 3k USDC
+- 7 ETHST + 0.12 WBTCST + 3k USDCST
 - 10k USDST debt (unchanged)
 - HF: 2.4
 
@@ -401,7 +399,7 @@ Risk: Diversified across 3 assets
 
 - ETH: -15% (crash)
 - BTC: +5% (resilient)
-- USDC: $1 (stable)
+- USDCST: $1 (stable)
 
 **Result comparison:**
 
@@ -417,15 +415,14 @@ Risk: Diversified across 3 assets
 
 ## Troubleshooting
 
-### "Can't withdraw ETH - HF too low"
+### "Can't withdraw ETHST - HF too low"
 
 **Problem:** Trying to withdraw before adding other collateral
 
 **Fix:**
 
-1. Add BTC and USDC first
-2. Then withdraw ETH
-3. Order matters!
+1. Add WBTCST and USDCST first
+2. Then withdraw ETHST 3. Order matters!
 
 ### "Insufficient USDST for swaps"
 

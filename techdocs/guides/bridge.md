@@ -18,7 +18,7 @@ Transfer assets between Ethereum and STRATO networks.
 
 1. Initiate bridge from Ethereum
 2. Wait for bridge processing (~10-15 min)
-3. Receive ETH on STRATO
+3. Receive ETHST on STRATO
 4. Start using it
 
 **Time needed:** 15-20 minutes  
@@ -104,8 +104,8 @@ Before bridging:
 Common bridgeable assets:
 
 - **ETH** → ETHST
-- **USDC** → USDC (on STRATO)
-- **USDT** → USDT (on STRATO)
+- **USDC** → USDCST (on STRATO)
+- **USDT** → USDTST (on STRATO)
 - **WBTC** → WBTCST
 - **Other ERC20 tokens** (check bridge interface for full list)
 
@@ -146,7 +146,7 @@ Common bridgeable assets:
 3. Verify you have:
 
    - Assets to bridge
-   - ETH for gas fees (~$10-30 extra)
+   - ETHST for gas fees (~$10-30 extra)
 
 ### Step 2: Go to Bridge
 
@@ -161,7 +161,7 @@ Common bridgeable assets:
 
 ### Step 4: Choose Asset and Amount
 
-1. **Select token** to bridge (e.g., USDC)
+1. **Select token** to bridge from Ethereum (e.g., USDC)
 2. **Enter amount** to transfer
 3. Review:
 
@@ -290,7 +290,7 @@ View all past bridges:
 - Check bridge status page for delays
 - Contact support with transaction hash
 
-### "Insufficient ETH for gas"
+### "Insufficient ETHST for gas"
 
 **Cause**: Not enough ETH to pay Ethereum gas fees
 
@@ -298,7 +298,7 @@ View all past bridges:
 
 - Get more ETH to your Ethereum wallet
 - Wait for lower gas prices
-- Try again with sufficient ETH balance
+- Try again with sufficient ETHST balance
 
 ### "Transaction failed" / Reverted
 

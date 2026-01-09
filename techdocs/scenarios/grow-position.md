@@ -12,46 +12,46 @@ Safely increase your asset holdings through strategic borrowing and reinvestment
 
 ## The Strategy
 
-**The smart way to increase your ETH holdings:**
+**The smart way to increase your ETHST holdings:**
 
-Instead of buying more ETH with new capital, use your existing ETH to borrow stablecoins, buy more ETH, and repeat. This lets you grow your position while maintaining a healthy safety margin.
+Instead of buying more ETHST with new capital, use your existing ETHST to borrow stablecoins, buy more ETHST, and repeat. This lets you grow your position while maintaining a healthy safety margin.
 
 **Why this works:**
 
-1. ✅ Increase ETH exposure without new capital
+1. ✅ Increase ETHST exposure without new capital
 2. ✅ Keep health factor safe throughout
-3. ✅ Amplify gains if ETH appreciates
+3. ✅ Amplify gains if ETHST appreciates
 4. ✅ Maintain control of your position
 5. ✅ Exit anytime by repaying debt
 
 **The loop:**
 
 ```
-Supply ETH → Borrow USDST → Buy more ETH → Supply new ETH → Repeat
+Supply ETHST → Borrow USDST → Buy more ETHST → Supply new ETHST → Repeat
 ```
 
 ---
 
-## Complete Example: Growing 5 ETH to 7.5 ETH
+## Complete Example: Growing 5 ETHST to 7.5 ETHST
 
 **Your starting position:**
 
-- You have: 5 ETH ($15,000 @ $3,000/ETH)
-- You want: More ETH exposure
+- You have: 5 ETHST ($15,000 @ $3,000/ETHST)
+- You want: More ETHST exposure
 - Your approach: Conservative looping (2 rounds)
 
 **The outcome:**
 
-- Final position: 7.5 ETH
+- Final position: 7.5 ETHST
 - Debt: $7,500 USDST
 - Health Factor: 2.4 (very safe)
 - Effective leverage: 1.5x
 - Time needed: 15 minutes
 
-**If ETH goes up 20% to $3,600:**
+**If ETHST goes up 20% to $3,600:**
 
-- Without looping: 5 ETH = $18,000 (gain: $3,000)
-- With looping: 7.5 ETH = $27,000 (gain: $12,000)
+- Without looping: 5 ETHST = $18,000 (gain: $3,000)
+- With looping: 7.5 ETHST = $27,000 (gain: $12,000)
 - **You earned 4x more!**
 
 ---
@@ -60,16 +60,16 @@ Supply ETH → Borrow USDST → Buy more ETH → Supply new ETH → Repeat
 
 ### Round 1: Initial Position
 
-#### Step 1: Supply Your ETH (2 min)
+#### Step 1: Supply Your ETHST (2 min)
 
 1. Go to **Borrow** (sidebar)
-2. In Collateral Management table, find **ETH** → Click **"Supply"**
+2. In Collateral Management table, find **ETHST** → Click **"Supply"**
 3. Enter amount: **5.0**
 4. Click **"Supply"** (~$0.10 gas, approval automatic)
 
 **Result:**
 ```
-✅ Collateral: 5 ETH ($15,000)
+✅ Collateral: 5 ETHST ($15,000)
 ✅ Can borrow: Up to $11,250 (75% LTV)
 ✅ Health Factor: N/A (no debt yet)
 ```
@@ -98,24 +98,24 @@ Supply ETH → Borrow USDST → Buy more ETH → Supply new ETH → Repeat
 ```
 ✅ Borrowed: 5,000 USDST
 ✅ Health Factor: 2.4 (very safe)
-✅ Collateral: 5 ETH ($15,000)
+✅ Collateral: 5 ETHST ($15,000)
 ```
 
 ---
 
-#### Step 3: Buy More ETH (2 min)
+#### Step 3: Buy More ETHST (2 min)
 
 1. Go to **Swap Assets**
 2. From: **USDST** → Amount: **5,000**
-3. To: **ETH**
-4. Review quote: ~1.65 ETH (after 0.3% swap fee)
+3. To: **ETHST**
+4. Review quote: ~1.65 ETHST (after 0.3% swap fee)
 5. Click **"Swap"**
 6. Confirm (~$0.10 gas)
 
 **Result:**
 ```
-✅ Received: ~1.65 ETH
-✅ Total ETH in wallet: 1.65 ETH
+✅ Received: ~1.65 ETHST
+✅ Total ETHST in wallet: 1.65 ETHST
 ✅ Ready for next loop
 ```
 
@@ -123,12 +123,12 @@ Supply ETH → Borrow USDST → Buy more ETH → Supply new ETH → Repeat
 
 ### Alternative: Diversify Into Other Assets
 
-**Instead of buying more ETH, you can diversify your collateral:**
+**Instead of buying more ETHST, you can diversify your collateral:**
 
 #### Option A: Add Bitcoin Exposure
 
 **Why BTC?**
-- Different price movements from ETH
+- Different price movements from ETHST
 - Store of value characteristics
 - Portfolio diversification
 
@@ -136,7 +136,7 @@ Supply ETH → Borrow USDST → Buy more ETH → Supply new ETH → Repeat
 
 1. Go to **Swap Assets**
 2. From: **USDST** (5,000) → To: **WBTCST**
-3. Review quote: ~0.075 BTC (at ~$65,000/BTC)
+3. Review quote: ~0.075 WBTCST (at ~$65,000/BTC)
 4. Click **"Swap"**
 5. Go to **Borrow** page
 6. Supply WBTCST as collateral
@@ -144,7 +144,7 @@ Supply ETH → Borrow USDST → Buy more ETH → Supply new ETH → Repeat
 
 **Result:**
 ```
-✅ Collateral: 5 ETH + 0.075 BTC
+✅ Collateral: 5 ETHST + 0.075 WBTCST
 ✅ Diversified portfolio
 ✅ Different price exposures
 ```
@@ -170,7 +170,7 @@ Supply ETH → Borrow USDST → Buy more ETH → Supply new ETH → Repeat
 
 **Result:**
 ```
-✅ Collateral: 5 ETH + 1.9 GOLD
+✅ Collateral: 5 ETHST + 1.9 GOLDST
 ✅ Crypto + precious metal
 ✅ Risk diversification
 ```
@@ -213,22 +213,22 @@ Supply ETH → Borrow USDST → Buy more ETH → Supply new ETH → Repeat
 **Example Multi-Asset Position:**
 
 ```
-Starting: 5 ETH
+Starting: 5 ETHST
 
 Round 1:
-- Supply 5 ETH → Borrow $5,000
-- Buy 0.075 BTC → Supply BTC
+- Supply 5 ETHST → Borrow $5,000
+- Buy 0.075 WBTCST → Supply WBTCST
 
 Round 2:
 - Borrow $2,500
-- Buy 1.9 GOLD → Supply GOLD
+- Buy 1.9 GOLDST → Supply GOLDST
 
 Round 3:
 - Borrow $1,500
-- Buy 160 SILVER → Supply SILVER
+- Buy 160 SILVST → Supply SILVST
 
 Final Position:
-- Collateral: 5 ETH + 0.075 BTC + 1.9 GOLD + 160 SILVER
+- Collateral: 5 ETHST + 0.075 WBTCST + 1.9 GOLDST + 160 SILVST
 - Total value: ~$24,000
 - Total debt: $9,000
 - Health Factor: 2.13 (safe)
@@ -255,16 +255,16 @@ Final Position:
 
 ### Round 2: First Loop
 
-#### Step 4: Supply New ETH (2 min)
+#### Step 4: Supply New ETHST (2 min)
 
 1. Go back to **Borrow** page
-2. In Collateral Management table, find **ETH** → Click **"Supply"**
+2. In Collateral Management table, find **ETHST** → Click **"Supply"**
 3. Enter amount: **1.65**
 4. Click **"Supply"**
 
 **Result:**
 ```
-✅ Total collateral: 6.65 ETH ($19,950)
+✅ Total collateral: 6.65 ETHST ($19,950)
 ✅ Current debt: 5,000 USDST
 ✅ New health factor: 3.19 (even safer!)
 ✅ Can borrow more: Up to $9,962
@@ -289,23 +289,21 @@ Final Position:
 ```
 ✅ Total borrowed: 7,500 USDST
 ✅ Health Factor: 2.13 (safe)
-✅ Collateral: 6.65 ETH ($19,950)
+✅ Collateral: 6.65 ETHST ($19,950)
 ```
 
 ---
 
-#### Step 6: Buy More ETH (2 min)
+#### Step 6: Buy More ETHST (2 min)
 
 1. Go to **Swap Assets**
 2. From: **USDST** → Amount: **2,500**
 3. To: **ETH**
-4. Receive: ~0.83 ETH
-5. Click **"Swap"**
+4. Receive: ~0.83 ETHST 5. Click **"Swap"**
 
 **Result:**
 ```
-✅ Received: ~0.83 ETH
-✅ Total ETH in wallet: 0.83 ETH
+✅ Received: ~0.83 ETHST ✅ Total ETHST in wallet: 0.83 ETHST
 ```
 
 ---
@@ -314,23 +312,22 @@ Final Position:
 
 #### Step 7: Supply Again (2 min)
 
-1. Supply the 0.83 ETH
-2. New total collateral: 7.48 ETH ($22,440)
+1. Supply the 0.83 ETHST
+2. New total collateral: 7.48 ETHST ($22,440)
 3. New health factor: 2.39 (very safe)
 
 **At this point, you can:**
 
 **Option A: Stop here (recommended)**
-- Total position: 7.48 ETH
+- Total position: 7.48 ETHST
 - Total debt: $7,500
 - Health Factor: 2.39
 - Good balance of growth and safety
 
 **Option B: Do one more loop**
 - Borrow another $1,500-2,000
-- Buy more ETH
-- Final position: ~8-8.5 ETH
-- Health Factor: still above 2.0
+- Buy more ETHST
+- Final position: ~8-8.5 ETHST - Health Factor: still above 2.0
 
 ---
 
@@ -341,16 +338,16 @@ Final Position:
 ```
 Starting: 5 ETH, $0 debt
 Final:    7.5 ETH, $7,500 debt
-Growth:   +50% more ETH
+Growth:   +50% more ETHST
 HF:       2.4 (very safe)
 ```
 
 **What you've achieved:**
 
-- ✅ 50% more ETH exposure
+- ✅ 50% more ETHST exposure
 - ✅ Maintained safe health factor
-- ✅ Can withstand 30%+ ETH price drop
-- ✅ Amplified gains if ETH goes up
+- ✅ Can withstand 30%+ ETHST price drop
+- ✅ Amplified gains if ETHST goes up
 - ✅ Still have room to borrow more if needed
 
 ---
@@ -362,15 +359,15 @@ HF:       2.4 (very safe)
 **Your effective leverage:**
 
 ```
-Total ETH value: 7.5 ETH × $3,000 = $22,500
+Total ETHST value: 7.5 ETHST × $3,000 = $22,500
 Your equity: $22,500 - $7,500 debt = $15,000
 Leverage: $22,500 / $15,000 = 1.5x
 ```
 
 **What this means:**
 
-- If ETH goes up 10%, your equity goes up 15%
-- If ETH goes down 10%, your equity goes down 15%
+- If ETHST goes up 10%, your equity goes up 15%
+- If ETHST goes down 10%, your equity goes down 15%
 - Moderate amplification, not extreme
 
 ---
@@ -403,7 +400,7 @@ Leverage: $22,500 / $15,000 = 1.5x
 **Stop when:**
 
 - ✅ Health factor drops below 2.0
-- ✅ You've reached your target ETH amount
+- ✅ You've reached your target ETHST amount
 - ✅ You're uncomfortable with debt level
 - ✅ Market conditions change
 
@@ -420,25 +417,25 @@ Leverage: $22,500 / $15,000 = 1.5x
 
 **Your position:** 7.5 ETH, $7,500 debt, HF 2.39
 
-**If ETH drops 15% to $2,550:**
+**If ETHST drops 15% to $2,550:**
 - Collateral value: $19,125
 - HF = (19,125 × 0.80) / 7,500 = 2.04
 - **Status:** Still safe ✅
 
-**If ETH drops 30% to $2,100:**
+**If ETHST drops 30% to $2,100:**
 - Collateral value: $15,750
 - HF = (15,750 × 0.80) / 7,500 = 1.68
 - **Status:** Getting risky ⚠️
 - **Action:** Add collateral or repay debt
 
-**If ETH drops 50% to $1,500:**
+**If ETHST drops 50% to $1,500:**
 - Collateral value: $11,250
 - HF = (11,250 × 0.80) / 7,500 = 1.20
 - **Status:** Dangerous ⚠️⚠️
 - **Action:** Urgent - add collateral NOW
 
 **Liquidation at:**
-- ETH < $1,250 (58% drop from $3,000)
+- ETHST < $1,250 (58% drop from $3,000)
 - Very unlikely in short/medium term
 
 ---
@@ -466,31 +463,29 @@ Leverage: $22,500 / $15,000 = 1.5x
 
 ### Taking Profits
 
-**If ETH goes up 30% to $3,900:**
+**If ETHST goes up 30% to $3,900:**
 
 Your position value:
-- 7.5 ETH × $3,900 = $29,250
+- 7.5 ETHST × $3,900 = $29,250
 - Minus debt: $7,500
 - Your equity: $21,750
 - **Profit: $6,750 (45% gain on $15k initial)**
 
 **To exit:**
 
-1. Sell enough ETH to repay debt
-   - Need: $7,500 / $3,900 = 1.92 ETH
-2. Sell 2 ETH for $7,800 USDST
+1. Sell enough ETHST to repay debt
+   - Need: $7,500 / $3,900 = 1.92 ETHST 2. Sell 2 ETHST for $7,800 USDST
 3. Repay $7,500 debt
-4. Withdraw remaining 5.5 ETH
-5. **Final:** 5.5 ETH (up from 5) + $300 USDST
+4. Withdraw remaining 5.5 ETHST 5. **Final:** 5.5 ETHST (up from 5) + $300 USDST
 
 ---
 
 ### Emergency Exit
 
-**If ETH is dropping fast:**
+**If ETHST is dropping fast:**
 
-1. **Sell ETH for USDST**
-   - Sell 2 ETH for ~$6,000 (if ETH at $3,000)
+1. **Sell ETHST for USDST**
+   - Sell 2 ETHST for ~$6,000 (if ETHST at $3,000)
 2. **Repay partial debt**
    - Repay $6,000 of $7,500
    - Remaining debt: $1,500
@@ -502,31 +497,31 @@ Your position value:
 
 ## Comparison: With vs Without Looping
 
-### Scenario: ETH goes from $3,000 to $3,600 (+20%)
+### Scenario: ETHST goes from $3,000 to $3,600 (+20%)
 
 **Without looping:**
-- Start: 5 ETH = $15,000
-- End: 5 ETH = $18,000
+- Start: 5 ETHST = $15,000
+- End: 5 ETHST = $18,000
 - Profit: $3,000 (20%)
 
 **With conservative looping (2 rounds):**
-- Start: 5 ETH = $15,000
-- End: 7.5 ETH = $27,000
+- Start: 5 ETHST = $15,000
+- End: 7.5 ETHST = $27,000
 - Minus debt: $7,500
 - Equity: $19,500
 - Profit: $4,500 (30%)
 - **50% more profit!**
 
-### Scenario: ETH goes from $3,000 to $2,400 (-20%)
+### Scenario: ETHST goes from $3,000 to $2,400 (-20%)
 
 **Without looping:**
-- Start: 5 ETH = $15,000
-- End: 5 ETH = $12,000
+- Start: 5 ETHST = $15,000
+- End: 5 ETHST = $12,000
 - Loss: $3,000 (-20%)
 
 **With conservative looping:**
-- Start: 5 ETH = $15,000
-- End: 7.5 ETH = $18,000
+- Start: 5 ETHST = $15,000
+- End: 7.5 ETHST = $18,000
 - Minus debt: $7,500
 - Equity: $10,500
 - Loss: $4,500 (-30%)
@@ -543,14 +538,13 @@ Your position value:
 **If you want more exposure:**
 
 - Loop 3-4 times instead of 2
-- Final position: ~9-10 ETH
-- Debt: ~$10,000-12,000
+- Final position: ~9-10 ETHST - Debt: ~$10,000-12,000
 - Health Factor: ~1.8-2.0
 - Leverage: ~2x
 
 **Trade-offs:**
 
-- ✅ More upside if ETH goes up
+- ✅ More upside if ETHST goes up
 - ❌ Less safety buffer
 - ❌ Liquidation risk higher
 - ❌ More interest costs
@@ -609,17 +603,17 @@ Your position value:
 
 ### Benefits
 
-**If ETH goes up 20%:**
+**If ETHST goes up 20%:**
 - Extra profit: $1,500
 - Net after costs: $1,102
 - **Worth it!**
 
-**If ETH stays flat:**
+**If ETHST stays flat:**
 - No price gain
 - Pay $398 in costs
 - **Not worth it**
 
-**Break-even:** ETH needs to go up ~5% to cover costs
+**Break-even:** ETHST needs to go up ~5% to cover costs
 
 ---
 
@@ -628,7 +622,7 @@ Your position value:
 ### Can I loop with other assets?
 
 Yes! This works with any collateral:
-- BTC (WBTCST)
+- WBTCST (WBTCST)
 - Gold (GOLDST)
 - Silver (SILVST)
 
@@ -640,12 +634,12 @@ Absolutely! Each loop can buy a different asset:
 
 **Example multi-asset loop:**
 
-1. **Round 1:** Supply 5 ETH → Borrow $5k → Buy 0.075 BTC
-2. **Round 2:** Supply BTC → Borrow $2.5k → Buy 1.9 GOLD
-3. **Round 3:** Supply GOLD → Borrow $1.5k → Buy 160 SILVER
+1. **Round 1:** Supply 5 ETHST → Borrow $5k → Buy 0.075 WBTCST
+2. **Round 2:** Supply WBTCST → Borrow $2.5k → Buy 1.9 GOLDST
+3. **Round 3:** Supply GOLDST → Borrow $1.5k → Buy 160 SILVST
 
 **Result:**
-- Diversified collateral: ETH + BTC + GOLD + SILVER
+- Diversified collateral: ETHST + WBTCST + GOLDST + SILVST
 - Total debt: $9,000
 - Health Factor: 2.1+ (safe)
 
@@ -671,7 +665,7 @@ Absolutely! Each loop can buy a different asset:
 ### What if I want to unwind one loop?
 
 Easy! Just:
-1. Sell some ETH for USDST
+1. Sell some ETHST for USDST
 2. Repay part of your debt
 3. Your HF improves
 4. Withdraw some collateral if desired
@@ -691,8 +685,7 @@ Yes! Same concept:
 **Ready to start?**
 
 1. **Practice with small amounts first**
-   - Try with 0.5-1 ETH
-   - Do 1-2 loops
+   - Try with 0.5-1 ETHST    - Do 1-2 loops
    - Get comfortable with the process
 
 2. **Scale up gradually**

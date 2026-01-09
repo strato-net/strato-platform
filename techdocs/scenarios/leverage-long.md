@@ -21,30 +21,30 @@ Use borrowed USDST to buy more of your collateral asset, creating leveraged expo
 
 **How it works:**
 
-1. Supply ETH as collateral
+1. Supply ETHST as collateral
 2. Borrow USDST against it
-3. Swap USDST → more ETH
-4. Supply new ETH as additional collateral
+3. Swap USDST → more ETHST
+4. Supply new ETHST as additional collateral
 5. Repeat 2-3 times
 
-**Result:** 2-3x exposure to ETH price movements (up AND down)
+**Result:** 2-3x exposure to ETHST price movements (up AND down)
 
 ---
 
-## Complete Example: 2x Leverage on 5 ETH
+## Complete Example: 2x Leverage on 5 ETHST
 
 **Your starting position:**
 
-- You have: 5 ETH ($15,000)
-- ETH price: $3,000
-- You believe: ETH will go up
-- You want: 2x exposure (10 ETH equivalent)
+- You have: 5 ETHST ($15,000)
+- ETHST price: $3,000
+- You believe: ETHST will go up
+- You want: 2x exposure (10 ETHST equivalent)
 
 **The play:**
 
-- Round 1: Supply 5 ETH, borrow $7,500, buy 2.5 ETH
-- Round 2: Supply 2.5 ETH, borrow $3,750, buy 1.25 ETH
-- Total: 8.75 ETH position
+- Round 1: Supply 5 ETHST, borrow $7,500, buy 2.5 ETHST
+- Round 2: Supply 2.5 ETHST, borrow $3,750, buy 1.25 ETHST
+- Total: 8.75 ETHST position
 - Debt: $11,250 USDST
 - Leverage: ~1.75x
 
@@ -59,14 +59,14 @@ Use borrowed USDST to buy more of your collateral asset, creating leveraged expo
 
 **What can go wrong:**
 
-**If ETH drops 20%:**
+**If ETHST drops 20%:**
 
 - Without leverage: Lose $3,000 (20%)
 - With 2x leverage: Lose $6,000 (40% of initial capital)
 - Health factor drops significantly
 - May face liquidation
 
-**If ETH drops 30%:**
+**If ETHST drops 30%:**
 
 - Without leverage: Lose $4,500 (30%)
 - With 2x leverage: Position likely LIQUIDATED
@@ -84,13 +84,13 @@ Use borrowed USDST to buy more of your collateral asset, creating leveraged expo
 ### Step 1: Supply Initial Collateral (2 min)
 
 1. Go to **Borrow** (in sidebar)
-2. In Collateral Management table, find **ETH** → Click **"Supply"**
+2. In Collateral Management table, find **ETHST** → Click **"Supply"**
 3. Enter amount: **5.0**
 4. Click **"Supply"** (~$0.10 gas, approval automatic)
 
 **Result:**
 ```
-✅ Collateral: 5 ETH ($15,000)
+✅ Collateral: 5 ETHST ($15,000)
 ✅ Can borrow: Up to $11,250 (75% LTV)
 ```
 
@@ -117,37 +117,37 @@ Use borrowed USDST to buy more of your collateral asset, creating leveraged expo
 
 ---
 
-### Step 3: Swap USDST → ETH (2 min)
+### Step 3: Swap USDST → ETHST (2 min)
 
 1. Go to **Swap Assets**
 2. From: **USDST** → Amount: **7,500**
-3. To: **ETH**
+3. To: **ETHST**
 4. Review:
 
-   - Receive: ~2.49 ETH (after 0.3% fee)
-   - Rate: ~$3,009/ETH (including fee)
+   - Receive: ~2.49 ETHST (after 0.3% fee)
+   - Rate: ~$3,009/ETHST (including fee)
 5. Click **"Swap"** (~$0.10 gas)
 
 **Result:**
 ```
-✅ Wallet: +2.49 ETH
-✅ Total ETH owned: 7.49 (5 in collateral + 2.49 in wallet)
+✅ Wallet: +2.49 ETHST
+✅ Total ETHST owned: 7.49 (5 in collateral + 2.49 in wallet)
 ```
 
 ---
 
-### Step 4: Supply New ETH (2 min)
+### Step 4: Supply New ETHST (2 min)
 
-**Add the new ETH to collateral:**
+**Add the new ETHST to collateral:**
 
 1. Go to **Borrow** (in sidebar)
-2. In Collateral Management table, find **ETH** → Click **"Supply"**
+2. In Collateral Management table, find **ETHST** → Click **"Supply"**
 3. Enter amount: **2.49**
 4. Click **"Supply"** (approval automatic)
 
 **Result:**
 ```
-✅ Total collateral: 7.49 ETH ($22,470)
+✅ Total collateral: 7.49 ETHST ($22,470)
 ✅ Debt: 7,500 USDST
 ✅ Health Factor: 2.4 (improved!)
 ✅ Can borrow more: Up to $16,852
@@ -177,12 +177,12 @@ Use borrowed USDST to buy more of your collateral asset, creating leveraged expo
 
 **Repeat the process:**
 
-1. **Swap:** 3,750 USDST → ~1.24 ETH
-2. **Supply:** 1.24 ETH to collateral
+1. **Swap:** 3,750 USDST → ~1.24 ETHST
+2. **Supply:** 1.24 ETHST to collateral
 
 **Final Result:**
 ```
-✅ Total collateral: 8.73 ETH ($26,190)
+✅ Total collateral: 8.73 ETHST ($26,190)
 ✅ Total debt: 11,250 USDST
 ✅ Health Factor: 1.86
 ✅ Leverage: 1.75x
@@ -194,21 +194,21 @@ Use borrowed USDST to buy more of your collateral asset, creating leveraged expo
 
 ### Position Summary
 
-**Starting capital:** 5 ETH ($15,000)
+**Starting capital:** 5 ETHST ($15,000)
 
 **Final position:**
 
-- Collateral: 8.73 ETH ($26,190)
+- Collateral: 8.73 ETHST ($26,190)
 - Debt: 11,250 USDST
 - Net value: $14,940 (slight loss from fees)
-- ETH exposure: 8.73 ETH (vs 5 originally)
+- ETHST exposure: 8.73 ETHST (vs 5 originally)
 - **Leverage: 1.75x**
 
 ### Effective Exposure
 
 **Price movement impact:**
 
-| ETH Price Change | Your Gain/Loss | vs No Leverage |
+| ETHST Price Change | Your Gain/Loss | vs No Leverage |
 |------------------|----------------|----------------|
 | +10% | +$2,619 (17.5%) | +$1,500 (10%) |
 | +20% | +$5,238 (35%) | +$3,000 (20%) |
@@ -254,10 +254,10 @@ ETH can drop from $3,000 to ~$1,614
 
 ### How to Respond to Drops
 
-**If ETH drops 10% ($3,000 → $2,700):**
+**If ETHST drops 10% ($3,000 → $2,700):**
 
 **Option 1: Add collateral**
-- Supply more ETH or other assets
+- Supply more ETHST or other assets
 - Improves HF immediately
 - Keep leverage
 
@@ -267,7 +267,7 @@ ETH can drop from $3,000 to ~$1,614
 - Lower leverage
 
 **Option 3: Partial exit**
-- Sell 1 ETH for USDST
+- Sell 1 ETHST for USDST
 - Repay debt
 - De-leverage partially
 
@@ -282,10 +282,10 @@ ETH can drop from $3,000 to ~$1,614
 1. Perform 4-5 rounds of borrow→swap→supply
 2. Final position:
 
-   - Collateral: ~15 ETH from 5 ETH start
+   - Collateral: ~15 ETHST from 5 ETHST start
    - Debt: ~$30,000 USDST
    - HF: ~1.1-1.2 (very risky)
-3. Liquidation at 15-20% ETH drop
+3. Liquidation at 15-20% ETHST drop
 
 **Why this is dangerous:**
 
@@ -328,15 +328,15 @@ ETH must rise > 3.75% to cover interest costs
 
 **Example scenarios:**
 
-- ETH +5%: Net gain ~$219 (1.5%)
-- ETH +10%: Net gain ~$2,056 (14%)
-- ETH +20%: Net gain ~$4,675 (31%)
+- ETHST +5%: Net gain ~$219 (1.5%)
+- ETHST +10%: Net gain ~$2,056 (14%)
+- ETHST +20%: Net gain ~$4,675 (31%)
 
-**Without leverage (5 ETH):**
+**Without leverage (5 ETHST):**
 
-- ETH +5%: $750 gain (5%)
-- ETH +10%: $1,500 gain (10%)
-- ETH +20%: $3,000 gain (20%)
+- ETHST +5%: $750 gain (5%)
+- ETHST +10%: $1,500 gain (10%)
+- ETHST +20%: $3,000 gain (20%)
 
 ---
 
@@ -344,20 +344,20 @@ ETH must rise > 3.75% to cover interest costs
 
 ### Taking Profits
 
-**If ETH rises 50% ($3,000 → $4,500):**
+**If ETHST rises 50% ($3,000 → $4,500):**
 
 **Your position:**
 
-- Collateral: 8.73 ETH ($39,285)
+- Collateral: 8.73 ETHST ($39,285)
 - Debt: 11,250 USDST (unchanged)
 - Net value: $28,035
 - Profit: $13,035 (87% gain!)
 
 **How to exit:**
 
-1. **Sell some ETH:**
+1. **Sell some ETHST:**
 
-   - Withdraw 2.5 ETH from collateral
+   - Withdraw 2.5 ETHST from collateral
    - Swap → USDST
    - Receive ~$11,220
 
@@ -368,14 +368,14 @@ ETH must rise > 3.75% to cover interest costs
 
 3. **Withdraw remaining collateral:**
 
-   - Withdraw 6.23 ETH
-   - Total ETH in wallet: 6.23
+   - Withdraw 6.23 ETHST
+   - Total ETHST in wallet: 6.23
    - Plus any leftover USDST
 
 **Final result:**
 
-- Started: 5 ETH at $3,000 = $15,000
-- Ended: 6.23 ETH at $4,500 = $28,035
+- Started: 5 ETHST at $3,000 = $15,000
+- Ended: 6.23 ETHST at $4,500 = $28,035
 - **Profit: $13,035 (87%)**
 - vs no leverage: $7,500 (50%)
 
@@ -504,7 +504,7 @@ ETH must rise > 3.75% to cover interest costs
 
 ### Health factor dropping fast
 
-**Problem:** ETH price falling
+**Problem:** ETHST price falling
 
 **Urgent actions:**
 

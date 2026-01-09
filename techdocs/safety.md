@@ -41,10 +41,10 @@ Essential security and risk management guidelines for using STRATO safely.
 ```
 Example Safe Position:
 
-- Collateral: 2 ETH ($6,000)
+- Collateral: 2 ETHST ($6,000)
 - Borrow: Only 2,000 USDST (not max $4,200)
 - Health Factor: ~2.4 (very safe)
-- Can withstand 58% ETH price drop
+- Can withstand 58% ETHST price drop
 ```
 
 **Monitor and React:**
@@ -203,7 +203,7 @@ Starting position:
 - Borrowed: 15,000 USDST
 - Health factor: 1.6
 
-ETH drops to $2,700:
+ETHST drops to $2,700:
 
 - Collateral now: $27,000
 - Health factor: 1.44 ⚠️

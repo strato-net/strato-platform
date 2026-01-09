@@ -36,6 +36,67 @@ Bridge 0.5 ETH to STRATO
 
 ---
 
+## Wrapped Tokens
+
+**Definition:** STRATO versions of Ethereum assets that you can use for DeFi operations on STRATO.
+
+**Why wrapped tokens?**
+
+When you bridge assets from Ethereum to STRATO, they become "wrapped" to work on the STRATO blockchain:
+
+- **On Ethereum**: You have ETH, USDC, WBTC
+- **On STRATO**: You have ETHST, USDCST, WBTCST (wrapped versions)
+- **1:1 Peg**: Always exchangeable 1:1 with the original
+
+**How it works:**
+
+```
+Bridge ETH from Ethereum → Receive ETHST on STRATO
+Use ETHST on STRATO → Bridge back → Receive ETH on Ethereum
+```
+
+**Common wrapped tokens:**
+
+| Original (Ethereum) | Wrapped (STRATO) | Type |
+|---------------------|------------------|------|
+| ETH | ETHST | Wrapped ETH |
+| WBTC | WBTCST | Wrapped BTC |
+| USDC | USDCST | Wrapped USDC |
+| USDT | USDTST | Wrapped USDT |
+| Gold tokens | GOLDST | Gold |
+| Silver tokens | SILVST | Silver |
+
+**Key points:**
+
+- ✅ **All STRATO operations** use wrapped tokens (swaps, lending, collateral, pools)
+- ✅ **Bridge operations** convert automatically (ETH → ETHST when bridging in)
+- ✅ **Always 1:1** - No slippage or conversion fees between original and wrapped
+- ✅ **Secure** - Backed by locked original assets on Ethereum
+
+**Example:**
+
+```
+1. You bridge 2 ETH from Ethereum to STRATO
+2. You receive 2 ETHST on STRATO
+3. You use ETHST to:
+   - Supply as collateral
+   - Swap for USDCST
+   - Provide liquidity in ETHST-USDCST pool
+4. Later, bridge 2 ETHST back to Ethereum
+5. You receive 2 ETH on Ethereum
+```
+
+**Why this matters:**
+
+Throughout the documentation, you'll see:
+- "Supply ETHST" (not "Supply ETH")
+- "USDST-USDCST pool" (not "USDST-USDC pool")
+- "Swap USDCST → ETHST" (not "Swap USDC → ETH")
+
+This is because on STRATO, you're working with the wrapped versions!
+
+---
+
 ## Collateral
 
 **Definition:** Assets you deposit to back your borrowing or minting.
@@ -49,9 +110,9 @@ Bridge 0.5 ETH to STRATO
 
 **Example:**
 ```
-Deposit: 1 ETH ($3,000)
+Deposit: 1 ETHST ($3,000)
 Can borrow: Up to ~$2,100 (70% LTV)
-If ETH drops to $2,000: Position at risk
+If ETHST drops to $2,000: Position at risk
 ```
 
 ## Health Factor (Lending)
@@ -92,12 +153,12 @@ stateDiagram-v2
 
 **Example:**
 ```
-Collateral: 10 ETH @ $3,000 = $30,000
+Collateral: 10 ETHST @ $3,000 = $30,000
 Liquidation threshold: 80%
 Borrowed: 15,000 USDST
 
 Health Factor = ($30,000 × 0.8) / $15,000 = 1.6
-Status: Safe, but watch ETH price
+Status: Safe, but watch ETHST price
 ```
 
 ## Collateralization Ratio (CDP)
@@ -117,7 +178,7 @@ CR = (Collateral Value / Minted USDST) × 100%
 
 **Example:**
 ```
-Collateral: 5 ETH @ $3,000 = $15,000
+Collateral: 5 ETHST @ $3,000 = $15,000
 Minted: 10,000 USDST
 
 CR = ($15,000 / $10,000) × 100% = 150%
@@ -176,18 +237,18 @@ Status: At minimum - risky!
 ```
 Before:
 
-- Collateral: 1 ETH @ $3,000
+- Collateral: 1 ETHST @ $3,000
 - Borrowed: 2,400 USDST
 - Health factor: 1.0
 
-ETH drops to $2,800:
+ETHST drops to $2,800:
 
 - Health factor: 0.93
 - LIQUIDATION TRIGGERED
 
 After:
 
-- Lost: 1 ETH ($2,800)
+- Lost: 1 ETHST ($2,800)
 - Kept: 2,400 USDST
 - Net loss: $400 + liquidation penalty (~$140)
 - Total loss: ~$540
@@ -215,13 +276,13 @@ After:
 ```
 Initial deposit:
 
-- 1 ETH ($3,000) + 3,000 USDC = $6,000 total
+- 1 ETHST ($3,000) + 3,000 USDCST = $6,000 total
 
 ETH doubles to $6,000:
 
 - Pool rebalances to: 0.707 ETH + 4,242 USDC
 - Pool value: $8,485
-- If you just held: 1 ETH ($6,000) + 3,000 USDC = $9,000
+- If you just held: 1 ETHST ($6,000) + 3,000 USDCST = $9,000
 - Impermanent loss: $515 (5.7%)
 
 BUT: Swap fees earned may offset this loss
@@ -280,6 +341,9 @@ Typically:
 ## Available Tokens
 
 STRATO supports various tokens for trading, lending, and collateral.
+
+!!! info "Understanding Wrapped Tokens"
+    All tokens bridged from Ethereum are automatically wrapped to work on STRATO. See [Wrapped Tokens](#wrapped-tokens) section above for details.
 
 ### Native & Wrapped Assets
 

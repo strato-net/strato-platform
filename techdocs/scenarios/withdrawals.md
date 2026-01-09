@@ -247,8 +247,8 @@ If you want to withdraw collateral, you'll need to close positions first. Here's
 
 ### About Asset Conversions
 
-- **USDST → USDC/USDT:** 1:1 conversion (no slippage)
-- **ETHST → ETH:** 1:1 conversion (no slippage)
+- **USDST → USDCST/USDT:** 1:1 conversion (no slippage)
+- **ETHST → ETHST:** 1:1 conversion (no slippage)
 - **Wrapped tokens:** Always convert back to original Ethereum asset
 
 ---
@@ -302,9 +302,9 @@ You don't have to withdraw everything:
 4. **Taking profits** - Withdraw trading gains, keep core positions
 
 **Example:**
-- Earned 2 ETH in yield
-- Bridge 2 ETH to Ethereum (take profits)
-- Keep 10 ETH lending position active on STRATO
+- Earned 2 ETHST in yield
+- Bridge 2 ETHST to Ethereum (take profits, receive 2 ETH)
+- Keep 10 ETHST lending position active on STRATO
 - No need to close anything
 
 ---

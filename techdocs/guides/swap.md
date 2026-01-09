@@ -7,19 +7,18 @@ Trade tokens instantly using STRATO's decentralized exchange.
 
 ---
 
-## Complete Example: Swap 1 ETH for USDC
-
+## Complete Example: Swap 1 ETHST for USDCST 
 **Your situation:**
 
-- You have: 1 ETH
-- ETH price: $3,000
-- You want: USDC stablecoin
+- You have: 1 ETHST
+- ETHST price: $3,000
+- You want: USDCST stablecoin
 
 **What you'll do:**
 
 1. Check swap quote
 2. Execute swap
-3. Receive USDC
+3. Receive USDCST
 
 **Time needed:** 2 minutes  
 **Total cost:** ~$9 trading fee + $0.10 gas
@@ -30,9 +29,9 @@ Trade tokens instantly using STRATO's decentralized exchange.
 
 **Step 1: Get Quote**
 - Go to **Swap** page
-- From: **ETH** → Enter **1.0**
-- To: **USDC**
-- Quote shows: **2,991 USDC** (0.3% fee = $9)
+- From: **ETHST** → Enter **1.0**
+- To: **USDCST**
+- Quote shows: **2,991 USDCST** (0.3% fee = $9)
 
 **Step 2: Execute Swap**
 - Click **"Swap"** (~$0.10 gas)
@@ -41,22 +40,22 @@ Trade tokens instantly using STRATO's decentralized exchange.
 
 **Result:**
 ```
-✅ Swapped: 1 ETH → 2,991 USDC
-✅ Rate: $2,991 per ETH (after fees)
+✅ Swapped: 1 ETHST → 2,991 USDCST
+✅ Rate: $2,991 per ETHST (after fees)
 ✅ Cost: $9 trading fee + $0.10 gas
 ```
 
 **Your wallet:**
 
-- Before: 1 ETH, 0 USDC
-- After: 0 ETH, 2,991 USDC
+- Before: 1 ETHST, 0 USDCST
+- After: 0 ETHST, 2,991 USDCST
 
 ---
 
 ## Overview
 
 **What is swapping?**
-- Exchange one token for another (e.g., ETH → USDC)
+- Exchange one token for another (e.g., ETHST → USDCST)
 - Instant execution through automated market makers (AMM)
 - No order books or centralized intermediaries
 
@@ -86,7 +85,7 @@ Before swapping:
 
 STRATO uses liquidity pools instead of traditional order books:
 
-1. **Liquidity pools** hold pairs of tokens (e.g., ETH-USDC pool)
+1. **Liquidity pools** hold pairs of tokens (e.g., ETHST-USDCST pool)
 2. **You swap** by trading with the pool
 3. **Price determined** by pool's token ratio
 4. **Liquidity providers** earn fees from your swap
@@ -113,13 +112,12 @@ STRATO uses liquidity pools instead of traditional order books:
 2. **To**: Select token you want to receive (destination token)
 3. Enter amount to swap
 
-**Example**: Swap 1 ETH for USDC
-
+**Example**: Swap 1 ETHST for USDCST 
 ### Step 3: Review Swap Details
 
 The app displays:
 
-- **Exchange rate**: Current price (e.g., 1 ETH = 3,000 USDC)
+- **Exchange rate**: Current price (e.g., 1 ETHST = 3,000 USDCST)
 - **Price impact**: How much your trade affects the price (< 1% is good)
 - **Minimum received**: Worst-case amount after slippage
 - **Fees**: Trading fee + gas fee
@@ -175,9 +173,9 @@ Both reduce your received amount.
 
 For optimal prices, swaps may route through multiple pools:
 
-**Example**: ETH → Reward Points
-- **Direct route**: ETH → Reward Points (if pool exists)
-- **Routed**: ETH → USDC → Reward Points (better price through two swaps)
+**Example**: ETHST → Reward Points
+- **Direct route**: ETHST → Reward Points (if pool exists)
+- **Routed**: ETHST → USDCST → Reward Points (better price through two swaps)
 
 The app automatically finds the best route.
 

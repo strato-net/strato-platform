@@ -14,13 +14,13 @@ Access USD liquidity without selling your crypto assets.
 
 **Your situation:**
 
-- You have: 1 ETH in your wallet
-- ETH price: $3,000
+- You have: 1 ETHST in your wallet
+- ETHST price: $3,000
 - You need: $1,000 USDST for expenses
 
 **What you'll do:**
 
-1. Supply 1 ETH as collateral
+1. Supply 1 ETHST as collateral
 2. Borrow 1,000 USDST
 3. Use your USDST
 4. Repay the loan (anytime)
@@ -36,14 +36,13 @@ Access USD liquidity without selling your crypto assets.
 
 **What you have:**
 
-- 1 ETH worth $3,000
+- 1 ETHST worth $3,000
 
 **In the app:**
 
 1. **Go to Borrow page** (in sidebar)
-2. **In the Collateral Management table**, find **ETH**
-3. Click the **"Supply"** button for ETH
-4. **In the modal:**
+2. **In the Collateral Management table**, find **ETHST**
+3. Click the **"Supply"** button for ETHST 4. **In the modal:**
    - Enter amount: **1.0** (or click "Max")
    - Review the health impact preview
 5. **Click "Supply"**
@@ -53,15 +52,15 @@ Access USD liquidity without selling your crypto assets.
 
 **Result:**
 ```
-✅ Collateral supplied: 1 ETH ($3,000)
+✅ Collateral supplied: 1 ETHST ($3,000)
 ✅ Can borrow up to: $2,250 USDST (75% of collateral)
 ✅ Health Factor: N/A (no debt yet)
 ```
 
 **Your wallet:**
 
-- Before: 1 ETH
-- After: 0 ETH (moved to collateral vault)
+- Before: 1 ETHST
+- After: 0 ETHST (moved to collateral vault)
 
 ---
 
@@ -92,7 +91,7 @@ Access USD liquidity without selling your crypto assets.
 
 **Your position now:**
 
-- Collateral: 1 ETH ($3,000)
+- Collateral: 1 ETHST ($3,000)
 - Debt: 1,000 USDST
 - Health Factor: 1.8 (very safe)
 - Still available to borrow: $1,250 more (but don't!)
@@ -153,7 +152,7 @@ You now have 1,000 USDST to use for:
 
 **Your position:**
 
-- Collateral: 1 ETH (still in vault)
+- Collateral: 1 ETHST (still in vault)
 - Debt: 0 USDST
 - Health Factor: No debt
 - You can now withdraw collateral
@@ -175,7 +174,7 @@ You now have 1,000 USDST to use for:
 
 **Result:**
 ```
-✅ Withdrawn: 1 ETH to your wallet
+✅ Withdrawn: 1 ETHST to your wallet
 ✅ Total position closed
 ```
 
@@ -184,13 +183,13 @@ You now have 1,000 USDST to use for:
 - You borrowed: 1,000 USDST
 - You repaid: 1,004 USDST
 - Total cost: $4 interest + $0.30 gas = **$4.30 total**
-- You still have: 1 ETH (same as you started)
+- You still have: 1 ETHST (same as you started)
 
 ---
 
 ## What If Prices Change?
 
-### Scenario: ETH Drops to $2,500
+### Scenario: ETHST Drops to $2,500
 
 **What happens:**
 
@@ -200,11 +199,10 @@ You now have 1,000 USDST to use for:
 
 **What to do:**
 
-- **Option 1: Add more collateral** - Supply 0.2 more ETH
-- **Option 2: Repay some debt** - Repay 400 USDST
+- **Option 1: Add more collateral** - Supply 0.2 more ETHST - **Option 2: Repay some debt** - Repay 400 USDST
 - **Option 3: Monitor closely** - Still safe, but watch the price
 
-### Scenario: ETH Drops to $2,000 (Danger!)
+### Scenario: ETHST Drops to $2,000 (Danger!)
 
 **What happens:**
 

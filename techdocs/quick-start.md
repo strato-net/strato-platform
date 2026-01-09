@@ -154,6 +154,17 @@ You need assets on STRATO to participate in DeFi. There are two ways to get them
 3. Request test tokens (free)
 4. Start experimenting!
 
+!!! info "Understanding Wrapped Tokens"
+    When you bridge assets to STRATO, they automatically become "wrapped" versions:
+    
+    - **ETH** → **ETHST** (Wrapped ETH on STRATO)
+    - **USDC** → **USDCST** (Wrapped USDC on STRATO)
+    - **WBTC** → **WBTCST** (Wrapped BTC on STRATO)
+    
+    These wrapped tokens work 1:1 with the original and are what you'll use for all STRATO operations (swaps, lending, collateral, etc.). When you bridge back to Ethereum, you receive the original tokens again.
+    
+    Learn more: **[Wrapped Tokens Concept](concepts.md#wrapped-tokens)**
+
 ---
 
 ## Step 4: Get USDST for Fees

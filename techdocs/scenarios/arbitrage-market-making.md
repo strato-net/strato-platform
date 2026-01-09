@@ -23,7 +23,7 @@ Two complementary strategies:
 
 **Price differences exist between platforms:**
 
-- STRATO DEX: ETH = $3,000
+- STRATO DEX: ETHST = $3,000
 - Uniswap: ETH = $3,015
 - **Opportunity:** Buy on STRATO, sell on Uniswap, profit $15
 
@@ -36,17 +36,16 @@ Two complementary strategies:
 
 ---
 
-### Complete Example: ETH Arbitrage
+### Complete Example: ETHST Arbitrage
 
 **Setup:**
 
-- Capital: $10,000 USDC
-- Split: $5k on STRATO, $5k on Uniswap (Ethereum)
-- Assets: USDC on both chains
+- Capital: $10,000 USDCST - Split: $5k on STRATO, $5k on Uniswap (Ethereum)
+- Assets: USDCST on both chains
 
 **Opportunity spotted:**
 
-- STRATO: 1 ETH = $2,990 USDC
+- STRATO: 1 ETHST = $2,990 USDCST
 - Uniswap: 1 ETH = $3,010 USDC
 - **Spread:** $20 (0.67%)
 
@@ -54,9 +53,9 @@ Two complementary strategies:
 
 1. **Buy on STRATO:**
 
-   - Swap $2,990 USDC → 1 ETH
+   - Swap $2,990 USDCST → 1 ETHST
    - Fee: 0.3% = $9
-   - Cost: $2,999 per ETH
+   - Cost: $2,999 per ETHST
 
 2. **Bridge ETH to Ethereum:**
 
@@ -66,10 +65,8 @@ Two complementary strategies:
 
 3. **Sell on Uniswap:**
 
-   - Swap 1 ETH → $3,010 USDC
-   - Fee: 0.3% = $9
-   - Receive: $3,001 USDC
-
+   - Swap 1 ETHST → $3,010 USDCST    - Fee: 0.3% = $9
+   - Receive: $3,001 USDCST 
 4. **Bridge USDC back:**
 
    - Optional: Keep capital balanced
@@ -125,8 +122,8 @@ Need at least 1.1% price difference
 
 **Example routes:**
 
-- Direct: USDC → ETH (one swap)
-- Routed: USDC → USDST → ETH (two swaps)
+- Direct: USDCST → ETHST (one swap)
+- Routed: USDCST → USDST → ETHST (two swaps)
 
 **If routing is cheaper, arbitrage exists!**
 
@@ -138,31 +135,31 @@ Need at least 1.1% price difference
 
 Direct swap:
 
-- USDC → ETH: Rate = $3,000 per ETH
+- USDCST → ETHST: Rate = $3,000 per ETHST
 
 Routed swap:
 
-- USDC → USDST: Rate = 1:1 (stable pair, low fee)
-- USDST → ETH: Rate = $2,985 per ETH (lower price!)
+- USDCST → USDST: Rate = 1:1 (stable pair, low fee)
+- USDST → ETHST: Rate = $2,985 per ETHST (lower price!)
 
 **Opportunity:**
 
 - Buy via route: $2,985 + fees
 - Sell direct: $3,000
-- Profit: ~$12 per ETH
+- Profit: ~$12 per ETHST
 
 **Execution:**
 
-1. **Buy ETH via route:**
+1. **Buy ETHST via route:**
 
-   - Swap $2,985 USDC → USDST (0.05% fee = $1.50)
-   - Swap $2,985 USDST → 1 ETH (0.3% fee = $9)
+   - Swap $2,985 USDCST → USDST (0.05% fee = $1.50)
+   - Swap $2,985 USDST → 1 ETHST (0.3% fee = $9)
    - Total cost: $2,995.50
 
-2. **Sell ETH direct:**
+2. **Sell ETHST direct:**
 
-   - Swap 1 ETH → $3,000 USDC (0.3% fee = $9)
-   - Receive: $2,991 USDC
+   - Swap 1 ETHST → $3,000 USDCST (0.3% fee = $9)
+   - Receive: $2,991 USDCST
 
 **Result:**
 ```
@@ -197,14 +194,14 @@ Loss: -$4.50 ❌
 
 ### Complete Example: Concentrated Liquidity
 
-**Starting capital:** $10,000 (5 ETH @ $2,000 or equivalent)
+**Starting capital:** $10,000 (5 ETHST @ $2,000 or equivalent)
 
-**Choose pool:** ETH-USDC (high volume)
+**Choose pool:** ETHST-USDCST (high volume)
 
 **Strategy decision:**
 
 **Option A: Wide range (passive)**
-- Provide liquidity: $1,500-$3,500 ETH price range
+- Provide liquidity: $1,500-$3,500 ETHST price range
 - Always in range
 - Lower fees but consistent
 - APR: 8-12%
@@ -223,20 +220,20 @@ Loss: -$4.50 ❌
 
 - Price: $2,000
 - Range: $1,950-$2,050
-- Capital: 2.5 ETH + $5,000 USDC
+- Capital: 2.5 ETHST + $5,000 USDCST
 
 **Deploy liquidity:**
 
 1. **Go to Advanced** (in sidebar) → **Swap Pools** tab
-2. Select **ETH-USDC** pool
+2. Select **ETHST-USDCST** pool
 3. **Choose concentrated range:**
 
    - Min: $1,950
    - Max: $2,050
 4. **Deposit:**
 
-   - 2.5 ETH
-   - $5,000 USDC
+   - 2.5 ETHST
+   - $5,000 USDCST
 5. **Click "Add Liquidity"** (~$0.10 gas, approvals automatic)
 
 **Result:**
@@ -256,7 +253,7 @@ Loss: -$4.50 ❌
 
 **Scenario 1: Price Stays in Range**
 
-**Days 1-5: ETH = $1,980-$2,020**
+**Days 1-5: ETHST = $1,980-$2,020**
 - Your liquidity is active
 - Earn fees: ~$30/day × 5 = $150
 - No action needed ✅
@@ -267,18 +264,18 @@ Loss: -$4.50 ❌
 
 **Scenario 2: Price Moves Out of Range**
 
-**Day 6: ETH pumps to $2,100**
+**Day 6: ETHST pumps to $2,100**
 
 **Your position:**
 
-- All converted to USDC (sold ETH automatically)
-- Now have: ~$10,150 USDC, 0 ETH
+- All converted to USDCST (sold ETHST automatically)
+- Now have: ~$10,150 USDCST, 0 ETHST
 - Out of range = no fees earned ❌
 
 **Action needed:**
 
 1. Remove liquidity
-2. Rebalance: Buy some ETH back
+2. Rebalance: Buy some ETHST back
 3. Set new range: $2,050-$2,150
 4. Re-provide liquidity
 
@@ -333,21 +330,21 @@ Loss: -$4.50 ❌
 
 **Start:**
 
-- Provide 1 ETH ($2,000) + $2,000 USDC
+- Provide 1 ETHST ($2,000) + $2,000 USDCST
 - Total: $4,000
 
 **ETH doubles to $4,000:**
 
 **If you just held:**
 
-- 1 ETH = $4,000
-- $2,000 USDC
+- 1 ETHST = $4,000
+- $2,000 USDCST
 - Total: $6,000
 
 **As LP:**
 
-- 0.707 ETH = $2,828
-- $2,828 USDC
+- 0.707 ETHST = $2,828
+- $2,828 USDCST
 - Total: $5,656
 - **IL: $344 (5.7%)**
 
@@ -441,7 +438,7 @@ Loss: -$4.50 ❌
 
 **Mitigations:**
 
-- Stick to major pairs (ETH-USDC, etc.)
+- Stick to major pairs (ETHST-USDCST, etc.)
 - Use audited protocols only
 - Diversify across pools
 - Monitor IL regularly
@@ -485,9 +482,9 @@ Loss: -$4.50 ❌
 
 **Pairs:**
 
-- ETH-USDC: $25k
-- BTC-USDC: $15k
-- USDST-USDC: $10k
+- ETHST-USDCST: $25k
+- WBTCST-USDCST: $15k
+- USDST-USDCST: $10k
 
 **Time commitment:** 30 min/day
 
@@ -495,9 +492,9 @@ Loss: -$4.50 ❌
 
 | Pool | Fees Earned | IL | Net | APR |
 |------|-------------|----|----|-----|
-| ETH-USDC | $2,100 | -$350 | $1,750 | 28% |
-| BTC-USDC | $1,350 | -$180 | $1,170 | 31% |
-| USDST-USDC | $280 | -$5 | $275 | 11% |
+| ETHST-USDCST | $2,100 | -$350 | $1,750 | 28% |
+| WBTCST-USDCST | $1,350 | -$180 | $1,170 | 31% |
+| USDST-USDCST | $280 | -$5 | $275 | 11% |
 | **Total** | **$3,730** | **-$535** | **$3,195** | **26%** |
 
 **Carlos's routine:**
@@ -523,7 +520,7 @@ Loss: -$4.50 ❌
 ### Week 2: Test
 
 - [ ] Start with $500-1,000
-- [ ] Choose stable pair (USDST-USDC)
+- [ ] Choose stable pair (USDST-USDCST)
 - [ ] Wide range (low risk)
 - [ ] Track daily performance
 - [ ] Learn the UI

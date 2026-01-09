@@ -7,16 +7,16 @@ Earn fees by providing liquidity to STRATO's decentralized exchange pools.
 
 ---
 
-## Complete Example: Provide $6,000 ETH-USDC Liquidity
+## Complete Example: Provide $6,000 ETHST-USDCST Liquidity
 
 **Your situation:**
 
-- You have: 1 ETH ($3,000) + 3,000 USDC
+- You have: 1 ETHST ($3,000) + 3,000 USDCST
 - You want: Earn trading fees passively
 
 **What you'll do:**
 
-1. Choose ETH-USDC pool
+1. Choose ETHST-USDCST pool
 2. Add liquidity
 3. Earn fees automatically
 5. Remove liquidity (anytime)
@@ -31,12 +31,12 @@ Earn fees by providing liquidity to STRATO's decentralized exchange pools.
 
 **Step 1: Choose Pool**
 - Go to **Pools** page
-- Select **ETH-USDC pool**
+- Select **ETHST-USDCST pool**
 - Check: 24h volume $500k, APR 12%
 
 **Step 2: Enter Amounts**
-- Enter: **1 ETH**
-- Auto-fills: **3,000 USDC** (to match ratio)
+- Enter: **1 ETHST**
+- Auto-fills: **3,000 USDCST** (to match ratio)
 - Your share: 0.5% of pool
 
 **Step 3: Add Liquidity**
@@ -47,7 +47,7 @@ Earn fees by providing liquidity to STRATO's decentralized exchange pools.
 
 **Result:**
 ```
-✅ Added: 1 ETH + 3,000 USDC to pool
+✅ Added: 1 ETHST + 3,000 USDCST to pool
 ✅ Received: LP tokens (representing your 0.5% share)
 ✅ Earning: ~$2/day in fees (12% APR)
 ✅ Plus: Reward Points
@@ -65,7 +65,7 @@ Earn fees by providing liquidity to STRATO's decentralized exchange pools.
 ## Overview
 
 **What is liquidity providing?**
-- Deposit token pairs into liquidity pools (e.g., ETH + USDC)
+- Deposit token pairs into liquidity pools (e.g., ETHST + USDC)
 - Earn trading fees from every swap that uses your pool
 - Receive LP (Liquidity Provider) tokens representing your share
 - Plus earn Reward Points
@@ -84,7 +84,7 @@ Before providing liquidity:
 
 - [ ] STRATO account set up ([Quick Start Guide](../quick-start.md))
 - [ ] Wallet connected to STRATO network
-- [ ] Both tokens of a pair in your wallet (e.g., ETH + USDC)
+- [ ] Both tokens of a pair in your wallet (e.g., ETHST + USDC)
 - [ ] Small amount of USDST for gas fees
 - [ ] Understanding of impermanent loss ([Core Concepts](../concepts.md#impermanent-loss-liquidity-provision))
 
@@ -94,7 +94,7 @@ Before providing liquidity:
 
 ### Automated Market Maker (AMM)
 
-1. **You deposit** equal value of two tokens (e.g., $1,000 ETH + $1,000 USDC)
+1. **You deposit** equal value of two tokens (e.g., $1,000 ETHST + $1,000 USDC)
 2. **Traders swap** between these tokens, paying fees
 3. **You earn** a share of fees proportional to your pool share
 4. **You can withdraw** anytime (subject to available liquidity)
@@ -142,9 +142,9 @@ Your LP tokens / Total LP tokens = Your % of pool
 
 **Popular pools**:
 
-- ETH / USDC - High volume, stable
-- WBTC / ETH - Dual crypto exposure
-- USDC / USDST - Minimal impermanent loss
+- ETHST / USDCST - High volume, stable
+- WBTC / ETHST - Dual crypto exposure
+- USDCST / USDST - Minimal impermanent loss
 
 ### Step 2: Enter Amounts
 
@@ -154,9 +154,9 @@ Your LP tokens / Total LP tokens = Your % of pool
 
 **Example**:
 
-- Pool is 50% ETH, 50% USDC
-- You enter: 1 ETH ($3,000)
-- Auto-fills: 3,000 USDC (to match value)
+- Pool is 50% ETHST, 50% USDCST
+- You enter: 1 ETHST ($3,000)
+- Auto-fills: 3,000 USDCST (to match value)
 
 !!! tip "Start Small"
     Test with ~$100-500 first to understand the process before committing large amounts.
@@ -252,13 +252,12 @@ Tokens (including earned fees) return to your wallet.
 
 **Initial deposit**:
 
-- 1 ETH ($3,000) + 3,000 USDC = $6,000 total
+- 1 ETHST ($3,000) + 3,000 USDCST = $6,000 total
 
 **ETH doubles to $6,000**:
 
-- Pool rebalances: 0.707 ETH + 4,242 USDC
-- Pool value: $8,485
-- If you just held: 1 ETH ($6,000) + 3,000 USDC = $9,000
+- Pool rebalances: 0.707 ETHST + 4,242 USDCST - Pool value: $8,485
+- If you just held: 1 ETHST ($6,000) + 3,000 USDCST = $9,000
 - **Impermanent loss: $515 (5.7%)**
 
 ### When Is It a Problem?

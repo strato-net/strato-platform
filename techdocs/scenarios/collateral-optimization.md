@@ -17,11 +17,11 @@ Actively manage collateral composition to:
 
 ---
 
-## Complete Example: Optimize 10 ETH Position
+## Complete Example: Optimize 10 ETHST Position
 
 **Your starting position:**
 
-- Collateral: 10 ETH ($30,000)
+- Collateral: 10 ETHST ($30,000)
 - Borrowed: 15,000 USDST
 - LTV: 50%
 - Health Factor: 1.6
@@ -29,7 +29,7 @@ Actively manage collateral composition to:
 
 **After optimization:**
 
-- Collateral: 3 ETH + 0.18 BTC + 12,000 USDC ($30,000)
+- Collateral: 3 ETHST + 0.18 WBTCST + 12,000 USDCST ($30,000)
 - Borrowed: 18,000 USDST
 - LTV: 60%
 - Health Factor: 1.37
@@ -47,13 +47,13 @@ Actively manage collateral composition to:
 
 ### Collateral Parameters on STRATO
 
-| Asset | LTV | Liq. Threshold | Volatility | Correlation to ETH |
+| Asset | LTV | Liq. Threshold | Volatility | Correlation to ETHST |
 |-------|-----|----------------|------------|-------------------|
-| **ETH** | 75% | 80% | High (70%) | 1.0 (perfect) |
-| **BTC** | 75% | 80% | High (65%) | 0.85 (high) |
-| **USDC** | 80% | 85% | None (0%) | 0.0 (none) |
-| **USDT** | 80% | 85% | None (0%) | 0.0 (none) |
-| **MATIC** | 70% | 75% | Very High (90%) | 0.75 (moderate) |
+| **ETHST** | 75% | 80% | High (70%) | 1.0 (perfect) |
+| **WBTCST** | 75% | 80% | High (65%) | 0.85 (high) |
+| **USDCST** | 80% | 85% | None (0%) | 0.0 (none) |
+| **USDTST** | 80% | 85% | None (0%) | 0.0 (none) |
+| **GOLDST** | 70% | 75% | Moderate (40%) | 0.3 (low) |
 
 **Key insights:**
 
@@ -73,7 +73,7 @@ Actively manage collateral composition to:
 ```
 Current position:
 
-- Collateral: 10 ETH ($30k)
+- Collateral: 10 ETHST ($30k)
 - Max borrow: $22,500 (75% LTV)
 - Volatility: 70% (high)
 - Sharpe-like ratio: $22,500 / 70% = 321
@@ -97,7 +97,7 @@ Target: Increase this ratio
 
 **Conservative:**
 
-- 40% volatile (ETH+BTC)
+- 40% volatile (ETHST+WBTCST)
 - 60% stables
 - Lower risk, less upside
 
@@ -122,32 +122,32 @@ Target: Increase this ratio
 **Target:**
 
 - $18k volatile (60%)
-  - $9k ETH (3 ETH)
-  - $9k BTC (0.18 BTC)
+  - $9k ETHST (3 ETHST)
+  - $9k WBTCST (0.18 BTC)
 - $12k stables (40%)
-  - $12k USDC
+  - $12k USDCST
 
-**From current (10 ETH):**
+**From current (10 ETHST):**
 
-1. **Remove 7 ETH from collateral**
+1. **Remove 7 ETHST from collateral**
    - Temporarily reduces HF
    - Will fix by adding others
 
-2. **Swap 4 ETH → $12k USDC**
+2. **Swap 4 ETHST → $12k USDCST**
    - Keep as stables
 
-3. **Swap 3 ETH → 0.18 BTC**
+3. **Swap 3 ETHST → 0.18 WBTCST**
    - Diversify volatile holdings
 
 4. **Supply new collateral:**
 
-   - 3 ETH
-   - 0.18 BTC
-   - 12,000 USDC
+   - 3 ETHST
+   - 0.18 WBTCST
+   - 12,000 USDCST
 
 **Result:**
 ```
-New collateral: 3 ETH + 0.18 BTC + 12k USDC
+New collateral: 3 ETHST + 0.18 WBTCST + 12k USDCST
 Value: $30,000 (unchanged)
 Max borrow: $23,100 (vs $22,500)
 Volatility: ~45% (vs 70%)
@@ -189,12 +189,12 @@ Weighted LTV = Σ(Asset_Value × Asset_LTV) / Total_Value
 
 Example:
 
-- 3 ETH ($9k) × 75% = $6,750
-- 0.18 BTC ($9k) × 75% = $6,750
-- 12k USDC × 80% = $9,600
+- 3 ETHST ($9k) × 75% = $6,750
+- 0.18 WBTCST ($9k) × 75% = $6,750
+- 12k USDCST × 80% = $9,600
 Total: $23,100 / $30k = 77% effective LTV
 
-vs pure ETH: 75% LTV
+vs pure ETHST: 75% LTV
 ```
 
 **Improvement: +2% borrowing capacity**
@@ -207,16 +207,16 @@ vs pure ETH: 75% LTV
 
 **Bad diversification:**
 
-- 50% ETH
-- 50% MATIC
-- Correlation: 0.75 (move together)
+- 50% ETHST
+- 50% WBTCST
+- Correlation: 0.85 (move together)
 - Crash together in bear market
 
 **Good diversification:**
 
-- 30% ETH
-- 30% BTC
-- 40% USDC
+- 30% ETHST
+- 30% GOLDST
+- 40% USDCST
 - Correlations: 0.85, 0.0
 - Better protected in crashes
 
@@ -241,8 +241,7 @@ Minimize this by choosing low-correlation assets
 
 **Target mix:**
 
-- 80% ETH + BTC
-- 20% stables (for stability)
+- 80% ETHST + WBTCST - 20% stables (for stability)
 
 **Why:**
 
@@ -262,7 +261,7 @@ Minimize this by choosing low-correlation assets
 
 **Target mix:**
 
-- 40% ETH + BTC (minimum exposure)
+- 40% ETHST + WBTCST (minimum exposure)
 - 60% stables (protection)
 
 **Why:**
@@ -315,8 +314,8 @@ If any asset > 50% of portfolio:
 
 **Price trigger:**
 ```
-If ETH drops > 15%:
-    Sell some ETH
+If ETHST drops > 15%:
+    Sell some ETHST
     Add stablecoins
     Protect from further drops
 ```
@@ -360,14 +359,14 @@ If ETH drops > 15%:
 
 **Without rebalancing:**
 
-- 10 ETH position
-- ETH drops 30%
+- 10 ETHST position
+- ETHST drops 30%
 - Liquidated, lose 10% = $900
 
 **With rebalancing (added stables):**
 
 - Mixed collateral
-- ETH drops 30%
+- ETHST drops 30%
 - Not liquidated
 - Cost to rebalance: $50
 
@@ -381,7 +380,7 @@ If ETH drops > 15%:
 
 **Starting (January):**
 
-- 10 ETH ($30k)
+- 10 ETHST ($30k)
 - 50% LTV
 - Volatility: 70%
 
@@ -401,7 +400,7 @@ If ETH drops > 15%:
 
 - Further reduced to 30% volatile, 70% stable
 - Preserved capital
-- Value: $30k (vs $20k if stayed 100% ETH)
+- Value: $30k (vs $20k if stayed 100% ETHST)
 
 **Q4 (Recovery):**
 

@@ -265,7 +265,7 @@ class YieldFarmingApp {
   
   async getETHPrice(): Promise<number> {
     // Get from price oracle
-    return 3000; // $3000 per ETH
+    return 3000; // $3000 per ETHST
   }
   
   async getUserCollateral() {

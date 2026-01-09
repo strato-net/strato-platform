@@ -24,22 +24,22 @@ Regularly deposit and invest fixed amounts into STRATO, regardless of price.
 **Your situation:**
 
 - Income: Steady job, $1,000/month to invest
-- Goal: Build ETH position + earn DeFi yields
+- Goal: Build ETHST position + earn DeFi yields
 - Timeline: 12 months
 - Risk tolerance: Moderate
 
 **The play:**
 
 1. Every month: Bridge $1,000 to STRATO
-2. Buy 50% ETH, keep 50% USDST
-3. Supply ETH as collateral
+2. Buy 50% ETHST, keep 50% USDST
+3. Supply ETHST as collateral
 4. Provide USDST liquidity
 5. Compound rewards
 
 **Expected outcome after 12 months:**
 
 - Total invested: $12,000
-- ETH accumulated: ~4-5 ETH (depending on prices)
+- ETHST accumulated: ~4-5 ETHST (depending on prices)
 - Liquidity provided: $6,000 in USDST pools
 - Rewards earned: ~$500-800 in Reward Points + fees
 
@@ -54,15 +54,15 @@ Regularly deposit and invest fixed amounts into STRATO, regardless of price.
 **Actions:**
 
 1. Bridge $1,000 USDC to STRATO ($20-30 Ethereum L1 gas, one-time per bridge)
-2. Swap $500 USDC → ETH (~0.167 ETH @ $3,000)
-3. Supply 0.167 ETH as collateral
-4. Swap $500 USDC → USDST
-5. Provide $500 USDST liquidity in USDST-USDC pool
+2. Swap $500 USDCST → ETHST (~0.167 ETHST @ $3,000)
+3. Supply 0.167 ETHST as collateral
+4. Swap $500 USDCST → USDST
+5. Provide $500 USDST liquidity in USDST-USDCST pool
 
 **Result:**
 ```
-Collateral: 0.167 ETH ($500)
-Liquidity: $500 USDST-USDC
+Collateral: 0.167 ETHST ($500)
+Liquidity: $500 USDST-USDCST
 Total value: $1,000
 Earning: LP fees + Reward Points
 ```
@@ -78,15 +78,15 @@ Earning: LP fees + Reward Points
 - Cost: ~$20 Ethereum L1 gas (paid on Ethereum network)
 
 **2. Split allocation** (50/50)
-- $500 → ETH (buy on STRATO DEX)
+- $500 → ETHST (buy on STRATO DEX)
 - $500 → USDST liquidity
 
-**3. Supply ETH collateral**
-- Add new ETH to collateral
+**3. Supply ETHST collateral**
+- Add new ETHST to collateral
 - Increase collateral base
 
 **4. Add to liquidity**
-- Increase USDST-USDC LP position
+- Increase USDST-USDCST LP position
 - Compound previous rewards
 
 ---
@@ -95,9 +95,9 @@ Earning: LP fees + Reward Points
 
 ### Scenario A: Bull Market
 
-**ETH price:** $3,000 → $5,000 over 12 months
+**ETHST price:** $3,000 → $5,000 over 12 months
 
-| Month | ETH Price | ETH Bought | Total ETH | LP Value | Total Value |
+| Month | ETHST Price | ETHST Bought | Total ETHST | LP Value | Total Value |
 |-------|-----------|------------|-----------|----------|-------------|
 | 1 | $3,000 | 0.167 | 0.167 | $500 | $1,000 |
 | 3 | $3,500 | 0.143 | 0.593 | $1,500 | $3,575 |
@@ -110,12 +110,11 @@ Earning: LP fees + Reward Points
 - Invested: $12,000
 - Value: $21,000
 - Profit: $9,000 (75% gain!)
-- ETH accumulated: 3 ETH @ average $2,000
+- ETHST accumulated: 3 ETHST @ average $2,000
 
 **vs Lump Sum at Month 1:**
 
-- Invest $12k at $3,000 = 4 ETH
-- Value at $5,000 = $20,000
+- Invest $12k at $3,000 = 4 ETHST - Value at $5,000 = $20,000
 - Profit: $8,000 (67% gain)
 
 **DCA wins in bull market (slightly)** ✅
@@ -124,9 +123,9 @@ Earning: LP fees + Reward Points
 
 ### Scenario B: Bear Market
 
-**ETH price:** $3,000 → $1,500 over 12 months
+**ETHST price:** $3,000 → $1,500 over 12 months
 
-| Month | ETH Price | ETH Bought | Total ETH | LP Value | Total Value |
+| Month | ETHST Price | ETHST Bought | Total ETHST | LP Value | Total Value |
 |-------|-----------|------------|-----------|----------|-------------|
 | 1 | $3,000 | 0.167 | 0.167 | $500 | $1,000 |
 | 3 | $2,500 | 0.200 | 0.733 | $1,500 | $3,333 |
@@ -139,12 +138,11 @@ Earning: LP fees + Reward Points
 - Invested: $12,000
 - Value: $13,500
 - Profit: $1,500 (12.5% gain!)
-- ETH accumulated: 5 ETH @ average $1,200
+- ETHST accumulated: 5 ETHST @ average $1,200
 
 **vs Lump Sum at Month 1:**
 
-- Invest $12k at $3,000 = 4 ETH
-- Value at $1,500 = $6,000
+- Invest $12k at $3,000 = 4 ETHST - Value at $1,500 = $6,000
 - Loss: -$6,000 (-50%)
 
 **DCA wins MASSIVELY in bear market** ✅✅✅
@@ -153,9 +151,9 @@ Earning: LP fees + Reward Points
 
 ### Scenario C: Volatile/Sideways
 
-**ETH price:** Ranges $2,500-$3,500, ends at $3,000
+**ETHST price:** Ranges $2,500-$3,500, ends at $3,000
 
-| Month | ETH Price | ETH Bought | Total ETH | LP Value | Total Value |
+| Month | ETHST Price | ETHST Bought | Total ETHST | LP Value | Total Value |
 |-------|-----------|------------|-----------|----------|-------------|
 | 1 | $3,000 | 0.167 | 0.167 | $500 | $1,000 |
 | 3 | $2,500 | 0.200 | 0.567 | $1,500 | $2,918 |
@@ -168,7 +166,7 @@ Earning: LP fees + Reward Points
 - Invested: $12,000
 - Value: $13,086
 - Profit: $1,086 (9% gain)
-- Average ETH price: $2,543 (better than ending price!)
+- Average ETHST price: $2,543 (better than ending price!)
 
 **DCA smooths volatility** ✅
 
@@ -181,15 +179,15 @@ Earning: LP fees + Reward Points
 **Each month:**
 
 1. Bridge $1,000
-2. Buy $500 ETH + keep $500 USDST
-3. Supply ETH as collateral
+2. Buy $500 ETHST + keep $500 USDST
+3. Supply ETHST as collateral
 4. Borrow additional $250 USDST (conservative leverage)
-5. Swap $250 to more ETH
+5. Swap $250 USDST to more ETHST
 6. Use remaining $500 + $250 borrowed = $750 for liquidity
 
 **Result:**
 
-- More ETH exposure via leverage
+- More ETHST exposure via leverage
 - More liquidity (higher yields)
 - Higher risk (interest costs, liquidation)
 
@@ -252,7 +250,7 @@ Earning: LP fees + Reward Points
 
 **Adjust amount based on price:**
 
-| ETH Price | Monthly Deposit |
+| ETHST Price | Monthly Deposit |
 |-----------|-----------------|
 | > $3,500 | $750 (buy less) |
 | $2,500-$3,500 | $1,000 (normal) |
@@ -269,11 +267,11 @@ Earning: LP fees + Reward Points
 
 **Each month:**
 
-- 30% → ETH collateral
+- 30% → ETHST collateral
 - 70% → Stablecoin liquidity (higher income)
 
 **Pros:** Maximize current income  
-**Cons:** Less ETH upside exposure
+**Cons:** Less ETHST upside exposure
 
 ---
 
@@ -327,7 +325,7 @@ Earning: LP fees + Reward Points
 **Every month:**
 
 - [ ] Bridge $1,000 (or batch quarterly)
-- [ ] Buy ETH allocation
+- [ ] Buy ETHST allocation
 - [ ] Supply to collateral
 - [ ] Add to liquidity
 - [ ] Claim and compound rewards
@@ -379,7 +377,7 @@ Earning: LP fees + Reward Points
 | Metric | Value |
 |--------|-------|
 | Total invested | $18,000 |
-| ETH accumulated | 6.8 ETH |
+| ETHST accumulated | 6.8 ETHST |
 | LP value | $9,000 |
 | Reward Points | $800 |
 | LP fees earned | $1,200 |
@@ -404,7 +402,7 @@ Earning: LP fees + Reward Points
 **Each month:**
 
 - Bridge: No tax
-- Buy ETH: Tax event (swap)
+- Buy ETHST: Tax event (swap)
 - Supply collateral: No tax
 - Add liquidity: No tax
 - Claim rewards: Taxable income
@@ -473,7 +471,7 @@ Earning: LP fees + Reward Points
 
 ```
 Average price = Sum(prices) / Number of months
-ETH accumulated = Total invested × 0.5 / Average price
+ETHST accumulated = Total invested × 0.5 / Average price
 LP value = Total invested × 0.5 × (1 + Annual LP APR ÷ 12 × Months)
 Estimated value = (ETH × Current price) + LP value
 ```
@@ -482,12 +480,11 @@ Estimated value = (ETH × Current price) + LP value
 
 - Monthly investment: $1,000
 - Duration: 12 months
-- ETH average price: $2,800
+- ETHST average price: $2,800
 - LP APR: 10%
 
 ```
-ETH accumulated = ($12,000 × 0.5) / $2,800 = 2.14 ETH
-LP value = $6,000 × 1.10 = $6,600
+ETHST accumulated = ($12,000 × 0.5) / $2,800 = 2.14 ETHST LP value = $6,000 × 1.10 = $6,600
 Total value = (2.14 × current_price) + $6,600
 ```
 
