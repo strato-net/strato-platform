@@ -310,19 +310,17 @@ export const calculateAdditionalCollateralAmountFromValue = (
 };
 
 /**
- * Calculates the max dollar value that the user can supply of the asset
- * @param balance - user's wei balance of the asset
- * @param price - asset price in USD, such as 21200000000000000000n for $21.20
- * @param decimals - asset decimals, such as 10n**18n for 18 decimals
- * @returns the maxmimum value in USD that the user can supply, such as 3400000000000000000n for $3.40
- * @throws if decimals is 0n
+ * Calculates the max dollar value that the user can supply of the asset, floored to cents
+ * @param collateral - the collateral asset to evaluate
+ * @returns the maximum value in USD floored to cents, such as 3.40 for $3.409
  */
-export const calculateMaxCollateralValueFromBalance = (
-  balance: bigint,
-  price: bigint,
-  decimals: bigint, // i.e. 10n**18n, not 18n
-): bigint => {
-  return (balance * price) / decimals;
+export const calculateMaxCollateralValueUSDCentFloored = (collateral: CollateralData): number => {
+  const balance = BigInt(collateral.userBalance ?? "0");
+  const price = BigInt(collateral.assetPrice ?? "0");
+  const decimals = BigInt(10) ** BigInt(collateral.customDecimals ?? 18);
+  const maxValueWei = (balance * price) / decimals
+  const maxValueUSD = Number(maxValueWei) / 1e18;
+  return Math.floor(maxValueUSD * 100) / 100; // Floor to cents
 };
 
 export const recommendCollateralToSupply = (
