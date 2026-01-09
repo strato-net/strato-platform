@@ -11,7 +11,7 @@ import { useTokenContext } from '@/context/TokenContext';
 import { Token, PriceHistoryEntry, SwapHistoryEntry } from '@/interface';
 import { formatUnits } from 'ethers';
 import { api } from '@/lib/axios';
-import PriceChart from '@/components/charts/PriceChart';
+import ConsolidatedPriceChart from '@/components/charts/ConsolidatedPriceChart';
 import CopyButton from '@/components/ui/copy';
 import { addCommasToInput, roundToDecimals } from '@/utils/numberUtils';
 
@@ -178,13 +178,6 @@ const fetchSwapPoolPrices = async (assetAddress: string): Promise<SwapPricePoint
   }
 };
 
-// Consistent color scheme for all charts
-const CHART_COLORS = {
-  GREEN: "#10b981", // Consistent green for upward trends
-  RED: "#ef4444",   // Consistent red for downward trends  
-  BLUE: "#2563eb"   // Default blue for neutral/no data
-};
-
 const AssetDetail = () => {
 
   const { id } = useParams<{ id: string }>();
@@ -201,21 +194,6 @@ const AssetDetail = () => {
   const [fetchingSingleAsset, setFetchingSingleAsset] = useState(false);
 
   const PRICE_WINDOW = 30; // Number of days to show in the price chart
-  const getChartColor = (currentPrice: string | undefined, priceData: PricePoint[]): string => {
-    if (!currentPrice || priceData.length === 0) return CHART_COLORS.BLUE;
-    
-    const current = parseFloat(formatUnits(currentPrice.toString(), 18));
-    const first = parseFloat(priceData[0].price);
-    return current > first ? CHART_COLORS.GREEN : CHART_COLORS.RED;
-  };
-  
-  const getSwapChartColor = (swapPriceData: SwapPricePoint[]): string => {
-    if (swapPriceData.length === 0) return CHART_COLORS.BLUE;
-    
-    const first = parseFloat(swapPriceData[0].price);
-    const last = parseFloat(swapPriceData[swapPriceData.length - 1].price);
-    return last > first ? CHART_COLORS.GREEN : CHART_COLORS.RED;
-  };
   
   useEffect(() => {
     fetchTokens()
@@ -482,26 +460,13 @@ const AssetDetail = () => {
             </div>
 
             <div className="lg:col-span-2">
-                <PriceChart
-                  data={priceData}
-                  loading={priceDataLoading}
-                  title="Spot Price History"
-                  subtitle={priceData.length > 0 ? "Hourly price data from first available oracle price to present" : undefined}
-                  loadingMessage="Loading price history..."
-                  emptyMessage="No price history available for this asset"
-                  chartColor={getChartColor(asset?.price?.toLocaleString("fullwide", { useGrouping: false }), priceData)}
-                  gradientId="colorPrice"
-                />
-
-                <PriceChart
-                  data={swapPriceData}
-                  loading={swapPriceDataLoading}
-                  title="Swap Pool Price History"
-                  subtitle={swapPriceData.length > 0 ? "Actual trading prices from swap pools (Last 30 days)" : undefined}
-                  loadingMessage="Loading swap pool prices..."
-                  emptyMessage="No swap pool data available for this asset"
-                  chartColor={getSwapChartColor(swapPriceData)}
-                  gradientId="colorSwapPrice"
+                <ConsolidatedPriceChart
+                  spotData={priceData}
+                  swapData={swapPriceData}
+                  spotLoading={priceDataLoading}
+                  swapLoading={swapPriceDataLoading}
+                  title="Price History"
+                  subtitle="Spot price (blue) and STRATO price (orange)"
                 />
             </div>
           </div>

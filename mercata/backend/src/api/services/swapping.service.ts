@@ -66,8 +66,10 @@ export const getPools = async (
     })
   ]);
 
-  // Filter out pools with null lpToken to prevent crashes
-  const validatedPools = (poolData as RawGetPool[]).filter(pool => pool.lpToken);
+  // Filter out hidden pools
+  const validatedPools = (poolData as RawGetPool[]).filter(
+    pool => !config.hiddenSwapPools.has(pool.address)
+  );
   const validatedFactory = factoryData[0] as RawPoolFactory;
   const tokenAddresses = extractTokenAddresses(validatedPools);
   const priceMap = await getOraclePrices(accessToken, {
@@ -119,13 +121,16 @@ export const getSwapableTokens = async (
   const { data: poolData } = await cirrus.get(accessToken, `/${Pool}`, {
     params: {
       poolFactory: "eq." + constants.poolFactory,
-      select: `tokenA:tokenA_fkey(${swapTokenSelectFields.join(',')}),tokenB:tokenB_fkey(${swapTokenSelectFields.join(',')}),tokenABalance::text,tokenBBalance::text`,
+      select: `address,tokenA:tokenA_fkey(${swapTokenSelectFields.join(',')}),tokenB:tokenB_fkey(${swapTokenSelectFields.join(',')}),tokenABalance::text,tokenBBalance::text`,
       "tokenA.balances.key": `eq.${userAddress}`,
       "tokenB.balances.key": `eq.${userAddress}`,
     }
   });
 
-  const validatedPools = poolData as PoolWithTokens[];
+  // Filter out hidden pools
+  const validatedPools = (poolData as (PoolWithTokens & { address: string })[]).filter(
+    pool => !config.hiddenSwapPools.has(pool.address)
+  ) as PoolWithTokens[];
   const tokenAddresses = extractTokenAddresses(validatedPools);
   const priceMap = await getOraclePrices(accessToken, {
     select: "asset:key,price:value::text",
@@ -158,7 +163,7 @@ export const getSwapableTokenPairs = async (
     cirrus.get(accessToken, `/${Pool}`, {
       params: {
         poolFactory: "eq." + constants.poolFactory,
-        select: `tokenB:tokenB_fkey(${swapTokenSelectFields.join(',')}),tokenBBalance::text`,
+        select: `address,tokenB:tokenB_fkey(${swapTokenSelectFields.join(',')}),tokenBBalance::text`,
         tokenA: "eq." + tokenAddress,
         "tokenB.balances.key": `eq.${userAddress}`,
       }
@@ -166,15 +171,20 @@ export const getSwapableTokenPairs = async (
     cirrus.get(accessToken, `/${Pool}`, {
       params: {
         poolFactory: "eq." + constants.poolFactory,
-        select: `tokenA:tokenA_fkey(${swapTokenSelectFields.join(',')}),tokenABalance::text`,
+        select: `address,tokenA:tokenA_fkey(${swapTokenSelectFields.join(',')}),tokenABalance::text`,
         tokenB: "eq." + tokenAddress,
         "tokenA.balances.key": `eq.${userAddress}`,
       }
     })
   ]);
 
-  const validatedPoolsA = poolDataA as PoolWithTokenB[];
-  const validatedPoolsB = poolDataB as PoolWithTokenA[];
+  // Filter out hidden pools
+  const validatedPoolsA = (poolDataA as (PoolWithTokenB & { address: string })[]).filter(
+    pool => !config.hiddenSwapPools.has(pool.address)
+  ) as PoolWithTokenB[];
+  const validatedPoolsB = (poolDataB as (PoolWithTokenA & { address: string })[]).filter(
+    pool => !config.hiddenSwapPools.has(pool.address)
+  ) as PoolWithTokenA[];
 
   const allTokens: Array<{token: RawToken, poolBalance: string}> = [
     ...validatedPoolsA.map(pool => ({ token: pool.tokenB, poolBalance: pool.tokenBBalance })),

@@ -67,7 +67,7 @@ pipeline {
     success {
       slackSend (
         color: 'good',
-        message: "Release ${env.RELEASE_VERSION} Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+        message: "Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
       )
       
       script {
@@ -86,7 +86,7 @@ pipeline {
     failure {
       slackSend (
         color: 'danger',
-        message: "Release ${env.RELEASE_VERSION} Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+        message: "Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
       )
     }
   }
