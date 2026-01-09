@@ -1,16 +1,16 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { endpointsOverview, buildConfigDoc } from "./docs.js";
-import { MercataMcpConfig } from "./config.js";
+import { GriphookConfig } from "./config.js";
 
-export function registerMercataResources(server: McpServer, config: MercataMcpConfig) {
+export function registerResources(server: McpServer, config: GriphookConfig) {
   server.registerResource(
-    "mercata-endpoints",
-    "mercata://resources/endpoints",
-    { mimeType: "text/markdown", description: "Mercata API endpoints mapped to UI features." },
+    "strato-endpoints",
+    "strato://resources/endpoints",
+    { mimeType: "text/markdown", description: "STRATO API endpoints mapped to UI features." },
     async () => ({
       contents: [
         {
-          uri: "mercata://resources/endpoints",
+          uri: "strato://resources/endpoints",
           text: endpointsOverview,
         },
       ],
@@ -18,13 +18,13 @@ export function registerMercataResources(server: McpServer, config: MercataMcpCo
   );
 
   server.registerResource(
-    "mercata-config",
-    "mercata://resources/config",
+    "strato-config",
+    "strato://resources/config",
     { mimeType: "text/markdown", description: "Active MCP configuration and env hints." },
     async () => ({
       contents: [
         {
-          uri: "mercata://resources/config",
+          uri: "strato://resources/config",
           text: buildConfigDoc(config),
         },
       ],

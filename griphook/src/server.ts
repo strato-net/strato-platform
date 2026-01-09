@@ -3,27 +3,27 @@ import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { loadConfig } from "./config.js";
-import { MercataApiClient } from "./client.js";
-import { registerMercataTools } from "./tools.js";
-import { registerMercataResources } from "./resources.js";
+import { GriphookClient } from "./client.js";
+import { registerTools } from "./tools.js";
+import { registerResources } from "./resources.js";
 
 function buildServer(config: ReturnType<typeof loadConfig>) {
   const instructions = [
-    "Mercata MCP server exposes the Mercata web app backend. Authentication requires an OAuth access token supplied via MERCATA_ACCESS_TOKEN.",
-    `API base: ${config.apiBaseUrl}. Override with MERCATA_API_BASE_URL.`,
-    "Use mercata.api-request for arbitrary endpoints; domain tools (mercata.tokens, mercata.swap, mercata.lending, mercata.cdp, mercata.bridge, mercata.rewards, mercata.admin, mercata.events, mercata.protocol-fees, mercata.rpc) provide common workflows.",
-    `HTTP transport: ${config.http.enabled ? `POST ${config.http.host}:${config.http.port}${config.http.path}` : "disabled (set MERCATA_MCP_HTTP_ENABLED=true)"}.`,
+    "Griphook MCP server exposes the STRATO web app backend. Authentication uses BlockApps OAuth credentials (BLOCKAPPS_USERNAME, BLOCKAPPS_PASSWORD).",
+    `API base: ${config.apiBaseUrl}. Override with STRATO_API_BASE_URL.`,
+    "Use strato.api-request for arbitrary endpoints; domain tools (strato.tokens, strato.swap, strato.lending, strato.cdp, strato.bridge, strato.rewards, strato.admin, strato.events, strato.protocol-fees, strato.rpc) provide common workflows.",
+    `HTTP transport: ${config.http.enabled ? `POST ${config.http.host}:${config.http.port}${config.http.path}` : "disabled (set GRIPHOOK_HTTP_ENABLED=true)"}.`,
   ].join("\n");
 
   const server = new McpServer(
-    { name: "mercata-mcp", version: "0.1.0" },
+    { name: "griphook", version: "0.1.0" },
     { capabilities: { logging: {} }, instructions },
   );
 
-  const client = new MercataApiClient(config);
+  const client = new GriphookClient(config);
 
-  registerMercataResources(server, config);
-  registerMercataTools(server, client, config);
+  registerResources(server, config);
+  registerTools(server, client, config);
 
   return server;
 }
@@ -50,7 +50,7 @@ async function startHttpServer(config: ReturnType<typeof loadConfig>) {
 
   const listener = app.listen(config.http.port, config.http.host, () => {
     console.log(
-      `Mercata MCP HTTP listening on http://${config.http.host}:${config.http.port}${config.http.path} (SSE at ${config.http.ssePath})`,
+      `Griphook MCP HTTP listening on http://${config.http.host}:${config.http.port}${config.http.path} (SSE at ${config.http.ssePath})`,
     );
   });
 
@@ -68,7 +68,7 @@ async function start() {
     const closeStdio = await startStdioServer(config);
     closers.push(closeStdio);
   } catch (err) {
-    console.error("Failed to start Mercata MCP stdio server:", err);
+    console.error("Failed to start Griphook MCP stdio server:", err);
   }
 
   try {
@@ -77,7 +77,7 @@ async function start() {
       closers.push(closeHttp);
     }
   } catch (err) {
-    console.error("Failed to start Mercata MCP HTTP server:", err);
+    console.error("Failed to start Griphook MCP HTTP server:", err);
   }
 
   process.on("SIGINT", async () => {
@@ -87,6 +87,6 @@ async function start() {
 }
 
 start().catch((err) => {
-  console.error("Failed to start Mercata MCP server:", err);
+  console.error("Failed to start Griphook MCP server:", err);
   process.exit(1);
 });

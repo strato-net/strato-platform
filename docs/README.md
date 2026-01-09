@@ -38,6 +38,15 @@ The DeFi and token management REST API:
 - **[Lending Pool Overview](mercata/lending_pool_overview.md)** - Detailed lending mechanics
 - **[Lending API Test Plan](mercata/lending_api_test_plan.md)** - Testing documentation
 
+## Griphook MCP Server
+
+AI agent integration via the Model Context Protocol:
+
+- **[Overview](griphook/README.md)** - What is Griphook and how it works
+- **[Setup & Configuration](griphook/setup.md)** - Installation and environment setup
+- **[Tools Reference](griphook/tools.md)** - Complete MCP tool documentation
+- **[Resources](griphook/resources.md)** - MCP resource endpoints
+
 ## Design Documents
 
 Technical specifications and architecture decisions:

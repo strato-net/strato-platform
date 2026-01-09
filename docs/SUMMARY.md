@@ -24,6 +24,13 @@
 * [Tokens](mercata/Tokens.md)
 * [Voucher](mercata/Voucher.md)
 
+## Griphook MCP Server
+
+* [Overview](griphook/README.md)
+* [Setup & Configuration](griphook/setup.md)
+* [Tools Reference](griphook/tools.md)
+* [Resources](griphook/resources.md)
+
 ## Design Documents
 
 * [Overview](design/README.md)

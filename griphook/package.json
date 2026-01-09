@@ -1,7 +1,7 @@
 {
-  "name": "mercata-mcp",
+  "name": "griphook",
   "version": "0.1.0",
-  "description": "MCP server exposing Mercata web app functionality over the Model Context Protocol.",
+  "description": "Griphook MCP server exposing STRATO web app functionality over the Model Context Protocol.",
   "main": "dist/server.js",
   "type": "module",
   "scripts": {
@@ -11,7 +11,9 @@
   },
   "keywords": [
     "mcp",
-    "mercata"
+    "griphook",
+    "strato",
+    "blockapps"
   ],
   "author": "",
   "license": "Apache-2.0",

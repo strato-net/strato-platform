@@ -1,12 +1,12 @@
-import { MercataMcpConfig } from "./config.js";
+import { GriphookConfig } from "./config.js";
 
-export const endpointsOverview = `# Mercata API surface
+export const endpointsOverview = `# STRATO API surface
 
 Authentication
-- OAuth tokens are acquired automatically using BlockApps credentials (BA_USERNAME, BA_PASSWORD).
-- Requires CLIENT_ID, CLIENT_SECRET, and OPENID_DISCOVERY_URL for OAuth configuration.
+- OAuth tokens are acquired automatically using BlockApps credentials (BLOCKAPPS_USERNAME, BLOCKAPPS_PASSWORD).
+- Requires OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET, and OPENID_DISCOVERY_URL for OAuth configuration.
 - Tokens are cached and refreshed automatically before expiration.
-- Base URL defaults to http://localhost:3001/api. Override with MERCATA_API_BASE_URL.
+- Base URL defaults to http://localhost:3001/api. Override with STRATO_API_BASE_URL.
 
 User & Admin
 - GET /user/me – current address, admin flag, username.
@@ -76,8 +76,8 @@ Config & Health
 - GET /health – backend health.
 `;
 
-export function buildConfigDoc(config: MercataMcpConfig): string {
-  return `# Mercata MCP configuration
+export function buildConfigDoc(config: GriphookConfig): string {
+  return `# Griphook configuration
 
 - Node URL: ${config.nodeUrl}
 - API base: ${config.apiBaseUrl}
@@ -87,20 +87,20 @@ export function buildConfigDoc(config: MercataMcpConfig): string {
 - HTTP timeout: ${config.timeoutMs}ms
 
 Required environment variables:
-- BA_USERNAME – BlockApps username
-- BA_PASSWORD – BlockApps password
-- CLIENT_ID – OAuth client ID
-- CLIENT_SECRET – OAuth client secret
+- BLOCKAPPS_USERNAME – BlockApps username
+- BLOCKAPPS_PASSWORD – BlockApps password
+- OAUTH_CLIENT_ID – OAuth client ID
+- OAUTH_CLIENT_SECRET – OAuth client secret
 - OPENID_DISCOVERY_URL – OpenID Connect discovery endpoint
 
 Optional environment variables:
-- NODE_URL (default http://localhost)
-- MERCATA_API_BASE_URL (default http://localhost:3001/api)
-- MERCATA_HTTP_TIMEOUT_MS (default 15000)
-- MERCATA_MCP_HTTP_ENABLED (default true)
-- MERCATA_MCP_HTTP_HOST (default 127.0.0.1)
-- MERCATA_MCP_HTTP_PORT (default 3005)
-- MERCATA_MCP_HTTP_PATH (default /mcp)
-- MERCATA_MCP_HTTP_SSE_PATH (default {path}/events)
+- STRATO_NODE_URL (default http://localhost)
+- STRATO_API_BASE_URL (default http://localhost:3001/api)
+- STRATO_HTTP_TIMEOUT_MS (default 15000)
+- GRIPHOOK_HTTP_ENABLED (default true)
+- GRIPHOOK_HTTP_HOST (default 127.0.0.1)
+- GRIPHOOK_HTTP_PORT (default 3005)
+- GRIPHOOK_HTTP_PATH (default /mcp)
+- GRIPHOOK_HTTP_SSE_PATH (default {path}/events)
 `;
 }

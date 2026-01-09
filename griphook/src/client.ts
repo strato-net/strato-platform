@@ -1,15 +1,15 @@
 import axios, { AxiosInstance, AxiosError, Method } from "axios";
 import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
-import { MercataMcpConfig } from "./config.js";
+import { GriphookConfig } from "./config.js";
 import { OAuthClient } from "./auth.js";
 
-export type MercataHttpMethod = "get" | "post" | "put" | "patch" | "delete";
+export type HttpMethod = "get" | "post" | "put" | "patch" | "delete";
 
-export class MercataApiClient {
+export class GriphookClient {
   private http: AxiosInstance;
   private oauth: OAuthClient;
 
-  constructor(config: MercataMcpConfig) {
+  constructor(config: GriphookConfig) {
     this.oauth = new OAuthClient(config.oauth);
     this.http = axios.create({
       baseURL: config.apiBaseUrl,
@@ -17,7 +17,7 @@ export class MercataApiClient {
     });
   }
 
-  async request<T = unknown>(method: MercataHttpMethod, path: string, options?: {
+  async request<T = unknown>(method: HttpMethod, path: string, options?: {
     params?: Record<string, unknown>;
     data?: unknown;
     headers?: Record<string, string>;

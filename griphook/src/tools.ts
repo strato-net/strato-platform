@@ -1,8 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { CallToolResult, McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import * as z from "zod";
-import { MercataApiClient, MercataHttpMethod } from "./client.js";
-import { MercataMcpConfig } from "./config.js";
+import { GriphookClient, HttpMethod } from "./client.js";
+import { GriphookConfig } from "./config.js";
 
 function toContent(payload: unknown, label?: string): CallToolResult {
   const text = JSON.stringify(payload, null, 2);
@@ -21,7 +21,7 @@ function buildEnum<T extends string>(values: readonly [T, ...T[]], description?:
   return description ? schema.describe(description) : schema;
 }
 
-export function registerMercataTools(server: McpServer, client: MercataApiClient, config: MercataMcpConfig) {
+export function registerTools(server: McpServer, client: GriphookClient, config: GriphookConfig) {
   registerApiRequestTool(server, client);
   registerTokensSnapshot(server, client);
   registerSwapSnapshot(server, client);
@@ -43,9 +43,9 @@ export function registerMercataTools(server: McpServer, client: MercataApiClient
   registerOracleActions(server, client);
 }
 
-function registerApiRequestTool(server: McpServer, client: MercataApiClient) {
+function registerApiRequestTool(server: McpServer, client: GriphookClient) {
   const apiRequestSchema = z.object({
-    method: buildEnum<MercataHttpMethod>(["get", "post", "put", "patch", "delete"] as const),
+    method: buildEnum<HttpMethod>(["get", "post", "put", "patch", "delete"] as const),
     path: z.string().describe("Path relative to the API base, e.g. /tokens or tokens/v2/earning-assets"),
     query: z.record(z.string(), z.any()).optional().describe("Optional query parameters"),
     body: z.any().optional().describe("Optional JSON payload"),
@@ -54,10 +54,10 @@ function registerApiRequestTool(server: McpServer, client: MercataApiClient) {
   type ApiRequestArgs = z.infer<typeof apiRequestSchema>;
 
   server.registerTool(
-    "mercata.api-request",
+    "strato.api-request",
     {
-      title: "Raw Mercata API call",
-      description: "Call any Mercata backend endpoint with an arbitrary method, path, query, and body.",
+      title: "Raw Strato API call",
+      description: "Call any Strato backend endpoint with an arbitrary method, path, query, and body.",
       inputSchema: apiRequestSchema,
     },
     async (input: ApiRequestArgs) => {
@@ -71,7 +71,7 @@ function registerApiRequestTool(server: McpServer, client: MercataApiClient) {
   );
 }
 
-function registerTokensSnapshot(server: McpServer, client: MercataApiClient) {
+function registerTokensSnapshot(server: McpServer, client: GriphookClient) {
   const tokensSchema = z.object({
     status: z.string().optional().describe("Optional status filter, e.g. eq.2"),
     includeStats: z.boolean().default(false),
@@ -83,7 +83,7 @@ function registerTokensSnapshot(server: McpServer, client: MercataApiClient) {
   type TokensArgs = z.infer<typeof tokensSchema>;
 
   server.registerTool(
-    "mercata.tokens",
+    "strato.tokens",
     {
       title: "Tokens and balances",
       description: "Fetch token catalog, user balances, voucher balance, and earning assets.",
@@ -142,7 +142,7 @@ function registerTokensSnapshot(server: McpServer, client: MercataApiClient) {
   );
 }
 
-function registerSwapSnapshot(server: McpServer, client: MercataApiClient) {
+function registerSwapSnapshot(server: McpServer, client: GriphookClient) {
   const swapSchema = z.object({
     tokenA: z.string().optional().describe("Token address A to find pairable pools"),
     tokenB: z.string().optional().describe("Token address B to find pairable pools"),
@@ -155,7 +155,7 @@ function registerSwapSnapshot(server: McpServer, client: MercataApiClient) {
   type SwapArgs = z.infer<typeof swapSchema>;
 
   server.registerTool(
-    "mercata.swap",
+    "strato.swap",
     {
       title: "Swap pools and liquidity",
       description: "Inspect swap pools, supported tokens, LP positions, history, and specific pool details.",
@@ -216,14 +216,14 @@ function registerSwapSnapshot(server: McpServer, client: MercataApiClient) {
   );
 }
 
-function registerSwapActions(server: McpServer, client: MercataApiClient) {
+function registerSwapActions(server: McpServer, client: GriphookClient) {
   const createPoolSchema = z.object({
     tokenA: z.string().describe("Address of token A"),
     tokenB: z.string().describe("Address of token B"),
     isStable: z.boolean().default(false).describe("Whether the pool is stable"),
   });
   server.registerTool(
-    "mercata.swap.create-pool",
+    "strato.swap.create-pool",
     {
       title: "Create swap pool",
       description: "Create a new swap pool between tokenA and tokenB.",
@@ -242,7 +242,7 @@ function registerSwapActions(server: McpServer, client: MercataApiClient) {
     stakeLPToken: z.boolean().optional().describe("Whether to stake LP tokens automatically"),
   });
   server.registerTool(
-    "mercata.swap.add-liquidity",
+    "strato.swap.add-liquidity",
     {
       title: "Add dual-sided liquidity",
       description: "Provide both tokens to a pool.",
@@ -262,7 +262,7 @@ function registerSwapActions(server: McpServer, client: MercataApiClient) {
     stakeLPToken: z.boolean().optional().describe("Whether to stake LP tokens automatically"),
   });
   server.registerTool(
-    "mercata.swap.add-liquidity-single",
+    "strato.swap.add-liquidity-single",
     {
       title: "Add single-sided liquidity",
       description: "Provide liquidity using only one token.",
@@ -281,7 +281,7 @@ function registerSwapActions(server: McpServer, client: MercataApiClient) {
     includeStakedLPToken: z.boolean().optional().describe("Include staked LP tokens"),
   });
   server.registerTool(
-    "mercata.swap.remove-liquidity",
+    "strato.swap.remove-liquidity",
     {
       title: "Remove liquidity",
       description: "Redeem LP tokens from a pool.",
@@ -301,7 +301,7 @@ function registerSwapActions(server: McpServer, client: MercataApiClient) {
     minAmountOut: z.string().describe("Minimum acceptable output"),
   });
   server.registerTool(
-    "mercata.swap.execute",
+    "strato.swap.execute",
     {
       title: "Execute swap",
       description: "Swap within an existing pool.",
@@ -314,7 +314,7 @@ function registerSwapActions(server: McpServer, client: MercataApiClient) {
   );
 }
 
-function registerLendingSnapshot(server: McpServer, client: MercataApiClient) {
+function registerLendingSnapshot(server: McpServer, client: GriphookClient) {
   const lendingSchema = z.object({
     includeInterest: z.boolean().default(false),
     includeNearUnhealthy: z.boolean().default(false),
@@ -322,7 +322,7 @@ function registerLendingSnapshot(server: McpServer, client: MercataApiClient) {
   type LendingArgs = z.infer<typeof lendingSchema>;
 
   server.registerTool(
-    "mercata.lending",
+    "strato.lending",
     {
       title: "Lending dashboard",
       description: "Fetch lending pools, loans, liquidity, collateral, liquidations, and safety module state.",
@@ -359,7 +359,7 @@ function registerLendingSnapshot(server: McpServer, client: MercataApiClient) {
   );
 }
 
-function registerCdpSnapshot(server: McpServer, client: MercataApiClient) {
+function registerCdpSnapshot(server: McpServer, client: GriphookClient) {
   const cdpSchema = z.object({
     asset: z.string().optional().describe("Specific asset address to inspect config and vault"),
     includeStats: z.boolean().default(true),
@@ -368,7 +368,7 @@ function registerCdpSnapshot(server: McpServer, client: MercataApiClient) {
   type CdpArgs = z.infer<typeof cdpSchema>;
 
   server.registerTool(
-    "mercata.cdp",
+    "strato.cdp",
     {
       title: "CDP overview",
       description: "Fetch CDP vaults, assets, debt metrics, bad debt, and interest/stats.",
@@ -408,7 +408,7 @@ function registerCdpSnapshot(server: McpServer, client: MercataApiClient) {
   );
 }
 
-function registerBridgeData(server: McpServer, client: MercataApiClient) {
+function registerBridgeData(server: McpServer, client: GriphookClient) {
   const bridgeSchema = z.object({
     chainId: z.string().optional().describe("External chain ID to list bridgeable tokens"),
     txType: buildEnum(["deposit", "withdrawal"] as const).optional().describe("Transaction type to fetch"),
@@ -420,7 +420,7 @@ function registerBridgeData(server: McpServer, client: MercataApiClient) {
   type BridgeArgs = z.infer<typeof bridgeSchema>;
 
   server.registerTool(
-    "mercata.bridge",
+    "strato.bridge",
     {
       title: "Bridge networks and activity",
       description: "Fetch bridge network configs, bridgeable tokens, deposit/withdrawal history, and withdrawal summary.",
@@ -466,7 +466,7 @@ function registerBridgeData(server: McpServer, client: MercataApiClient) {
   );
 }
 
-function registerRewardsData(server: McpServer, client: MercataApiClient) {
+function registerRewardsData(server: McpServer, client: GriphookClient) {
   const rewardsSchema = z.object({
     userAddress: z.string().optional().describe("User address to fetch activity data for"),
     includeLeaderboard: z.boolean().default(false),
@@ -476,7 +476,7 @@ function registerRewardsData(server: McpServer, client: MercataApiClient) {
   type RewardsArgs = z.infer<typeof rewardsSchema>;
 
   server.registerTool(
-    "mercata.rewards",
+    "strato.rewards",
     {
       title: "Rewards overview",
       description: "Fetch rewards overview, activities, user rewards, pending balances, and leaderboard.",
@@ -513,7 +513,7 @@ function registerRewardsData(server: McpServer, client: MercataApiClient) {
   );
 }
 
-function registerAdminData(server: McpServer, client: MercataApiClient) {
+function registerAdminData(server: McpServer, client: GriphookClient) {
   const adminSchema = z.object({
     search: z.string().optional().describe("Contract search query"),
     contractAddress: z.string().optional().describe("Contract address to fetch details"),
@@ -522,7 +522,7 @@ function registerAdminData(server: McpServer, client: MercataApiClient) {
   type AdminArgs = z.infer<typeof adminSchema>;
 
   server.registerTool(
-    "mercata.admin",
+    "strato.admin",
     {
       title: "Admin and governance",
       description: "Fetch current user profile, admins, open issues, contract search, and config.",
@@ -562,7 +562,7 @@ function registerAdminData(server: McpServer, client: MercataApiClient) {
   );
 }
 
-function registerEventsSearch(server: McpServer, client: MercataApiClient) {
+function registerEventsSearch(server: McpServer, client: GriphookClient) {
   const eventsSchema = z.object({
     order: z.string().optional().describe("Order clause, e.g. block_timestamp.desc"),
     limit: z.string().optional(),
@@ -571,7 +571,7 @@ function registerEventsSearch(server: McpServer, client: MercataApiClient) {
   type EventsArgs = z.infer<typeof eventsSchema>;
 
   server.registerTool(
-    "mercata.events",
+    "strato.events",
     {
       title: "Event search",
       description: "Query chain events through the backend search interface.",
@@ -584,7 +584,7 @@ function registerEventsSearch(server: McpServer, client: MercataApiClient) {
   );
 }
 
-function registerProtocolRevenue(server: McpServer, client: MercataApiClient) {
+function registerProtocolRevenue(server: McpServer, client: GriphookClient) {
   const revenueSchema = z.object({
     protocol: z.string().optional().describe("Optional protocol: cdp|lending|swap|gas"),
     period: z.string().optional().describe("Optional period: daily|weekly|monthly|ytd|allTime"),
@@ -592,7 +592,7 @@ function registerProtocolRevenue(server: McpServer, client: MercataApiClient) {
   type RevenueArgs = z.infer<typeof revenueSchema>;
 
   server.registerTool(
-    "mercata.protocol-fees",
+    "strato.protocol-fees",
     {
       title: "Protocol revenue",
       description: "Fetch aggregated or per-protocol revenue summaries.",
@@ -617,7 +617,7 @@ function registerProtocolRevenue(server: McpServer, client: MercataApiClient) {
   );
 }
 
-function registerRpcProxy(server: McpServer, client: MercataApiClient) {
+function registerRpcProxy(server: McpServer, client: GriphookClient) {
   const rpcSchema = z.object({
     chainId: z.string().describe("Numeric chain ID, e.g. 1 or 11155111"),
     payload: z.record(z.string(), z.any()).describe("Raw JSON-RPC payload"),
@@ -625,7 +625,7 @@ function registerRpcProxy(server: McpServer, client: MercataApiClient) {
   type RpcArgs = z.infer<typeof rpcSchema>;
 
   server.registerTool(
-    "mercata.rpc",
+    "strato.rpc",
     {
       title: "RPC proxy",
       description: "Proxy a JSON-RPC request through the backend RPC router.",
@@ -641,7 +641,7 @@ function registerRpcProxy(server: McpServer, client: MercataApiClient) {
   );
 }
 
-function registerTokenActions(server: McpServer, client: MercataApiClient) {
+function registerTokenActions(server: McpServer, client: GriphookClient) {
   const createSchema = z.object({
     name: z.string(),
     symbol: z.string(),
@@ -653,7 +653,7 @@ function registerTokenActions(server: McpServer, client: MercataApiClient) {
     fileNames: z.array(z.string()).optional(),
   });
   server.registerTool(
-    "mercata.tokens.create",
+    "strato.tokens.create",
     {
       title: "Create token",
       description: "Admin: create a new token.",
@@ -677,7 +677,7 @@ function registerTokenActions(server: McpServer, client: MercataApiClient) {
     value: z.string(),
   });
   server.registerTool(
-    "mercata.tokens.transfer",
+    "strato.tokens.transfer",
     {
       title: "Transfer token",
       description: "Transfer tokens to another address.",
@@ -695,7 +695,7 @@ function registerTokenActions(server: McpServer, client: MercataApiClient) {
     value: z.string(),
   });
   server.registerTool(
-    "mercata.tokens.approve",
+    "strato.tokens.approve",
     {
       title: "Approve spender",
       description: "Approve allowance for a spender.",
@@ -714,7 +714,7 @@ function registerTokenActions(server: McpServer, client: MercataApiClient) {
     value: z.string(),
   });
   server.registerTool(
-    "mercata.tokens.transfer-from",
+    "strato.tokens.transfer-from",
     {
       title: "Transfer from",
       description: "Transfer tokens on behalf of another address.",
@@ -731,7 +731,7 @@ function registerTokenActions(server: McpServer, client: MercataApiClient) {
     status: z.number().int().describe("1=PENDING, 2=ACTIVE, 3=LEGACY"),
   });
   server.registerTool(
-    "mercata.tokens.set-status",
+    "strato.tokens.set-status",
     {
       title: "Set token status",
       description: "Admin: update token status.",
@@ -744,13 +744,13 @@ function registerTokenActions(server: McpServer, client: MercataApiClient) {
   );
 }
 
-function registerLendingActions(server: McpServer, client: MercataApiClient) {
+function registerLendingActions(server: McpServer, client: GriphookClient) {
   const collateralSchema = z.object({
     asset: z.string(),
     amount: z.string(),
   });
   server.registerTool(
-    "mercata.lending.supply-collateral",
+    "strato.lending.supply-collateral",
     {
       title: "Supply collateral",
       description: "Supply collateral to lending pool.",
@@ -763,7 +763,7 @@ function registerLendingActions(server: McpServer, client: MercataApiClient) {
   );
 
   server.registerTool(
-    "mercata.lending.withdraw-collateral",
+    "strato.lending.withdraw-collateral",
     {
       title: "Withdraw collateral",
       description: "Withdraw supplied collateral.",
@@ -777,7 +777,7 @@ function registerLendingActions(server: McpServer, client: MercataApiClient) {
 
   const withdrawMaxSchema = z.object({ asset: z.string() });
   server.registerTool(
-    "mercata.lending.withdraw-collateral-max",
+    "strato.lending.withdraw-collateral-max",
     {
       title: "Withdraw max collateral",
       description: "Withdraw maximum available collateral for an asset.",
@@ -791,7 +791,7 @@ function registerLendingActions(server: McpServer, client: MercataApiClient) {
 
   const borrowSchema = z.object({ amount: z.string() });
   server.registerTool(
-    "mercata.lending.borrow",
+    "strato.lending.borrow",
     {
       title: "Borrow USDST",
       description: "Borrow from lending pool.",
@@ -804,7 +804,7 @@ function registerLendingActions(server: McpServer, client: MercataApiClient) {
   );
 
   server.registerTool(
-    "mercata.lending.borrow-max",
+    "strato.lending.borrow-max",
     {
       title: "Borrow max",
       description: "Borrow the maximum available USDST.",
@@ -818,7 +818,7 @@ function registerLendingActions(server: McpServer, client: MercataApiClient) {
 
   const repaySchema = z.object({ amount: z.string() });
   server.registerTool(
-    "mercata.lending.repay",
+    "strato.lending.repay",
     {
       title: "Repay loan",
       description: "Repay outstanding debt.",
@@ -831,7 +831,7 @@ function registerLendingActions(server: McpServer, client: MercataApiClient) {
   );
 
   server.registerTool(
-    "mercata.lending.repay-all",
+    "strato.lending.repay-all",
     {
       title: "Repay all loans",
       description: "Repay all debt.",
@@ -848,7 +848,7 @@ function registerLendingActions(server: McpServer, client: MercataApiClient) {
     stakeMToken: z.boolean(),
   });
   server.registerTool(
-    "mercata.lending.deposit-liquidity",
+    "strato.lending.deposit-liquidity",
     {
       title: "Deposit pool liquidity",
       description: "Deposit into lending pool.",
@@ -865,7 +865,7 @@ function registerLendingActions(server: McpServer, client: MercataApiClient) {
     includeStakedMToken: z.boolean().optional(),
   });
   server.registerTool(
-    "mercata.lending.withdraw-liquidity",
+    "strato.lending.withdraw-liquidity",
     {
       title: "Withdraw pool liquidity",
       description: "Withdraw from lending pool.",
@@ -878,7 +878,7 @@ function registerLendingActions(server: McpServer, client: MercataApiClient) {
   );
 
   server.registerTool(
-    "mercata.lending.withdraw-liquidity-all",
+    "strato.lending.withdraw-liquidity-all",
     {
       title: "Withdraw all pool liquidity",
       description: "Withdraw all available liquidity.",
@@ -895,7 +895,7 @@ function registerLendingActions(server: McpServer, client: MercataApiClient) {
     stakeSToken: z.boolean(),
   });
   server.registerTool(
-    "mercata.lending.safety-stake",
+    "strato.lending.safety-stake",
     {
       title: "Safety stake",
       description: "Stake USDST into safety module.",
@@ -908,7 +908,7 @@ function registerLendingActions(server: McpServer, client: MercataApiClient) {
   );
 
   server.registerTool(
-    "mercata.lending.safety-cooldown",
+    "strato.lending.safety-cooldown",
     {
       title: "Start safety cooldown",
       description: "Begin safety module cooldown.",
@@ -925,7 +925,7 @@ function registerLendingActions(server: McpServer, client: MercataApiClient) {
     includeStakedSToken: z.boolean(),
   });
   server.registerTool(
-    "mercata.lending.safety-redeem",
+    "strato.lending.safety-redeem",
     {
       title: "Redeem safety",
       description: "Redeem sUSDST shares.",
@@ -938,7 +938,7 @@ function registerLendingActions(server: McpServer, client: MercataApiClient) {
   );
 
   server.registerTool(
-    "mercata.lending.safety-redeem-all",
+    "strato.lending.safety-redeem-all",
     {
       title: "Redeem all safety",
       description: "Redeem all sUSDST shares.",
@@ -957,7 +957,7 @@ function registerLendingActions(server: McpServer, client: MercataApiClient) {
     minCollateralOut: z.string().optional(),
   });
   server.registerTool(
-    "mercata.lending.liquidate",
+    "strato.lending.liquidate",
     {
       title: "Execute liquidation",
       description: "Liquidate a lending loan.",
@@ -980,7 +980,7 @@ function registerLendingActions(server: McpServer, client: MercataApiClient) {
     perSecondFactorRAY: z.string(),
   });
   server.registerTool(
-    "mercata.lending.configure-asset",
+    "strato.lending.configure-asset",
     {
       title: "Configure lending asset",
       description: "Admin: set lending parameters.",
@@ -994,7 +994,7 @@ function registerLendingActions(server: McpServer, client: MercataApiClient) {
 
   const sweepSchema = z.object({ amount: z.string() });
   server.registerTool(
-    "mercata.lending.sweep-reserves",
+    "strato.lending.sweep-reserves",
     {
       title: "Sweep reserves",
       description: "Admin: sweep protocol reserves.",
@@ -1011,7 +1011,7 @@ function registerLendingActions(server: McpServer, client: MercataApiClient) {
     usdValue: z.string(),
   });
   server.registerTool(
-    "mercata.lending.set-debt-ceilings",
+    "strato.lending.set-debt-ceilings",
     {
       title: "Set debt ceilings",
       description: "Admin: set global/per-asset debt ceilings.",
@@ -1024,7 +1024,7 @@ function registerLendingActions(server: McpServer, client: MercataApiClient) {
   );
 
   server.registerTool(
-    "mercata.lending.pause",
+    "strato.lending.pause",
     {
       title: "Pause lending pool",
       description: "Admin: pause lending.",
@@ -1037,7 +1037,7 @@ function registerLendingActions(server: McpServer, client: MercataApiClient) {
   );
 
   server.registerTool(
-    "mercata.lending.unpause",
+    "strato.lending.unpause",
     {
       title: "Unpause lending pool",
       description: "Admin: unpause lending.",
@@ -1050,13 +1050,13 @@ function registerLendingActions(server: McpServer, client: MercataApiClient) {
   );
 }
 
-function registerCdpActions(server: McpServer, client: MercataApiClient) {
+function registerCdpActions(server: McpServer, client: GriphookClient) {
   const cdpCollateralSchema = z.object({
     asset: z.string(),
     amount: z.string(),
   });
   server.registerTool(
-    "mercata.cdp.deposit",
+    "strato.cdp.deposit",
     {
       title: "CDP deposit collateral",
       description: "Deposit collateral into a vault.",
@@ -1069,7 +1069,7 @@ function registerCdpActions(server: McpServer, client: MercataApiClient) {
   );
 
   server.registerTool(
-    "mercata.cdp.withdraw",
+    "strato.cdp.withdraw",
     {
       title: "CDP withdraw collateral",
       description: "Withdraw collateral from a vault.",
@@ -1083,7 +1083,7 @@ function registerCdpActions(server: McpServer, client: MercataApiClient) {
 
   const cdpWithdrawMaxSchema = z.object({ asset: z.string() });
   server.registerTool(
-    "mercata.cdp.withdraw-max",
+    "strato.cdp.withdraw-max",
     {
       title: "CDP withdraw max",
       description: "Withdraw maximum safe collateral.",
@@ -1100,7 +1100,7 @@ function registerCdpActions(server: McpServer, client: MercataApiClient) {
     amount: z.string(),
   });
   server.registerTool(
-    "mercata.cdp.mint",
+    "strato.cdp.mint",
     {
       title: "CDP mint USDST",
       description: "Mint USDST against collateral.",
@@ -1113,7 +1113,7 @@ function registerCdpActions(server: McpServer, client: MercataApiClient) {
   );
 
   server.registerTool(
-    "mercata.cdp.mint-max",
+    "strato.cdp.mint-max",
     {
       title: "CDP mint max",
       description: "Mint maximum safe USDST.",
@@ -1130,7 +1130,7 @@ function registerCdpActions(server: McpServer, client: MercataApiClient) {
     amount: z.string(),
   });
   server.registerTool(
-    "mercata.cdp.repay",
+    "strato.cdp.repay",
     {
       title: "CDP repay",
       description: "Repay USDST debt.",
@@ -1143,7 +1143,7 @@ function registerCdpActions(server: McpServer, client: MercataApiClient) {
   );
 
   server.registerTool(
-    "mercata.cdp.repay-all",
+    "strato.cdp.repay-all",
     {
       title: "CDP repay all",
       description: "Repay all debt for an asset.",
@@ -1161,7 +1161,7 @@ function registerCdpActions(server: McpServer, client: MercataApiClient) {
     debtToCover: z.string(),
   });
   server.registerTool(
-    "mercata.cdp.liquidate",
+    "strato.cdp.liquidate",
     {
       title: "CDP liquidate",
       description: "Liquidate an unhealthy CDP position.",
@@ -1185,7 +1185,7 @@ function registerCdpActions(server: McpServer, client: MercataApiClient) {
     isPaused: z.boolean(),
   });
   server.registerTool(
-    "mercata.cdp.set-collateral-config",
+    "strato.cdp.set-collateral-config",
     {
       title: "CDP set collateral config",
       description: "Admin: set collateral parameters.",
@@ -1209,7 +1209,7 @@ function registerCdpActions(server: McpServer, client: MercataApiClient) {
     pauses: z.array(z.boolean()),
   });
   server.registerTool(
-    "mercata.cdp.set-collateral-config-batch",
+    "strato.cdp.set-collateral-config-batch",
     {
       title: "CDP batch collateral config",
       description: "Admin: set multiple collateral configs.",
@@ -1226,7 +1226,7 @@ function registerCdpActions(server: McpServer, client: MercataApiClient) {
     isPaused: z.boolean(),
   });
   server.registerTool(
-    "mercata.cdp.set-asset-paused",
+    "strato.cdp.set-asset-paused",
     {
       title: "CDP pause asset",
       description: "Admin: toggle pause for a collateral asset.",
@@ -1243,7 +1243,7 @@ function registerCdpActions(server: McpServer, client: MercataApiClient) {
     supported: z.boolean(),
   });
   server.registerTool(
-    "mercata.cdp.set-asset-supported",
+    "strato.cdp.set-asset-supported",
     {
       title: "CDP set asset supported",
       description: "Admin: toggle asset support.",
@@ -1257,7 +1257,7 @@ function registerCdpActions(server: McpServer, client: MercataApiClient) {
 
   const cdpGlobalPauseSchema = z.object({ isPaused: z.boolean() });
   server.registerTool(
-    "mercata.cdp.set-global-paused",
+    "strato.cdp.set-global-paused",
     {
       title: "CDP global pause",
       description: "Admin: toggle global CDP pause.",
@@ -1274,7 +1274,7 @@ function registerCdpActions(server: McpServer, client: MercataApiClient) {
     amountUSDST: z.string(),
   });
   server.registerTool(
-    "mercata.cdp.open-junior-note",
+    "strato.cdp.open-junior-note",
     {
       title: "Open junior note",
       description: "Open a junior note position for bad debt.",
@@ -1288,7 +1288,7 @@ function registerCdpActions(server: McpServer, client: MercataApiClient) {
 
   const topUpSchema = z.object({ amountUSDST: z.string() });
   server.registerTool(
-    "mercata.cdp.top-up-junior-note",
+    "strato.cdp.top-up-junior-note",
     {
       title: "Top up junior note",
       description: "Add USDST to junior note.",
@@ -1301,7 +1301,7 @@ function registerCdpActions(server: McpServer, client: MercataApiClient) {
   );
 
   server.registerTool(
-    "mercata.cdp.claim-junior-note",
+    "strato.cdp.claim-junior-note",
     {
       title: "Claim junior note",
       description: "Claim junior note rewards.",
@@ -1314,7 +1314,7 @@ function registerCdpActions(server: McpServer, client: MercataApiClient) {
   );
 }
 
-function registerBridgeActions(server: McpServer, client: MercataApiClient) {
+function registerBridgeActions(server: McpServer, client: GriphookClient) {
   const withdrawSchema = z.object({
     externalChainId: z.string(),
     stratoToken: z.string(),
@@ -1323,7 +1323,7 @@ function registerBridgeActions(server: McpServer, client: MercataApiClient) {
     targetStratoToken: z.string().optional(),
   });
   server.registerTool(
-    "mercata.bridge.request-withdrawal",
+    "strato.bridge.request-withdrawal",
     {
       title: "Bridge request withdrawal",
       description: "Submit a withdrawal request to an external chain.",
@@ -1340,7 +1340,7 @@ function registerBridgeActions(server: McpServer, client: MercataApiClient) {
     externalTxHash: z.string(),
   });
   server.registerTool(
-    "mercata.bridge.request-auto-save",
+    "strato.bridge.request-auto-save",
     {
       title: "Bridge request auto save",
       description: "Request auto save for a bridge transaction.",
@@ -1353,9 +1353,9 @@ function registerBridgeActions(server: McpServer, client: MercataApiClient) {
   );
 }
 
-function registerRewardsActions(server: McpServer, client: MercataApiClient) {
+function registerRewardsActions(server: McpServer, client: GriphookClient) {
   server.registerTool(
-    "mercata.rewards.claim",
+    "strato.rewards.claim",
     {
       title: "Claim Chef rewards",
       description: "Claim all pending CATA rewards from RewardsChef.",
@@ -1368,7 +1368,7 @@ function registerRewardsActions(server: McpServer, client: MercataApiClient) {
   );
 
   server.registerTool(
-    "mercata.rewards.claim-all-activities",
+    "strato.rewards.claim-all-activities",
     {
       title: "Claim all rewards",
       description: "Claim all rewards across activities.",
@@ -1382,7 +1382,7 @@ function registerRewardsActions(server: McpServer, client: MercataApiClient) {
 
   const claimActivitySchema = z.object({ activityId: z.number().int() });
   server.registerTool(
-    "mercata.rewards.claim-activity",
+    "strato.rewards.claim-activity",
     {
       title: "Claim activity rewards",
       description: "Claim rewards for a specific activity.",
@@ -1395,10 +1395,10 @@ function registerRewardsActions(server: McpServer, client: MercataApiClient) {
   );
 }
 
-function registerAdminActions(server: McpServer, client: MercataApiClient) {
+function registerAdminActions(server: McpServer, client: GriphookClient) {
   const addAdminSchema = z.object({ userAddress: z.string() });
   server.registerTool(
-    "mercata.admin.add-admin",
+    "strato.admin.add-admin",
     {
       title: "Add admin",
       description: "Grant administrator access.",
@@ -1411,7 +1411,7 @@ function registerAdminActions(server: McpServer, client: MercataApiClient) {
   );
 
   server.registerTool(
-    "mercata.admin.remove-admin",
+    "strato.admin.remove-admin",
     {
       title: "Remove admin",
       description: "Revoke administrator access.",
@@ -1429,7 +1429,7 @@ function registerAdminActions(server: McpServer, client: MercataApiClient) {
     args: z.array(z.string()),
   });
   server.registerTool(
-    "mercata.admin.vote",
+    "strato.admin.vote",
     {
       title: "Cast vote",
       description: "Cast an administrative vote.",
@@ -1443,7 +1443,7 @@ function registerAdminActions(server: McpServer, client: MercataApiClient) {
 
   const voteByIdSchema = z.object({ issueId: z.string() });
   server.registerTool(
-    "mercata.admin.vote-by-id",
+    "strato.admin.vote-by-id",
     {
       title: "Cast vote by issue ID",
       description: "Cast a vote given an issue ID.",
@@ -1457,7 +1457,7 @@ function registerAdminActions(server: McpServer, client: MercataApiClient) {
 
   const dismissSchema = z.object({ issueId: z.string() });
   server.registerTool(
-    "mercata.admin.dismiss-issue",
+    "strato.admin.dismiss-issue",
     {
       title: "Dismiss governance issue",
       description: "Dismiss an issue (only proposer only-voter case).",
@@ -1470,13 +1470,13 @@ function registerAdminActions(server: McpServer, client: MercataApiClient) {
   );
 }
 
-function registerOracleActions(server: McpServer, client: MercataApiClient) {
+function registerOracleActions(server: McpServer, client: GriphookClient) {
   const priceSchema = z.object({
     token: z.string(),
     price: z.string().describe("Price value (wei)"),
   });
   server.registerTool(
-    "mercata.oracle.set-price",
+    "strato.oracle.set-price",
     {
       title: "Set oracle price",
       description: "Admin: set oracle price for an asset.",
