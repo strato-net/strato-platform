@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
-import { getEvents, getContractInfo } from "../services/events.service";
+import { getEvents, getContractInfo, getActivities } from "../services/events.service";
 
 class EventsController {
   static async getEvents(
@@ -27,6 +27,25 @@ class EventsController {
       const contractInfo = await getContractInfo(accessToken);
 
       res.status(RestStatus.OK).json(contractInfo);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getActivities(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress, query } = req;
+      const activities = await getActivities(accessToken, {
+        limit: query?.limit ? parseInt(query.limit as string) : 10,
+        offset: query?.offset ? parseInt(query.offset as string) : 0,
+        userAddress: query?.userAddress as string || (query?.my === 'true' ? userAddress : undefined),
+        type: query?.type as string,
+      });
+      res.status(RestStatus.OK).json(activities);
     } catch (error) {
       next(error);
     }

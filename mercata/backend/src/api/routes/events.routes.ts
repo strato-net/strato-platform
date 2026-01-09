@@ -75,4 +75,39 @@ router.get("/", authHandler.authorizeRequest(), EventsController.getEvents);
  */
 router.get("/contracts", authHandler.authorizeRequest(), EventsController.getContractInfo);
 
+/**
+ * @openapi
+ * /events/activities:
+ *   get:
+ *     summary: Get user-friendly activity feed
+ *     tags: [Events]
+ *     parameters:
+ *       - name: limit
+ *         in: query
+ *         description: Maximum number of activities to return
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *       - name: offset
+ *         in: query
+ *         description: Number of activities to skip for pagination
+ *         schema:
+ *           type: integer
+ *           default: 0
+ *       - name: my
+ *         in: query
+ *         description: If true, filter by current user's address
+ *         schema:
+ *           type: boolean
+ *       - name: type
+ *         in: query
+ *         description: Filter by activity type (deposit, withdraw, swap, etc.)
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Activity list with total count
+ */
+router.get("/activities", authHandler.authorizeRequest(), EventsController.getActivities);
+
 export default router;

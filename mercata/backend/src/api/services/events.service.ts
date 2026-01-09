@@ -5,6 +5,21 @@ import type {
   EventResponse,
   ContractInfoResponse,
 } from "@mercata/shared-types";
+import {
+  ACTIVITY_EVENTS,
+  EVENT_TYPE_MAP,
+  ActivityItem,
+  extractTokenAddresses,
+  fetchTokenMetadata,
+  transformEvent
+} from "./activity.helpers";
+
+export interface ActivitiesResponse {
+  activities: ActivityItem[];
+  total: number;
+  limit: number;
+  offset: number;
+}
 
 export const getEvents = async (
   accessToken: string,
@@ -81,4 +96,58 @@ export const getContractInfo = async (
       }))
       .sort((a, b) => a.name.localeCompare(b.name)),
   };
+};
+
+export const getActivities = async (
+  accessToken: string,
+  query: {
+    limit?: number;
+    offset?: number;
+    userAddress?: string;
+    type?: string;
+  } = {}
+): Promise<ActivitiesResponse> => {
+  const { limit = 10, offset = 0, userAddress, type } = query;
+  const storageSelect = "storage!inner(contract!inner(contract_name))";
+
+  // Build event name filter based on type
+  let eventNames = ACTIVITY_EVENTS;
+  if (type && type !== 'all') {
+    eventNames = Object.entries(EVENT_TYPE_MAP)
+      .filter(([_, t]) => t === type)
+      .map(([name]) => name);
+  }
+
+  const params: Record<string, string> = {
+    select: `*,${storageSelect}`,
+    order: 'block_timestamp.desc',
+    event_name: `in.(${eventNames.join(',')})`,
+    limit: limit.toString(),
+    offset: offset.toString(),
+  };
+
+  if (userAddress) {
+    params.transaction_sender = `eq.${userAddress}`;
+  }
+
+  // Build count params (exclude limit, offset, order)
+  const { limit: _l, offset: _o, order: _ord, ...countBase } = params;
+  const countParams = { ...countBase, select: `${storageSelect},count()` };
+
+  const [countRes, eventsRes] = await Promise.all([
+    cirrus.get(accessToken, `/${constants.Event}`, { params: countParams }),
+    cirrus.get(accessToken, `/${constants.Event}`, { params }),
+  ]);
+
+  const total = countRes.data?.[0]?.count || 0;
+  const events = eventsRes.data || [];
+
+  // Fetch token metadata for all token addresses in events
+  const tokenAddresses = extractTokenAddresses(events);
+  const tokenMap = await fetchTokenMetadata(accessToken, tokenAddresses);
+
+  // Transform events to activities
+  const activities = events.map((event: any) => transformEvent(event, tokenMap));
+
+  return { activities, total, limit, offset };
 };
