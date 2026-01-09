@@ -85,5 +85,10 @@ Environment variables:
 - MERCATA_API_BASE_URL (default http://localhost:3001/api)
 - MERCATA_ACCESS_TOKEN or MERCATA_TOKEN
 - MERCATA_HTTP_TIMEOUT_MS (optional)
+- MERCATA_MCP_HTTP_ENABLED (default true)
+- MERCATA_MCP_HTTP_HOST (default 127.0.0.1)
+- MERCATA_MCP_HTTP_PORT (default 3005)
+- MERCATA_MCP_HTTP_PATH (default /mcp)
+- MERCATA_MCP_HTTP_SSE_PATH (default {path}/events)
 `;
 }

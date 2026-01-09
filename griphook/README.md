@@ -22,7 +22,16 @@ npm run build    # emit dist/
 npm start        # run compiled server
 ```
 
-The server uses stdio transport. Tools:
+Transports:
+- Stdio transport (default for Claude Code/other MCP-aware clients when launched as a command).
+- HTTP Streamable transport (enabled by default) at `http://127.0.0.1:3005/mcp` with SSE at `/mcp/events`. Override with:
+  - `MERCATA_MCP_HTTP_ENABLED` (true/false)
+  - `MERCATA_MCP_HTTP_HOST` (default 127.0.0.1)
+  - `MERCATA_MCP_HTTP_PORT` (default 3005)
+  - `MERCATA_MCP_HTTP_PATH` (default /mcp)
+  - `MERCATA_MCP_HTTP_SSE_PATH` (default {path}/events)
+
+Tools:
 - `mercata.api-request` – raw HTTP call to any endpoint
 - Domain snapshots: `mercata.tokens`, `mercata.swap`, `mercata.lending`, `mercata.cdp`, `mercata.bridge`, `mercata.rewards`, `mercata.admin`, `mercata.events`, `mercata.protocol-fees`, `mercata.rpc`
 - Swap actions: `mercata.swap.create-pool`, `mercata.swap.add-liquidity`, `mercata.swap.add-liquidity-single`, `mercata.swap.remove-liquidity`, `mercata.swap.execute`
