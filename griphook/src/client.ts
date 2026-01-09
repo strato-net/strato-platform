@@ -1,15 +1,16 @@
 import axios, { AxiosInstance, AxiosError, Method } from "axios";
 import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import { MercataMcpConfig } from "./config.js";
+import { OAuthClient } from "./auth.js";
 
 export type MercataHttpMethod = "get" | "post" | "put" | "patch" | "delete";
 
 export class MercataApiClient {
   private http: AxiosInstance;
-  private config: MercataMcpConfig;
+  private oauth: OAuthClient;
 
   constructor(config: MercataMcpConfig) {
-    this.config = config;
+    this.oauth = new OAuthClient(config.oauth);
     this.http = axios.create({
       baseURL: config.apiBaseUrl,
       timeout: config.timeoutMs,
@@ -20,16 +21,14 @@ export class MercataApiClient {
     params?: Record<string, unknown>;
     data?: unknown;
     headers?: Record<string, string>;
-    tokenOverride?: string;
   }): Promise<T> {
     const url = path.startsWith("/") ? path : `/${path}`;
     const headers: Record<string, string> = { ...(options?.headers ?? {}) };
-    const token = options?.tokenOverride || this.config.accessToken;
 
-    if (token) {
-      headers["x-user-access-token"] = token;
-      headers["authorization"] = `Bearer ${token}`;
-    }
+    // Get fresh token for each request (uses cache internally)
+    const token = await this.oauth.getAccessToken();
+    headers["x-user-access-token"] = token;
+    headers["authorization"] = `Bearer ${token}`;
 
     try {
       const response = await this.http.request<T>({
@@ -43,6 +42,13 @@ export class MercataApiClient {
     } catch (err) {
       throw new McpError(ErrorCode.InternalError, this.formatAxiosError(err));
     }
+  }
+
+  /**
+   * Get the authenticated username from the OAuth token
+   */
+  async getUsername(): Promise<string> {
+    return this.oauth.getUsername();
   }
 
   private formatAxiosError(err: unknown): string {

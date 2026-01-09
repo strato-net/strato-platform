@@ -9,10 +9,20 @@ cd griphook
 npm install
 ```
 
-Environment:
-- `MERCATA_API_BASE_URL` – defaults to `http://localhost:3001/api`
-- `MERCATA_ACCESS_TOKEN` (or `MERCATA_TOKEN`) – OAuth access token, sent as `x-user-access-token` and `Authorization: Bearer`
-- `MERCATA_HTTP_TIMEOUT_MS` – optional HTTP timeout (default 15000)
+### Required Environment Variables
+
+Authentication (BlockApps OAuth):
+- `BA_USERNAME` – BlockApps username
+- `BA_PASSWORD` – BlockApps password
+- `CLIENT_ID` – OAuth client ID
+- `CLIENT_SECRET` – OAuth client secret
+- `OPENID_DISCOVERY_URL` – OpenID Connect discovery endpoint (e.g., `https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration`)
+
+### Optional Environment Variables
+
+- `NODE_URL` – BlockApps node URL (default `http://localhost`)
+- `MERCATA_API_BASE_URL` – API base URL (default `http://localhost:3001/api`)
+- `MERCATA_HTTP_TIMEOUT_MS` – HTTP timeout in ms (default 15000)
 
 ## Run
 

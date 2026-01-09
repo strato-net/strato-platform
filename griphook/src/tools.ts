@@ -50,7 +50,6 @@ function registerApiRequestTool(server: McpServer, client: MercataApiClient) {
     query: z.record(z.string(), z.any()).optional().describe("Optional query parameters"),
     body: z.any().optional().describe("Optional JSON payload"),
     headers: z.record(z.string(), z.string()).optional().describe("Additional headers to send"),
-    accessToken: z.string().optional().describe("Override access token (defaults to MERCATA_ACCESS_TOKEN)"),
   });
   type ApiRequestArgs = z.infer<typeof apiRequestSchema>;
 
@@ -66,7 +65,6 @@ function registerApiRequestTool(server: McpServer, client: MercataApiClient) {
         params: input.query,
         data: input.body,
         headers: input.headers,
-        tokenOverride: input.accessToken,
       });
       return toContent(data, `Response from ${input.method.toUpperCase()} ${input.path}`);
     },

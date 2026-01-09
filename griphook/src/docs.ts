@@ -3,7 +3,9 @@ import { MercataMcpConfig } from "./config.js";
 export const endpointsOverview = `# Mercata API surface
 
 Authentication
-- Most endpoints require an OAuth access token. Provide it via MERCATA_ACCESS_TOKEN (sent as x-user-access-token and Bearer).
+- OAuth tokens are acquired automatically using BlockApps credentials (BA_USERNAME, BA_PASSWORD).
+- Requires CLIENT_ID, CLIENT_SECRET, and OPENID_DISCOVERY_URL for OAuth configuration.
+- Tokens are cached and refreshed automatically before expiration.
 - Base URL defaults to http://localhost:3001/api. Override with MERCATA_API_BASE_URL.
 
 User & Admin
@@ -77,14 +79,24 @@ Config & Health
 export function buildConfigDoc(config: MercataMcpConfig): string {
   return `# Mercata MCP configuration
 
+- Node URL: ${config.nodeUrl}
 - API base: ${config.apiBaseUrl}
-- Access token configured: ${config.accessToken ? "yes" : "no"} (sent as x-user-access-token and Bearer)
+- OAuth username: ${config.oauth.username}
+- OAuth client ID: ${config.oauth.clientId}
+- OpenID discovery: ${config.oauth.openIdDiscoveryUrl}
 - HTTP timeout: ${config.timeoutMs}ms
 
-Environment variables:
+Required environment variables:
+- BA_USERNAME – BlockApps username
+- BA_PASSWORD – BlockApps password
+- CLIENT_ID – OAuth client ID
+- CLIENT_SECRET – OAuth client secret
+- OPENID_DISCOVERY_URL – OpenID Connect discovery endpoint
+
+Optional environment variables:
+- NODE_URL (default http://localhost)
 - MERCATA_API_BASE_URL (default http://localhost:3001/api)
-- MERCATA_ACCESS_TOKEN or MERCATA_TOKEN
-- MERCATA_HTTP_TIMEOUT_MS (optional)
+- MERCATA_HTTP_TIMEOUT_MS (default 15000)
 - MERCATA_MCP_HTTP_ENABLED (default true)
 - MERCATA_MCP_HTTP_HOST (default 127.0.0.1)
 - MERCATA_MCP_HTTP_PORT (default 3005)
