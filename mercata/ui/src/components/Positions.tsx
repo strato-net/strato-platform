@@ -127,7 +127,7 @@ const PositionSection = ({ loanData }: BorrowingSectionProps) => {
                   <span className="text-muted-foreground text-sm font-medium">Collateral Supplied</span>
                 </InfoTooltip>
                 <span className="font-semibold text-lg">
-                  {formatBalance(loanData?.totalCollateralValueSupplied || 0n, "USDST", 18, 2, 2)}
+                  {formatBalance(loanData?.totalCollateralValueSupplied || 0n, undefined, 18, 2, 2, true)}
                 </span>
               </div>
             </div>
