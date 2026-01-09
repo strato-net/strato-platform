@@ -36,7 +36,7 @@ const AssetsList = ({
   }, [tokens]);
 
   return (
-    <div className="w-full overflow-hidden bg-card rounded-xl border border-border shadow-sm">
+    <div className={`w-full overflow-hidden bg-card ${isDashboard ? 'rounded-xl border border-border shadow-sm' : ''}`}>
       {isDashboard && (
         <div className="p-4 md:p-5 border-b border-border">
           <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3 md:gap-0">
@@ -56,8 +56,8 @@ const AssetsList = ({
 
       <div>
         {!isDashboard && (
-          <div className="p-4 text-right border-b border-border flex justify-between">
-            <span className="font-bold">Earning Assets</span>
+          <div className="py-3 px-2 md:px-4 text-left">
+            <span className="font-bold text-sm md:text-base">Earning Assets</span>
           </div>
         )}
         {isDashboard && (
@@ -69,7 +69,7 @@ const AssetsList = ({
           <table className="w-full md:min-w-[700px]">
             <thead>
               <tr className="bg-muted/50">
-                <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
+                <th className="text-left text-[10px] md:text-xs font-medium text-muted-foreground uppercase tracking-wider py-2 md:py-3 px-2 md:px-4">
                   Asset
                 </th>
                 <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
@@ -78,13 +78,13 @@ const AssetsList = ({
                 <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
                   Change
                 </th>
-                <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
+                <th className="text-right text-[10px] md:text-xs font-medium text-muted-foreground uppercase tracking-wider py-2 md:py-3 px-2 md:px-4">
                   Balance
                 </th>
                 <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
                   Collateral Balance
                 </th>
-                <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
+                <th className="text-right text-[10px] md:text-xs font-medium text-muted-foreground uppercase tracking-wider py-2 md:py-3 px-2 md:px-4">
                   Value
                 </th>
               </tr>
@@ -108,29 +108,29 @@ const AssetsList = ({
                       key={index}
                       className="hover:bg-muted/50 transition-colors"
                     >
-                      <td className="py-4 px-4">
+                      <td className="py-2 md:py-4 px-2 md:px-4">
                         <div className="flex items-center">
                           {asset?.images?.[0] ? (
                             <img
                               src={asset.images[0].value}
                               alt={asset._name}
-                              className="w-8 h-8 rounded-full object-cover"
+                              className="w-7 h-7 md:w-8 md:h-8 rounded-full object-cover"
                             />
                           ) : (
                             <div
-                              className="w-8 h-8 rounded-full flex items-center justify-center text-xs text-white font-medium"
+                              className="w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-[10px] md:text-xs text-white font-medium"
                               style={{ backgroundColor: "red" }}
                             >
                               {asset?._symbol?.slice(0, 2) || "??"}
                             </div>
                           )}
-                          <div className="ml-3 min-w-0 flex-1">
+                          <div className="ml-2 md:ml-3 min-w-0 flex-1">
                             <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Link
                                     to={`/dashboard/deposits/${asset?.address || ''}`}
-                                    className="font-medium text-blue-600 truncate hover:text-blue-800 underline transition-colors"
+                                    className="font-medium text-xs md:text-sm text-blue-600 truncate hover:text-blue-800 underline transition-colors block"
                                   >
                                     {asset?._name || ""}
                                   </Link>
@@ -143,7 +143,7 @@ const AssetsList = ({
                             <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <p className="text-muted-foreground text-xs truncate">
+                                  <p className="text-muted-foreground text-[10px] md:text-xs truncate">
                                     {asset?._symbol || ""}
                                   </p>
                                 </TooltipTrigger>
@@ -177,8 +177,8 @@ const AssetsList = ({
                             : "-"}
                         </div>
                       </td>
-                      <td className="py-4 px-4 whitespace-nowrap text-right">
-                        <p className="font-medium text-foreground">
+                      <td className="py-2 md:py-4 px-2 md:px-4 whitespace-nowrap text-right">
+                        <p className="font-medium text-xs md:text-sm text-foreground">
                           {!asset?.balance || asset.balance === "0"
                             ? "-"
                             : formatBalance(asset.balance, undefined, 18,1, 4)}
@@ -191,8 +191,8 @@ const AssetsList = ({
                             : formatBalance(asset.collateralBalance, undefined, 18,1,4)}
                         </p>
                       </td>
-                      <td className="py-4 px-4 whitespace-nowrap text-right">
-                        <p className="font-medium text-foreground">
+                      <td className="py-2 md:py-4 px-2 md:px-4 whitespace-nowrap text-right">
+                        <p className="font-medium text-xs md:text-sm text-foreground">
                           {!asset?.value || asset.value === "0.00" || parseFloat(asset.value) === 0
                             ? "-"
                             : `$${asset.value}`}

@@ -36,7 +36,7 @@ const MintWidget: React.FC<MintWidgetProps> = ({ onSuccess, title = "Mint Agains
   const { toast } = useToast();
   const { activeTokens, fetchTokens } = useUserTokens();
   const { fetchUsdstBalance } = useTokenContext();
-  const { canPerformAction } = useAuthAction();
+  const { canPerformAction, isLoggedIn } = useAuthAction();
   const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
   const borrowRate = depositAsset?.stabilityFeeRate || 5.54;
@@ -270,6 +270,14 @@ const MintWidget: React.FC<MintWidgetProps> = ({ onSuccess, title = "Mint Agains
         return;
       }
 
+      // Skip user-specific API calls if not logged in
+      if (!isLoggedIn) {
+        setExistingVaultCollateral("0");
+        setExistingVaultDebt("0");
+        setMaxBorrowableUSD(0);
+        return;
+      }
+
       try {
         // Fetch existing vault data
         const vaultData = await cdpService.getVault(depositAsset.asset);
@@ -302,7 +310,7 @@ const MintWidget: React.FC<MintWidgetProps> = ({ onSuccess, title = "Mint Agains
     };
 
     fetchVaultData();
-  }, [depositAsset, getMaxBorrowable]);
+  }, [depositAsset, getMaxBorrowable, isLoggedIn]);
 
 
   // Reset borrow MAX state when deposit asset changes

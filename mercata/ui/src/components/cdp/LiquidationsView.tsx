@@ -34,13 +34,20 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
   const [availableUsdstBalance, setAvailableUsdstBalance] = useState<number>(0);
   const [isGlobalPaused, setIsGlobalPaused] = useState<boolean>(false);
   const { toast } = useToast();
-  const { userAddress } = useUser();
+  const { userAddress, isLoggedIn } = useUser();
   const { canPerformAction } = useAuthAction();
   const { fetchTokens } = useUserTokens();
   const { fetchUsdstBalance, usdstBalance } = useTokenContext();
 
   // Fetch liquidatable positions, asset configs, and USDST balance
   useEffect(() => {
+    // Skip API calls if user is not logged in
+    if (!isLoggedIn) {
+      setLoading(false);
+      setLiquidatableVaults([]);
+      return;
+    }
+
     const fetchData = async () => {
       setLoading(true);
       try {
@@ -115,7 +122,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
     };
 
     fetchData();
-  }, [toast, userAddress, fetchUsdstBalance, usdstBalance]);
+  }, [toast, userAddress, isLoggedIn, fetchUsdstBalance, usdstBalance]);
 
   const toggleExpanded = async (vaultKey: string) => {
     const isCurrentlyExpanded = expandedVaults[vaultKey];

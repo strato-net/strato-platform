@@ -49,7 +49,7 @@ const DashboardSidebar = () => {
   const { isAdmin } = useUser();
   const { pathname } = useLocation();
   const { resolvedTheme } = useTheme();
-  const [isMoreOpen, setIsMoreOpen] = useState(true);
+  const [isMoreOpen, setIsMoreOpen] = useState(false);
 
   useEffect(() => {
     const updateWidth = () => {

@@ -4,12 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cdpService, BadDebt } from "@/services/cdpService";
 import { useToast } from "@/hooks/use-toast";
-import { RefreshCw, AlertTriangle } from "lucide-react";
+import { useUser } from "@/context/UserContext";
+import { RefreshCw, AlertTriangle, LogIn } from "lucide-react";
 import { formatWeiToDecimalHP, formatNumber } from "@/utils/numberUtils";
 import JuniorNoteView from "./JuniorNoteView";
 
 
 const BadDebtView: React.FC = () => {
+  const { isLoggedIn } = useUser();
   const [badDebtData, setBadDebtData] = useState<BadDebt[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -19,6 +21,13 @@ const BadDebtView: React.FC = () => {
   const { toast } = useToast();
 
   const fetchBadDebtData = useCallback(async (showRefreshing = false) => {
+    // Skip API calls if user is not logged in
+    if (!isLoggedIn) {
+      setLoading(false);
+      setError("Authentication required");
+      return;
+    }
+
     if (showRefreshing) {
       setRefreshing(true);
     } else {
@@ -46,16 +55,19 @@ const BadDebtView: React.FC = () => {
       console.error("Failed to fetch bad debt data:", error);
       const errorMessage = error.response?.data?.message || error.message || "Failed to load bad debt information";
       setError(errorMessage);
-      toast({
-        title: "Error",
-        description: `Failed to load on-chain bad debt data: ${errorMessage}`,
-        variant: "destructive",
-      });
+      // Only show toast if user is logged in (authentication errors expected when not logged in)
+      if (isLoggedIn) {
+        toast({
+          title: "Error",
+          description: `Failed to load on-chain bad debt data: ${errorMessage}`,
+          variant: "destructive",
+        });
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [toast]);
+  }, [toast, isLoggedIn]);
 
   useEffect(() => {
     fetchBadDebtData();
@@ -107,14 +119,22 @@ const BadDebtView: React.FC = () => {
         </CardHeader>
         <CardContent className="px-3 md:px-6 pb-3 md:pb-6 pt-0">
           {error ? (
-            <div className="text-center py-6 md:py-8">
-              <AlertTriangle className="h-10 w-10 md:h-12 md:w-12 text-red-500 mx-auto mb-3 md:mb-4" />
-              <div className="text-red-600 font-medium mb-2 text-sm md:text-base">Failed to load on-chain data</div>
-              <div className="text-xs md:text-sm text-muted-foreground mb-4">{error}</div>
-              <Button onClick={handleRefresh} disabled={refreshing} size="sm">
-                {refreshing ? "Retrying..." : "Retry"}
-              </Button>
-            </div>
+            !isLoggedIn ? (
+              <div className="text-center py-6 md:py-8">
+                <LogIn className="h-10 w-10 md:h-12 md:w-12 text-muted-foreground mx-auto mb-3 md:mb-4" />
+                <div className="text-muted-foreground font-medium mb-2 text-sm md:text-base">Login required to view data</div>
+                <div className="text-xs md:text-sm text-muted-foreground">Please log in to view bad debt information</div>
+              </div>
+            ) : (
+              <div className="text-center py-6 md:py-8">
+                <AlertTriangle className="h-10 w-10 md:h-12 md:w-12 text-red-500 mx-auto mb-3 md:mb-4" />
+                <div className="text-red-600 font-medium mb-2 text-sm md:text-base">Failed to load on-chain data</div>
+                <div className="text-xs md:text-sm text-muted-foreground mb-4">{error}</div>
+                <Button onClick={handleRefresh} disabled={refreshing} size="sm">
+                  {refreshing ? "Retrying..." : "Retry"}
+                </Button>
+              </div>
+            )
           ) : (
             <div className="text-center">
               <div className="text-2xl md:text-3xl font-bold text-red-600 dark:text-red-400">

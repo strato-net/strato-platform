@@ -50,12 +50,12 @@ const DepositsPage = () => {
       <DashboardSidebar />
       <div className="h-screen flex flex-col transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
         <DashboardHeader title="Deposits" />
-        <main className="flex-1 p-4 md:p-6 overflow-y-auto pb-20 md:pb-6">
+        <main className="flex-1 p-3 md:p-6 overflow-y-auto pb-20 md:pb-6">
           <div className="flex flex-col lg:flex-row gap-4 md:gap-6">
             {/* Left Column - Deposit Form */}
             <div className="w-full lg:w-1/2">
-              <Card className="shadow-sm rounded-xl">
-                <CardContent className="pt-6">
+              <Card className="shadow-sm rounded-none md:rounded-xl border-x-0 md:border-x">
+                <CardContent className="pt-4 md:pt-6 px-3 md:px-6">
                   {/* Tabs */}
                   <div className="flex border-b border-border mb-6">
                     <button
@@ -93,11 +93,11 @@ const DepositsPage = () => {
                 color="bg-blue-500"
                 isLoading={isLoadingNetBalance}
               />
-              <Card className="shadow-sm rounded-xl flex-1">
-                <CardHeader>
-                  <CardTitle className="text-lg font-bold">My Deposits</CardTitle>
+              <Card className="shadow-sm rounded-none md:rounded-xl border-x-0 md:border-x flex-1">
+                <CardHeader className="px-3 md:px-6 py-3 md:py-4">
+                  <CardTitle className="text-base md:text-lg font-bold">My Deposits</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="px-0 md:px-6 pb-3 md:pb-6">
                   <AssetsList 
                     loading={loadingEarningAssets} 
                     tokens={nonPoolTokens} 
