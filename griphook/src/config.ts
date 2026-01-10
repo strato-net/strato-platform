@@ -1,6 +1,4 @@
 export type OAuthConfig = {
-  username: string;
-  password: string;
   clientId: string;
   clientSecret: string;
   openIdDiscoveryUrl: string;
@@ -42,18 +40,15 @@ function normalizePath(value: string): string {
 
 /**
  * Load OAuth configuration if all required environment variables are present.
- * Returns null if password-based OAuth is not configured.
+ * Returns null if OAuth client is not configured.
  */
 function loadOAuthConfig(): OAuthConfig | null {
-  const username = process.env.BLOCKAPPS_USERNAME;
-  const password = process.env.BLOCKAPPS_PASSWORD;
   const clientId = process.env.OAUTH_CLIENT_ID;
   const clientSecret = process.env.OAUTH_CLIENT_SECRET;
   const openIdDiscoveryUrl = process.env.OPENID_DISCOVERY_URL;
 
-  // All must be present for password-based OAuth
-  if (username && password && clientId && clientSecret && openIdDiscoveryUrl) {
-    return { username, password, clientId, clientSecret, openIdDiscoveryUrl };
+  if (clientId && clientSecret && openIdDiscoveryUrl) {
+    return { clientId, clientSecret, openIdDiscoveryUrl };
   }
 
   return null;

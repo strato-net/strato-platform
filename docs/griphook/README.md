@@ -13,9 +13,8 @@ Griphook provides a bridge between AI assistants (like Claude) and the STRATO De
 
 ## Key Features
 
-### Authentication (3 modes)
+### Authentication (2 modes)
 - **Browser Login** (recommended) - Run `griphook login` for interactive OAuth via browser
-- **Password Mode** (legacy) - Automatic token acquisition using environment variables
 - **Token Mode** - Set `STRATO_ACCESS_TOKEN` for pre-authenticated scenarios
 
 ### Transports

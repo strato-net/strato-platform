@@ -68,7 +68,6 @@ The config resource includes:
 
 - **Authentication Modes**
   - Browser login (recommended): Run `griphook login` to authenticate
-  - Password mode (legacy): Set all OAuth environment variables
   - Token mode: Set `STRATO_ACCESS_TOKEN` directly
 
 - **Environment Variables**
@@ -90,15 +89,15 @@ Agent: Read resource strato://resources/config
 
 Response: # Griphook configuration
 
-- Node URL: https://helium.blockapps.net
-- API base: https://helium.blockapps.net/api
-- OAuth username: user@example.com
-- OAuth client ID: strato-client
+- Node URL: https://buildtest.mercata-testnet.blockapps.net
+- API base: https://buildtest.mercata-testnet.blockapps.net/api
+- OAuth client ID: localhost
 - OpenID discovery: https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration
 - HTTP timeout: 15000ms
 
-Required environment variables:
-- BLOCKAPPS_USERNAME – BlockApps username
+Authentication modes:
+1. Browser login (recommended): Run 'griphook login' to authenticate via browser
+2. Token mode: Set STRATO_ACCESS_TOKEN with a pre-obtained access token
 ...
 ```
 

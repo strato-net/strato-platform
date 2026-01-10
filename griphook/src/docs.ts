@@ -3,7 +3,7 @@ import { GriphookConfig } from "./config.js";
 export const endpointsOverview = `# STRATO API surface
 
 Authentication
-- OAuth tokens are acquired automatically using BlockApps credentials (BLOCKAPPS_USERNAME, BLOCKAPPS_PASSWORD).
+- Run 'griphook login' to authenticate via browser OAuth.
 - Requires OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET, and OPENID_DISCOVERY_URL for OAuth configuration.
 - Tokens are cached and refreshed automatically before expiration.
 - Base URL defaults to http://localhost:3001/api. Override with STRATO_API_BASE_URL.
@@ -78,9 +78,7 @@ Config & Health
 
 export function buildConfigDoc(config: GriphookConfig): string {
   const authInfo = config.oauth
-    ? `- Auth mode: password (legacy)
-- OAuth username: ${config.oauth.username}
-- OAuth client ID: ${config.oauth.clientId}
+    ? `- OAuth client ID: ${config.oauth.clientId}
 - OpenID discovery: ${config.oauth.openIdDiscoveryUrl}`
     : `- Auth mode: browser (run 'griphook login' to authenticate)`;
 
@@ -93,8 +91,7 @@ ${authInfo}
 
 Authentication modes:
 1. Browser login (recommended): Run 'griphook login' to authenticate via browser
-2. Password mode (legacy): Set BLOCKAPPS_USERNAME, BLOCKAPPS_PASSWORD, OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET, OPENID_DISCOVERY_URL
-3. Token mode: Set STRATO_ACCESS_TOKEN with a pre-obtained access token
+2. Token mode: Set STRATO_ACCESS_TOKEN with a pre-obtained access token
 
 Optional environment variables:
 - STRATO_NODE_URL (default http://localhost)

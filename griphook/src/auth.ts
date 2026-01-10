@@ -28,7 +28,7 @@ interface CachedToken {
 
 const TOKEN_REFRESH_BUFFER_MS = 120 * 1000; // Refresh 2 minutes before expiry
 
-export type AuthMode = "browser" | "password" | "token";
+export type AuthMode = "browser" | "token";
 
 export class OAuthClient {
   private config: OAuthConfig | null;
@@ -86,8 +86,6 @@ export class OAuthClient {
     switch (this.authMode) {
       case "browser":
         return this.fetchTokenFromBrowserCredentials();
-      case "password":
-        return this.fetchTokenWithPassword();
       case "token":
         return this.fetchTokenFromEnv();
       default:
@@ -101,7 +99,7 @@ export class OAuthClient {
   private async fetchTokenFromBrowserCredentials(): Promise<string> {
     if (!this.storedCredentials) {
       throw new Error(
-        "Not logged in. Run 'griphook login' to authenticate, or set BLOCKAPPS_USERNAME/BLOCKAPPS_PASSWORD for password mode."
+        "Not logged in. Run 'griphook login' to authenticate."
       );
     }
 
@@ -153,51 +151,6 @@ export class OAuthClient {
       throw new Error(
         `Failed to refresh token: ${err instanceof Error ? err.message : err}. Run 'griphook login' to re-authenticate.`
       );
-    }
-  }
-
-  /**
-   * Password mode: use Resource Owner Password Credentials grant (legacy)
-   */
-  private async fetchTokenWithPassword(): Promise<string> {
-    if (!this.config) {
-      throw new Error("OAuth configuration not provided for password mode");
-    }
-
-    const tokenEndpoint = await this.getTokenEndpoint();
-
-    const params = new URLSearchParams({
-      grant_type: "password",
-      client_id: this.config.clientId,
-      client_secret: this.config.clientSecret,
-      username: this.config.username,
-      password: this.config.password,
-      scope: "openid email",
-    });
-
-    try {
-      const response = await axios.post<TokenResponse>(tokenEndpoint, params.toString(), {
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        timeout: 30000,
-      });
-
-      const { access_token, expires_in } = response.data;
-
-      this.cachedToken = {
-        accessToken: access_token,
-        expiresAt: Date.now() + expires_in * 1000,
-      };
-
-      return access_token;
-    } catch (err) {
-      if (axios.isAxiosError(err)) {
-        const status = err.response?.status;
-        const detail = err.response?.data?.error_description || err.response?.data?.error || err.message;
-        throw new Error(`OAuth token request failed (HTTP ${status}): ${detail}`);
-      }
-      throw new Error(`OAuth token request failed: ${err instanceof Error ? err.message : "Unknown error"}`);
     }
   }
 
@@ -269,11 +222,6 @@ export function detectAuthMode(): AuthMode {
   // If access token is directly provided, use token mode
   if (process.env.STRATO_ACCESS_TOKEN) {
     return "token";
-  }
-
-  // If username/password provided, use password mode (legacy)
-  if (process.env.BLOCKAPPS_USERNAME && process.env.BLOCKAPPS_PASSWORD) {
-    return "password";
   }
 
   // Default to browser mode (uses stored credentials from 'griphook login')

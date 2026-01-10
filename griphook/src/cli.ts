@@ -18,19 +18,13 @@ Commands:
   help      Show this help message
 
 Authentication:
-  Griphook supports three authentication modes:
+  Griphook supports two authentication modes:
 
   1. Browser login (recommended):
      $ griphook login
      Opens browser for OAuth authentication, stores refresh token locally.
 
-  2. Password mode (legacy):
-     Set environment variables:
-       BLOCKAPPS_USERNAME, BLOCKAPPS_PASSWORD,
-       OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET,
-       OPENID_DISCOVERY_URL
-
-  3. Token mode:
+  2. Token mode:
      Set STRATO_ACCESS_TOKEN with a pre-obtained access token.
 
 Credentials are stored in: ${getCredentialsPath()}

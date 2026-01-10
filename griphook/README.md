@@ -12,25 +12,9 @@ npm run build
 
 ## Authentication
 
-Griphook supports three authentication modes (in priority order):
+Griphook supports two authentication modes:
 
-### 1. Token Mode
-```bash
-export STRATO_ACCESS_TOKEN="eyJhbGciOiJSUzI1NiIs..."
-npm start
-```
-
-### 2. Password Mode (Legacy)
-```bash
-export BLOCKAPPS_USERNAME="user@example.com"
-export BLOCKAPPS_PASSWORD="yourpassword"
-export OAUTH_CLIENT_ID="your-client-id"
-export OAUTH_CLIENT_SECRET="your-client-secret"
-export OPENID_DISCOVERY_URL="https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration"
-npm start
-```
-
-### 3. Browser Mode (Recommended)
+### 1. Browser Mode (Recommended)
 ```bash
 export OAUTH_CLIENT_ID="localhost"
 export OAUTH_CLIENT_SECRET="your-client-secret"
@@ -42,6 +26,12 @@ npm start       # Start the server
 ```
 
 Credentials are stored in `~/.griphook/credentials.json`.
+
+### 2. Token Mode
+```bash
+export STRATO_ACCESS_TOKEN="eyJhbGciOiJSUzI1NiIs..."
+npm start
+```
 
 ### CLI Commands
 

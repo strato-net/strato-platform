@@ -9,7 +9,7 @@ import { registerResources } from "./resources.js";
 
 function buildServer(config: ReturnType<typeof loadConfig>) {
   const instructions = [
-    "Griphook MCP server exposes the STRATO web app backend. Authentication uses BlockApps OAuth credentials (BLOCKAPPS_USERNAME, BLOCKAPPS_PASSWORD).",
+    "Griphook MCP server exposes the STRATO web app backend. Run 'griphook login' to authenticate via browser.",
     `API base: ${config.apiBaseUrl}. Override with STRATO_API_BASE_URL.`,
     "Domain tools: strato.tokens, strato.swap, strato.lending, strato.cdp, strato.bridge, strato.rewards, strato.admin, strato.events, strato.protocol-fees, strato.rpc.",
     `HTTP transport: ${config.http.enabled ? `POST ${config.http.host}:${config.http.port}${config.http.path}` : "disabled (set GRIPHOOK_HTTP_ENABLED=true)"}.`,

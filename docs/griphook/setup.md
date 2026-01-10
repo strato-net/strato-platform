@@ -19,27 +19,9 @@ npm run build
 
 ## Authentication
 
-Griphook supports three authentication modes (checked in this priority order):
+Griphook supports two authentication modes:
 
-### 1. Token Mode (Highest Priority)
-Set `STRATO_ACCESS_TOKEN` with a pre-obtained access token:
-```bash
-export STRATO_ACCESS_TOKEN="eyJhbGciOiJSUzI1NiIs..."
-npm start
-```
-
-### 2. Password Mode (Legacy)
-Set all OAuth environment variables for automatic token acquisition:
-```bash
-export BLOCKAPPS_USERNAME="user@example.com"
-export BLOCKAPPS_PASSWORD="yourpassword"
-export OAUTH_CLIENT_ID="your-client-id"
-export OAUTH_CLIENT_SECRET="your-client-secret"
-export OPENID_DISCOVERY_URL="https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration"
-npm start
-```
-
-### 3. Browser Mode (Recommended)
+### 1. Browser Mode (Recommended)
 Interactive OAuth login via browser - no password stored in environment:
 
 ```bash
@@ -58,6 +40,13 @@ npm start
 
 Credentials are stored securely in `~/.griphook/credentials.json` and automatically refreshed.
 
+### 2. Token Mode
+Set `STRATO_ACCESS_TOKEN` with a pre-obtained access token:
+```bash
+export STRATO_ACCESS_TOKEN="eyJhbGciOiJSUzI1NiIs..."
+npm start
+```
+
 **CLI Commands:**
 | Command | Description |
 |---------|-------------|
@@ -74,13 +63,6 @@ Credentials are stored securely in `~/.griphook/credentials.json` and automatica
 | `OAUTH_CLIENT_ID` | OAuth 2.0 client ID | `localhost` |
 | `OAUTH_CLIENT_SECRET` | OAuth 2.0 client secret | `client-secret-value` |
 | `OPENID_DISCOVERY_URL` | OpenID Connect discovery endpoint | `https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration` |
-
-### Password Mode (Legacy)
-
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `BLOCKAPPS_USERNAME` | BlockApps account username | `user@example.com` |
-| `BLOCKAPPS_PASSWORD` | BlockApps account password | `secretpassword` |
 
 ### STRATO Backend
 
@@ -152,18 +134,6 @@ npm run login   # One-time browser authentication
 npm start       # Start the server
 ```
 
-### Password Auth (Legacy)
-```bash
-export BLOCKAPPS_USERNAME="user@company.com"
-export BLOCKAPPS_PASSWORD="$VAULT_PASSWORD"
-export OAUTH_CLIENT_ID="production-client"
-export OAUTH_CLIENT_SECRET="$VAULT_CLIENT_SECRET"
-export OPENID_DISCOVERY_URL="https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration"
-export STRATO_API_BASE_URL="https://your-strato-instance/api"
-
-npm start
-```
-
 ### Claude Code Integration
 Add to `~/.claude/claude_code_config.json` or project `.mcp.json`:
 
@@ -197,12 +167,6 @@ Note: Run `npm run login` in the griphook directory first to authenticate.
 6. Griphook exchanges code for tokens using PKCE
 7. Tokens saved to `~/.griphook/credentials.json`
 8. Subsequent API calls use stored tokens (auto-refreshed)
-
-### Password Mode
-1. On first API request, discovers token endpoint from `OPENID_DISCOVERY_URL`
-2. Acquires access token using Resource Owner Password Credentials grant
-3. Caches token until 2 minutes before expiration
-4. Automatically refreshes expired tokens
 
 ## Troubleshooting
 
