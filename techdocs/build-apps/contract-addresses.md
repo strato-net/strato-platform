@@ -2,12 +2,14 @@
 
 Find deployed contracts and addresses for your STRATO deployment.
 
-!!! danger "STRATO Deployment Required"
-    **Contract addresses are specific to YOUR STRATO deployment.**
+!!! note "About Endpoints"
+    All examples use `localhost` for local development.
     
-    - **Local dev?** → [Setup Guide](../contribute/setup.md)
-    - **Remote?** → Get addresses from DevOps or deployment logs
-    - **Examples use localhost** - Replace with your actual STRATO URL
+    **For production, use public endpoints:**
+    - Mainnet: `https://app.strato.nexus`
+    - Testnet: `https://buildtest.mercata-testnet.blockapps.net`
+    
+    **Contract addresses are the same across all deployments** (query from registries)
 
 !!! tip "Query Dynamically"
     Contract addresses are **not hardcoded** in documentation. Always fetch them dynamically from Cirrus or registries to ensure accuracy.
@@ -153,8 +155,9 @@ All contracts are verified on the STRATO Management Dashboard (SMD). You can:
 # Local development
 http://localhost:8080/smd/
 
-# Remote deployment
-https://your-strato.example.com/smd/
+# Production
+https://app.strato.nexus/smd/  (mainnet)
+https://buildtest.mercata-testnet.blockapps.net/smd/  (testnet)
 
 # View specific contract
 http://localhost:8080/smd/address/0x.../contracts
@@ -254,8 +257,13 @@ Add STRATO to wallet or app:
 const STRATO_NETWORK = {
   chainId: '0x...', // Get from your deployment
   chainName: 'STRATO',
-  rpcUrls: ['http://localhost:8080/strato-api/eth/v1.2'], // Replace with your STRATO URL
-  blockExplorerUrls: ['http://localhost:8080/smd'], // Replace with your STRATO URL
+  // For local dev:
+  rpcUrls: ['http://localhost:8080/strato-api/eth/v1.2'],
+  blockExplorerUrls: ['http://localhost:8080/smd'],
+  
+  // For production (replace with):
+  // rpcUrls: ['https://app.strato.nexus/strato-api/eth/v1.2'],  // mainnet
+  // blockExplorerUrls: ['https://app.strato.nexus/smd'],  // mainnet
   nativeCurrency: {
     name: 'USDST',
     symbol: 'USDST',
@@ -333,7 +341,10 @@ async function getUserCollateral(
 
 ### Always Verify
 
-- ✅ Block explorer (SMD): `{your-strato-url}/smd/` (e.g., `http://localhost:8080/smd/`)
+- ✅ Block explorer (SMD): 
+  - Local: `http://localhost:8080/smd/`
+  - Mainnet: `https://app.strato.nexus/smd/`
+  - Testnet: `https://buildtest.mercata-testnet.blockapps.net/smd/`
 - ✅ Query Cirrus for contract code
 - ✅ Check contract name matches expected
 

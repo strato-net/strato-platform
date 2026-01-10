@@ -7,12 +7,14 @@ Quick reference for common STRATO operations using REST APIs.
     
     Use STRATO REST APIs: `/strato/v2.3`, `/cirrus/search`, `/bloc/v2.2`
 
-!!! danger "STRATO Deployment Required"
-    **All examples assume you have access to a STRATO deployment.**
+!!! note "About Endpoints"
+    All examples use `localhost` for local development.
     
-    - **Local dev?** → [Setup Guide](../contribute/setup.md)
-    - **Remote?** → Get your STRATO URL from DevOps
-    - **Examples use localhost** - Replace with your actual STRATO URL
+    **For production, use public endpoints:**
+    - Mainnet: `https://app.strato.nexus`
+    - Testnet: `https://buildtest.mercata-testnet.blockapps.net`
+    
+    **Optional:** [Local setup guide](../contribute/setup.md)
 
 ---
 
@@ -21,7 +23,12 @@ Quick reference for common STRATO operations using REST APIs.
 ```typescript
 import axios, { AxiosInstance } from 'axios';
 
-const NODE_URL = process.env.NODE_URL || 'http://localhost:8080';
+// For local dev:
+const NODE_URL = 'http://localhost:8080';
+
+// For production (replace with):
+// const NODE_URL = 'https://app.strato.nexus';  // mainnet
+// const NODE_URL = 'https://buildtest.mercata-testnet.blockapps.net';  // testnet
 
 function createApiClient(baseURL: string): AxiosInstance {
   return axios.create({

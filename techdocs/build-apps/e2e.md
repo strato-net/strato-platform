@@ -7,17 +7,24 @@ Complete workflow examples for building on STRATO using REST APIs.
     
     Use STRATO REST APIs: `/strato/v2.3`, `/cirrus/search`, `/bloc/v2.2`
 
-!!! danger "Prerequisites"
-    **These examples assume you have access to a STRATO deployment.**
+!!! note "About STRATO Endpoints"
+    **All examples use `localhost` for local development.**
     
-    - **Local dev?** → [Setup Guide](../contribute/setup.md), then `./start my_node_name`
-    - **Remote deployment?** → Get your STRATO URL from DevOps
-    - **Examples use localhost** - Replace with your actual STRATO URL
+    For production, use public endpoints:
     
-    **All examples connect to your STRATO deployment:**
+    - **Mainnet:** `https://app.strato.nexus`
+    - **Testnet:** `https://buildtest.mercata-testnet.blockapps.net`
+    
+    **In your code:**
     
     ```typescript
-    const NODE_URL = process.env.NODE_URL || 'http://localhost:8080';
+    // For local dev:
+    const NODE_URL = 'http://localhost:8080';
+    
+    // For production (replace localhost with):
+    // const NODE_URL = 'https://app.strato.nexus';  // mainnet
+    // const NODE_URL = 'https://buildtest.mercata-testnet.blockapps.net';  // testnet
+    
     const strato = createApiClient(`${NODE_URL}/strato/v2.3`);
     const cirrus = createApiClient(`${NODE_URL}/cirrus/search`);
     ```
@@ -514,7 +521,7 @@ async function main() {
   const userAddress = '0x...';
   
   const dashboard = new PortfolioDashboard(accessToken, userAddress);
-  const portfolio = await dashboard.getCompletePortfolio();
+const portfolio = await dashboard.getCompletePortfolio();
   
   console.log('Complete portfolio:', JSON.stringify(portfolio, null, 2));
 }

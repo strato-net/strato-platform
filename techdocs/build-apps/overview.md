@@ -19,24 +19,35 @@ Welcome! This guide helps you build external applications that integrate with yo
 - **Full-stack APIs** - No need for own indexer
 - **Active DeFi** - Lending, swaps, CDP ecosystem
 
-## Important: STRATO is NOT a Public Blockchain
+## Important: STRATO Uses REST APIs (Not JSON-RPC)
 
-Unlike Ethereum or other public blockchains, **STRATO is infrastructure you deploy and run yourself**.
+**STRATO is a public blockchain**, but it uses **REST APIs** instead of JSON-RPC like Ethereum.
 
-To build applications on STRATO, you must:
+**Key differences from Ethereum:**
 
-1. ✅ **Deploy STRATO** - Install and run on your infrastructure
-2. ✅ **Connect to your deployment** - Your own STRATO instance URL
-3. ✅ **Examples use localhost** - For local development
+- ❌ **No JSON-RPC** - `ethers.js`, `web3.js` won't work
+- ✅ **REST APIs** - Use HTTP requests to STRATO's native APIs
+- ✅ **Public endpoints** - Access STRATO without deploying your own node
+- ✅ **Built-in indexer** - Query blockchain data directly (no need for The Graph)
 
-**Your STRATO deployment can be:**
+### Connection Options
 
-- **Local development** - `http://localhost:8080` (for testing)
-- **Cloud deployment** - `https://your-strato.example.com`
-- **Private network** - `http://10.0.0.5:8080` (internal)
+**Option 1: Use Public STRATO Endpoints (Recommended)**
 
-!!! warning "No Public RPC Endpoints"
-    STRATO does not provide public RPC endpoints like `https://mainnet.infura.io`. You must deploy your own STRATO instance. The examples use `localhost` for development, but replace with your actual deployment URL.
+Connect to the public STRATO network via REST APIs:
+
+- **Mainnet**: `https://app.strato.nexus/api`
+- **Testnet**: `https://buildtest.mercata-testnet.blockapps.net/api`
+
+**Option 2: Deploy Your Own Node (Optional)**
+
+You can also run your own STRATO instance for local development:
+
+- **Local development**: `http://localhost:8080`
+- See [Setup Guide](../contribute/setup.md) for installation
+
+!!! tip "Most Developers Use Public Endpoints"
+    Unlike Ethereum where you need Infura/Alchemy, STRATO provides public REST endpoints. You don't need to deploy your own node unless you want local development.
 
 ---
 
@@ -65,36 +76,32 @@ To build applications on STRATO, you must:
 
 ## Prerequisites
 
-### 1. STRATO Deployment (Required)
+### 1. STRATO Access
 
-!!! danger "Critical Prerequisite"
-    **You MUST have a STRATO deployment before building apps.**
-    
-    STRATO is not a public blockchain. You need your own instance (local, cloud, or private network).
+You need access to a STRATO endpoint to build apps.
 
-**Deployment Options:**
+**Option 1: Use Public Endpoints (Recommended)**
 
-- **Local Development** - Install on your machine → [Setup Guide](../contribute/setup.md)
-- **Cloud Deployment** - Deploy to AWS, GCP, Azure, etc.
-- **Managed Instance** - Contact STRATO team for hosted options
+- **Mainnet**: `https://app.strato.nexus`
+- **Testnet**: `https://buildtest.mercata-testnet.blockapps.net`
 
-**For local development:**
+No setup required - just start building!
+
+**Option 2: Local Development (Optional)**
+
+For local testing, you can run STRATO on your machine:
 
 ```bash
 cd strato-platform
 ./start my_node_name
 ```
 
-**Your STRATO instance will be available at:**
+Your local instance will be at: `http://localhost:8080`
 
-- **Local**: `http://localhost:8080` (development)
-- **Remote**: `https://your-strato.example.com` (production)
-- **Private**: `http://10.0.0.5:8080` (internal network)
-
-**Example URLs in this guide use `localhost` - replace with your actual deployment URL.**
+See [Setup Guide](../contribute/setup.md) for installation instructions.
 
 !!! tip "Examples Use Localhost"
-    All code examples use `http://localhost:8080` for local development. Replace with your actual STRATO deployment URL (e.g., `https://your-strato.example.com`).
+    All code examples use `http://localhost:8080` for local development. For production, replace with public endpoints (`https://app.strato.nexus` for mainnet).
 
 ### 2. Technical Requirements (for Your App)
 

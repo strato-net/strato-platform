@@ -7,12 +7,15 @@ Complete walkthrough for integrating with STRATO using REST APIs.
     
     Use STRATO REST APIs: `/strato/v2.3`, `/cirrus/search`, `/bloc/v2.2`
 
-!!! danger "Prerequisites"
-    This guide assumes you have access to a STRATO deployment.
+!!! note "STRATO Endpoint Options"
+    All examples use `localhost` for local development.
     
-    - **Local dev?** → [Setup Guide](../contribute/setup.md), then `./start my_node_name`
-    - **Remote?** → Get your STRATO URL from DevOps
-    - **Examples use localhost** - Replace with your actual STRATO URL
+    **For production, use public endpoints:**
+    
+    - **Mainnet:** `https://app.strato.nexus`
+    - **Testnet:** `https://buildtest.mercata-testnet.blockapps.net`
+    
+    **Optional local setup:** [Setup Guide](../contribute/setup.md)
 
 ---
 
@@ -28,11 +31,20 @@ This guide covers end-to-end integration with STRATO, including:
 - CDP vault management
 - Rewards tracking
 
-**Your STRATO URLs:**
+**STRATO API Endpoints:**
 
-- **STRATO API**: `{your-url}/strato/v2.3` (transactions, keys)
-- **Cirrus**: `{your-url}/cirrus/search` (indexed queries)
-- **BLOC**: `{your-url}/bloc/v2.2` (block/tx queries)
+```typescript
+// For local dev:
+const BASE_URL = 'http://localhost:8080';
+
+// For production (replace with):
+// const BASE_URL = 'https://app.strato.nexus';  // mainnet
+// const BASE_URL = 'https://buildtest.mercata-testnet.blockapps.net';  // testnet
+
+const STRATO_API = `${BASE_URL}/strato/v2.3`;  // transactions, keys
+const CIRRUS = `${BASE_URL}/cirrus/search`;     // indexed queries
+const BLOC = `${BASE_URL}/bloc/v2.2`;           // block/tx queries
+```
 
 ---
 

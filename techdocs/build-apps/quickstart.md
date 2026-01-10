@@ -7,12 +7,16 @@ Build your first app on STRATO in 10 minutes using STRATO's REST APIs.
     
     You must use STRATO's REST APIs (`/strato/v2.3`, `/cirrus/search`).
 
-!!! danger "Prerequisites"
-    **You MUST have a STRATO deployment before starting this guide.**
+!!! info "STRATO Endpoint Options"
+    You can use either public STRATO endpoints or deploy your own:
     
-    - **Local dev?** → Install locally: [Setup Guide](../contribute/setup.md), then `./start my_node_name`
-    - **Remote deployment?** → Get your STRATO URL from your DevOps team
-    - **Examples use localhost** - Replace with your actual STRATO URL
+    - **Option 1 (Recommended):** Use public endpoints
+        - Mainnet: `https://app.strato.nexus/api`
+        - Testnet: `https://buildtest.mercata-testnet.blockapps.net/api`
+    - **Option 2 (Optional):** Deploy locally for development
+        - See [Setup Guide](../contribute/setup.md) to install
+        - Run `./start my_node_name`
+        - Use `http://localhost:3000/api`
 
 ---
 
@@ -40,7 +44,12 @@ Create `.env`:
 
 ```bash
 # Your STRATO deployment URL
+# For local development:
 NODE_URL=http://localhost:8080
+
+# For production, use public endpoints:
+# NODE_URL=https://app.strato.nexus  (mainnet)
+# NODE_URL=https://buildtest.mercata-testnet.blockapps.net  (testnet)
 
 # OAuth credentials (required for authentication)
 OAUTH_CLIENT_ID=your_client_id_here
@@ -48,8 +57,11 @@ OAUTH_CLIENT_SECRET=your_client_secret_here
 OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata
 ```
 
-!!! tip "Get OAuth Credentials"
-    Contact STRATO support to get OAuth credentials for your deployment.
+!!! tip "Endpoint Options"
+    - **Local dev:** Use `http://localhost:8080` (requires [local STRATO setup](../contribute/setup.md))
+    - **Production:** Use public endpoints (no local deployment needed)
+        - Mainnet: `https://app.strato.nexus`
+        - Testnet: `https://buildtest.mercata-testnet.blockapps.net`
 
 ### TypeScript Configuration
 
@@ -75,6 +87,12 @@ Create `tsconfig.json`:
 ---
 
 ## 2. Create STRATO API Client (2 minutes)
+
+!!! note "About the Examples"
+    All code examples use `localhost` for local development. For production:
+    
+    - Replace `http://localhost:8080` with `https://app.strato.nexus` (mainnet)
+    - Or use `https://buildtest.mercata-testnet.blockapps.net` (testnet)
 
 Create `src/config.ts`:
 
@@ -461,8 +479,7 @@ async function getLendingContracts(accessToken: string) {
 
 Before building your app:
 
-- [ ] STRATO is deployed (local, cloud, or private network)
-- [ ] You can access your STRATO instance
+- [ ] You have access to a STRATO endpoint (public or local dev)
 - [ ] You have OAuth credentials
 - [ ] Your `.env` is configured
 - [ ] You're using STRATO REST APIs (NOT ethers.js)

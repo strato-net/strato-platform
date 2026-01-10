@@ -58,3 +58,69 @@ docker-compose.oracle.yml
 
 /app
 /mynode/
+
+# Documentation working files (summaries, verification reports, commit messages)
+/*_SUMMARY.md
+/*_VERIFICATION.md
+/*_COMPLETE.md
+/*_FIXES*.md
+/*_FIX*.md
+/*_REPORT.md
+/COMMIT_MESSAGE*.txt
+/COMMIT_MESSAGE*.md
+/COMPREHENSIVE*.txt
+/COMPREHENSIVE*.md
+/CRITICAL*.md
+/ACTUAL*.md
+/APPROVAL*.md
+/DCA*.md
+/DEVELOPER*.md
+/DOCUMENTATION*.md
+/EXAMPLE*.md
+/PLATFORM*.md
+/PORTFOLIO*.md
+/RELEASE*.md
+/RESTRUCTURE*.md
+/SCENARIO*.md
+/STRATEGY*.md
+/SWAP*.md
+/TESTING*.md
+/TROUBLESHOOTING*.md
+/VOUCHER*.md
+
+
+# Python virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# macOS
+.DS_Store
+
+# IDE
+.worktrees/
+
+
+# More documentation working files
+/*_PLAN.md
+/COMPLETE_*.md
+/COMPLETE_*.txt
+/DOCS_*.md
+/FINAL_*.txt
+/FINAL_*.md
+/LENDING_*.md
+/MAXIMIZE_*.md
+/RISK_*.md
+/verify_docs_accuracy.py
+
+# Old docs folders (obsolete)
+/docs/developer/
+/docs/end-user/
+

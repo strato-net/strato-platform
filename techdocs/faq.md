@@ -15,7 +15,7 @@ STRATO is a blockchain platform for decentralized finance (DeFi) that enables bo
 - **Faster**: 1-2 second transaction finality vs. 12+ seconds on Ethereum
 - **Cheaper**: Transactions typically < $0.10 vs. $5-50+ on Ethereum
 - **Compatible**: Full Solidity/EVM compatibility - same tools and contracts work
-- **Enterprise-ready**: OAuth support, permissioned options, HSM integration
+- **Developer-friendly**: OAuth authentication, REST APIs, built-in indexing (Cirrus)
 
 ### What are the fees on STRATO?
 
@@ -318,12 +318,11 @@ Yes! See **[API Reference](reference/api.md)** for full documentation.
 
 ### Can I run my own STRATO node?
 
-Yes, for enterprise deployments. Contact the STRATO team for:
+Yes, for local development. See:
 
-- Node setup instructions
-- Validator participation
-- Private network deployment
-- Custom configurations
+- [Setup Guide](contribute/setup.md) - Local development installation
+- [Architecture](contribute/architecture.md) - Understanding STRATO components
+- Contact STRATO team for validator participation
 
 ---
 

@@ -256,7 +256,23 @@ This overwrites existing `docker-compose.yml` files with the latest configuratio
 
 ## Run Locally
 
-### 1. Start STRATO
+### 1. Build STRATO
+
+```bash
+cd strato-platform
+make
+```
+
+**What this does:**
+
+- Compiles the Haskell blockchain core
+- Builds Solidity smart contracts
+- Builds Node.js backend API
+- Builds React frontend UI
+
+**Time:** First build takes 15-30 minutes, subsequent builds are 2-5 minutes.
+
+### 2. Start STRATO
 
 ```bash
 ./start my_node_name
@@ -280,7 +296,7 @@ The first run will:
 
 **This takes 2-5 minutes.**
 
-### 2. Verify It's Running
+### 3. Verify It's Running
 
 **Check the blockchain API:**
 
@@ -316,7 +332,7 @@ Open your browser: http://localhost:3001
 
 You should see the STRATO DeFi interface.
 
-### 3. Access Logs
+### 4. Access Logs
 
 **All logs:**
 
@@ -342,7 +358,7 @@ tail -f my_node_name/logs/mercata-backend.log
 tail -f my_node_name/logs/mercata-ui.log
 ```
 
-### 4. Stop STRATO
+### 5. Stop STRATO
 
 ```bash
 # Graceful shutdown
@@ -352,7 +368,7 @@ tail -f my_node_name/logs/mercata-ui.log
 pkill -f strato
 ```
 
-### 5. Wipe and Start Fresh
+### 6. Wipe and Start Fresh
 
 ```bash
 ./forceWipe
