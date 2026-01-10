@@ -66,3 +66,4 @@ docker-compose.oracle.yml
 /griphook/.turbo
 /griphook/.env
 !/griphook/.env.sample
+/.mcp.json
