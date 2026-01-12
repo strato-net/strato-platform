@@ -17,6 +17,17 @@ npm install
 npm run build
 ```
 
+## Configuration
+
+Copy `.env.sample` to `.env` and configure your environment:
+
+```bash
+cp .env.sample .env
+# Edit .env with your values
+```
+
+Griphook automatically loads the `.env` file on startup. You can also set environment variables manually if preferred.
+
 ## Authentication
 
 Griphook supports two authentication modes:
@@ -24,26 +35,31 @@ Griphook supports two authentication modes:
 ### 1. Browser Mode (Recommended)
 Interactive OAuth login via browser - no password stored in environment:
 
+Configure OAuth credentials in `.env`:
 ```bash
-# Set OAuth client configuration
-export OAUTH_CLIENT_ID="your-client-id"
-export OAUTH_CLIENT_SECRET="your-client-secret"
-export OPENID_DISCOVERY_URL="https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration"
-export STRATO_API_BASE_URL="https://your-strato-instance/api"
+OAUTH_CLIENT_ID=localhost
+OAUTH_CLIENT_SECRET=your-client-secret
+OPENID_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration
+STRATO_API_BASE_URL=https://your-strato-instance/api
+```
 
-# Login via browser (opens browser for OAuth)
-npm run login
-
-# Start the server
-npm start
+Then authenticate and start:
+```bash
+npm run login   # Opens browser for OAuth
+npm start       # Start the server
 ```
 
 Credentials are stored securely in `~/.griphook/credentials.json` and automatically refreshed.
 
 ### 2. Token Mode
-Set `STRATO_ACCESS_TOKEN` with a pre-obtained access token:
+Set `STRATO_ACCESS_TOKEN` in `.env` or environment:
 ```bash
-export STRATO_ACCESS_TOKEN="eyJhbGciOiJSUzI1NiIs..."
+STRATO_ACCESS_TOKEN=eyJhbGciOiJSUzI1NiIs...
+STRATO_API_BASE_URL=https://your-strato-instance/api
+```
+
+Then start the server:
+```bash
 npm start
 ```
 

@@ -10,17 +10,25 @@ npm install
 npm run build
 ```
 
+## Configuration
+
+Copy `.env.sample` to `.env` and configure:
+
+```bash
+cp .env.sample .env
+# Edit .env with your values
+```
+
+Griphook automatically loads `.env` on startup.
+
 ## Authentication
 
 Griphook supports two authentication modes:
 
 ### 1. Browser Mode (Recommended)
-```bash
-export OAUTH_CLIENT_ID="localhost"
-export OAUTH_CLIENT_SECRET="your-client-secret"
-export OPENID_DISCOVERY_URL="https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration"
-export STRATO_API_BASE_URL="https://buildtest.mercata-testnet.blockapps.net/api"
+Configure OAuth in `.env`, then run:
 
+```bash
 npm run login   # Opens browser for OAuth
 npm start       # Start the server
 ```
@@ -28,6 +36,8 @@ npm start       # Start the server
 Credentials are stored in `~/.griphook/credentials.json`.
 
 ### 2. Token Mode
+Set `STRATO_ACCESS_TOKEN` in `.env` or environment:
+
 ```bash
 export STRATO_ACCESS_TOKEN="eyJhbGciOiJSUzI1NiIs..."
 npm start

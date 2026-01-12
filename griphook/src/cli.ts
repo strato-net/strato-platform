@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import "dotenv/config";
 import { loginCommand, logoutCommand, statusCommand, getCredentialsPath } from "./login.js";
 
 const args = process.argv.slice(2);
