@@ -263,6 +263,11 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
     }
   }, [borrowAmount, loans, maxAmount, availableToBorrow, maxAtMinHF]);
 
+  // Automatically reset to auto-supply mode when borrow amount or health factor changes
+  useEffect(() => {
+    setAutoSupplyCollateral(true);
+  }, [borrowAmount, targetHealthFactor]);
+
   // Handle checkbox change - expand when unchecked
   const handleAutoSupplyChange = (checked: boolean) => {
     setAutoSupplyCollateral(checked);
@@ -426,7 +431,6 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
     // Slider goes from max HF (left/0) to min HF (right/range)
     const range = Number(sliderExtrema.max) - Number(sliderExtrema.min);
     const newHF = Number(sliderExtrema.max) - sliderPos;
-    handleAutoSupplyChange(true);
     setTargetHealthFactor(Math.round(newHF * 100) / 100);
   };
 
@@ -472,7 +476,6 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
               onChange={(e) => {
                 const value = e.target.value;
                 handleAmountInputChange(value, setBorrowAmount, setBorrowAmountError, maxAmount);
-                handleAutoSupplyChange(true);
                 handlePollingUpdate(value);
               }}
             />
@@ -483,7 +486,6 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
             onClick={() => {
               try {
                 setBorrowAmount(formatUnits(BigInt(maxAmount)));
-                handleAutoSupplyChange(true);
                 setBorrowAmountError("");
                 handlePollingUpdate(formatUnits(BigInt(maxAmount)));
               } catch {}
