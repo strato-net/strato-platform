@@ -40,7 +40,7 @@ const Allocation: React.FC<AllocationProps> = ({
   onAverageVaultHealthChange,
 }) => {
   const [isOpen, setIsOpen] = useState(!autoSupplyCollateral);
-  const [displayMode, setDisplayMode] = useState<'USD' | 'WAD'>('WAD');
+  const [displayMode, setDisplayMode] = useState<'USD' | 'WAD'>('USD');
   const { earningAssets, inactiveTokens } = useTokenContext();
 
   // Expand vault breakdown when auto-allocate is unchecked, close when checked
@@ -519,7 +519,7 @@ const Allocation: React.FC<AllocationProps> = ({
                 }}
                 className="h-6 px-2 text-xs"
               >
-                  {displayMode}
+                  {displayMode === 'USD' ? 'Value' : 'Amount'}
               </Button>
               )}
               {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
