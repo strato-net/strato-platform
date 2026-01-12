@@ -374,6 +374,81 @@ export const calculatePositionMetrics = (
   };
 };
 
+/**
+ * Calculate aggregate health factor across multiple vaults
+ * 
+ * Formula: overallHF = aggregateCR / weightedAvgLT
+ * Where:
+ * - aggregateCR = (totalCollateralUSD / totalDebtUSD) × 100
+ * - weightedAvgLT = Σ(debt_i × LT_i) / Σ(debt_i)
+ * 
+ * This is used consistently across:
+ * - DebtPosition.tsx (for current position)
+ * - Mint.tsx (for projected position after mint)
+ * - Allocation.tsx (for display in vault breakdown)
+ * 
+ * @param vaults - Array of vault data with collateral, debt, and new deposits/mints
+ * @returns Health factor as a formatted string (2 decimal places) or null if no debt
+ */
+export const calculateAggregateHealthFactor = (
+  vaults: Array<{
+    currentCollateral: bigint;
+    currentDebt: bigint;
+    depositAmount: number; // New deposit to add (in token units)
+    mintAmount: number; // New mint to add (in USDST)
+    oraclePrice: bigint;
+    assetScale: bigint;
+    liquidationRatio: bigint;
+    decimals: number; // Token decimals for parsing deposit
+  }>
+): string | null => {
+  let totalCollateralUSD = 0;
+  let totalDebtUSD = 0;
+  let weightedLTSum = 0;
+  
+  for (const vault of vaults) {
+    // Calculate total debt for this vault (existing + new mint)
+    const mintWei = vault.mintAmount > 0 ? parseUnits(String(vault.mintAmount), 18) : 0n;
+    const totalDebt = vault.currentDebt + mintWei;
+    
+    // Skip vaults with zero debt (they have infinite HF)
+    if (totalDebt <= 0n) continue;
+
+    // Calculate total collateral (existing + new deposit)
+    const depositWei = vault.depositAmount > 0 ? parseUnits(String(vault.depositAmount), vault.decimals) : 0n;
+    const totalCollateral = vault.currentCollateral + depositWei;
+    
+    // Calculate collateral value in USD
+    const collateralValueUSD = (totalCollateral * vault.oraclePrice) / vault.assetScale;
+    const collateralUSD = parseFloat(formatUnits(collateralValueUSD, 18));
+    const debtUSD = parseFloat(formatUnits(totalDebt, 18));
+    
+    // Liquidation ratio as percentage (e.g., 1.33e18 -> 133)
+    const lt = parseFloat(formatUnits(vault.liquidationRatio, 18)) * 100;
+    
+    // Accumulate totals for aggregate calculation
+    totalCollateralUSD += collateralUSD;
+    totalDebtUSD += debtUSD;
+    weightedLTSum += debtUSD * lt;
+  }
+
+  // Need at least some debt to calculate HF
+  if (totalDebtUSD <= 0) return null;
+
+  // Calculate weighted average liquidation threshold
+  const weightedAvgLT = weightedLTSum / totalDebtUSD;
+  
+  // Calculate aggregate collateralization ratio
+  const aggregateCR = (totalCollateralUSD / totalDebtUSD) * 100;
+  
+  // Calculate overall health factor
+  const overallHF = aggregateCR / weightedAvgLT;
+  
+  if (!isFinite(overallHF) || isNaN(overallHF)) return null;
+  
+  return overallHF.toFixed(2);
+};
+
 // Asset utilities
 export const getAssetColor = (symbol: string): string => {
   const colors: Record<string, string> = {

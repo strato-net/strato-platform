@@ -31,6 +31,7 @@ import {
   calculateWeightedAverageAPR,
   calculateSliderMinHFFromPercentages,
   calculatePositionMetrics,
+  calculateAggregateHealthFactor,
 } from '@/utils/loanUtils';
 import { formatWeiToDecimalHP } from '@/utils/numberUtils';
 
@@ -71,7 +72,6 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   // minHF = max(minCR) / max(liquidationRatio) across all vaults
   // Currently using hardcoded values - TODO: calculate from actual vault data
   const sliderMinHF = useMemo(() => {
-    console.log('[Mint] Calculating slider minHF on component mount');
     return calculateSliderMinHFFromPercentages([150], [133]);
   }, []); // Empty deps = only runs once on mount
 
@@ -109,7 +109,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     const fetchCurrentPosition = async () => {
       try {
         const positions = await cdpService.getVaults();
-        const { overallHealthFactor } = calculatePositionMetrics(
+        const metrics = calculatePositionMetrics(
           positions.map(pos => ({
             debtAmount: pos.debtAmount,
             collateralValueUSD: pos.collateralValueUSD,
@@ -119,7 +119,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
           })),
           formatWeiToDecimalHP
         );
-        setCurrentPositionHF(overallHealthFactor === Infinity ? undefined : overallHealthFactor);
+        setCurrentPositionHF(metrics.overallHealthFactor === Infinity ? undefined : metrics.overallHealthFactor);
       } catch {
         setCurrentPositionHF(undefined);
       }
@@ -151,7 +151,6 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   const [hasLowHF, setHasLowHF] = useState(false);
   const [exceedsBalance, setExceedsBalance] = useState(false);
   const [totalManualMint, setTotalManualMint] = useState('0');
-  const [averageVaultHealth, setAverageVaultHealth] = useState<string | null>(null);
   const [exceedsMaxMint, setExceedsMaxMint] = useState(false);
 
   // Compute fresh allocations when auto-supply is enabled
@@ -190,6 +189,44 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
 
   // Use customAllocations as the source of truth
   const optimalAllocations = customAllocations;
+
+  // Calculate aggregate HF for projected position (current + planned deposits/mints)
+  // Uses the same calculation as DebtPosition.tsx and Allocation.tsx
+  const averageVaultHealth = useMemo(() => {
+    console.log('[Mint] averageVaultHealth calculation:', {
+      autoSupplyCollateral,
+      vaultCandidatesLength: vaultCandidates.length,
+      optimalAllocationsLength: optimalAllocations.length,
+    });
+    
+    if (!autoSupplyCollateral || vaultCandidates.length === 0 || optimalAllocations.length === 0) {
+      console.log('[Mint] Returning null - early exit');
+      return null;
+    }
+
+    // Build vault data for all vaults with debt or planned changes
+    const vaultData = vaultCandidates.map(candidate => {
+      const allocation = optimalAllocations.find(a => a.assetAddress === candidate.assetAddress);
+      const depositAmt = parseFloat(allocation?.depositAmount || '0');
+      const mintAmt = parseFloat(allocation?.mintAmount || '0');
+      
+      return {
+        currentCollateral: candidate.currentCollateral,
+        currentDebt: candidate.currentDebt,
+        depositAmount: depositAmt,
+        mintAmount: mintAmt,
+        oraclePrice: candidate.oraclePrice,
+        assetScale: candidate.assetScale,
+        liquidationRatio: candidate.liquidationRatio,
+        decimals: candidate.assetScale.toString().length - 1,
+      };
+    }).filter(v => v.currentDebt > 0n || v.depositAmount > 0 || v.mintAmount > 0);
+
+    console.log('[Mint] vaultData for HF calculation:', vaultData.length, 'vaults');
+    const result = calculateAggregateHealthFactor(vaultData);
+    console.log('[Mint] averageVaultHealth result:', result);
+    return result;
+  }, [autoSupplyCollateral, vaultCandidates, optimalAllocations]);
 
   const totalHeadroomWei = useMemo(() => 
     vaultCandidates.length === 0 ? 0n : computeTotalHeadroom(riskBuffer, vaultCandidates),
@@ -630,7 +667,6 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
               onHFValidationChange={setHasLowHF}
               onBalanceExceededChange={setExceedsBalance}
               onTotalManualMintChange={setTotalManualMint}
-              onAverageVaultHealthChange={setAverageVaultHealth}
               exceedsBalance={exceedsBalance}
               hasLowHF={hasLowHF}
             />

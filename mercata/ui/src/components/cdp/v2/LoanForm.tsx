@@ -66,7 +66,7 @@ const LoanForm: React.FC<LoanFormProps> = ({
 }) => {
 
   return (
-    <Card>
+      <Card>
         <CardContent className="pt-6 space-y-6">
           {/* Available to Mint/Borrow */}
           <div className="space-y-2">
@@ -107,13 +107,13 @@ const LoanForm: React.FC<LoanFormProps> = ({
 
           {/* Confirm Button - only shown when showButton is true */}
           {showButton && onConfirm && (
-            <Button
+          <Button
               disabled={(buttonDisabled ?? disabled) || isProcessing}
-              onClick={onConfirm}
-              className="w-full"
-            >
-              {isProcessing ? 'Processing...' : actionButtonLabel}
-            </Button>
+            onClick={onConfirm}
+            className="w-full"
+          >
+            {isProcessing ? 'Processing...' : actionButtonLabel}
+          </Button>
           )}
         </CardContent>
       </Card>

@@ -8,7 +8,7 @@ import { formatUnits, parseUnits } from 'ethers';
 import { NumericFormat } from 'react-number-format';
 import type { PlanItem } from '@/services/cdpTypes';
 import type { VaultCandidate } from '@/services/MintService';
-import { formatPercentage, getAssetColor, convertStabilityFeeRateToAnnualPercentage } from '@/utils/loanUtils';
+import { formatPercentage, getAssetColor, convertStabilityFeeRateToAnnualPercentage, calculateAggregateHealthFactor } from '@/utils/loanUtils';
 import { useTokenContext } from '@/context/TokenContext';
 import { formatNumberWithCommas, parseCommaNumber } from '@/utils/numberUtils';
 
@@ -169,8 +169,9 @@ const Allocation: React.FC<AllocationProps> = ({
     return Math.round(minHF * 100) / 100; // Round to 2 decimal places
   }, []);
 
-  // Calculate HF for a vault - matches VaultsList formula: HF = CR / LT
-  const calculateHF = useCallback((candidate: VaultCandidate, depositAmt: number, mintAmt: number): string => {
+  // Calculate raw HF value for a vault - returns number for precise calculations
+  // Returns null for infinite/invalid values
+  const calculateHFRaw = useCallback((candidate: VaultCandidate, depositAmt: number, mintAmt: number): number | null => {
     try {
       const decimals = candidate.assetScale.toString().length - 1;
       const depositWei = depositAmt > 0 ? parseUnits(String(depositAmt), decimals) : 0n;
@@ -179,7 +180,7 @@ const Allocation: React.FC<AllocationProps> = ({
       const totalCollateral = candidate.currentCollateral + depositWei;
       const totalDebt = candidate.currentDebt + mintWei;
 
-      if (totalDebt <= 0n) return '∞';
+      if (totalDebt <= 0n) return null; // Infinite HF
 
       // Calculate collateral value in USD (18 decimals)
       const collateralValueUSD = (totalCollateral * candidate.oraclePrice) / candidate.assetScale;
@@ -197,13 +198,26 @@ const Allocation: React.FC<AllocationProps> = ({
       // HF = CR / LT (same as VaultsList)
       const hf = cr / lt;
 
-      if (!isFinite(hf) || isNaN(hf)) return '-';
-      if (hf >= 999) return '∞';
-      return hf.toFixed(2);
+      if (!isFinite(hf) || isNaN(hf) || hf >= 999) return null;
+      return hf;
     } catch {
-      return '-';
+      return null;
     }
   }, []);
+
+  // Format HF for display - rounds to 2 decimal places
+  const calculateHF = useCallback((candidate: VaultCandidate, depositAmt: number, mintAmt: number): string => {
+    const decimals = candidate.assetScale.toString().length - 1;
+    const depositWei = depositAmt > 0 ? parseUnits(String(depositAmt), decimals) : 0n;
+    const mintWei = mintAmt > 0 ? parseUnits(String(mintAmt), 18) : 0n;
+    const totalDebt = candidate.currentDebt + mintWei;
+
+    if (totalDebt <= 0n) return '∞';
+
+    const hfRaw = calculateHFRaw(candidate, depositAmt, mintAmt);
+    if (hfRaw === null) return '∞';
+    return hfRaw.toFixed(2);
+  }, [calculateHFRaw]);
 
   // Sync from optimalAllocations when they change
   // This always uses the canonical WAD values from optimalAllocations
@@ -374,21 +388,21 @@ const Allocation: React.FC<AllocationProps> = ({
       const canonicalDeposit = depositCanonical[candidate.assetAddress] || '';
       const depositAmt = toNumber(canonicalDeposit);
       
-      const hf = calculateHF(candidate, depositAmt, mintAmt);
-      const hfNum = parseFloat(hf);
+      // Use raw HF value for precise comparison
+      const hfRaw = calculateHFRaw(candidate, depositAmt, mintAmt);
       
       // Calculate this vault's minimum HF based on its specific minCR and liquidationRatio
       const vaultMinHF = calculateVaultMinHF(candidate);
       
       // Check if HF is below this vault's minimum (not the global slider value)
-      if (hfNum !== Infinity && !isNaN(hfNum) && hfNum < vaultMinHF) {
+      if (hfRaw !== null && hfRaw < vaultMinHF) {
         hasLowHF = true;
         break;
       }
     }
     
     onHFValidationChange(hasLowHF);
-  }, [depositCanonical, mintInputs, vaultCandidates, autoSupplyCollateral, onHFValidationChange, toNumber, calculateVaultMinHF, calculateHF]);
+  }, [depositCanonical, mintInputs, vaultCandidates, autoSupplyCollateral, onHFValidationChange, toNumber, calculateVaultMinHF, calculateHFRaw]);
 
   // Check for deposits exceeding available balance and notify parent
   useEffect(() => {
@@ -437,51 +451,50 @@ const Allocation: React.FC<AllocationProps> = ({
     onTotalManualMintChange(totalMint > 0 ? String(totalMint) : '0');
   }, [mintInputs, vaultCandidates, autoSupplyCollateral, onTotalManualMintChange, toNumber]);
 
-  // Calculate average HF across all vaults in the breakdown
-  // Excludes vaults with zero debt (currentDebt + mintAmt = 0)
+  // Calculate aggregate HF for projected position (current + planned deposits/mints)
+  // Uses the same shared utility as Mint.tsx and DebtPosition.tsx
   const averageVaultHealth = React.useMemo(() => {
     if (vaultCandidates.length === 0) return null;
 
-    const hfValues: number[] = [];
-    
-    for (const candidate of vaultCandidates) {
-      const canonicalDeposit = depositCanonical[candidate.assetAddress] || '';
-      const depositAmt = toNumber(canonicalDeposit);
-      const mintInput = mintInputs[candidate.assetAddress] || '';
-      const mintAmt = toNumber(mintInput);
+    // Build vault data for all vaults with debt or planned changes
+    const vaultData = vaultCandidates.map(candidate => {
+      let depositAmt = 0;
+      let mintAmt = 0;
       
-      // Calculate total debt for this vault (existing + new mint)
-      const mintWei = mintAmt > 0 ? parseUnits(String(mintAmt), 18) : 0n;
-      const totalDebt = candidate.currentDebt + mintWei;
-      
-      // Skip vaults with zero debt
-      if (totalDebt <= 0n) continue;
-      
-      const hfStr = calculateHF(candidate, depositAmt, mintAmt);
-      
-      // Skip infinite or invalid values
-      if (hfStr !== '∞' && hfStr !== '-') {
-        const hfNum = parseFloat(hfStr);
-        if (isFinite(hfNum) && !isNaN(hfNum)) {
-          hfValues.push(hfNum);
-        }
+      if (autoSupplyCollateral) {
+        // In auto mode, use values from optimalAllocations
+        const allocation = optimalAllocations.find(a => a.assetAddress === candidate.assetAddress);
+        depositAmt = parseFloat(allocation?.depositAmount || '0');
+        mintAmt = parseFloat(allocation?.mintAmount || '0');
+      } else {
+        // In manual mode, use user input values
+        const canonicalDeposit = depositCanonical[candidate.assetAddress] || '';
+        depositAmt = toNumber(canonicalDeposit);
+        const mintInput = mintInputs[candidate.assetAddress] || '';
+        mintAmt = toNumber(mintInput);
       }
-    }
+      
+      return {
+        currentCollateral: candidate.currentCollateral,
+        currentDebt: candidate.currentDebt,
+        depositAmount: depositAmt,
+        mintAmount: mintAmt,
+        oraclePrice: candidate.oraclePrice,
+        assetScale: candidate.assetScale,
+        liquidationRatio: candidate.liquidationRatio,
+        decimals: candidate.assetScale.toString().length - 1,
+      };
+    }).filter(v => v.currentDebt > 0n || v.depositAmount > 0 || v.mintAmount > 0);
 
-    if (hfValues.length === 0) return null;
+    return calculateAggregateHealthFactor(vaultData);
+  }, [vaultCandidates, depositCanonical, mintInputs, toNumber, autoSupplyCollateral, optimalAllocations]);
 
-    const average = hfValues.reduce((sum, hf) => sum + hf, 0) / hfValues.length;
-    return average.toFixed(2);
-  }, [vaultCandidates, depositCanonical, mintInputs, calculateHF, toNumber]);
-
-  // Notify parent component when average vault health changes
-  // Only update when auto-supply is enabled (auto-allocate mode)
+  // Notify parent component when average vault health changes (for display in Allocation summary)
   useEffect(() => {
     if (onAverageVaultHealthChange) {
       if (autoSupplyCollateral) {
         onAverageVaultHealthChange(averageVaultHealth);
       } else {
-        // In manual mode, don't update average vault health
         onAverageVaultHealthChange(null);
       }
     }
@@ -567,9 +580,7 @@ const Allocation: React.FC<AllocationProps> = ({
               <Label className="text-sm font-medium cursor-pointer">Vault Breakdown</Label>
             <div className="flex items-center gap-2">
               {isOpen && (
-              <Button
-                variant="outline"
-                size="sm"
+              <span
                 onClick={(e) => {
                   e.stopPropagation();
                     e.preventDefault();
@@ -578,10 +589,10 @@ const Allocation: React.FC<AllocationProps> = ({
                   onPointerDown={(e) => {
                     e.stopPropagation();
                 }}
-                className="h-6 px-2 text-xs"
+                className="h-6 px-2 text-xs rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center cursor-pointer"
               >
                   {displayMode === 'USD' ? 'Value' : 'Amount'}
-              </Button>
+              </span>
               )}
               {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </div>
