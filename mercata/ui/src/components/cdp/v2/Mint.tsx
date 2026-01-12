@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -59,7 +60,9 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   const [progressError, setProgressError] = useState<string | undefined>();
   const [autoSupplyCollateral, setAutoSupplyCollateral] = useState(true);
   const [currentPositionHF, setCurrentPositionHF] = useState<number | undefined>(undefined);
+  const [shouldRefreshOnClose, setShouldRefreshOnClose] = useState(false);
 
+  const navigate = useNavigate();
   const { fetchAllPrices } = useOracleContext();
   const { toast } = useToast();
   const { userRewards } = useRewardsUserInfo();
@@ -241,6 +244,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     setTransactionLoading(true);
     setProgressModalOpen(true);
     setProgressError(undefined);
+    setShouldRefreshOnClose(true); // Mark that we should refresh when modal closes
     
     try {
       // Use the exact displayed allocations - no recalculation to avoid precision drift
@@ -389,17 +393,15 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
         currentTxIndex++;
       }
 
-      if (allSuccessful) setCurrentProgressStep('complete');
-      await Promise.all([fetchVaultCandidates(), fetchAllPrices()]);
-      setMintAmountInput('');
-      setIsMaxMode(false);
-      if (onSuccess) onSuccess();
+      if (allSuccessful) {
+        setCurrentProgressStep('complete');
+      }
     } catch {
-      try { await Promise.all([fetchVaultCandidates(), fetchAllPrices()]); } catch { /* silent refetch */ }
+      // Errors are already captured in progressTransactions
     } finally {
       setTransactionLoading(false);
     }
-  }, [mintAmount, optimalAllocations, fetchVaultCandidates, fetchAllPrices, onSuccess]);
+  }, [mintAmount, optimalAllocations]);
 
   // Find CDP activity for rewards display
   const cdpActivity = useMemo(() => {
@@ -673,6 +675,13 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
           setCurrentProgressStep('depositing');
           setProgressTransactions([]);
           setProgressError(undefined);
+          
+          // Only refresh if transactions were actually executed
+          if (shouldRefreshOnClose) {
+            setShouldRefreshOnClose(false);
+            // Use navigate(0) to reload the current route and refresh all components
+            navigate(0);
+          }
         }}
       />
     </>
