@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { REPAY_FEE } from "@/lib/constants";
-import { safeParseUnits, addCommasToInput, formatCurrency, formatUnits } from "@/utils/numberUtils";
+import { safeParseUnits, addCommasToInput, formatUnits, formatBalance } from "@/utils/numberUtils";
 import { NewLoanData } from "@/interface";
 import { calculateRepayHealthImpact } from "@/utils/lendingUtils";
 import RiskLevelProgress from "@/components/ui/RiskLevelProgress";
@@ -25,49 +25,35 @@ const FormattedAmount = ({
   symbol = "USDST", 
   className = "" 
 }: { 
-  value: string; 
+  value: bigint;
   symbol?: string; 
   className?: string;
 }) => {
-  // Preserve the original string value for full precision display
-  const fullValue = value || "0";
   
-  // Format to exactly 2 decimals for display using formatCurrency helper
-  const formatted2Decimals = (() => {
-    const numValue = parseFloat(value);
-    if (isNaN(numValue)) return "0.00";
-    // formatCurrency handles locale formatting, then ensure exactly 2 decimals
-    return numValue.toLocaleString("en-US", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-  })();
-  
-  // Format full value with commas using addCommasToInput helper
-  const fullValueFormatted = fullValue === "0" 
-    ? "0" 
-    : addCommasToInput(fullValue);
-  
-  // Only show tooltip if the formatted value differs from full value
-  const needsTooltip = formatted2Decimals !== fullValueFormatted && fullValueFormatted !== "0";
-  
-  if (!needsTooltip) {
-    return (
-      <span className={className}>
-        {formatted2Decimals} {symbol}
-      </span>
-    );
+  if (value <= 1n) {
+    return <span className={className}>0.00 {symbol}</span>;
   }
-  
+
+  // Format to exactly 2 decimals for display
+  const displayAmount = formatBalance(value, symbol, 18, 0, 2);
+
+  // Format full value with 2 decimals for tooltip
+  const fullAmount = formatBalance(value, symbol, 18, 2);
+
+  // Only show tooltip if the formatted value differs from full value
+  const needsTooltip = displayAmount !== fullAmount;
+
+  if (!needsTooltip) {
+    return <span className={className}>{displayAmount}</span>;
+  }
+
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span className={`cursor-help ${className}`}>
-          {formatted2Decimals} {symbol}
-        </span>
+        <span className={`cursor-help ${className}`}>{displayAmount}</span>
       </TooltipTrigger>
       <TooltipContent>
-        <p>{fullValueFormatted} {symbol}</p>
+        <p>{fullAmount}</p>
       </TooltipContent>
     </Tooltip>
   );
@@ -163,11 +149,9 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance 
           <span className="font-normal">
             {(() => {
               try {
-                const bi = BigInt(loans?.totalAmountOwed ?? "0");
-                const display = bi <= 1n ? 0n : bi;
-                return <FormattedAmount value={formatUnits(display)} />;
+                return <FormattedAmount value={BigInt(loans?.totalAmountOwed ?? "0")} />;
               } catch {
-                return <FormattedAmount value="0" />;
+                return <FormattedAmount value={BigInt(0)} />;
               }
             })()}
           </span>
@@ -179,11 +163,9 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance 
             <span className="font-medium">
               {(() => {
                 try {
-                  const bi = BigInt(loans?.totalAmountOwedPreview ?? "0");
-                  const display = bi <= 1n ? 0n : bi;
-                  return <FormattedAmount value={formatUnits(display)} />;
+                  return <FormattedAmount value={BigInt(loans?.totalAmountOwedPreview ?? "0")} />;
                 } catch {
-                  return <FormattedAmount value="0" />;
+                  return <FormattedAmount value={0n} />;
                 }
               })()}
             </span>
@@ -194,11 +176,9 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance 
           <span className="text-lg">
             {(() => {
               try {
-                const bi = BigInt(loans?.totalAmountOwed ?? "0");
-                const display = bi <= 1n ? 0n : bi;
-                return <FormattedAmount value={formatUnits(display)} />;
+                return <FormattedAmount value={BigInt(loans?.totalAmountOwed ?? "0")} />;
               } catch {
-                return <FormattedAmount value="0" />;
+                return <FormattedAmount value={0n} />;
               }
             })()}
           </span>
@@ -233,7 +213,7 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance 
             {BigInt(maxAmount) <= 0n ? (
               <span>- USDST</span>
             ) : (
-              <FormattedAmount value={formatUnits(BigInt(maxAmount))} />
+              <FormattedAmount value={BigInt(maxAmount)} />
             )}
           </div>
         </div>
@@ -278,7 +258,7 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance 
         <div className="flex justify-between items-center">
           <span className="text-sm text-muted-foreground">Payment Amount</span>
           <span className="font-medium">
-            <FormattedAmount value={repayAmountError ? "0" : (repayAmount || "0")} />
+            <FormattedAmount value={repayAmountError ? 0n : safeParseUnits(repayAmount || "0")} />
           </span>
         </div>
         
@@ -290,13 +270,13 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance 
                 const totalOwed = BigInt(loans?.totalAmountOwed || 0);
                 // If there's an error, show full amount owed (no repayment)
                 if (repayAmountError) {
-                  return <FormattedAmount value={formatUnits(totalOwed)} />;
+                  return <FormattedAmount value={totalOwed} />;
                 }
                 const repayAmountWei = safeParseUnits(repayAmount || "0");
                 const remaining = totalOwed - repayAmountWei;
-                return <FormattedAmount value={formatUnits(remaining > 0n ? remaining : 0n)} />;
+                return <FormattedAmount value={remaining > 0n ? remaining : 0n} />;
               } catch {
-                return <FormattedAmount value={formatUnits(BigInt(loans?.totalAmountOwed || "0"))} />;
+                return <FormattedAmount value={BigInt(loans?.totalAmountOwed || "0")} />;
               }
             })()}
           </span>

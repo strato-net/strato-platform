@@ -93,8 +93,8 @@ const USDValueDisplay = ({ value }: { value: bigint }) => {
     return <div className="text-xs text-muted-foreground">$0.00</div>;
   }
   
-  const displayValue = formatBalance(value, undefined, 18, 0, 2);
-  return <div className="text-xs text-muted-foreground">${displayValue}</div>;
+  const displayValue = formatBalance(value, undefined, 18, 0, 2, true);
+  return <div className="text-xs text-muted-foreground">{displayValue}</div>;
 };
 
 const CollateralManagementTable = ({
@@ -150,6 +150,7 @@ const CollateralManagementTable = ({
                 
                 return (
                   <TableRow key={asset?.address}>
+                    {/* Asset */}
                     <TableCell>
                       <div className="flex items-center gap-2">
                         {asset?.images?.[0] ? (
@@ -172,12 +173,15 @@ const CollateralManagementTable = ({
                         </div>
                       </div>
                     </TableCell>
+                    {/* LTV */}
                     <TableCell>
                       {asset?.ltv ? (Number(asset.ltv) / 100) : 0}%
                     </TableCell>
+                    {/* LT */}
                     <TableCell>
                       {asset?.liquidationThreshold ? (Number(asset.liquidationThreshold) / 100) : 0}%
                     </TableCell>
+                    {/* Supply */}
                     <TableCell>
                       <div className="flex items-center justify-end gap-4">
                         <div className="text-right">
@@ -204,6 +208,7 @@ const CollateralManagementTable = ({
                         </Tooltip>
                       </div>
                     </TableCell>
+                    {/* Withdraw */}
                     <TableCell>
                       <div className="flex items-center justify-end gap-4">
                         <div className="text-right">
