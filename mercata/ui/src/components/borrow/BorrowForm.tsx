@@ -426,6 +426,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
     // Slider goes from max HF (left/0) to min HF (right/range)
     const range = Number(sliderExtrema.max) - Number(sliderExtrema.min);
     const newHF = Number(sliderExtrema.max) - sliderPos;
+    handleAutoSupplyChange(true);
     setTargetHealthFactor(Math.round(newHF * 100) / 100);
   };
 
@@ -471,6 +472,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
               onChange={(e) => {
                 const value = e.target.value;
                 handleAmountInputChange(value, setBorrowAmount, setBorrowAmountError, maxAmount);
+                handleAutoSupplyChange(true);
                 handlePollingUpdate(value);
               }}
             />
@@ -481,6 +483,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
             onClick={() => {
               try {
                 setBorrowAmount(formatUnits(BigInt(maxAmount)));
+                handleAutoSupplyChange(true);
                 setBorrowAmountError("");
                 handlePollingUpdate(formatUnits(BigInt(maxAmount)));
               } catch {}
