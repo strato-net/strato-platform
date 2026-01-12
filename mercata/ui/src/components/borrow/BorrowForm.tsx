@@ -397,16 +397,18 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
         s.id === "borrow" ? { ...s, status: "completed" } : s
       ));
       
-      // Reset form after successful completion
+    } catch (error: any) {
+      // Error already handled in individual steps
+    } finally {
+      // Reset form after completion (success or failure)
       setBorrowAmount("");
       setBorrowAmountError("");
       setCustomBorrowError("");
       setFeeError("");
+      setCustomCollateralValues(new Map());
+      setAutoSupplyCollateral(true);
+      setIsCollateralExpanded(false);
       handlePollingUpdate("");
-      
-    } catch (error: any) {
-      // Error already handled in individual steps
-      console.error("Borrow process failed:", error);
     }
   };
 
