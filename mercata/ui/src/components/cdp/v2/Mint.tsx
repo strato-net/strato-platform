@@ -29,7 +29,7 @@ import {
   calculateTotalMaxMintWei,
   calculateAvailableToMint,
   calculateWeightedAverageAPR,
-  calculateSliderMinHFFromPercentages,
+  calculateSliderMinHF,
   calculatePositionMetrics,
   calculateAggregateHealthFactor,
 } from '@/utils/loanUtils';
@@ -68,12 +68,11 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   const { toast } = useToast();
   const { userRewards } = useRewardsUserInfo();
 
-  // Calculate slider minHF only once on mount
+  // Calculate slider minHF from actual vault candidates
   // minHF = max(minCR) / max(liquidationRatio) across all vaults
-  // Currently using hardcoded values - TODO: calculate from actual vault data
   const sliderMinHF = useMemo(() => {
-    return calculateSliderMinHFFromPercentages([150], [133]);
-  }, []); // Empty deps = only runs once on mount
+    return calculateSliderMinHF(vaultCandidates);
+  }, [vaultCandidates]);
 
   // Calculate slider color based on health factor (riskBuffer)
   const sliderColor = useMemo(() => {
