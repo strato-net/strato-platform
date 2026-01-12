@@ -68,7 +68,6 @@ npm start
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `STRATO_NODE_URL` | STRATO blockchain node URL | `http://localhost` |
 | `STRATO_API_BASE_URL` | STRATO API base URL | `http://localhost:3001/api` |
 | `STRATO_HTTP_TIMEOUT_MS` | HTTP request timeout in milliseconds | `15000` |
 

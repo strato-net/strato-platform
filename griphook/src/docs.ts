@@ -84,7 +84,6 @@ export function buildConfigDoc(config: GriphookConfig): string {
 
   return `# Griphook configuration
 
-- Node URL: ${config.nodeUrl}
 - API base: ${config.apiBaseUrl}
 ${authInfo}
 - HTTP timeout: ${config.timeoutMs}ms
@@ -94,7 +93,6 @@ Authentication modes:
 2. Token mode: Set STRATO_ACCESS_TOKEN with a pre-obtained access token
 
 Optional environment variables:
-- STRATO_NODE_URL (default http://localhost)
 - STRATO_API_BASE_URL (default http://localhost:3001/api)
 - STRATO_HTTP_TIMEOUT_MS (default 15000)
 - GRIPHOOK_HTTP_ENABLED (default true)

@@ -60,7 +60,6 @@ This resource displays the current Griphook configuration, showing how the serve
 The config resource includes:
 
 - **Runtime Configuration**
-  - Node URL
   - API base URL
   - OAuth username and client ID
   - OpenID discovery URL
@@ -71,7 +70,6 @@ The config resource includes:
   - Token mode: Set `STRATO_ACCESS_TOKEN` directly
 
 - **Environment Variables**
-  - `STRATO_NODE_URL`
   - `STRATO_API_BASE_URL`
   - `STRATO_HTTP_TIMEOUT_MS`
   - `GRIPHOOK_HTTP_ENABLED`
@@ -89,7 +87,6 @@ Agent: Read resource strato://resources/config
 
 Response: # Griphook configuration
 
-- Node URL: https://buildtest.mercata-testnet.blockapps.net
 - API base: https://buildtest.mercata-testnet.blockapps.net/api
 - OAuth client ID: localhost
 - OpenID discovery: https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration

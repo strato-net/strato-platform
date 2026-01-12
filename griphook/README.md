@@ -45,7 +45,6 @@ npm start
 
 ### Optional (STRATO Backend)
 
-- `STRATO_NODE_URL` - STRATO node URL (default `http://localhost`)
 - `STRATO_API_BASE_URL` - API base URL (default `http://localhost:3001/api`)
 - `STRATO_HTTP_TIMEOUT_MS` - HTTP timeout in ms (default 15000)
 

@@ -5,7 +5,6 @@ export type OAuthConfig = {
 };
 
 export type GriphookConfig = {
-  nodeUrl: string;
   apiBaseUrl: string;
   oauth: OAuthConfig | null;
   timeoutMs: number;
@@ -55,7 +54,6 @@ function loadOAuthConfig(): OAuthConfig | null {
 }
 
 export function loadConfig(): GriphookConfig {
-  const nodeUrl = normalizeBaseUrl(process.env.STRATO_NODE_URL || "http://localhost");
   const apiBaseUrl = normalizeBaseUrl(process.env.STRATO_API_BASE_URL || "http://localhost:3001/api");
   const timeoutEnv = Number(process.env.STRATO_HTTP_TIMEOUT_MS ?? 15000);
   const httpHost = process.env.GRIPHOOK_HTTP_HOST || "127.0.0.1";
@@ -64,7 +62,6 @@ export function loadConfig(): GriphookConfig {
   const httpSsePath = normalizePath(process.env.GRIPHOOK_HTTP_SSE_PATH || `${httpPath}/events`);
 
   return {
-    nodeUrl,
     apiBaseUrl,
     oauth: loadOAuthConfig(),
     timeoutMs: Number.isFinite(timeoutEnv) ? timeoutEnv : 15000,
