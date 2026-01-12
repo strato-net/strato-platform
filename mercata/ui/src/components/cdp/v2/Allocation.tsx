@@ -24,6 +24,8 @@ interface AllocationProps {
   onBalanceExceededChange?: (exceedsBalance: boolean) => void; // Callback when deposit exceeds balance
   onTotalManualMintChange?: (totalMint: string) => void; // Callback with total mint from all vaults in manual mode
   onAverageVaultHealthChange?: (averageHF: string | null) => void; // Callback with average vault health
+  exceedsBalance?: boolean; // Whether any deposit exceeds available balance
+  hasLowHF?: boolean; // Whether any vault has HF below minimum
 }
 
 const Allocation: React.FC<AllocationProps> = ({
@@ -33,6 +35,8 @@ const Allocation: React.FC<AllocationProps> = ({
   onDepositAmountChange,
   onMintAmountChange,
   autoSupplyCollateral = true,
+  exceedsBalance = false,
+  hasLowHF = false,
   targetHF,
   onHFValidationChange,
   onBalanceExceededChange,
@@ -585,6 +589,25 @@ const Allocation: React.FC<AllocationProps> = ({
         </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="mt-2 px-3 pt-3 pb-3 border border-border rounded-md bg-muted/50 space-y-3">
+            {/* Vault-specific warnings - shown between header and form */}
+            {exceedsBalance && !autoSupplyCollateral && (
+              <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                <p className="text-sm font-semibold text-red-800 dark:text-red-200 mb-2">Deposit Exceeds Available Balance</p>
+                <p className="text-xs text-red-700 dark:text-red-300">
+                  One or more vaults have a deposit amount that exceeds your available balance. Please reduce the deposit amounts.
+                </p>
+              </div>
+            )}
+
+            {hasLowHF && !autoSupplyCollateral && (
+              <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                <p className="text-sm font-semibold text-red-800 dark:text-red-200 mb-2">Health Factor Below Minimum</p>
+                <p className="text-xs text-red-700 dark:text-red-300">
+                  One or more vaults have a health factor below the required minimum. Please reduce mint amounts or increase deposits.
+                </p>
+              </div>
+            )}
+
             <div className="space-y-2">
               <div className={`grid gap-2 text-xs font-medium text-muted-foreground pb-2 border-b border-border ${getGridClass()}`}>
                 <div>Asset</div>

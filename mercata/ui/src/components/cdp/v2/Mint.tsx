@@ -208,10 +208,17 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   const exceedsMaxCollateral = !isMaxMode && mintAmountWei > 0n && mintAmountWei > totalHeadroomWei;
 
   // When MAX mode is enabled and slider changes, update the mint amount input
+  // If available to mint becomes 0 or less, disable max mode
   useEffect(() => {
-    if (isMaxMode && totalMaxMintWei > 0n) {
-      const maxMint = formatUnits(totalMaxMintWei, 18).replace(/\.?0+$/, '');
-      setMintAmountInput(formatNumberWithCommas(maxMint));
+    if (isMaxMode) {
+      if (totalMaxMintWei > 0n) {
+        const maxMint = formatUnits(totalMaxMintWei, 18).replace(/\.?0+$/, '');
+        setMintAmountInput(formatNumberWithCommas(maxMint));
+      } else {
+        // Available to mint is now 0 or less - disable max mode and clear input
+        setIsMaxMode(false);
+        setMintAmountInput('');
+      }
     }
   }, [isMaxMode, totalMaxMintWei, riskBuffer]);
 
@@ -504,17 +511,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   }, [vaultCandidates]);
 
   const getButtonText = () => {
-    if (transactionLoading) return 'Processing...';
-    if (shouldLockInput) return 'Insufficient Collateral: Move Risk Slider to the right';
-    // In manual mode, check total manual mint amount; in auto mode, check mint amount input
-    const effectiveMintAmount = !autoSupplyCollateral ? parseFloat(totalManualMint) : mintAmount;
-    if (effectiveMintAmount <= 0 && !isMaxMode) return 'Enter mint amount';
-    if (exceedsMaxCollateral) return 'Insufficient Collateral: Decrease Mint Amount or move Risk Slider to the right';
-    if (optimalAllocations.length === 0 && debtFloorHit) return 'Debt Floor: Increase Mint Amount';
-    if (optimalAllocations.length === 0 && totalHeadroomWei <= 0n) return 'Vaults at Capacity: Move Risk Slider to the right';
-    if (optimalAllocations.length === 0) return 'No vaults available';
-    if (exceedsBalance && !autoSupplyCollateral) return 'Deposit exceeds available balance';
-    if (hasLowHF && !autoSupplyCollateral) return 'Health Factor below minimum: Reduce mint amounts or increase deposits';
+    // Button text should always be "Confirm Mint" - warnings are shown separately above the button
     return 'Confirm Mint';
   };
 
@@ -545,7 +542,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
             inputDisabled={!autoSupplyCollateral}
             sliderDisabled={!autoSupplyCollateral}
             averageVaultHealth={averageVaultHealth}
-            showButton={autoSupplyCollateral}
+            showButton={false}
             actionButtonLabel={getButtonText()}
             onConfirm={handleQuickMint}
             isProcessing={transactionLoading}
@@ -569,7 +566,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
             </div>
           )}
 
-          {/* Status Messages and Allocation Section */}
+          {/* Warning Messages - Always shown above buttons (priority order: most critical first) */}
           {shouldLockInput ? (
             <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
               <p className="text-sm font-semibold text-red-800 dark:text-red-200 mb-2">Insufficient Collateral</p>
@@ -597,54 +594,46 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
                   : 'No vaults are available for minting at this time.'}
               </p>
             </div>
-          ) : (
-            <>
-              {/* Allocation Section - shown when there's a valid allocation OR when auto-supply is off and available to mint > 0 */}
-              <Allocation
-                optimalAllocations={optimalAllocations}
-                vaultCandidates={vaultCandidates}
-                showMintAmounts={true}
-                autoSupplyCollateral={autoSupplyCollateral}
-                onDepositAmountChange={handleAllocationDepositChange}
-                onMintAmountChange={handleAllocationMintChange}
-                targetHF={riskBuffer}
-                onHFValidationChange={setHasLowHF}
-                onBalanceExceededChange={setExceedsBalance}
-                onTotalManualMintChange={setTotalManualMint}
-                onAverageVaultHealthChange={setAverageVaultHealth}
-              />
-              {/* Warning for partial allocation due to debt constraints */}
-              {(debtFloorHit || debtCeilingHit) && (
-                <div className="p-3 rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-                  <p className="text-xs text-amber-800 dark:text-amber-200">
-                    ⚠️ One or more vaults have hit a debt {debtFloorHit && debtCeilingHit ? 'floor/ceiling' : debtFloorHit ? 'floor' : 'ceiling'}. Effective mint amount may be lower than requested.
-                  </p>
-                </div>
-              )}
-              {/* Warning for deposit exceeding available balance */}
-              {exceedsBalance && !autoSupplyCollateral && (
-                <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-                  <p className="text-sm font-semibold text-red-800 dark:text-red-200 mb-2">Deposit Exceeds Available Balance</p>
-                  <p className="text-xs text-red-700 dark:text-red-300">
-                    One or more vaults have a deposit amount that exceeds your available balance. Please reduce the deposit amounts.
-                  </p>
-                </div>
-              )}
-            </>
+          ) : null}
+
+          {/* Warning for partial allocation due to debt constraints */}
+          {(debtFloorHit || debtCeilingHit) && (
+            <div className="p-3 rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+              <p className="text-xs text-amber-800 dark:text-amber-200">
+                ⚠️ One or more vaults have hit a debt {debtFloorHit && debtCeilingHit ? 'floor/ceiling' : debtFloorHit ? 'floor' : 'ceiling'}. Effective mint amount may be lower than requested.
+              </p>
+            </div>
           )}
 
-          {/* Confirm Button - only shown when auto supply is unchecked */}
-          {!autoSupplyCollateral && (
-            <Button
-              disabled={
-                parseFloat(totalManualMint) <= 0 || 
-                optimalAllocations.length === 0 || transactionLoading || exceedsMaxCollateral || shouldLockInput || hasLowHF || exceedsBalance
-              }
-              onClick={handleQuickMint}
-              className="w-full"
-            >
-              {getButtonText()}
-            </Button>
+          {/* Confirm Button - shown in both auto and manual modes */}
+          <Button
+            disabled={
+              (autoSupplyCollateral ? (mintAmount <= 0 && !isMaxMode) : parseFloat(totalManualMint) <= 0) || 
+              optimalAllocations.length === 0 || transactionLoading || exceedsMaxCollateral || shouldLockInput || hasLowHF || exceedsBalance
+            }
+            onClick={handleQuickMint}
+            className="w-full"
+          >
+            {transactionLoading ? 'Processing...' : getButtonText()}
+          </Button>
+
+          {/* Allocation Section - shown when there's a valid allocation OR when auto-supply is off and available to mint > 0 */}
+          {!(optimalAllocations.length === 0 && parseFloat(availableToMint.replace(/,/g, '')) <= 0) && (
+            <Allocation
+              optimalAllocations={optimalAllocations}
+              vaultCandidates={vaultCandidates}
+              showMintAmounts={true}
+              autoSupplyCollateral={autoSupplyCollateral}
+              onDepositAmountChange={handleAllocationDepositChange}
+              onMintAmountChange={handleAllocationMintChange}
+              targetHF={riskBuffer}
+              onHFValidationChange={setHasLowHF}
+              onBalanceExceededChange={setExceedsBalance}
+              onTotalManualMintChange={setTotalManualMint}
+              onAverageVaultHealthChange={setAverageVaultHealth}
+              exceedsBalance={exceedsBalance}
+              hasLowHF={hasLowHF}
+            />
           )}
 
           {/* Transaction Fee */}
