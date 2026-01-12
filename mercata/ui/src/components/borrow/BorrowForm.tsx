@@ -381,7 +381,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
               error: error.message || "Supply failed"
             } : s
           ));
-          throw error; // Stop execution on error
+          throw error; // Don't execute later steps if this fails
         }
       }
       
@@ -389,14 +389,22 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
       setBorrowSteps(prev => prev.map(s => 
         s.id === "borrow" ? { ...s, status: "processing" } : s
       ));
-      
-      await onBorrow(borrowAmount);
-      
-      // Mark borrow as completed
-      setBorrowSteps(prev => prev.map(s => 
-        s.id === "borrow" ? { ...s, status: "completed" } : s
-      ));
-      
+      try {
+        await onBorrow(borrowAmount);
+        // Mark borrow as completed
+        setBorrowSteps(prev => prev.map(s => 
+          s.id === "borrow" ? { ...s, status: "completed" } : s
+        ));
+      } catch (error: any) {
+        setBorrowSteps(prev => prev.map(s => 
+          s.id === "borrow" ? { 
+            ...s, 
+            status: "error",
+            error: error.message || "Borrow failed"
+          } : s
+        ));
+        throw error;
+      }
     } catch (error: any) {
       // Error already handled in individual steps
     } finally {
