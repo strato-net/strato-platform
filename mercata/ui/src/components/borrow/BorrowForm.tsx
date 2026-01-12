@@ -21,7 +21,7 @@ import {
   calculateMaxCollateralValueUSDCentFloored,
   centCeil
 } from "@/utils/lendingUtils";
-import { getRiskLabel } from "@/utils/loanUtils";
+import { getRiskLabel } from "@/utils/lendingUtils";
 import { useLendingContext } from "@/context/LendingContext";
 import { handleAmountInputChange } from "@/utils/transferValidation";
 import { UserRewardsData } from "@/services/rewardsService";

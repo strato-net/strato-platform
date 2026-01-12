@@ -465,3 +465,10 @@ export const calculateAfterBorrowHealthFactor = (
 
   return Number(newHealthFactorRaw) / 1e18;
 };
+
+// @dev TODO: the same is implemented in loanUtils.ts, need to consolidate
+export const getRiskLabel = (factor: number): string => {
+  if (factor >= 2.0) return 'Low Risk';
+  if (factor >= 1.5) return 'Moderate Risk';
+  return 'High Risk';
+};
