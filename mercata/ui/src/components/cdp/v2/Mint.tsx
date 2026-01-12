@@ -152,6 +152,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   const [exceedsBalance, setExceedsBalance] = useState(false);
   const [totalManualMint, setTotalManualMint] = useState('0');
   const [exceedsMaxMint, setExceedsMaxMint] = useState(false);
+  const [mintMaxVaults, setMintMaxVaults] = useState<Set<string>>(new Set()); // Vaults that should use mintMax
 
   // Compute fresh allocations when auto-supply is enabled
   useEffect(() => {
@@ -159,7 +160,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
       // Manual mode: keep existing allocations (don't clear) so users can see and adjust them
       return;
     }
-    
+
     if (isMaxMode) {
       setCustomAllocations(maxAllocations);
       setDebtFloorHit(false);
@@ -193,14 +194,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   // Calculate aggregate HF for projected position (current + planned deposits/mints)
   // Uses the same calculation as DebtPosition.tsx and Allocation.tsx
   const averageVaultHealth = useMemo(() => {
-    console.log('[Mint] averageVaultHealth calculation:', {
-      autoSupplyCollateral,
-      vaultCandidatesLength: vaultCandidates.length,
-      optimalAllocationsLength: optimalAllocations.length,
-    });
-    
     if (!autoSupplyCollateral || vaultCandidates.length === 0 || optimalAllocations.length === 0) {
-      console.log('[Mint] Returning null - early exit');
       return null;
     }
 
@@ -222,10 +216,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
       };
     }).filter(v => v.currentDebt > 0n || v.depositAmount > 0 || v.mintAmount > 0);
 
-    console.log('[Mint] vaultData for HF calculation:', vaultData.length, 'vaults');
-    const result = calculateAggregateHealthFactor(vaultData);
-    console.log('[Mint] averageVaultHealth result:', result);
-    return result;
+    return calculateAggregateHealthFactor(vaultData);
   }, [autoSupplyCollateral, vaultCandidates, optimalAllocations]);
 
   const totalHeadroomWei = useMemo(() => 
@@ -249,8 +240,8 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   useEffect(() => {
     if (isMaxMode) {
       if (totalMaxMintWei > 0n) {
-        const maxMint = formatUnits(totalMaxMintWei, 18).replace(/\.?0+$/, '');
-        setMintAmountInput(formatNumberWithCommas(maxMint));
+      const maxMint = formatUnits(totalMaxMintWei, 18).replace(/\.?0+$/, '');
+      setMintAmountInput(formatNumberWithCommas(maxMint));
       } else {
         // Available to mint is now 0 or less - disable max mode and clear input
         setIsMaxMode(false);
@@ -283,8 +274,10 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   }, [totalMaxMintWei, isMaxMode]);
 
   const handleQuickMint = useCallback(async () => {
-    if (mintAmount <= 0 || optimalAllocations.length === 0) return;
-
+    const effectiveMintAmount = autoSupplyCollateral ? mintAmount : parseFloat(totalManualMint);
+    if (effectiveMintAmount <= 0 || optimalAllocations.length === 0) {
+      return;
+    }
     setTransactionLoading(true);
     setProgressModalOpen(true);
     setProgressError(undefined);
@@ -315,6 +308,12 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
         }
       }
 
+      if (transactions.length === 0) {
+        setTransactionLoading(false);
+        setProgressModalOpen(false);
+        return;
+      }
+
       setProgressTransactions(transactions.map(tx => ({
         symbol: tx.symbol,
         type: tx.type,
@@ -324,6 +323,9 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
 
       let allSuccessful = true;
       let currentTxIndex = 0;
+
+      const depositTransactions = transactions.filter(tx => tx.type === 'deposit');
+      const mintTransactions = transactions.filter(tx => tx.type === 'mint');
 
       setCurrentProgressStep('depositing');
       for (const tx of transactions) {
@@ -391,9 +393,15 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
         });
 
         try {
-          // Execute with exact planned amount (no safety check adjustment)
-          // The plan is already calculated with proper constraints
-          const result = await cdpService.mint(tx.asset, tx.amount);
+          // Use mintMax for vaults marked as such (from "Available: x" click)
+          // This uses the contract's on-chain calculation for max mint
+          // Otherwise use exact amount for manual inputs
+          const useMintMax = mintMaxVaults.has(tx.asset);
+          
+          const result = useMintMax 
+            ? await cdpService.mintMax(tx.asset)
+            : await cdpService.mint(tx.asset, tx.amount);
+            
           if (result.status.toLowerCase() !== 'success') {
             allSuccessful = false;
             setProgressTransactions(prev => {
@@ -440,12 +448,13 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
       if (allSuccessful) {
         setCurrentProgressStep('complete');
       }
-    } catch {
-      // Errors are already captured in progressTransactions
+    } catch (err) {
+      // Errors are already captured in progressTransactions, but log unexpected errors
+      console.error('[Mint] handleQuickMint unexpected error:', err);
     } finally {
       setTransactionLoading(false);
     }
-  }, [mintAmount, optimalAllocations]);
+  }, [mintAmount, totalManualMint, autoSupplyCollateral, optimalAllocations, mintMaxVaults]);
 
   // Find CDP activity for rewards display
   const cdpActivity = useMemo(() => {
@@ -584,41 +593,44 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
             onConfirm={handleQuickMint}
             isProcessing={transactionLoading}
             buttonDisabled={
-              (autoSupplyCollateral ? (mintAmount <= 0 && !isMaxMode) : parseFloat(totalManualMint) <= 0) || 
-              optimalAllocations.length === 0 || exceedsMaxCollateral || shouldLockInput || hasLowHF || exceedsBalance
+              (autoSupplyCollateral 
+                ? (mintAmount <= 0 && !isMaxMode) 
+                : parseFloat(totalManualMint) <= 0) || 
+              optimalAllocations.length === 0 || 
+              (autoSupplyCollateral && (exceedsMaxCollateral || shouldLockInput)) || 
+              hasLowHF || exceedsBalance
             }
           />
 
-          {/* Auto Supply Collateral - only show if available to mint > 0 */}
-          {parseFloat(availableToMint.replace(/,/g, '')) > 0 && (
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="auto-supply"
-                checked={autoSupplyCollateral}
-                onCheckedChange={(checked) => setAutoSupplyCollateral(checked === true)}
-              />
-              <Label htmlFor="auto-supply" className="text-sm cursor-pointer">
-                Automatically allocate across vaults
-              </Label>
-            </div>
-          )}
+          {/* Auto Supply Collateral - always shown */}
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="auto-supply"
+              checked={autoSupplyCollateral}
+              onCheckedChange={(checked) => setAutoSupplyCollateral(checked === true)}
+            />
+            <Label htmlFor="auto-supply" className="text-sm cursor-pointer">
+              Automatically allocate across vaults
+            </Label>
+          </div>
 
           {/* Warning Messages - Always shown above buttons (priority order: most critical first) */}
-          {shouldLockInput ? (
+          {/* Hide "Insufficient Collateral" errors in custom mode - user controls allocation manually */}
+          {shouldLockInput && autoSupplyCollateral ? (
             <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
               <p className="text-sm font-semibold text-red-800 dark:text-red-200 mb-2">Insufficient Collateral</p>
               <p className="text-xs text-red-700 dark:text-red-300">
                 Zero USDST can be minted with your current asset balances and selected Risk value. Try moving the Risk Slider to the right to increase headroom.
               </p>
             </div>
-          ) : exceedsMaxCollateral ? (
+          ) : exceedsMaxCollateral && autoSupplyCollateral ? (
             <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
               <p className="text-sm font-semibold text-red-800 dark:text-red-200 mb-2">Insufficient Collateral</p>
               <p className="text-xs text-red-700 dark:text-red-300">
                 The requested mint amount exceeds your maximum borrowing capacity ({availableToMint} USDST). Try decreasing the mint amount or moving the Risk Slider to the right.
               </p>
             </div>
-          ) : optimalAllocations.length === 0 && parseFloat(availableToMint.replace(/,/g, '')) <= 0 ? (
+          ) : optimalAllocations.length === 0 && parseFloat(availableToMint.replace(/,/g, '')) <= 0 && autoSupplyCollateral ? (
             <div className="p-3 rounded-md bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
               <p className="text-sm font-semibold text-yellow-800 dark:text-yellow-200 mb-2">
                 {debtFloorHit ? 'Debt floor prevents allocation' : totalHeadroomWei <= 0n ? 'Vaults at capacity for current risk value' : 'No suitable vaults found'}
@@ -645,8 +657,13 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
           {/* Confirm Button - shown in both auto and manual modes */}
           <Button
             disabled={
-              (autoSupplyCollateral ? (mintAmount <= 0 && !isMaxMode) : parseFloat(totalManualMint) <= 0) || 
-              optimalAllocations.length === 0 || transactionLoading || exceedsMaxCollateral || shouldLockInput || hasLowHF || exceedsBalance
+              (autoSupplyCollateral 
+                ? (mintAmount <= 0 && !isMaxMode) 
+                : parseFloat(totalManualMint) <= 0) || 
+              optimalAllocations.length === 0 || 
+              transactionLoading || 
+              (autoSupplyCollateral && (exceedsMaxCollateral || shouldLockInput)) || 
+              hasLowHF || exceedsBalance
             }
             onClick={handleQuickMint}
             className="w-full"
@@ -654,12 +671,12 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
             {transactionLoading ? 'Processing...' : getButtonText()}
           </Button>
 
-          {/* Allocation Section - shown when there's a valid allocation OR when auto-supply is off and available to mint > 0 */}
-          {!(optimalAllocations.length === 0 && parseFloat(availableToMint.replace(/,/g, '')) <= 0) && (
-            <Allocation
-              optimalAllocations={optimalAllocations}
-              vaultCandidates={vaultCandidates}
-              showMintAmounts={true}
+          {/* Allocation Section - always shown when auto-supply is off (custom mode), or when there's a valid allocation in auto mode */}
+          {(!autoSupplyCollateral || !(optimalAllocations.length === 0 && parseFloat(availableToMint.replace(/,/g, '')) <= 0)) && (
+          <Allocation
+            optimalAllocations={optimalAllocations}
+            vaultCandidates={vaultCandidates}
+            showMintAmounts={true}
               autoSupplyCollateral={autoSupplyCollateral}
               onDepositAmountChange={handleAllocationDepositChange}
               onMintAmountChange={handleAllocationMintChange}
@@ -667,6 +684,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
               onHFValidationChange={setHasLowHF}
               onBalanceExceededChange={setExceedsBalance}
               onTotalManualMintChange={setTotalManualMint}
+              onMintMaxVaultsChange={setMintMaxVaults}
               exceedsBalance={exceedsBalance}
               hasLowHF={hasLowHF}
             />

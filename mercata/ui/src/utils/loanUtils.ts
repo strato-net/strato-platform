@@ -408,14 +408,16 @@ export const calculateAggregateHealthFactor = (
   
   for (const vault of vaults) {
     // Calculate total debt for this vault (existing + new mint)
-    const mintWei = vault.mintAmount > 0 ? parseUnits(String(vault.mintAmount), 18) : 0n;
+    // Round to 18 decimals to avoid "too many decimals" error in parseUnits
+    const mintWei = vault.mintAmount > 0 ? parseUnits(vault.mintAmount.toFixed(18), 18) : 0n;
     const totalDebt = vault.currentDebt + mintWei;
     
     // Skip vaults with zero debt (they have infinite HF)
     if (totalDebt <= 0n) continue;
 
     // Calculate total collateral (existing + new deposit)
-    const depositWei = vault.depositAmount > 0 ? parseUnits(String(vault.depositAmount), vault.decimals) : 0n;
+    // Round to token decimals to avoid "too many decimals" error in parseUnits
+    const depositWei = vault.depositAmount > 0 ? parseUnits(vault.depositAmount.toFixed(vault.decimals), vault.decimals) : 0n;
     const totalCollateral = vault.currentCollateral + depositWei;
     
     // Calculate collateral value in USD
