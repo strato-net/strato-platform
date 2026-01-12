@@ -17,6 +17,7 @@ export async function getCronSchedule(): Promise<string> {
 }
 
 function isMetalsMarketClosed(): boolean {
+    return false; // HOTFIX!!
     const now = new Date();
     const etString = now.toLocaleString('en-US', { timeZone: 'America/New_York' });
     const etDate = new Date(etString);
