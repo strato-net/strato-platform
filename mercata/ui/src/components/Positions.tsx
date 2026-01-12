@@ -100,7 +100,7 @@ const PositionSection = ({ loanData }: BorrowingSectionProps) => {
                   <span className="text-muted-foreground text-sm font-medium">Health Factor</span>
                 </InfoTooltip>
                 <div className="flex flex-row gap-3">
-                  <span className="font-semibold text-lg mt-3" style={{ color: getTextColor((loanData?.healthFactor)) }}>
+                  <span className="font-semibold text-lg mt-3" style={{ color: getTextColor(loanData?.healthFactor || 0, 3) }}>
                     {(() => {
                       const totalAmountOwed = loanData?.totalAmountOwed ? parseFloat(formatUnits(loanData.totalAmountOwed.toString(), 18)) : 0;
                       if (totalAmountOwed === 0) {
