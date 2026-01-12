@@ -539,6 +539,19 @@ const Allocation: React.FC<AllocationProps> = ({
       : 'grid-cols-[minmax(120px,auto)_minmax(100px,auto)_1fr]';
   };
 
+  // Filter vaults to display based on auto-allocate mode
+  const vaultsToDisplay = autoSupplyCollateral 
+    ? vaultCandidates.filter(candidate => {
+        // In auto mode, only show vaults that will receive collateral/mint
+        const allocation = optimalAllocations.find(a => a.assetAddress === candidate.assetAddress);
+        if (!allocation) return false;
+        
+        const depositNum = parseFloat(allocation.depositAmount || '0');
+        const mintNum = parseFloat(allocation.mintAmount || '0');
+        return depositNum > 0 || mintNum > 0;
+      })
+    : vaultCandidates; // In manual mode, show all supported vaults
+
   return (
     <div className="space-y-2">
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -580,7 +593,7 @@ const Allocation: React.FC<AllocationProps> = ({
                 {showMintAmounts && <div>Mint</div>}
                 {!autoSupplyCollateral && <div className="text-right pr-3">HF</div>}
               </div>
-              {vaultCandidates.map((candidate) => {
+              {vaultsToDisplay.map((candidate) => {
                 const allocation = optimalAllocations.find(a => a.assetAddress === candidate.assetAddress);
                 const stabilityFeeRate = allocation 
                   ? allocation.stabilityFeeRate 
