@@ -12,6 +12,7 @@ import { useUserTokens } from "@/context/UserTokensContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { useOracleContext } from "@/context/OracleContext";
 import { formatWeiToDecimalHP, formatNumber, formatDecimalToWeiHP, formatNumberWithCommas, parseCommaNumber } from "@/utils/numberUtils";
+import { getAssetColor } from "@/utils/loanUtils";
 import { usdstAddress } from "@/lib/constants";
 
 // Calculate Health Factor: CR / LT (Liquidation Threshold)
@@ -47,7 +48,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const { activeTokens, fetchTokens } = useUserTokens();
-  const { fetchUsdstBalance } = useTokenContext();
+  const { fetchUsdstBalance, earningAssets, inactiveTokens } = useTokenContext();
   const { getPrice } = useOracleContext();
   
   // State for active action and input amounts for each position
@@ -678,9 +679,23 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center text-xs font-semibold">
-                    {position.symbol.slice(0, 2)}
-                  </div>
+                  {(() => {
+                    const token = [...earningAssets, ...inactiveTokens].find(
+                      t => t.address?.toLowerCase() === position.asset?.toLowerCase()
+                    );
+                    const tokenImage = token?.images?.[0]?.value;
+                    
+                    return tokenImage ? (
+                      <img src={tokenImage} alt={position.symbol} className="w-8 h-8 rounded-full object-cover" />
+                    ) : (
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold text-white"
+                        style={{ backgroundColor: getAssetColor(position.symbol) }}
+                      >
+                        {position.symbol.slice(0, 2)}
+                      </div>
+                    );
+                  })()}
                   <div>
                     <h4 className="font-semibold">{position.symbol}</h4>
                   </div>
