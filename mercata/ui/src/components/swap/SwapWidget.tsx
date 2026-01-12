@@ -936,27 +936,27 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
         );
       })()}
 
-      <div className="flex flex-col gap-2 bg-muted/50 p-4 rounded-lg border border-border">
-        <div className="flex flex-col gap-1 text-sm">
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Exchange Rate</span>
+      <div className="flex flex-col gap-3 bg-muted/50 p-3 md:p-4 rounded-lg border border-border">
+        <div className="flex flex-col gap-1.5 text-xs md:text-sm">
+          <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-0.5 md:gap-2">
+            <span className="text-muted-foreground shrink-0">Exchange Rate</span>
             {!exchangeRate ? (
               canPerformAction && poolLoading ? <LoadingSpinner /> : <span className="text-muted-foreground">—</span>
             ) : (
-              <span className="font-medium text-foreground">
+              <span className="font-medium text-foreground break-all md:break-normal md:text-right">
                 1 {fromAsset?._symbol || ""} ≈ {exchangeRate} ({oracleExchangeRate}*) {toAsset?._symbol || ""}
               </span>
             )}
           </div>
           {exchangeRate && (
             <>
-              <div className="flex justify-end">
-                <span className="text-muted-foreground/70">
+              <div className="flex justify-start md:justify-end">
+                <span className="text-muted-foreground/70 break-all md:break-normal">
                   1 {toAsset?._symbol || ""} ≈ {invertedExchangeRate} ({invertedOracleExchangeRate}*) {fromAsset?._symbol || ""}
                 </span>
               </div>
-              <div className="flex justify-end">
-                <span className="text-xs text-muted-foreground/70">* spot price</span>
+              <div className="flex justify-start md:justify-end">
+                <span className="text-[0.625rem] md:text-xs text-muted-foreground/70">* spot price</span>
               </div>
             </>
           )}

@@ -16,6 +16,7 @@ import BridgeIn from '@/components/bridge/BridgeIn';
 import { useBridgeContext } from '@/context/BridgeContext';
 // import DepositTransactionDetails from '@/components/dashboard/DepositTransactionDetails';
 import { cataAddress } from '@/lib/constants';
+import DepositTransactionDetails from '@/components/dashboard/DepositTransactionDetails';
 
 const DepositsPage = () => {
   const location = useLocation();
@@ -108,16 +109,14 @@ const DepositsPage = () => {
               </Card>
             </div>
           </div>
-
-          {/* Deposit History - Commented for now */}
-          {/* <Card className="shadow-sm rounded-xl mt-4 md:mt-6">
+          <Card className="shadow-sm rounded-xl mt-4 md:mt-6">
             <CardHeader>
               <CardTitle className="text-lg font-bold">Deposit History</CardTitle>
             </CardHeader>
             <CardContent>
               <DepositTransactionDetails context="deposits" />
             </CardContent>
-          </Card> */}
+          </Card>
         </main>
       </div>
       <MobileBottomNav />

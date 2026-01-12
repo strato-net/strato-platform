@@ -180,16 +180,14 @@ const WithdrawalsPage = () => {
               </Card>
             </div>
           </div>
-
-          {/* Withdrawal History - Commented out for now */}
-          {/* <Card className="shadow-sm">
+          <Card className="shadow-sm">
             <CardHeader className="px-3 md:px-6">
               <CardTitle>Withdrawal History</CardTitle>
             </CardHeader>
             <CardContent className="px-0 md:px-6 pb-0 md:pb-6">
               <WithdrawTransactionDetails context="withdrawals" />
             </CardContent>
-          </Card> */}
+          </Card>
         </main>
       </div>
     </div>
