@@ -190,6 +190,7 @@ const Borrow = () => {
       ]);
     } catch (error) {
       setBorrowLoading(false);
+      throw error;
     }
   };
 
