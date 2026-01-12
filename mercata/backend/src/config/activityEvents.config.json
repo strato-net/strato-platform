@@ -1,0 +1,51 @@
+{
+  "events": {
+    "Deposited":           { "type": "deposit",     "title": "Deposit" },
+    "DepositedOnBehalfOf": { "type": "deposit",     "title": "Deposit" },
+    "DepositCompleted":    { "type": "deposit",     "title": "Bridge Deposit" },
+    "DepositInitiated":    { "type": "deposit",     "title": "Bridge Initiated" },
+    
+    "Withdrawn":           { "type": "withdraw",    "title": "Withdraw" },
+    "WithdrawnCollateral": { "type": "withdraw",    "title": "Withdraw Collateral" },
+    "WithdrawalCompleted": { "type": "withdraw",    "title": "Bridge Withdraw" },
+    "WithdrawalRequested": { "type": "withdraw",    "title": "Withdraw Requested" },
+    
+    "Borrowed":            { "type": "borrow",      "title": "Borrow",            "defaultToken": "USDST" },
+    "Repaid":              { "type": "repay",       "title": "Repay",             "defaultToken": "USDST" },
+    "SuppliedCollateral":  { "type": "collateral",  "title": "Supply Collateral" },
+    
+    "USDSTMinted":         { "type": "mint",        "title": "Mint USDST",        "defaultToken": "USDST" },
+    "USDSTBurned":         { "type": "burn",        "title": "Burn USDST",        "defaultToken": "USDST" },
+    "LiquidationExecuted": { "type": "liquidation", "title": "Liquidation" },
+    
+    "Swap":                { "type": "swap",        "title": "Swap" },
+    "AddLiquidity":        { "type": "liquidity",   "title": "Add Liquidity" },
+    "RemoveLiquidity":     { "type": "liquidity",   "title": "Remove Liquidity" },
+    
+    "Staked":              { "type": "stake",       "title": "Stake",             "defaultToken": "USDST" },
+    "Redeemed":            { "type": "redeem",      "title": "Redeem",            "defaultToken": "USDST" },
+    
+    "RewardsClaimed":      { "type": "rewards",     "title": "Claim Rewards",     "defaultToken": "CATA" }
+  },
+  
+  "fields": {
+    "symbolFields": [
+      "tokenSymbol", "symbol", "assetSymbol", "tokenInSymbol", "tokenOutSymbol",
+      "collateralSymbol", "borrowedSymbol", "_symbol"
+    ],
+    
+    "tokenAddressFields": ["token", "asset", "tokenIn", "tokenOut", "collateral"],
+    
+    "amountFields": ["amount", "assets", "amountUSD", "amountIn", "amountOut", "value", "shares"],
+    
+    "contractTokenDefaults": [
+      { "pattern": "Vault", "token": "USDST" },
+      { "pattern": "CDP", "token": "USDST" },
+      { "pattern": "Safety", "token": "USDST" }
+    ]
+  },
+  
+  "cache": {
+    "ttlMs": 300000
+  }
+}

@@ -6,12 +6,13 @@ import type {
   ContractInfoResponse,
 } from "@mercata/shared-types";
 import {
-  ACTIVITY_EVENTS,
   EVENT_TYPE_MAP,
   ActivityItem,
   extractTokenAddresses,
   fetchTokenMetadata,
-  transformEvent
+  transformEvent,
+  fetchActivityEventsFromCirrus,
+  getActivityEvents
 } from "./activity.helpers";
 
 export interface ActivitiesResponse {
@@ -110,12 +111,22 @@ export const getActivities = async (
   const { limit = 10, offset = 0, userAddress, type } = query;
   const storageSelect = "storage!inner(contract!inner(contract_name))";
 
+  // Fetch activity events dynamically from Cirrus (with caching)
+  // This validates our event list against what actually exists on-chain
+  const activityEvents = await fetchActivityEventsFromCirrus(accessToken);
+
   // Build event name filter based on type
-  let eventNames = ACTIVITY_EVENTS;
+  let eventNames = activityEvents;
   if (type && type !== 'all') {
+    // Filter to events of the specified type that exist on-chain
     eventNames = Object.entries(EVENT_TYPE_MAP)
-      .filter(([_, t]) => t === type)
+      .filter(([eventName, eventType]) => eventType === type && activityEvents.includes(eventName))
       .map(([name]) => name);
+  }
+
+  // If no matching events found, return empty response
+  if (eventNames.length === 0) {
+    return { activities: [], total: 0, limit, offset };
   }
 
   const params: Record<string, string> = {
