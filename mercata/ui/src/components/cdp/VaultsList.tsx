@@ -742,13 +742,49 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Collateral</p>
-                  <p className="font-semibold">{formatNumber(parseFloat(formatWeiToDecimalHP(position.collateralAmount, position.collateralAmountDecimals)))} {position.symbol}</p>
-                  <p className="text-xs text-muted-foreground">${formatNumber(parseFloat(formatWeiToDecimalHP(position.collateralValueUSD, 18)))}</p>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <p className="font-semibold cursor-help">{formatNumber(parseFloat(formatWeiToDecimalHP(position.collateralAmount, position.collateralAmountDecimals)))} {position.symbol}</p>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <div className="text-xs">
+                        {formatNumberWithCommas(formatWeiToDecimalHP(position.collateralAmount, position.collateralAmountDecimals))} {position.symbol}
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <p className="text-xs text-muted-foreground cursor-help">${formatNumber(parseFloat(formatWeiToDecimalHP(position.collateralValueUSD, 18)))}</p>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <div className="text-xs">
+                        ${formatNumberWithCommas(formatWeiToDecimalHP(position.collateralValueUSD, 18))}
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Debt</p>
-                  <p className="font-semibold">{formatNumber(parseFloat(formatWeiToDecimalHP(position.debtAmount, 18)))} USDST</p>
-                  <p className="text-xs text-muted-foreground">${formatNumber(parseFloat(formatWeiToDecimalHP(position.debtAmount, 18)))}</p>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <p className="font-semibold cursor-help">{formatNumber(parseFloat(formatWeiToDecimalHP(position.debtAmount, 18)))} USDST</p>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <div className="text-xs">
+                        {formatNumberWithCommas(formatWeiToDecimalHP(position.debtAmount, 18))} USDST
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <p className="text-xs text-muted-foreground cursor-help">${formatNumber(parseFloat(formatWeiToDecimalHP(position.debtAmount, 18)))}</p>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <div className="text-xs">
+                        ${formatNumberWithCommas(formatWeiToDecimalHP(position.debtAmount, 18))}
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Health Factor</p>
@@ -761,7 +797,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                     <TooltipContent>
                       <div className="whitespace-pre-line text-center">
                         {hasDebt 
-                          ? `Health Factor = CR ÷ Liquidation Threshold\n${formatNumber(position.collateralizationRatio)}% ÷ ${formatNumber(position.liquidationRatio)}% = ${formatNumber(healthFactor)}`
+                          ? `Full precision: ${formatNumberWithCommas(healthFactor.toString())}\n\nHealth Factor = CR ÷ Liquidation Threshold\n${formatNumber(position.collateralizationRatio)}% ÷ ${formatNumber(position.liquidationRatio)}% = ${formatNumber(healthFactor)}`
                           : 'Health Factor = CR ÷ Liquidation Threshold'
                         }
                       </div>
@@ -770,7 +806,16 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Stability Fee</p>
-                  <p className="font-semibold">{formatPercentage(position.stabilityFeeRate)}</p>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <p className="font-semibold cursor-help">{formatPercentage(position.stabilityFeeRate)}</p>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <div className="text-xs">
+                        {formatNumberWithCommas(position.stabilityFeeRate.toString())}%
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
               </div>
 
@@ -790,13 +835,49 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     <div>
                       <p className="text-xs text-blue-600 dark:text-blue-400 mb-1">Collateral</p>
-                      <p className="font-semibold text-blue-900 dark:text-blue-100">{previewValues.collateralAmount} {position.symbol}</p>
-                      <p className="text-xs text-blue-500 dark:text-blue-400">${previewValues.collateralValueUSD}</p>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <p className="font-semibold text-blue-900 dark:text-blue-100 cursor-help">{previewValues.collateralAmount} {position.symbol}</p>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <div className="text-xs">
+                            {formatNumberWithCommas(parseCommaNumber(previewValues.collateralAmount))} {position.symbol}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <p className="text-xs text-blue-500 dark:text-blue-400 cursor-help">${previewValues.collateralValueUSD}</p>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <div className="text-xs">
+                            ${formatNumberWithCommas(parseCommaNumber(previewValues.collateralValueUSD))}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
                     </div>
                     <div>
                       <p className="text-xs text-blue-600 dark:text-blue-400 mb-1">Debt</p>
-                      <p className="font-semibold text-blue-900 dark:text-blue-100">{previewValues.debtAmount} USDST</p>
-                      <p className="text-xs text-blue-500 dark:text-blue-400">${previewValues.debtAmount}</p>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <p className="font-semibold text-blue-900 dark:text-blue-100 cursor-help">{previewValues.debtAmount} USDST</p>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <div className="text-xs">
+                            {formatNumberWithCommas(parseCommaNumber(previewValues.debtAmount))} USDST
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <p className="text-xs text-blue-500 dark:text-blue-400 cursor-help">${previewValues.debtAmount}</p>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <div className="text-xs">
+                            ${formatNumberWithCommas(parseCommaNumber(previewValues.debtAmount))}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
                     </div>
                     <div>
                       <p className="text-xs text-blue-600 dark:text-blue-400 mb-1">Health Factor</p>
@@ -810,7 +891,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                           <div className="whitespace-pre-line text-center">
                             {previewValues.healthFactor === Infinity 
                               ? 'Health Factor = CR ÷ Liquidation Threshold'
-                              : `Health Factor = CR ÷ Liquidation Threshold\n${formatNumber((parseFloat(previewValues.collateralValueUSD) / parseFloat(previewValues.debtAmount)) * 100)}% ÷ ${formatNumber(position.liquidationRatio)}% = ${formatNumber(previewValues.healthFactor)}`
+                              : `Full precision: ${formatNumberWithCommas(previewValues.healthFactor.toString())}\n\nHealth Factor = CR ÷ Liquidation Threshold\n${formatNumber((parseFloat(previewValues.collateralValueUSD) / parseFloat(previewValues.debtAmount)) * 100)}% ÷ ${formatNumber(position.liquidationRatio)}% = ${formatNumber(previewValues.healthFactor)}`
                             }
                           </div>
                         </TooltipContent>
@@ -818,7 +899,16 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                     </div>
                     <div>
                       <p className="text-xs text-blue-600 dark:text-blue-400 mb-1">Stability Fee</p>
-                      <p className="font-semibold text-blue-900 dark:text-blue-100">{formatPercentage(position.stabilityFeeRate)}</p>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <p className="font-semibold text-blue-900 dark:text-blue-100 cursor-help">{formatPercentage(position.stabilityFeeRate)}</p>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <div className="text-xs">
+                            {formatNumberWithCommas(position.stabilityFeeRate.toString())}%
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
                     </div>
                   </div>
                 </div>

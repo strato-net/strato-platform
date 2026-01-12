@@ -58,8 +58,8 @@ export const hiddenSwapPools: Set<string> = new Set([
    These are used to set bridge URL and rewards address based on network ID.
 */
 export const defaultBridgeServiceFor: Record<string, string> = {
-  "114784819836269":"https://bridge.testnet.stratomercata.com", // Helium testnet
-  "33056204878082667":"https://bridge.stratomercata.com",       // Upquark mainnet
+  "114784819836269":"https://bridge.testnet.strato.nexus", // Helium testnet
+  "33056204878082667":"https://bridge.strato.nexus",       // Upquark mainnet
 };
 export const defaultRewardsAddressFor: Record<string, string> = {
   "114784819836269": "170147f58738c9f46112a874030420b823901f3b", // Helium testnet

@@ -78,7 +78,7 @@ export function getMaxAllocations(
   riskBuffer: number
 ): Allocation[] {
   if (candidates.length === 0 || riskBuffer <= 0) return [];
-
+  
   const allocations: Allocation[] = [];
 
   for (const candidate of candidates) {
