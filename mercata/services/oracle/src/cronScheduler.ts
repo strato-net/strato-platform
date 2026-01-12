@@ -155,56 +155,55 @@ async function processBatchFeed(feed: any, configLoader: ConfigLoader): Promise<
     }
 
     // Prepare parallel fetch tasks for batch sources
-    const fetchTasks = resolvedFeed.sources.map(async (sourceName: string) => {
+    const results: any[] = new Array(resolvedFeed.sources.length).fill(null);
+    const fetchTasks = resolvedFeed.sources.map(async (sourceName: string, index: number) => {
         try {
             const sourceConfig = configLoader.getSourceConfig(sourceName);
             const batchResult = await fetchBatchPrices(resolvedFeed.assets, sourceConfig);
-            
-            return { batchResult, source: sourceName, success: true };
-            
+            const result = { batchResult, source: sourceName, success: true };
+            results[index] = result;
+            return result;
         } catch (err) {
             const error = err as Error;
-            return { batchResult: {}, source: sourceName, success: false, error: error.message };
+            const result = { batchResult: {}, source: sourceName, success: false, error: error.message };
+            results[index] = result;
+            return result;
         }
     });
 
-    const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Parallel fetch timeout')), 30000)
-    );
+    const timeoutPromise = new Promise<void>((resolve) => {
+        setTimeout(() => resolve(), 30000);
+    });
     
     try {
-        const results = await Promise.race([
-            Promise.allSettled(fetchTasks),
-            timeoutPromise
-        ]) as PromiseSettledResult<any>[];
+        const allSettledPromise = Promise.allSettled(fetchTasks);
+        const timeoutReached = await Promise.race([
+            allSettledPromise.then(() => false),
+            timeoutPromise.then(() => true)
+        ]);
+        
+        if (timeoutReached) {
+            logError('CronScheduler', new Error(`${feed.name}: Timeout after 30000ms`));
+            for (let i = 0; i < resolvedFeed.sources.length; i++) {
+                if (!results[i]) {
+                    results[i] = { batchResult: {}, source: resolvedFeed.sources[i], success: false, error: 'Timeout' };
+                }
+            }
+        }
         
         // Process batch results
         const allSuccessfulSources: Array<{name: string, prices: Record<string, number>}> = [];
         const failedSources: string[] = [];
         
         results.forEach((result) => {
-            if (result.status === 'fulfilled' && (result as PromiseFulfilledResult<any>).value.success) {
-                const value = (result as PromiseFulfilledResult<any>).value;
+            if (result.success) {
                 allSuccessfulSources.push({
-                    name: value.source,
-                    prices: value.batchResult
+                    name: result.source,
+                    prices: result.batchResult 
                 });
             } else {
-                // Get the actual source name and error details
-                let sourceName = 'unknown';
-                let errorMessage = 'Unknown error';
-                
-                if (result.status === 'fulfilled') {
-                    const value = (result as PromiseFulfilledResult<any>).value;
-                    sourceName = value.source || 'unknown';
-                    errorMessage = value.error || 'Unknown error';
-                } else if (result.status === 'rejected') {
-                    const reason = (result as PromiseRejectedResult).reason;
-                    errorMessage = reason instanceof Error ? reason.message : String(reason);
-                }
-                
-                failedSources.push(sourceName);
-                logError('CronScheduler', new Error(`Failed to fetch ${feed.name} from ${sourceName}: ${errorMessage}`));
+                failedSources.push(result.source);
+                logError('CronScheduler', new Error(`Failed to fetch ${feed.name} from ${result.source}: ${result.error || 'Unknown error'}`));
             }
         });
 

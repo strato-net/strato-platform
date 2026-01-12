@@ -118,7 +118,8 @@ function buildBatchRequestOptions(sourceConfig: SourceConfig, url: string, apiKe
     const requestOptions: any = {
         method: sourceConfig.method || 'GET',
         url,
-        headers
+        headers,
+        timeout: 15000
     };
 
     // Handle POST request body
