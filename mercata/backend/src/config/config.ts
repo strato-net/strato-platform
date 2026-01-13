@@ -67,8 +67,8 @@ export const defaultRewardsAddressFor: Record<string, string> = {
   "33056204878082667": "4a116cf8cb056036632aef08f7c0df27c720f1c0", // Upquark mainnet
 };
 export const defaultReferralServiceFor: Record<string, string> = {
-  "114784819836269": "http://localhost:3003", // Helium testnet
-  "33056204878082667": "http://localhost:3003", // Upquark mainnet
+  "114784819836269": "http://ec2-54-89-36-118.compute-1.amazonaws.com", // Helium testnet
+  "33056204878082667": "http://ec2-54-89-36-118.compute-1.amazonaws.com", // Upquark mainnet
 };
 
 export let bridgeUrl: string | undefined;
