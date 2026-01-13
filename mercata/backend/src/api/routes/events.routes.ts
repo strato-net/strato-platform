@@ -45,7 +45,7 @@ const router = Router();
  *                 total:
  *                   type: integer
  */
-router.get("/", authHandler.authorizeRequest(), EventsController.getEvents);
+router.get("/", authHandler.authorizeRequest(true), EventsController.getEvents);
 
 /**
  * @openapi
@@ -73,6 +73,6 @@ router.get("/", authHandler.authorizeRequest(), EventsController.getEvents);
  *                         items:
  *                           type: string
  */
-router.get("/contracts", authHandler.authorizeRequest(), EventsController.getContractInfo);
+router.get("/contracts", authHandler.authorizeRequest(true), EventsController.getContractInfo);
 
 export default router;

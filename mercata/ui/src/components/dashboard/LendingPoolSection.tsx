@@ -71,13 +71,12 @@ const LendingPoolSection = () => {
 
   // 1. Fetch on mount, with abort controller
   useEffect(() => {
-    if (!isLoggedIn) return;
     const abortController = new AbortController();
     refreshLendingData(abortController.signal);
     return () => {
       abortController.abort();
     };
-  }, [isLoggedIn]);
+  }, []);
 
 
   const isDepositAmountValid = () => {

@@ -49,13 +49,12 @@ const SafetyModuleSection = () => {
 
   // Fetch on mount, with abort controller
   useEffect(() => {
-    if (!isLoggedIn) return;
     const abortController = new AbortController();
     refreshData(abortController.signal);
     return () => {
       abortController.abort();
     };
-  }, [isLoggedIn]);
+  }, []);
 
   // usdstBalance is now coming directly from useUserTokens() context
 

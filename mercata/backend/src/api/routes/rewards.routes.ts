@@ -227,7 +227,7 @@ router.get("/pools/by-lp-token/:lpTokenAddress", authHandler.authorizeRequest(),
  *       401:
  *         description: Unauthorized
  */
-router.get("/state", authHandler.authorizeRequest(), RewardsChefController.getState);
+router.get("/state", authHandler.authorizeRequest(true), RewardsChefController.getState);
 
 // ═════════════════════════════════════════════════════════════════════════
 // REWARDS CONTRACT ENDPOINTS
@@ -268,7 +268,7 @@ router.get("/state", authHandler.authorizeRequest(), RewardsChefController.getSt
  *       401:
  *         description: Unauthorized
  */
-router.get("/overview", authHandler.authorizeRequest(), RewardsController.getOverview);
+router.get("/overview", authHandler.authorizeRequest(true), RewardsController.getOverview);
 
 /**
  * @openapi
@@ -305,7 +305,7 @@ router.get("/overview", authHandler.authorizeRequest(), RewardsController.getOve
  *       401:
  *         description: Unauthorized
  */
-router.get("/activities", authHandler.authorizeRequest(), RewardsController.getAllActivities);
+router.get("/activities", authHandler.authorizeRequest(true), RewardsController.getAllActivities);
 
 /**
  * @openapi
@@ -484,6 +484,6 @@ router.post("/claim/:activityId", authHandler.authorizeRequest(), RewardsControl
  *       401:
  *         description: Unauthorized
  */
-router.get("/leaderboard", authHandler.authorizeRequest(), RewardsController.getLeaderboard);
+router.get("/leaderboard", authHandler.authorizeRequest(true), RewardsController.getLeaderboard);
 
 export default router;

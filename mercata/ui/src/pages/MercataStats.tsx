@@ -7,7 +7,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/axios";
 import { formatUnits } from '@/utils/numberUtils';
-import { useUser } from '@/context/UserContext';
 
 interface TokenWithStats {
   address: string;
@@ -122,9 +121,6 @@ const createEmptyRevenuePeriod = (): RevenuePeriod => ({
 });
 
 const MercataStats = () => {
-  const { userAddress } = useUser();
-  const isLoggedIn = !!userAddress;
-  
   const [activeTab, setActiveTab] = useState<'tokens' | 'cdp' | 'revenue'>('tokens');
   const [tokens, setTokens] = useState<TokenWithStats[]>([]);
   const [totalMarketCap, setTotalMarketCap] = useState<string>('0');
@@ -175,10 +171,6 @@ const MercataStats = () => {
   }, []);
 
   const fetchTokenStats = async () => {
-    if (!isLoggedIn) {
-      setLoading(false);
-      return;
-    }
     try {
       setLoading(true);
       const response = await api.get<TokenStatsResponse>('/tokens/stats');
@@ -195,10 +187,6 @@ const MercataStats = () => {
   };
 
   const fetchCDPStats = async () => {
-    if (!isLoggedIn) {
-      setCdpLoading(false);
-      return;
-    }
     try {
       setCdpLoading(true);
       const response = await api.get<CDPStatsResponse>('/cdp/stats');
@@ -216,10 +204,6 @@ const MercataStats = () => {
   };
 
   const fetchProtocolRevenue = async () => {
-    if (!isLoggedIn) {
-      setRevenueLoading(false);
-      return;
-    }
     try {
       setRevenueLoading(true);
       

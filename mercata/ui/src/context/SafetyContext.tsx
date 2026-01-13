@@ -29,8 +29,6 @@ export const SafetyProvider = ({ children }: { children: React.ReactNode }) => {
 
   const refreshSafetyInfo = useCallback(
     async (signal?: AbortSignal) => {
-      if (!isLoggedIn) return;
-
       try {
         setLoading(true);
         const response = await api.get("/lending/safety/info", { signal });
@@ -43,7 +41,7 @@ export const SafetyProvider = ({ children }: { children: React.ReactNode }) => {
         setLoading(false);
       }
     },
-    [isLoggedIn]
+    []
   );
 
   const stakeSafety = useCallback(
@@ -84,15 +82,14 @@ export const SafetyProvider = ({ children }: { children: React.ReactNode }) => {
     return response.data;
   }, [isLoggedIn, refreshSafetyInfo]);
 
-  // Auto-refresh when logged in
+  // Auto-refresh on mount
   useEffect(() => {
-    if (!isLoggedIn) return;
     const abortController = new AbortController();
     refreshSafetyInfo(abortController.signal);
     return () => {
       abortController.abort();
     };
-  }, [isLoggedIn, refreshSafetyInfo]);
+  }, [refreshSafetyInfo]);
 
   // Auto-refresh timer for cooldown/window status
   useEffect(() => {
