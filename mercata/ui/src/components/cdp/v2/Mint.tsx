@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useOracleContext } from '@/context/OracleContext';
 import { cdpService } from '@/services/cdpService';
-import { getOptimalAllocations, computeTotalHeadroom, getMaxAllocations, type VaultCandidate } from '@/services/MintService';
+import { getOptimalAllocations, computeTotalHeadroom, getMaxAllocations, getAbsoluteMaxAllocations, type VaultCandidate } from '@/services/MintService';
 import type { PlanItem } from '@/services/cdpTypes';
 import { formatUnits, parseUnits } from 'ethers';
 import { formatNumberWithCommas, parseCommaNumber } from '@/utils/numberUtils';
@@ -136,12 +136,17 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   const maxAllocations = useMemo<PlanItem[]>(() => {
     if (vaultCandidates.length === 0) return [];
     try {
-      const result = getMaxAllocations(vaultCandidates, riskBuffer);
+      // When slider is at minimum HF (rightmost), use absolute max calculation
+      // which matches "Available: x" exactly
+      const isAtMinHF = Math.abs(riskBuffer - sliderMinHF) < 0.01;
+      const result = isAtMinHF 
+        ? getAbsoluteMaxAllocations(vaultCandidates)
+        : getMaxAllocations(vaultCandidates, riskBuffer);
       return convertAllocationsToPlanItems(result, vaultCandidates);
     } catch {
       return [];
     }
-  }, [riskBuffer, vaultCandidates]);
+  }, [riskBuffer, sliderMinHF, vaultCandidates]);
 
   // Store allocations - updated by auto-supply or manual edits
   const [customAllocations, setCustomAllocations] = useState<PlanItem[]>([]);
@@ -164,8 +169,17 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
       setCustomAllocations(maxAllocations);
       setDebtFloorHit(false);
       setDebtCeilingHit(false);
+      
+      // In max mode, mark ALL vaults as mintMax to use on-chain mintMax() for absolute maximum
+      const maxVaultAddresses = maxAllocations
+        .filter(alloc => parseFloat(alloc.mintAmount || '0') > 0)
+        .map(alloc => alloc.assetAddress);
+      setMintMaxVaults(new Set(maxVaultAddresses));
       return;
     }
+    
+    // Not in max mode - clear mintMax vaults
+    setMintMaxVaults(new Set());
     
     if (mintAmountWei <= 0n || vaultCandidates.length === 0) {
       setCustomAllocations([]);
@@ -677,6 +691,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
             vaultCandidates={vaultCandidates}
             showMintAmounts={true}
               autoSupplyCollateral={autoSupplyCollateral}
+              isMaxMode={isMaxMode}
               onDepositAmountChange={handleAllocationDepositChange}
               onMintAmountChange={handleAllocationMintChange}
               targetHF={riskBuffer}

@@ -20,6 +20,7 @@ interface AllocationProps {
   onDepositAmountChange?: (assetAddress: string, amount: string) => void;
   onMintAmountChange?: (assetAddress: string, amount: string) => void;
   autoSupplyCollateral?: boolean;
+  isMaxMode?: boolean; // Whether max mode is enabled (forces sync even in manual mode)
   targetHF?: number; // Target HF from slider (riskBuffer)
   onHFValidationChange?: (hasLowHF: boolean) => void; // Callback when HF validation changes
   onBalanceExceededChange?: (exceedsBalance: boolean) => void; // Callback when deposit exceeds balance
@@ -37,6 +38,7 @@ const Allocation: React.FC<AllocationProps> = ({
   onDepositAmountChange,
   onMintAmountChange,
   autoSupplyCollateral = true,
+  isMaxMode = false,
   exceedsBalance = false,
   hasLowHF = false,
   targetHF,
@@ -294,12 +296,13 @@ const Allocation: React.FC<AllocationProps> = ({
 
   // Sync from optimalAllocations when they change
   // This always uses the canonical WAD values from optimalAllocations
-  // In manual mode, skip syncing to prevent feedback loop and flickering
+  // In manual mode, skip syncing UNLESS max mode is enabled
   useEffect(() => {
     // In manual mode, user controls the inputs - don't sync from optimalAllocations
+    // EXCEPTION: When max mode is enabled, we must sync the max values
     // This prevents flickering caused by the feedback loop:
     // user input → parent callback → optimalAllocations update → sync back → flickering
-    if (!autoSupplyCollateral) {
+    if (!autoSupplyCollateral && !isMaxMode) {
       return;
     }
     
@@ -367,7 +370,7 @@ const Allocation: React.FC<AllocationProps> = ({
       return newMints;
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [optimalAllocations, vaultCandidates, autoSupplyCollateral]);
+  }, [optimalAllocations, vaultCandidates, autoSupplyCollateral, isMaxMode]);
 
   // When display mode changes, handle conversion based on auto/manual mode
   useEffect(() => {
@@ -497,7 +500,9 @@ const Allocation: React.FC<AllocationProps> = ({
       // Get available balance (uses same calculation as VaultsList.tsx)
       const availableBalance = getAvailableBalance(candidate);
       
-      if (depositAmt > availableBalance) {
+      // Use tolerance for floating-point precision (same as blue highlighting logic)
+      const TOLERANCE = 0.000001;
+      if (depositAmt - availableBalance > TOLERANCE) {
         exceedsBalance = true;
         break;
       }
@@ -755,7 +760,9 @@ const Allocation: React.FC<AllocationProps> = ({
 
                 // Check if deposit exceeds available balance (uses same calculation as VaultsList.tsx)
                 const availableBalance = getAvailableBalance(candidate);
-                const exceedsBalance = !autoSupplyCollateral && depositAmt > 0 && depositAmt > availableBalance;
+                // Use tolerance for floating-point precision (same as blue highlighting logic)
+                const TOLERANCE = 0.000001;
+                const exceedsBalance = !autoSupplyCollateral && depositAmt > 0 && (depositAmt - availableBalance > TOLERANCE);
 
                 // Check if deposit input matches available amount (for blue highlighting)
                 const depositDisplayValue = depositDisplayInputs[candidate.assetAddress] || '';

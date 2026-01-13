@@ -102,24 +102,73 @@ export function getMaxAllocations(
   return allocations;
 }
 
+// Get absolute max allocations - uses exact same calculation as "Available: x" in Allocation.tsx
+// Only used when HF slider is at rightmost (minimum HF) AND max mode is enabled
+export function getAbsoluteMaxAllocations(candidates: VaultCandidate[]): Allocation[] {
+  if (candidates.length === 0) return [];
+  
+  const allocations: Allocation[] = [];
+
+  for (const candidate of candidates) {
+    if (candidate.oraclePrice <= 0n) {
+      continue;
+    }
+
+    // EXACT same calculation as Allocation.tsx calculateMaxMint
+    const totalCollateral = candidate.currentCollateral + candidate.potentialCollateral;
+    
+    if (totalCollateral <= 0n) {
+      continue;
+    }
+    
+    const collateralValueUSD = (totalCollateral * candidate.oraclePrice) / candidate.assetScale;
+    const maxBorrowableUSD = (collateralValueUSD * WAD) / candidate.minCR;
+    
+    let maxMintAmount: bigint;
+    if (maxBorrowableUSD <= candidate.currentDebt) {
+      maxMintAmount = 0n;
+    } else {
+      const available = maxBorrowableUSD - candidate.currentDebt;
+      maxMintAmount = available > 1n ? (available - 1n) : 0n;
+    }
+    
+    // Check debt ceiling
+    if (candidate.debtCeiling > 0n && candidate.globalDebt < candidate.debtCeiling) {
+      const ceilingHeadroom = candidate.debtCeiling - candidate.globalDebt;
+      if (maxMintAmount > ceilingHeadroom) {
+        maxMintAmount = ceilingHeadroom;
+      }
+    }
+    
+    // Check debt floor
+    const totalDebt = candidate.currentDebt + maxMintAmount;
+    if (totalDebt > 0n && totalDebt < candidate.debtFloor) {
+      continue;
+    }
+    
+    if (maxMintAmount > 0n) {
+      allocations.push({
+        assetAddress: candidate.assetAddress,
+        depositAmount: candidate.potentialCollateral,
+        mintAmount: maxMintAmount,
+      });
+    }
+  }
+
+  return allocations;
+}
+
 // Helper to compute headroom for a single candidate (used by both sorting and total headroom calculation)
-// NOTE: Conservative buffer is applied because:
-//   1. On-chain uses strict < check: require(currentDebt + amountUSD < maxBorrowableUSD)
-//   2. Rate accumulator can drift between frontend calc and on-chain execution
-//   3. Indexed currentDebt may be slightly stale
-// Buffer: 0.1% (1/1000) of max debt, minimum 1 wei
+// NOTE: 1-wei buffer is applied because on-chain uses strict < check:
+//   require(currentDebt + amountUSD < maxBorrowableUSD)
+// When HF slider is at rightmost (minimum HF), this matches "Available: x" display
 function computeHeadroom(c: VaultCandidate, targetCR: bigint): bigint {
   const maxCollateral = c.currentCollateral + c.potentialCollateral;
   const collateralValue = computeCollateralValueUSD(maxCollateral, c.oraclePrice, c.assetScale);
   const maxDebtRaw = (collateralValue * WAD) / targetCR;
   
-  // Apply conservative buffer: 0.1% of max debt, minimum 1 wei
-  const BUFFER_BPS = 1n; // 0.1% = 1 basis point (1/1000)
-  const BPS_SCALE = 1000n;
-  const percentBuffer = (maxDebtRaw * BUFFER_BPS) / BPS_SCALE;
-  const safetyBuffer = percentBuffer > 0n ? percentBuffer : 1n;
-  
-  const maxDebtFromCollateral = maxDebtRaw > safetyBuffer ? maxDebtRaw - safetyBuffer : 0n;
+  // Apply 1-wei buffer to satisfy strict < inequality on-chain
+  const maxDebtFromCollateral = maxDebtRaw > 1n ? maxDebtRaw - 1n : 0n;
   const headroomFromCollateral = maxDebtFromCollateral > c.currentDebt 
     ? maxDebtFromCollateral - c.currentDebt 
     : 0n;
@@ -320,11 +369,8 @@ function allocate(
     // MAX mode: deposit everything and compute max mintable
     depositAmount = candidate.potentialCollateral;
     const maxDebtRaw = (maxCollateralValue * WAD) / targetCR;
-    const BUFFER_BPS = 1n;
-    const BPS_SCALE = 1000n;
-    const percentBuffer = (maxDebtRaw * BUFFER_BPS) / BPS_SCALE;
-    const safetyBuffer = percentBuffer > 0n ? percentBuffer : 1n;
-    const maxDebtFromCollateral = maxDebtRaw > safetyBuffer ? maxDebtRaw - safetyBuffer : 0n;
+    // Apply 1-wei buffer (matches "Available: x" calculation)
+    const maxDebtFromCollateral = maxDebtRaw > 1n ? maxDebtRaw - 1n : 0n;
     mintAmount = maxDebtFromCollateral > candidate.currentDebt
       ? maxDebtFromCollateral - candidate.currentDebt
       : 0n;
@@ -340,11 +386,8 @@ function allocate(
 
       if (maxCR < targetCR) {
         const maxDebtRaw = (maxCollateralValue * WAD) / targetCR;
-        const BUFFER_BPS = 1n;
-        const BPS_SCALE = 1000n;
-        const percentBuffer = (maxDebtRaw * BUFFER_BPS) / BPS_SCALE;
-        const safetyBuffer = percentBuffer > 0n ? percentBuffer : 1n;
-        const maxDebtFromCollateral = maxDebtRaw > safetyBuffer ? maxDebtRaw - safetyBuffer : 0n;
+        // Apply 1-wei buffer (matches "Available: x" calculation)
+        const maxDebtFromCollateral = maxDebtRaw > 1n ? maxDebtRaw - 1n : 0n;
         mintAmount = maxDebtFromCollateral > candidate.currentDebt
           ? maxDebtFromCollateral - candidate.currentDebt
           : 0n;

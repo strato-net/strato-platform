@@ -86,10 +86,24 @@ export function computeTargetCRFromHF(
   targetHF: number,
   liquidationRatioWad: bigint
 ): bigint {
-  const targetHFScaled = BigInt(Math.floor(targetHF * 1000));
+  // Use high precision (1e12) to minimize floating-point rounding errors
+  const PRECISION = 1000000000000n; // 1e12
+  const targetHFScaled = BigInt(Math.round(targetHF * 1e12));
   
   // targetCR = liquidationRatio * targetHF
-  const targetCRFromHF = (liquidationRatioWad * targetHFScaled) / 1000n;
+  const targetCRFromHF = (liquidationRatioWad * targetHFScaled) / PRECISION;
+  
+  // Calculate the theoretical minimum HF using pure BigInt math: minHF = minCR / liquidationRatio
+  // If targetHF is at or below this minimum, return minCR exactly (avoids rounding issues)
+  // minHF * PRECISION = (minCR * PRECISION) / liquidationRatio
+  const minHFScaled = (minCRWad * PRECISION) / liquidationRatioWad;
+  
+  // If targetHF is at or very close to minimum (within 0.01%), snap to minCR
+  // This handles floating-point imprecision from the slider
+  const tolerance = minHFScaled / 10000n; // 0.01%
+  if (targetHFScaled <= minHFScaled + tolerance) {
+    return minCRWad;
+  }
   
   // Ensure we don't go below minCR (would fail on-chain)
   return targetCRFromHF > minCRWad ? targetCRFromHF : minCRWad;
@@ -486,21 +500,14 @@ export const calculateSliderMinHF = (
   const maxLRWad = vaultCandidates.reduce((max, v) => v.liquidationRatio > max ? v.liquidationRatio : max, 0n);
   const maxLT = Number(maxLRWad) / Number(WAD) * 100; // Convert to percentage
   
-  console.log('[calculateSliderMinHF] Vault candidates:', vaultCandidates.length);
-  console.log('[calculateSliderMinHF] max(minCR) across all vaults:', maxMinCRPercent, '%');
-  console.log('[calculateSliderMinHF] max(liquidationRatio) across all vaults:', maxLT, '%');
-  
   if (maxLT <= 0) return 1.0;
   
   // minHF = max(minCR) / max(LT)
   // e.g., 150% / 133% = 1.13
   const minHF = maxMinCRPercent / maxLT;
   
-  console.log('[calculateSliderMinHF] minHF = max(minCR) / max(LT) =', maxMinCRPercent, '/', maxLT, '=', minHF);
-  
   // Round to 2 decimal places
   const roundedMinHF = Math.round(minHF * 100) / 100;
-  console.log('[calculateSliderMinHF] Rounded minHF:', roundedMinHF);
   
   return roundedMinHF;
 };
@@ -522,18 +529,11 @@ export const calculateSliderMinHFFromPercentages = (
   const maxMinCR = Math.max(...minCRs);
   const maxLT = Math.max(...liquidationRatios);
   
-  console.log('[calculateSliderMinHFFromPercentages] minCRs:', minCRs);
-  console.log('[calculateSliderMinHFFromPercentages] liquidationRatios:', liquidationRatios);
-  console.log('[calculateSliderMinHFFromPercentages] max(minCR) across all vaults:', maxMinCR, '%');
-  console.log('[calculateSliderMinHFFromPercentages] max(liquidationRatio) across all vaults:', maxLT, '%');
-  
   if (maxLT <= 0) return 1.0;
   
   const minHF = maxMinCR / maxLT;
-  console.log('[calculateSliderMinHFFromPercentages] minHF = max(minCR) / max(LT) =', maxMinCR, '/', maxLT, '=', minHF);
   
   const roundedMinHF = Math.round((maxMinCR / maxLT) * 100) / 100;
-  console.log('[calculateSliderMinHFFromPercentages] Rounded minHF:', roundedMinHF);
   
   return roundedMinHF;
 };
