@@ -60,8 +60,8 @@ const Admin = () => {
             }`}
           >
             <Droplets className="h-3 w-3 md:h-4 md:w-4" />
-            <span className="hidden sm:inline">Pools</span>
-            <span className="sm:hidden">Pools</span>
+            <span className="hidden sm:inline"> Create Pools</span>
+            <span className="sm:hidden">Create Pools</span>
           </button>
           
           {/* Lending Dropdown */}

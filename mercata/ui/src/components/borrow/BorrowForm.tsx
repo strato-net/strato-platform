@@ -121,6 +121,16 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
           </span>
         </div>
         <div className="flex justify-between items-center">
+          <span className="text-xs md:text-sm text-muted-foreground">Total Amount Owed</span>
+          <span className="text-xs md:text-sm font-medium">
+            {(() => {
+              const owed = BigInt(loans?.totalAmountOwed || 0);
+              const owedNum = owed <= 1n ? 0 : Number(formatUnits(owed.toString(), 18));
+              return `${owedNum.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} USDST`;
+            })()}
+          </span>
+        </div>
+        <div className="flex justify-between items-center">
           <span className="text-xs md:text-sm text-muted-foreground">Interest Rate</span>
           <span className="text-xs md:text-sm font-medium">
             {interestRateDisplay}

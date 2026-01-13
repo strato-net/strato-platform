@@ -91,15 +91,21 @@ const PositionSection = ({ loanData }: BorrowingSectionProps) => {
       <CardContent className="pt-4 md:pt-6 px-4 md:px-6">
         <h2 className="text-lg md:text-xl font-bold mb-3 md:mb-4">Your Position</h2>
         
-        <div className="space-y-2 md:space-y-3">
+        <div className="space-y-3 md:space-y-4">
+          {/* Total Amount Owed */}
+          <div className="p-3 md:p-4 bg-muted/50 rounded-lg">
+            <span className="text-xs md:text-sm text-muted-foreground block mb-1">Total Amount Owed</span>
+            <span className="text-lg md:text-xl font-semibold">{formatValue(totalAmountOwed)} USDST</span>
+          </div>
+
           {/* Health Factor */}
-          <div className="flex items-center justify-between p-2.5 md:p-3 bg-muted/50 rounded-lg gap-2">
-            <InfoTooltip content="Measures your position's safety. Higher is better.">
+          <div className="p-3 md:p-4 bg-muted/50 rounded-lg">
+            <InfoTooltip content="Measures your position's safety. Higher is better. Close to 1.0 means high risk of liquidation. Below 1.0 means your position can be liquidated. No loan means you have no outstanding debt.">
               <span className="text-xs md:text-sm text-muted-foreground">Health Factor</span>
             </InfoTooltip>
-            <span className={`text-sm md:text-base font-semibold ${totalAmountOwedNum === 0 ? 'text-foreground' : getHealthFactorColor(loanData?.healthFactor || 0)}`}>
+            <div className={`text-lg md:text-xl font-semibold mt-1 ${totalAmountOwedNum === 0 ? 'text-orange-500' : getHealthFactorColor(loanData?.healthFactor || 0)}`}>
               {totalAmountOwedNum === 0 ? "No Loan" : (loanData?.healthFactor?.toFixed(2) || "N/A")}
-            </span>
+            </div>
           </div>
 
           {/* Liquidation Warning */}
@@ -110,40 +116,28 @@ const PositionSection = ({ loanData }: BorrowingSectionProps) => {
             </div>
           )}
 
-          {/* Total Amount Owed */}
-          <div className="flex items-center justify-between p-2.5 md:p-3 bg-muted/50 rounded-lg gap-2">
-            <span className="text-xs md:text-sm text-muted-foreground shrink-0">Total Amount Owed</span>
-            <span className="text-sm md:text-base font-semibold text-right">{formatValue(totalAmountOwed)} USDST</span>
-          </div>
-
-          {/* Available to Borrow */}
-          <div className="flex items-center justify-between p-2.5 md:p-3 bg-muted/50 rounded-lg gap-2">
-            <InfoTooltip content="Supply collateral to enable borrowing.">
-              <span className="text-xs md:text-sm text-muted-foreground">Available to Borrow</span>
+          {/* Available Borrowing Power */}
+          <div className="p-3 md:p-4 bg-muted/50 rounded-lg">
+            <InfoTooltip content="You need to supply tokens as collateral before you can borrow. Click 'Supply' in the Eligible Collateral table below to get started.">
+              <span className="text-xs md:text-sm text-muted-foreground">Available Borrowing Power</span>
             </InfoTooltip>
-            <span className="text-sm md:text-base font-semibold text-right">{formatValue(loanData?.maxAvailableToBorrowUSD || 0)} USDST</span>
-          </div>
-
-          {/* Supplied Collateral Value */}
-          <div className="flex items-center justify-between p-2.5 md:p-3 bg-muted/50 rounded-lg gap-2">
-            <span className="text-xs md:text-sm text-muted-foreground shrink-0">Supplied Collateral Value</span>
-            <span className="text-sm md:text-base font-semibold text-right">{formatValue(loanData?.totalCollateralValueUSD || 0)} USDST</span>
+            <div className="text-lg md:text-xl font-semibold mt-1">{formatValue(loanData?.maxAvailableToBorrowUSD || 0)} USDST</div>
           </div>
 
           {/* Borrow Index */}
-          <div className="flex items-center justify-between p-2.5 md:p-3 bg-muted/50 rounded-lg gap-2">
+          <div className="p-3 md:p-4 bg-muted/50 rounded-lg">
             <InfoTooltip content="Global borrow index for the lending pool.">
               <span className="text-xs md:text-sm text-muted-foreground">Borrow Index</span>
             </InfoTooltip>
-            <span className="text-sm md:text-base font-semibold">{borrowIndexDisplay}</span>
+            <div className="text-lg md:text-xl font-semibold mt-1">{borrowIndexDisplay}</div>
           </div>
 
           {/* Interest Rate */}
-          <div className="flex items-center justify-between p-2.5 md:p-3 bg-muted/50 rounded-lg gap-2">
-            <InfoTooltip content="Annual percentage rate on borrowed amounts.">
+          <div className="p-3 md:p-4 bg-muted/50 rounded-lg">
+            <InfoTooltip content="Annual percentage rate you pay on borrowed amounts. This rate applies to your total borrowed amount.">
               <span className="text-xs md:text-sm text-muted-foreground">Interest Rate</span>
             </InfoTooltip>
-            <span className="text-sm md:text-base font-semibold">{((Number(loanData?.interestRate) || 0) / 100).toFixed(2)}%</span>
+            <div className="text-lg md:text-xl font-semibold mt-1">{((Number(loanData?.interestRate) || 0) / 100).toFixed(2)}%</div>
           </div>
         </div>
       </CardContent>
