@@ -25,6 +25,8 @@ import ActivityFeed from "./pages/ActivityFeed";
 import NotFound from "./pages/NotFound";
 import MercataStats from "./pages/MercataStats";
 import Rewards from "./pages/Rewards";
+import ReferFriend from "./pages/ReferFriend";
+import Claim from "./pages/Claim";
 
 // Import dashboard components
 
@@ -135,6 +137,7 @@ const App = () => {
                               <UsdstBalanceBox />
                               <Routes>
                                 <Route path="/" element={<Index />} />
+                                <Route path="/claim" element={<Claim />} />
                                 <Route
                                   path="/dashboard"
                                   element={
@@ -242,6 +245,15 @@ const App = () => {
                                   element={
                                     <ProtectedRoute>
                                       <Rewards />
+                                    </ProtectedRoute>
+                                  }
+                                />
+
+                                <Route
+                                  path="/dashboard/refer"
+                                  element={
+                                    <ProtectedRoute>
+                                      <ReferFriend />
                                     </ProtectedRoute>
                                   }
                                 />
