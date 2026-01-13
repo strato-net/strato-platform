@@ -20,6 +20,7 @@ import cdpRoutes from "./routes/cdp.routes";
 import rewardsRoutes from "./routes/rewards.routes";
 import protocolFeeRoutes from "./routes/protocolFee.routes";
 import rpcRoutes from "./routes/rpc.routes";
+import referRoutes from "./routes/refer.routes";
 
 const router = Router();
 
@@ -82,6 +83,9 @@ router.use("/rewards", rewardsRoutes);
 
 // ----- Protocol Fee Routes -----
 router.use("/protocol-fees", protocolFeeRoutes);
+
+// ----- Refer Routes -----
+router.use("/refer", referRoutes);
 
 // ----- Documentation Routes -----
 // Serve static files for Swagger customizations

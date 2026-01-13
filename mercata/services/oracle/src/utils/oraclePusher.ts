@@ -10,9 +10,10 @@ import { txMetricsService } from './txMetricsService';
 async function callListAndWait(callListArgs: CallListArg[]): Promise<TransactionResult> {
     const accessToken = await oauthClient().getAccessToken();
     const submitTime = Date.now();
-    
+
+    const submitEndpoint = `${process.env.STRATO_NODE_URL}/bloc/v2.2/transaction/parallel?resolve=true`;
     const response = await apiPost(
-        `${process.env.STRATO_NODE_URL}/bloc/v2.2/transaction/parallel?resolve=true`,
+        submitEndpoint,
         {
             txs: callListArgs.map(callArg => ({
                 type: "FUNCTION",
@@ -32,7 +33,11 @@ async function callListAndWait(callListArgs: CallListArg[]): Promise<Transaction
             },
             timeout: TIMEOUTS.SUBMIT
         },
-        { logPrefix: 'OraclePusher' }
+        {
+            logPrefix: 'OraclePusher',
+            apiUrl: submitEndpoint,
+            method: 'POST'
+        }
     );
 
     const txHash = extractTransactionHash(response.data);
@@ -105,13 +110,14 @@ export async function pushAssetPrices(assets: string[], prices: number[]): Promi
 
 async function waitForTransaction(txHash: string): Promise<TransactionResult> {
     const startTime = Date.now();
-    
+
+    const statusEndpoint = `${process.env.STRATO_NODE_URL}/bloc/v2.2/transactions/results`;
     while (Date.now() - startTime < TIMEOUTS.WAIT) {
         try {
             const accessToken = await oauthClient().getAccessToken();
-            
+
             const response = await apiPost(
-                `${process.env.STRATO_NODE_URL}/bloc/v2.2/transactions/results`,
+                statusEndpoint,
                 [txHash],
                 {
                     headers: {
@@ -120,7 +126,11 @@ async function waitForTransaction(txHash: string): Promise<TransactionResult> {
                     },
                     timeout: TIMEOUTS.STATUS
                 },
-                { logPrefix: 'OraclePusher' }
+                {
+                    logPrefix: 'OraclePusher',
+                    apiUrl: statusEndpoint,
+                    method: 'POST'
+                }
             );
 
             const txData = response.data[0];

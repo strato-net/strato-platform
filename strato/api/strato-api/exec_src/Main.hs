@@ -196,8 +196,8 @@ main = do
             case flags_network of
               "mercata-hydrogen" -> "https://monitor.mercata-testnet2.blockapps.net:18080"
               "mercata" -> "https://monitor.mercata.blockapps.net:18080"
-              "helium" -> "https://monitor.testnet.stratomercata.com"
-              "upquark" -> "https://monitor.stratomercata.com"
+              "helium" -> "https://monitor.testnet.strato.nexus"
+              "upquark" -> "https://monitor.strato.nexus"
               _ -> ""
           )
         ]

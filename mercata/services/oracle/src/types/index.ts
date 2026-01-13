@@ -52,6 +52,8 @@ export interface CallListArg {
 export interface RetryConfig {
     maxAttempts: number;
     logPrefix: string;
+    apiUrl?: string;
+    method?: string;
 } 
 
 export interface TxMetric {
