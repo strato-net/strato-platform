@@ -328,19 +328,20 @@ export const calculateBorrowTxFee = (collateralCount: number): { fee: number, vo
 };
 
 /**
- * TODO describe, TODO review
- * @param collateralValueUSD TODO
+ * Calculate the wei amount of collateral asset whose total value in USD is the provided dollar value
+ * @param collateralValueUSD The user-supplied dollar value from which to calculate the asset amount
  * @param price The oracle price of the collateral asset in wei
- * @param decimals TODO
- * @returns TODO
+ * @param decimals The number of decimals of the collateral asset, defaulting to 18
+ * @returns The amount of collateral asset to supply in wei
  */
 export const calculateAdditionalCollateralAmountFromValue = (
-  collateralValueUSD: bigint,
+  collateralValueUSD: number,
   price: bigint,
-  decimals: bigint, // i.e. 10n**18n, not 18n
+  decimals: number = 18,
 ): bigint => {
+  const collateralValueWei = BigInt(Math.round(collateralValueUSD * 1e18)); // questionable
   if (price === 0n) return 0n;
-  return (collateralValueUSD * decimals) / price;
+  return (collateralValueWei * 10n ** BigInt(decimals)) / price;
 };
 
 /**

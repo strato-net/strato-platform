@@ -128,20 +128,16 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
       sortCollateralAssets(collateralsArray);
 
       for (const collateral of collateralsArray) {
-        const price = BigInt(collateral.assetPrice ?? "0");
-        const decimals = BigInt(10) ** BigInt(collateral.customDecimals ?? 18);
-        
         // Use custom value if set, otherwise check if in recommendation
         if (customCollateralValues.has(collateral.address)) {
+          const price = BigInt(collateral.assetPrice ?? "0");
+          const decimals = collateral.customDecimals ?? 18;
           const customValue = parseFloat(customCollateralValues.get(collateral.address) || "0");
-          const customValueWei = BigInt(Math.round(customValue * 1e18));
-          const customAmount = calculateAdditionalCollateralAmountFromValue(customValueWei, price, decimals);
+          const customAmount = calculateAdditionalCollateralAmountFromValue(customValue, price, decimals);
           data.push({ collateral, amount: customAmount, valueUSD: customValue });
         } else {
-          // Fallback to recommended amount or 0
-          const recommendedAmount = recommendedCollateral.get(collateral) ?? 0n;
-          const valueUSD = Number((recommendedAmount * price) / decimals) / 1e18;
-          data.push({ collateral, amount: recommendedAmount, valueUSD });
+          // Fallback to 0
+          data.push({ collateral, amount: 0n, valueUSD: 0.00 });
         }
       }
     }
@@ -612,7 +608,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
         </CollapsibleTrigger>
         <CollapsibleContent className="px-4 pb-4">
           <style>{`
-            /* Hide number input spinner arrows */
+            /* Hide number input spinner arrows - @dev questionable */
             .collateral-value-input[type="number"]::-webkit-outer-spin-button,
             .collateral-value-input[type="number"]::-webkit-inner-spin-button {
               -webkit-appearance: none;
