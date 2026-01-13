@@ -178,7 +178,8 @@ export const simulateLoan = (
       "0", // user token balance not needed here
       collateral.amount,
       cfg.price,                  // USD 1e18
-      cfg.ltv || 0                // bps
+      cfg.ltv || 0,               // bps
+      cfg.liquidationThreshold || 0 // bps
     );
     maxBorrowingPowerUSD += toBig(metrics.maxBorrowingPower);
   }
@@ -239,23 +240,27 @@ export const percentageToHealthFactor = (percentage: number): string => {
  * @param collateralizedAmount Amount of tokens used as collateral
  * @param assetPrice Price of the asset in USD (18 decimals)
  * @param ltv Loan-to-Value ratio in basis points (e.g., 7500 = 75%)
+ * @param liquidationThreshold Liquidation threshold in basis points (e.g., 8000 = 80%)
  * @returns Object with calculated values
  */
 export const calculateCollateralMetrics = (
   userBalance: string,
   collateralizedAmount: string,
   assetPrice: string,
-  ltv: number
+  ltv: number,
+  liquidationThreshold: number
 ): {
   userBalanceValue: string;
   collateralizedAmountValue: string;
   maxBorrowingPower: string;
   unsuppliedBorrowingPower: string;
+  unsuppliedLTCollateralValue: string;
 } => {
   const balance = toBig(userBalance);
   const collateralized = toBig(collateralizedAmount);
   const price = toBig(assetPrice);
   const ltvBasisPoints = BigInt(ltv);
+  const ltBasisPoints = BigInt(liquidationThreshold);
 
   // Calculate values in USD (18 decimals)
   const userBalanceValue = ((balance * price) / DECIMALS).toString();
@@ -266,12 +271,17 @@ export const calculateCollateralMetrics = (
   
   // Calculate unsupplied borrowing power: userBalance * price * ltv (for sorting unsupplied collaterals)
   const unsuppliedBorrowingPower = ((balance * price * ltvBasisPoints) / (DECIMALS * 10000n)).toString();
+  
+  // Calculate unsupplied LT-weighted collateral value: userBalance * price * lt / (1e18 * 10000)
+  // Used for health factor calculations
+  const unsuppliedLTCollateralValue = ((balance * price * ltBasisPoints) / (DECIMALS * 10000n)).toString();
 
   return {
     userBalanceValue,
     collateralizedAmountValue,
     maxBorrowingPower,
     unsuppliedBorrowingPower,
+    unsuppliedLTCollateralValue,
   };
 };
 

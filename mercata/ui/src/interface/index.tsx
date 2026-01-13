@@ -199,6 +199,7 @@ export interface CollateralData {
   ltv: string; // Loan-to-Value ratio (e.g., "7500" = 75%)
   maxBorrowingPower: string; // Borrowing power from supplied collateral (collateralizedAmount * price * ltv)
   unsuppliedBorrowingPower: string; // Potential borrowing power from user balance (userBalance * price * ltv)
+  unsuppliedLTCollateralValue: string; // LT-weighted value of unsupplied balance (userBalance * price * lt)
   userBalance: string;
   userBalanceValue: string;
   _name: string;
