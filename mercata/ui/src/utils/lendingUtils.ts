@@ -207,14 +207,19 @@ export const calculateBorrowHealthImpact = (
   loanData: NewLoanData
 ) => {
   return calculateBorrowOperationHealthImpact(borrowAmountWei, loanData, true);
-}; 
+};
 
 
-// ----
+// Floor the value to the nearest 0.01;
+// e.g. 3.409 -> 3.40, 3.45 --> 3.45
+// @dev could be unreliable with javascript's floating point precision
 const centFloor = (value: Number): Number => {
   return Math.floor(+value * 100) / 100;
 };
 
+// Ceil the value to the nearest 0.01;
+// e.g. 3.401 -> 3.41, 3.45 --> 3.45
+// @dev could be unreliable with javascript's floating point precision
 export const centCeil = (value: Number): Number => {
   return Math.ceil(+value * 100) / 100;
 };
@@ -250,30 +255,42 @@ export const calculateAvailableToBorrowUSD = (
   if (maxDebtForTargetHF <= currentDebtUSD) return 0.00;
   const centsInWei = 10n ** 16n; // 0.01 USD = 1e16 wei
   const availableWei = (maxDebtForTargetHF - currentDebtUSD) / centsInWei * centsInWei;
-  const flooredToCentsWei = (availableWei / centsInWei) * centsInWei; // BigInt division truncates (floors)
+  const flooredToCentsWei = (availableWei / centsInWei) * centsInWei; // using BigInt floored division
   return Number(flooredToCentsWei) / 1e18;
 };
 
+/**
+ * Determine the left-hand low-risk (max) and right-hand high-risk (min) health factors for the slider.
+ * @param loanData - The current loan data fetched from the backend
+ * @param collaterals - The current collateral data fetched from the backend
+ * @param DEFAULT_MAX_HEALTH_FACTOR - The default maximum health factor, overriden if the current health factor is higher. 3.00 by default.
+ * @param BASICALLY_INFINITE_HEALTH - The value above which the health factor is considered infinite. 999999 by default.
+ * @returns The minimum and maximum health factors for the slider
+ */
 export const calculateHFSliderExtrema = (
   loanData: NewLoanData,
   collaterals: CollateralData[],
-  DEFAULT_MAX_HEALTH_FACTOR: Number = 3.00,
+  DEFAULT_MAX_HEALTH_FACTOR: number = 3.00,
+  BASICALLY_INFINITE_HEALTH: number = 999999,
 ) : { min: Number, max: Number } => {
-  const minHF = Math.min(...collaterals.map(c => Number(BigInt(c.liquidationThreshold))/Number(BigInt(c.ltv))));
+  // The slider should only go down to the least risky asset's minimum health factor
+  const minHF = Math.max(...collaterals.map(c => Number(BigInt(c.liquidationThreshold))/Number(BigInt(c.ltv))));
   
   // Check if there's no loan (no debt)
   const hasLoan = BigInt(loanData?.totalAmountOwed ?? "0") > 1n;
   const currentHF = loanData?.healthFactor ?? 0;
-  const isInfiniteHF = !isFinite(currentHF) || currentHF >= 999999;
+  const isInfiniteHF = !isFinite(currentHF) || currentHF >= BASICALLY_INFINITE_HEALTH;
   
   // If no loan, max is DEFAULT_MAX_HEALTH_FACTOR; otherwise use max of default and current HF
   const maxHF = hasLoan && !isInfiniteHF
-    ? Math.max(+DEFAULT_MAX_HEALTH_FACTOR, currentHF)
-    : +DEFAULT_MAX_HEALTH_FACTOR;
+    ? Math.max(DEFAULT_MAX_HEALTH_FACTOR, currentHF)
+    : DEFAULT_MAX_HEALTH_FACTOR;
   
   return { min: centCeil(minHF), max: centFloor(maxHF) };
 };
 
+// Determine the error message to display, suggesting options for the user while avoiding unavailable solutions.
+// Returns a string including newlines for line breaks; should by formatted by a UI component that parses this. (whitespace-pre-line)
 export const determineErrorMessage = (
   borrowAmount: Number,
   maxAtRequestedHF: Number,
@@ -285,14 +302,17 @@ export const determineErrorMessage = (
     if (borrowAmount > maxAtMinHF) {
       return "Borrow amount exceeds the maximum at this health factor.\nConsider bridging in more collateral.";
     }
-    
     // Otherwise, suggest increasing risk level as an option
     return "Borrow amount exceeds the maximum at this health factor.\nConsider bridging in more collateral, or increase risk level.";
   }
-  
   return "";
 };
 
+/**
+ * Calculate the total fees for all of the transactions that will be triggered by this borrow.
+ * @param collateralCount The number of distinct additional collateral assets being supplied.
+ * @returns The fee in USDST numeric (i.e. 0.03) and voucher integer (i.e. 3)
+ */
 export const calculateBorrowTxFee = (collateralCount: number): { fee: number, voucher: number } =>
 {
     const fee = collateralCount * parseFloat(SUPPLY_COLLATERAL_FEE) + parseFloat(BORROW_FEE);
@@ -300,6 +320,13 @@ export const calculateBorrowTxFee = (collateralCount: number): { fee: number, vo
     return { fee, voucher };
 };
 
+/**
+ * TODO describe, TODO review
+ * @param collateralValueUSD TODO
+ * @param price The oracle price of the collateral asset in wei
+ * @param decimals TODO
+ * @returns TODO
+ */
 export const calculateAdditionalCollateralAmountFromValue = (
   collateralValueUSD: bigint,
   price: bigint,
@@ -323,6 +350,14 @@ export const calculateMaxCollateralValueUSDCentFloored = (collateral: Collateral
   return Math.floor(maxValueUSD * 100) / 100; // Floor to cents
 };
 
+/**
+ * TODO describe, TODO review
+ * @param loanData TODO
+ * @param healthFactor TODO
+ * @param borrowAmountUSD TODO
+ * @param collaterals TODO
+ * @returns TODO
+ */
 export const recommendCollateralToSupply = (
   loanData: NewLoanData,
   healthFactor: Number,
@@ -384,12 +419,17 @@ export const recommendCollateralToSupply = (
   return result;
 };
 
+/**
+ * Sort collateral assets in place by unsupplied borrowing power, most to least, with all supplied assets coming first.
+ * - Amongst the collateral asset types the user has already supplied, sort by `asset.balanceOf(user)*lendingPool.config[asset].LTV`
+ * - After all of those, sort remaining collateral the user possesses by `asset.balanceOf(user)*lendingPool.config[asset].LTV`
+ * @param collaterals The array of collateral assets to sort in place.
+ * @param DO_IGNORE_ONE_WEI Whether to consider one wei of an asset supplied to be a non-supplied asset (default true)
+ */
 export const sortCollateralAssets = (
   collaterals: CollateralData[],
   DO_IGNORE_ONE_WEI: boolean = true,
 ) : void => {
-  // - Amongst the collateral asset types the user has already supplied, sort by `asset.balanceOf(user)*lendingPool.config[asset].LTV`
-  // - After all of those, sort remaining collateral the user possesses by `asset.balanceOf(user)*lendingPool.config[asset].LTV`
   const nonexistant = DO_IGNORE_ONE_WEI ? 1n : 0n;
   const isSupplied = (collat: CollateralData) => BigInt(collat.collateralizedAmount) > nonexistant;
   collaterals.sort((a, b) => {
@@ -401,11 +441,20 @@ export const sortCollateralAssets = (
   });
 };
 
-const calculateMinimumLTV = (collaterals: CollateralData[]) : bigint => {
-  if (collaterals.length === 0) return 0n;
-  return collaterals.map(c => BigInt(c.ltv ?? "0")).reduce((a, b) => a < b ? a : b);
+// Get the minimum LTV from the array of collateral assets
+// Returns the minimum LTV in basis points bigint, e.g. 7500n for 75%
+const calculateMinimumLTV = (collaterals: readonly CollateralData[]) : bigint => {
+  return collaterals.map(c => BigInt(c.ltv ?? "0")).reduce(((a, b) => a < b ? a : b), 0n);
 };
 
+/**
+ * TODO describe, TODO review
+ * @param collaterals TODO
+ * @param borrowAmount TODO
+ * @param loanData TODO
+ * @param targetHealthFactor TODO
+ * @returns TODO
+ */
 export const calculateAdditionalValueNeeded = (
   collaterals: CollateralData[],
   borrowAmount: Number,
@@ -442,6 +491,13 @@ export const calculateAdditionalValueNeeded = (
   return Number(additionalValueNeeded) / 1e18;
 };
 
+/**
+ * TODO describe, TODO review
+ * @param loanData TODO
+ * @param borrowAmount TODO
+ * @param newCollateralSupplied TODO
+ * @returns TODO
+ */
 export const calculateAfterBorrowHealthFactor = (
   loanData: NewLoanData,
   borrowAmount: Number,
@@ -466,7 +522,8 @@ export const calculateAfterBorrowHealthFactor = (
   return Number(newHealthFactorRaw) / 1e18;
 };
 
-// @dev TODO: the same is implemented in loanUtils.ts, need to consolidate
+// @dev TODO: the same is implemented in loanUtils.ts;
+// need to consolidate after both PRs are merged
 export const getRiskLabel = (factor: number): string => {
   if (factor >= 2.0) return 'Low Risk';
   if (factor >= 1.5) return 'Moderate Risk';
