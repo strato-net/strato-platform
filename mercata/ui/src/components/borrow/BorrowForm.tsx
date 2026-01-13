@@ -209,18 +209,17 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
   }, [collateralTableData]);
 
   // Check if user can afford the transaction fee (separate from borrow amount)
-  const canAffordFee = useMemo(() => {
+  useEffect(() => {
     const feeWei = safeParseUnits(txFee.fee.toString(), 18);
     const voucherBal = BigInt(voucherBalance || 0);
     const usdstBal = safeParseUnits(usdstBalance || "0", 18);
     
     const canCover = voucherBal >= BigInt(txFee.voucher) || usdstBal >= feeWei;
     if (!canCover) {
-      setFeeError("Insufficient balance to cover transaction fee");
+      setFeeError("Insufficient USDST + voucher balance for transaction fee");
     } else {
       setFeeError("");
     }
-    return canCover;
   }, [txFee, voucherBalance, usdstBalance]);
 
   // Update custom error message when borrow amount exceeds maximum at selected health factor
@@ -230,14 +229,13 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
       return;
     }
 
-    const cleanedInput = borrowAmount.replace(/,/g, "");
-    const borrowAmountNum = parseFloat(cleanedInput);
+    const borrowAmountNum = parseFloat(borrowAmount);
     if (isNaN(borrowAmountNum) || borrowAmountNum <= 0) {
       setCustomBorrowError("");
       return;
     }
 
-    const borrowAmountWei = safeParseUnits(cleanedInput, 18);
+    const borrowAmountWei = safeParseUnits(borrowAmount, 18);
     const maxAmountWei = BigInt(maxAmount);
     
     // Only set custom error if amount exceeds maximum
@@ -296,14 +294,12 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
   };
 
   // Get risk indicator color and label
-  const getRiskIndicator = (hf: number): { label: string; color: string } => {
-    const label = getRiskLabel(hf);
+  const riskIndicator = useMemo(() => {
+    const label = getRiskLabel(targetHealthFactor);
     if (label === 'Low Risk') return { label, color: 'text-green-500' };
     if (label === 'Moderate Risk') return { label, color: 'text-yellow-500' };
     return { label, color: 'text-red-500' };
-  };
-
-  const riskIndicator = getRiskIndicator(targetHealthFactor);
+  }, [targetHealthFactor]);
 
   // Consolidated polling handler
   const handlePollingUpdate = (amount: string) => {
@@ -322,18 +318,16 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
     const collateralToSupply = collateralTableData.filter(item => item.amount > 0n);
     
     // Add collateral supply steps if we have collateral to supply
-    if (collateralToSupply.length > 0) {
-      for (const item of collateralToSupply) {
-        const decimals = item.collateral.customDecimals ?? 18;
-        const formattedAmount = formatUnits(item.amount, decimals);
-        steps.push({
-          id: `supply-${item.collateral.address}`,
-          label: `Supply ${item.collateral._symbol}`,
-          status: "pending",
-          asset: item.collateral,
-          amount: formattedAmount,
-        });
-      }
+    for (const item of collateralToSupply) {
+      const decimals = item.collateral.customDecimals ?? 18;
+      const formattedAmount = formatUnits(item.amount, decimals);
+      steps.push({
+        id: `supply-${item.collateral.address}`,
+        label: `Supply ${item.collateral._symbol}`,
+        status: "pending",
+        asset: item.collateral,
+        amount: formattedAmount,
+      });
     }
     
     // Add borrow step
@@ -419,25 +413,27 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
   const handleSliderChange = (values: number[]) => {
     const sliderPos = values[0];
     // Slider goes from max HF (left/0) to min HF (right/range)
-    const range = Number(sliderExtrema.max) - Number(sliderExtrema.min);
     const newHF = Number(sliderExtrema.max) - sliderPos;
     setTargetHealthFactor(Math.round(newHF * 100) / 100);
   };
 
   // Convert HF to slider position
   const sliderPosition = useMemo(() => {
-    const range = Number(sliderExtrema.max) - Number(sliderExtrema.min);
     return Number(sliderExtrema.max) - targetHealthFactor;
   }, [targetHealthFactor, sliderExtrema]);
 
-  const interestRateDisplay = (() => {
-    const raw = (loans as any)?.interestRate; // bps
-    const num = Number(raw);
-    if (!isFinite(num)) return "-";
-    return `${(num / 100).toFixed(2)}%`;
-  })();
+  const interestRateDisplay = useMemo(() => {
+    if (!loans) return "-";
+    return `${(loans.interestRate / 100).toFixed(2)}%`;
+  }, [loans]);
 
-  const sliderRange = Number(sliderExtrema.max) - Number(sliderExtrema.min);
+  const sliderRange = useMemo(() => {
+    return Number(sliderExtrema.max) - Number(sliderExtrema.min);
+  }, [sliderExtrema]);
+
+  const borrowAmountExceedsMax = useMemo(() => {
+    return safeParseUnits(borrowAmount || "0", 18) > BigInt(maxAmount);
+  }, [borrowAmount, maxAmount]);
 
   return (
     <div className="space-y-4 pt-4">
@@ -461,7 +457,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
           <div className="relative flex-1">
             <Input
               placeholder="0"
-              className={`pr-20 ${safeParseUnits(borrowAmount || "0", 18) > BigInt(maxAmount) ? 'text-red-600' : ''}`}
+              className={`pr-20 ${borrowAmountExceedsMax ? 'text-red-600' : ''}`}
               value={addCommasToInput(borrowAmount)}
               onChange={(e) => {
                 const value = e.target.value;
@@ -566,7 +562,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
           safeParseUnits(borrowAmount || "0") <= 0n ||
           borrowLoading ||
           progressModalOpen ||
-          safeParseUnits(borrowAmount || "0") > BigInt(maxAmount) ||
+          borrowAmountExceedsMax ||
           hasExceededMaxCollateralValue ||
           hasInsufficientCollateral
         }
