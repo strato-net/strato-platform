@@ -53,7 +53,6 @@ export const calculateCollateralHealthImpact = (
   const currentTotalBorrowValueUSD = currentHealthFactorRaw === 0n
     ? 0n
     : (currentCollateralValueUSD * 10n ** 18n) / currentHealthFactorRaw;
-  console.log("derived, real:", currentTotalBorrowValueUSD, loanData?.totalAmountOwed);
 
   // If there's no outstanding loan, collateral operations are always healthy
   if (currentTotalBorrowValueUSD === 0n) {
@@ -209,6 +208,7 @@ export const calculateBorrowHealthImpact = (
   return calculateBorrowOperationHealthImpact(borrowAmountWei, loanData, true);
 };
 
+// Below: Utilities for New Borrow UX with Risk Slider and Automatic Collateral Supply
 
 // Floor the value to the nearest 0.01;
 // e.g. 3.409 -> 3.40, 3.45 --> 3.45
@@ -264,6 +264,7 @@ export const calculateAvailableToBorrowUSD = (
  * @param loanData - The current loan data fetched from the backend
  * @param collaterals - The current collateral data fetched from the backend
  * @param DEFAULT_MAX_HEALTH_FACTOR - The default maximum health factor, overriden if the current health factor is higher. 3.00 by default.
+ * @param DEFAULT_MIN_HEALTH_FACTOR - The default minimum health factor, used only when data is unavailable. 1.07 by default.
  * @param BASICALLY_INFINITE_HEALTH - The value above which the health factor is considered infinite. 999999 by default.
  * @returns The minimum and maximum health factors for the slider
  */
@@ -271,8 +272,14 @@ export const calculateHFSliderExtrema = (
   loanData: NewLoanData,
   collaterals: CollateralData[],
   DEFAULT_MAX_HEALTH_FACTOR: number = 3.00,
+  DEFAULT_MIN_HEALTH_FACTOR: number = 1.07,
   BASICALLY_INFINITE_HEALTH: number = 999999,
 ) : { min: Number, max: Number } => {
+  // If no data is available, use the defaults
+  if (!loanData || !collaterals || collaterals.length === 0) {
+    return { min: DEFAULT_MIN_HEALTH_FACTOR, max: DEFAULT_MAX_HEALTH_FACTOR };
+  }
+
   // The slider should only go down to the least risky asset's minimum health factor
   const minHF = Math.max(...collaterals.map(c => Number(BigInt(c.liquidationThreshold))/Number(BigInt(c.ltv))));
   
@@ -461,7 +468,7 @@ export const calculateAdditionalValueNeeded = (
   loanData: NewLoanData,
   targetHealthFactor: Number,
 ) : Number => {
-  if (collaterals.length === 0) return 0;
+  if (!loanData || !collaterals || collaterals.length === 0) return 0;
   
   // Find minimum LT (strictest for achieving target HF)
   const minLT = collaterals

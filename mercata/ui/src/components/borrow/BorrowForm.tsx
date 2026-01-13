@@ -52,13 +52,10 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
   const [customCollateralValues, setCustomCollateralValues] = useState<Map<string, string>>(new Map());
   const [progressModalOpen, setProgressModalOpen] = useState(false);
   const [borrowSteps, setBorrowSteps] = useState<BorrowStep[]>([]);
-  const { borrowMax, supplyCollateral } = useLendingContext();
+  const { supplyCollateral } = useLendingContext();
 
   // Calculate slider extrema based on collateral configs
   const sliderExtrema = useMemo(() => {
-    if (!loans || !collateralInfo || collateralInfo.length === 0) {
-      return { min: 1.01, max: 3.00 };
-    }
     return calculateHFSliderExtrema(loans, collateralInfo);
   }, [loans, collateralInfo]);
 
@@ -79,13 +76,11 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
   // Calculate available to borrow based on current health factor setting
   // Includes all available collateral balances (max potential borrowing power)
   const availableToBorrow = useMemo(() => {
-    if (!loans) return 0;
     return calculateAvailableToBorrowUSD(loans, targetHealthFactor, potentialCollateral);
   }, [loans, targetHealthFactor, potentialCollateral]);
 
-  // Calculate maximum borrowable at minimum health factor (riskier)
+  // Calculate maximum borrowable at slider minimum (riskiest) health factor
   const maxAtMinHF = useMemo(() => {
-    if (!loans) return 0;
     return calculateAvailableToBorrowUSD(loans, sliderExtrema.min, potentialCollateral);
   }, [loans, sliderExtrema.min, potentialCollateral]);
 
@@ -175,10 +170,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
 
   // Check if any custom collateral values exceed their maximum
   const hasExceededMaxCollateralValue = useMemo(() => {
-    for (const exceedsMax of collateralExceedsMaxMap.values()) {
-      if (exceedsMax) return true;
-    }
-    return false;
+    return [...collateralExceedsMaxMap.values()].some(exceedsMax => exceedsMax);
   }, [collateralExceedsMaxMap]);
 
   // Calculate after-borrow health factor (includes new collateral being supplied)
@@ -187,10 +179,9 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
       return null;
     }
     // Build collateral map from table data (includes auto or custom amounts)
-    const newCollateral = new Map<CollateralData, bigint>();
-    for (const item of collateralTableData) {
-      newCollateral.set(item.collateral, item.amount);
-    }
+    const newCollateral = new Map<CollateralData, bigint>(
+      collateralTableData.map(item => [item.collateral, item.amount])
+    );
     return calculateAfterBorrowHealthFactor(loans, parseFloat(borrowAmount), newCollateral);
   }, [loans, borrowAmount, collateralTableData]);
 
@@ -200,7 +191,6 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
       return totalCollateralValue;
     }
     // In custom mode, calculate what's needed to achieve target HF using strictest LT
-    if (!loans || !collateralInfo || collateralInfo.length === 0) return 0;
     const needed = calculateAdditionalValueNeeded(collateralInfo, parseFloat(borrowAmount || "0"), loans, targetHealthFactor);
     return Number(needed);
   }, [autoSupplyCollateral, totalCollateralValue, loans, collateralInfo, borrowAmount, targetHealthFactor]);
