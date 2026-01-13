@@ -7,8 +7,9 @@ async function fetchVoucherBalance(): Promise<bigint> {
     const accessToken = await oauthClient().getAccessToken();
     const userAddr = await oauthClient().getUserAddress();
 
+    const voucherEndpoint = `${process.env.STRATO_NODE_URL}/cirrus/search/BlockApps-Voucher-_balances`;
     const response = await apiGet(
-        `${process.env.STRATO_NODE_URL}/cirrus/search/BlockApps-Voucher-_balances`,
+        voucherEndpoint,
         {
             headers: {
                 'Authorization': `Bearer ${accessToken}`,
@@ -20,7 +21,11 @@ async function fetchVoucherBalance(): Promise<bigint> {
             },
             timeout: 10000
         },
-        { logPrefix: 'BalanceChecker' }
+        {
+            logPrefix: 'BalanceChecker',
+            apiUrl: voucherEndpoint,
+            method: 'GET'
+        }
     );
 
     return BigInt(response.data[0]?.balance || '0');
@@ -30,8 +35,9 @@ async function fetchUSDSTBalance(): Promise<bigint> {
     const accessToken = await oauthClient().getAccessToken();
     const userAddr = await oauthClient().getUserAddress();
 
+    const tokenEndpoint = `${process.env.STRATO_NODE_URL}/cirrus/search/BlockApps-Token-_balances`;
     const response = await apiGet(
-        `${process.env.STRATO_NODE_URL}/cirrus/search/BlockApps-Token-_balances`,
+        tokenEndpoint,
         {
             headers: {
                 'Authorization': `Bearer ${accessToken}`,
@@ -44,7 +50,11 @@ async function fetchUSDSTBalance(): Promise<bigint> {
             },
             timeout: 10000
         },
-        { logPrefix: 'BalanceChecker' }
+        {
+            logPrefix: 'BalanceChecker',
+            apiUrl: tokenEndpoint,
+            method: 'GET'
+        }
     );
 
     return BigInt(response.data[0]?.balance || '0');
