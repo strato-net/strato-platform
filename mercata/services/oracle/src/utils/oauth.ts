@@ -33,15 +33,15 @@ class OAuthClient {
             logInfo('OAuth', 'Discovering token endpoint...');
             const response = await axios.get(this.discoveryUrl, { timeout: 10000 });
             this.tokenEndpoint = response.data.token_endpoint;
-            
+
             if (!this.tokenEndpoint) {
                 throw new Error('Token endpoint not found in discovery document');
             }
-            
+
             logInfo('OAuth', `Token endpoint discovered: ${this.tokenEndpoint}`);
             return this.tokenEndpoint;
         } catch (error: any) {
-            logError('OAuth', new Error(`Error discovering token endpoint: ${error.message}`));
+            logError('OAuth', new Error(`Failed to call GET ${this.discoveryUrl}: ${error.message}`));
             throw new Error(`OAuth discovery failed: ${error.message}`);
         }
     }
@@ -58,9 +58,10 @@ class OAuthClient {
     }
 
     async refreshToken(): Promise<string> {
+        let tokenEndpoint: string | undefined;
         try {
             // Get the token endpoint from discovery
-            const tokenEndpoint = await this.getTokenEndpoint();
+            tokenEndpoint = await this.getTokenEndpoint();
 
             // Use password grant to authenticate as the specific username
             const tokenData = new URLSearchParams();
@@ -82,14 +83,15 @@ class OAuthClient {
                 this.accessToken = response.data.access_token;
                 const expiresIn = response.data.expires_in || 3600; // Default 1 hour
                 this.tokenExpiry = Date.now() + (expiresIn * 1000);
-                
+
                 return this.accessToken!;
             } else {
                 throw new Error('No access token in response');
             }
         } catch (error: any) {
             const errorMessage = error.response?.data?.error_description || error.response?.data?.error || error.message;
-            logError('OAuth', new Error(`Error getting access token: ${errorMessage}`));
+            const endpoint = tokenEndpoint || this.discoveryUrl;
+            logError('OAuth', new Error(`Failed to call POST ${endpoint}: ${errorMessage}`));
             throw new Error(`OAuth authentication failed: ${errorMessage}`);
         }
     }
@@ -113,20 +115,27 @@ class OAuthClient {
             return this.userAddress;
         }
 
-        const accessToken = await this.getAccessToken();
-        const response = await axios.get(
-            `${process.env.STRATO_NODE_URL}/strato/v2.3/key`,
-            {
-                headers: {
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json'
-                },
-                timeout: 10000
-            }
-        );
+        const keyEndpoint = `${process.env.STRATO_NODE_URL}/strato/v2.3/key`;
+        try {
+            const accessToken = await this.getAccessToken();
+            const response = await axios.get(
+                keyEndpoint,
+                {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    timeout: 10000
+                }
+            );
 
-        this.userAddress = response.data.address;
-        return this.userAddress!;
+            this.userAddress = response.data.address;
+            return this.userAddress!;
+        } catch (error: any) {
+            const errorMessage = error.response?.data?.message || error.message;
+            logError('OAuth', new Error(`Failed to call GET ${keyEndpoint}: ${errorMessage}`));
+            throw new Error(`Failed to get user address: ${errorMessage}`);
+        }
     }
 
 
