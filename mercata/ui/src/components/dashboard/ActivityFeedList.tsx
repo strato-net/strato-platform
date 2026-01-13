@@ -43,7 +43,7 @@ const ActivityFeedList = () => {
   const [totalEvents, setTotalEvents] = useState(0);
   const [filters, setFilters] = useState<FilterOptions>({});
   const itemsPerPage = 10;
-  const { isLoggedIn, userAddress, isAdmin } = useUser();
+  const { userAddress, isAdmin } = useUser();
 
   const [filterOptions, setFilterOptions] = useState<{ 
     contractNames: string[]; 
@@ -79,7 +79,7 @@ const ActivityFeedList = () => {
 
   // Load filter options once
   useEffect(() => {
-    if (!isLoggedIn || filterOptionsLoaded) return;
+    if (filterOptionsLoaded) return;
     
     const loadOptions = async () => {
       try {
@@ -92,16 +92,10 @@ const ActivityFeedList = () => {
     };
     
     loadOptions();
-  }, [isLoggedIn, filterCache, filterOptionsLoaded]);
+  }, [filterCache, filterOptionsLoaded]);
 
   useEffect(() => {
     const fetchEvents = async () => {
-      if (!isLoggedIn) {
-        setLoading(false);
-        setEvents([]);
-        return;
-      }
-      
       setLoading(true);
       try {
         const offset = (currentPage - 1) * itemsPerPage;
@@ -136,7 +130,7 @@ const ActivityFeedList = () => {
     }, 300); // 300ms delay
 
     return () => clearTimeout(timeoutId);
-  }, [currentPage, isLoggedIn, filters]);
+  }, [currentPage, filters]);
 
   // Memoized utility functions to prevent unnecessary re-renders
   const formatAddress = useCallback((address: string | null) => {

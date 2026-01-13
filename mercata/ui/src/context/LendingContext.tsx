@@ -77,10 +77,6 @@ export const LendingProvider = ({
   const loansAbortControllerRef = useRef<AbortController | null>(null);
 
   const fetchLiquidityInfo = useCallback(async (signal?: AbortSignal) => {
-    if (!isLoggedIn) {
-      setLoadingLiquidity(false);
-      return;
-    }
     setLoadingLiquidity(true);
     try {
       const res = await api.get<LiquidityData>("/lending/liquidity", {
@@ -94,7 +90,7 @@ export const LendingProvider = ({
     } finally {
       setLoadingLiquidity(false);
     }
-  }, [isLoggedIn]);
+  }, []);
 
   const fetchCollateralInfo = useCallback(async (signal?: AbortSignal) => {
     if (!isLoggedIn) {
