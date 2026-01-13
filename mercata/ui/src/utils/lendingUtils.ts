@@ -224,6 +224,13 @@ export const centCeil = (value: Number): Number => {
   return Math.ceil(+value * 100) / 100;
 };
 
+// Ceiling division, helpful when reversing calculations that use floored division
+// @dev b must be > 0n
+const ceilDivBigInt = (a: bigint, b: bigint): bigint => {
+  if (b <= 0n) return 0n; // ERROR!
+  return (a + b - 1n) / b;
+};
+
 // Return the maximum amount that can be borrowed with the given health factor
 export const calculateAvailableToBorrowUSD = (
   loanData: NewLoanData,
@@ -387,8 +394,8 @@ export const recommendCollateralToSupply = (
 
   const newDebt = currentDebt + borrowAmount;
 
-  // Required LT-weighted collateral to achieve target HF (add 1 for floored division safety)
-  const requiredTotalLTCollateral = (targetHFRaw * newDebt) / (10n ** 18n) + 1n; // TODO: review
+  // Required LT-weighted collateral to achieve target HF
+  const requiredTotalLTCollateral = ceilDivBigInt(targetHFRaw * newDebt, 10n ** 18n);
   let neededLTValue = requiredTotalLTCollateral > currentLTCollateral
     ? requiredTotalLTCollateral - currentLTCollateral
     : 0n;
@@ -411,13 +418,13 @@ export const recommendCollateralToSupply = (
       result.set(collat, available);
       neededLTValue -= maxLTValue;
     } else {
-      // Calculate exact amount needed for remaining LT value (+ 1 wei for floor safety)
+      // Calculate exact amount needed for remaining LT value
       const price = BigInt(collat.assetPrice ?? "0");
       const lt = BigInt(collat.liquidationThreshold ?? "0");
       const decimals = BigInt(10) ** BigInt(collat.customDecimals ?? 18);
       
       if (price === 0n || lt === 0n) continue;
-      const amountNeeded = (neededLTValue * decimals * 10000n) / (price * lt) + 1n; // TODO: review
+      const amountNeeded = ceilDivBigInt(neededLTValue * decimals * 10000n, price * lt);
       result.set(collat, amountNeeded < available ? amountNeeded : available);
       neededLTValue = 0n;
     }
@@ -457,7 +464,6 @@ const calculateMinimumLTV = (collaterals: readonly CollateralData[]) : bigint =>
 /**
  * Calculates the total USD value of additional collateral which would need
  * to be supplied to achieve the target health factor after the specified borrow
- * TODO: review implementation
  * @param collaterals The current collateral data fetched from the backend
  * @param borrowAmount The amount of USDST the user is trying to borrow
  * @param loanData The current loan data fetched from the backend
@@ -486,8 +492,8 @@ export const calculateAdditionalValueNeeded = (
   const newDebt = currentDebt + newBorrow;
   if (newDebt === 0n) return 0;
 
-  // Required LT-weighted collateral for target HF (+ 1 for floor safety)
-  const requiredLTCollateral = (targetHFRaw * newDebt) / (10n ** 18n) + 1n;
+  // Required LT-weighted collateral for target HF
+  const requiredLTCollateral = ceilDivBigInt(targetHFRaw * newDebt, 10n ** 18n);
   
   if (currentLTCollateral >= requiredLTCollateral) return 0;
   
@@ -506,9 +512,8 @@ export const calculateAdditionalValueNeeded = (
  * May be healthier than the health factor selected using the slider, if the user is already
  * in such a good position that borrowing the specified amount with no additional collateral
  * already achieves a superior health factor.
- * TODO review
  * @param loanData The current loan data fetched from the backend
- * @param borrowAmount The amount of USDST the user is trying to borrow
+ * @param borrowAmount The amount of USDST the user is trying to borrow; should be > 0
  * @param newCollateralSupplied The additional collateral assets, mapped to the wei amount being supplied
  * @returns The predicted health factor after all the supply and borrow transactions are completed
  */
@@ -518,7 +523,7 @@ export const calculateAfterBorrowHealthFactor = (
   newCollateralSupplied: Map<CollateralData, bigint>
 ) : Number => {
   const totalDebtAfterBorrow = BigInt(loanData.totalAmountOwed) + BigInt(Math.round(Number(borrowAmount) * 1e18));
-  if (totalDebtAfterBorrow === 0n) return Infinity; // maybe zero can be used for no loan
+  if (totalDebtAfterBorrow === 0n) return 0; // should not occur
 
   // Sum LT-weighted value of new collateral
   let newCollateralLTValue = 0n;
