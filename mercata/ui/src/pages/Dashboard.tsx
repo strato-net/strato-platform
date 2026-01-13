@@ -289,6 +289,8 @@ const Dashboard = () => {
       });
 
       // Refresh data after successful claim (silent refresh)
+      // Wait briefly before refreshing assets to allow backend to update health factor
+      await new Promise((resolve) => setTimeout(resolve, 1500));
       await Promise.all([
         getEarningAssets(false),
         getInactiveTokens(false),
