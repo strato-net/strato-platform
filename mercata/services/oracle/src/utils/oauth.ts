@@ -1,5 +1,7 @@
 import axios from 'axios';
 import { logInfo, logError } from './logger';
+import { withRetry } from './apiClient';
+import { DEFAULT_RETRY_CONFIG } from './constants';
 
 
 const TOKEN_LIFETIME_THRESHOLD_SECONDS = 10;
@@ -58,7 +60,7 @@ class OAuthClient {
     }
 
     async refreshToken(): Promise<string> {
-        let tokenEndpoint: string | undefined;
+        let tokenEndpoint: string = '';
         try {
             // Get the token endpoint from discovery
             tokenEndpoint = await this.getTokenEndpoint();
@@ -71,13 +73,16 @@ class OAuthClient {
             tokenData.append('client_id', this.clientId);
             tokenData.append('client_secret', this.clientSecret);
 
-            const response = await axios.post(tokenEndpoint, tokenData, {
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'Accept': 'application/json'
-                },
-                timeout: 10000
-            });
+            const response = await withRetry(
+                () => axios.post(tokenEndpoint, tokenData, {
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'Accept': 'application/json'
+                    },
+                    timeout: 10000
+                }),
+                { ...DEFAULT_RETRY_CONFIG, logPrefix: 'OAuth', apiUrl: tokenEndpoint, method: 'POST' }
+            );
 
             if (response.data.access_token) {
                 this.accessToken = response.data.access_token;

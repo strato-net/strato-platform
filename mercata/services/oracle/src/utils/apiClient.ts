@@ -41,7 +41,7 @@ function extractErrorMessage(error: any): string {
     return error.message || 'Unknown error';
 }
 
-async function withRetry<T>(
+export async function withRetry<T>(
     operation: () => Promise<T>,
     config: RetryConfig = DEFAULT_RETRY_CONFIG
 ): Promise<T> {
