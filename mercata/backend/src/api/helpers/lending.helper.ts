@@ -273,7 +273,6 @@ export const calculateCollateralMetrics = (
   const unsuppliedBorrowingPower = ((balance * price * ltvBasisPoints) / (DECIMALS * 10000n)).toString();
   
   // Calculate unsupplied LT-weighted collateral value: userBalance * price * lt / (1e18 * 10000)
-  // Used for health factor calculations
   const unsuppliedLTCollateralValue = ((balance * price * ltBasisPoints) / (DECIMALS * 10000n)).toString();
 
   return {

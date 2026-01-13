@@ -51,7 +51,8 @@ const InfoTooltip = ({ children, content }: { children: React.ReactNode; content
 
 
 const PositionSection = ({ loanData }: BorrowingSectionProps) => {
-  function getTextColor(value: number, maxValue = 10) {
+  function getTextColor(value: number, maxValue = 10, noLoan = false) {
+    if (noLoan) return 'rgb(0, 255, 0)';
     const clamped = Math.min(Math.max(value, 1), maxValue);
     const ratio = (clamped - 1) / (maxValue - 1);
     const red = Math.round(255 * (1 - ratio));
@@ -100,7 +101,7 @@ const PositionSection = ({ loanData }: BorrowingSectionProps) => {
                   <span className="text-muted-foreground text-sm font-medium">Health Factor</span>
                 </InfoTooltip>
                 <div className="flex flex-row gap-3">
-                  <span className="font-semibold text-lg mt-3" style={{ color: getTextColor(loanData?.healthFactor || 0, 3) }}>
+                  <span className="font-semibold text-lg mt-3" style={{ color: getTextColor(loanData?.healthFactor || 0, 3, !loanData || BigInt(loanData.totalAmountOwed) === 0n) }}>
                     {(() => {
                       const totalAmountOwed = loanData?.totalAmountOwed ? parseFloat(formatUnits(loanData.totalAmountOwed.toString(), 18)) : 0;
                       if (totalAmountOwed === 0) {
