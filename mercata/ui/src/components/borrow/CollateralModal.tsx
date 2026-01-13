@@ -154,6 +154,18 @@ const CollateralModal = ({
     onClose();
   };
 
+  // Handle Dialog's onOpenChange - only call onClose() when user dismisses the dialog
+  // (e.g., clicking outside, pressing escape). State reset is handled by the useEffect
+  // above that watches isOpen. Avoid resetting state here to prevent the health factor
+  // from briefly showing old values before the modal closes.
+  const handleOpenChange = (open: boolean) => {
+    if (!open && isOpen) {
+      // Only notify parent if dialog is being dismissed by user interaction
+      // (isOpen is still true, meaning parent hasn't closed it yet)
+      onClose();
+    }
+  };
+
   const getBalanceText = () => {
     if (isSupply) {
       return "Available to supply";
@@ -200,7 +212,7 @@ const CollateralModal = ({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent aria-describedby={null} className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
