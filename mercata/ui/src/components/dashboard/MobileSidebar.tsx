@@ -25,7 +25,7 @@ const MobileSidebar = ({ isOpen, onClose }: MobileSidebarProps) => {
     { icon: <Droplets size={20} />, label: 'Advanced', path: '/dashboard/advanced' },
     { icon: <Coins size={20} />, label: 'Rewards', path: '/dashboard/rewards' },
     { icon: <UserPlus size={20} />, label: 'My Referrals', path: '/dashboard/referrals' },
-    { icon: <BarChart3 size={20} />, label: 'Mercata Stats', path: '/dashboard/stats' },
+    { icon: <BarChart3 size={20} />, label: 'STRATO Stats', path: '/dashboard/stats' },
     { icon: <Download size={20} />, label: 'Withdrawals', path: '/dashboard/withdrawals' },
     { icon: <Activity size={20} />, label: 'Activity Feed', path: '/dashboard/activity' },
     { icon: <Shield size={20} />, label: 'Admin', path: '/dashboard/admin' },
