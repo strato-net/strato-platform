@@ -96,6 +96,7 @@ contract Escrow is Ownable {
         deposits[ephemeralAddress].amounts[i] = 0;
         require(ok, "transfer failed");
     }
+    deposits[ephemeralAddress].sender = address(0);
     deposits[ephemeralAddress].tokens.length = 0;
     deposits[ephemeralAddress].amounts.length = 0;
     deposits[ephemeralAddress].expiry = 0;

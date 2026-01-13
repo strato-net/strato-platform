@@ -17,23 +17,27 @@ const router = Router();
  *           schema:
  *             type: object
  *             required:
- *               - tokenAddress
- *               - amount
+ *               - tokens
+ *               - amounts
  *               - ephemeralAddress
- *               - escrowContractAddress
+ *               - expiry
  *             properties:
- *               tokenAddress:
- *                 type: string
- *                 description: Token contract address (with or without 0x prefix)
- *               amount:
- *                 type: string
- *                 description: Amount in wei (as string to avoid overflow)
+ *               tokens:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Array of token contract addresses (with or without 0x prefix)
+ *               amounts:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Array of amounts in wei (as strings to avoid overflow)
  *               ephemeralAddress:
  *                 type: string
  *                 description: Ephemeral address for the recipient (with or without 0x prefix)
- *               escrowContractAddress:
- *                 type: string
- *                 description: Escrow contract address (with or without 0x prefix)
+ *               expiry:
+ *                 type: number
+ *                 description: Expiry time in seconds from now (e.g., 604800 for 7 days)
  *     responses:
  *       200:
  *         description: Deposit transaction submitted successfully
@@ -153,6 +157,134 @@ router.get("/deposit", authHandler.authorizeRequest(false), ReferController.getD
  *         description: Redemption server error or misconfiguration
  */
 router.post("/redeem", authHandler.authorizeRequest(), ReferController.redeem);
+
+/**
+ * @openapi
+ * /refer/referrals:
+ *   get:
+ *     summary: Get all active referrals for the current user
+ *     tags: [Refer]
+ *     responses:
+ *       200:
+ *         description: List of active referrals retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       ephemeralAddress:
+ *                         type: string
+ *                       sender:
+ *                         type: string
+ *                       tokens:
+ *                         type: array
+ *                         items:
+ *                           type: string
+ *                       amounts:
+ *                         type: array
+ *                         items:
+ *                           type: string
+ *                       expiry:
+ *                         type: number
+ */
+router.get("/referrals", authHandler.authorizeRequest(), ReferController.getReferrals);
+
+/**
+ * @openapi
+ * /refer/cancel:
+ *   post:
+ *     summary: Cancel an expired referral deposit
+ *     tags: [Refer]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - ephemeralAddress
+ *             properties:
+ *               ephemeralAddress:
+ *                 type: string
+ *                 description: Ephemeral address of the deposit to cancel (with or without 0x prefix)
+ *     responses:
+ *       200:
+ *         description: Cancellation transaction submitted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     status:
+ *                       type: string
+ *                     hash:
+ *                       type: string
+ *       400:
+ *         description: Invalid request parameters
+ *       403:
+ *         description: Deposit not eligible for cancellation (not expired or not owned by user)
+ */
+router.post("/cancel", authHandler.authorizeRequest(), ReferController.cancel);
+
+/**
+ * @openapi
+ * /refer/history:
+ *   get:
+ *     summary: Get referral history (Redeemed and Cancelled events)
+ *     tags: [Refer]
+ *     responses:
+ *       200:
+ *         description: Referral history retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                       eventName:
+ *                         type: string
+ *                       ephemeralAddress:
+ *                         type: string
+ *                       tokens:
+ *                         type: array
+ *                         items:
+ *                           type: string
+ *                       amounts:
+ *                         type: array
+ *                         items:
+ *                           type: string
+ *                       sender:
+ *                         type: string
+ *                       recipient:
+ *                         type: string
+ *                       timestamp:
+ *                         type: string
+ *                         format: date-time
+ *                       blockTimestamp:
+ *                         type: string
+ *                         format: date-time
+ */
+router.get("/history", authHandler.authorizeRequest(), ReferController.getHistory);
 
 export default router;
 

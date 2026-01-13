@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Copy, CopyCheck, Loader2, CheckCircle2, XCircle, AlertCircle, LogIn } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatUnits } from "@/utils/numberUtils";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/axios";
 import { useTokenContext } from "@/context/TokenContext";
 
@@ -18,6 +18,7 @@ type CirrusRow = {
     sender: string;   // likely no 0x in Cirrus
     tokens: string[];
     amounts: string[];
+    expiry: number;
   };
 };
 
@@ -34,6 +35,7 @@ type Props = {
 
 export function RecipientClaim(props: Props) {
   const cirrusBase = props.cirrusBaseUrl ?? "";
+  const [searchParams] = useSearchParams();
 
   const [hiPart, setHiPart] = useState("");
   const [ephemeralAddressNo0x, setEphemeralAddressNo0x] = useState("");
@@ -49,6 +51,11 @@ export function RecipientClaim(props: Props) {
   const { getTransferableTokens } = useTokenContext();
   const [allTokens, setAllTokens] = useState<any[]>([]);
   const navigate = useNavigate();
+
+  // URL params for logged-out display
+  const urlEphemeralAddress = searchParams.get("e") || "";
+  const urlTokenSymbols = searchParams.get("tokens")?.split(",") || [];
+  const urlTokenAmounts = searchParams.get("amounts")?.split(",") || [];
 
   // Fetch all tokens to get symbol/name for display
   useEffect(() => {
@@ -80,33 +87,42 @@ export function RecipientClaim(props: Props) {
     setHiPart(url.searchParams.get("k") || "");
   }, []);
 
-  // Reconstruct ephemeral address when code changes (if code is 10 chars)
+  // Determine ephemeral address: from code if entered, otherwise from URL if logged in
   useEffect(() => {
     (async () => {
-      if (!hiPart || !code || code.trim().length !== 10) {
-        setEphemeralAddressNo0x("");
-        setRow(null);
-        return;
-      }
-
-      try {
-        const privHex = joinPrivateKey(hiPart, code.trim().toLowerCase()); // 64 hex chars, no 0x
-        const wallet = new ethers.Wallet("0x" + privHex);
-        const reconstructed = await wallet.getAddress();
-        const reconstructedNo0x = reconstructed.toLowerCase().replace(/^0x/, "");
-        setEphemeralAddressNo0x(reconstructedNo0x);
-      } catch (error) {
-        console.error("Error reconstructing ephemeral address:", error);
+      // If code is entered, reconstruct ephemeral address from code + k
+      if (hiPart && code && code.trim().length === 10) {
+        try {
+          const privHex = joinPrivateKey(hiPart, code.trim().toLowerCase()); // 64 hex chars, no 0x
+          const wallet = new ethers.Wallet("0x" + privHex);
+          const reconstructed = await wallet.getAddress();
+          const reconstructedNo0x = reconstructed.toLowerCase().replace(/^0x/, "");
+          setEphemeralAddressNo0x(reconstructedNo0x);
+        } catch (error) {
+          console.error("Error reconstructing ephemeral address:", error);
+          setEphemeralAddressNo0x("");
+          setRow(null);
+        }
+      } else if (urlEphemeralAddress && props.isLoggedIn && !code) {
+        // If no code but logged in and URL has ephemeral address, use it
+        setEphemeralAddressNo0x(urlEphemeralAddress);
+      } else if (!code) {
+        // No code and no URL address (or not logged in), clear it
         setEphemeralAddressNo0x("");
         setRow(null);
       }
     })();
-  }, [hiPart, code]);
+  }, [hiPart, code, urlEphemeralAddress, props.isLoggedIn]);
 
-  // Lookup deposit when ephemeral address is reconstructed
+  // Lookup deposit when ephemeral address is available (from URL or reconstructed from code)
   useEffect(() => {
     (async () => {
       try {
+        // Only fetch if user is logged in
+        if (!props.isLoggedIn) {
+          return;
+        }
+
         if (!ephemeralAddressNo0x || !/^[0-9a-f]{40}$/.test(ephemeralAddressNo0x)) {
           setRow(null);
           return;
@@ -115,7 +131,7 @@ export function RecipientClaim(props: Props) {
         setIsLoading(true);
         setStatus("Looking up deposit...");
         
-        // Query backend API for escrow deposit (tokenAddress is optional now)
+        // Query backend API for escrow deposit
         const response = await api.get("/refer/deposit", {
           params: {
             ephemeralAddress: ephemeralAddressNo0x,
@@ -124,13 +140,14 @@ export function RecipientClaim(props: Props) {
 
         if (response.data.success && response.data.data) {
           const deposit = response.data.data;
-          setTokenAddressNo0x(deposit.token || "");
+          setTokenAddressNo0x(deposit.tokens?.[0] || "");
           setRow({
             key: ephemeralAddressNo0x,
             value: {
               sender: deposit.sender,
               tokens: deposit.tokens || [],
               amounts: deposit.amounts || [],
+              expiry: deposit.expiry || 0,
             },
           });
           setStatus("Deposit found successfully.");
@@ -157,7 +174,7 @@ export function RecipientClaim(props: Props) {
         setIsLoading(false);
       }
     })();
-  }, [ephemeralAddressNo0x, toast]);
+  }, [ephemeralAddressNo0x, props.isLoggedIn, toast]);
 
   async function redeem() {
     try {
@@ -175,7 +192,7 @@ export function RecipientClaim(props: Props) {
       const wallet = new ethers.Wallet("0x" + privHex);
 
       const reconstructedEph = (await wallet.getAddress()).toLowerCase().replace(/^0x/, "");
-      if (reconstructedEph !== ephemeralAddressNo0x) {
+      if (reconstructedEph !== ephemeralAddressNo0x || reconstructedEph !== row.key) {
         throw new Error("Code does not match this link (ephemeral address mismatch).");
       }
 
@@ -288,6 +305,37 @@ export function RecipientClaim(props: Props) {
     ? row.value.amounts.map(amt => formatUnits(String(amt), 18))
     : [];
 
+  // Create display data from URL params or fetched row
+  const displayData = useMemo(() => {
+    // If we have row data (from backend), use that
+    if (row) {
+      return {
+        tokens: row.value.tokens.map((tokenAddress, index) => ({
+          address: tokenAddress,
+          symbol: getTokenInfo(tokenAddress).symbol,
+          amount: formattedAmounts[index] || "0",
+        })),
+        sender: row.value.sender,
+        expiry: row.value.expiry || 0,
+      };
+    }
+    
+    // Otherwise, if we have URL params, use those (for logged-out users)
+    if (urlEphemeralAddress && urlTokenSymbols.length > 0 && urlTokenAmounts.length > 0) {
+      return {
+        tokens: urlTokenSymbols.map((symbol, index) => ({
+          address: "", // No address from URL
+          symbol: symbol,
+          amount: urlTokenAmounts[index] || "0",
+        })),
+        sender: "",
+        expiry: 0,
+      };
+    }
+    
+    return null;
+  }, [row, formattedAmounts, urlEphemeralAddress, urlTokenSymbols, urlTokenAmounts, getTokenInfo]);
+
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <Card>
@@ -299,26 +347,28 @@ export function RecipientClaim(props: Props) {
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Redemption Code Input */}
-          <div className="space-y-2">
-            <Label htmlFor="redemptionCode">Redemption Code</Label>
-            <Input
-              id="redemptionCode"
-              value={code}
-              onChange={(e) => {
-                const value = e.target.value.trim();
-                // Only allow alphanumeric and limit to 10 characters
-                if (value === "" || /^[a-z0-9]{0,10}$/i.test(value)) {
-                  setCode(value);
-                }
-              }}
-              placeholder="Enter 10 character code"
-              className="font-mono text-center text-lg tracking-wider"
-              maxLength={10}
-            />
-            <p className="text-xs text-muted-foreground">
-              Enter the redemption code you received (via SMS or email)
-            </p>
-          </div>
+          {props.isLoggedIn && (
+            <div className="space-y-2">
+              <Label htmlFor="redemptionCode">Redemption Code</Label>
+              <Input
+                id="redemptionCode"
+                value={code}
+                onChange={(e) => {
+                  const value = e.target.value.trim();
+                  // Only allow alphanumeric and limit to 10 characters
+                  if (value === "" || /^[a-z0-9]{0,10}$/i.test(value)) {
+                    setCode(value);
+                  }
+                }}
+                placeholder="Enter redemption code"
+                className="font-mono text-center text-lg tracking-wider"
+                maxLength={10}
+              />
+              <p className="text-xs text-muted-foreground">
+                Enter the redemption code you received (via SMS or email)
+              </p>
+            </div>
+          )}
 
           {/* Deposit Information */}
           {isLoading ? (
@@ -330,7 +380,7 @@ export function RecipientClaim(props: Props) {
                 </div>
               </CardContent>
             </Card>
-          ) : code.length === 10 && !row ? (
+          ) : code.length === 10 && !row && !displayData ? (
             <Card className="bg-muted/50">
               <CardContent className="p-6">
                 <div className="flex items-center gap-2 text-muted-foreground">
@@ -339,60 +389,75 @@ export function RecipientClaim(props: Props) {
                 </div>
               </CardContent>
             </Card>
-          ) : row ? (
+          ) : displayData ? (
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
-                  { <>
-                      <AlertCircle className="h-5 w-5 text-blue-500" />
-                      Claim Information
-                    </>
-                  }
+                  <AlertCircle className="h-5 w-5 text-blue-500" />
+                  Claim Information
+                  {!row && displayData && (
+                    <span className="text-xs text-muted-foreground font-normal ml-2">
+                      (Preview - Sign up to claim)
+                    </span>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">From</Label>
-                  <div className="flex items-center gap-2">
-                    <code className="flex-1 p-2 bg-background rounded border text-sm break-all">
-                      {row.value.sender}
-                    </code>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => copyToClipboard(row.value.sender, "sender")}
-                    >
-                      {copiedField === "sender" ? (
-                        <CopyCheck className="h-4 w-4" />
-                      ) : (
-                        <Copy className="h-4 w-4" />
-                      )}
-                    </Button>
+                {displayData.sender && (
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">From</Label>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 p-2 bg-background rounded border text-sm break-all">
+                        {displayData.sender}
+                      </code>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => copyToClipboard(displayData.sender, "sender")}
+                      >
+                        {copiedField === "sender" ? (
+                          <CopyCheck className="h-4 w-4" />
+                        ) : (
+                          <Copy className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
                   </div>
-                </div>
+                )}
+
+                {displayData.expiry !== undefined && displayData.expiry !== 0 && (
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Expiry</Label>
+                    <p className="p-2 bg-background rounded border text-sm font-medium">
+                      {displayData.expiry === 0 ? "No Expiry" : new Date(displayData.expiry * 1000).toLocaleString()}
+                    </p>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Label className="text-xs text-muted-foreground">Tokens</Label>
                   <div className="space-y-2">
-                    {row.value.tokens.map((tokenAddress, index) => {
-                      const tokenInfo = getTokenInfo(tokenAddress);
-                      const amount = formattedAmounts[index] || "0";
-                      return (
-                        <div key={index} className="p-3 bg-background rounded border">
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium">{tokenInfo.symbol}</span>
+                    {displayData.tokens.map((token, index) => (
+                      <div key={index} className="p-3 bg-background rounded border">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium">Token: {token.symbol}</span>
+                              {token.address && (
                                 <code className="text-xs text-muted-foreground">
-                                  {tokenAddress.slice(0, 8)}...{tokenAddress.slice(-6)}
+                                  {token.address.slice(0, 8)}...{token.address.slice(-6)}
                                 </code>
-                              </div>
-                              <p className="text-sm font-semibold mt-1">{amount}</p>
+                              )}
                             </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium">Amount: {token.amount}</span>
+                            </div>
+                          </div>
+                          {token.address && (
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => copyToClipboard(tokenAddress, `token-${index}`)}
+                              onClick={() => copyToClipboard(token.address, `token-${index}`)}
                             >
                               {copiedField === `token-${index}` ? (
                                 <CopyCheck className="h-4 w-4" />
@@ -400,17 +465,26 @@ export function RecipientClaim(props: Props) {
                                 <Copy className="h-4 w-4" />
                               )}
                             </Button>
-                          </div>
+                          )}
                         </div>
-                      );
-                    })}
+                      </div>
+                    ))}
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 p-2 bg-background rounded border">
-                  <span className="text-sm text-muted-foreground">Status:</span>
-                  <span className="text-sm font-medium text-blue-600">Pending</span>
-                </div>
+                {row && (
+                  <div className="flex items-center gap-2 p-2 bg-background rounded border">
+                    <span className="text-sm text-muted-foreground">Status:</span>
+                    {displayData.expiry !== 0 && displayData.expiry < Date.now() / 1000 ? (
+                      <span className="text-sm font-medium text-destructive flex items-center gap-1">
+                        <XCircle className="h-4 w-4" />
+                        Expired
+                      </span>
+                    ) : (
+                      <span className="text-sm font-medium text-blue-600">Pending</span>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           ) : (

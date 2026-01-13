@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { depositToEscrow, DepositParams, getEscrowDeposit, EscrowDepositQuery, redeemEscrow, RedeemParams } from "../services/refer.service";
+import { depositToEscrow, DepositParams, getEscrowDeposit, EscrowDepositQuery, redeemEscrow, RedeemParams, getUserReferrals, cancelDeposit, CancelDepositParams, getReferralHistory } from "../services/refer.service";
 import { TransactionResponse } from "@mercata/shared-types";
 import { constants } from "../../config/constants";
 import { referralUrl } from "../../config/config";
@@ -14,7 +14,7 @@ class ReferController {
       const { accessToken, address: userAddress, body } = req;
       
         // Validate required fields
-        const { tokens, amounts, ephemeralAddress } = body;
+        const { tokens, amounts, ephemeralAddress, expiry } = body;
         
         if (!tokens || !Array.isArray(tokens) || tokens.length === 0) {
           res.status(400).json({ error: "tokens array is required and must not be empty" });
@@ -36,10 +36,16 @@ class ReferController {
           return;
         }
 
+        if (expiry === undefined || typeof expiry !== "number" || expiry <= 0) {
+          res.status(400).json({ error: "expiry is required and must be a positive number of seconds" });
+          return;
+        }
+
         const params: DepositParams = {
           tokens,
           amounts,
           ephemeralAddress,
+          expiry,
         };
 
       const result: TransactionResponse = await depositToEscrow(
@@ -139,6 +145,88 @@ class ReferController {
       }
 
       const result = await redeemEscrow(accessToken, params, redemptionServerUrl);
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
+  static async getReferrals(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress } = req;
+
+      if (!userAddress || typeof userAddress !== "string") {
+        res.status(400).json({ error: "User address is required" });
+        return;
+      }
+
+      const result = await getUserReferrals(accessToken, userAddress as string);
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
+  static async cancel(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress, body } = req;
+      
+      const { ephemeralAddress } = body;
+
+      if (!ephemeralAddress || typeof ephemeralAddress !== "string") {
+        res.status(400).json({ error: "ephemeralAddress is required" });
+        return;
+      }
+
+      const params: CancelDepositParams = {
+        ephemeralAddress,
+      };
+
+      const result: TransactionResponse = await cancelDeposit(
+        accessToken,
+        userAddress as string,
+        params
+      );
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
+  static async getHistory(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress } = req;
+
+      if (!userAddress || typeof userAddress !== "string") {
+        res.status(400).json({ error: "User address is required" });
+        return;
+      }
+
+      const result = await getReferralHistory(accessToken, userAddress as string);
 
       res.json({
         success: true,

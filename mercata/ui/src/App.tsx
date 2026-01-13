@@ -27,6 +27,7 @@ import MercataStats from "./pages/MercataStats";
 import Rewards from "./pages/Rewards";
 import ReferFriend from "./pages/ReferFriend";
 import Claim from "./pages/Claim";
+import ReferralsManagement from "./pages/ReferralsManagement";
 
 // Import dashboard components
 
@@ -254,6 +255,15 @@ const App = () => {
                                   element={
                                     <ProtectedRoute>
                                       <ReferFriend />
+                                    </ProtectedRoute>
+                                  }
+                                />
+
+                                <Route
+                                  path="/dashboard/referrals"
+                                  element={
+                                    <ProtectedRoute>
+                                      <ReferralsManagement />
                                     </ProtectedRoute>
                                   }
                                 />

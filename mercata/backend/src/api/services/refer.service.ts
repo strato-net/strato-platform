@@ -13,6 +13,7 @@ export interface DepositParams {
   tokens: string[]; // Array of token addresses (with or without 0x)
   amounts: string[]; // Array of amounts in wei (as strings)
   ephemeralAddress: string; // Ephemeral address (with or without 0x)
+  expiry: number; // Expiry in seconds from now
 }
 
 export const depositToEscrow = async (
@@ -51,6 +52,11 @@ export const depositToEscrow = async (
     }
   }
 
+  // Validate expiry
+  if (typeof params.expiry !== "number" || params.expiry <= 0) {
+    throw new Error("Invalid expiry: must be a positive number of seconds");
+  }
+
   // Build transaction: approve each token, then deposit all
   const approveTxs = normalizedTokens.map((tokenAddress, index) => ({
     contractName: extractContractName(Token),
@@ -70,7 +76,7 @@ export const depositToEscrow = async (
       tokens: normalizedTokens,
       amounts: params.amounts,
       ephemeralAddress: ephemeralAddress,
-      expiry: 0,
+      expiry: params.expiry,
     },
   };
 
@@ -141,7 +147,7 @@ export const getEscrowDeposit = async (
       sender: deposit.value?.sender || "",
       tokens: deposit.value?.tokens || [],
       amounts: deposit.value?.amounts || [],
-      expiry: deposit.value?.expirty || 0,
+      expiry: deposit.value?.expiry || 0,
     };
   } catch (error: any) {
     // If it's a 404 or empty result, return null
@@ -202,6 +208,179 @@ export const redeemEscrow = async (
     return await response.json();
   } catch (error: any) {
     console.error("Error in redeemEscrow service:", error);
+    throw error;
+  }
+};
+
+export interface UserReferral {
+  ephemeralAddress: string;
+  sender: string;
+  tokens: string[];
+  amounts: string[];
+  expiry: number;
+}
+
+export const getUserReferrals = async (
+  accessToken: string,
+  userAddress: string
+): Promise<UserReferral[]> => {
+  const normalizeAddress = (addr: string): string => {
+    return addr.startsWith("0x") ? addr.slice(2).toLowerCase() : addr.toLowerCase();
+  };
+
+  const normalizedUserAddress = normalizeAddress(userAddress);
+  const escrowAddress = normalizeAddress(escrow);
+
+  if (!/^[0-9a-f]{40}$/.test(normalizedUserAddress)) {
+    throw new Error("Invalid user address");
+  }
+  if (!/^[0-9a-f]{40}$/.test(escrowAddress)) {
+    throw new Error("Invalid escrow contract address");
+  }
+
+  try {
+    const params: Record<string, string> = {
+      select: "key,value",
+      address: `eq.${escrowAddress}`,
+      collection_name: `eq.deposits`,
+      ['value->>sender']: `eq.${normalizedUserAddress}`,
+    };
+
+    const response = await cirrus.get(accessToken, `/${EscrowDeposits}`, {
+      params,
+    });
+
+    const data = response.data;
+    if (!Array.isArray(data) || data.length === 0) {
+      return [];
+    }
+
+    return data.filter((d) => Array.isArray(d.value?.tokens)).map((deposit) => ({
+      ephemeralAddress: deposit.key.key || "",
+      sender: deposit.value?.sender || "",
+      tokens: deposit.value?.tokens || [],
+      amounts: deposit.value?.amounts || [],
+      expiry: deposit.value?.expiry || 0,
+    }));
+  } catch (error: any) {
+    if (error.response?.status === 404 || error.response?.status === 200) {
+      return [];
+    }
+    throw error;
+  }
+};
+
+export interface CancelDepositParams {
+  ephemeralAddress: string; // without 0x prefix
+}
+
+export const cancelDeposit = async (
+  accessToken: string,
+  userAddress: string,
+  params: CancelDepositParams
+): Promise<TransactionResponse> => {
+  const normalizeAddress = (addr: string): string => {
+    return addr.startsWith("0x") ? addr.slice(2).toLowerCase() : addr.toLowerCase();
+  };
+
+  const ephemeralAddress = normalizeAddress(params.ephemeralAddress);
+  const escrowAddress = normalizeAddress(escrow);
+
+  if (!/^[0-9a-f]{40}$/.test(ephemeralAddress)) {
+    throw new Error("Invalid ephemeral address");
+  }
+  if (!/^[0-9a-f]{40}$/.test(escrowAddress)) {
+    throw new Error("Invalid escrow contract address");
+  }
+
+  const cancelTx = {
+    contractName: Escrow,
+    contractAddress: escrowAddress,
+    method: "cancelDeposit",
+    args: {
+      ephemeralAddress: ephemeralAddress,
+    },
+  };
+
+  const tx = await buildFunctionTx(
+    [cancelTx],
+    userAddress,
+    accessToken
+  );
+
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, tx)
+  );
+};
+
+export interface ReferralHistoryEntry {
+  id: string;
+  eventName: string;
+  ephemeralAddress: string;
+  tokens: string[];
+  amounts: string[];
+  sender: string;
+  recipient?: string; // Only for Redeemed events
+  blockTimestamp: Date;
+}
+
+export const getReferralHistory = async (
+  accessToken: string,
+  userAddress: string
+): Promise<ReferralHistoryEntry[]> => {
+  const normalizeAddress = (addr: string): string => {
+    return addr.startsWith("0x") ? addr.slice(2).toLowerCase() : addr.toLowerCase();
+  };
+
+  const normalizedUserAddress = normalizeAddress(userAddress);
+  const escrowAddress = normalizeAddress(escrow);
+
+  if (!/^[0-9a-f]{40}$/.test(normalizedUserAddress)) {
+    throw new Error("Invalid user address");
+  }
+  if (!/^[0-9a-f]{40}$/.test(escrowAddress)) {
+    throw new Error("Invalid escrow contract address");
+  }
+
+  try {
+    const params: Record<string, string> = {
+      select: "id,event_name,attributes,block_timestamp",
+      address: `eq.${escrowAddress}`,
+      event_name: `in.(Redeemed,Cancelled)`,
+      ['attributes->>sender']: `eq.${normalizedUserAddress}`,
+      order: "block_timestamp.desc",
+    };
+
+    const response = await cirrus.get(accessToken, `/event`, {
+      params,
+    });
+
+    const data = response.data;
+    if (!Array.isArray(data) || data.length === 0) {
+      return [];
+    }
+
+    return data.map((event: any) => {
+      // Handle attributes that might be a JSON string or an object
+      const attributes = typeof event.attributes === 'string' 
+        ? JSON.parse(event.attributes) 
+        : event.attributes || {};
+      
+      return {
+        id: event.id?.toString() || "",
+        eventName: event.event_name || "",
+        ephemeralAddress: attributes.ephemeralAddress || "",
+        tokens: Array.isArray(attributes.tokens) ? attributes.tokens : [],
+        amounts: Array.isArray(attributes.amounts) ? attributes.amounts : [],
+        sender: attributes.sender || "",
+        recipient: attributes.recipient || undefined,
+        blockTimestamp: event.block_timestamp ? new Date(event.block_timestamp) : new Date(),
+      };
+    });
+  } catch (error: any) {
+    if (error.response?.status === 404 || error.response?.status === 200) {
+      return [];
+    }
     throw error;
   }
 };
