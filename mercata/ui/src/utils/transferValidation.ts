@@ -66,7 +66,7 @@ export const handleAmountInputChange = (
   userInput: string,
   setAmount: Dispatch<SetStateAction<string>>,
   setError: Dispatch<SetStateAction<string>>,
-  maxBalanceWei: string,
+  maxBalanceWei: string | undefined,
   tokenDecimals: number = DECIMAL
 ): void => {
   const input = userInput.replace(/,/g, "").trim();
@@ -105,8 +105,11 @@ export const handleAmountInputChange = (
   const amountWei = safeParseUnits(input, tokenDecimals);
   if (amountWei <= 0n) return setError("Amount must be greater than 0");
 
-  const maxWei = BigInt(maxBalanceWei || "0");
-  if (maxWei <= 0n || amountWei > maxWei) return setError("Maximum amount exceeded");
+  // Only check max balance if provided
+  if (maxBalanceWei !== undefined) {
+    const maxWei = BigInt(maxBalanceWei || "0");
+    if (maxWei <= 0n || amountWei > maxWei) return setError("Maximum amount exceeded");
+  }
 
   setError("");
 };

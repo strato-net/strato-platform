@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import MobileSidebar from "../components/dashboard/MobileSidebar";
@@ -23,6 +24,7 @@ import { handleRecipientAddress, handleAmountInputChange, computeMaxTransferable
 import { sortTokensCompareFn } from "@/lib/tokenPriority";
 
 const Transfer = () => {
+  const [searchParams] = useSearchParams();
   const { userAddress } = useUser();
   const { usdstBalance, voucherBalance, fetchUsdstBalance, loadingUsdstBalance, getTransferableTokens, transferToken } = useTokenContext();
   const { toast } = useToast();
@@ -83,6 +85,23 @@ const Transfer = () => {
     fetchUserTokens();
     fetchUsdstBalance();
   }, [fetchUserTokens, fetchUsdstBalance]);
+
+  // Handle URL params for pre-filling (from QR scan)
+  useEffect(() => {
+    const to = searchParams.get("to");
+    const amount = searchParams.get("amount");
+    if (to) setRecipient(to);
+    if (amount) setFromAmount(amount);
+  }, [searchParams]);
+
+  // Set token from URL params after tokens load
+  useEffect(() => {
+    const tokenAddress = searchParams.get("token");
+    if (tokenAddress && tokens.length > 0 && !fromAsset) {
+      const token = tokens.find(t => t.address === tokenAddress);
+      if (token) setFromAsset(token);
+    }
+  }, [tokens, searchParams, fromAsset]);
 
   const handleConfirmTransfer = async () => {
     if (!fromAsset || !recipient || !fromAmount) return;

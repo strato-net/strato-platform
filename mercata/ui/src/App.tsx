@@ -25,6 +25,7 @@ import ActivityFeed from "./pages/ActivityFeed";
 import NotFound from "./pages/NotFound";
 import MercataStats from "./pages/MercataStats";
 import Rewards from "./pages/Rewards";
+import ScanToPay from "./pages/ScanToPay";
 
 // Import dashboard components
 
@@ -196,6 +197,14 @@ const App = () => {
                                   element={
                                     <ProtectedRoute>
                                         <Transfer />
+                                    </ProtectedRoute>
+                                  }
+                                />
+                                <Route
+                                  path="/dashboard/scan-to-pay"
+                                  element={
+                                    <ProtectedRoute>
+                                        <ScanToPay />
                                     </ProtectedRoute>
                                   }
                                 />
