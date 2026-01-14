@@ -16,8 +16,6 @@ export interface FeedConfig {
     name: string;
     sources: string[];
     assets: string[]; // Array of asset keys
-    minPrice?: number;
-    maxPrice?: number;
 }
 
 export interface SourceConfig {
