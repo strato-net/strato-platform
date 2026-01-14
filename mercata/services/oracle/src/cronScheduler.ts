@@ -69,20 +69,23 @@ async function processAllFeeds(configLoader: ConfigLoader): Promise<void> {
     const startTime = Date.now();
     let timedOut = false;
 
-    await Promise.race([
-        (async () => {
-            for (const promise of feedPromises) {
-                try {
-                    const result = await promise;
-                    completedFeeds.add(result.feedName);
-                    feedResults.push(result);
-                } catch (err) {
-                    // Individual feed errors are already handled in the promise
-                }
-            }
-        })(),
-        new Promise((resolve) => setTimeout(() => { timedOut = true; resolve(undefined); }, timeoutMs))
+    // Race the timeout against Promise.allSettled to collect all results that complete in time
+    const raceResult = await Promise.race([
+        Promise.allSettled(feedPromises),
+        new Promise<'timeout'>((resolve) => setTimeout(() => { timedOut = true; resolve('timeout'); }, timeoutMs))
     ]);
+
+    // Collect results from all settled promises (both fulfilled and rejected)
+    if (raceResult !== 'timeout') {
+        raceResult.forEach((settledResult) => {
+            if (settledResult.status === 'fulfilled') {
+                const result = settledResult.value;
+                completedFeeds.add(result.feedName);
+                feedResults.push(result);
+            }
+            // Rejected promises are already handled in the promise itself
+        });
+    }
 
     // Log timeout info if it occurred
     if (timedOut) {
@@ -206,20 +209,23 @@ async function processBatchFeed(feed: any, configLoader: ConfigLoader): Promise<
     const timeoutMs = 30000;
     let timedOut = false;
 
-    await Promise.race([
-        (async () => {
-            for (const promise of fetchTasks) {
-                try {
-                    const result = await promise;
-                    completedSources.add(result.source);
-                    sourceResults.push(result);
-                } catch (err) {
-                    // Individual source errors are already handled in fetchTasks
-                }
-            }
-        })(),
-        new Promise((resolve) => setTimeout(() => { timedOut = true; resolve(undefined); }, timeoutMs))
+    // Race the timeout against Promise.allSettled to collect all results that complete in time
+    const raceResult = await Promise.race([
+        Promise.allSettled(fetchTasks),
+        new Promise<'timeout'>((resolve) => setTimeout(() => { timedOut = true; resolve('timeout'); }, timeoutMs))
     ]);
+
+    // Collect results from all settled promises (both fulfilled and rejected)
+    if (raceResult !== 'timeout') {
+        raceResult.forEach((settledResult) => {
+            if (settledResult.status === 'fulfilled') {
+                const result = settledResult.value;
+                completedSources.add(result.source);
+                sourceResults.push(result);
+            }
+            // Rejected promises are already handled in the promise itself
+        });
+    }
 
     // Log timeout info if it occurred
     if (timedOut) {
