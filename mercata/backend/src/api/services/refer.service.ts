@@ -2,10 +2,11 @@ import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { strato, cirrus } from "../../utils/mercataApiHelper";
 import { StratoPaths, constants } from "../../config/constants";
+import { escrow } from "../../config/config";
 import { extractContractName } from "../../utils/utils";
 import { TransactionResponse } from "@mercata/shared-types";
 
-const { Token, escrow } = constants;
+const { Token } = constants;
 const Escrow = "storage";
 const EscrowDeposits = `mapping`;
 
@@ -493,7 +494,7 @@ export const getReferralHistory = async (
     throw new Error("Invalid user address");
   }
   if (!/^[0-9a-f]{40}$/.test(escrowAddress)) {
-    throw new Error("Invalid escrow contract address");
+    throw new Error(`Invalid escrow contract address: ${escrowAddress}`);
   }
 
   try {
