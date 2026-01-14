@@ -60,3 +60,6 @@ docker-compose.oracle.yml
 /app
 /mynode/
 .aider*
+
+# Environment variables
+.env

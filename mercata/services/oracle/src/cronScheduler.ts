@@ -37,23 +37,42 @@ function isMetalsMarketClosed(): boolean {
     return false;
 }
 
+// Helper to wrap a promise with an individual timeout
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutError: string): Promise<T> {
+    return Promise.race([
+        promise,
+        new Promise<T>((_, reject) =>
+            setTimeout(() => reject(new Error(timeoutError)), timeoutMs)
+        )
+    ]);
+}
+
 // Process all feeds in parallel and combine results
 async function processAllFeeds(configLoader: ConfigLoader): Promise<void> {
     const allFeeds = configLoader.getResolvedFeeds();
     const marketClosed = isMetalsMarketClosed();
-    
+
     const resolvedFeeds = allFeeds.filter(feed => {
         if (feed.name === 'metals-batch') return !marketClosed;
         if (feed.name === 'metals-weekend') return marketClosed;
         return true;
     });
-    
+
     logInfo('CronScheduler', `Metals market ${marketClosed ? 'closed' : 'open'}, using feeds: [${resolvedFeeds.map(f => f.name).join(', ')}]`);
-    
-    // Process all feeds in parallel - collect results as they complete until timeout
+
+    const timeoutMs = 60000;
+    const startTime = Date.now();
+
+    // Process all feeds in parallel with individual timeouts
+    // Each feed gets its own timeout so slow feeds don't block results from fast feeds
     const feedPromises = resolvedFeeds.map(async (feed, index) => {
         try {
-            return { index, feedName: feed.name, result: await processBatchFeed(feed, configLoader), error: null };
+            const result = await withTimeout(
+                processBatchFeed(feed, configLoader),
+                timeoutMs,
+                `Feed ${feed.name} timed out after ${timeoutMs}ms`
+            );
+            return { index, feedName: feed.name, result, error: null };
         } catch (err) {
             const error = err as Error;
             logError('CronScheduler', new Error(`${feed.name}: ${error.message}`));
@@ -61,37 +80,35 @@ async function processAllFeeds(configLoader: ConfigLoader): Promise<void> {
         }
     });
 
-    // Wait for all feeds to complete or timeout
-    const completedFeeds = new Set<string>();
+    // Wait for all feeds to settle (complete or timeout individually)
+    const settledResults = await Promise.allSettled(feedPromises);
+
+    // Collect results from all settled promises
     const feedResults: Array<{ index: number; feedName: string; result: any; error: string | null }> = [];
+    const completedFeeds = new Set<string>();
+    const timedOutFeeds: string[] = [];
 
-    const timeoutMs = 60000;
-    const startTime = Date.now();
-    let timedOut = false;
-
-    await Promise.race([
-        (async () => {
-            for (const promise of feedPromises) {
-                try {
-                    const result = await promise;
-                    completedFeeds.add(result.feedName);
-                    feedResults.push(result);
-                } catch (err) {
-                    // Individual feed errors are already handled in the promise
-                }
+    settledResults.forEach((settled, index) => {
+        const feedName = resolvedFeeds[index].name;
+        if (settled.status === 'fulfilled') {
+            feedResults.push(settled.value);
+            completedFeeds.add(feedName);
+            if (settled.value.error?.includes('timed out')) {
+                timedOutFeeds.push(feedName);
             }
-        })(),
-        new Promise((resolve) => setTimeout(() => { timedOut = true; resolve(undefined); }, timeoutMs))
-    ]);
+        } else {
+            // This shouldn't happen since we catch errors in feedPromises, but handle it
+            logError('CronScheduler', new Error(`${feedName}: ${settled.reason}`));
+            feedResults.push({ index, feedName, result: null, error: String(settled.reason) });
+        }
+    });
 
-    // Log timeout info if it occurred
-    if (timedOut) {
-        const pendingFeeds = resolvedFeeds.filter(f => !completedFeeds.has(f.name)).map(f => f.name);
-        const completedList = Array.from(completedFeeds);
+    // Log timeout info if any feeds timed out
+    if (timedOutFeeds.length > 0) {
         logError('CronScheduler', new Error(
-            `Feed processing timeout after ${Date.now() - startTime}ms. ` +
-            `Feeds completed: [${completedList.join(', ') || 'none'}]. ` +
-            `Feeds still pending: [${pendingFeeds.join(', ') || 'none'}]`
+            `Feed processing: ${timedOutFeeds.length} feed(s) timed out after ${Date.now() - startTime}ms. ` +
+            `Timed out: [${timedOutFeeds.join(', ')}]. ` +
+            `Completed: [${Array.from(completedFeeds).filter(f => !timedOutFeeds.includes(f)).join(', ') || 'none'}]`
         ));
     }
 
@@ -172,20 +189,24 @@ async function processBatchFeed(feed: any, configLoader: ConfigLoader): Promise<
         return { assetPrices, assetAddresses, assetSources };
     }
 
-    // Track which sources have completed
-    const completedSources = new Set<string>();
     const startTime = Date.now();
+    const timeoutMs = 30000;
 
-    // Prepare parallel fetch tasks for batch sources
+    // Prepare parallel fetch tasks for batch sources with individual timeouts
+    // Each source gets its own timeout so slow sources don't block results from fast sources
     const fetchTasks = resolvedFeed.sources.map(async (sourceName: string) => {
         const fetchStartTime = Date.now();
         logInfo('CronScheduler', `${feed.name}: Starting fetch from source ${sourceName}`);
 
         try {
             const sourceConfig = configLoader.getSourceConfig(sourceName);
-            const batchResult = await fetchBatchPrices(resolvedFeed.assets, sourceConfig);
+            // Wrap the fetch in an individual timeout so one slow source doesn't block others
+            const batchResult = await withTimeout(
+                fetchBatchPrices(resolvedFeed.assets, sourceConfig),
+                timeoutMs,
+                `Source ${sourceName} timed out after ${timeoutMs}ms`
+            );
 
-            completedSources.add(sourceName);
             const fetchDuration = Date.now() - fetchStartTime;
             logInfo('CronScheduler', `${feed.name}: Completed fetch from source ${sourceName} in ${fetchDuration}ms`);
 
@@ -193,7 +214,6 @@ async function processBatchFeed(feed: any, configLoader: ConfigLoader): Promise<
 
         } catch (err) {
             const error = err as Error;
-            completedSources.add(sourceName);
             const fetchDuration = Date.now() - fetchStartTime;
             logError('CronScheduler', new Error(`${feed.name}: Failed to fetch from source ${sourceName} after ${fetchDuration}ms: ${error.message}`));
 
@@ -201,36 +221,35 @@ async function processBatchFeed(feed: any, configLoader: ConfigLoader): Promise<
         }
     });
 
-    // Wait for sources to complete or timeout - collect results as they come in
+    // Wait for all sources to settle (complete or timeout individually)
+    const settledResults = await Promise.allSettled(fetchTasks);
+
+    // Collect results from all settled promises
     const sourceResults: Array<{ batchResult: any; source: string; success: boolean; error?: string }> = [];
-    const timeoutMs = 30000;
-    let timedOut = false;
+    const timedOutSources: string[] = [];
 
-    await Promise.race([
-        (async () => {
-            for (const promise of fetchTasks) {
-                try {
-                    const result = await promise;
-                    completedSources.add(result.source);
-                    sourceResults.push(result);
-                } catch (err) {
-                    // Individual source errors are already handled in fetchTasks
-                }
+    settledResults.forEach((settled, index) => {
+        const sourceName = resolvedFeed.sources[index];
+        if (settled.status === 'fulfilled') {
+            sourceResults.push(settled.value);
+            if (settled.value.error?.includes('timed out')) {
+                timedOutSources.push(sourceName);
             }
-        })(),
-        new Promise((resolve) => setTimeout(() => { timedOut = true; resolve(undefined); }, timeoutMs))
-    ]);
+        } else {
+            // This shouldn't happen since we catch errors in fetchTasks, but handle it
+            logError('CronScheduler', new Error(`${feed.name}: Unexpected rejection from ${sourceName}: ${settled.reason}`));
+            sourceResults.push({ batchResult: {}, source: sourceName, success: false, error: String(settled.reason) });
+        }
+    });
 
-    // Log timeout info if it occurred
-    if (timedOut) {
+    // Log timeout info if any sources timed out
+    if (timedOutSources.length > 0) {
         const duration = Date.now() - startTime;
-        const pendingSources = resolvedFeed.sources.filter((s: string) => !completedSources.has(s));
-        const completedSourcesList = Array.from(completedSources);
-
+        const completedSources = sourceResults.filter(r => r.success).map(r => r.source);
         logError('CronScheduler', new Error(
-            `${feed.name}: Timeout after ${duration}ms. ` +
-            `Sources completed: [${completedSourcesList.join(', ') || 'none'}]. ` +
-            `Sources still pending: [${pendingSources.join(', ') || 'none'}]`
+            `${feed.name}: ${timedOutSources.length} source(s) timed out after ${duration}ms. ` +
+            `Timed out: [${timedOutSources.join(', ')}]. ` +
+            `Completed: [${completedSources.join(', ') || 'none'}]`
         ));
     }
 
