@@ -25,12 +25,14 @@ dependencies:
 library:
   source-dirs: src
   dependencies:
+    - base16-bytestring
     - blockapps-vault-wrapper-api
     - bytestring
     - cache
     - common-log
     - cryptonite
     - http-client
+    - http-types
     - lens
     - mtl
     - opaleye

@@ -4,6 +4,7 @@
 
 module Strato.Strato23.Server.Password where
 
+import Control.Monad (when)
 import Control.Monad.IO.Class
 import Control.Monad.Reader
 import qualified Crypto.KDF.Scrypt as Scrypt
@@ -18,6 +19,7 @@ import Database.PostgreSQL.Simple (Connection)
 import Strato.Strato23.Crypto
 import Strato.Strato23.Database.Queries
 import Strato.Strato23.Monad
+import Strato.Strato23.Server.BreachedPassword
 
 superSecretVaultWrapperMessage :: ByteString
 superSecretVaultWrapperMessage =
@@ -51,6 +53,12 @@ setPassword pw conn = do
 
 postPassword :: Text -> VaultM ()
 postPassword password = do
+  -- Check if password has been breached before proceeding
+  manager <- asks httpManager
+  isBreached <- liftIO $ isPasswordBreached manager password
+  when isBreached $
+    vaultWrapperError $ UserError "Password has been found in known data breaches and cannot be used. Please choose a different password."
+
   existingKey <- asks superSecretKey
   doIAlreadyHaveAKey <- liftIO $ readIORef existingKey
 
