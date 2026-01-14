@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { logInfo, logError } from './logger';
+import { apiPost } from './apiClient';
 
 
 const TOKEN_LIFETIME_THRESHOLD_SECONDS = 10;
@@ -71,13 +72,18 @@ class OAuthClient {
             tokenData.append('client_id', this.clientId);
             tokenData.append('client_secret', this.clientSecret);
 
-            const response = await axios.post(tokenEndpoint, tokenData, {
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'Accept': 'application/json'
+            const response = await apiPost(
+                tokenEndpoint,
+                tokenData,
+                {
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'Accept': 'application/json'
+                    },
+                    timeout: 10000
                 },
-                timeout: 10000
-            });
+                { logPrefix: 'OAuth' }
+            );
 
             if (response.data.access_token) {
                 this.accessToken = response.data.access_token;
@@ -89,10 +95,8 @@ class OAuthClient {
                 throw new Error('No access token in response');
             }
         } catch (error: any) {
-            const errorMessage = error.response?.data?.error_description || error.response?.data?.error || error.message;
-            const endpoint = tokenEndpoint || this.discoveryUrl;
-            logError('OAuth', new Error(`Failed to call POST ${endpoint}: ${errorMessage}`));
-            throw new Error(`OAuth authentication failed: ${errorMessage}`);
+            // apiPost already logged the error with retry details
+            throw new Error(`OAuth authentication failed: ${error.message}`);
         }
     }
 
