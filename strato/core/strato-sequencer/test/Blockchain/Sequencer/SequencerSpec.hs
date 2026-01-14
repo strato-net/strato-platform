@@ -50,7 +50,6 @@ import           Blockchain.Data.RLP
 import           Blockchain.Data.Transaction         (createChainMessageTX)
 import           Blockchain.Data.TransactionDef
 import qualified Blockchain.Data.TXOrigin as TO
-import           Blockchain.Privacy.Monad
 import           Blockchain.Sequencer
 import           Blockchain.Sequencer.CablePackage
 import           Blockchain.Sequencer.ChainHelpers
@@ -153,7 +152,6 @@ withTemporaryDepBlockDB genesisBlock m = do
         boot = do
           bootstrapGenesisBlock hsh difficulty
           A.insert (A.Proxy @X509CertInfoState) myAddr $ cmpsToXcis myAddr myCM
-          A.insert (A.Proxy @EmittedBlock) hsh alreadyEmittedBlock
     runNoLoggingT (runSequencerM cfg ctx (boot >> m))
       `finally`
       (removeDirectoryRecursive fullPath >> setCurrentDirectory cwd)-- always clean up
