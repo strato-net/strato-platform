@@ -64,6 +64,7 @@ async function main() {
     console.log(`CDP Vault: ${deployedContract.managers.cdpVault}`);
     console.log(`Safety Module: ${deployedContract.managers.safetyModule}`);
     console.log(`Rewards: ${deployedContract.managers.rewards}`);
+    console.log(`Escrow: ${deployedContract.managers.escrow}`);
     console.log('===================================\n');
     
     // Return the deployed contract address for scripting
@@ -91,6 +92,7 @@ async function main() {
       CDP_VAULT: deployedContract.managers.cdpVault,
       SAFETY_MODULE: deployedContract.managers.safetyModule,
       REWARDS: deployedContract.managers.rewards,
+      ESCROW: deployedContract.managers.escrow,
       MERCATA_CORE: deployedContract.address,
     };
     Object.entries(envLines).forEach(([k, v]) => {

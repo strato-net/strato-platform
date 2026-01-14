@@ -39,15 +39,19 @@ export async function fetchBatchPrices(assets: Asset[], sourceConfig: SourceConf
     const apiKey = getApiKey(sourceConfig);
     const url = buildBatchUrl(sourceConfig, assets, apiKey);
     const requestOptions = buildBatchRequestOptions(sourceConfig, url, apiKey, assets);
-    
-    const response = await apiRequest(requestOptions, { logPrefix: 'GenericRestAdapter' });
-    
+
+    const response = await apiRequest(requestOptions, {
+        logPrefix: 'GenericRestAdapter',
+        apiUrl: url,
+        method: requestOptions.method || 'GET'
+    });
+
     // Check for API error responses that don't throw HTTP errors
     if (response.data && response.data.success === false) {
         const errorMessage = response.data.error?.message || response.data.error || 'API returned error response';
         throw new Error(`${sourceConfig.url}: ${errorMessage}`);
     }
-    
+
     return parseBatchResponse(response.data, sourceConfig, assets);
 }
 
