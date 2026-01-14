@@ -118,8 +118,8 @@ const Allocation: React.FC<AllocationProps> = ({
   // Convert WAD token amount to USD
   // roundForDisplay: true in auto mode (2 decimal places), false in manual mode (no rounding)
   const wadToUSD = useCallback((wadAmount: string, assetAddress: string, roundForDisplay: boolean = true): string => {
-    if (!wadAmount || wadAmount === '0') return '';
     const tokenAmount = toNumber(wadAmount);
+    if (tokenAmount <= 0) return '';
     const price = getPrice(assetAddress);
     const usdValue = tokenAmount * price;
     if (usdValue <= 0) return '';
@@ -129,8 +129,8 @@ const Allocation: React.FC<AllocationProps> = ({
 
   // Convert USD to WAD token amount (never rounds - preserves full precision)
   const usdToWad = useCallback((usdValue: string, assetAddress: string): string => {
-    if (!usdValue || usdValue === '0') return '';
     const usd = toNumber(usdValue);
+    if (usd <= 0) return '';
     const price = getPrice(assetAddress);
     const tokenAmount = price > 0 ? usd / price : 0;
     return tokenAmount > 0 ? String(tokenAmount) : '';
@@ -139,8 +139,37 @@ const Allocation: React.FC<AllocationProps> = ({
   // Track previous autoSupplyCollateral value to detect transitions
   const prevAutoSupplyRef = useRef<boolean>(autoSupplyCollateral);
   
+  // Track if this is the initial mount
+  const isInitialMountRef = useRef<boolean>(true);
+  
+  // Initialize inputs on mount when component starts in manual mode (autoSupplyCollateral=false)
+  useEffect(() => {
+    // Only run on initial mount and only if starting in manual mode
+    if (!isInitialMountRef.current || autoSupplyCollateral) {
+      return;
+    }
+    
+    // Mark that we've completed initial mount
+    isInitialMountRef.current = false;
+    
+    // Initialize with empty inputs in manual mode (user will fill them in)
+    // This ensures a clean slate rather than trying to use optimalAllocations
+    // which may be empty/null when mounting in manual mode
+    const emptyInputs: Record<string, string> = {};
+    vaultCandidates.forEach(c => {
+      emptyInputs[c.assetAddress] = '';
+    });
+    
+    setDepositCanonical(emptyInputs);
+    setDepositDisplayInputs(emptyInputs);
+    setMintInputs(emptyInputs);
+  }, [autoSupplyCollateral, vaultCandidates]);
+  
   // When transitioning from auto to manual mode, initialize inputs from optimalAllocations
   useEffect(() => {
+    // Mark that initial mount is complete (if not already)
+    isInitialMountRef.current = false;
+    
     // Detect transition from auto (true) to manual (false)
     if (prevAutoSupplyRef.current === true && autoSupplyCollateral === false) {
       // Initialize canonical deposit values from optimalAllocations
