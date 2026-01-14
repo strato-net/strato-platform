@@ -53,7 +53,7 @@ const Borrow = () => {
 
   // Use the new smart polling hook for balance updates
   const { startPolling, stopPolling } = useSmartPolling({
-    fetchFn: fetchUsdstBalance,
+    fetchFn: (signal: AbortSignal) => fetchUsdstBalance(signal),
     shouldPoll: () => true,
     interval: 10000,
     onError: (error) => console.error("Balance polling error:", error)

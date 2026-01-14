@@ -19,7 +19,7 @@ export const useSmartPolling = (config: PollingConfig): PollingReturn => {
     if (abortRef.current) abortRef.current.abort();
     abortRef.current = new AbortController();
     try {
-      const rawData = await fetchFn();
+      const rawData = await fetchFn(abortRef.current.signal);
       if (!isMountedRef.current) return null;
       const processedData = transformData ? transformData(rawData) : rawData;
       setLastData(processedData);
@@ -56,20 +56,20 @@ export const useSmartPolling = (config: PollingConfig): PollingReturn => {
 };
 
 // Specialized hooks
-export const useBalancePolling = (userAddress: string, fetchBalance: (address: string) => Promise<any>, shouldPoll: (amount: string) => boolean = () => true) =>
-  useSmartPolling({ fetchFn: () => fetchBalance(userAddress), shouldPoll, interval: 10000, onError: (error) => console.error("Balance polling error:", error) });
+export const useBalancePolling = (userAddress: string, fetchBalance: (address: string, signal?: AbortSignal) => Promise<any>, shouldPoll: (amount: string) => boolean = () => true) =>
+  useSmartPolling({ fetchFn: (signal: AbortSignal) => fetchBalance(userAddress, signal), shouldPoll, interval: 10000, onError: (error) => console.error("Balance polling error:", error) });
 
 // Optimized focused hooks
 
 // Hook for managing pool data fetching and state
 export const usePoolPolling = ({ fromAsset, toAsset, getPoolByTokenPair, fetchUsdstBalance, interval = 10000 }: PoolPollingConfig) =>
   useSmartPolling({
-    fetchFn: async () => {
+    fetchFn: async (signal: AbortSignal) => {
       if (!fromAsset?.address || !toAsset?.address) return null;
-      const poolData = await getPoolByTokenPair(fromAsset.address, toAsset.address);
+      const poolData = await getPoolByTokenPair(fromAsset.address, toAsset.address, signal);
       // Also fetch USDST balance to keep it updated
       if (fetchUsdstBalance) {
-        await fetchUsdstBalance();
+        await fetchUsdstBalance(signal);
       }
       return poolData;
     },

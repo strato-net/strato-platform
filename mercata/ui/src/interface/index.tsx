@@ -342,7 +342,7 @@ export interface HealthImpactData {
 /*-------- Polling Interfaces --------*/
 
 export interface PollingConfig {
-  fetchFn: () => Promise<any>;
+  fetchFn: (signal: AbortSignal) => Promise<any>;
   shouldPoll?: (amount: string) => boolean;
   onDataUpdate?: (data: any) => void;
   interval?: number;
@@ -365,7 +365,7 @@ export interface PoolPollingConfig {
   fromAsset: any;
   toAsset: any;
   getPoolByTokenPair: (tokenA: string, tokenB: string, signal?: AbortSignal) => Promise<any>;
-  fetchUsdstBalance: () => Promise<void>;
+  fetchUsdstBalance: (signal?: AbortSignal) => Promise<void>;
   interval?: number;
 }
 
