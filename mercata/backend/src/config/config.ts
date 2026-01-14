@@ -71,7 +71,7 @@ export const defaultEscrowAddressFor: Record<string, string> = {
 }
 export const defaultReferralServiceFor: Record<string, string> = {
   "114784819836269": "http://ec2-54-89-36-118.compute-1.amazonaws.com", // Helium testnet
-  "33056204878082667": "http://ec2-54-89-36-118.compute-1.amazonaws.com", // Upquark mainnet
+  "33056204878082667": "http://ec2-18-218-166-133.us-east-2.compute.amazonaws.com", // Upquark mainnet
 };
 
 export let bridgeUrl: string | undefined;
