@@ -69,19 +69,30 @@ async function processAllFeeds(configLoader: ConfigLoader): Promise<void> {
     const startTime = Date.now();
     let timedOut = false;
 
+    // Create a timeout promise that resolves after timeoutMs
+    const timeoutPromise = new Promise<void>((resolve) =>
+        setTimeout(() => {
+            timedOut = true;
+            resolve();
+        }, timeoutMs)
+    );
+
+    // Collect results as each promise completes, racing against the timeout
     await Promise.race([
-        (async () => {
-            for (const promise of feedPromises) {
+        Promise.all(
+            feedPromises.map(async (promise) => {
                 try {
                     const result = await promise;
-                    completedFeeds.add(result.feedName);
-                    feedResults.push(result);
+                    if (!timedOut) {
+                        completedFeeds.add(result.feedName);
+                        feedResults.push(result);
+                    }
                 } catch (err) {
                     // Individual feed errors are already handled in the promise
                 }
-            }
-        })(),
-        new Promise((resolve) => setTimeout(() => { timedOut = true; resolve(undefined); }, timeoutMs))
+            })
+        ),
+        timeoutPromise
     ]);
 
     // Log timeout info if it occurred
@@ -206,19 +217,30 @@ async function processBatchFeed(feed: any, configLoader: ConfigLoader): Promise<
     const timeoutMs = 30000;
     let timedOut = false;
 
+    // Create a timeout promise that resolves after timeoutMs
+    const timeoutPromise = new Promise<void>((resolve) =>
+        setTimeout(() => {
+            timedOut = true;
+            resolve();
+        }, timeoutMs)
+    );
+
+    // Collect results as each promise completes, racing against the timeout
     await Promise.race([
-        (async () => {
-            for (const promise of fetchTasks) {
+        Promise.all(
+            fetchTasks.map(async (promise) => {
                 try {
                     const result = await promise;
-                    completedSources.add(result.source);
-                    sourceResults.push(result);
+                    if (!timedOut) {
+                        completedSources.add(result.source);
+                        sourceResults.push(result);
+                    }
                 } catch (err) {
                     // Individual source errors are already handled in fetchTasks
                 }
-            }
-        })(),
-        new Promise((resolve) => setTimeout(() => { timedOut = true; resolve(undefined); }, timeoutMs))
+            })
+        ),
+        timeoutPromise
     ]);
 
     // Log timeout info if it occurred
