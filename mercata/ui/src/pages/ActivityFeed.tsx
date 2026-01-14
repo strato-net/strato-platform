@@ -4,25 +4,45 @@ import DashboardHeader from "../components/dashboard/DashboardHeader";
 import MobileSidebar from "../components/dashboard/MobileSidebar";
 import ActivityFeedList from "../components/dashboard/ActivityFeedList";
 import { Activity } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useSearchParams } from "react-router-dom";
+import { useUser } from "@/context/UserContext";
 
 const ActivityFeed = () => {
+  const [searchParams] = useSearchParams();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const { userAddress } = useUser();
+
+  const [activeTab, setActiveTab] = useState<"activity" | "my-activity">(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam === "my-activity") {
+      return tabParam;
+    }
+    return "activity";
+  });
 
   useEffect(() => {
     document.title = "Activity Feed | STRATO";
   }, []);
 
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam === "activity" || tabParam === "my-activity") {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams]);
+
   return (
     <div className="min-h-screen bg-background">
       <DashboardSidebar />
-      <MobileSidebar 
-        isOpen={isMobileSidebarOpen} 
-        onClose={() => setIsMobileSidebarOpen(false)} 
+      <MobileSidebar
+        isOpen={isMobileSidebarOpen}
+        onClose={() => setIsMobileSidebarOpen(false)}
       />
 
       <div className="transition-all duration-300 md:pl-64" style={{ paddingLeft: 'var(--sidebar-width, 0rem)' }}>
-        <DashboardHeader 
-          title="Activity Feed" 
+        <DashboardHeader
+          title="Activity Feed"
           onMenuClick={() => setIsMobileSidebarOpen(true)}
         />
 
@@ -37,7 +57,24 @@ const ActivityFeed = () => {
             </p>
           </div>
 
-          <ActivityFeedList />
+          <Tabs
+            value={activeTab}
+            onValueChange={(value) => setActiveTab(value as "activity" | "my-activity")}
+            className="w-full"
+          >
+            <TabsList className="grid w-full grid-cols-2 mb-6">
+              <TabsTrigger value="activity">Activity</TabsTrigger>
+              <TabsTrigger value="my-activity">My Activity</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="activity">
+              <ActivityFeedList />
+            </TabsContent>
+
+            <TabsContent value="my-activity">
+              <ActivityFeedList myActivityOnly={true} userAddress={userAddress} />
+            </TabsContent>
+          </Tabs>
         </main>
       </div>
     </div>
