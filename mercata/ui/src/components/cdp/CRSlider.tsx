@@ -87,8 +87,6 @@ const CRSlider: React.FC<CRSliderProps> = ({
     return `CR = Collateral Value ÷ Debt Value\n$${collateralFormatted} ÷ $${debtFormatted} = ${crFormatted}%`;
   };
 
-  console.log(projectedCR, sliderMin);
-
   return (
     <TooltipProvider>
       <div className="space-y-3">
