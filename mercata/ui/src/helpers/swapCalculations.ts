@@ -66,8 +66,9 @@ export const calculateSwapInput = (
 
   // Reverse AMM formula: (inputReserve * outputAmount) / (outputReserve - outputAmount)
   const ratio = isAToB ? pool.aToBRatio : pool.bToARatio;
-  const numerator = pool.isStable ? inputReserve * BigInt(Math.round(parseFloat(ratio) * 1e18)) : inputReserve * outputAmountBigInt;
-  const denominator = pool.isStable ? BigInt(1e18) : outputReserve - outputAmountBigInt;
+  const ratioBigInt = BigInt(Math.round(parseFloat(ratio) * 1e18));
+  const numerator = pool.isStable ? outputAmountBigInt * BigInt(1e18) : inputReserve * outputAmountBigInt;
+  const denominator = pool.isStable ? ratioBigInt : outputReserve - outputAmountBigInt;
   
   // Ceil to beat on-chain floor
   // a=11, b=5: ceil(11/5)=3. (11+5-1)/5 = 15/5 = 3.

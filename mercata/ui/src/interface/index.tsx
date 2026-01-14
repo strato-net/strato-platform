@@ -197,7 +197,9 @@ export interface CollateralData {
   isCollateralized: boolean;
   liquidationThreshold: string; // Possibly in basis points (e.g., "8000" = 80%)
   ltv: string; // Loan-to-Value ratio (e.g., "7500" = 75%)
-  maxBorrowingPower: string; // Usually a percent string
+  maxBorrowingPower: string; // Borrowing power from supplied collateral (collateralizedAmount * price * ltv)
+  unsuppliedBorrowingPower: string; // Potential borrowing power from user balance (userBalance * price * ltv)
+  unsuppliedLTCollateralValue: string; // LT-weighted value of unsupplied balance (userBalance * price * lt)
   userBalance: string;
   userBalanceValue: string;
   _name: string;
@@ -312,7 +314,8 @@ export type NewLoanData = {
   healthFactor: number;
   healthFactorRaw: string;
   totalBorrowingPowerUSD: string;
-  totalCollateralValueUSD: string;
+  totalCollateralValueUSD: string;      // risk-adjusted by LT (for health factor)
+  totalCollateralValueSupplied: string; // full supplied collat $ value (for display)
   maxAvailableToBorrowUSD: string;
   interestRate: number;                // bps
   isAboveLiquidationThreshold: boolean;

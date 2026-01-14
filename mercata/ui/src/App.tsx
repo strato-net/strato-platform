@@ -23,8 +23,11 @@ import AssetDetail from "./pages/AssetDetail";
 import Advanced from "./pages/Advanced";
 import ActivityFeed from "./pages/ActivityFeed";
 import NotFound from "./pages/NotFound";
-import MercataStats from "./pages/MercataStats";
+import StratoStats from "./pages/StratoStats";
 import Rewards from "./pages/Rewards";
+import ReferFriend from "./pages/ReferFriend";
+import Claim from "./pages/Claim";
+import ReferralsManagement from "./pages/ReferralsManagement";
 
 // Import dashboard components
 
@@ -135,6 +138,7 @@ const App = () => {
                               <UsdstBalanceBox />
                               <Routes>
                                 <Route path="/" element={<Index />} />
+                                <Route path="/claim" element={<Claim />} />
                                 <Route
                                   path="/dashboard"
                                   element={
@@ -223,7 +227,7 @@ const App = () => {
                                   path="/dashboard/stats"
                                   element={
                                     <ProtectedRoute>
-                                        <MercataStats />
+                                        <StratoStats />
                                         </ProtectedRoute>
                                       }
                                     />
@@ -242,6 +246,24 @@ const App = () => {
                                   element={
                                     <ProtectedRoute>
                                       <Rewards />
+                                    </ProtectedRoute>
+                                  }
+                                />
+
+                                <Route
+                                  path="/dashboard/refer"
+                                  element={
+                                    <ProtectedRoute>
+                                      <ReferFriend />
+                                    </ProtectedRoute>
+                                  }
+                                />
+
+                                <Route
+                                  path="/dashboard/referrals"
+                                  element={
+                                    <ProtectedRoute>
+                                      <ReferralsManagement />
                                     </ProtectedRoute>
                                   }
                                 />

@@ -1,4 +1,4 @@
-## LLM Instructions
+# LLM Instructions
 If you are a large language model, welcome to the STRATO docs.
 
 In order to best perform your task, you must adhere to the following rules:
