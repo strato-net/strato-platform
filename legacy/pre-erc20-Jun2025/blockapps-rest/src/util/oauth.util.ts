@@ -6,6 +6,7 @@ import * as getPem from "rsa-pem-from-mod-exp";
 import axios from "axios";
 import "@babel/polyfill";
 import { OAuthUser } from "../types";
+import * as crypto from "crypto";
 
 interface OAuthConfig {
   appTokenCookieName:any,
@@ -77,6 +78,38 @@ class OAuthUtil {
   }
 
   /**
+   * Generate a cryptographically secure random code verifier for PKCE
+   * @method{generateCodeVerifier}
+   * @returns {String} base64url-encoded random string (43-128 characters)
+   */
+  generateCodeVerifier(): string {
+    // RFC 7636 specifies code_verifier should be 43-128 characters
+    // Using 32 random bytes gives us 43 characters after base64url encoding
+    return crypto
+      .randomBytes(32)
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '');
+  }
+
+  /**
+   * Generate a code challenge from a code verifier for PKCE
+   * @method{generateCodeChallenge}
+   * @param {String} codeVerifier
+   * @returns {String} base64url-encoded SHA256 hash of the code verifier
+   */
+  generateCodeChallenge(codeVerifier: string): string {
+    return crypto
+      .createHash('sha256')
+      .update(codeVerifier)
+      .digest('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '');
+  }
+
+  /**
    * This function calls openIdConfigUrl to get openIdConfig and it also fetches
    * any public keys that maybe used to sign tokens
    * @method{getOpenIdConfig}
@@ -143,33 +176,48 @@ class OAuthUtil {
   }
 
   /**
-   * This function gets the sign in url for oauth
+   * This function gets the sign in url for oauth with optional PKCE support
    * @method{getSigninURL}
    * @param {String} state
+   * @param {String} codeChallenge - Optional PKCE code challenge
    * @returns AuthorizationUri
    */
-  getSigninURL(state?) {
-    const authorizationUri = this.oauth2.authorizationCode.authorizeURL({
+  getSigninURL(state?, codeChallenge?) {
+    const authParams: any = {
       redirect_uri: this.redirectUri,
       scope: this.scope,
       state: state || ""
-    });
+    };
+
+    // Add PKCE parameters if code challenge is provided
+    if (codeChallenge) {
+      authParams.code_challenge = codeChallenge;
+      authParams.code_challenge_method = 'S256';
+    }
+
+    const authorizationUri = this.oauth2.authorizationCode.authorizeURL(authParams);
 
     return authorizationUri;
   }
 
   /**
-   * This function gets the access token from the authorization code
+   * This function gets the access token from the authorization code with optional PKCE support
    * @method{getAccessTokenByAuthCode}
    * @param {String} authCode
+   * @param {String} codeVerifier - Optional PKCE code verifier
    * @returns AccessTokenResponse
    */
-  async getAccessTokenByAuthCode(authCode) {
-    const tokenConfig = {
+  async getAccessTokenByAuthCode(authCode, codeVerifier?) {
+    const tokenConfig: any = {
       code: authCode,
       redirect_uri: this.redirectUri,
       scope: this.scope
     };
+
+    // Add PKCE code verifier if provided
+    if (codeVerifier) {
+      tokenConfig.code_verifier = codeVerifier;
+    }
 
     const result = await this.oauth2.authorizationCode.getToken(tokenConfig);
     const accessTokenResponse = this.oauth2.accessToken.create(result);

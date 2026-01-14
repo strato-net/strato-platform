@@ -143,10 +143,14 @@ const run = async function() {
 
   const oauth = await oauthUtil.init(config.nodes[0].oauth);
 
-  const signinUri = oauth.getSigninURL();
+  // Generate PKCE code verifier and challenge for authorization code flow
+  const codeVerifier = oauth.generateCodeVerifier();
+  const codeChallenge = oauth.generateCodeChallenge(codeVerifier);
+
+  const signinUri = oauth.getSigninURL(undefined, codeChallenge);
   async function requestListener(req, res) {
     // TODO: better route matching
-    
+
     if (req.url === '/') {
       res.writeHead(302, {
         'Location': signinUri
@@ -156,7 +160,7 @@ const run = async function() {
     }
 
     const callbackPath = redirectUriParsed.pathname;
-    
+
     if (req.url.indexOf(callbackPath) !== 0 ) {
       if (req.url !== '/favicon.ico') {
         console.log('Unknown URI was called: ' + req.url);
@@ -165,7 +169,7 @@ const run = async function() {
       res.end();
       return
     }
-    
+
     const urlParts = req.url.split("?");
     if (urlParts.length < 2) {
       console.error("Missing query string in redirectUri callback url.");
@@ -176,7 +180,7 @@ const run = async function() {
       console.error('Missing required query parameter "code" in redirectUri callback');
       return
     }
-    const acToken = await oauth.getAccessTokenByAuthCode(query.code);
+    const acToken = await oauth.getAccessTokenByAuthCode(query.code, codeVerifier);
 
     if (commander.env) {
       envConfig[commander.env] = acToken.token.access_token;
