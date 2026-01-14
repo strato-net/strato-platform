@@ -88,20 +88,20 @@ contract Escrow is Ownable {
         if (feeAmount > 0) {
             feeOk = IERC20(d.tokens[i]).transfer(msg.sender, feeAmount);
         }
-        tokens.push(deposits[ephemeralAddress].tokens[i]);
-        amounts.push(deposits[ephemeralAddress].amounts[i]);
+        tokens.push(d.tokens[i]);
+        amounts.push(d.amounts[i]);
         if (d.quantity == 1) {
-          deposits[ephemeralAddress].tokens[i] = address(0);
-          deposits[ephemeralAddress].amounts[i] = 0;
+          d.tokens[i] = address(0);
+          d.amounts[i] = 0;
         }
         require(ok && feeOk, "transfer failed");
     }
 
     if (d.quantity == 1) {
-        deposits[ephemeralAddress].sender = address(0);
-        deposits[ephemeralAddress].tokens.length = 0;
-        deposits[ephemeralAddress].amounts.length = 0;
-        deposits[ephemeralAddress].expiry = 0;
+        d.sender = address(0);
+        d.tokens.length = 0;
+        d.amounts.length = 0;
+        d.expiry = 0;
         for (uint j = 0; j < d.recipients.length; j++) {
             depositRecipients[ephemeralAddress][d.recipients[j]] = false;
             d.recipients[j] = address(0);
@@ -131,21 +131,22 @@ contract Escrow is Ownable {
 
     for (uint i = 0; i < d.tokens.length; i++) {
         bool ok = IERC20(d.tokens[i]).transfer(sender, quantity * d.amounts[i]);
-        tokens.push(deposits[ephemeralAddress].tokens[i]);
-        amounts.push(deposits[ephemeralAddress].amounts[i]);
-        deposits[ephemeralAddress].tokens[i] = address(0);
-        deposits[ephemeralAddress].amounts[i] = 0;
+        tokens.push(d.tokens[i]);
+        amounts.push(d.amounts[i]);
+        d.tokens[i] = address(0);
+        d.amounts[i] = 0;
         require(ok, "transfer failed");
     }
 
-    deposits[ephemeralAddress].sender = address(0);
-    deposits[ephemeralAddress].tokens.length = 0;
-    deposits[ephemeralAddress].amounts.length = 0;
-    deposits[ephemeralAddress].expiry = 0;
+    d.sender = address(0);
+    d.tokens.length = 0;
+    d.amounts.length = 0;
+    d.expiry = 0;
     for (uint j = 0; j < d.recipients.length; j++) {
         depositRecipients[ephemeralAddress][d.recipients[j]] = false;
         d.recipients[j] = address(0);
     }
+    d.quantity = 0;
     d.recipients.length = 0;
 
     emit Cancelled(ephemeralAddress, quantity, tokens, amounts, sender);
