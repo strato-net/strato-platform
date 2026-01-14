@@ -6,7 +6,7 @@ import AssetSummary from "../components/dashboard/AssetSummary";
 import AssetsList from "../components/dashboard/AssetsList";
 import DashboardFAQ from "../components/dashboard/DashboardFAQ";
 import BorrowingSection from "../components/dashboard/BorrowingSection";
-import { Wallet, Coins, Shield, Banknote, Loader2, Trophy } from "lucide-react";
+import { Wallet, Coins, Shield, Banknote, Loader2, Trophy, UserPlus } from "lucide-react";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
 import { usePendingRewards } from "@/hooks/usePendingRewards";
@@ -33,7 +33,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-  const { userAddress } = useUser();
+  const { userAddress, isLoggedIn } = useUser();
   const {
     earningAssets,
     getEarningAssets,
@@ -132,6 +132,14 @@ const Dashboard = () => {
   useEffect(() => {
     document.title = "Dashboard | STRATO";
     
+    // Check if user just logged in and needs to be redirected back to claim page
+    const claimReturnUrl = localStorage.getItem("claimReturnUrl");
+    if (claimReturnUrl && isLoggedIn) {
+      localStorage.removeItem("claimReturnUrl");
+      navigate(claimReturnUrl, { replace: true });
+      return;
+    }
+    
     const hasExistingEarningAssets = earningAssets.length > 0;
     const hasExistingInactiveTokens = inactiveTokens.length > 0;
     
@@ -139,7 +147,7 @@ const Dashboard = () => {
     getInactiveTokens(!hasExistingInactiveTokens);
     refreshLoans();
     refreshVaults();
-  }, [location.pathname, userAddress, getEarningAssets, getInactiveTokens, refreshLoans, refreshVaults]);
+  }, [location.pathname, userAddress, getEarningAssets, getInactiveTokens, refreshLoans, refreshVaults, isLoggedIn, navigate]);
 
   useEffect(() => {
     localStorage.setItem('dashboard-activeTab', activeTab);
@@ -378,6 +386,32 @@ const Dashboard = () => {
               onClick={() => setActiveTab('borrowed')}
               isActive={activeTab === 'borrowed'}
             />
+          </div>
+
+          {/* Refer a Friend Section */}
+          <div className="mb-8">
+            <div className="bg-card shadow-md rounded-lg p-6 border border-border">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-blue-500 rounded-lg">
+                    <UserPlus className="text-white" size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold">Refer a Friend</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Send tokens to friends who haven't signed up yet
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  onClick={() => navigate("/dashboard/refer")}
+                  className="flex items-center gap-2"
+                >
+                  <UserPlus className="h-4 w-4" />
+                  Get Started
+                </Button>
+              </div>
+            </div>
           </div>
 
           {/* Portfolio Value Chart */}

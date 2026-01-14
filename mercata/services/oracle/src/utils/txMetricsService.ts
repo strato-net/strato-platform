@@ -56,7 +56,8 @@ class TxMetricsService {
                 `Recorded metric: txHash=${metric.txHash}, duration=${metric.duration}ms, status=${metric.status}`
             );
         } catch (error) {
-            logError('TxMetricsService', error as Error);
+            const err = error as Error;
+            logError('TxMetricsService', new Error(`Failed to call AWS CloudWatch PutMetricData (namespace: ${NAMESPACE}): ${err.message}`));
         }
     }
 }
