@@ -19,7 +19,8 @@ import {
   calculateAdditionalCollateralAmountFromValue,
   sortCollateralAssets,
   calculateMaxCollateralValueUSDCentFloored,
-  centCeil
+  centCeil,
+  centFloor
 } from "@/utils/lendingUtils";
 import { getRiskLabel } from "@/utils/lendingUtils";
 import { useLendingContext } from "@/context/LendingContext";
@@ -193,20 +194,30 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
 
   // Additional collateral needed value (for header)
   const additionalCollateralNeededValue = useMemo(() => {
-    if (autoSupplyCollateral) {
-      return totalCollateralValue;
-    }
+    // In auto mode, the amount needed is already what's supplied
+    if (autoSupplyCollateral) { return totalCollateralValue; }
     // In custom mode, calculate what's needed to achieve target HF using strictest LT
-    const needed = calculateAdditionalValueNeeded(collateralInfo, parseFloat(borrowAmount || "0"), loans, targetHealthFactor);
-    return Number(needed);
+    if (!loans || !collateralInfo || collateralInfo.length === 0) return 0;
+    const borrowNum = parseFloat(borrowAmount || "0");
+    if (!borrowNum || borrowNum <= 0) return 0;
+    return Number(calculateAdditionalValueNeeded(collateralInfo, borrowNum, loans, targetHealthFactor));
   }, [autoSupplyCollateral, totalCollateralValue, loans, collateralInfo, borrowAmount, targetHealthFactor]);
 
   // Check if sufficient collateral is supplied in custom mode
-  const hasInsufficientCollateral = useMemo(() => {
-    if (autoSupplyCollateral) return false; // Only check in custom mode
-    if (!borrowAmount || parseFloat(borrowAmount) <= 0) return false; // No validation needed if no borrow amount
-    return totalCollateralValue < additionalCollateralNeededValue;
+  const additionalCollateralShortfall = useMemo(() => {
+    if (autoSupplyCollateral) return 0; // Only check in custom mode
+    if (!borrowAmount || parseFloat(borrowAmount) <= 0) return 0; // No validation needed if no borrow amount
+    return additionalCollateralNeededValue - totalCollateralValue;
   }, [autoSupplyCollateral, totalCollateralValue, additionalCollateralNeededValue, borrowAmount]);
+
+  const hasInsufficientCollateral = useMemo(() => {
+    return additionalCollateralShortfall > 0;
+  }, [additionalCollateralShortfall]);
+
+  const hasExcessCollateral = useMemo(() => {
+    const EXCESS_COLLATERAL_ALLOWANCE = 1.00; // Allow for 1 USD of excess
+    return additionalCollateralShortfall < -EXCESS_COLLATERAL_ALLOWANCE;
+  }, [autoSupplyCollateral, additionalCollateralShortfall, borrowAmount]);
 
   // Calculate transaction fee based on number of collateral assets being supplied
   const txFee = useMemo(() => {
@@ -570,7 +581,8 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
           progressModalOpen ||
           borrowAmountExceedsMax ||
           hasExceededMaxCollateralValue ||
-          hasInsufficientCollateral
+          hasInsufficientCollateral ||
+          hasExcessCollateral
         }
         className="w-full"
       >
@@ -630,12 +642,33 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
           `}</style>
           {/* Total Value Header */}
           <div className="text-sm font-medium mb-3 pt-2 border-t">
-            Total Value of Collateral: ${totalCollateralValue.toFixed(2)}
-            {hasInsufficientCollateral && (
-              <span className="text-yellow-600 dark:text-yellow-400 ml-2">
-                (${centCeil(additionalCollateralNeededValue - totalCollateralValue).toFixed(2)} more needed)
-              </span>
-            )}
+            Selected Additional Collateral Value: ${totalCollateralValue.toFixed(2)}
+            {(() => {
+              // Show delta in custom mode (input-driven), where the user may be short or have excess.
+              if (autoSupplyCollateral) return null;
+              if (hasInsufficientCollateral) {
+                return (
+                  <span className="text-yellow-600 dark:text-yellow-400 ml-2">
+                    (${centCeil(additionalCollateralShortfall).toFixed(2)} more is needed)
+                  </span>
+                );
+              }
+              else if (hasExcessCollateral) {
+                return (
+                  <span className="text-yellow-600 dark:text-yellow-400 ml-2">
+                    (${centFloor(-additionalCollateralShortfall).toFixed(2)} less is needed)
+                  </span>
+                );
+              }
+              else if (additionalCollateralShortfall < -0.01) {
+                return (
+                  <span className="text-muted-foreground ml-2">
+                    (${centFloor(-additionalCollateralShortfall).toFixed(2)} slight excess)
+                  </span>
+                );
+              }
+              return null;
+            })()}
           </div>
 
           {/* Collateral Table */}
