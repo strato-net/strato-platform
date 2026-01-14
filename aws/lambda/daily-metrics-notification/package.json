@@ -1,0 +1,15 @@
+{
+  "name": "daily-metrics-notification",
+  "version": "1.0.0",
+  "description": "Lambda function to send daily network metrics notifications",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@aws-sdk/client-cloudwatch": "^3.490.0",
+    "@aws-sdk/client-sns": "^3.490.0"
+  },
+  "author": "BlockApps",
+  "license": "ISC"
+}

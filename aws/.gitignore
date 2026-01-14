@@ -1,0 +1,22 @@
+# Node modules
+node_modules/
+package-lock.json
+
+# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfvars
+.terraform.tfstate.lock.info
+
+# Lambda deployment packages
+*.zip
+lambda-deployment.zip
+
+# Test outputs
+response.json
+
+# OS files
+.DS_Store
+Thumbs.db
