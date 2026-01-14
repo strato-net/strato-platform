@@ -48,7 +48,8 @@ const Advanced = () => {
               <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "lending" | "swap" | "liquidations" | "safety" | "mint")} className="w-full">
                 <TabsList className="grid w-full grid-cols-5 mb-4">
                   <TabsTrigger value="mint" className="text-sm sm:text-base">
-                    Mint
+                    <span className="hidden sm:inline">Mint USDST</span>
+                    <span className="sm:hidden">Mint</span>
                   </TabsTrigger>
                   <TabsTrigger value="lending" className="text-sm sm:text-base">
                     <span className="hidden sm:inline">Lending Pools</span>
