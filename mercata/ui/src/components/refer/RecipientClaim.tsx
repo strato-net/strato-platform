@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Copy, CopyCheck, Loader2, CheckCircle2, XCircle, AlertCircle, LogIn } from "lucide-react";
+import { Copy, CopyCheck, Loader2, CheckCircle2, XCircle, AlertCircle, LogIn, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatUnits } from "@/utils/numberUtils";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
@@ -46,7 +46,7 @@ export function RecipientClaim(props: Props) {
   const [isLoading, setIsLoading] = useState(false);
   const [isRedeeming, setIsRedeeming] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
-  const [referralStatus, setReferralStatus] = useState<'active' | 'redeemed' | 'cancelled' | null>(null);
+  const [referralStatus, setReferralStatus] = useState<'active' | 'redeemed' | 'cancelled' | 'user_redeemed' | null>(null);
   const { toast } = useToast();
   const { getTransferableTokens } = useTokenContext();
   const [allTokens, setAllTokens] = useState<any[]>([]);
@@ -97,7 +97,7 @@ export function RecipientClaim(props: Props) {
   // Check if referral is redeemed or cancelled (using status from API or fallback to checking row data)
   const isRedeemedOrCancelled = (): boolean => {
     // First check the API status if available
-    if (referralStatus === 'redeemed' || referralStatus === 'cancelled') {
+    if (referralStatus === 'redeemed' || referralStatus === 'cancelled' || referralStatus === 'user_redeemed') {
       return true;
     }
     // Fallback: check row data structure
@@ -417,8 +417,26 @@ export function RecipientClaim(props: Props) {
     return null;
   }, [row, formattedAmounts, urlEphemeralAddress, urlTokenSymbols, urlTokenAmounts, getTokenInfo]);
 
+  const handleBackToDashboard = () => {
+    // Clear referral link from local storage
+    localStorage.removeItem("claimReturnUrl");
+    // Navigate to dashboard
+    navigate("/dashboard", { replace: true });
+  };
+
   return (
     <div className="max-w-2xl mx-auto space-y-6">
+      {/* Back Button */}
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={handleBackToDashboard}
+        className="flex items-center gap-2 mb-4"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back to Dashboard
+      </Button>
+
       <Card>
         <CardHeader>
           <CardTitle>Claim Your Tokens</CardTitle>
@@ -427,20 +445,24 @@ export function RecipientClaim(props: Props) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Check if redeemed/cancelled early to show simple message */}
-          {props.isLoggedIn && isRedeemedOrCancelled() ? (
+          {/* Check if redeemed/cancelled/user_redeemed early to show simple message */}
+          {props.isLoggedIn && (referralStatus === 'redeemed' || referralStatus === 'cancelled' || referralStatus === 'user_redeemed') ? (
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <XCircle className="h-5 w-5 text-destructive" />
-                  Referral No Longer Available
+                  {referralStatus === 'user_redeemed' 
+                    ? "Already Claimed"
+                    : "Referral No Longer Available"}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
                   <p className="text-sm font-medium text-destructive">
-                    {referralStatus === 'redeemed' 
-                      ? "This referral has already been redeemed. The tokens have been claimed."
+                    {referralStatus === 'user_redeemed'
+                      ? "You have already claimed this referral."
+                      : referralStatus === 'redeemed' 
+                      ? "This referral has already been fully redeemed. All quantities have been claimed."
                       : referralStatus === 'cancelled'
                       ? "This referral has been cancelled. The tokens have been returned to the sender."
                       : "This referral is no longer available."}
