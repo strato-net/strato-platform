@@ -1,4 +1,4 @@
-import { lendingRegistry, poolFactory, tokenFactory, adminRegistry, mercataBridge, cdpRegistry, voucher, escrow } from "./config";
+import { lendingRegistry, poolFactory, tokenFactory, adminRegistry, mercataBridge, cdpRegistry, voucher } from "./config";
 import {
   SWAP_CONTRACTS,
   SWAP_TOKEN_SELECT_FIELDS,
@@ -122,7 +122,6 @@ export const constants = (() => {
     tokenFactory,
     adminRegistry,
     cdpRegistry,
-    escrow,
     Token,
     TokenFactory,
     LendingPool,

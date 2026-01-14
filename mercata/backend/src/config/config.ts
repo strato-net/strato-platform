@@ -47,7 +47,6 @@ export const adminRegistry = process.env.ADMIN_REGISTRY || "00000000000000000000
 export const voucher = process.env.VOUCHER_CONTRACT_ADDRESS || "000000000000000000000000000000000000100e";
 export const cdpRegistry = process.env.CDP_REGISTRY || "0000000000000000000000000000000000001012";
 export const rewardsChef = process.env.REWARDS_CHEF || "000000000000000000000000000000000000101f";
-export const escrow = process.env.ESCROW || "7fa32d329b5f61a1808418304eea249b1b0b28fc";
 
 // Hidden swap pools - these pools are filtered out from API responses
 export const hiddenSwapPools: Set<string> = new Set([
@@ -66,6 +65,10 @@ export const defaultRewardsAddressFor: Record<string, string> = {
   "114784819836269": "170147f58738c9f46112a874030420b823901f3b", // Helium testnet
   "33056204878082667": "4a116cf8cb056036632aef08f7c0df27c720f1c0", // Upquark mainnet
 };
+export const defaultEscrowAddressFor: Record<string, string> = {
+  "114784819836269": "7fa32d329b5f61a1808418304eea249b1b0b28fc", // Helium testnet
+  "33056204878082667": "4b4a14095077946c20fb680980db511932b7cf4b", // Upquark mainnet
+}
 export const defaultReferralServiceFor: Record<string, string> = {
   "114784819836269": "http://ec2-54-89-36-118.compute-1.amazonaws.com", // Helium testnet
   "33056204878082667": "http://ec2-54-89-36-118.compute-1.amazonaws.com", // Upquark mainnet
@@ -75,6 +78,7 @@ export let bridgeUrl: string | undefined;
 export let rewards: string | undefined;
 export let networkId: string | undefined;
 export let referralUrl: string | undefined;
+export let escrow: string = '';
 
 export function setBridgeConfig(networkId: string) {
   if (process.env.BRIDGE_SERVICE_URL) {
@@ -93,6 +97,11 @@ export function setRewardsConfig(networkId: string) {
 }
 
 export function setReferralConfig(networkId: string) {
+  if (process.env.ESCROW_ADDRESS) {
+    escrow = process.env.ESCROW_ADDRESS;
+  } else {
+    escrow = defaultEscrowAddressFor[networkId];
+  }
   if (process.env.REDEMPTION_SERVER_URL) {
     referralUrl = process.env.REDEMPTION_SERVER_URL;
   } else {
