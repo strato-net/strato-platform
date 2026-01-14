@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { ethers } from "ethers";
 import { joinPrivateKey } from "./keyUtils";
 import { Button } from "@/components/ui/button";
@@ -43,10 +43,10 @@ export function RecipientClaim(props: Props) {
 
   const [row, setRow] = useState<CirrusRow | null>(null);
   const [code, setCode] = useState(""); // base36 10 chars
-  const [status, setStatus] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isRedeeming, setIsRedeeming] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [referralStatus, setReferralStatus] = useState<'active' | 'redeemed' | 'cancelled' | null>(null);
   const { toast } = useToast();
   const { getTransferableTokens } = useTokenContext();
   const [allTokens, setAllTokens] = useState<any[]>([]);
@@ -79,6 +79,46 @@ export function RecipientClaim(props: Props) {
       symbol: token?.token?._symbol || token?.token?._name || "TOKEN",
       name: token?.token?._name || address.slice(0, 8) + "..."
     };
+  };
+
+  // Helper to normalize amounts/tokens from object to array (handles Cirrus format after redemption)
+  const normalizeToArray = (value: any): any[] => {
+    if (Array.isArray(value)) {
+      return value;
+    }
+    if (value && typeof value === 'object') {
+      // Convert object like { '0': 'value1', '1': 'value2' } to array
+      const keys = Object.keys(value).sort((a, b) => parseInt(a) - parseInt(b));
+      return keys.map(key => value[key]);
+    }
+    return [];
+  };
+
+  // Check if referral is redeemed or cancelled (using status from API or fallback to checking row data)
+  const isRedeemedOrCancelled = (): boolean => {
+    // First check the API status if available
+    if (referralStatus === 'redeemed' || referralStatus === 'cancelled') {
+      return true;
+    }
+    // Fallback: check row data structure
+    if (!row) return false;
+    const amounts = row.value.amounts;
+    const tokens = row.value.tokens;
+    // If amounts or tokens are objects (not arrays), it's likely redeemed
+    if (amounts && typeof amounts === 'object' && !Array.isArray(amounts)) {
+      return true;
+    }
+    if (tokens && typeof tokens === 'object' && !Array.isArray(tokens)) {
+      return true;
+    }
+    // If arrays are empty, it might be redeemed
+    if (Array.isArray(amounts) && amounts.length === 0) {
+      return true;
+    }
+    if (Array.isArray(tokens) && tokens.length === 0) {
+      return true;
+    }
+    return false;
   };
 
   // Get hiPart from URL on mount
@@ -114,6 +154,53 @@ export function RecipientClaim(props: Props) {
     })();
   }, [hiPart, code, urlEphemeralAddress, props.isLoggedIn]);
 
+  // Check referral status (redeemed/cancelled) when user is logged in and we have ephemeral address
+  const checkReferralStatus = useCallback(async (ephemeralAddress: string) => {
+    try {
+      // Only check status if user is logged in
+      if (!props.isLoggedIn) {
+        return;
+      }
+      
+      if (!ephemeralAddress || !/^[0-9a-f]{40}$/.test(ephemeralAddress)) {
+        setReferralStatus(null);
+        return;
+      }
+      
+      // Query backend API for referral status
+      const response = await api.get("/refer/status", {
+        params: {
+          ephemeralAddress: ephemeralAddress,
+        },
+      });
+
+      if (response.data.success && response.data.data) {
+        const statusData = response.data.data;
+        setReferralStatus(statusData.status);
+      } else {
+        setReferralStatus('active');
+      }
+    } catch (e: any) {
+      // If status check fails, assume active
+      console.error("Failed to check referral status:", e);
+      setReferralStatus('active');
+    }
+  }, [props.isLoggedIn]);
+
+  // Check status when page loads (using URL ephemeral address)
+  useEffect(() => {
+    if (urlEphemeralAddress && props.isLoggedIn) {
+      checkReferralStatus(urlEphemeralAddress);
+    }
+  }, [urlEphemeralAddress, props.isLoggedIn, checkReferralStatus]);
+
+  // Re-check status when redemption code is entered and ephemeral address is reconstructed
+  useEffect(() => {
+    if (code.length === 10 && ephemeralAddressNo0x && props.isLoggedIn) {
+      checkReferralStatus(ephemeralAddressNo0x);
+    }
+  }, [code, ephemeralAddressNo0x, props.isLoggedIn, checkReferralStatus]);
+
   // Lookup deposit when ephemeral address is available (from URL or reconstructed from code)
   useEffect(() => {
     (async () => {
@@ -129,7 +216,6 @@ export function RecipientClaim(props: Props) {
         }
         
         setIsLoading(true);
-        setStatus("Looking up deposit...");
         
         // Query backend API for escrow deposit
         const response = await api.get("/refer/deposit", {
@@ -140,29 +226,29 @@ export function RecipientClaim(props: Props) {
 
         if (response.data.success && response.data.data) {
           const deposit = response.data.data;
-          setTokenAddressNo0x(deposit.tokens?.[0] || "");
+          // Normalize tokens and amounts to arrays (handle object format from Cirrus)
+          const normalizedTokens = normalizeToArray(deposit.tokens);
+          const normalizedAmounts = normalizeToArray(deposit.amounts);
+          
+          setTokenAddressNo0x(normalizedTokens[0] || "");
           setRow({
             key: ephemeralAddressNo0x,
             value: {
               sender: deposit.sender,
-              tokens: deposit.tokens || [],
-              amounts: deposit.amounts || [],
+              tokens: normalizedTokens,
+              amounts: normalizedAmounts,
               expiry: deposit.expiry || 0,
             },
           });
-          setStatus("Deposit found successfully.");
         } else {
           setRow(null);
-          setStatus("");
         }
       } catch (e: any) {
         // Handle 404 as "not found" rather than error
         if (e?.response?.status === 404) {
           setRow(null);
-          setStatus("");
         } else {
           const errorMsg = e?.response?.data?.error || e?.message || String(e);
-          setStatus(`Error: ${errorMsg}`);
           toast({
             title: "Error",
             description: errorMsg,
@@ -186,7 +272,6 @@ export function RecipientClaim(props: Props) {
       }
 
       setIsRedeeming(true);
-      setStatus("Reconstructing ephemeral key...");
 
       const privHex = joinPrivateKey(hiPart, code.trim().toLowerCase()); // 64 hex chars, no 0x
       const wallet = new ethers.Wallet("0x" + privHex);
@@ -241,8 +326,6 @@ export function RecipientClaim(props: Props) {
         }
       };
 
-      setStatus('Submitting redemption request to server...');
-
       // Call backend endpoint instead of redemption server directly
       const response = await api.post("/refer/redeem", {
         r: rHex,
@@ -251,8 +334,6 @@ export function RecipientClaim(props: Props) {
         recipient: props.currentRecipientAddressNo0x
       });
 
-      setStatus(`Redemption submitted successfully.`);
-      
       toast({
         title: "Success",
         description: "Redemption request submitted successfully.",
@@ -267,7 +348,6 @@ export function RecipientClaim(props: Props) {
       }, 1500);
     } catch (e: any) {
       const errorMsg = e?.message ?? String(e);
-      setStatus(`Error: ${errorMsg}`);
       toast({
         title: "Error",
         description: errorMsg,
@@ -300,17 +380,18 @@ export function RecipientClaim(props: Props) {
     window.location.href = `/login?theme=${theme}`;
   };
 
-  // Format all amounts
+  // Format all amounts (normalize to array first)
   const formattedAmounts = row 
-    ? row.value.amounts.map(amt => formatUnits(String(amt), 18))
+    ? normalizeToArray(row.value.amounts).map(amt => formatUnits(String(amt), 18))
     : [];
 
   // Create display data from URL params or fetched row
   const displayData = useMemo(() => {
     // If we have row data (from backend), use that
     if (row) {
+      const normalizedTokens = normalizeToArray(row.value.tokens);
       return {
-        tokens: row.value.tokens.map((tokenAddress, index) => ({
+        tokens: normalizedTokens.map((tokenAddress, index) => ({
           address: tokenAddress,
           symbol: getTokenInfo(tokenAddress).symbol,
           amount: formattedAmounts[index] || "0",
@@ -346,50 +427,73 @@ export function RecipientClaim(props: Props) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Redemption Code Input */}
-          {props.isLoggedIn && (
-            <div className="space-y-2">
-              <Label htmlFor="redemptionCode">Redemption Code</Label>
-              <Input
-                id="redemptionCode"
-                value={code}
-                onChange={(e) => {
-                  const value = e.target.value.trim();
-                  // Only allow alphanumeric and limit to 10 characters
-                  if (value === "" || /^[a-z0-9]{0,10}$/i.test(value)) {
-                    setCode(value);
-                  }
-                }}
-                placeholder="Enter redemption code"
-                className="font-mono text-center text-lg tracking-wider"
-                maxLength={10}
-              />
-              <p className="text-xs text-muted-foreground">
-                Enter the redemption code you received (via SMS or email)
-              </p>
-            </div>
-          )}
+          {/* Check if redeemed/cancelled early to show simple message */}
+          {props.isLoggedIn && isRedeemedOrCancelled() ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <XCircle className="h-5 w-5 text-destructive" />
+                  Referral No Longer Available
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+                  <p className="text-sm font-medium text-destructive">
+                    {referralStatus === 'redeemed' 
+                      ? "This referral has already been redeemed. The tokens have been claimed."
+                      : referralStatus === 'cancelled'
+                      ? "This referral has been cancelled. The tokens have been returned to the sender."
+                      : "This referral is no longer available."}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              {/* Redemption Code Input */}
+              {props.isLoggedIn && (
+                <div className="space-y-2">
+                  <Label htmlFor="redemptionCode">Redemption Code</Label>
+                  <Input
+                    id="redemptionCode"
+                    value={code}
+                    onChange={(e) => {
+                      const value = e.target.value.trim();
+                      // Only allow alphanumeric and limit to 10 characters
+                      if (value === "" || /^[a-z0-9]{0,10}$/i.test(value)) {
+                        setCode(value);
+                      }
+                    }}
+                    placeholder="Enter redemption code"
+                    className="font-mono text-center text-lg tracking-wider"
+                    maxLength={10}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Enter the redemption code you received (via SMS or email)
+                  </p>
+                </div>
+              )}
 
-          {/* Deposit Information */}
-          {isLoading ? (
-            <Card className="bg-muted/50">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span className="text-sm">Looking up deposit...</span>
-                </div>
-              </CardContent>
-            </Card>
-          ) : code.length === 10 && !row && !displayData ? (
-            <Card className="bg-muted/50">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <XCircle className="h-4 w-4" />
-                  <span className="text-sm">No deposits found for that redemption code.</span>
-                </div>
-              </CardContent>
-            </Card>
-          ) : displayData ? (
+              {/* Deposit Information */}
+              {isLoading ? (
+                <Card className="bg-muted/50">
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="text-sm">Looking up deposit...</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : code.length === 10 && !row && !displayData ? (
+                <Card className="bg-muted/50">
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <XCircle className="h-4 w-4" />
+                      <span className="text-sm">No deposits found for that redemption code.</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : displayData ? (
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
@@ -498,77 +602,68 @@ export function RecipientClaim(props: Props) {
             </Card>
           )}
 
-          {/* Recipient Address / Sign Up */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Your Address</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {props.currentRecipientAddressNo0x ? (
-                <div className="flex items-center gap-2">
-                  <code className="flex-1 p-2 bg-muted rounded border text-sm break-all">
-                    {props.currentRecipientAddressNo0x}
-                  </code>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => copyToClipboard(props.currentRecipientAddressNo0x!, "recipient")}
-                  >
-                    {copiedField === "recipient" ? (
-                      <CopyCheck className="h-4 w-4" />
+              {/* Redeem Button */}
+              {row && !isRedeemedOrCancelled() && (
+                <Button
+                  onClick={redeem}
+                  disabled={!row || !code || code.length !== 10 || isRedeeming || !props.currentRecipientAddressNo0x}
+                  className="w-full"
+                  size="lg"
+                >
+                  {isRedeeming ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    "Redeem Tokens"
+                  )}
+                </Button>
+              )}
+
+              {/* Recipient Address / Sign Up */}
+              {!isRedeemedOrCancelled() && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Your Address</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {props.currentRecipientAddressNo0x ? (
+                      <div className="flex items-center gap-2">
+                        <code className="flex-1 p-2 bg-muted rounded border text-sm break-all">
+                          {props.currentRecipientAddressNo0x}
+                        </code>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => copyToClipboard(props.currentRecipientAddressNo0x!, "recipient")}
+                        >
+                          {copiedField === "recipient" ? (
+                            <CopyCheck className="h-4 w-4" />
+                          ) : (
+                            <Copy className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
                     ) : (
-                      <Copy className="h-4 w-4" />
+                      <div className="space-y-4">
+                        <p className="text-sm text-muted-foreground">
+                          You need to sign up for STRATO to claim your tokens.
+                        </p>
+                        <Button
+                          onClick={handleSignUp}
+                          className="w-full"
+                          size="lg"
+                        >
+                          <LogIn className="h-4 w-4 mr-2" />
+                          Sign Up for STRATO
+                        </Button>
+                      </div>
                     )}
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <p className="text-sm text-muted-foreground">
-                    You need to sign up for STRATO to claim your tokens.
-                  </p>
-                  <Button
-                    onClick={handleSignUp}
-                    className="w-full"
-                    size="lg"
-                  >
-                    <LogIn className="h-4 w-4 mr-2" />
-                    Sign Up for STRATO
-                  </Button>
-                </div>
+                  </CardContent>
+                </Card>
               )}
-            </CardContent>
-          </Card>
-
-          {/* Redeem Button */}
-          {row && (
-            <Button
-              onClick={redeem}
-              disabled={!row || !code || code.length !== 10 || isRedeeming || !props.currentRecipientAddressNo0x}
-              className="w-full"
-              size="lg"
-            >
-              {isRedeeming ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                "Redeem Tokens"
-              )}
-            </Button>
-          )}
-
-          {/* Status Message */}
-          {status && (
-            <div className={`p-4 rounded-lg ${
-              status.startsWith("Error") 
-                ? "bg-destructive/10 text-destructive border border-destructive/20" 
-                : status.includes("successfully") || status.includes("loaded")
-                ? "bg-green-500/10 text-green-700 dark:text-green-400 border border-green-500/20"
-                : "bg-muted/50 text-foreground"
-            }`}>
-              <p className="text-sm font-medium">{status}</p>
-            </div>
+            </>
           )}
         </CardContent>
       </Card>
