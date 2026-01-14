@@ -1,6 +1,7 @@
 import { apiRequest } from '../utils/apiClient';
 import { SourceConfig, BatchPriceResult, Asset } from '../types';
 import { logError } from '../utils/logger';
+import { validatePriceSanity } from '../utils/priceValidator';
 
 // Helper functions for simplified configuration
 function getApiKey(sourceConfig: SourceConfig): string {
@@ -165,8 +166,12 @@ function parseBatchResponse(
             if (item.prices && item.prices.length > 0) {
                 const priceUSD = parseFloat(item.prices[0].value);
                 const price = Math.floor(priceUSD * 1e18);
-                const feedTimestamp = item.prices[0].lastUpdatedAt || new Date().toISOString();
-                result[asset.name] = { price, feedTimestamp };
+
+                // Validate price sanity before accepting
+                if (validatePriceSanity(price, asset.name)) {
+                    const feedTimestamp = item.prices[0].lastUpdatedAt || new Date().toISOString();
+                    result[asset.name] = { price, feedTimestamp };
+                }
             }
         });
         
@@ -178,8 +183,12 @@ function parseBatchResponse(
             if (symbolData && symbolData[0] && symbolData[0].quote && symbolData[0].quote.USD) {
                 const priceUSD = parseFloat(symbolData[0].quote.USD.price);
                 const price = Math.floor(priceUSD * 1e18);
-                const feedTimestamp = symbolData[0].quote.USD.last_updated || new Date().toISOString();
-                result[asset.name] = { price, feedTimestamp };
+
+                // Validate price sanity before accepting
+                if (validatePriceSanity(price, asset.name)) {
+                    const feedTimestamp = symbolData[0].quote.USD.last_updated || new Date().toISOString();
+                    result[asset.name] = { price, feedTimestamp };
+                }
             }
         });
         
@@ -189,14 +198,18 @@ function parseBatchResponse(
             const symbol = asset.name.split('-')[0];
             const id = sourceConfig.symbolMapping?.[symbol] || symbol.toLowerCase();
             const priceData = data[id];
-            
+
             if (priceData && priceData.usd) {
                 const priceUSD = parseFloat(priceData.usd);
                 const price = Math.floor(priceUSD * 1e18);
-                const feedTimestamp = priceData.last_updated_at 
-                    ? new Date(priceData.last_updated_at * 1000).toISOString()
-                    : new Date().toISOString();
-                result[asset.name] = { price, feedTimestamp };
+
+                // Validate price sanity before accepting
+                if (validatePriceSanity(price, asset.name)) {
+                    const feedTimestamp = priceData.last_updated_at
+                        ? new Date(priceData.last_updated_at * 1000).toISOString()
+                        : new Date().toISOString();
+                    result[asset.name] = { price, feedTimestamp };
+                }
             }
         });
         
@@ -205,7 +218,7 @@ function parseBatchResponse(
         assets.forEach(asset => {
             let priceUSD: number;
             let feedTimestamp: string;
-            
+
             if (parsePattern.includes('metals.{metal}')) {
                 // Metals.dev format
                 const symbol = asset.name.split('-')[0];
@@ -219,10 +232,14 @@ function parseBatchResponse(
                 priceUSD = parseFloat(data.rates[rateKey]);
                 feedTimestamp = data.timestamp ? new Date(data.timestamp * 1000).toISOString() : new Date().toISOString();
             }
-            
+
             if (!isNaN(priceUSD)) {
                 const price = Math.floor(priceUSD * 1e18);
-                result[asset.name] = { price, feedTimestamp };
+
+                // Validate price sanity before accepting
+                if (validatePriceSanity(price, asset.name)) {
+                    result[asset.name] = { price, feedTimestamp };
+                }
             }
         });
         
@@ -233,13 +250,17 @@ function parseBatchResponse(
                 const symbol = asset.name.split('-')[0];
                 const assetParsePath = parsePattern.replace(/\{symbol\}/g, symbol);
                 const priceUSD = extractNestedProperty(data, assetParsePath);
-                
+
                 if (priceUSD && !isNaN(parseFloat(priceUSD))) {
                     const price = Math.floor(parseFloat(priceUSD) * 1e18);
-                    const feedTimestamp = timestampPattern 
-                        ? extractNestedProperty(data, timestampPattern) || new Date().toISOString()
-                        : new Date().toISOString();
-                    result[asset.name] = { price, feedTimestamp };
+
+                    // Validate price sanity before accepting
+                    if (validatePriceSanity(price, asset.name)) {
+                        const feedTimestamp = timestampPattern
+                            ? extractNestedProperty(data, timestampPattern) || new Date().toISOString()
+                            : new Date().toISOString();
+                        result[asset.name] = { price, feedTimestamp };
+                    }
                 }
             } catch (error) {
                 logError('GenericRestAdapter', new Error(`Failed to parse price for ${asset.name}: ${error}`));

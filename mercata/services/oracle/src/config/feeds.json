@@ -3,12 +3,16 @@
     {
       "name": "crypto-batch",
       "sources": ["Alchemy", "CoinMarketCap", "CoinGecko"],
-      "assets": ["ETH", "WBTC", "PAXG", "XAUT", "sUSDS"]
+      "assets": ["ETH", "WBTC", "PAXG", "XAUT", "sUSDS"],
+      "minPrice": 100000000000000,
+      "maxPrice": 1000000000000000000000
     },
     {
       "name": "metals-batch",
       "sources": ["Metals.dev", "MetalsAPI"],
-      "assets": ["XAU", "XAG"]
+      "assets": ["XAU", "XAG"],
+      "minPrice": 100000000000000000,
+      "maxPrice": 100000000000000000000
     },
     {
       "name": "metals-weekend",

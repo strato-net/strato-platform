@@ -4,6 +4,7 @@ import { fetchBatchPrices, generateConstantPrices } from './adapters/genericRest
 import { pushAssetPrices } from './utils/oraclePusher';
 import { ConfigLoader } from './utils/configLoader';
 import { Asset } from './types';
+import { validateAndFilterPrices, PriceData, PriceValidationConfig } from './utils/priceValidator';
 
 export async function getCronSchedule(): Promise<string> {
     const schedule = process.env.CRON_SCHEDULE || "0 */15 * * * *";
@@ -260,29 +261,57 @@ async function processBatchFeed(feed: any, configLoader: ConfigLoader): Promise<
         logError('CronScheduler', new Error(error));
     }
 
-    // Calculate average prices for each asset across sources
+    // Calculate average prices for each asset across sources with validation
     const assetPrices: Record<string, number> = {};
     const assetAddresses: Record<string, string> = {};
     const assetSources: Record<string, string[]> = {};
 
     resolvedFeed.assets.forEach((asset: Asset) => {
-        const prices: number[] = [];
-        const sources: string[] = [];
+        const pricesData: PriceData[] = [];
 
         allSuccessfulSources.forEach(source => {
             const assetResult = source.prices[asset.name] as any;
             if (assetResult && assetResult.price && assetResult.feedTimestamp) {
-                prices.push(assetResult.price);
-                sources.push(source.name);
+                pricesData.push({
+                    price: assetResult.price,
+                    feedTimestamp: assetResult.feedTimestamp,
+                    sourceName: source.name
+                });
             }
         });
 
-        if (prices.length > 0) {
-            const averagePrice = Math.floor(prices.reduce((sum, price) => sum + price, 0) / prices.length);
+        if (pricesData.length > 0) {
+            // Apply comprehensive validation
+            const validationConfig: PriceValidationConfig = {
+                minPrice: resolvedFeed.minPrice,
+                maxPrice: resolvedFeed.maxPrice,
+                maxStalenessMs: 5 * 60 * 1000, // 5 minutes
+                maxDeviationPercent: 10 // 10% deviation threshold
+            };
 
-            assetPrices[asset.name] = averagePrice;
-            assetAddresses[asset.name] = asset.targetAssetAddress;
-            assetSources[asset.name] = sources;
+            const validPrices = validateAndFilterPrices(pricesData, asset.name, validationConfig);
+
+            if (validPrices.length > 0) {
+                // Calculate average from valid prices only
+                const prices = validPrices.map(pd => pd.price);
+                const sources = validPrices.map(pd => pd.sourceName || 'unknown');
+                const averagePrice = Math.floor(prices.reduce((sum, price) => sum + price, 0) / prices.length);
+
+                assetPrices[asset.name] = averagePrice;
+                assetAddresses[asset.name] = asset.targetAssetAddress;
+                assetSources[asset.name] = sources;
+
+                // Log if some sources were filtered out
+                if (validPrices.length < pricesData.length) {
+                    logInfo('CronScheduler',
+                        `${asset.name}: Using ${validPrices.length}/${pricesData.length} sources after validation`
+                    );
+                }
+            } else {
+                logError('CronScheduler', new Error(
+                    `${asset.name}: All ${pricesData.length} price sources failed validation`
+                ));
+            }
         }
     });
 
