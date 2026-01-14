@@ -678,6 +678,10 @@ const CollateralConfigManager = () => {
                             <p className="text-sm text-muted-foreground">Debt Ceiling</p>
                             <p className="font-semibold">{formatValue(asset.debtCeiling, 'usd')}</p>
                           </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Token Decimals</p>
+                            <p className="font-semibold">{Math.log10(Number(asset.unitScale))}</p>
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
