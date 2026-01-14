@@ -22,6 +22,8 @@ contract Escrow is Ownable {
 
   constructor(address _initialOwner) Ownable(_initialOwner) { }
 
+  uint public fee = 1e16;
+
   function deposit(address[] tokens, uint256[] amounts, address ephemeralAddress, uint expiry, uint quantity) external {
     require(ephemeralAddress != address(0), "ephemeral=0");
     require(expiry > 0, "expiry=0");
@@ -80,14 +82,16 @@ contract Escrow is Ownable {
     address sender = d.sender;
 
     for (uint i = 0; i < d.tokens.length; i++) {
-        bool ok = IERC20(d.tokens[i]).transfer(recipient, d.amounts[i]);
+        uint feeAmount = (d.amounts[i] * fee) / 1e18;
+        bool ok = IERC20(d.tokens[i]).transfer(recipient, d.amounts[i] - feeAmount);
+        bool feeOk = IERC20(d.tokens[i]).transfer(msg.sender, feeAmount);
         tokens.push(deposits[ephemeralAddress].tokens[i]);
         amounts.push(deposits[ephemeralAddress].amounts[i]);
         if (d.quantity == 1) {
           deposits[ephemeralAddress].tokens[i] = address(0);
           deposits[ephemeralAddress].amounts[i] = 0;
         }
-        require(ok, "transfer failed");
+        require(ok && feeOk, "transfer failed");
     }
 
     if (d.quantity == 1) {
@@ -151,5 +155,9 @@ contract Escrow is Ownable {
     address signer = ecrecover(digest, v, r, s);
     require(signer != address(0), "ecrecover failed");
     return signer;
+  }
+
+  function setFee(uint _fee) external onlyOwner {
+    fee = _fee;
   }
 }
