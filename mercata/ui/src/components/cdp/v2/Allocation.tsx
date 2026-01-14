@@ -986,17 +986,19 @@ const Allocation: React.FC<AllocationProps> = ({
                             // Pass true for isFromAvailableClick to indicate this is a max mint
                             handleMintChange(candidate.assetAddress, maxMint, finalFormattedMaxMint, true);
                             
-                            // Clear the ref after a short delay (after NumericFormat's onValueChange has fired)
-                            setTimeout(() => {
-                              populatingFromAvailableRef.current = null;
-                            }, 100);
-                            
-                            // Blur both inputs after populating
+                            // Blur inputs and clear ref in sequence to avoid race conditions
+                            // The ref must remain set until NumericFormat's onValueChange completes
                             setTimeout(() => {
                               depositInputRefs.current[candidate.assetAddress]?.blur();
                               mintInputRefs.current[candidate.assetAddress]?.blur();
                               setFocusedInput(null);
                               editingInputRef.current = null;
+                              
+                              // Clear the ref after blur completes (next event loop tick)
+                              // This ensures NumericFormat's onValueChange has finished
+                              setTimeout(() => {
+                                populatingFromAvailableRef.current = null;
+                              }, 0);
                             }, 0);
                           };
                           
