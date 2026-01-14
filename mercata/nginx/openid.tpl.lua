@@ -34,6 +34,7 @@ local authenticate_opts = {
   post_logout_redirect_uri = node_host_with_protocol,
   -- redirect_after_logout_uri = "/", -- URI to redirect after app and oauth provider logouts, otherwise show "Logged Out" text message on logout_path URI
   revoke_tokens_on_logout = true,
+  use_pkce = true,
   authorization_params = auth_params
 }
 
