@@ -145,11 +145,6 @@ export async function validateConfig(): Promise<boolean> {
                 }
             }
             
-            // Validate price bounds
-            if (feed.minPrice && feed.maxPrice && feed.minPrice >= feed.maxPrice) {
-                errors.push(`${feedPrefix} minPrice must be less than maxPrice`);
-            }
-            
             // Validate that constant pricing is not mixed with external sources
             if (feed.sources?.includes('constant') && feed.sources.length > 1) {
                 errors.push(`${feedPrefix} Cannot mix constant pricing with external sources`);
