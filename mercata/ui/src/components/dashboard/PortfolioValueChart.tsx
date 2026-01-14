@@ -73,7 +73,6 @@ const getChangeText = (hasData: boolean, tabType: TabType, change: { percentage:
   let txt: string = '';
   const twoDigits = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
   const amt: string = change.amount.toLocaleString('en-US', twoDigits);
-  const pct: string = change.percentage?.toLocaleString('en-US', twoDigits);
   switch (tabType) {
     case 'rewards':
       txt = `${amt} Reward Points`; break;
@@ -84,7 +83,11 @@ const getChangeText = (hasData: boolean, tabType: TabType, change: { percentage:
     default:
       txt = `${amt}`; break;
   }
-  if (change.percentage !== null) txt += ` (${pct}%)`;
+  // Only show percentage if basis (first value) was non-zero
+  if (change.percentage !== null) {
+    const pct: string = change.percentage.toLocaleString('en-US', twoDigits);
+    txt += ` (${pct}%)`;
+  }
   return txt;
 };
 
