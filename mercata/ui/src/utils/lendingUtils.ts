@@ -214,7 +214,7 @@ export const calculateBorrowHealthImpact = (
 // Floor the value to the nearest 0.01;
 // e.g. 3.409 -> 3.40, 3.45 --> 3.45
 // @dev could be unreliable with javascript's floating point precision
-const centFloor = (value: Number): Number => {
+export const centFloor = (value: Number): Number => {
   return Math.floor(+value * 100) / 100;
 };
 
