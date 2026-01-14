@@ -86,21 +86,30 @@ runPeer peer sSource = do
   $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "Attempting to connect to " ++ C.yellow (format (pPeerHost peer) ++ ":" ++ show (pPeerTcpPort peer))
   $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "my pubkey is: " ++ format myPublic
   $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "server pubkey is: " ++ format otherPubKey
-  withActivePeer peer $
-    runClientConnection (pPeerHost peer) (TCPPort . fromIntegral $ pPeerTcpPort peer) sSource $ \c -> do
-      attempt :: (Maybe SomeException) <-
-        withCertifiedPeer peer $
-          runEthClientConduit
-            peer {pPeerPubkey = Just otherPubKey}
-            (c ^. peerSource)
-            (c ^. peerSink)
-            (c ^. seqSource)
-            pStr
+  withActivePeer peer $ do
+    -- Wrap the entire TCP connection attempt with a timeout to prevent hanging
+    -- on unreachable peers (e.g., when a validator is down)
+    mConnectionAttempt <- timeout 5000000 $  -- 5 second timeout for TCP connection
+      runClientConnection (pPeerHost peer) (TCPPort . fromIntegral $ pPeerTcpPort peer) sSource $ \c -> do
+        attempt :: (Maybe SomeException) <-
+          withCertifiedPeer peer $
+            runEthClientConduit
+              peer {pPeerPubkey = Just otherPubKey}
+              (c ^. peerSource)
+              (c ^. peerSink)
+              (c ^. seqSource)
+              pStr
 
-      case attempt of
-        Nothing  -> $logDebugS "runPeer" "Peer ran successfully!"
-        Just err -> do $logErrorS "runPeer" . T.pack $ "Peer did not run successfully: " ++ show err
-                       throwIO err
+        case attempt of
+          Nothing  -> $logDebugS "runPeer" "Peer ran successfully!"
+          Just err -> do $logErrorS "runPeer" . T.pack $ "Peer did not run successfully: " ++ show err
+                         throwIO err
+
+    case mConnectionAttempt of
+      Nothing -> do
+        $logWarnS "runPeer" . T.pack $ "TCP connection attempt timed out to " ++ format (pPeerHost peer) ++ ":" ++ show (pPeerTcpPort peer)
+        throwIO $ HandshakeException "TCP connection timed out"
+      Just _ -> return ()
 
 runEthClientConduit ::
   MonadP2P m =>
