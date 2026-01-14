@@ -35,9 +35,12 @@ const router = Router();
  *               ephemeralAddress:
  *                 type: string
  *                 description: Ephemeral address for the recipient (with or without 0x prefix)
- *               expiry:
- *                 type: number
- *                 description: Expiry time in seconds from now (e.g., 604800 for 7 days)
+             *               expiry:
+             *                 type: number
+             *                 description: Expiry time in seconds from now (e.g., 604800 for 7 days)
+             *               quantity:
+             *                 type: number
+             *                 description: Number of referrals this deposit supports (must be a positive integer)
  *     responses:
  *       200:
  *         description: Deposit transaction submitted successfully
