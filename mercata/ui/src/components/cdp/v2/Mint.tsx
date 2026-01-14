@@ -201,6 +201,43 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     }
   }, [mintAmountWei, riskBuffer, vaultCandidates, isMaxMode, maxAllocations, autoSupplyCollateral]);
 
+  // Check for debt floor/ceiling violations in manual mode
+  useEffect(() => {
+    // Only check in manual mode - auto mode handles this in the allocation algorithm
+    if (autoSupplyCollateral) {
+      return;
+    }
+
+    let hasFloorHit = false;
+    let hasCeilingHit = false;
+
+    // Check each allocation against vault constraints
+    for (const allocation of customAllocations) {
+      const candidate = vaultCandidates.find(v => v.assetAddress === allocation.assetAddress);
+      if (!candidate) continue;
+
+      const mintAmount = parseFloat(allocation.mintAmount || '0');
+      if (mintAmount <= 0) continue;
+
+      // Convert mint amount to wei for comparison
+      const mintWei = parseUnits(mintAmount.toString(), 18);
+      const newTotalDebt = candidate.currentDebt + mintWei;
+
+      // Check debt floor: newTotalDebt must be 0 OR >= debtFloor
+      if (newTotalDebt > 0n && newTotalDebt < candidate.debtFloor) {
+        hasFloorHit = true;
+      }
+
+      // Check debt ceiling: newTotalDebt must be <= debtCeiling (if debtCeiling > 0)
+      if (candidate.debtCeiling > 0n && newTotalDebt > candidate.debtCeiling) {
+        hasCeilingHit = true;
+      }
+    }
+
+    setDebtFloorHit(hasFloorHit);
+    setDebtCeilingHit(hasCeilingHit);
+  }, [customAllocations, vaultCandidates, autoSupplyCollateral]);
+
   // Use customAllocations as the source of truth
   const optimalAllocations = customAllocations;
 
