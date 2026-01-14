@@ -42,7 +42,7 @@ const DashboardSidebar = () => {
   }, [collapsed]);
 
   const allNavItems = [
-    { icon: <LayoutDashboard size={20} />, label: 'Overview', path: '/dashboard' },
+    { icon: <LayoutDashboard size={20} />, label: 'Portfolio', path: '/dashboard' },
     { icon: <Wallet size={20} />, label: 'Deposits', path: '/dashboard/deposits' },
     { icon: <Send size={20} />, label: 'Transfer', path: '/dashboard/transfer' },
     { icon: <Book size={20} />, label: 'Borrow', path: '/dashboard/borrow' },
