@@ -46,6 +46,37 @@ export const until = async <T>(
 };
 
 /**
+ * Check if the immediate response from resolve=true contains a final result
+ */
+const getImmediateResult = (response: any[]): TxResponse | undefined => {
+  if (!Array.isArray(response) || !response.length) {
+    return undefined;
+  }
+
+  const first = response[0];
+  const status = first?.status;
+
+  switch (status) {
+    case "Success":
+      return { status: "Success", hash: first.hash };
+    case "Failed":
+    case "Failure": {
+      const errorMessage =
+        first?.txResult?.message ||
+        first?.error ||
+        first?.message ||
+        "Transaction failed";
+      throw new Error(extractErrorMessage(errorMessage));
+    }
+    case "Pending":
+    case undefined:
+    default:
+      // Pending, undefined, or unknown status: fallback to polling
+      return undefined;
+  }
+};
+
+/**
  * Post transaction and wait for completion
  */
 export const postAndWaitForTx = async (
@@ -58,6 +89,13 @@ export const postAndWaitForTx = async (
     throw new Error("Invalid transaction response");
   }
 
+  // Check for immediate result from resolve=true
+  const immediateResult = getImmediateResult(response);
+  if (immediateResult) {
+    return immediateResult;
+  }
+
+  // Extract hashes for polling fallback
   const txHashes = response.map((r, i) => {
     if (!r?.hash) throw new Error(`Invalid tx result at index ${i}`);
     return r.hash;
