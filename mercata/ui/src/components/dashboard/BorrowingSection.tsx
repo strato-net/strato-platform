@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { ArrowUpRight } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
 import { formatUnits } from "ethers";
@@ -58,16 +58,25 @@ const BorrowingSection = ({ loanData }: BorrowingSectionProps) => {
 
   return (
     <Card className="border border-border shadow-sm">
-      <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-2 space-y-2 sm:space-y-0">
+      <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-2 space-y-4 sm:space-y-0">
         <div>
           <CardTitle className="text-xl font-bold">My Borrowing</CardTitle>
           <CardDescription className="text-muted-foreground">Leverage your assets with secured loans</CardDescription>
         </div>
-        <div className="hidden sm:block">
-          <Button onClick={()=> navigate('/dashboard/borrow')} className="flex items-center gap-2">
-            <ArrowUpRight size={16} /> Start Borrowing
-          </Button>
-        </div>
+        {/* Mobile: full width button */}
+        <Button 
+          onClick={() => navigate('/dashboard/borrow')} 
+          className="w-full sm:hidden flex items-center justify-center gap-2"
+        >
+          <Plus size={16} /> Borrow
+        </Button>
+        {/* Desktop: small button */}
+        <Button 
+          onClick={() => navigate('/dashboard/borrow')} 
+          className="hidden sm:flex items-center gap-2"
+        >
+          <Plus size={16} /> Borrow
+        </Button>
       </CardHeader>
       <CardContent>
         <div className="py-4">
@@ -116,13 +125,6 @@ const BorrowingSection = ({ loanData }: BorrowingSectionProps) => {
                   })()}
                 </span>
               </div>
-            </div>
-            
-            {/* Mobile Button */}
-            <div className="sm:hidden mt-6">
-              <Button onClick={()=> navigate('/dashboard/borrow')} className="flex items-center justify-center gap-2 w-full">
-                <ArrowUpRight size={16} /> Start Borrowing
-              </Button>
             </div>
           </div>
         </div>
