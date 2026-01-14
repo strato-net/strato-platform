@@ -34,7 +34,12 @@ import { activityFeedApi } from "@/lib/activityFeed";
 import type { Event } from "@mercata/shared-types";
 import { useUser } from "@/context/UserContext";
 
-const ActivityFeedList = () => {
+interface ActivityFeedListProps {
+  myActivityOnly?: boolean;
+  userAddress?: string | null;
+}
+
+const ActivityFeedList = ({ myActivityOnly = false, userAddress: propUserAddress }: ActivityFeedListProps = {}) => {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -43,7 +48,8 @@ const ActivityFeedList = () => {
   const [totalEvents, setTotalEvents] = useState(0);
   const [filters, setFilters] = useState<FilterOptions>({});
   const itemsPerPage = 10;
-  const { isLoggedIn, userAddress, isAdmin } = useUser();
+  const { isLoggedIn, userAddress: contextUserAddress, isAdmin } = useUser();
+  const userAddress = propUserAddress || contextUserAddress;
 
   const [filterOptions, setFilterOptions] = useState<{ 
     contractNames: string[]; 
@@ -99,7 +105,7 @@ const ActivityFeedList = () => {
       if (!isLoggedIn) {
         return;
       }
-      
+
       setLoading(true);
       try {
         const offset = (currentPage - 1) * itemsPerPage;
@@ -110,13 +116,18 @@ const ActivityFeedList = () => {
           event_name: filters.event_name ? `eq.${filters.event_name}` : undefined,
           transaction_sender: filters.transaction_sender ? `eq.${filters.transaction_sender}` : undefined
         };
-        
+
+        // If myActivityOnly is true, automatically filter by user address
+        if (myActivityOnly && userAddress) {
+          apiFilters.transaction_sender = `eq.${userAddress}`;
+        }
+
         const response = await activityFeedApi.getEvents({
           offset: offset,
           limit: itemsPerPage,
           ...apiFilters
         });
-        
+
         setEvents(response.events || []);
         setTotalEvents(response.total || 0);
         setTotalPages(Math.ceil((response.total || 0) / itemsPerPage));
@@ -134,7 +145,7 @@ const ActivityFeedList = () => {
     }, 300); // 300ms delay
 
     return () => clearTimeout(timeoutId);
-  }, [currentPage, isLoggedIn, filters]);
+  }, [currentPage, isLoggedIn, filters, myActivityOnly, userAddress]);
 
   // Memoized utility functions to prevent unnecessary re-renders
   const formatAddress = useCallback((address: string | null) => {
@@ -195,7 +206,7 @@ const ActivityFeedList = () => {
   const downloadCSV = useCallback(async () => {
     try {
       setLoading(true);
-      
+
       // Get all events without pagination
       const apiFilters = {
         ...filters,
@@ -203,7 +214,12 @@ const ActivityFeedList = () => {
         event_name: filters.event_name ? `eq.${filters.event_name}` : undefined,
         transaction_sender: filters.transaction_sender ? `eq.${filters.transaction_sender}` : undefined
       };
-      
+
+      // If myActivityOnly is true, automatically filter by user address
+      if (myActivityOnly && userAddress) {
+        apiFilters.transaction_sender = `eq.${userAddress}`;
+      }
+
       const response = await activityFeedApi.getEvents({
         limit: totalEvents || 10000, // Get all events or a large number
         offset: 0,
@@ -285,7 +301,7 @@ const ActivityFeedList = () => {
     } finally {
       setLoading(false);
     }
-  }, [filters, totalEvents, formatTimestamp, formatValue]);
+  }, [filters, totalEvents, formatTimestamp, formatValue, myActivityOnly, userAddress]);
 
   // Memoized computed values to prevent unnecessary recalculations
   const paginationInfo = useMemo(() => {
@@ -443,12 +459,12 @@ const ActivityFeedList = () => {
 
   return (
     <div>
-      <ActivityFeedFilters 
+      <ActivityFeedFilters
         filters={filters}
         onFiltersChange={handleFiltersChange}
         contractNames={filterOptions.contractNames}
         eventNames={filterOptions.eventNames}
-        userAddress={userAddress}
+        userAddress={myActivityOnly ? null : userAddress}
       />
       
       {error && (
