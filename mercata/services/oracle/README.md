@@ -11,6 +11,9 @@ Fetches asset prices from multiple sources and pushes them to the STRATO blockch
 - **Health Monitoring**: Service marks itself unhealthy on persistent failures
 - **Balance Checks**: Validates USDST balance before transactions
 - **Transaction Metrics**: Records transaction timing data to AWS CloudWatch (optional)
+- **Input Validation**: Drops invalid, non-finite, non-positive, or stale prices (older than 1 hour)
+- **Median Aggregation**: Uses median instead of average for price calculation across sources
+- **Anchoring Safety**: Rejects price updates with >15% deviation from last-known-good price
 
 ## Environment Variables
 

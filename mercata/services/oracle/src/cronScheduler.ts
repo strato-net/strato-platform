@@ -4,6 +4,96 @@ import { fetchBatchPrices, generateConstantPrices } from './adapters/genericRest
 import { pushAssetPrices } from './utils/oraclePusher';
 import { ConfigLoader } from './utils/configLoader';
 import { Asset } from './types';
+import * as fs from 'fs';
+import * as path from 'path';
+
+// State file for storing last-known-good prices
+const STATE_FILE = path.join(process.cwd(), 'oracle-state.json');
+const ANCHORING_THRESHOLD = 0.15; // 15% deviation threshold
+const MAX_PRICE_AGE_MS = 3600000; // 1 hour staleness threshold
+
+interface OracleState {
+    lastGoodPrices: Record<string, number>;
+}
+
+// Load last-known-good prices from state file
+function loadState(): OracleState {
+    try {
+        if (fs.existsSync(STATE_FILE)) {
+            const data = fs.readFileSync(STATE_FILE, 'utf-8');
+            return JSON.parse(data);
+        }
+    } catch (error) {
+        logError('CronScheduler', new Error(`Failed to load state file: ${error}`));
+    }
+    return { lastGoodPrices: {} };
+}
+
+// Save last-known-good prices to state file
+function saveState(state: OracleState): void {
+    try {
+        fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
+    } catch (error) {
+        logError('CronScheduler', new Error(`Failed to save state file: ${error}`));
+    }
+}
+
+// Calculate median of an array of numbers
+function calculateMedian(values: number[]): number {
+    if (values.length === 0) {
+        throw new Error('Cannot calculate median of empty array');
+    }
+
+    const sorted = [...values].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+
+    if (sorted.length % 2 === 0) {
+        // Even number of values: return average of two middle values
+        return Math.floor((sorted[mid - 1] + sorted[mid]) / 2);
+    } else {
+        // Odd number of values: return middle value
+        return sorted[mid];
+    }
+}
+
+// Validate individual price entry
+function isValidPrice(priceData: { price: number; feedTimestamp: string }): boolean {
+    // Check if price is finite, positive, and non-zero
+    if (!Number.isFinite(priceData.price) || priceData.price <= 0) {
+        return false;
+    }
+
+    // Check if timestamp is valid
+    if (!priceData.feedTimestamp) {
+        return false;
+    }
+
+    // Check if price is fresh (not older than 1 hour)
+    try {
+        const feedTime = new Date(priceData.feedTimestamp).getTime();
+        const now = Date.now();
+        if (isNaN(feedTime) || now - feedTime > MAX_PRICE_AGE_MS) {
+            return false;
+        }
+    } catch {
+        return false;
+    }
+
+    return true;
+}
+
+// Check if candidate price passes anchoring safety check
+function passesAnchoringCheck(candidatePrice: number, lastGoodPrice: number | undefined): boolean {
+    // If no previous price exists, accept the candidate
+    if (lastGoodPrice === undefined) {
+        return true;
+    }
+
+    // Calculate deviation
+    const deviation = Math.abs(candidatePrice - lastGoodPrice) / lastGoodPrice;
+
+    return deviation <= ANCHORING_THRESHOLD;
+}
 
 export async function getCronSchedule(): Promise<string> {
     const schedule = process.env.CRON_SCHEDULE || "0 */15 * * * *";
@@ -126,15 +216,66 @@ async function processAllFeeds(configLoader: ConfigLoader): Promise<void> {
         throw new Error('No valid prices received from any feed');
     }
 
-    // Submit all assets to the contract - it handles round logic automatically
-    const assetNames = Object.keys(allAssetPrices);
-    const assetAddresses = assetNames.map(name => allAssetAddresses[name]);
-    const assetPriceValues = assetNames.map(name => allAssetPrices[name]);
+    // Load state with last-known-good prices
+    const state = loadState();
 
-    const result = await pushAssetPrices(assetAddresses, assetPriceValues);
+    // Step 3: Apply anchoring safety check for each asset
+    const assetsToSubmit: string[] = [];
+    const addressesToSubmit: string[] = [];
+    const pricesToSubmit: number[] = [];
+    const rejectedAssets: Array<{ name: string; candidate: number; lastGood: number; deviation: number }> = [];
 
-    // Log success for each asset
-    assetNames.forEach(assetName => {
+    Object.keys(allAssetPrices).forEach(assetName => {
+        const candidatePrice = allAssetPrices[assetName];
+        const assetAddress = allAssetAddresses[assetName];
+        const lastGoodPrice = state.lastGoodPrices[assetAddress];
+
+        // Check anchoring
+        if (passesAnchoringCheck(candidatePrice, lastGoodPrice)) {
+            // Accept and queue for submission
+            assetsToSubmit.push(assetName);
+            addressesToSubmit.push(assetAddress);
+            pricesToSubmit.push(candidatePrice);
+
+            // Update last-known-good price
+            state.lastGoodPrices[assetAddress] = candidatePrice;
+        } else {
+            // Reject update due to anchoring violation
+            const deviation = Math.abs(candidatePrice - lastGoodPrice!) / lastGoodPrice!;
+            rejectedAssets.push({
+                name: assetName,
+                candidate: candidatePrice,
+                lastGood: lastGoodPrice!,
+                deviation
+            });
+            logError('CronScheduler', new Error(
+                `Anchoring check failed for ${assetName}: ` +
+                `candidate=${candidatePrice}, lastGood=${lastGoodPrice}, deviation=${(deviation * 100).toFixed(2)}%`
+            ));
+        }
+    });
+
+    // Log rejected assets summary
+    if (rejectedAssets.length > 0) {
+        logError('CronScheduler', new Error(
+            `Rejected ${rejectedAssets.length} asset(s) due to anchoring violations (>15% deviation): ` +
+            rejectedAssets.map(a => `${a.name} (${(a.deviation * 100).toFixed(2)}%)`).join(', ')
+        ));
+    }
+
+    // Only submit if we have assets that passed anchoring check
+    if (assetsToSubmit.length === 0) {
+        throw new Error('All assets rejected by anchoring safety check');
+    }
+
+    // Submit accepted assets to the contract
+    const result = await pushAssetPrices(addressesToSubmit, pricesToSubmit);
+
+    // Save updated state
+    saveState(state);
+
+    // Log success for each submitted asset
+    assetsToSubmit.forEach(assetName => {
         const price = allAssetPrices[assetName];
         const sources = allAssetSources[assetName];
 
@@ -260,30 +401,46 @@ async function processBatchFeed(feed: any, configLoader: ConfigLoader): Promise<
         logError('CronScheduler', new Error(error));
     }
 
-    // Calculate average prices for each asset across sources
+    // Calculate median prices for each asset across sources with input validation
     const assetPrices: Record<string, number> = {};
     const assetAddresses: Record<string, string> = {};
     const assetSources: Record<string, string[]> = {};
 
     resolvedFeed.assets.forEach((asset: Asset) => {
-        const prices: number[] = [];
+        const validPrices: number[] = [];
         const sources: string[] = [];
 
+        // Step 1: Input validation - collect and validate prices from all sources
         allSuccessfulSources.forEach(source => {
             const assetResult = source.prices[asset.name] as any;
-            if (assetResult && assetResult.price && assetResult.feedTimestamp) {
-                prices.push(assetResult.price);
-                sources.push(source.name);
+            if (assetResult) {
+                // Validate the price entry
+                if (isValidPrice(assetResult)) {
+                    validPrices.push(assetResult.price);
+                    sources.push(source.name);
+                } else {
+                    logError('CronScheduler', new Error(
+                        `${feed.name}: Dropped invalid price for ${asset.name} from ${source.name} ` +
+                        `(price: ${assetResult.price}, timestamp: ${assetResult.feedTimestamp})`
+                    ));
+                }
             }
         });
 
-        if (prices.length > 0) {
-            const averagePrice = Math.floor(prices.reduce((sum, price) => sum + price, 0) / prices.length);
-
-            assetPrices[asset.name] = averagePrice;
-            assetAddresses[asset.name] = asset.targetAssetAddress;
-            assetSources[asset.name] = sources;
+        // If no valid prices remain, skip this asset
+        if (validPrices.length === 0) {
+            logError('CronScheduler', new Error(
+                `${feed.name}: No valid prices for ${asset.name} after validation`
+            ));
+            return;
         }
+
+        // Step 2: Calculate candidate price using median
+        const candidatePrice = calculateMedian(validPrices);
+
+        assetPrices[asset.name] = candidatePrice;
+        assetAddresses[asset.name] = asset.targetAssetAddress;
+        assetSources[asset.name] = sources;
     });
 
     return { assetPrices, assetAddresses, assetSources };
