@@ -215,7 +215,38 @@ export const LendingProvider = ({
   };
 
   const supplyCollateral = async (args: { asset: string, amount: string }) => {
+    // Capture the current state before the transaction
+    const previousLoans = await fetchLoans(false);
+    const previousHealthFactor = previousLoans?.healthFactor;
+    const previousCollateralValue = previousLoans?.totalCollateralValueSupplied;
+
     await api.post("/lending/collateral", args);
+
+    // Poll until the blockchain state reflects the new collateral supply
+    // We check for changes in either health factor or total collateral value
+    const maxAttempts = 20; // 10 seconds max (20 * 500ms)
+    let attempt = 0;
+
+    while (attempt < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms between checks
+
+      const updatedLoans = await fetchLoans(false);
+
+      // Check if the data has changed from the previous state
+      const healthFactorChanged = updatedLoans?.healthFactor !== previousHealthFactor;
+      const collateralValueChanged = updatedLoans?.totalCollateralValueSupplied !== previousCollateralValue;
+
+      if (healthFactorChanged || collateralValueChanged) {
+        // Data has been updated, refresh all related data once more to ensure consistency
+        await refreshLendingData();
+        return;
+      }
+
+      attempt++;
+    }
+
+    // If we timeout, still refresh the data one final time
+    await refreshLendingData();
   };
 
   const withdrawCollateral = async (args: { asset: string, amount: string }) => {
