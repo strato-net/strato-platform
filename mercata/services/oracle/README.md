@@ -11,6 +11,9 @@ Fetches asset prices from multiple sources and pushes them to the STRATO blockch
 - **Health Monitoring**: Service marks itself unhealthy on persistent failures
 - **Balance Checks**: Validates USDST balance before transactions
 - **Transaction Metrics**: Records transaction timing data to AWS CloudWatch (optional)
+- **Price Validation**: Drops invalid, non-finite, non-positive, or stale prices (older than 5 minutes)
+- **Median Aggregation**: Uses median (not average) when multiple price sources are available
+- **Anchoring Safety**: Rejects price updates that jump more than 15% from last-known-good price
 
 ## Environment Variables
 
@@ -66,6 +69,36 @@ curl http://localhost:3000/health
 
 The service automatically marks itself as unhealthy when:
 - Any API source fails twice in a row
-- Transaction submission fails twice in a row  
+- Transaction submission fails twice in a row
 - USDST balance check fails twice in a row
-- USDST balance is below minimum threshold (10 USDST) 
+- USDST balance is below minimum threshold (10 USDST)
+
+## Price Aggregation & Safety
+
+The oracle implements a robust price aggregation and validation flow:
+
+### 1. Input Validation
+For each asset, prices are collected from all configured sources and **dropped** if:
+- Invalid / non-finite / non-positive
+- Missing required fields (timestamp)
+- Stale (older than 5 minutes)
+
+If no valid prices remain after validation, the update for that asset is rejected.
+
+### 2. Candidate Price Selection
+- **≥ 2 valid prices**: `candidate = median(validPrices)`
+  - With 2 prices, median is the average
+  - With 3+ prices, median is the middle value
+- **1 valid price**: `candidate = price`
+
+### 3. Anchoring Safety Check
+Computes deviation vs last-known-good price:
+
+```
+jump = |candidate - lastGood| / lastGood
+```
+
+- **If `jump ≤ 15%`**: Publish candidate and update last-known-good
+- **If `jump > 15%`**: Reject update, retain last-known-good, log error
+
+If no last-known-good price exists (first update), the candidate is accepted immediately. 

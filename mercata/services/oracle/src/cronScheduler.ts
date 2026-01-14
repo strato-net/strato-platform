@@ -4,6 +4,13 @@ import { fetchBatchPrices, generateConstantPrices } from './adapters/genericRest
 import { pushAssetPrices } from './utils/oraclePusher';
 import { ConfigLoader } from './utils/configLoader';
 import { Asset } from './types';
+import {
+    validatePrice,
+    calculateMedian,
+    anchoringSafetyCheck,
+    updateLastKnownGoodPrice,
+    ValidatedPrice
+} from './utils/priceValidator';
 
 export async function getCronSchedule(): Promise<string> {
     const schedule = process.env.CRON_SCHEDULE || "0 */15 * * * *";
@@ -260,30 +267,59 @@ async function processBatchFeed(feed: any, configLoader: ConfigLoader): Promise<
         logError('CronScheduler', new Error(error));
     }
 
-    // Calculate average prices for each asset across sources
+    // Calculate median prices for each asset across sources with validation and anchoring
     const assetPrices: Record<string, number> = {};
     const assetAddresses: Record<string, string> = {};
     const assetSources: Record<string, string[]> = {};
 
     resolvedFeed.assets.forEach((asset: Asset) => {
-        const prices: number[] = [];
-        const sources: string[] = [];
+        // Step 1: Input validation - collect and validate prices from all sources
+        const validatedPrices: ValidatedPrice[] = [];
 
         allSuccessfulSources.forEach(source => {
             const assetResult = source.prices[asset.name] as any;
-            if (assetResult && assetResult.price && assetResult.feedTimestamp) {
-                prices.push(assetResult.price);
-                sources.push(source.name);
+            if (assetResult) {
+                const validated = validatePrice(asset.name, assetResult, source.name);
+                if (validated) {
+                    validatedPrices.push(validated);
+                }
             }
         });
 
-        if (prices.length > 0) {
-            const averagePrice = Math.floor(prices.reduce((sum, price) => sum + price, 0) / prices.length);
-
-            assetPrices[asset.name] = averagePrice;
-            assetAddresses[asset.name] = asset.targetAssetAddress;
-            assetSources[asset.name] = sources;
+        // If no valid prices remain, skip this asset
+        if (validatedPrices.length === 0) {
+            logError('CronScheduler', new Error(
+                `${asset.name}: No valid prices after validation (sources attempted: ${allSuccessfulSources.length})`
+            ));
+            return;
         }
+
+        // Step 2: Candidate price selection (median if >=2 prices, single price if 1)
+        const priceValues = validatedPrices.map(vp => vp.price);
+        const candidatePrice = priceValues.length >= 2
+            ? calculateMedian(priceValues)
+            : priceValues[0];
+
+        logInfo('CronScheduler',
+            `${asset.name}: Candidate price ${candidatePrice} from ${validatedPrices.length} valid source(s) ` +
+            `(${validatedPrices.length >= 2 ? 'median' : 'single'})`
+        );
+
+        // Step 3: Anchoring safety check
+        const safePrice = anchoringSafetyCheck(asset.name, candidatePrice);
+
+        if (safePrice === null) {
+            // Price jump too large - reject update
+            return;
+        }
+
+        // Price is safe - include in batch update
+        assetPrices[asset.name] = safePrice;
+        assetAddresses[asset.name] = asset.targetAssetAddress;
+        assetSources[asset.name] = validatedPrices.map(vp => vp.source);
+
+        // Update last-known-good price for future comparisons
+        updateLastKnownGoodPrice(asset.name, safePrice);
     });
 
     return { assetPrices, assetAddresses, assetSources };
