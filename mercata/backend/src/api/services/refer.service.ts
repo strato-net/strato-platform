@@ -324,6 +324,65 @@ export interface ReferralHistoryEntry {
   blockTimestamp: Date;
 }
 
+export interface ReferralStatusResult {
+  status: 'active' | 'redeemed' | 'cancelled';
+  eventName?: string;
+  blockTimestamp?: Date;
+}
+
+export const getReferralStatus = async (
+  accessToken: string,
+  ephemeralAddress: string
+): Promise<ReferralStatusResult> => {
+  const normalizeAddress = (addr: string): string => {
+    return addr.startsWith("0x") ? addr.slice(2).toLowerCase() : addr.toLowerCase();
+  };
+
+  const normalizedEphemeralAddress = normalizeAddress(ephemeralAddress);
+  const escrowAddress = normalizeAddress(escrow);
+
+  if (!/^[0-9a-f]{40}$/.test(normalizedEphemeralAddress)) {
+    throw new Error("Invalid ephemeral address");
+  }
+  if (!/^[0-9a-f]{40}$/.test(escrowAddress)) {
+    throw new Error("Invalid escrow contract address");
+  }
+
+  try {
+    const params: Record<string, string> = {
+      select: "event_name,attributes,block_timestamp",
+      address: `eq.${escrowAddress}`,
+      event_name: `in.(Redeemed,Cancelled)`,
+      ['attributes->>ephemeralAddress']: `eq.${normalizedEphemeralAddress}`,
+      order: "block_timestamp.desc",
+      limit: "1",
+    };
+
+    const response = await cirrus.get(accessToken, `/event`, {
+      params,
+    });
+
+    const data = response.data;
+    if (!Array.isArray(data) || data.length === 0) {
+      return { status: 'active' };
+    }
+
+    const event = data[0];
+    const eventName = event.event_name;
+    
+    return {
+      status: eventName === 'Redeemed' ? 'redeemed' : 'cancelled',
+      eventName: eventName,
+      blockTimestamp: event.block_timestamp ? new Date(event.block_timestamp) : undefined,
+    };
+  } catch (error: any) {
+    if (error.response?.status === 404 || error.response?.status === 200) {
+      return { status: 'active' };
+    }
+    throw error;
+  }
+};
+
 export const getReferralHistory = async (
   accessToken: string,
   userAddress: string

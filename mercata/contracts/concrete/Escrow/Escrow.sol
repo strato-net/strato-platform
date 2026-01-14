@@ -66,10 +66,14 @@ contract Escrow is Ownable {
     Deposit storage d = deposits[ephemeralAddress];
     require(d.sender != address(0) && d.tokens.length > 0 && d.amounts.length > 0, "no deposit");
 
-    emit Redeemed(ephemeralAddress, d.tokens, d.amounts, d.sender, recipient);
+    address[] tokens = [];
+    uint[] amounts = [];
+    address sender = d.sender;
 
     for (uint i = 0; i < d.tokens.length; i++) {
         bool ok = IERC20(d.tokens[i]).transfer(recipient, d.amounts[i]);
+        tokens.push(deposits[ephemeralAddress].tokens[i]);
+        amounts.push(deposits[ephemeralAddress].amounts[i]);
         deposits[ephemeralAddress].tokens[i] = address(0);
         deposits[ephemeralAddress].amounts[i] = 0;
         require(ok, "transfer failed");
@@ -78,6 +82,8 @@ contract Escrow is Ownable {
     deposits[ephemeralAddress].tokens.length = 0;
     deposits[ephemeralAddress].amounts.length = 0;
     deposits[ephemeralAddress].expiry = 0;
+
+    emit Redeemed(ephemeralAddress, tokens, amounts, sender, recipient);
   }
 
   function cancelDeposit(
@@ -88,18 +94,25 @@ contract Escrow is Ownable {
     require(d.tokens.length > 0 && d.amounts.length > 0, "no deposit");
     require(block.timestamp >= d.expiry, "deposit not eligible for cancellation yet");
 
-    emit Cancelled(ephemeralAddress, d.tokens, d.amounts, msg.sender);
+    address[] tokens = [];
+    uint[] amounts = [];
+    address sender = d.sender;
 
     for (uint i = 0; i < d.tokens.length; i++) {
         bool ok = IERC20(d.tokens[i]).transfer(msg.sender, d.amounts[i]);
+        tokens.push(deposits[ephemeralAddress].tokens[i]);
+        amounts.push(deposits[ephemeralAddress].amounts[i]);
         deposits[ephemeralAddress].tokens[i] = address(0);
         deposits[ephemeralAddress].amounts[i] = 0;
         require(ok, "transfer failed");
     }
+
     deposits[ephemeralAddress].sender = address(0);
     deposits[ephemeralAddress].tokens.length = 0;
     deposits[ephemeralAddress].amounts.length = 0;
     deposits[ephemeralAddress].expiry = 0;
+
+    emit Cancelled(ephemeralAddress, tokens, amounts, sender);
   }
 
   function recoverSigner(string digest, uint8 v, string r, string s) public pure returns (address) {

@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { depositToEscrow, DepositParams, getEscrowDeposit, EscrowDepositQuery, redeemEscrow, RedeemParams, getUserReferrals, cancelDeposit, CancelDepositParams, getReferralHistory } from "../services/refer.service";
+import { depositToEscrow, DepositParams, getEscrowDeposit, EscrowDepositQuery, redeemEscrow, RedeemParams, getUserReferrals, cancelDeposit, CancelDepositParams, getReferralHistory, getReferralStatus } from "../services/refer.service";
 import { TransactionResponse } from "@mercata/shared-types";
 import { constants } from "../../config/constants";
 import { referralUrl } from "../../config/config";
@@ -231,6 +231,31 @@ class ReferController {
       res.json({
         success: true,
         data: result,
+      });
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
+  static async getStatus(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken } = req;
+      const { ephemeralAddress } = req.query;
+
+      if (!ephemeralAddress || typeof ephemeralAddress !== "string") {
+        res.status(400).json({ error: "ephemeralAddress is required" });
+        return;
+      }
+
+      const status = await getReferralStatus(accessToken, ephemeralAddress);
+
+      res.json({
+        success: true,
+        data: status,
       });
     } catch (error: any) {
       next(error);

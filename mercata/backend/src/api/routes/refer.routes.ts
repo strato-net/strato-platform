@@ -286,5 +286,46 @@ router.post("/cancel", authHandler.authorizeRequest(), ReferController.cancel);
  */
 router.get("/history", authHandler.authorizeRequest(), ReferController.getHistory);
 
+/**
+ * @openapi
+ * /refer/status:
+ *   get:
+ *     summary: Get referral status (active, redeemed, or cancelled)
+ *     tags: [Refer]
+ *     parameters:
+ *       - name: ephemeralAddress
+ *         in: query
+ *         required: true
+ *         description: Ephemeral address (with or without 0x prefix)
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Referral status retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     status:
+ *                       type: string
+ *                       enum: [active, redeemed, cancelled]
+ *                     eventName:
+ *                       type: string
+ *                       nullable: true
+ *                     blockTimestamp:
+ *                       type: string
+ *                       format: date-time
+ *                       nullable: true
+ *       400:
+ *         description: Invalid ephemeral address
+ */
+router.get("/status", authHandler.authorizeRequest(), ReferController.getStatus);
+
 export default router;
 
