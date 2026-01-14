@@ -25,6 +25,7 @@ import { handleAmountInputChange } from "@/utils/transferValidation";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
+import { usdstAddress } from "@/lib/constants";
 
 type Props = {
   senderUsername: string;
@@ -74,6 +75,8 @@ export function SenderFlow(props: Props) {
     return `${hours}:${minutes}`;
   });
   const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [quantity, setQuantity] = useState<string>("1");
+  const [quantityError, setQuantityError] = useState<string>("");
 
   // Fetch tokens on mount
   const fetchUserTokens = useCallback(async () => {
@@ -101,6 +104,25 @@ export function SenderFlow(props: Props) {
 
     return { activeTokens: active, inactiveTokens: inactive };
   }, [tokens]);
+
+  // Set first entry to USDST when active tokens are loaded (only if it's in active tokens)
+  useEffect(() => {
+    if (activeTokens.length > 0 && entries.length > 0 && !entries[0].token) {
+      const usdstToken = activeTokens.find(
+        token => token.address?.toLowerCase() === usdstAddress.toLowerCase()
+      );
+      
+      if (usdstToken) {
+        setEntries(prevEntries => 
+          prevEntries.map((entry, index) => 
+            index === 0 
+              ? { ...entry, token: usdstToken }
+              : entry
+          )
+        );
+      }
+    }
+  }, [activeTokens, entries]);
 
   // Get max amount for a specific token
   const getMaxAmount = (token: Token | undefined): string => {
@@ -228,12 +250,19 @@ export function SenderFlow(props: Props) {
         throw new Error("Expiry date and time must be in the future");
       }
 
+      // Validate quantity
+      const quantityNum = parseInt(quantity, 10);
+      if (!quantity || isNaN(quantityNum) || quantityNum <= 0) {
+        throw new Error("Quantity must be a positive integer greater than 0");
+      }
+
       // Step 4: Submit deposit transaction
       const response = await api.post("/refer/deposit", {
         tokens: tokenAddresses,
         amounts: amounts,
         ephemeralAddress: eAddr,
         expiry: expirySeconds,
+        quantity: quantityNum,
       });
 
       // Step 4: Store generated information for message display
@@ -794,6 +823,46 @@ export function SenderFlow(props: Props) {
             })}
           </div>
 
+          {/* Quantity Input */}
+          <div className="space-y-2">
+            <Label htmlFor="quantity">Quantity</Label>
+            <Input
+              id="quantity"
+              type="number"
+              min="1"
+              step="1"
+              value={quantity}
+              onChange={(e) => {
+                const value = e.target.value;
+                // Allow empty string
+                if (value === "") {
+                  setQuantity("");
+                  setQuantityError("");
+                  return;
+                }
+                
+                // Allow only positive integers
+                const numValue = parseInt(value, 10);
+                if (!isNaN(numValue) && numValue > 0) {
+                  setQuantity(value);
+                  setQuantityError("");
+                } else {
+                  setQuantity(value);
+                  setQuantityError("Quantity must be a positive integer greater than 0");
+                }
+              }}
+              placeholder="1"
+              className={quantityError ? "border-red-500" : "w-full"}
+            />
+            {quantityError ? (
+              <p className="text-xs text-red-600">{quantityError}</p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Number of referrals this deposit will support. Each redemption will use one quantity.
+              </p>
+            )}
+          </div>
+
           {/* Expiry Date and Time Picker */}
           <div className="space-y-4">
             <Label>Expiry Date & Time</Label>
@@ -862,14 +931,18 @@ export function SenderFlow(props: Props) {
             </p>
           </div>
 
-          <Button
-            onClick={generateAndSubmitDeposit}
-            disabled={
-              entries.every(e => !e.token || !e.amount || !!e.amountError) || 
-              isSubmitting
-            }
-            className="w-full"
-          >
+              <Button
+                onClick={generateAndSubmitDeposit}
+                disabled={
+                  entries.every(e => !e.token || !e.amount || !!e.amountError) || 
+                  isSubmitting ||
+                  !quantity ||
+                  isNaN(parseInt(quantity, 10)) ||
+                  parseInt(quantity, 10) <= 0 ||
+                  !!quantityError
+                }
+                className="w-full"
+              >
             {isSubmitting ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />

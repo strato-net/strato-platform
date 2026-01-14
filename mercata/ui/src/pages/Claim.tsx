@@ -2,11 +2,16 @@ import { useEffect } from "react";
 import { useSearchParams, useLocation } from "react-router-dom";
 import { RecipientClaim } from "@/components/refer/RecipientClaim";
 import { useUser } from "@/context/UserContext";
+import { useTheme } from "next-themes";
+import STRATOLOGO from '@/assets/strato.png';
+import STRATOLOGODARK from '@/assets/strato-dark.png';
 
 const Claim = () => {
   const { userAddress, isLoggedIn } = useUser();
   const [searchParams] = useSearchParams();
   const location = useLocation();
+  const { resolvedTheme } = useTheme();
+  const logo = resolvedTheme === 'dark' ? STRATOLOGODARK : STRATOLOGO;
 
   useEffect(() => {
     document.title = "Claim Tokens | STRATO";
@@ -52,9 +57,12 @@ const Claim = () => {
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
+          {/* STRATO Branding Header */}
+          <div className="flex items-center justify-center mb-8">
+            <img src={logo} alt="STRATO" className="h-12" />
+          </div>
           <RecipientClaim
             currentRecipientAddressNo0x={currentRecipientAddressNo0x}
-            escrowContractAddressNo0x={escrowContractAddressNo0x}
             redemptionServerUrl={redemptionServerUrl}
             isLoggedIn={isLoggedIn}
           />

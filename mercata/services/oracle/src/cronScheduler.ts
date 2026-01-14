@@ -97,7 +97,7 @@ async function processAllFeeds(configLoader: ConfigLoader): Promise<void> {
     // Collect all successful results from completed feeds
     const allAssetPrices: Record<string, number> = {};
     const allAssetAddresses: Record<string, string> = {};
-    const allAssetSources: Record<string, string[]> = {};
+    const allAssetSources: Record<string, Array<{ name: string; price: number }>> = {};
 
     feedResults.forEach(({ result, feedName }) => {
         if (result) {
@@ -137,14 +137,14 @@ async function processAllFeeds(configLoader: ConfigLoader): Promise<void> {
         const price = allAssetPrices[assetName];
         const sources = allAssetSources[assetName];
 
-        logFeedUpdate(assetName, price, sources.map(s => ({ name: s, price })), result.hash);
+        logFeedUpdate(assetName, price, sources, result.hash);
     });
 }
 
 async function processBatchFeed(feed: any, configLoader: ConfigLoader): Promise<{
     assetPrices: Record<string, number>;
     assetAddresses: Record<string, string>;
-    assetSources: Record<string, string[]>;
+    assetSources: Record<string, Array<{ name: string; price: number }>>;
 }> {
     const resolvedFeed = configLoader.getResolvedFeeds().find(f => f.name === feed.name);
     if (!resolvedFeed) {
@@ -157,14 +157,14 @@ async function processBatchFeed(feed: any, configLoader: ConfigLoader): Promise<
         const constantPrices = generateConstantPrices(resolvedFeed.assets);
         const assetPrices: Record<string, number> = {};
         const assetAddresses: Record<string, string> = {};
-        const assetSources: Record<string, string[]> = {};
+        const assetSources: Record<string, Array<{ name: string; price: number }>> = {};
         
         resolvedFeed.assets.forEach(asset => {
             const priceData = constantPrices[asset.name];
             if (priceData) {
                 assetPrices[asset.name] = priceData.price;
                 assetAddresses[asset.name] = asset.targetAssetAddress;
-                assetSources[asset.name] = ['constant'];
+                assetSources[asset.name] = [{ name: 'constant', price: priceData.price }];
             }
         });
         
@@ -262,17 +262,17 @@ async function processBatchFeed(feed: any, configLoader: ConfigLoader): Promise<
     // Calculate average prices for each asset across sources
     const assetPrices: Record<string, number> = {};
     const assetAddresses: Record<string, string> = {};
-    const assetSources: Record<string, string[]> = {};
+    const assetSources: Record<string, Array<{ name: string; price: number }>> = {};
 
     resolvedFeed.assets.forEach((asset: Asset) => {
         const prices: number[] = [];
-        const sources: string[] = [];
+        const sources: Array<{ name: string; price: number }> = [];
 
         allSuccessfulSources.forEach(source => {
             const assetResult = source.prices[asset.name] as any;
             if (assetResult && assetResult.price && assetResult.feedTimestamp) {
                 prices.push(assetResult.price);
-                sources.push(source.name);
+                sources.push({ name: source.name, price: assetResult.price });
             }
         });
 

@@ -13,7 +13,6 @@ export const redeemReferral = async (
   params: RedeemReferralRequestParams,
 ) => {
   try {
-    console.log(`AYOOO: ${JSON.stringify(params)}`)
     return await execute({
       contractName: "Escrow",
       contractAddress: config.escrow.address!,

@@ -1,5 +1,6 @@
 import { CollateralData, NewLoanData } from "@/interface";
 import { SUPPLY_COLLATERAL_FEE, BORROW_FEE } from "@/lib/constants";
+import { safeParseUnits } from "@/utils/numberUtils";
 
 export const getMaxSafeWithdrawAmount = (
   asset: CollateralData,
@@ -213,7 +214,7 @@ export const calculateBorrowHealthImpact = (
 // Floor the value to the nearest 0.01;
 // e.g. 3.409 -> 3.40, 3.45 --> 3.45
 // @dev could be unreliable with javascript's floating point precision
-const centFloor = (value: Number): Number => {
+export const centFloor = (value: Number): Number => {
   return Math.floor(+value * 100) / 100;
 };
 
@@ -337,18 +338,18 @@ export const calculateBorrowTxFee = (collateralCount: number): { fee: number, vo
 /**
  * Calculate the wei amount of collateral asset whose total value in USD is the provided dollar value
  * @param collateralValueUSD The user-supplied dollar value from which to calculate the asset amount
- * @param price The oracle price of the collateral asset in wei
+ * @param price The oracle price of the collateral asset in wei. If price is <= 0n, returns 0n.
  * @param decimals The number of decimals of the collateral asset, defaulting to 18
  * @returns The amount of collateral asset to supply in wei
  */
 export const calculateAdditionalCollateralAmountFromValue = (
-  collateralValueUSD: number,
+  collateralValueUSD: string,
   price: bigint,
   decimals: number = 18,
 ): bigint => {
-  const collateralValueWei = BigInt(Math.round(collateralValueUSD * 1e18)); // questionable
-  if (price === 0n) return 0n;
-  return (collateralValueWei * 10n ** BigInt(decimals)) / price;
+  const collateralValueWei = safeParseUnits(collateralValueUSD || "0", 18);
+  if (price <= 0n) return 0n;
+  return ceilDivBigInt(collateralValueWei * 10n ** BigInt(decimals), price);
 };
 
 /**
