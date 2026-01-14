@@ -41,6 +41,13 @@ interface BorrowFormProps {
   rewardsLoading?: boolean;
 }
 
+  // In custom mode, each asset row can be driven by:
+  // - exact wei (e.g. from recommendation or MAX button), or
+  // - a USD input (typed by the user) which determines wei.
+type CustomCollateralEntry =
+  | { source: "wei"; wei: bigint }
+  | { source: "usd"; usd: string };
+
 const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalance, collateralInfo, startPolling, stopPolling, userRewards, rewardsLoading }: BorrowFormProps) => {
   const [borrowAmount, setBorrowAmount] = useState<string>("");
   const [borrowAmountError, setBorrowAmountError] = useState<string>("");
@@ -49,7 +56,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
   const [targetHealthFactor, setTargetHealthFactor] = useState<number>(2.10);
   const [autoSupplyCollateral, setAutoSupplyCollateral] = useState<boolean>(true);
   const [isCollateralExpanded, setIsCollateralExpanded] = useState<boolean>(false);
-  const [customCollateralValues, setCustomCollateralValues] = useState<Map<string, string>>(new Map());
+  const [customCollateralEntries, setCustomCollateralEntries] = useState<Map<string, CustomCollateralEntry>>(new Map());
   const [progressModalOpen, setProgressModalOpen] = useState(false);
   const [borrowSteps, setBorrowSteps] = useState<BorrowStep[]>([]);
   const { supplyCollateral } = useLendingContext();
@@ -128,22 +135,26 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
       sortCollateralAssets(collateralsArray);
 
       for (const collateral of collateralsArray) {
-        // Use custom value if set, otherwise check if in recommendation
-        if (customCollateralValues.has(collateral.address)) {
-          const price = BigInt(collateral.assetPrice ?? "0");
-          const decimals = collateral.customDecimals ?? 18;
-          const customValue = parseFloat(customCollateralValues.get(collateral.address) || "0");
-          const customAmount = calculateAdditionalCollateralAmountFromValue(customValue, price, decimals);
-          data.push({ collateral, amount: customAmount, valueUSD: customValue });
-        } else {
-          // Fallback to 0
-          data.push({ collateral, amount: 0n, valueUSD: 0.00 });
-        }
+        const entry = customCollateralEntries.get(collateral.address);
+        const price = BigInt(collateral.assetPrice ?? "0");
+        const decimals = collateral.customDecimals ?? 18;
+
+        const amount = (() => {
+          if (!entry) return 0n;
+          if (entry.source === "wei") return entry.wei;
+          if (entry.source === "usd") return calculateAdditionalCollateralAmountFromValue(entry.usd, price, decimals);
+          return 0n; // unreachable
+        })();
+
+        const tokenDecimals = BigInt(10) ** BigInt(decimals);
+        const valueUSD = Number((amount * price) / tokenDecimals) / 1e18;
+
+        data.push({ collateral, amount, valueUSD });
       }
     }
     
     return data;
-  }, [recommendedCollateral, autoSupplyCollateral, customCollateralValues, potentialCollateral]);
+  }, [recommendedCollateral, autoSupplyCollateral, customCollateralEntries, potentialCollateral]);
 
   // Total value of collateral in table
   const totalCollateralValue = useMemo(() => {
@@ -156,9 +167,8 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
     if (autoSupplyCollateral) return map; // Only check in custom mode
     
     for (const item of collateralTableData) {
-      const maxValueUSD = calculateMaxCollateralValueUSDCentFloored(item.collateral);
-      
-      map.set(item.collateral.address, item.valueUSD > maxValueUSD);
+      const balanceWei = BigInt(item.collateral.userBalance ?? "0");
+      map.set(item.collateral.address, item.amount > balanceWei);
     }
     
     return map;
@@ -257,36 +267,36 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
     setAutoSupplyCollateral(checked);
     if (!checked) {
       setIsCollateralExpanded(true);
-      // Initialize custom values from ALL user-possessed collateral assets
-      // Assets in recommendation get their recommended value, others get 0
-      const initialCustomValues = new Map<string, string>();
+      // Initialize custom entries from ALL user-possessed collateral assets.
+      // - If we have a recommendation: preserve the exact recommended wei
+      // - Otherwise: initialize as USD-driven with 0.00.
+      const initialEntries = new Map<string, CustomCollateralEntry>();
       for (const [collateral] of potentialCollateral.entries()) {
         const recommendedAmount = recommendedCollateral.get(collateral);
         if (recommendedAmount && recommendedAmount > 0n) {
-          const price = BigInt(collateral.assetPrice ?? "0");
-          const decimals = BigInt(10) ** BigInt(collateral.customDecimals ?? 18);
-          const valueUSD = Number((recommendedAmount * price) / decimals) / 1e18;
-          initialCustomValues.set(collateral.address, valueUSD.toFixed(2));
+          initialEntries.set(collateral.address, { source: "wei", wei: recommendedAmount });
         } else {
           // Not in recommendation - initialize to zero
-          initialCustomValues.set(collateral.address, "0.00");
+          initialEntries.set(collateral.address, { source: "usd", usd: "0.00" });
         }
       }
-      setCustomCollateralValues(initialCustomValues);
+      setCustomCollateralEntries(initialEntries);
     }
   };
 
   // Handle custom value change
   const handleCustomValueChange = (address: string, value: string) => {
-    const newValues = new Map(customCollateralValues);
-    newValues.set(address, value);
-    setCustomCollateralValues(newValues);
+    const newEntries = new Map(customCollateralEntries);
+    newEntries.set(address, { source: "usd", usd: value });
+    setCustomCollateralEntries(newEntries);
   };
 
   // Handle clicking available value to fill max
   const handleFillAddCollatMaxValue = (collateral: CollateralData) => {
-    const maxValueUSD = calculateMaxCollateralValueUSDCentFloored(collateral);
-    handleCustomValueChange(collateral.address, maxValueUSD.toFixed(2));
+    const balanceWei = BigInt(collateral.userBalance ?? "0");
+    const newEntries = new Map(customCollateralEntries);
+    newEntries.set(collateral.address, { source: "wei", wei: balanceWei });
+    setCustomCollateralEntries(newEntries);
   };
 
   // Get risk indicator color and label
@@ -398,7 +408,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
       setBorrowAmountError("");
       setCustomBorrowError("");
       setFeeError("");
-      setCustomCollateralValues(new Map());
+      setCustomCollateralEntries(new Map());
       setAutoSupplyCollateral(true);
       setIsCollateralExpanded(false);
       handlePollingUpdate("");
@@ -692,7 +702,11 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
                           <span className="text-muted-foreground">$</span>
                           <Input
                             type="number"
-                            value={customCollateralValues.get(item.collateral.address) || item.valueUSD.toFixed(2)}
+                            value={(() => {
+                              const entry = customCollateralEntries.get(item.collateral.address);
+                              if (entry && entry.source === "usd") return entry.usd;
+                              return item.valueUSD.toFixed(2);
+                            })()}
                             onChange={(e) => handleCustomValueChange(item.collateral.address, e.target.value)}
                             className={`collateral-value-input w-20 h-7 text-right text-sm px-2 ${collateralExceedsMaxMap.get(item.collateral.address) ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                           />
