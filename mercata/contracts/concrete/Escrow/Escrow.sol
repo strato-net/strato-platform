@@ -84,7 +84,10 @@ contract Escrow is Ownable {
     for (uint i = 0; i < d.tokens.length; i++) {
         uint feeAmount = (d.amounts[i] * fee) / 1e18;
         bool ok = IERC20(d.tokens[i]).transfer(recipient, d.amounts[i] - feeAmount);
-        bool feeOk = IERC20(d.tokens[i]).transfer(msg.sender, feeAmount);
+        bool feeOk = true;
+        if (feeAmount > 0) {
+            feeOk = IERC20(d.tokens[i]).transfer(msg.sender, feeAmount);
+        }
         tokens.push(deposits[ephemeralAddress].tokens[i]);
         amounts.push(deposits[ephemeralAddress].amounts[i]);
         if (d.quantity == 1) {
