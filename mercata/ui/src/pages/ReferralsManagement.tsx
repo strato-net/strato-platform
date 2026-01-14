@@ -20,6 +20,7 @@ interface UserReferral {
   tokens: string[];
   amounts: string[];
   expiry: number;
+  quantity: number;
 }
 
 const ReferralsManagement = () => {
@@ -197,6 +198,7 @@ const ReferralsManagement = () => {
                         <TableRow>
                           <TableHead>Ephemeral Address</TableHead>
                           <TableHead>Tokens</TableHead>
+                          <TableHead>Quantity</TableHead>
                           <TableHead>Expiry</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead className="text-right">Actions</TableHead>
@@ -242,6 +244,9 @@ const ReferralsManagement = () => {
                                     );
                                   })}
                                 </div>
+                              </TableCell>
+                              <TableCell>
+                                <span className="text-sm font-medium">{referral.quantity || 1}</span>
                               </TableCell>
                               <TableCell>
                                 {referral.expiry === 0 ? (
@@ -414,6 +419,7 @@ const ReferralHistoryTable = ({ userAddress, getTokenInfo }: ReferralHistoryTabl
             <TableHead>Event</TableHead>
             <TableHead>Ephemeral Address</TableHead>
             <TableHead>Tokens</TableHead>
+            <TableHead>Quantity</TableHead>
             <TableHead>Recipient</TableHead>
           </TableRow>
         </TableHeader>
@@ -469,6 +475,9 @@ const ReferralHistoryTable = ({ userAddress, getTokenInfo }: ReferralHistoryTabl
                       );
                     })}
                   </div>
+                </TableCell>
+                <TableCell>
+                  <span className="text-sm font-medium">{entry.quantity || 1}</span>
                 </TableCell>
                 <TableCell>
                   {entry.recipient ? (

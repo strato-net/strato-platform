@@ -35,9 +35,12 @@ const router = Router();
  *               ephemeralAddress:
  *                 type: string
  *                 description: Ephemeral address for the recipient (with or without 0x prefix)
- *               expiry:
- *                 type: number
- *                 description: Expiry time in seconds from now (e.g., 604800 for 7 days)
+             *               expiry:
+             *                 type: number
+             *                 description: Expiry time in seconds from now (e.g., 604800 for 7 days)
+             *               quantity:
+             *                 type: number
+             *                 description: Number of referrals this deposit supports (must be a positive integer)
  *     responses:
  *       200:
  *         description: Deposit transaction submitted successfully
@@ -285,6 +288,47 @@ router.post("/cancel", authHandler.authorizeRequest(), ReferController.cancel);
  *                         format: date-time
  */
 router.get("/history", authHandler.authorizeRequest(), ReferController.getHistory);
+
+/**
+ * @openapi
+ * /refer/status:
+ *   get:
+ *     summary: Get referral status (active, redeemed, or cancelled)
+ *     tags: [Refer]
+ *     parameters:
+ *       - name: ephemeralAddress
+ *         in: query
+ *         required: true
+ *         description: Ephemeral address (with or without 0x prefix)
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Referral status retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     status:
+ *                       type: string
+ *                       enum: [active, redeemed, cancelled]
+ *                     eventName:
+ *                       type: string
+ *                       nullable: true
+ *                     blockTimestamp:
+ *                       type: string
+ *                       format: date-time
+ *                       nullable: true
+ *       400:
+ *         description: Invalid ephemeral address
+ */
+router.get("/status", authHandler.authorizeRequest(), ReferController.getStatus);
 
 export default router;
 

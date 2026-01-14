@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { depositToEscrow, DepositParams, getEscrowDeposit, EscrowDepositQuery, redeemEscrow, RedeemParams, getUserReferrals, cancelDeposit, CancelDepositParams, getReferralHistory } from "../services/refer.service";
+import { depositToEscrow, DepositParams, getEscrowDeposit, EscrowDepositQuery, redeemEscrow, RedeemParams, getUserReferrals, cancelDeposit, CancelDepositParams, getReferralHistory, getReferralStatus } from "../services/refer.service";
 import { TransactionResponse } from "@mercata/shared-types";
 import { constants } from "../../config/constants";
 import { referralUrl } from "../../config/config";
@@ -14,7 +14,7 @@ class ReferController {
       const { accessToken, address: userAddress, body } = req;
       
         // Validate required fields
-        const { tokens, amounts, ephemeralAddress, expiry } = body;
+        const { tokens, amounts, ephemeralAddress, expiry, quantity } = body;
         
         if (!tokens || !Array.isArray(tokens) || tokens.length === 0) {
           res.status(400).json({ error: "tokens array is required and must not be empty" });
@@ -41,11 +41,17 @@ class ReferController {
           return;
         }
 
+        if (quantity === undefined || typeof quantity !== "number" || quantity <= 0 || !Number.isInteger(quantity)) {
+          res.status(400).json({ error: "quantity is required and must be a positive integer" });
+          return;
+        }
+
         const params: DepositParams = {
           tokens,
           amounts,
           ephemeralAddress,
           expiry,
+          quantity,
         };
 
       const result: TransactionResponse = await depositToEscrow(
@@ -231,6 +237,35 @@ class ReferController {
       res.json({
         success: true,
         data: result,
+      });
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
+  static async getStatus(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress } = req;
+      const { ephemeralAddress } = req.query;
+
+      if (!ephemeralAddress || typeof ephemeralAddress !== "string") {
+        res.status(400).json({ error: "ephemeralAddress is required" });
+        return;
+      }
+
+      const status = await getReferralStatus(
+        accessToken, 
+        ephemeralAddress,
+        userAddress as string | undefined
+      );
+
+      res.json({
+        success: true,
+        data: status,
       });
     } catch (error: any) {
       next(error);
