@@ -1,5 +1,5 @@
 import { api } from "@/lib/axios";
-import { parseUnits } from "ethers";
+import { parseUnitsWithTruncation } from "@/utils/numberUtils";
 import type {
   VaultData,
   AssetConfig,
@@ -67,7 +67,8 @@ export const cdpService = {
   // Deposit collateral
   async deposit(asset: string, amount: string): Promise<TransactionResponse> {
     const decimals = await getAssetDecimals(asset);
-    const amountWei = parseUnits(amount, decimals).toString();
+    // Use parseUnitsWithTruncation to handle amounts with too many decimal places
+    const amountWei = parseUnitsWithTruncation(amount, decimals).toString();
     const response = await api.post("/cdp/deposit", { asset, amount: amountWei });
     return response.data;
   },
@@ -75,7 +76,8 @@ export const cdpService = {
   // Withdraw collateral
   async withdraw(asset: string, amount: string): Promise<TransactionResponse> {
     const decimals = await getAssetDecimals(asset);
-    const amountWei = parseUnits(amount, decimals).toString();
+    // Use parseUnitsWithTruncation to handle amounts with too many decimal places
+    const amountWei = parseUnitsWithTruncation(amount, decimals).toString();
     const response = await api.post("/cdp/withdraw", { asset, amount: amountWei });
     return response.data;
   },
@@ -100,7 +102,8 @@ export const cdpService = {
 
   // Mint USDST
   async mint(asset: string, amount: string): Promise<TransactionResponse> {
-    const amountWei = parseUnits(amount, USDST_DECIMALS).toString();
+    // Use parseUnitsWithTruncation to handle amounts with too many decimal places
+    const amountWei = parseUnitsWithTruncation(amount, USDST_DECIMALS).toString();
     const response = await api.post("/cdp/mint", { asset, amount: amountWei });
     return response.data;
   },
@@ -113,7 +116,8 @@ export const cdpService = {
 
   // Repay USDST debt
   async repay(asset: string, amount: string): Promise<TransactionResponse> {
-    const amountWei = parseUnits(amount, USDST_DECIMALS).toString();
+    // Use parseUnitsWithTruncation to handle amounts with too many decimal places
+    const amountWei = parseUnitsWithTruncation(amount, USDST_DECIMALS).toString();
     const response = await api.post("/cdp/repay", { asset, amount: amountWei });
     return response.data;
   },
@@ -126,7 +130,8 @@ export const cdpService = {
 
   // Execute liquidation
   async liquidate(collateralAsset: string, borrower: string, debtToCover: string): Promise<TransactionResponse> {
-    const debtToCoverWei = parseUnits(debtToCover, USDST_DECIMALS).toString();
+    // Use parseUnitsWithTruncation to handle amounts with too many decimal places
+    const debtToCoverWei = parseUnitsWithTruncation(debtToCover, USDST_DECIMALS).toString();
     const response = await api.post("/cdp/liquidate", { collateralAsset, borrower, debtToCover: debtToCoverWei });
     return response.data;
   },

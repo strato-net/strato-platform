@@ -4,14 +4,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronUp, ChevronDown } from 'lucide-react';
-import { formatUnits, parseUnits } from 'ethers';
+import { formatUnits } from 'ethers';
 import { NumericFormat } from 'react-number-format';
 import type { PlanItem } from '@/services/cdpTypes';
 import type { VaultCandidate } from '@/services/MintService';
 import { formatPercentage, getAssetColor, convertStabilityFeeRateToAnnualPercentage, calculateAggregateHealthFactor } from '@/utils/loanUtils';
 import { useTokenContext } from '@/context/TokenContext';
 import { useUserTokens } from '@/context/UserTokensContext';
-import { formatNumberWithCommas, parseCommaNumber, formatWeiToDecimalHP } from '@/utils/numberUtils';
+import { formatNumberWithCommas, parseCommaNumber, formatWeiToDecimalHP, parseUnitsWithTruncation } from '@/utils/numberUtils';
 
 interface AllocationProps {
   optimalAllocations: PlanItem[];
@@ -214,8 +214,9 @@ const Allocation: React.FC<AllocationProps> = ({
   const calculateHFRaw = useCallback((candidate: VaultCandidate, depositAmt: number, mintAmt: number): number | null => {
     try {
       const decimals = candidate.assetScale.toString().length - 1;
-      const depositWei = depositAmt > 0 ? parseUnits(depositAmt.toFixed(decimals), decimals) : 0n;
-      const mintWei = mintAmt > 0 ? parseUnits(mintAmt.toFixed(18), 18) : 0n;
+      // Use parseUnitsWithTruncation to handle amounts with too many decimal places
+      const depositWei = depositAmt > 0 ? parseUnitsWithTruncation(depositAmt.toString(), decimals) : 0n;
+      const mintWei = mintAmt > 0 ? parseUnitsWithTruncation(mintAmt.toString(), 18) : 0n;
 
       const totalCollateral = candidate.currentCollateral + depositWei;
       const totalDebt = candidate.currentDebt + mintWei;
@@ -247,9 +248,8 @@ const Allocation: React.FC<AllocationProps> = ({
 
   // Format HF for display - rounds to 2 decimal places
   const calculateHF = useCallback((candidate: VaultCandidate, depositAmt: number, mintAmt: number): string => {
-    const decimals = candidate.assetScale.toString().length - 1;
-    const depositWei = depositAmt > 0 ? parseUnits(depositAmt.toFixed(decimals), decimals) : 0n;
-    const mintWei = mintAmt > 0 ? parseUnits(mintAmt.toFixed(18), 18) : 0n;
+    // Use parseUnitsWithTruncation to handle amounts with too many decimal places
+    const mintWei = mintAmt > 0 ? parseUnitsWithTruncation(mintAmt.toString(), 18) : 0n;
     const totalDebt = candidate.currentDebt + mintWei;
 
     if (totalDebt <= 0n) return '∞';
@@ -265,7 +265,8 @@ const Allocation: React.FC<AllocationProps> = ({
   const calculateMaxMint = useCallback((candidate: VaultCandidate, depositAmt: number): number => {
     // Match backend's exact calculation from cdp.service.ts getMaxMint (lines 846-950)
     const decimals = candidate.assetScale.toString().length - 1;
-    const depositWei = depositAmt > 0 ? parseUnits(depositAmt.toFixed(decimals), decimals) : 0n;
+    // Use parseUnitsWithTruncation to handle amounts with too many decimal places
+    const depositWei = depositAmt > 0 ? parseUnitsWithTruncation(depositAmt.toString(), decimals) : 0n;
     const totalCollateral = candidate.currentCollateral + depositWei;
     
     // Calculate collateral value in USD (WAD precision)
@@ -273,7 +274,7 @@ const Allocation: React.FC<AllocationProps> = ({
     
     // Backend uses minCR directly, not liquidationRatio
     // maxBorrowableUSD = (collateralValueUSD * WAD) / minCR
-    const WAD = parseUnits("1", 18);
+    const WAD = 10n ** 18n; // Use BigInt literal instead of parseUnitsWithTruncation for constant
     const maxBorrowableUSD = (collateralValueUSD * WAD) / candidate.minCR;
     
     const currentDebt = candidate.currentDebt;

@@ -53,6 +53,100 @@ export const safeParseUnits = (value: string, decimals: number = 18): bigint => 
 };
 
 /**
+ * Truncates a decimal string to the specified number of decimal places.
+ * Uses string manipulation to avoid floating-point precision issues.
+ * 
+ * @param value - The decimal string to truncate (may contain commas)
+ * @param maxDecimals - Maximum number of decimal places allowed
+ * @returns Truncated decimal string without commas
+ */
+export const truncateDecimals = (value: string, maxDecimals: number): string => {
+  if (!value) return value;
+  
+  // Remove commas first
+  const cleaned = value.replace(/,/g, '');
+  
+  // Handle edge cases
+  if (cleaned === '' || cleaned === '.') return '0';
+  
+  // Split by decimal point
+  const parts = cleaned.split('.');
+  const integerPart = parts[0] || '0';
+  const decimalPart = parts[1] || '';
+  
+  // If no decimals allowed or no decimal part, return integer
+  if (maxDecimals <= 0 || !decimalPart) {
+    return integerPart;
+  }
+  
+  // Truncate decimal part if too long
+  const truncatedDecimal = decimalPart.length > maxDecimals 
+    ? decimalPart.substring(0, maxDecimals) 
+    : decimalPart;
+  
+  // Remove trailing zeros from truncated decimal
+  const trimmedDecimal = truncatedDecimal.replace(/0+$/, '');
+  
+  return trimmedDecimal ? `${integerPart}.${trimmedDecimal}` : integerPart;
+};
+
+/**
+ * Parses a string to BigInt using parseUnits with automatic decimal truncation.
+ * This is specifically designed for CDP operations where floating-point calculations
+ * may produce values with more decimal places than the token supports.
+ * 
+ * Key features:
+ * - Automatically truncates excessive decimal places to match token's decimals
+ * - Handles commas in input (e.g., "1,000.50")
+ * - Handles incomplete decimals (e.g., "35.")
+ * - Handles negative numbers
+ * - Never throws - returns 0n on invalid input
+ * 
+ * Example: "0.00021714615052494696" with 18 decimals becomes "0.000217146150524946"
+ * 
+ * @param value - The string value to parse (may contain commas or excessive decimals)
+ * @param decimals - The number of decimals for the token (default: 18)
+ * @returns BigInt representation of the value in wei, or 0n if invalid
+ */
+export const parseUnitsWithTruncation = (value: string, decimals: number = 18): bigint => {
+  try {
+    // Handle edge cases
+    if (!value || value === '.') {
+      return 0n;
+    }
+    
+    // Remove commas
+    let cleaned = value.replace(/,/g, '').trim();
+    
+    // Handle negative numbers
+    const isNegative = cleaned.startsWith('-');
+    if (isNegative) {
+      cleaned = cleaned.slice(1);
+    }
+    
+    // Handle incomplete decimal inputs (e.g., "35.") by treating as "35"
+    if (cleaned.endsWith('.')) {
+      cleaned = cleaned.slice(0, -1);
+      if (!cleaned) {
+        return 0n;
+      }
+    }
+    
+    // Truncate to maximum allowed decimals to prevent "too many decimals" error
+    const truncated = truncateDecimals(cleaned, decimals);
+    
+    if (!truncated || truncated === '0') {
+      return 0n;
+    }
+    
+    const result = parseUnits(truncated, decimals);
+    return isNegative ? -result : result;
+  } catch {
+    return 0n;
+  }
+};
+
+/**
  * Safely parses a string to a number, handling invalid inputs
  * 
  * @param value - The string value to parse
