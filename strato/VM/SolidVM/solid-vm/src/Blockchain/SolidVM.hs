@@ -1113,8 +1113,7 @@ expToVar' (CC.Binary _ "&=" lhs rhs) = binopAssign (.&.) lhs rhs
 expToVar' (CC.Binary _ "^=" lhs rhs) = binopAssign xor lhs rhs
 expToVar' (CC.Binary _ ">>=" lhs rhs) = do
   binopAssign (\x i -> x `shiftR` fromInteger i) lhs rhs
-expToVar' (CC.Binary _ "<<=" lhs rhs) = do
-  binopAssign (\x i -> x `shiftL` fromInteger i) lhs rhs
+expToVar' (CC.Binary _ "<<=" lhs rhs) = leftShiftAssign lhs rhs
 expToVar' (CC.Binary _ ">>>=" lhs rhs) = do
   binopAssign (\x i -> fromInteger (toInteger ((fromInteger x) :: Word256)) `shiftR` fromInteger i) lhs rhs
 expToVar' (CC.MemberAccess _ (CC.FunctionCall x (CC.Variable _ "type") [CC.Variable _ name]) "runTimeCode") = do
@@ -1276,8 +1275,8 @@ expToVar' (CC.Binary _ "%" expr1 expr2) = expToVarArith rem decMod expr1 expr2
 expToVar' (CC.Binary _ "|" expr1 expr2) = expToVarInteger expr1 (.|.) expr2 SInteger
 expToVar' (CC.Binary _ "&" expr1 expr2) = expToVarInteger expr1 (.&.) expr2 SInteger
 expToVar' (CC.Binary _ "^" expr1 expr2) = expToVarInteger expr1 xor expr2 SInteger
-expToVar' (CC.Binary _ "**" expr1 expr2) = expToVarInteger expr1 (^) expr2 SInteger
-expToVar' (CC.Binary _ "<<" expr1 expr2) = expToVarInteger expr1 (\x i -> x `shift` fromInteger i) expr2 SInteger
+expToVar' (CC.Binary _ "**" expr1 expr2) = expToVarExponentiation expr1 expr2
+expToVar' (CC.Binary _ "<<" expr1 expr2) = expToVarLeftShift expr1 expr2
 expToVar' (CC.Binary _ ">>" expr1 expr2) = expToVarInteger expr1 (\x i -> x `shiftR` fromInteger i) expr2 SInteger
 expToVar' (CC.Binary _ ">>>" expr1 expr2) = expToVarInteger expr1 (\x i -> fromInteger (toInteger ((fromInteger x) :: Word256)) `shiftR` fromInteger i) expr2 SInteger
 expToVar' (CC.Unitary _ "!" expr) = do
@@ -1913,6 +1912,45 @@ expToVarInteger expr1 o expr2 retType = do
   i2 <- getInt =<< expToVar expr2
   return . Constant . retType $ i1 `o` i2
 
+-- | Exponentiation with dynamic gas cost based on exponent size.
+-- Gas cost formula follows EVM specification: base cost + cost per byte of exponent.
+-- This prevents DoS attacks where attackers use computationally expensive but gas-cheap
+-- operations like 2**100000 to monopolize blocks.
+-- See: https://github.com/blockapps/strato-platform/issues/5805
+expToVarExponentiation :: MonadSM m => CC.Expression -> CC.Expression -> m Variable
+expToVarExponentiation expr1 expr2 = do
+  i1 <- getInt =<< expToVar expr1
+  i2 <- getInt =<< expToVar expr2
+  -- Calculate gas cost based on exponent size (following EVM gas model)
+  -- Base cost: 10 gas (gEXPBASE)
+  -- Per-byte cost: 50 gas per byte of exponent (more aggressive than EVM's 10 to account for
+  -- unbounded integers in Haskell which can grow much larger than EVM's 256-bit limit)
+  let expBytes = if i2 <= 0 then 0 else ceiling (logBase 256 (fromIntegral (abs i2 + 1) :: Double) :: Double)
+      gasCost = Gas (10 + 50 * expBytes)
+  decrementGas gasCost
+  -- Limit maximum exponent to prevent memory exhaustion from unbounded integer growth
+  -- EVM limits to 256-bit results; we allow larger but cap exponent at 10000
+  when (i2 > 10000) $ do
+    arithmeticException "exponent too large (max 10000): " i2
+  return . Constant . SInteger $ i1 ^ i2
+
+-- | Left shift with bounds checking to prevent unbounded integer growth.
+-- Unlike EVM which has 256-bit word limits, SolidVM uses unbounded Haskell integers.
+-- Large left shifts can create enormous integers, causing memory exhaustion.
+-- See: https://github.com/blockapps/strato-platform/issues/5805
+expToVarLeftShift :: MonadSM m => CC.Expression -> CC.Expression -> m Variable
+expToVarLeftShift expr1 expr2 = do
+  i1 <- getInt =<< expToVar expr1
+  i2 <- getInt =<< expToVar expr2
+  -- Base gas cost of 3 (same as EVM SHL) plus additional cost for large shifts
+  let shiftGas = Gas (3 + max 0 (i2 `div` 8))
+  decrementGas shiftGas
+  -- Limit shift amount to prevent memory exhaustion (256 bits = 32 bytes is EVM standard)
+  -- We allow up to 1024 bits (128 bytes) for SolidVM's larger integer support
+  when (i2 > 1024 || i2 < 0) $ do
+    arithmeticException "shift amount out of range (0-1024): " i2
+  return . Constant . SInteger $ i1 `shift` fromInteger i2
+
 binopAssign' :: MonadSM m =>
   (Integer -> Integer -> Integer) ->
   (Decimal -> Decimal -> Decimal) ->
@@ -1994,6 +2032,25 @@ binopAssign oper lhs rhs = do
   curValue <- readInt lhs
   varToAssign <- expToVar lhs
   let next = SInteger $ curValue `oper` delta
+  setVar varToAssign next
+  return $ Constant next
+
+-- | Protected left shift compound assignment with bounds checking.
+-- Prevents DoS attacks via unbounded integer growth from large shift amounts.
+-- See: https://github.com/blockapps/strato-platform/issues/5805
+leftShiftAssign :: MonadSM m => CC.Expression -> CC.Expression -> m Variable
+leftShiftAssign lhs rhs = do
+  let readInt e = getInt =<< expToVar e
+  shiftAmt <- readInt rhs
+  curValue <- readInt lhs
+  varToAssign <- expToVar lhs
+  -- Gas cost: base 3 plus additional cost for large shifts
+  let shiftGas = Gas (3 + max 0 (shiftAmt `div` 8))
+  decrementGas shiftGas
+  -- Limit shift amount to prevent memory exhaustion
+  when (shiftAmt > 1024 || shiftAmt < 0) $ do
+    arithmeticException "shift amount out of range (0-1024): " shiftAmt
+  let next = SInteger $ curValue `shiftL` fromInteger shiftAmt
   setVar varToAssign next
   return $ Constant next
 
