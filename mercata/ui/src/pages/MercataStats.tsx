@@ -520,8 +520,8 @@ const MercataStats = () => {
                   <button
                     onClick={() => setSelectedPeriod('daily')}
                     className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedPeriod === 'daily'
-                        ? 'bg-blue-600 text-white dark:bg-blue-700'
-                        : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                      ? 'bg-blue-600 text-white dark:bg-blue-700'
+                      : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
                       }`}
                   >
                     Daily
@@ -529,8 +529,8 @@ const MercataStats = () => {
                   <button
                     onClick={() => setSelectedPeriod('weekly')}
                     className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedPeriod === 'weekly'
-                        ? 'bg-blue-600 text-white dark:bg-blue-700'
-                        : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                      ? 'bg-blue-600 text-white dark:bg-blue-700'
+                      : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
                       }`}
                   >
                     Weekly
@@ -538,8 +538,8 @@ const MercataStats = () => {
                   <button
                     onClick={() => setSelectedPeriod('monthly')}
                     className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedPeriod === 'monthly'
-                        ? 'bg-blue-600 text-white dark:bg-blue-700'
-                        : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                      ? 'bg-blue-600 text-white dark:bg-blue-700'
+                      : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
                       }`}
                   >
                     Monthly
@@ -547,8 +547,8 @@ const MercataStats = () => {
                   <button
                     onClick={() => setSelectedPeriod('ytd')}
                     className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedPeriod === 'ytd'
-                        ? 'bg-blue-600 text-white dark:bg-blue-700'
-                        : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                      ? 'bg-blue-600 text-white dark:bg-blue-700'
+                      : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
                       }`}
                   >
                     YTD
@@ -556,8 +556,8 @@ const MercataStats = () => {
                   <button
                     onClick={() => setSelectedPeriod('allTime')}
                     className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedPeriod === 'allTime'
-                        ? 'bg-blue-600 text-white dark:bg-blue-700'
-                        : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                      ? 'bg-blue-600 text-white dark:bg-blue-700'
+                      : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
                       }`}
                   >
                     All Time
