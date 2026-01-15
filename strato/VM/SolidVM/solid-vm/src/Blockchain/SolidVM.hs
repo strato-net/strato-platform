@@ -2257,11 +2257,11 @@ runTheConstructors from to hsh cc contractName' argVals' = do
 
   void . withCallInfo to to contract' "constructor" hsh cc (M.fromList zipped) False False . pushSender from $ do
 
-    forM_ [(n, e) | (n, CC.VariableDecl _ _ (Just e) _ _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, e) -> do
+    forM_ [(n, e) | (n, CC.VariableDecl _ _ (Just e) _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, e) -> do
       v <- expToVar e
       setVar (Constant (SReference (AddressPath to $ MS.StoragePath [MS.Field $ BC.pack $ labelToString n]))) =<< getVar v
 
-    forM_ [(n, theType) | (n, CC.VariableDecl theType _ Nothing _ _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, theType) -> do
+    forM_ [(n, theType) | (n, CC.VariableDecl theType _ Nothing _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, theType) -> do
       case theType of
         SVMType.Mapping _ _ _ -> return ()
         SVMType.Array _ _ -> return ()

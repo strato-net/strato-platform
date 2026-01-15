@@ -554,7 +554,6 @@ getVariableOfName name = do
                           CC._usings = M.empty,
                           CC._contractType = currentContract x ^. CC.contractType,
                           CC._importedFrom = Nothing,
-                          CC._isContractRecord = currentContract x ^. CC.isContractRecord,
                           CC._contractContext = currentContract x ^. CC.contractContext
                         }
                   }
@@ -954,8 +953,7 @@ getMapNamesFromContract c =
   let storageDefs' = c ^. CC.storageDefs
       storageDefsList = M.toList storageDefs'
       listOfMappings = filter (\(_, vd) -> case (CC._varType vd) of SVMType.Mapping _ _ _ -> True; _ -> False) storageDefsList
-      listOfMappingsWithRecords = filter (\(_, vd) -> CC._isRecord vd) listOfMappings
-   in T.pack . fst <$> listOfMappingsWithRecords
+   in T.pack . fst <$> listOfMappings
 
 --also needs to be changed for testnet3 to be only record
 getArrayNamesFromContract :: CC.Contract -> [T.Text]
@@ -963,4 +961,4 @@ getArrayNamesFromContract c =
   let storageDefs' = c ^. CC.storageDefs
       storageDefsList = M.toList storageDefs'
       listOfArrays = filter (\(_, vd) -> case (CC._varType vd) of SVMType.Array _ _ -> True; _ -> False) storageDefsList
-   in T.pack . fst <$> listOfArrays -- we need to change this to filter on _isRecord on testnet3
+   in T.pack . fst <$> listOfArrays

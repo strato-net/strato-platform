@@ -52,13 +52,13 @@ type SourceUnit = Positioned SourceUnitF
 -- | Parses an entire Solidity contract
 solidityContract :: SolidityParser SourceUnit
 solidityContract = do
-  ~(a, (kind, isRecord, contractName', baseConstrs)) <- withPosition $ do
+  ~(a, (kind, contractName', baseConstrs)) <- withPosition $ do
     kind <-
       (reserved "contract" >> return SolidVM.ContractType)
         <|> (reserved "interface" >> return SolidVM.InterfaceType)
         <|> (reserved "abstract contract" >> return SolidVM.AbstractType)
         <|> (reserved "library" >> return SolidVM.LibraryType)
-    isRecord' <- maybe False (const True) <$> optionMaybe (reserved "record")
+    _ <- optionMaybe (reserved "record")
     contractName' <- fmap stringToLabel identifier
     modifyState (\s -> s {contractName = (labelToString contractName')})
     baseConstrs <- option [] $ do
@@ -67,7 +67,7 @@ solidityContract = do
         name <- intercalate "." <$> sepBy1 identifier dot
         consArgs <- option "" parensCode
         return (name, consArgs)
-    pure (kind, isRecord', contractName', baseConstrs)
+    pure (kind, contractName', baseConstrs)
   declarations <-
     braces (many $ solidityDeclaration False)
 
@@ -98,7 +98,6 @@ solidityContract = do
         SolidVM._constructor = mCtor,
         SolidVM._contractType = kind,
         SolidVM._importedFrom = Nothing,
-        SolidVM._isContractRecord = isRecord,
         SolidVM._contractContext = a
       }
   where
@@ -156,7 +155,7 @@ structDeclaration = do
     structName <- identifier
     structFields <- braces $
       many1 $ do
-        (fieldName, VariableDeclaration (SolidVM.VariableDecl decl _ _ _ _ _)) <- simpleVariableDeclaration
+        (fieldName, VariableDeclaration (SolidVM.VariableDecl decl _ _ _ _)) <- simpleVariableDeclaration
         return (fieldName, decl)
     pure (structName, structFields)
   return
@@ -177,7 +176,7 @@ solidityFLStruct = do
     structName <- identifier
     structFields <- braces $
       many1 $ do
-        (fieldName, VariableDeclaration (SolidVM.VariableDecl decl _ _ _ _ _)) <- simpleVariableDeclaration
+        (fieldName, VariableDeclaration (SolidVM.VariableDecl decl _ _ _ _)) <- simpleVariableDeclaration
         return (fieldName, decl)
     pure (structName, structFields)
   return $ FLStruct (Text.pack structName) (SolidVM.Struct {SolidVM.fields = zipWith (\(n, v) i -> (stringToLabel n, SolidVM.FieldType i v)) structFields [0 ..], SolidVM.bytes = 0, SolidVM.context = a})
@@ -327,7 +326,6 @@ simpleVariableDeclaration = do
   -- generate accessor functions
   keywords <- many stateVariableKeyword
   visibility <- varVisibility keywords
-  let isRecord = KRecord `elem` keywords
   -- check to see if the "account" variable is being used
   variableName <- identifier
   value <- optionMaybe $ do
@@ -340,7 +338,7 @@ simpleVariableDeclaration = do
   let isConstant = KConstant `elem` keywords
   if isConstant
     then return (variableName, ConstantDeclaration $ SolidVM.ConstantDecl variableType visibility (fromMaybe (parseError "constants must be initialized" variableName) value) ctx)
-    else return (variableName, VariableDeclaration $ SolidVM.VariableDecl variableType visibility value ctx isImmutable isRecord)
+    else return (variableName, VariableDeclaration $ SolidVM.VariableDecl variableType visibility value ctx isImmutable)
 
 errorDeclaration :: SolidityParser (String, Declaration)
 errorDeclaration = do

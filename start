@@ -57,6 +57,7 @@ fi
 export STRATO_HOSTNAME
 
 export HTTP_PORT=8081 #You can change this to 80 for Linux, Mac seems to forbid it
+export HTTPS_PORT=8082 #You can change this to 80 for Linux, Mac seems to forbid it
 export NODE_HOST="localhost:8081"
 export blocHost=$STRATO_HOSTNAME:3000
 
