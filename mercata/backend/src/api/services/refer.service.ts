@@ -436,7 +436,7 @@ export const getReferralStatus = async (
       const quantity = deposit.value?.quantity || 0;
       
       // If quantity is 0, it's fully redeemed
-      if (quantity === 0) {
+      if (quantity === 0 || quantity === '0000000000000000000000000000000000000000') {
         return { status: 'redeemed' };
       }
       
