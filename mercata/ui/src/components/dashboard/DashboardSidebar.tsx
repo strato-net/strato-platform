@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTheme } from 'next-themes';
-import { LayoutDashboard, Wallet, ArrowLeft, ArrowRight, Book, ArrowRightLeft, Send, Shield, Activity, BarChart3, Coins ,Droplets, Download} from 'lucide-react';
+import { LayoutDashboard, Wallet, ArrowLeft, ArrowRight, Book, ArrowRightLeft, Send, Shield, Activity, BarChart3, Coins ,Droplets, Download, UserPlus} from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import STRATOLOGO from '@/assets/strato.png';
 import STRATOLOGODARK from '@/assets/strato-dark.png';
@@ -42,14 +42,15 @@ const DashboardSidebar = () => {
   }, [collapsed]);
 
   const allNavItems = [
-    { icon: <LayoutDashboard size={20} />, label: 'Overview', path: '/dashboard' },
+    { icon: <LayoutDashboard size={20} />, label: 'Portfolio', path: '/dashboard' },
     { icon: <Wallet size={20} />, label: 'Deposits', path: '/dashboard/deposits' },
     { icon: <Send size={20} />, label: 'Transfer', path: '/dashboard/transfer' },
     { icon: <Book size={20} />, label: 'Borrow', path: '/dashboard/borrow' },
     { icon: <ArrowRightLeft size={20} />, label: 'Swap', path: '/dashboard/swap' },
     { icon: <Droplets size={20} />, label: 'Advanced', path: '/dashboard/advanced' },
     { icon: <Coins size={20} />, label: 'Rewards', path: '/dashboard/rewards' },
-    { icon: <BarChart3 size={20} />, label: 'Mercata Stats', path: '/dashboard/stats' },
+    { icon: <UserPlus size={20} />, label: 'My Referrals', path: '/dashboard/referrals' },
+    { icon: <BarChart3 size={20} />, label: 'STRATO Stats', path: '/dashboard/stats' },
     { icon: <Download size={20} />, label: 'Withdrawals', path: '/dashboard/withdrawals' },
     { icon: <Activity size={20} />, label: 'Activity Feed', path: '/dashboard/activity' },
     { icon: <Shield size={20} />, label: 'Admin', path: '/dashboard/admin' },

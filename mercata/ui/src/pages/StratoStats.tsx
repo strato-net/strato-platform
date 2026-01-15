@@ -121,7 +121,7 @@ const createEmptyRevenuePeriod = (): RevenuePeriod => ({
   allTime: { total: '0', byAsset: [] }
 });
 
-const MercataStats = () => {
+const StratoStats = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [tokens, setTokens] = useState<TokenWithStats[]>([]);
   const [totalMarketCap, setTotalMarketCap] = useState<string>('0');
@@ -327,8 +327,7 @@ const MercataStats = () => {
         onClose={() => setIsMobileSidebarOpen(false)}
       />
       <div className="transition-all duration-300 md:pl-64" style={{ paddingLeft: 'var(--sidebar-width, 0rem)' }}>
-        <DashboardHeader title="Mercata Stats" onMenuClick={() => setIsMobileSidebarOpen(true)} />
-
+        <DashboardHeader title="STRATO Stats" onMenuClick={() => setIsMobileSidebarOpen(true)} />
         <main className="p-6">
           <div className="max-w-7xl mx-auto">
             <Tabs defaultValue="tokens" className="w-full">
@@ -748,4 +747,4 @@ const MercataStats = () => {
   );
 };
 
-export default MercataStats;
+export default StratoStats;

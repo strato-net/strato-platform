@@ -39,18 +39,24 @@ const AssetsList = ({
     <div className="w-full overflow-hidden">
       {isDashboard && (
         <div className="p-5 border-b border-border">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
             <h2 className="font-bold text-lg">My Deposits</h2>
+            {/* Mobile: full width button */}
             <Button
-              size="sm"
+              className="w-full sm:hidden flex items-center justify-center gap-2"
+              onClick={() => window.location.href = "/dashboard/deposits"}
             >
               <Plus size={16} />
-              <a
-                href="/dashboard/deposits"
-                className="text-sm text-white flex items-center justify-end"
-              >
-                Add Deposits
-              </a>
+              Deposit
+            </Button>
+            {/* Desktop: small button */}
+            <Button
+              size="sm"
+              className="hidden sm:flex items-center gap-2"
+              onClick={() => window.location.href = "/dashboard/deposits"}
+            >
+              <Plus size={16} />
+              Deposit
             </Button>
           </div>
         </div>

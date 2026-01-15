@@ -522,11 +522,12 @@ export const collateralAndBalance = async (
       const liquidationThreshold = assetConfig?.liquidationThreshold || 0;
 
       // Calculate metrics using the helper function
-      const {userBalanceValue, collateralizedAmountValue, maxBorrowingPower} = calculateCollateralMetrics(
+      const {userBalanceValue, collateralizedAmountValue, maxBorrowingPower, unsuppliedBorrowingPower, unsuppliedLTCollateralValue} = calculateCollateralMetrics(
         userBalance,
         collateralizedAmount,
         assetPrice,
-        ltv
+        ltv,
+        liquidationThreshold
       );
 
       return {
@@ -539,6 +540,8 @@ export const collateralAndBalance = async (
         isCollateralized: collateral?.amount > 0,
         canSupply: BigInt(userBalance) > 0n,
         maxBorrowingPower,
+        unsuppliedBorrowingPower,
+        unsuppliedLTCollateralValue,
         assetPrice,
         ltv,
         liquidationThreshold,
@@ -658,13 +661,11 @@ export const liquidityAndBalance = async (
   const supplyAPY = apyData.supplyAPY * (utilizationRate / 100);
 
   // Total collateral value across all users (USD 1e18)
-  const totalCollateralValue = await Promise.resolve(
-    calculateTotalCollateralValue(
-      registry.lendingPool?.assetConfigs || [],
-      allCollaterals,
-      priceMap,
-      borrowableAsset
-    )
+  const totalCollateralValue = calculateTotalCollateralValue(
+    registry.lendingPool?.assetConfigs || [],
+    allCollaterals,
+    priceMap,
+    borrowableAsset
   );
 
   // Get user's staked balance from RewardsChef

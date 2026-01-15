@@ -59,3 +59,4 @@ docker-compose.oracle.yml
 
 /app
 /mynode/
+.aider*
