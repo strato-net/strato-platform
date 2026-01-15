@@ -235,7 +235,6 @@ processTheMessages messages = do
             for (rowToCollections row) $ \stateDiff -> do
               let pCollections = processedContractToProcessedCollectionRows stateDiff row --get all collection rows to insert
               pure $ BatchedInserts indexContract pCollections
-              
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"
 
