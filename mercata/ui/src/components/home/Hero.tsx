@@ -20,18 +20,19 @@ const Hero = () => {
   return (
     <>
       {/* Hero Section */}
-      <section className="pt-20 lg:pt-24 overflow-hidden">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="relative rounded-3xl overflow-hidden">
+      <section className="overflow-hidden">
+        <div className="relative">
+          <div className="relative overflow-hidden min-h-[500px] md:min-h-[calc(100vh-100px)]">
       {/* Background Image */}
       <div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        className="absolute inset-0 bg-cover bg-center md:bg-right bg-no-repeat"
         style={{
-          backgroundImage: `url(${backgroundImage})`
+          backgroundImage: `url(${backgroundImage})`,
+          backgroundSize: 'cover'
         }}
       />
             
-            <div className="relative z-10 p-8 sm:p-12 lg:p-16 min-h-[400px] lg:min-h-[500px] flex flex-col justify-center">
+            <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-12 md:py-16 lg:py-20 min-h-[500px] md:min-h-[calc(100vh-100px)] flex flex-col justify-center">
               {/* Badge */}
               <div className="inline-flex items-center gap-2 bg-white dark:bg-slate-800 rounded-full px-4 py-2 shadow-sm border border-border/50 w-fit mb-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
                 <Sparkles className="w-4 h-4 text-strato-lightblue" />
@@ -42,8 +43,10 @@ const Hero = () => {
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold mb-6 leading-tight max-w-2xl animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100">
                 <span className="text-foreground">Where Stability</span>
                 <br />
-                <span className="text-strato-lightblue">Meets Opportunity</span>
-          </h1>
+                <span className="text-strato-lightblue">Meets</span>
+                <br />
+                <span className="text-strato-lightblue">Opportunity</span>
+              </h1>
               
               {/* Description */}
               <p className="text-lg text-muted-foreground mb-8 max-w-md leading-relaxed animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200">
