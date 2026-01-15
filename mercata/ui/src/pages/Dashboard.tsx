@@ -6,7 +6,7 @@ import AssetSummary from "../components/dashboard/AssetSummary";
 import AssetsList from "../components/dashboard/AssetsList";
 import DashboardFAQ from "../components/dashboard/DashboardFAQ";
 import BorrowingSection from "../components/dashboard/BorrowingSection";
-import { Wallet, Coins, Shield, Banknote, Loader2, Trophy, UserPlus } from "lucide-react";
+import { Wallet, Coins, Shield, Banknote, Loader2, Trophy, UserPlus, Send, Book, ArrowRightLeft } from "lucide-react";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
 import { usePendingRewards } from "@/hooks/usePendingRewards";
@@ -309,7 +309,7 @@ const Dashboard = () => {
 
       <div className="transition-all duration-300 md:pl-64" style={{ paddingLeft: 'var(--sidebar-width, 0rem)' }}>
         <DashboardHeader 
-          title="Overview" 
+          title="Portfolio" 
           onMenuClick={() => setIsMobileSidebarOpen(true)}
         />
 
@@ -426,6 +426,38 @@ const Dashboard = () => {
               subtitle={chartConfig[activeTab].subtitle}
               currentValue={chartConfig[activeTab].currentValue}
             />
+          </div>
+
+          {/* Quick Action Buttons */}
+          <div className="mb-8 grid grid-cols-4 gap-2 md:gap-4">
+            <Button
+              onClick={() => navigate("/dashboard/deposits")}
+              className="h-auto py-3 md:h-12 md:py-0 bg-primary hover:bg-primary/90 text-primary-foreground font-medium flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2"
+            >
+              <Wallet size={18} />
+              <span className="text-xs md:text-sm">Deposit</span>
+            </Button>
+            <Button
+              onClick={() => navigate("/dashboard/transfer")}
+              className="h-auto py-3 md:h-12 md:py-0 bg-primary hover:bg-primary/90 text-primary-foreground font-medium flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2"
+            >
+              <Send size={18} />
+              <span className="text-xs md:text-sm">Transfer</span>
+            </Button>
+            <Button
+              onClick={() => navigate("/dashboard/borrow")}
+              className="h-auto py-3 md:h-12 md:py-0 bg-primary hover:bg-primary/90 text-primary-foreground font-medium flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2"
+            >
+              <Book size={18} />
+              <span className="text-xs md:text-sm">Borrow</span>
+            </Button>
+            <Button
+              onClick={() => navigate("/dashboard/swap")}
+              className="h-auto py-3 md:h-12 md:py-0 bg-primary hover:bg-primary/90 text-primary-foreground font-medium flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2"
+            >
+              <ArrowRightLeft size={18} />
+              <span className="text-xs md:text-sm">Swap</span>
+            </Button>
           </div>
 
           <div className="mb-8">
