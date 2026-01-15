@@ -2,17 +2,30 @@ import dotenv from 'dotenv';
 import { oauthClient } from './oauth';
 import { logInfo, logError } from './logger';
 
-const feedsConfig = require('../config/feeds.json');
 const sourcesConfig = require('../config/sources.json');
 const assetsConfig = require('../config/assets.json');
 
+// Minimum number of valid sources required to submit a price
+const MIN_VALID_SOURCES = 3;
+
 dotenv.config();
+
+/**
+ * Get sources that support a given symbol (either in assets array or symbolMapping)
+ */
+function getSourcesForSymbol(symbol: string): string[] {
+    return Object.entries(sourcesConfig)
+        .filter(([_, config]: [string, any]) => {
+            return config.assets?.includes(symbol) || config.symbolMapping?.[symbol];
+        })
+        .map(([name]) => name);
+}
 
 export async function validateConfig(): Promise<boolean> {
     const errors: string[] = [];
     const warnings: string[] = [];
-    const usedSources = new Set<string>();
 
+    // Validate required environment variables
     const requiredEnvVars = [
         'STRATO_NODE_URL', 'OAUTH_DISCOVERY_URL', 'OAUTH_CLIENT_ID',
         'OAUTH_CLIENT_SECRET', 'USERNAME', 'PASSWORD', 'PRICE_ORACLE_ADDRESS'
@@ -24,6 +37,7 @@ export async function validateConfig(): Promise<boolean> {
         }
     });
 
+    // Validate OAuth configuration
     if (process.env.OAUTH_DISCOVERY_URL && process.env.OAUTH_CLIENT_ID && process.env.OAUTH_CLIENT_SECRET) {
         try {
             const isValid = await oauthClient().validateToken();
@@ -37,133 +51,66 @@ export async function validateConfig(): Promise<boolean> {
         errors.push('Incomplete OAuth configuration');
     }
     
-    if (!feedsConfig.feeds || !Array.isArray(feedsConfig.feeds)) {
-        errors.push('feeds.json must contain a "feeds" array');
+    // Validate assets.json structure
+    if (!assetsConfig.assets || typeof assetsConfig.assets !== 'object') {
+        errors.push('assets.json must contain an "assets" object');
     } else {
-        feedsConfig.feeds.forEach((feed: any, index: number) => {
-            const feedPrefix = `   Feed ${index + 1} (${feed.name}):`;
+        const assetKeys = Object.keys(assetsConfig.assets);
+        
+        assetKeys.forEach(assetKey => {
+            const asset = assetsConfig.assets[assetKey];
+            const assetPrefix = `   Asset ${assetKey}:`;
             
-            // Check required fields
-            if (!feed.name) errors.push(`${feedPrefix} Missing name`);
-            
-            // Check if this is a batch feed
-            const isBatchFeed = feed.assets && Array.isArray(feed.assets);
-            
-            if (isBatchFeed) {
-                // Validate batch feed structure
-                if (!feed.sources || !Array.isArray(feed.sources)) {
-                    errors.push(`${feedPrefix} Missing or invalid sources array`);
-                }
-                
-                // Validate sources array for batch feeds
-                if (feed.sources && Array.isArray(feed.sources)) {
-                    feed.sources.forEach((sourceName: string, sourceIndex: number) => {
-                        const sourcePrefix = `${feedPrefix} Source ${sourceIndex + 1}:`;
-                        
-                        if (!sourceName) {
-                            errors.push(`${sourcePrefix} Missing source name`);
-                        } else if (sourceName === 'constant') {
-                            // Skip validation for constant source - it's handled specially
-                            usedSources.add(sourceName);
-                        } else if (!(sourcesConfig as any)[sourceName]) {
-                            errors.push(`${sourcePrefix} Unknown source: ${sourceName}`);
-                        } else {
-                            usedSources.add(sourceName);
-                        }
-                    });
-                }
-                
-                // Validate assets array (now just asset keys)
-                if (!feed.assets || !Array.isArray(feed.assets) || feed.assets.length === 0) {
-                    errors.push(`${feedPrefix} Missing or invalid assets array`);
-                } else {
-                    // Load assets registry to validate asset keys
-                    feed.assets.forEach((assetKey: string, assetIndex: number) => {
-                        const assetPrefix = `${feedPrefix} Asset ${assetIndex + 1}:`;
-                        
-                        if (!assetKey) {
-                            errors.push(`${assetPrefix} Missing asset key`);
-                        } else if (!assetsConfig.assets[assetKey]) {
-                            errors.push(`${assetPrefix} Unknown asset key: ${assetKey}`);
-                        } else {
-                            const asset = assetsConfig.assets[assetKey];
-                            
-                            // Validate targetAssetAddress format
-                            if (asset.targetAssetAddress && !/^[a-fA-F0-9]{40}$/.test(asset.targetAssetAddress)) {
-                                errors.push(`${assetPrefix} Invalid targetAssetAddress format: ${asset.targetAssetAddress}`);
-                            }
-                            
-                            // Validate tokenAddress format for crypto assets
-                            if (asset.tokenAddress && !/^0x[a-fA-F0-9]{40}$/.test(asset.tokenAddress)) {
-                                errors.push(`${assetPrefix} Invalid tokenAddress format: ${asset.tokenAddress}`);
-                            }
-                            
-                            // Validate constantPrice for assets in constant-price feeds
-                            if (feed.sources && feed.sources.includes('constant')) {
-                                if (!asset.constantPrice || typeof asset.constantPrice !== 'number') {
-                                    errors.push(`${assetPrefix} Must have constantPrice field (number) when using constant source`);
-                                }
-                            }
-                        }
-                    });
-                }
-            } else {
-                // Validate individual feed structure (legacy)
-                if (!feed.sources || !Array.isArray(feed.sources)) {
-                    errors.push(`${feedPrefix} Missing or invalid sources array`);
-                }
-                if (!feed.targetAssetAddress) errors.push(`${feedPrefix} Missing targetAssetAddress`);
-                
-                // Validate sources array
-                if (feed.sources && Array.isArray(feed.sources)) {
-                    feed.sources.forEach((source: any, sourceIndex: number) => {
-                        const sourcePrefix = `${feedPrefix} Source ${sourceIndex + 1}:`;
-                        
-                        if (!source.name) {
-                            errors.push(`${sourcePrefix} Missing source name`);
-                        } else if (!(sourcesConfig as any)[source.name]) {
-                            errors.push(`${sourcePrefix} Unknown source: ${source.name}`);
-                        } else {
-                            usedSources.add(source.name);
-                        }
-                    });
-                }
-                
-                // Validate feed structure consistency
-                if (!feed.tokenAddress && !feed.symbol) {
-                    errors.push(`${feedPrefix} Must have either tokenAddress (for crypto) or symbol (for metals)`);
-                }
-                
-                // Validate tokenAddress format (if present)
-                if (feed.tokenAddress && !/^0x[a-fA-F0-9]{40}$/.test(feed.tokenAddress)) {
-                    errors.push(`${feedPrefix} Invalid tokenAddress format: ${feed.tokenAddress}`);
-                }
-                
-                // Validate targetAssetAddress format
-                if (feed.targetAssetAddress && !/^[a-fA-F0-9]{40}$/.test(feed.targetAssetAddress)) {
-                    errors.push(`${feedPrefix} Invalid targetAssetAddress format: ${feed.targetAssetAddress}`);
-                }
+            // Validate required fields
+            if (!asset.targetAssetAddress) {
+                errors.push(`${assetPrefix} Missing targetAssetAddress`);
+            } else if (!/^[a-fA-F0-9]{40}$/.test(asset.targetAssetAddress)) {
+                errors.push(`${assetPrefix} Invalid targetAssetAddress format: ${asset.targetAssetAddress}`);
             }
             
-            // Validate that constant pricing is not mixed with external sources
-            if (feed.sources?.includes('constant') && feed.sources.length > 1) {
-                errors.push(`${feedPrefix} Cannot mix constant pricing with external sources`);
+            // Validate constantPrice is a number (if present)
+            if (asset.constantPrice !== undefined && typeof asset.constantPrice !== 'number') {
+                errors.push(`${assetPrefix} constantPrice must be a number`);
             }
             
+            // Validate weekendProxy is a string (if present)
+            if (asset.weekendProxy !== undefined && typeof asset.weekendProxy !== 'string') {
+                errors.push(`${assetPrefix} weekendProxy must be a string (proxy symbol)`);
+            }
+            
+            // Validate weekendProxy symbol has enough sources
+            if (asset.weekendProxy) {
+                const proxySources = getSourcesForSymbol(asset.weekendProxy);
+                if (proxySources.length < MIN_VALID_SOURCES) {
+                    errors.push(
+                        `${assetPrefix} weekendProxy '${asset.weekendProxy}' has only ${proxySources.length} source(s), ` +
+                        `needs at least ${MIN_VALID_SOURCES}. Sources: [${proxySources.join(', ')}]`
+                    );
+                }
+            }
         });
     }
 
-    // Validate sources
+    // Validate sources.json structure and build asset-to-sources mapping
+    const assetSourceCount: Record<string, string[]> = {};
     const sourceNames = Object.keys(sourcesConfig);
+    
     sourceNames.forEach(sourceName => {
         const source = sourcesConfig[sourceName];
         const sourcePrefix = `   Source ${sourceName}:`;
         
-        // Skip URL validation for constant price sources
+        // Each source must have an assets array
+        if (!source.assets || !Array.isArray(source.assets)) {
+            errors.push(`${sourcePrefix} Missing or invalid 'assets' array`);
+            return;
+        }
+        
+        // Skip URL validation for constant source
         if (sourceName !== 'constant' && !source.url) {
             errors.push(`${sourcePrefix} Missing url`);
         }
 
+        // Validate parse pattern
         if (!source.parse) {
             errors.push(`${sourcePrefix} Missing parse pattern`);
         }
@@ -172,8 +119,86 @@ export async function validateConfig(): Promise<boolean> {
         if (source.apiKeyEnvVar && !process.env[source.apiKeyEnvVar]) {
             errors.push(`Missing required API key for source ${sourceName}: ${source.apiKeyEnvVar}`);
         }
+        
+        // Validate each asset in the source's assets array
+        source.assets.forEach((assetKey: string) => {
+            // Check asset exists in assets.json
+            if (!assetsConfig.assets[assetKey]) {
+                errors.push(`${sourcePrefix} References unknown asset: ${assetKey}`);
+                return;
+            }
+            
+            // Track which sources support each asset
+            if (!assetSourceCount[assetKey]) {
+                assetSourceCount[assetKey] = [];
+            }
+            assetSourceCount[assetKey].push(sourceName);
+            
+            // Check symbolMapping exists for assets that need it
+            if (source.symbolMapping && !source.symbolMapping[assetKey]) {
+                warnings.push(`${sourcePrefix} No symbolMapping for asset ${assetKey} (may use default)`);
+            }
+        });
+        
+        // Validate constant source has assets with constantPrice
+        if (sourceName === 'constant') {
+            source.assets.forEach((assetKey: string) => {
+                const asset = assetsConfig.assets[assetKey];
+                if (asset && (asset.constantPrice === undefined || typeof asset.constantPrice !== 'number')) {
+                    errors.push(`${sourcePrefix} Asset ${assetKey} must have a numeric constantPrice field`);
+                }
+            });
+        }
     });
-
+    
+    // Build set of assets used as weekend proxies
+    const proxyAssets = new Set<string>();
+    Object.values(assetsConfig.assets).forEach((asset: any) => {
+        if (asset.weekendProxy) {
+            proxyAssets.add(asset.weekendProxy);
+        }
+    });
+    
+    // Validate each asset has at least MIN_VALID_SOURCES
+    const assetKeys = Object.keys(assetsConfig.assets);
+    assetKeys.forEach(assetKey => {
+        const asset = assetsConfig.assets[assetKey];
+        const sources = assetSourceCount[assetKey] || [];
+        
+        // Skip minimum source check for constant-priced assets
+        if (asset.constantPrice !== undefined) {
+            if (!sources.includes('constant')) {
+                warnings.push(`Asset ${assetKey} has constantPrice but no 'constant' source references it`);
+            }
+            return;
+        }
+        
+        // Skip minimum source check for assets used only as weekend proxies
+        // These assets are fetched for proxy use but not submitted as regular assets
+        if (proxyAssets.has(assetKey) && asset.constantPrice === undefined && asset.weekendProxy === undefined) {
+            // Asset is only used as a proxy, not as a direct asset
+            // Validation for proxy sources is done in the weekendProxy check above
+            return;
+        }
+        
+        // Skip minimum source check for assets with weekendProxy (they use proxy sources when needed)
+        if (asset.weekendProxy !== undefined) {
+            // Just warn if no direct sources
+            if (sources.length === 0) {
+                warnings.push(`Asset ${assetKey} has no direct sources, relies on weekendProxy '${asset.weekendProxy}'`);
+            }
+            return;
+        }
+        
+        if (sources.length < MIN_VALID_SOURCES) {
+            errors.push(
+                `Asset ${assetKey} has only ${sources.length} source(s), needs at least ${MIN_VALID_SOURCES}. ` +
+                `Sources: [${sources.join(', ')}]`
+            );
+        }
+    });
+    
+    // Log validation results
     if (errors.length > 0) {
         logError('ConfigValidator', new Error(`Configuration errors:\n${errors.map(error => `   ${error}`).join('\n')}`));
         return false;
@@ -182,6 +207,8 @@ export async function validateConfig(): Promise<boolean> {
     if (warnings.length > 0) {
         logInfo('ConfigValidator', `Warnings:\n${warnings.map(warning => `   ${warning}`).join('\n')}`);
     }
+    
+    logInfo('ConfigValidator', `Configuration valid. ${assetKeys.length} assets, ${sourceNames.length} sources.`);
     
     return true;
 }
@@ -193,4 +220,4 @@ if (require.main === module) {
         logError('ConfigValidator', new Error(`Validation error: ${error}`));
         process.exit(1);
     });
-} 
+}

@@ -1,8 +1,12 @@
 export interface Asset {
-    name: string;
-    tokenAddress?: string;
     targetAssetAddress: string;
     constantPrice?: number;
+    weekendProxy?: string; // Proxy symbol for weekend/market-closed pricing (e.g., "PAXG" for XAU)
+}
+
+// Asset with its key attached for processing
+export interface ResolvedAsset extends Asset {
+    key: string; // Asset identifier (ETH, WBTC, XAU, etc.)
 }
 
 export interface BatchPriceResult {
@@ -12,14 +16,8 @@ export interface BatchPriceResult {
     };
 }
 
-export interface FeedConfig {
-    name: string;
-    sources: string[];
-    assets: string[]; // Array of asset keys
-}
-
 export interface SourceConfig {
-    url: string;
+    url?: string; // Optional for constant source
     method?: string;
     params?: string; // Comma-separated URL parameters
     headers?: string; // Comma-separated header names
@@ -29,6 +27,7 @@ export interface SourceConfig {
     batchMode?: boolean;
     apiKeyEnvVar?: string; // Environment variable name for API key
     symbolMapping?: Record<string, string>; // Mapping from asset symbols to API-specific keys
+    assets: string[]; // Which assets this source supports
 }
 
 export interface SourcesConfig {
@@ -58,4 +57,13 @@ export interface TxMetric {
     txHash: string;         // Transaction hash (for logging)
     duration: number;       // Time from submit to confirm (ms)
     status: string;         // "Success" or "Failure"
-} 
+}
+
+// Schedule types for asset processing
+export type AssetSchedule = 'always' | 'metals' | 'constant';
+
+export interface AssetsBySchedule {
+    always: string[];   // Crypto assets - always process
+    metals: string[];   // Assets with weekendProxy - use proxy when market closed
+    constant: string[]; // Assets with constantPrice - use fixed price
+}
