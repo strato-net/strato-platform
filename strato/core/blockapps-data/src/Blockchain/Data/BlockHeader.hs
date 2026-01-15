@@ -112,7 +112,12 @@ getBlockDifficulty BlockHeaderV2 {} = 1
 
 getBlockGasLimit :: BlockHeader -> Integer
 getBlockGasLimit BlockHeader { gasLimit } = gasLimit
-getBlockGasLimit BlockHeaderV2 {} = 22500000000000000000000000000000 -- arbitrary as FUCK
+-- TODO(#5805): This placeholder value enables block monopolization attacks.
+-- BlockHeaderV2 should use a configurable, reasonable block gas limit
+-- (e.g., 30000000 like Ethereum mainnet) instead of this arbitrary large value.
+-- However, changing this requires careful backward compatibility analysis
+-- as existing blocks may have been validated with this limit.
+getBlockGasLimit BlockHeaderV2 {} = 22500000000000000000000000000000
 
 getBlockGasUsed :: BlockHeader -> Integer
 getBlockGasUsed BlockHeader { gasUsed } = gasUsed

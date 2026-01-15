@@ -1041,6 +1041,81 @@ decrementGas !gas = do
     else do
       return ()
 
+-- | Gas cost constants for expensive operations (similar to EVM gas pricing)
+gEXPBASE :: Gas
+gEXPBASE = 10
+
+gEXPBYTE :: Gas
+gEXPBYTE = 50  -- Higher than EVM's 10 because SolidVM uses unbounded integers
+
+gSHIFTBASE :: Gas
+gSHIFTBASE = 3
+
+gSHIFTBYTE :: Gas
+gSHIFTBYTE = 3
+
+-- | Maximum exponent value to prevent DoS attacks
+-- This limits exponents to reasonable values that won't cause excessive computation
+maxExponent :: Integer
+maxExponent = 262144  -- 2^18, allows results up to 2^262144 which is very large but bounded
+
+-- | Maximum shift amount to prevent DoS attacks via large shifts
+maxShiftAmount :: Integer
+maxShiftAmount = 262144  -- Same as maxExponent for consistency
+
+-- | Calculate the number of bytes needed to represent an integer
+bytesNeeded :: Integer -> Gas
+bytesNeeded 0 = 0
+bytesNeeded x = 1 + bytesNeeded (x `shiftR` 8)
+
+-- | Gas-aware exponentiation that charges gas proportional to exponent size
+-- and enforces limits to prevent computational DoS attacks
+expWithGas :: MonadSM m => Integer -> Integer -> m Integer
+expWithGas base exponent' = do
+  -- Enforce maximum exponent to prevent DoS
+  when (exponent' > maxExponent) $
+    arithmeticException "exponent too large (max 262144)" exponent'
+  when (exponent' < 0) $
+    arithmeticException "negative exponent not allowed" exponent'
+  -- Calculate gas cost based on exponent size (similar to EVM EXP pricing)
+  let gasCost = if exponent' == 0
+                then gEXPBASE
+                else gEXPBASE + gEXPBYTE * bytesNeeded exponent'
+  decrementGas gasCost
+  -- Perform the exponentiation
+  return $ base ^ exponent'
+
+-- | Gas-aware left shift that charges gas proportional to shift amount
+-- and enforces limits to prevent computational DoS attacks
+shiftLeftWithGas :: MonadSM m => Integer -> Integer -> m Integer
+shiftLeftWithGas x shiftAmount = do
+  -- Enforce maximum shift to prevent DoS
+  when (shiftAmount > maxShiftAmount) $
+    arithmeticException "shift amount too large (max 262144)" shiftAmount
+  when (shiftAmount < 0) $
+    arithmeticException "negative shift amount not allowed" shiftAmount
+  -- Calculate gas cost based on shift amount
+  let gasCost = gSHIFTBASE + gSHIFTBYTE * bytesNeeded shiftAmount
+  decrementGas gasCost
+  return $ x `shift` fromInteger shiftAmount
+
+-- | Gas-aware right shift (less expensive since it reduces value size)
+shiftRightWithGas :: MonadSM m => Integer -> Integer -> m Integer
+shiftRightWithGas x shiftAmount = do
+  when (shiftAmount < 0) $
+    arithmeticException "negative shift amount not allowed" shiftAmount
+  -- Right shifts are bounded by input size, so just charge base gas
+  decrementGas gSHIFTBASE
+  return $ x `shiftR` fromInteger shiftAmount
+
+-- | Gas-aware unsigned right shift for Word256
+shiftRightUnsignedWithGas :: MonadSM m => Integer -> Integer -> m Integer
+shiftRightUnsignedWithGas x shiftAmount = do
+  when (shiftAmount < 0) $
+    arithmeticException "negative shift amount not allowed" shiftAmount
+  decrementGas gSHIFTBASE
+  return $ fromInteger (toInteger ((fromInteger x) :: Word256)) `shiftR` fromInteger shiftAmount
+
 expToVar' :: MonadSM m => CC.Expression -> m Variable
 expToVar' (CC.NumberLiteral _ v Nothing) = return . Constant $ SInteger v
 expToVar' (CC.NumberLiteral _ v (Just nu)) =
@@ -1276,10 +1351,28 @@ expToVar' (CC.Binary _ "%" expr1 expr2) = expToVarArith rem decMod expr1 expr2
 expToVar' (CC.Binary _ "|" expr1 expr2) = expToVarInteger expr1 (.|.) expr2 SInteger
 expToVar' (CC.Binary _ "&" expr1 expr2) = expToVarInteger expr1 (.&.) expr2 SInteger
 expToVar' (CC.Binary _ "^" expr1 expr2) = expToVarInteger expr1 xor expr2 SInteger
-expToVar' (CC.Binary _ "**" expr1 expr2) = expToVarInteger expr1 (^) expr2 SInteger
-expToVar' (CC.Binary _ "<<" expr1 expr2) = expToVarInteger expr1 (\x i -> x `shift` fromInteger i) expr2 SInteger
-expToVar' (CC.Binary _ ">>" expr1 expr2) = expToVarInteger expr1 (\x i -> x `shiftR` fromInteger i) expr2 SInteger
-expToVar' (CC.Binary _ ">>>" expr1 expr2) = expToVarInteger expr1 (\x i -> fromInteger (toInteger ((fromInteger x) :: Word256)) `shiftR` fromInteger i) expr2 SInteger
+-- Exponentiation and shift operations use gas-aware functions to prevent
+-- computational DoS attacks via fixed gas pricing asymmetry (issue #5805)
+expToVar' (CC.Binary _ "**" expr1 expr2) = do
+  i1 <- getInt =<< expToVar expr1
+  i2 <- getInt =<< expToVar expr2
+  result <- expWithGas i1 i2
+  return . Constant . SInteger $ result
+expToVar' (CC.Binary _ "<<" expr1 expr2) = do
+  i1 <- getInt =<< expToVar expr1
+  i2 <- getInt =<< expToVar expr2
+  result <- shiftLeftWithGas i1 i2
+  return . Constant . SInteger $ result
+expToVar' (CC.Binary _ ">>" expr1 expr2) = do
+  i1 <- getInt =<< expToVar expr1
+  i2 <- getInt =<< expToVar expr2
+  result <- shiftRightWithGas i1 i2
+  return . Constant . SInteger $ result
+expToVar' (CC.Binary _ ">>>" expr1 expr2) = do
+  i1 <- getInt =<< expToVar expr1
+  i2 <- getInt =<< expToVar expr2
+  result <- shiftRightUnsignedWithGas i1 i2
+  return . Constant . SInteger $ result
 expToVar' (CC.Unitary _ "!" expr) = do
   (Constant . SBool . not) <$> (getBool =<< expToVar expr)
 expToVar' (CC.Unitary _ "delete" expr) = do
