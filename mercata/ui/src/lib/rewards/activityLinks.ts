@@ -32,30 +32,25 @@ export const getActivityLink = (activityName: string): string | null => {
   if (lowerName.includes('borrow')) {
     return '/dashboard/borrow';
   }
+  
+  // Lending activities - goes to the Advanced page, Lending Pools tab
+  if (lowerName.includes('lend')) {
+    return '/dashboard/advanced?tab=lending';
+  }
 
   // Deposit activities - goes to the Deposits page
   if (lowerName.includes('deposit')) {
     return '/dashboard/deposits';
   }
   
-  // Deposit activities - goes to the Withdrawals page
+  // Withdrawal activities - goes to the Withdrawals page
   if (lowerName.includes('withdrawal')) {
     return '/dashboard/withdrawals';
-  }
-
-  // Lending/Lend activities - goes to the Advanced page, Lending Pools tab
-  if (lowerName.includes('lend')) {
-    return '/dashboard/advanced?tab=lending';
   }
 
   // Safety Module activities - goes to the Advanced page, Safety tab
   if (lowerName.includes('safety')) {
     return '/dashboard/advanced?tab=safety';
-  }
-
-  // Liquidity Pool activities - goes to the Advanced page, Liquidations tab
-  if (lowerName.includes('liquidity')) {
-    return '/dashboard/advanced?tab=liquidations';
   }
 
   // No match found
