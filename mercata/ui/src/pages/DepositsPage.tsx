@@ -1,13 +1,13 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import MobileSidebar from '../components/dashboard/MobileSidebar';
-import { 
-  Card, 
-  CardContent,  
-  CardHeader, 
-  CardTitle 
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle
 } from "@/components/ui/card";
 import { Tabs as AntdTabs } from "antd";
 import AssetSummary from '@/components/dashboard/AssetSummary';
@@ -25,6 +25,7 @@ import { cataAddress } from '@/lib/constants';
 
 const DepositsPage = () => {
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { userAddress } = useUser();
   const { earningAssets, getEarningAssets, inactiveTokens, loadingEarningAssets } = useTokenContext();
   const { loans } = useLendingContext();
@@ -32,6 +33,14 @@ const DepositsPage = () => {
   const { loadNetworksAndTokens, setTargetTransactionTab } = useBridgeContext();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"easy-savings" | "bridge-in">("easy-savings");
+
+  // Handle query parameters for tab navigation from rewards page
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam && ['easy-savings', 'bridge-in'].includes(tabParam)) {
+      setActiveTab(tabParam as "easy-savings" | "bridge-in");
+    }
+  }, [searchParams]);
 
   // Extract CATA token from inactive tokens by address
   const cataToken = inactiveTokens?.find(token =>
