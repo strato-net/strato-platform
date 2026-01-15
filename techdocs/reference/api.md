@@ -687,9 +687,9 @@ Use testnet for development:
 https://buildtest.mercata-testnet.blockapps.net/api
 ```
 
-- Free test tokens available via faucet
 - No real value at risk
 - Identical API to production
+- Use for testing before mainnet deployment
 
 ### Sandbox Mode
 

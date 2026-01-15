@@ -7,18 +7,18 @@ Trade tokens instantly using STRATO's decentralized exchange.
 
 ---
 
-## Complete Example: Swap 1 ETHST for USDCST 
+## Complete Example: Swap 1 ETHST for USDST 
 **Your situation:**
 
 - You have: 1 ETHST
 - ETHST price: $3,000
-- You want: USDCST stablecoin
+- You want: USDST stablecoin
 
 **What you'll do:**
 
 1. Check swap quote
 2. Execute swap
-3. Receive USDCST
+3. Receive USDST
 
 **Time needed:** 2 minutes  
 **Total cost:** ~$9 trading fee + $0.10 gas
@@ -30,8 +30,8 @@ Trade tokens instantly using STRATO's decentralized exchange.
 **Step 1: Get Quote**
 - Go to **Swap** page
 - From: **ETHST** → Enter **1.0**
-- To: **USDCST**
-- Quote shows: **2,991 USDCST** (0.3% fee = $9)
+- To: **USDST**
+- Quote shows: **2,991 USDST** (0.3% fee = $9)
 
 **Step 2: Execute Swap**
 - Click **"Swap"** (~$0.10 gas)
@@ -40,22 +40,22 @@ Trade tokens instantly using STRATO's decentralized exchange.
 
 **Result:**
 ```
-✅ Swapped: 1 ETHST → 2,991 USDCST
+✅ Swapped: 1 ETHST → 2,991 USDST
 ✅ Rate: $2,991 per ETHST (after fees)
 ✅ Cost: $9 trading fee + $0.10 gas
 ```
 
 **Your wallet:**
 
-- Before: 1 ETHST, 0 USDCST
-- After: 0 ETHST, 2,991 USDCST
+- Before: 1 ETHST, 0 USDST
+- After: 0 ETHST, 2,991 USDST
 
 ---
 
 ## Overview
 
 **What is swapping?**
-- Exchange one token for another (e.g., ETHST → USDCST)
+- Exchange one token for another (e.g., ETHST → USDST)
 - Instant execution through automated market makers (AMM)
 - No order books or centralized intermediaries
 
@@ -85,7 +85,7 @@ Before swapping:
 
 STRATO uses liquidity pools instead of traditional order books:
 
-1. **Liquidity pools** hold pairs of tokens (e.g., ETHST-USDCST pool)
+1. **Liquidity pools** hold pairs of tokens (e.g., ETHST-USDST pool)
 2. **You swap** by trading with the pool
 3. **Price determined** by pool's token ratio
 4. **Liquidity providers** earn fees from your swap
@@ -112,12 +112,12 @@ STRATO uses liquidity pools instead of traditional order books:
 2. **To**: Select token you want to receive (destination token)
 3. Enter amount to swap
 
-**Example**: Swap 1 ETHST for USDCST 
+**Example**: Swap 1 ETHST for USDST 
 ### Step 3: Review Swap Details
 
 The app displays:
 
-- **Exchange rate**: Current price (e.g., 1 ETHST = 3,000 USDCST)
+- **Exchange rate**: Current price (e.g., 1 ETHST = 3,000 USDST)
 - **Price impact**: How much your trade affects the price (< 1% is good)
 - **Minimum received**: Worst-case amount after slippage
 - **Fees**: Trading fee + gas fee
@@ -175,7 +175,7 @@ For optimal prices, swaps may route through multiple pools:
 
 **Example**: ETHST → Reward Points
 - **Direct route**: ETHST → Reward Points (if pool exists)
-- **Routed**: ETHST → USDCST → Reward Points (better price through two swaps)
+- **Routed**: ETHST → USDST → Reward Points (better price through two swaps)
 
 The app automatically finds the best route.
 

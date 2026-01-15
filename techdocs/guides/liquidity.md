@@ -7,16 +7,16 @@ Earn fees by providing liquidity to STRATO's decentralized exchange pools.
 
 ---
 
-## Complete Example: Provide $6,000 ETHST-USDCST Liquidity
+## Complete Example: Provide $6,000 ETHST-USDST Liquidity
 
 **Your situation:**
 
-- You have: 1 ETHST ($3,000) + 3,000 USDCST
+- You have: 1 ETHST ($3,000) + 3,000 USDST
 - You want: Earn trading fees passively
 
 **What you'll do:**
 
-1. Choose ETHST-USDCST pool
+1. Choose ETHST-USDST pool
 2. Add liquidity
 3. Earn fees automatically
 5. Remove liquidity (anytime)
@@ -31,12 +31,12 @@ Earn fees by providing liquidity to STRATO's decentralized exchange pools.
 
 **Step 1: Choose Pool**
 - Go to **Pools** page
-- Select **ETHST-USDCST pool**
+- Select **ETHST-USDST pool**
 - Check: 24h volume $500k, APR 12%
 
 **Step 2: Enter Amounts**
 - Enter: **1 ETHST**
-- Auto-fills: **3,000 USDCST** (to match ratio)
+- Auto-fills: **3,000 USDST** (to match ratio)
 - Your share: 0.5% of pool
 
 **Step 3: Add Liquidity**
@@ -47,7 +47,7 @@ Earn fees by providing liquidity to STRATO's decentralized exchange pools.
 
 **Result:**
 ```
-✅ Added: 1 ETHST + 3,000 USDCST to pool
+✅ Added: 1 ETHST + 3,000 USDST to pool
 ✅ Received: LP tokens (representing your 0.5% share)
 ✅ Earning: ~$2/day in fees (12% APR)
 ✅ Plus: Reward Points
@@ -142,9 +142,9 @@ Your LP tokens / Total LP tokens = Your % of pool
 
 **Popular pools**:
 
-- ETHST / USDCST - High volume, stable
+- ETHST / USDST - High volume, stable
 - WBTC / ETHST - Dual crypto exposure
-- USDCST / USDST - Minimal impermanent loss
+- USDST / USDST - Minimal impermanent loss
 
 ### Step 2: Enter Amounts
 
@@ -154,9 +154,9 @@ Your LP tokens / Total LP tokens = Your % of pool
 
 **Example**:
 
-- Pool is 50% ETHST, 50% USDCST
+- Pool is 50% ETHST, 50% USDST
 - You enter: 1 ETHST ($3,000)
-- Auto-fills: 3,000 USDCST (to match value)
+- Auto-fills: 3,000 USDST (to match value)
 
 !!! tip "Start Small"
     Test with ~$100-500 first to understand the process before committing large amounts.
@@ -252,12 +252,12 @@ Tokens (including earned fees) return to your wallet.
 
 **Initial deposit**:
 
-- 1 ETHST ($3,000) + 3,000 USDCST = $6,000 total
+- 1 ETHST ($3,000) + 3,000 USDST = $6,000 total
 
 **ETH doubles to $6,000**:
 
-- Pool rebalances: 0.707 ETHST + 4,242 USDCST - Pool value: $8,485
-- If you just held: 1 ETHST ($6,000) + 3,000 USDCST = $9,000
+- Pool rebalances: 0.707 ETHST + 4,242 USDST - Pool value: $8,485
+- If you just held: 1 ETHST ($6,000) + 3,000 USDST = $9,000
 - **Impermanent loss: $515 (5.7%)**
 
 ### When Is It a Problem?

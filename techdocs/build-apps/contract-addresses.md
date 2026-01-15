@@ -251,7 +251,7 @@ console.log('All contract addresses:', addresses);
 
 ## Network Configuration
 
-Add STRATO to wallet or app:
+Configure STRATO network programmatically in your app:
 
 ```typescript
 const STRATO_NETWORK = {
@@ -271,6 +271,9 @@ const STRATO_NETWORK = {
   }
 };
 ```
+
+!!! note "For Developers Only"
+    This configuration is for programmatic network setup in applications, not for manually adding STRATO to wallets.
 
 ---
 

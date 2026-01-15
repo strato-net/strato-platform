@@ -141,7 +141,7 @@ All with worked examples, real numbers, and best practices.
 
 - **Copy-Paste Code** - Ready-to-use functions
 - **All ABIs** - Every contract interface
-- **Production Ready** - Error handling, gas optimization
+- **Production Ready** - Error handling, best practices
 - **Multiple Languages** - JavaScript, TypeScript examples
 
 ---

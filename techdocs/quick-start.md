@@ -97,32 +97,6 @@ Once your email is verified:
 !!! danger "Critical Security Warning"
     Your seed phrase is the ONLY way to recover your wallet. Anyone with it can steal all your funds. Write it down and store it securely offline.
 
-### Add STRATO Network
-
-The STRATO app will auto-prompt you to add the network on first connection. Alternatively:
-
-**Manual Setup:**
-
-1. Open MetaMask → Network dropdown → "Add Network"
-2. Enter network details:
-
-**Mainnet:**
-
-- **Network Name:** STRATO
-- **RPC URL:** `https://app.strato.nexus/strato-api/eth/v1.2`
-- **Chain ID:** (auto-detected)
-- **Currency Symbol:** ETH
-- **Block Explorer:** `https://app.strato.nexus/explorer`
-
-**Testnet:**
-
-- **Network Name:** STRATO Testnet
-- **RPC URL:** `https://buildtest.mercata-testnet.blockapps.net/strato-api/eth/v1.2`
-- **Chain ID:** (auto-detected)
-- **Currency Symbol:** ETH
-
-3. Click **Save**
-
 ---
 
 ## Step 3: Get Assets on STRATO
@@ -147,19 +121,13 @@ You need assets on STRATO to participate in DeFi. There are two ways to get them
 - 0.1-0.5 ETH (for collateral and fees)
 - Or 500-1000 USDC (for stable collateral)
 
-### Option B: Use Testnet Faucet (Testnet Only)
-
-1. Switch to STRATO Testnet in your wallet
-2. Go to Faucet page in app
-3. Request test tokens (free)
-4. Start experimenting!
-
 !!! info "Understanding Wrapped Tokens"
     When you bridge assets to STRATO, they automatically become "wrapped" versions:
     
     - **ETH** → **ETHST** (Wrapped ETH on STRATO)
-    - **USDC** → **USDCST** (Wrapped USDC on STRATO)
     - **WBTC** → **WBTCST** (Wrapped BTC on STRATO)
+    - **Gold** → **GOLDST** (Tokenized Gold on STRATO)
+    - **Silver** → **SILVST** (Tokenized Silver on STRATO)
     
     These wrapped tokens work 1:1 with the original and are what you'll use for all STRATO operations (swaps, lending, collateral, etc.). When you bridge back to Ethereum, you receive the original tokens again.
     
@@ -182,9 +150,6 @@ STRATO transactions require USDST for gas fees (typically < $0.10 per transactio
 - Bridge collateral (ETH, WBTC)
 - Borrow 20-50 USDST (see guides below)
 - Use for transaction fees
-
-**Method 3: Faucet (Testnet)**
-- Request free USDST from testnet faucet
 
 ---
 

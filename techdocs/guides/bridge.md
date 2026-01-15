@@ -104,8 +104,8 @@ Before bridging:
 Common bridgeable assets:
 
 - **ETH** → ETHST
-- **USDC** → USDCST (on STRATO)
-- **USDT** → USDTST (on STRATO)
+- **USDC** → USDST (on STRATO)
+- **USDT** → USDST (on STRATO)
 - **WBTC** → WBTCST
 - **Other ERC20 tokens** (check bridge interface for full list)
 
@@ -117,22 +117,24 @@ Common bridgeable assets:
 
 ---
 
-## Bridge Fees
+## Bridge Costs
+
+**There are NO bridge fees.** You only pay:
 
 ### Ethereum → STRATO
 
 - **Ethereum gas**: $5-50+ (varies with network congestion)
-- **STRATO fee**: Minimal (< $0.10 in USDST)
+- **STRATO transaction**: < $0.10 in USDST (or free with vouchers)
 
 **Cost optimization**:
 
 - Bridge during low gas hours (late night/weekends UTC)
 - Use gas trackers (etherscan.io/gastracker)
-- Bridge larger amounts to amortize fees
+- Bridge larger amounts to spread out Ethereum gas costs
 
 ### STRATO → Ethereum
 
-- **STRATO fee**: < $0.10 in USDST
+- **STRATO transaction**: < $0.10 in USDST (or free with vouchers)
 - **Ethereum gas**: Paid when claiming on Ethereum
 
 ---
@@ -334,7 +336,7 @@ View all past bridges:
 ### Before Bridging
 
 - [ ] Check current Ethereum gas prices
-- [ ] Calculate total cost (gas + bridge fees)
+- [ ] Calculate total cost (gas fees only)
 - [ ] Verify sufficient balance (amount + gas)
 - [ ] Start with small test amount
 - [ ] Bookmark official bridge URL

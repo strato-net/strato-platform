@@ -22,7 +22,7 @@ STRATO is a blockchain platform for decentralized finance (DeFi) that enables bo
 - **Transaction fees**: 
   - First 10 transactions: **FREE** (using vouchers from bridge-in)
   - After vouchers: 0.01 USDST (~$0.01) per transaction
-- **Bridge fees**: Ethereum gas fees when bridging (varies by network congestion)
+- **Ethereum gas fees**: When bridging from Ethereum (varies by network congestion, typically $15-30)
 - **Protocol fees**: Small percentage on swaps, borrows, etc. (goes to protocol treasury)
 
 ### What are transaction vouchers?
@@ -45,18 +45,6 @@ Bridge 0.5 ETH → Get 10 vouchers → 10 free transactions
 Bridge 100 USDC → Get 10 more vouchers → 10 more free transactions
 ```
 
-### Testnet vs Mainnet - which should I use?
-
-- **Testnet (Helium)**: For learning and testing. Free test tokens, no real value at risk. Start here if you're new.
-- **Mainnet (Upquark)**: For real DeFi operations with actual value. Use after you're comfortable with testnet.
-
-### How do I get test tokens on testnet?
-
-1. Switch to STRATO Testnet in your wallet
-2. Go to the Faucet page in the app
-3. Request test tokens (ETH, USDC, etc.)
-4. Start experimenting!
-
 ---
 
 ## Getting Started
@@ -74,16 +62,6 @@ See the **[Quick Start Guide](quick-start.md)** for step-by-step instructions. Y
 - WalletConnect-compatible wallets
 - Coinbase Wallet
 - Trust Wallet
-
-### How do I add STRATO to my wallet?
-
-The app will auto-prompt you to add the network. Or add manually:
-
-- **RPC URL**: `https://app.strato.nexus/strato-api/eth/v1.2`
-- **Chain ID**: (auto-detected)
-- **Currency Symbol**: ETH
-
-See **[Quick Start Guide](quick-start.md#step-2-set-up-your-wallet)** for full details.
 
 ### How do I bridge assets to STRATO?
 
@@ -220,7 +198,7 @@ Impermanent loss occurs when you provide liquidity and token prices diverge from
 
 **Example**:
 
-- Deposit 1 ETHST ($3,000) + 3,000 USDCST
+- Deposit 1 ETHST ($3,000) + 3,000 USDST
 - ETH doubles to $6,000
 - Pool auto-rebalances: you now have 0.707 ETH + 4,242 USDC
 - Pool value: $8,485

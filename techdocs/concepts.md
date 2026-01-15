@@ -44,8 +44,8 @@ Bridge 0.5 ETH to STRATO
 
 When you bridge assets from Ethereum to STRATO, they become "wrapped" to work on the STRATO blockchain:
 
-- **On Ethereum**: You have ETH, USDC, WBTC
-- **On STRATO**: You have ETHST, USDCST, WBTCST (wrapped versions)
+- **On Ethereum**: You have ETH, WBTC, Gold, Silver
+- **On STRATO**: You have ETHST, WBTCST, GOLDST, SILVST (wrapped versions)
 - **1:1 Peg**: Always exchangeable 1:1 with the original
 
 **How it works:**
@@ -61,10 +61,8 @@ Use ETHST on STRATO → Bridge back → Receive ETH on Ethereum
 |---------------------|------------------|------|
 | ETH | ETHST | Wrapped ETH |
 | WBTC | WBTCST | Wrapped BTC |
-| USDC | USDCST | Wrapped USDC |
-| USDT | USDTST | Wrapped USDT |
-| Gold tokens | GOLDST | Gold |
-| Silver tokens | SILVST | Silver |
+| Gold tokens | GOLDST | Tokenized Gold |
+| Silver tokens | SILVST | Tokenized Silver |
 
 **Key points:**
 
@@ -80,8 +78,8 @@ Use ETHST on STRATO → Bridge back → Receive ETH on Ethereum
 2. You receive 2 ETHST on STRATO
 3. You use ETHST to:
    - Supply as collateral
-   - Swap for USDCST
-   - Provide liquidity in ETHST-USDCST pool
+   - Swap for USDST
+   - Provide liquidity in ETHST-USDST pool
 4. Later, bridge 2 ETHST back to Ethereum
 5. You receive 2 ETH on Ethereum
 ```
@@ -90,8 +88,8 @@ Use ETHST on STRATO → Bridge back → Receive ETH on Ethereum
 
 Throughout the documentation, you'll see:
 - "Supply ETHST" (not "Supply ETH")
-- "USDST-USDCST pool" (not "USDST-USDC pool")
-- "Swap USDCST → ETHST" (not "Swap USDC → ETH")
+- "USDST-ETHST pool" (not "USDST-ETH pool")
+- "Swap WBTCST → ETHST" (not "Swap WBTC → ETH")
 
 This is because on STRATO, you're working with the wrapped versions!
 
@@ -276,13 +274,13 @@ After:
 ```
 Initial deposit:
 
-- 1 ETHST ($3,000) + 3,000 USDCST = $6,000 total
+- 1 ETHST ($3,000) + 3,000 USDST = $6,000 total
 
 ETH doubles to $6,000:
 
-- Pool rebalances to: 0.707 ETH + 4,242 USDC
+- Pool rebalances to: 0.707 ETHST + 4,242 USDST
 - Pool value: $8,485
-- If you just held: 1 ETHST ($6,000) + 3,000 USDCST = $9,000
+- If you just held: 1 ETHST ($6,000) + 3,000 USDST = $9,000
 - Impermanent loss: $515 (5.7%)
 
 BUT: Swap fees earned may offset this loss
@@ -367,18 +365,6 @@ STRATO supports various tokens for trading, lending, and collateral.
 - Minted via CDP or borrowed from lending pool
 - Pegged to 1 USD
 - Used for fees and trading
-
-**USDCST** (Wrapped USDC):
-
-- Bridged from Ethereum
-- 1:1 with USDC
-- Stable collateral and trading pair
-
-**USDTST** (Wrapped USDT):
-
-- Bridged from Ethereum
-- 1:1 with USDT
-- Stable collateral option
 
 ### Commodity Tokens
 

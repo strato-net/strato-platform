@@ -40,12 +40,12 @@ Two complementary strategies:
 
 **Setup:**
 
-- Capital: $10,000 USDCST - Split: $5k on STRATO, $5k on Uniswap (Ethereum)
-- Assets: USDCST on both chains
+- Capital: $10,000 USDST - Split: $5k on STRATO, $5k on Uniswap (Ethereum)
+- Assets: USDST on both chains
 
 **Opportunity spotted:**
 
-- STRATO: 1 ETHST = $2,990 USDCST
+- STRATO: 1 ETHST = $2,990 USDST
 - Uniswap: 1 ETH = $3,010 USDC
 - **Spread:** $20 (0.67%)
 
@@ -53,7 +53,7 @@ Two complementary strategies:
 
 1. **Buy on STRATO:**
 
-   - Swap $2,990 USDCST → 1 ETHST
+   - Swap $2,990 USDST → 1 ETHST
    - Fee: 0.3% = $9
    - Cost: $2,999 per ETHST
 
@@ -65,8 +65,8 @@ Two complementary strategies:
 
 3. **Sell on Uniswap:**
 
-   - Swap 1 ETHST → $3,010 USDCST    - Fee: 0.3% = $9
-   - Receive: $3,001 USDCST 
+   - Swap 1 ETHST → $3,010 USDST    - Fee: 0.3% = $9
+   - Receive: $3,001 USDST 
 4. **Bridge USDC back:**
 
    - Optional: Keep capital balanced
@@ -122,8 +122,8 @@ Need at least 1.1% price difference
 
 **Example routes:**
 
-- Direct: USDCST → ETHST (one swap)
-- Routed: USDCST → USDST → ETHST (two swaps)
+- Direct: USDST → ETHST (one swap)
+- Routed: USDST → USDST → ETHST (two swaps)
 
 **If routing is cheaper, arbitrage exists!**
 
@@ -135,11 +135,11 @@ Need at least 1.1% price difference
 
 Direct swap:
 
-- USDCST → ETHST: Rate = $3,000 per ETHST
+- USDST → ETHST: Rate = $3,000 per ETHST
 
 Routed swap:
 
-- USDCST → USDST: Rate = 1:1 (stable pair, low fee)
+- USDST → USDST: Rate = 1:1 (stable pair, low fee)
 - USDST → ETHST: Rate = $2,985 per ETHST (lower price!)
 
 **Opportunity:**
@@ -152,14 +152,14 @@ Routed swap:
 
 1. **Buy ETHST via route:**
 
-   - Swap $2,985 USDCST → USDST (0.05% fee = $1.50)
+   - Swap $2,985 USDST → USDST (0.05% fee = $1.50)
    - Swap $2,985 USDST → 1 ETHST (0.3% fee = $9)
    - Total cost: $2,995.50
 
 2. **Sell ETHST direct:**
 
-   - Swap 1 ETHST → $3,000 USDCST (0.3% fee = $9)
-   - Receive: $2,991 USDCST
+   - Swap 1 ETHST → $3,000 USDST (0.3% fee = $9)
+   - Receive: $2,991 USDST
 
 **Result:**
 ```
@@ -196,7 +196,7 @@ Loss: -$4.50 ❌
 
 **Starting capital:** $10,000 (5 ETHST @ $2,000 or equivalent)
 
-**Choose pool:** ETHST-USDCST (high volume)
+**Choose pool:** ETHST-USDST (high volume)
 
 **Strategy decision:**
 
@@ -220,12 +220,12 @@ Loss: -$4.50 ❌
 
 - Price: $2,000
 - Range: $1,950-$2,050
-- Capital: 2.5 ETHST + $5,000 USDCST
+- Capital: 2.5 ETHST + $5,000 USDST
 
 **Deploy liquidity:**
 
 1. **Go to Advanced** (in sidebar) → **Swap Pools** tab
-2. Select **ETHST-USDCST** pool
+2. Select **ETHST-USDST** pool
 3. **Choose concentrated range:**
 
    - Min: $1,950
@@ -233,7 +233,7 @@ Loss: -$4.50 ❌
 4. **Deposit:**
 
    - 2.5 ETHST
-   - $5,000 USDCST
+   - $5,000 USDST
 5. **Click "Add Liquidity"** (~$0.10 gas, approvals automatic)
 
 **Result:**
@@ -268,8 +268,8 @@ Loss: -$4.50 ❌
 
 **Your position:**
 
-- All converted to USDCST (sold ETHST automatically)
-- Now have: ~$10,150 USDCST, 0 ETHST
+- All converted to USDST (sold ETHST automatically)
+- Now have: ~$10,150 USDST, 0 ETHST
 - Out of range = no fees earned ❌
 
 **Action needed:**
@@ -330,7 +330,7 @@ Loss: -$4.50 ❌
 
 **Start:**
 
-- Provide 1 ETHST ($2,000) + $2,000 USDCST
+- Provide 1 ETHST ($2,000) + $2,000 USDST
 - Total: $4,000
 
 **ETH doubles to $4,000:**
@@ -338,13 +338,13 @@ Loss: -$4.50 ❌
 **If you just held:**
 
 - 1 ETHST = $4,000
-- $2,000 USDCST
+- $2,000 USDST
 - Total: $6,000
 
 **As LP:**
 
 - 0.707 ETHST = $2,828
-- $2,828 USDCST
+- $2,828 USDST
 - Total: $5,656
 - **IL: $344 (5.7%)**
 
@@ -438,7 +438,7 @@ Loss: -$4.50 ❌
 
 **Mitigations:**
 
-- Stick to major pairs (ETHST-USDCST, etc.)
+- Stick to major pairs (ETHST-USDST, etc.)
 - Use audited protocols only
 - Diversify across pools
 - Monitor IL regularly
@@ -482,9 +482,9 @@ Loss: -$4.50 ❌
 
 **Pairs:**
 
-- ETHST-USDCST: $25k
-- WBTCST-USDCST: $15k
-- USDST-USDCST: $10k
+- ETHST-USDST: $25k
+- WBTCST-USDST: $15k
+- USDST-USDST: $10k
 
 **Time commitment:** 30 min/day
 
@@ -492,9 +492,9 @@ Loss: -$4.50 ❌
 
 | Pool | Fees Earned | IL | Net | APR |
 |------|-------------|----|----|-----|
-| ETHST-USDCST | $2,100 | -$350 | $1,750 | 28% |
-| WBTCST-USDCST | $1,350 | -$180 | $1,170 | 31% |
-| USDST-USDCST | $280 | -$5 | $275 | 11% |
+| ETHST-USDST | $2,100 | -$350 | $1,750 | 28% |
+| WBTCST-USDST | $1,350 | -$180 | $1,170 | 31% |
+| USDST-USDST | $280 | -$5 | $275 | 11% |
 | **Total** | **$3,730** | **-$535** | **$3,195** | **26%** |
 
 **Carlos's routine:**
@@ -520,7 +520,7 @@ Loss: -$4.50 ❌
 ### Week 2: Test
 
 - [ ] Start with $500-1,000
-- [ ] Choose stable pair (USDST-USDCST)
+- [ ] Choose stable pair (USDST-USDST)
 - [ ] Wide range (low risk)
 - [ ] Track daily performance
 - [ ] Learn the UI
