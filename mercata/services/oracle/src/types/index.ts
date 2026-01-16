@@ -2,11 +2,7 @@ export interface Asset {
     targetAssetAddress: string;
     constantPrice?: number;
     weekendProxy?: string; // Proxy symbol for weekend/market-closed pricing (e.g., "PAXG" for XAU)
-}
-
-// Asset with its key attached for processing
-export interface ResolvedAsset extends Asset {
-    key: string; // Asset identifier (ETH, WBTC, XAU, etc.)
+    submit?: boolean; // Whether to submit this asset to blockchain (default: true)
 }
 
 export interface BatchPriceResult {
@@ -23,15 +19,10 @@ export interface SourceConfig {
     headers?: string; // Comma-separated header names
     body?: string; // Request body key
     parse: string; // Price parsing pattern
-    timestamp?: string; // Timestamp parsing pattern
-    batchMode?: boolean;
     apiKeyEnvVar?: string; // Environment variable name for API key
+    apiKey?: string; // Resolved API key (populated at load time)
     symbolMapping?: Record<string, string>; // Mapping from asset symbols to API-specific keys
     assets: string[]; // Which assets this source supports
-}
-
-export interface SourcesConfig {
-    [key: string]: SourceConfig;
 }
 
 export interface TransactionResult {
@@ -59,11 +50,20 @@ export interface TxMetric {
     status: string;         // "Success" or "Failure"
 }
 
-// Schedule types for asset processing
-export type AssetSchedule = 'always' | 'metals' | 'constant';
-
-export interface AssetsBySchedule {
-    always: string[];   // Crypto assets - always process
-    metals: string[];   // Assets with weekendProxy - use proxy when market closed
-    constant: string[]; // Assets with constantPrice - use fixed price
+export interface SourceResult {
+    sourceName: string;
+    prices: Record<string, { price: number; feedTimestamp: string }>;
+    success: boolean;
+    duration: number;
 }
+
+export interface AggregatedPrice {
+    assetKey: string;
+    medianPrice: number;
+    targetAddress: string;
+    sources: Array<{ name: string; price: number }>;
+    expectedSourceCount: number;
+    failed?: boolean;
+    error?: string;
+}
+

@@ -92,8 +92,6 @@ function extractTransactionHash(data: any): string {
 }
 
 export async function pushAssetPrices(assets: string[], prices: number[]): Promise<TransactionResult> {
-    logInfo('OraclePusher', 'Submitting prices');
-    
     // Check balances before submitting
     await checkBalances();
     

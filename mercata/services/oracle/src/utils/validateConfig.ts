@@ -1,12 +1,10 @@
 import dotenv from 'dotenv';
 import { oauthClient } from './oauth';
 import { logInfo, logError } from './logger';
+import { ORACLE_CONFIG } from './constants';
 
 const sourcesConfig = require('../config/sources.json');
 const assetsConfig = require('../config/assets.json');
-
-// Minimum number of valid sources required to submit a price
-const MIN_VALID_SOURCES = 3;
 
 dotenv.config();
 
@@ -81,12 +79,17 @@ export async function validateConfig(): Promise<boolean> {
             // Validate weekendProxy symbol has enough sources
             if (asset.weekendProxy) {
                 const proxySources = getSourcesForSymbol(asset.weekendProxy);
-                if (proxySources.length < MIN_VALID_SOURCES) {
+                if (proxySources.length < ORACLE_CONFIG.MIN_VALID_SOURCES) {
                     errors.push(
                         `${assetPrefix} weekendProxy '${asset.weekendProxy}' has only ${proxySources.length} source(s), ` +
-                        `needs at least ${MIN_VALID_SOURCES}. Sources: [${proxySources.join(', ')}]`
+                        `needs at least ${ORACLE_CONFIG.MIN_VALID_SOURCES}. Sources: [${proxySources.join(', ')}]`
                     );
                 }
+            }
+            
+            // Validate submit field if present
+            if (asset.submit !== undefined && typeof asset.submit !== 'boolean') {
+                errors.push(`${assetPrefix} submit must be a boolean`);
             }
         });
     }
@@ -151,19 +154,16 @@ export async function validateConfig(): Promise<boolean> {
         }
     });
     
-    // Build set of assets used as weekend proxies
-    const proxyAssets = new Set<string>();
-    Object.values(assetsConfig.assets).forEach((asset: any) => {
-        if (asset.weekendProxy) {
-            proxyAssets.add(asset.weekendProxy);
-        }
-    });
-    
     // Validate each asset has at least MIN_VALID_SOURCES
     const assetKeys = Object.keys(assetsConfig.assets);
     assetKeys.forEach(assetKey => {
         const asset = assetsConfig.assets[assetKey];
         const sources = assetSourceCount[assetKey] || [];
+        
+        // Skip validation for assets not submitted (e.g., proxy-only assets like KAG)
+        if (asset.submit === false) {
+            return;
+        }
         
         // Skip minimum source check for constant-priced assets
         if (asset.constantPrice !== undefined) {
@@ -173,26 +173,17 @@ export async function validateConfig(): Promise<boolean> {
             return;
         }
         
-        // Skip minimum source check for assets used only as weekend proxies
-        // These assets are fetched for proxy use but not submitted as regular assets
-        if (proxyAssets.has(assetKey) && asset.constantPrice === undefined && asset.weekendProxy === undefined) {
-            // Asset is only used as a proxy, not as a direct asset
-            // Validation for proxy sources is done in the weekendProxy check above
-            return;
-        }
-        
         // Skip minimum source check for assets with weekendProxy (they use proxy sources when needed)
         if (asset.weekendProxy !== undefined) {
-            // Just warn if no direct sources
             if (sources.length === 0) {
                 warnings.push(`Asset ${assetKey} has no direct sources, relies on weekendProxy '${asset.weekendProxy}'`);
             }
             return;
         }
         
-        if (sources.length < MIN_VALID_SOURCES) {
+        if (sources.length < ORACLE_CONFIG.MIN_VALID_SOURCES) {
             errors.push(
-                `Asset ${assetKey} has only ${sources.length} source(s), needs at least ${MIN_VALID_SOURCES}. ` +
+                `Asset ${assetKey} has only ${sources.length} source(s), needs at least ${ORACLE_CONFIG.MIN_VALID_SOURCES}. ` +
                 `Sources: [${sources.join(', ')}]`
             );
         }
@@ -208,7 +199,15 @@ export async function validateConfig(): Promise<boolean> {
         logInfo('ConfigValidator', `Warnings:\n${warnings.map(warning => `   ${warning}`).join('\n')}`);
     }
     
-    logInfo('ConfigValidator', `Configuration valid. ${assetKeys.length} assets, ${sourceNames.length} sources.`);
+    // Count assets that won't be submitted
+    const proxyOnlyAssets = assetKeys.filter(k => assetsConfig.assets[k].submit === false);
+    const submitCount = assetKeys.length - proxyOnlyAssets.length;
+    
+    let summary = `Configuration valid. ${submitCount}/${assetKeys.length} assets to submit, ${sourceNames.length} sources.`;
+    if (proxyOnlyAssets.length > 0) {
+        summary += ` Proxy-only: [${proxyOnlyAssets.join(', ')}]`;
+    }
+    logInfo('ConfigValidator', summary);
     
     return true;
 }

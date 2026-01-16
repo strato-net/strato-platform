@@ -21,6 +21,12 @@ export const TIMEOUTS = {
     SUBMIT: 20000, 
     WAIT: 180000,
     STATUS: 10000,
+    FETCH: 30000,
+};
+
+// Oracle configuration
+export const ORACLE_CONFIG = {
+    MIN_VALID_SOURCES: 3,
 };
 
 // Retry delay configurations

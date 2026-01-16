@@ -4,7 +4,6 @@
     "params": "symbols[]",
     "parse": "data[].prices[0].value",
     "timestamp": "data[0].prices[0].lastUpdatedAt",
-    "batchMode": true,
     "apiKeyEnvVar": "ALCHEMY_API_KEY",
     "assets": ["ETH", "WBTC", "PAXG", "XAUT", "sUSDS", "KAG"]
   },
@@ -14,7 +13,6 @@
     "headers": "X-CMC_PRO_API_KEY",
     "parse": "data.{symbol}[0].quote.USD.price",
     "timestamp": "data.{firstSymbol}[0].quote.USD.last_updated",
-    "batchMode": true,
     "apiKeyEnvVar": "COINMARKETCAP_API_KEY",
     "assets": ["ETH", "WBTC", "PAXG", "XAUT"]
   },
@@ -23,7 +21,6 @@
     "params": "api_key,currency=USD,unit=toz,metals",
     "parse": "metals.{metal}",
     "timestamp": "timestamps.metal",
-    "batchMode": true,
     "apiKeyEnvVar": "METALS_DEV_API_KEY",
     "assets": ["XAU", "XAG"],
     "symbolMapping": {
@@ -36,7 +33,6 @@
     "params": "access_key,base=USD,symbols",
     "parse": "rates.USD{symbol}",
     "timestamp": "timestamp",
-    "batchMode": true,
     "apiKeyEnvVar": "METALS_API_API_KEY",
     "assets": ["XAU", "XAG"]
   },
@@ -45,7 +41,6 @@
     "params": "x_cg_pro_api_key,ids,vs_currencies=usd,include_last_updated_at=true",
     "parse": "{id}.usd",
     "timestamp": "{id}.last_updated_at",
-    "batchMode": true,
     "apiKeyEnvVar": "COINGECKO_API_KEY",
     "assets": ["ETH", "WBTC", "PAXG", "XAUT", "sUSDS", "KAG"],
     "symbolMapping": {
@@ -63,7 +58,6 @@
     "headers": "X-CoinAPI-Key",
     "parse": "assets",
     "timestamp": "data_quote_start",
-    "batchMode": true,
     "apiKeyEnvVar": "COINAPI_API_KEY",
     "assets": ["ETH", "WBTC", "PAXG", "XAUT"]
   },
@@ -73,7 +67,6 @@
     "headers": "x-api-key",
     "body": "codes",
     "parse": "coins",
-    "batchMode": true,
     "apiKeyEnvVar": "LIVECOINWATCH_API_KEY",
     "assets": ["ETH", "WBTC", "PAXG", "XAUT", "sUSDS", "KAG"],
     "symbolMapping": {
@@ -90,7 +83,6 @@
     "params": "access_key,base=USD,symbols",
     "parse": "data.rates.{symbol}",
     "timestamp": "data.timestamp",
-    "batchMode": true,
     "apiKeyEnvVar": "COMMODITIES_API_KEY",
     "assets": ["XAU", "XAG"]
   },
