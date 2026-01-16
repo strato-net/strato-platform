@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTheme } from 'next-themes';
-import { LayoutDashboard, Wallet, ArrowLeft, ArrowRight, Book, ArrowRightLeft, Send, Shield, Activity, BarChart3, Coins ,Droplets, Download, UserPlus} from 'lucide-react';
+import { LayoutDashboard, Wallet, ArrowLeft, ArrowRight, Book, ArrowRightLeft, Send, Shield, Activity, BarChart3, Coins, Droplets, Download, UserPlus, Vault } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import STRATOLOGO from '@/assets/strato.png';
 import STRATOLOGODARK from '@/assets/strato-dark.png';
@@ -48,6 +48,7 @@ const DashboardSidebar = () => {
     { icon: <Book size={20} />, label: 'Borrow', path: '/dashboard/borrow' },
     { icon: <ArrowRightLeft size={20} />, label: 'Swap', path: '/dashboard/swap' },
     { icon: <Droplets size={20} />, label: 'Advanced', path: '/dashboard/advanced' },
+    { icon: <Vault size={20} />, label: 'Vault', path: '/dashboard/vault' },
     { icon: <Coins size={20} />, label: 'Rewards', path: '/dashboard/rewards' },
     { icon: <UserPlus size={20} />, label: 'My Referrals', path: '/dashboard/referrals' },
     { icon: <BarChart3 size={20} />, label: 'STRATO Stats', path: '/dashboard/stats' },
@@ -77,8 +78,7 @@ const DashboardSidebar = () => {
 
   return (
     <div
-      className={`h-screen flex-col bg-sidebar-background text-sidebar-foreground fixed left-0 top-0 z-40 transition-all duration-300 border-r border-sidebar-border hidden md:flex ${
-        collapsed ? 'w-16' : 'w-64'
+      className={`h-screen flex-col bg-sidebar-background text-sidebar-foreground fixed left-0 top-0 z-40 transition-all duration-300 border-r border-sidebar-border hidden md:flex ${collapsed ? 'w-16' : 'w-64'
         }`}
     >
       <div className="border-b border-sidebar-border">
@@ -148,7 +148,8 @@ const DashboardSidebar = () => {
                     </Link>
                   )}
                 </li>
-              )})}
+              )
+            })}
           </ul>
         </nav>
       </div>
