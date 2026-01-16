@@ -34,7 +34,7 @@ class OAuthClient {
             const response = await apiGet(
                 this.discoveryUrl,
                 { timeout: 10000 },
-                { logPrefix: 'OAuth', apiUrl: this.discoveryUrl, method: 'GET' }
+                { logPrefix: 'OAuth', apiUrl: this.discoveryUrl, method: 'GET', maxAttempts: 3 }
             );
             this.tokenEndpoint = response.data.token_endpoint;
 
@@ -84,7 +84,7 @@ class OAuthClient {
                     },
                     timeout: 10000
                 },
-                { logPrefix: 'OAuth', apiUrl: tokenEndpoint, method: 'POST' }
+                { logPrefix: 'OAuth', apiUrl: tokenEndpoint, method: 'POST', maxAttempts: 3 }
             );
 
             if (response.data.access_token) {
@@ -133,7 +133,7 @@ class OAuthClient {
                     },
                     timeout: 10000
                 },
-                { logPrefix: 'OAuth', apiUrl: keyEndpoint, method: 'GET' }
+                { logPrefix: 'OAuth', apiUrl: keyEndpoint, method: 'GET', maxAttempts: 3 }
             );
 
             this.userAddress = response.data.address;
