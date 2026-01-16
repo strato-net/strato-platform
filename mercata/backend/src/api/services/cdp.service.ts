@@ -8,6 +8,7 @@ import { FunctionInput } from "../../types/types";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
+import { getBalance as getTokenBalances } from "./tokens.service";
 
 // Helper function for fixed-point exponentiation (matches contract's _rpow)
 const rpow = (x: bigint, n: bigint, ray: bigint): bigint => {
@@ -63,6 +64,7 @@ const {
 
 const RAY = BigInt(10) ** BigInt(27);
 const WAD = BigInt(10) ** BigInt(18);
+
 
 /**
  * Generic Cirrus fetch for the CDPRegistry row.
@@ -204,12 +206,6 @@ const calculateHealthFactor = (cr: number, liquidationRatio: number): number => 
 };
 
 // Helper function to get health status
-const getHealthStatus = (healthFactor: number): "healthy" | "warning" | "danger" => {
-  if (healthFactor >= 1.5) return "healthy";
-  if (healthFactor >= 1.1) return "warning";
-  return "danger";
-};
-
 // Helper function to get token info
 const getTokenInfo = async (
   accessToken: string,
@@ -289,17 +285,14 @@ interface VaultData {
   asset: string;
   symbol: string;
   collateralAmount: string;
-  collateralAmountDecimals: number; // Decimals for proper formatting
+  collateralAmountDecimals: number;
   collateralValueUSD: string;
   debtAmount: string;
-  debtValueUSD: string;
   collateralizationRatio: number;
   liquidationRatio: number;
   healthFactor: number;
   stabilityFeeRate: number;
-  health: "healthy" | "warning" | "danger";
-  borrower?: string; // Optional for liquidatable positions
-  // Raw data for precision calculations
+  borrower?: string;
   scaledDebt: string;
   rateAccumulator: string;
 }
@@ -317,6 +310,24 @@ interface AssetConfig {
   unitScale: string;
   isPaused: boolean;
   isSupported: boolean;
+}
+
+// RefinedVaultCandidate - All bigint values in their smallest unit (wei for 18-decimal tokens, satoshi for 8-decimal, etc.)
+// "Collateral" = native asset units, "Debt/Mint" = USDST (always 18 decimals)
+export interface RefinedVaultCandidate {
+  assetAddress: string;
+  symbol: string;                 // Asset symbol (e.g., "ETH", "WBTC")
+  assetScale: string;             // 10^decimals as string (e.g., "1000000000000000000" for 18-decimal assets)
+  minCR: string;                  // WAD format as string (1.5e18 = 150% CR) - min CR for user actions
+  liquidationRatio: string;       // WAD format as string (1.5e18 = 150%) - liquidation threshold for HF calc
+  stabilityFeeRate: string;       // Per-second rate as string (RAY format)
+  oraclePrice: string;            // Price per unit in USDST as string (18 decimals)
+  currentCollateral: string;      // User's current collateral as string (native asset units)
+  potentialCollateral: string;    // User's available balance as string (native asset units)
+  currentDebt: string;            // User's current debt as string (USDST, 18 decimals)
+  globalDebt: string;             // Global debt for this asset as string (USDST, 18 decimals)
+  debtFloor: string;              // Minimum debt per vault as string (USDST, 18 decimals)
+  debtCeiling: string;            // Maximum global debt as string (USDST, 18 decimals)
 }
 interface BadDebt {
   asset: string;
@@ -398,17 +409,14 @@ export const getVaults = async (
     return {
       asset,
       symbol: tokenInfo.symbol,
-      collateralAmount: collateralAmount.toString(), // Raw integer string
-      collateralAmountDecimals: tokenInfo.decimals, // Include decimals info for frontend formatting
-      collateralValueUSD: collateralValueUSD.toString(), // Raw integer string (18 decimals)
-      debtAmount: currentDebt.toString(), // Raw integer string (18 decimals)
-      debtValueUSD: currentDebt.toString(), // Raw integer string (18 decimals) - USDST is 1:1 with USD
+      collateralAmount: collateralAmount.toString(),
+      collateralAmountDecimals: tokenInfo.decimals,
+      collateralValueUSD: collateralValueUSD.toString(),
+      debtAmount: currentDebt.toString(),
       collateralizationRatio: cr,
       liquidationRatio,
       healthFactor,
       stabilityFeeRate,
-      health: getHealthStatus(healthFactor),
-      // Raw data for precision calculations
       scaledDebt: scaledDebt.toString(),
       rateAccumulator: currentRateAccumulator.toString(),
     };
@@ -416,6 +424,170 @@ export const getVaults = async (
 
   const vaults = await Promise.all(vaultPromises);
   return vaults.filter((v: VaultData | null): v is VaultData => v !== null);
+};
+
+/**
+ * Get vault candidates that are fully validated and ready for the greedy mint planning algorithm.
+ * 
+ * This endpoint performs all validation checks and returns only candidates that meet all criteria:
+ * - Not USDST (cannot be used as collateral)
+ * - isSupported: true
+ * - isPaused: false
+ * - oraclePrice > 0
+ * - unitScale > 0
+ * - Has collateral or balance (existing vaults) OR has non-collateral balance (potential vaults)
+ * 
+ * The frontend can trust that all returned candidates are valid and ready to be used directly
+ * in the greedy algorithm without additional filtering or validation.
+ */
+export const getVaultCandidates = async (
+  accessToken: string,
+  userAddress: string
+): Promise<{ existingVaults: RefinedVaultCandidate[]; potentialVaults: RefinedVaultCandidate[] }> => {
+  // Existing vaults (user already has a CDP vault entry for the asset)
+  const [existingVaults, supportedAssets, tokenBalances, registry] = await Promise.all([
+    getVaults(accessToken, userAddress),
+    getSupportedAssets(accessToken),
+    getTokenBalances(accessToken, userAddress),
+    getCDPRegistry(accessToken, userAddress, {}, "getVaultCandidates"),
+  ]);
+
+  const usdstAddress = (registry?.usdst || "").toLowerCase();
+
+  // Build quick lookup maps
+  const existingByAsset = new Map<string, VaultData>();
+  for (const v of existingVaults) {
+    existingByAsset.set(v.asset.toLowerCase(), v);
+  }
+
+  const balanceByAsset = new Map<string, any>();
+  for (const t of tokenBalances || []) {
+    if (t?.address) {
+      balanceByAsset.set(t.address.toLowerCase(), t);
+    }
+  }
+
+  const globalStateByAsset = new Map<string, any>();
+  for (const s of registry?.cdpEngine?.collateralGlobalStates || []) {
+    if (s?.asset) {
+      globalStateByAsset.set(s.asset.toLowerCase(), s.CollateralGlobalState);
+    }
+  }
+
+  // Build map of raw configs for accessing stabilityFeeRate in RAY format
+  const rawConfigByAsset = new Map<string, any>();
+  for (const c of registry?.cdpEngine?.collateralConfigs || []) {
+    if (c?.asset) {
+      rawConfigByAsset.set(c.asset.toLowerCase(), c.CollateralConfig);
+    }
+  }
+
+  const existingCandidates: RefinedVaultCandidate[] = [];
+  const potentialCandidates: RefinedVaultCandidate[] = [];
+
+  for (const asset of supportedAssets) {
+    const assetLower = asset.asset.toLowerCase();
+
+    // Filter out invalid assets
+    // 1. USDST cannot be used as collateral
+    if (usdstAddress && assetLower === usdstAddress) {
+      continue;
+    }
+
+    // 2. Unsupported assets
+    if (!asset.isSupported) {
+      continue;
+    }
+
+    // 3. Paused assets
+    if (asset.isPaused) {
+      continue;
+    }
+
+    const tokenEntry = balanceByAsset.get(assetLower);
+    const nonCollateral = BigInt(tokenEntry?.balance || "0");
+    const existing = existingByAsset.get(assetLower);
+    const collateralAmount = BigInt(existing?.collateralAmount || "0");
+
+    // 4. Must have collateral or balance (for existing vaults, include even if no balance)
+    //    For potential vaults, we already check nonCollateral > 0 below
+    const hasCollateralOrBalance = collateralAmount > 0n || nonCollateral > 0n;
+    if (!hasCollateralOrBalance) {
+      continue;
+    }
+
+    // 5. Only surface potential vaults if the user can actually open one (has non-collateral balance)
+    if (!existing && nonCollateral <= 0n) {
+      continue;
+    }
+
+    const oraclePrice = BigInt(tokenEntry?.price || "0");
+    const unitScale = BigInt(asset.unitScale || WAD.toString());
+
+    // 7. Must have valid oracle price
+    if (oraclePrice <= 0n) {
+      continue;
+    }
+
+    // 8. Must have valid unit scale
+    if (unitScale <= 0n) {
+      continue;
+    }
+
+    const globalState = globalStateByAsset.get(assetLower);
+    const rateAccumulatorRay = BigInt(globalState?.rateAccumulator || RAY);
+    const totalScaledDebt = BigInt(globalState?.totalScaledDebt || "0");
+    const globalDebtUSD = (totalScaledDebt * rateAccumulatorRay) / RAY;
+
+    // Get user's current debt from existing vault
+    const userScaledDebt = BigInt(existing?.scaledDebt || "0");
+    const userCurrentDebt = (userScaledDebt * rateAccumulatorRay) / RAY;
+
+    // Get raw config for stabilityFeeRate in RAY format
+    const rawConfig = rawConfigByAsset.get(assetLower);
+    const stabilityFeeRateRay = rawConfig?.stabilityFeeRate || RAY.toString();
+
+    // Convert minCR from percentage to WAD format (e.g., 150% = 1.5 = 1.5e18)
+    // asset.minCR is a percentage (e.g., 150 for 150%), convert to decimal then WAD
+    // Formula: (percentage / 100) * WAD = (percentage * WAD) / 100
+    const minCRWad = (BigInt(Math.floor(asset.minCR)) * WAD) / 100n;
+    
+    // Convert liquidationRatio from percentage to WAD format (same as minCR)
+    const liquidationRatioWad = (BigInt(Math.floor(asset.liquidationRatio)) * WAD) / 100n;
+
+    // Calculate assetScale from unitScale (unitScale is already 10^decimals)
+    const assetScale = unitScale;
+
+    // All candidates returned from this endpoint have passed validation:
+    // - isSupported: true (filtered out unsupported assets)
+    // - isPaused: false (filtered out paused assets)
+    // - oraclePrice > 0 (validated)
+    // - unitScale > 0 (validated)
+    // - has collateral or balance (validated)
+    const candidate: RefinedVaultCandidate = {
+      assetAddress: asset.asset,
+      symbol: asset.symbol,
+      assetScale: assetScale.toString(),
+      minCR: minCRWad.toString(),
+      liquidationRatio: liquidationRatioWad.toString(),
+      stabilityFeeRate: stabilityFeeRateRay.toString(),
+      oraclePrice: oraclePrice.toString(),
+      currentCollateral: (existing?.collateralAmount ?? "0"),
+      potentialCollateral: nonCollateral.toString(),
+      currentDebt: userCurrentDebt.toString(),
+      globalDebt: globalDebtUSD.toString(),
+      debtFloor: asset.debtFloor,
+      debtCeiling: asset.debtCeiling,
+    };
+
+    if (existing) {
+      existingCandidates.push(candidate);
+    } else {
+      potentialCandidates.push(candidate);
+    }
+  }
+
+  return { existingVaults: existingCandidates, potentialVaults: potentialCandidates };
 };
 
 export const getVault = async (
@@ -490,17 +662,14 @@ export const getVault = async (
     return {
       asset,
       symbol: tokenInfo.symbol,
-      collateralAmount: collateralAmount.toString(), // Raw integer string
-      collateralAmountDecimals: tokenInfo.decimals, // Include decimals info for frontend formatting
-      collateralValueUSD: collateralValueUSD.toString(), // Raw integer string (18 decimals)
-      debtAmount: currentDebt.toString(), // Raw integer string (18 decimals)
-      debtValueUSD: currentDebt.toString(), // Raw integer string (18 decimals) - USDST is 1:1 with USD
+      collateralAmount: collateralAmount.toString(),
+      collateralAmountDecimals: tokenInfo.decimals,
+      collateralValueUSD: collateralValueUSD.toString(),
+      debtAmount: currentDebt.toString(),
       collateralizationRatio: cr,
       liquidationRatio,
       healthFactor,
       stabilityFeeRate,
-      health: getHealthStatus(healthFactor),
-      // Raw data for precision calculations
       scaledDebt: scaledDebt.toString(),
       rateAccumulator: currentRateAccumulator.toString(),
     };
@@ -1461,7 +1630,6 @@ export const getBadDebt = async (
 
 
     if (!data || data.length === 0) {
-      console.log('No bad debt entries found on-chain');
       return [];
     }
 
@@ -1469,7 +1637,6 @@ export const getBadDebt = async (
     const nonZeroBadDebtEntries = data.filter((entry: any) => entry.value && entry.value !== "0");
     
     if (nonZeroBadDebtEntries.length === 0) {
-      console.log('No non-zero bad debt entries found');
       return [];
     }
 
@@ -1498,8 +1665,6 @@ export const getBadDebt = async (
         let symbol = "UNKNOWN";
         if (symbolResponse.data && symbolResponse.data.length > 0 && symbolResponse.data[0]._symbol) {
           symbol = symbolResponse.data[0]._symbol;
-        } else {
-          console.log(`No symbol found for ${assetAddress}, using UNKNOWN`);
         }
 
         badDebtEntries.push({

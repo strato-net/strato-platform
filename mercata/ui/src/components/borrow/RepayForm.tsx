@@ -2,13 +2,14 @@ import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { REPAY_FEE } from "@/lib/constants";
-import { safeParseUnits, addCommasToInput, formatCurrency, formatUnits } from "@/utils/numberUtils";
+import { safeParseUnits, addCommasToInput, formatUnits, formatBalance } from "@/utils/numberUtils";
 import { NewLoanData } from "@/interface";
 import { calculateRepayHealthImpact } from "@/utils/lendingUtils";
 import RiskLevelProgress from "@/components/ui/RiskLevelProgress";
 import HealthImpactDisplay from "@/components/ui/HealthImpactDisplay";
 import PercentageButtons from "../ui/PercentageButtons";
 import { computeMaxTransferable, handleAmountInputChange } from "@/utils/transferValidation";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 
 interface RepayFormProps {
   loans: NewLoanData | null;
@@ -17,6 +18,46 @@ interface RepayFormProps {
   usdstBalance: string;
   voucherBalance: string;
 }
+
+// Component to display numbers with 2 decimals, showing full value on hover
+const FormattedAmount = ({ 
+  value, 
+  symbol = "USDST", 
+  className = "" 
+}: { 
+  value: bigint;
+  symbol?: string; 
+  className?: string;
+}) => {
+  
+  if (value <= 1n) {
+    return <span className={className}>0.00 {symbol}</span>;
+  }
+
+  // Format to exactly 2 decimals for display
+  const displayAmount = formatBalance(value, symbol, 18, 0, 2);
+
+  // Format full value with 2 decimals for tooltip
+  const fullAmount = formatBalance(value, symbol, 18, 2);
+
+  // Only show tooltip if the formatted value differs from full value
+  const needsTooltip = displayAmount !== fullAmount;
+
+  if (!needsTooltip) {
+    return <span className={className}>{displayAmount}</span>;
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className={`cursor-help ${className}`}>{displayAmount}</span>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>{fullAmount}</p>
+      </TooltipContent>
+    </Tooltip>
+  );
+};
 
 const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance }: RepayFormProps) => {
   const [repayAmount, setRepayAmount] = useState<string>("");
@@ -54,7 +95,8 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance 
 
       const totalBorrowedBigInt = BigInt(loans.totalAmountOwed);
       const collateralValueBigInt = BigInt(loans.totalCollateralValueUSD);
-      const repayAmountWei = safeParseUnits(repayAmount || "0");
+      // If there's an error, treat repay amount as 0 (no repayment)
+      const repayAmountWei = repayAmountError ? 0n : safeParseUnits(repayAmount || "0");
       const newBorrowedAmount = totalBorrowedBigInt - repayAmountWei;
       
       if (newBorrowedAmount <= 0n) {
@@ -67,14 +109,14 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance 
     } catch {
       setRiskLevel(0);
     }
-  }, [repayAmount, loans?.totalCollateralValueUSD, loans?.totalAmountOwed]);
+  }, [repayAmount, loans?.totalCollateralValueUSD, loans?.totalAmountOwed, repayAmountError]);
 
   // Calculate health impact when repay amount changes
   useEffect(() => {
-    const repayAmountWei = safeParseUnits(repayAmount || "0");
+    const repayAmountWei = repayAmountError ? 0n : safeParseUnits(repayAmount || "0");
     const impact = calculateRepayHealthImpact(repayAmountWei, loans);
     setHealthImpact(impact);
-  }, [repayAmount, loans]);
+  }, [repayAmount, loans, repayAmountError]);
 
   const handleRepay = async () => {
     const owed = BigInt(loans?.totalAmountOwed || 0);
@@ -98,7 +140,8 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance 
   }
 
   return (
-    <div className="space-y-4 pt-4">
+    <TooltipProvider>
+      <div className="space-y-4 pt-4">
       {/* Loan Details */}
       <div className="space-y-2">
         <div className="flex justify-between items-center">
@@ -106,11 +149,9 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance 
           <span className="font-normal">
             {(() => {
               try {
-                const bi = BigInt(loans?.totalAmountOwed ?? "0");
-                const display = bi <= 1n ? 0n : bi;
-                return `USDST ${formatUnits(display)}`;
+                return <FormattedAmount value={BigInt(loans?.totalAmountOwed ?? "0")} />;
               } catch {
-                return `USDST 0`;
+                return <FormattedAmount value={BigInt(0)} />;
               }
             })()}
           </span>
@@ -122,11 +163,9 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance 
             <span className="font-medium">
               {(() => {
                 try {
-                  const bi = BigInt(loans?.totalAmountOwedPreview ?? "0");
-                  const display = bi <= 1n ? 0n : bi;
-                  return `USDST ${formatUnits(display)}`;
+                  return <FormattedAmount value={BigInt(loans?.totalAmountOwedPreview ?? "0")} />;
                 } catch {
-                  return `USDST 0`;
+                  return <FormattedAmount value={0n} />;
                 }
               })()}
             </span>
@@ -134,7 +173,15 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance 
         )}
         
         <div className="flex justify-between items-center pt-2 border-t">
-          <span className="text-lg">{(() => { try { const bi = BigInt(loans?.totalAmountOwed ?? "0"); const display = bi <= 1n ? 0n : bi; return `USDST ${formatUnits(display)}`; } catch { return `USDST 0`; } })()}</span>
+          <span className="text-lg">
+            {(() => {
+              try {
+                return <FormattedAmount value={BigInt(loans?.totalAmountOwed ?? "0")} />;
+              } catch {
+                return <FormattedAmount value={0n} />;
+              }
+            })()}
+          </span>
         </div>
       </div>
 
@@ -163,9 +210,11 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance 
             >
               Max :
             </button>
-            <span>{(() => {
-              return BigInt(maxAmount) <= 0n ? '-' : formatCurrency(formatUnits(BigInt(maxAmount)));
-            })()} USDST</span>
+            {BigInt(maxAmount) <= 0n ? (
+              <span>- USDST</span>
+            ) : (
+              <FormattedAmount value={BigInt(maxAmount)} />
+            )}
           </div>
         </div>
         <div className="relative">
@@ -209,7 +258,7 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance 
         <div className="flex justify-between items-center">
           <span className="text-sm text-muted-foreground">Payment Amount</span>
           <span className="font-medium">
-            {repayAmount ? `${formatCurrency(repayAmount)} USDST` : "0.00 USDST"}
+            <FormattedAmount value={repayAmountError ? 0n : safeParseUnits(repayAmount || "0")} />
           </span>
         </div>
         
@@ -219,11 +268,15 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance 
             {(() => {
               try {
                 const totalOwed = BigInt(loans?.totalAmountOwed || 0);
+                // If there's an error, show full amount owed (no repayment)
+                if (repayAmountError) {
+                  return <FormattedAmount value={totalOwed} />;
+                }
                 const repayAmountWei = safeParseUnits(repayAmount || "0");
                 const remaining = totalOwed - repayAmountWei;
-                return `${formatCurrency(formatUnits(remaining > 0n ? remaining : 0n))} USDST`;
+                return <FormattedAmount value={remaining > 0n ? remaining : 0n} />;
               } catch {
-                return `${formatCurrency(formatUnits(BigInt(loans?.totalAmountOwed || "0")))} USDST`;
+                return <FormattedAmount value={BigInt(loans?.totalAmountOwed || "0")} />;
               }
             })()}
           </span>
@@ -259,7 +312,8 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance 
           "Repay"
         )}
       </Button>
-    </div>
+      </div>
+    </TooltipProvider>
   );
 };
 

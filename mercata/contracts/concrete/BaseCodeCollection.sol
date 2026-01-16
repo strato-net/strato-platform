@@ -42,6 +42,9 @@ import "CDP/CDPEngine.sol";
 import "CDP/CDPVault.sol";
 import "CDP/CDPReserve.sol";
 
+//Escrow
+import "Escrow/Escrow.sol";
+
 //Proxy
 import "Proxy/Proxy.sol";
 
@@ -67,6 +70,7 @@ contract record Mercata is Authorizable {
     RewardsChef public rewardsChef;
     Rewards public rewards;
     Token public cataToken;
+    Escrow public escrow;
 
     constructor() public {
         // The owner of the implementation contract is ignored in favor of the proxy owner
@@ -182,6 +186,10 @@ contract record Mercata is Authorizable {
 
         cdpRegistry.setAllComponents(address(cdpVault), address(cdpEngine), address(priceOracle), address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010), address(tokenFactory), address(feeCollector), address(cdpReserve));
         Ownable(cdpRegistry).transferOwnership(address(adminRegistry));
+
+        address escrowImpl = address(new Escrow(implOwnerIgnored));
+        escrow = Escrow(address(new Proxy(escrowImpl, this)));
+        Ownable(escrow).transferOwnership(address(adminRegistry));
 
         adminRegistry.swapAdmin(this, msg.sender);
     }

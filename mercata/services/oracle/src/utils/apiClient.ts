@@ -1,5 +1,5 @@
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
-import { logError } from './logger';
+import { logError, logInfo } from './logger';
 import { RetryConfig } from '../types';
 import { healthMonitor } from './healthMonitor';
 import { DEFAULT_RETRY_CONFIG } from './constants';
@@ -53,11 +53,13 @@ async function withRetry<T>(
         } catch (error: any) {
             const errorMessage = extractErrorMessage(error);
 
+            logInfo(config.logPrefix, `Attempt ${attempt} failed${apiContext}: ${errorMessage}`);
+
+            // Failed final attempt
             if (attempt === config.maxAttempts) {
                 logError(config.logPrefix, new Error(`All ${config.maxAttempts} attempts failed${apiContext}. Last error: ${errorMessage}`));
                 throw new Error(errorMessage);
             }
-            logError(config.logPrefix, new Error(`Attempt ${attempt} failed${apiContext}: ${errorMessage}`));
         }
     }
     throw new Error('Unexpected retry loop exit');

@@ -56,6 +56,7 @@ import Data.Maybe
 import Data.Source
 import Data.Text (Text)
 import qualified Data.Text as T
+import Data.Traversable (for)
 --import Database.Persist
 import Database.Persist.Postgresql
 import Database.Esqueleto.PostgreSQL.JSON
@@ -103,11 +104,11 @@ rowToInsert row =
    in processedContract newState row
 
 
-rowToCollections :: AggregateAction -> Map.Map Text Value
+rowToCollections :: AggregateAction -> Either Text (Map.Map Text Value)
 rowToCollections row =
   let newState = case actionStorage row of
         Action.SolidVMDiff mp -> SolidVM.decodeCacheValuesForCollections mp
-   in Map.fromList newState
+   in Map.fromList <$> newState
 
 processedContractToProcessedCollectionRows :: Map.Map Text Value -> AggregateAction -> [ProcessedCollectionRow]
 processedContractToProcessedCollectionRows state row =
@@ -231,9 +232,9 @@ processTheMessages messages = do
             let indexContract = rowToInsert row
             --get columns for abstract table
             $logDebugLS "History inserts are: " $ T.pack $ show indexContract
-            let stateDiff = rowToCollections row
-                pCollections = processedContractToProcessedCollectionRows stateDiff row --get all collection rows to insert
-            pure . Right $ BatchedInserts indexContract pCollections
+            for (rowToCollections row) $ \stateDiff -> do
+              let pCollections = processedContractToProcessedCollectionRows stateDiff row --get all collection rows to insert
+              pure $ BatchedInserts indexContract pCollections
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"
 

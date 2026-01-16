@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import MobileSidebar from '../components/dashboard/MobileSidebar';
@@ -8,13 +8,17 @@ import LendingPoolSection from '@/components/dashboard/LendingPoolSection';
 import SwapPoolsSection from '@/components/dashboard/SwapPoolsSection';
 import LiquidationsSection from '@/components/dashboard/LiquidationsSection';
 import SafetyModuleSection from '@/components/dashboard/SafetyModuleSection';
-import MintWidget from '@/components/cdp/MintWidget';
+import MintPlanner from '@/components/cdp/MintPlanner';
 import VaultsList from '@/components/cdp/VaultsList';
 import LiquidationsView from '@/components/cdp/LiquidationsView';
 import BadDebtView from '@/components/cdp/BadDebtView';
+// New v2 components
+import Mint from '@/components/cdp/v2/Mint';
+import DebtPosition from '@/components/cdp/v2/DebtPosition';
 import { useCDP } from '@/context/CDPContext';
 import { CompactRewardsDisplay } from '@/components/rewards/CompactRewardsDisplay';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
+import { useUserTokens } from '@/context/UserTokensContext';
 
 const Advanced = () => {
   const [activeTab, setActiveTab] = useState<"lending" | "swap" | "liquidations" | "safety" | "mint">("mint");
@@ -22,15 +26,35 @@ const Advanced = () => {
   const [borrowActiveTab, setBorrowActiveTab] = useState('vaults');
   const { refreshVaults } = useCDP();
   const [vaultsRefreshTrigger, setVaultsRefreshTrigger] = useState(0);
-  const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
+  const [mintPlannerRefreshTrigger, setMintPlannerRefreshTrigger] = useState(0);
+  const { userRewards, loading: rewardsLoading, refetch: refetchRewards } = useRewardsUserInfo();
+  const { fetchTokens } = useUserTokens();
 
-  const handleBorrowSuccess = () => {
+  // Unified refresh function that refreshes ALL CDP components after any transaction
+  // This ensures MintPlanner, VaultsList, and MintWidget all have fresh data
+  const refreshAllCDPComponents = useCallback(async () => {
+    // Increment both triggers to refresh both MintPlanner and VaultsList
     setVaultsRefreshTrigger(prev => prev + 1);
-  };
-
-  const handleVaultActionSuccess = () => {
+    setMintPlannerRefreshTrigger(prev => prev + 1);
+    
+    // Refresh CDP context
     refreshVaults();
-  };
+    
+    // Refresh all related data in parallel
+    await Promise.all([
+      refetchRewards(),
+      fetchTokens(), // Token balances used by all components
+    ]);
+  }, [refreshVaults, refetchRewards, fetchTokens]);
+
+  // Use the unified refresh for all CDP component callbacks
+  const handleVaultActionSuccess = useCallback(async () => {
+    await refreshAllCDPComponents();
+  }, [refreshAllCDPComponents]);
+
+  const handleQuickMintSuccess = useCallback(async () => {
+    await refreshAllCDPComponents();
+  }, [refreshAllCDPComponents]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -81,15 +105,23 @@ const Advanced = () => {
                       </TabsTrigger>
                     </TabsList>
                     <TabsContent value="vaults">
-                      <div className="space-y-6">
-
-                        <div className="border border-border bg-card rounded-xl p-4 flex flex-col shadow-sm">
-                          <MintWidget onSuccess={handleBorrowSuccess} />
+                      <div className="flex flex-col lg:flex-row gap-6">
+                        {/* Left Column - Mint Section (New v2) */}
+                        <div className="w-full lg:w-[60%]">
+                          <Mint
+                            onSuccess={handleQuickMintSuccess}
+                            refreshTrigger={mintPlannerRefreshTrigger}
+                          />
                         </div>
-                        <VaultsList 
-                          refreshTrigger={vaultsRefreshTrigger} 
-                          onVaultActionSuccess={handleVaultActionSuccess}
-                        />
+
+                        {/* Right Column - Position and Vaults (New v2) */}
+                        <div className="w-full lg:w-[40%] space-y-6">
+                          <DebtPosition refreshTrigger={vaultsRefreshTrigger} />
+                          <VaultsList
+                            refreshTrigger={vaultsRefreshTrigger}
+                            onVaultActionSuccess={handleVaultActionSuccess}
+                          />
+                        </div>
                       </div>
                     </TabsContent>
                     <TabsContent value="bad-debt">
