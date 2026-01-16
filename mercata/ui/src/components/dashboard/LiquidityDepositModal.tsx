@@ -103,7 +103,7 @@ const LiquidityDepositModal = ({
   const handleClose = () => {
     setToken1Amount('');
     setToken2Amount('');
-    setDepositMode('A');
+    setDepositMode('A&B');
     setStakeLPToken(rewardsEnabled); // Reset to default based on rewardsEnabled
     onClose();
   };
@@ -408,7 +408,7 @@ const LiquidityDepositModal = ({
 
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Deposit Liquidity</DialogTitle>
