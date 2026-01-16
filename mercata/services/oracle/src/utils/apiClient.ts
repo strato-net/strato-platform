@@ -4,6 +4,13 @@ import { RetryConfig } from '../types';
 import { healthMonitor } from './healthMonitor';
 import { DEFAULT_RETRY_CONFIG } from './constants';
 
+export function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+    return Promise.race([
+        promise,
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Timeout')), ms))
+    ]);
+}
+
 function extractErrorMessage(error: any): string {
     // Extract error message from different API response formats
     if (error.response?.data) {

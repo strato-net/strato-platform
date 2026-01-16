@@ -2,8 +2,10 @@ import cron from 'node-cron';
 import { logInfo, logError, logFeedUpdate } from './utils/logger';
 import { fetchPrices, generateConstantPrices } from './adapters/genericRestAdapter';
 import { pushAssetPrices } from './utils/oraclePusher';
+import { checkBalances } from './utils/balanceChecker';
+import { withTimeout } from './utils/apiClient';
 import { ConfigLoader } from './utils/configLoader';
-import { SourceResult, AggregatedPrice } from './types';
+import { SourceResult, AggregatedPrice, SourceConfig } from './types';
 import { TIMEOUTS, ORACLE_CONFIG } from './utils/constants';
 
 // ============================================================================
@@ -49,51 +51,35 @@ export function getCronSchedule(): string {
 // Step 1: Fetch from All Sources
 // ============================================================================
 
+async function fetchSource(sourceName: string, sourceConfig: SourceConfig, configLoader: ConfigLoader): Promise<SourceResult> {
+    const startTime = Date.now();
+    try {
+        const fetchPromise = sourceName === 'constant'
+            ? Promise.resolve(generateConstantPrices(sourceConfig.assets, configLoader.getAllAssets()))
+            : fetchPrices(sourceConfig);
+        const prices = await withTimeout(fetchPromise, TIMEOUTS.FETCH);
+        return { sourceName, prices, success: true, duration: Date.now() - startTime };
+    } catch (err) {
+        const duration = Date.now() - startTime;
+        logError('CronScheduler', new Error(`${sourceName} failed (${duration}ms): ${(err as Error).message}`));
+        return { sourceName, prices: {}, success: false, duration };
+    }
+}
+
 async function fetchFromAllSources(configLoader: ConfigLoader): Promise<Map<string, SourceResult>> {
     const allSources = Object.entries(configLoader.getAllSourceConfigs());
+    const fetchResults = await Promise.all(
+        allSources.map(([name, config]) => fetchSource(name, config, configLoader))
+    );
+    
     const results = new Map<string, SourceResult>();
-    
-    // Wrap each fetch with its own timeout to capture partial results
-    const fetchPromises = allSources.map(async ([sourceName, sourceConfig]): Promise<SourceResult> => {
-        const startTime = Date.now();
-        
-        try {
-            const fetchPromise = (async () => {
-                if (sourceName === 'constant') {
-                    return generateConstantPrices(sourceConfig.assets, configLoader.getAllAssets());
-                }
-                return await fetchPrices(sourceConfig);
-            })();
-            
-            const prices = await Promise.race([
-                fetchPromise,
-                new Promise<never>((_, reject) => 
-                    setTimeout(() => reject(new Error('Timeout')), TIMEOUTS.FETCH)
-                )
-            ]);
-            
-            return { sourceName, prices, success: true, duration: Date.now() - startTime };
-        } catch (err) {
-            const duration = Date.now() - startTime;
-            logError('CronScheduler', new Error(`${sourceName} failed (${duration}ms): ${(err as Error).message}`));
-            return { sourceName, prices: {}, success: false, duration };
-        }
-    });
-    
-    // Wait for all fetches (each has its own timeout)
-    const fetchResults = await Promise.all(fetchPromises);
-    
-    // Store results and log summary
-    const succeeded: string[] = [];
-    const failed: string[] = [];
-    
+    const succeeded: string[] = [], failed: string[] = [];
     fetchResults.forEach(r => {
         results.set(r.sourceName, r);
         (r.success ? succeeded : failed).push(`${r.sourceName} (${r.duration}ms)`);
     });
     
     logInfo('CronScheduler', `${succeeded.length}/${allSources.length} sources: [${succeeded.join(', ')}]${failed.length ? `. Failed: [${failed.join(', ')}]` : ''}`);
-    
     return results;
 }
 
@@ -106,68 +92,47 @@ function aggregatePrices(
     sourceResults: Map<string, SourceResult>,
     marketClosed: boolean
 ): AggregatedPrice[] {
-    const allAssets = configLoader.getAllAssets();
-    const aggregated: AggregatedPrice[] = [];
-    
-    Object.keys(allAssets).forEach(assetKey => {
-        const asset = allAssets[assetKey];
+    return Object.entries(configLoader.getAllAssets()).map(([assetKey, asset]) => {
         const useProxy = asset.weekendProxy && marketClosed;
-        const fetchSymbol = useProxy ? asset.weekendProxy! : assetKey;
-        const expectedSources = useProxy 
-            ? configLoader.getSourcesForProxySymbol(fetchSymbol)
-            : configLoader.getSourcesForAsset(assetKey);
         const requiredSources = asset.constantPrice !== undefined ? 1 : ORACLE_CONFIG.MIN_VALID_SOURCES;
-        
-        if (useProxy) {
-            logInfo('CronScheduler', `${assetKey}: Using proxy ${fetchSymbol}`);
-        }
-        
-        // Collect prices from sources
-        const prices: number[] = [];
+        const weekdaySources = configLoader.getSourcesForAsset(assetKey);
         const sources: Array<{ name: string; price: number }> = [];
-        
-        expectedSources.forEach(sourceName => {
-            const result = sourceResults.get(sourceName);
-            const data = result?.success && result.prices[fetchSymbol];
-            if (data) {
-                prices.push(data.price);
-                sources.push({ name: sourceName, price: data.price });
-            }
-        });
-        
-        // Log missing sources
-        const missing = expectedSources.filter(s => !sources.some(src => src.name === s));
-        if (missing.length > 0) {
-            logError('CronScheduler', new Error(`Missing sources for ${assetKey}: [${missing.join(', ')}]`));
-        }
-        
-        // Validate and calculate median
-        if (prices.length >= requiredSources) {
-            aggregated.push({
-                assetKey,
-                medianPrice: calculateMedian(prices),
-                targetAddress: asset.targetAssetAddress,
-                sources,
-                expectedSourceCount: expectedSources.length
+        let expectedCount = weekdaySources.length;
+
+        const collect = (names: string[], symbol: string) => {
+            names.forEach(name => {
+                const data = sourceResults.get(name)?.success && sourceResults.get(name)?.prices[symbol];
+                if (data) sources.push({ name, price: data.price });
             });
+            return sources.length;
+        };
+
+        if (!useProxy) {
+            collect(weekdaySources, assetKey);
         } else {
-            logError('CronScheduler', new Error(
-                `Insufficient sources for ${assetKey}: got ${prices.length}, need ${requiredSources}`
-            ));
-            // Still add to array but mark as failed
-            aggregated.push({
-                assetKey,
-                medianPrice: 0,
-                targetAddress: asset.targetAssetAddress,
-                sources,
-                expectedSourceCount: expectedSources.length,
-                failed: true,
-                error: `Not enough sources (${prices.length}/${requiredSources})`
-            });
+            const ps = configLoader.getSourcesForProxySymbol(asset.weekendProxy!);
+            logInfo('CronScheduler', `${assetKey}: Using proxy ${asset.weekendProxy}`);
+            if (collect(ps, asset.weekendProxy!) >= requiredSources) {
+                expectedCount = ps.length;
+            } else {
+                logInfo('CronScheduler', `${assetKey}: Proxy insufficient, falling back`);
+                collect(weekdaySources, assetKey);
+                expectedCount = new Set([...ps, ...weekdaySources]).size;
+            }
         }
+        
+        const isValid = sources.length >= requiredSources;
+        if (!isValid) logError('CronScheduler', new Error(`Insufficient sources for ${assetKey}: got ${sources.length}, need ${requiredSources}`));
+        
+        return {
+            assetKey,
+            medianPrice: isValid ? calculateMedian(sources.map(s => s.price)) : 0,
+            targetAddress: asset.targetAssetAddress,
+            sources,
+            expectedSourceCount: expectedCount,
+            ...(isValid ? {} : { failed: true, error: `Not enough sources (${sources.length}/${requiredSources})` })
+        };
     });
-    
-    return aggregated;
 }
 
 // ============================================================================
@@ -175,6 +140,7 @@ function aggregatePrices(
 // ============================================================================
 
 async function processAllAssets(configLoader: ConfigLoader): Promise<void> {
+    await checkBalances();
     const marketClosed = isMetalsMarketClosed();
     const assetCount = Object.keys(configLoader.getAllAssets()).length;
     
@@ -183,27 +149,19 @@ async function processAllAssets(configLoader: ConfigLoader): Promise<void> {
     const sourceResults = await fetchFromAllSources(configLoader);
     const aggregatedPrices = aggregatePrices(configLoader, sourceResults, marketClosed);
     
-    // Filter out failed assets for submission
-    const validPrices = aggregatedPrices.filter(p => !p.failed);
-    const failedPrices = aggregatedPrices.filter(p => p.failed);
+    // Partition into valid and failed prices in single pass
+    const validPrices: AggregatedPrice[] = [];
+    const failedPrices: AggregatedPrice[] = [];
+    aggregatedPrices.forEach(p => (p.failed ? failedPrices : validPrices).push(p));
     
     if (validPrices.length === 0) {
         throw new Error('No valid prices to submit');
     }
     
-    const submittingAssets = validPrices.map(p => p.assetKey).join(', ');
-    const skippedAssets = failedPrices.map(p => p.assetKey).join(', ');
+    const skipped = failedPrices.length ? `. Skipped ${failedPrices.length}: [${failedPrices.map(p => p.assetKey).join(', ')}]` : '';
+    logInfo('CronScheduler', `Submitting ${validPrices.length} prices: [${validPrices.map(p => p.assetKey).join(', ')}]${skipped}`);
     
-    if (failedPrices.length > 0) {
-        logInfo('CronScheduler', `Submitting ${validPrices.length} prices: [${submittingAssets}]. Skipped ${failedPrices.length}: [${skippedAssets}]`);
-    } else {
-        logInfo('CronScheduler', `Submitting ${validPrices.length} prices: [${submittingAssets}]`);
-    }
-    
-    const result = await pushAssetPrices(
-        validPrices.map(p => p.targetAddress),
-        validPrices.map(p => p.medianPrice)
-    );
+    const result = await pushAssetPrices(validPrices);
     
     // Log all prices (including failed ones)
     aggregatedPrices.forEach(p => logFeedUpdate(p.assetKey, p.medianPrice, p.sources, p.expectedSourceCount, result.hash, p.failed, p.error));
