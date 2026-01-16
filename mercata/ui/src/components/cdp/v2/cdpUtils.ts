@@ -1,7 +1,6 @@
 import { formatUnits } from 'ethers';
 import { formatNumberWithCommas, parseUnitsWithTruncation } from '@/utils/numberUtils';
-import type { PlanItem } from '@/services/cdpTypes';
-import type { VaultCandidate } from '@/services/MintService';
+import type { VaultCandidate, Allocation } from '@/components/cdp/v2/cdpTypes';
 
 // ============================================================================
 // Constants
@@ -208,63 +207,48 @@ export const parseInputToWei = (input: string): bigint => {
   }
 };
 
-// Allocation conversion utilities
-export function allocationToPlanItem(
-  allocation: { assetAddress: string; depositAmount: bigint; mintAmount: bigint },
-  candidate: VaultCandidate
-): PlanItem {
-  const decimals = candidate.assetScale.toString().length - 1;
-  const depositAmountUSDWei = (allocation.depositAmount * candidate.oraclePrice) / candidate.assetScale;
-  const existingCollateralUSDWei = (candidate.currentCollateral * candidate.oraclePrice) / candidate.assetScale;
-  const userBalanceUSDWei = (candidate.potentialCollateral * candidate.oraclePrice) / candidate.assetScale;
-  
-  return {
-    assetAddress: allocation.assetAddress,
-    symbol: candidate.symbol,
-    depositAmount: formatUnits(allocation.depositAmount, decimals),
-    depositAmountUSD: formatUnits(depositAmountUSDWei, 18),
-    mintAmount: formatUnits(allocation.mintAmount, 18),
-    stabilityFeeRate: convertStabilityFeeRateToAnnualPercentage(candidate.stabilityFeeRate),
-    existingCollateralUSD: formatUnits(existingCollateralUSDWei, 18),
-    userBalance: formatUnits(candidate.potentialCollateral, decimals),
-    userBalanceUSD: formatUnits(userBalanceUSDWei, 18),
-  };
-}
-
-export function convertAllocationsToPlanItems(
-  allocations: { assetAddress: string; depositAmount: bigint; mintAmount: bigint }[],
+// Allocation utilities
+export function addAllocationsToVaultCandidates(
+  allocations: Allocation[],
   candidates: VaultCandidate[]
-): PlanItem[] {
-  return allocations
+): VaultCandidate[] {
+  const result = allocations
     .map(allocation => {
-      const candidate = candidates.find(c => c.assetAddress === allocation.assetAddress);
-      return candidate ? allocationToPlanItem(allocation, candidate) : null;
+      const candidate = candidates.find(c => c.vaultConfig.assetAddress === allocation.assetAddress);
+      return candidate ? { ...candidate, allocation } : null;
     })
-    .filter((item): item is PlanItem => item !== null)
-    .sort((a, b) => a.stabilityFeeRate - b.stabilityFeeRate);
+    .filter((item) => item !== null) as VaultCandidate[];
+  
+  return result.sort((a, b) => {
+    const aRate = parseFloat(formatUnits(a.vaultConfig.stabilityFeeRate, 18));
+    const bRate = parseFloat(formatUnits(b.vaultConfig.stabilityFeeRate, 18));
+    return aRate - bRate;
+  });
 }
 
 // Fee calculation utilities
-export const calculateTransactionCount = (optimalAllocations: PlanItem[]): number => {
-  return optimalAllocations.reduce((count, a) => {
-    const hasDeposit = a.depositAmount && a.depositAmount !== '0' && parseFloat(a.depositAmount) > 0;
-    const hasMint = a.mintAmount && a.mintAmount !== '0' && parseFloat(a.mintAmount) > 0;
+export const calculateTransactionCount = (vaultCandidates: VaultCandidate[]): number => {
+  return vaultCandidates.reduce((count, v) => {
+    const hasDeposit = v.allocation && v.allocation.depositAmount > 0n;
+    const hasMint = v.allocation && v.allocation.mintAmount > 0n;
     return count + (hasDeposit ? 1 : 0) + (hasMint ? 1 : 0);
   }, 0);
 };
 
-export const calculateTotalFees = (optimalAllocations: PlanItem[]): number => {
-  return optimalAllocations.reduce((fees, a) => {
-    const hasDeposit = a.depositAmount && a.depositAmount !== '0' && parseFloat(a.depositAmount) > 0;
-    const hasMint = a.mintAmount && a.mintAmount !== '0' && parseFloat(a.mintAmount) > 0;
+export const calculateTotalFees = (vaultCandidates: VaultCandidate[]): number => {
+  return vaultCandidates.reduce((fees, v) => {
+    const hasDeposit = v.allocation && v.allocation.depositAmount > 0n;
+    const hasMint = v.allocation && v.allocation.mintAmount > 0n;
     return fees + (hasDeposit ? DEPOSIT_FEE_USDST : 0) + (hasMint ? MINT_FEE_USDST : 0);
   }, 0);
 };
 
 // Amount calculation utilities
-export const calculateTotalMaxMintWei = (maxAllocations: PlanItem[]): bigint => {
-  // Use parseUnitsWithTruncation to handle mint amounts with too many decimal places
-  return maxAllocations.reduce((sum, a) => sum + parseUnitsWithTruncation(a.mintAmount, 18), 0n);
+export const calculateTotalMaxMintWei = (vaultCandidates: VaultCandidate[]): bigint => {
+  // mintAmount is already in wei format (bigint)
+  return vaultCandidates.reduce((sum, v) => {
+    return sum + (v.allocation?.mintAmount || 0n);
+  }, 0n);
 };
 
 export const calculateAvailableToMint = (totalMaxMintWei: bigint): string => {
@@ -277,15 +261,17 @@ export const calculateAvailableToMint = (totalMaxMintWei: bigint): string => {
 };
 
 // APR calculation utilities
-export const calculateWeightedAverageAPR = (optimalAllocations: PlanItem[]): number => {
-  if (optimalAllocations.length === 0) return 0;
+export const calculateWeightedAverageAPR = (vaultCandidates: VaultCandidate[]): number => {
+  if (vaultCandidates.length === 0) return 0;
   let totalMint = 0, weightedSum = 0;
   
-  for (const a of optimalAllocations) {
-    const mint = parseFloat(a.mintAmount);
-    if (isFinite(mint) && isFinite(a.stabilityFeeRate) && mint > 0 && a.stabilityFeeRate >= 0) {
+  for (const v of vaultCandidates) {
+    if (!v.allocation) continue;
+    const mint = parseFloat(formatUnits(v.allocation.mintAmount, 18));
+    const feeRate = parseFloat(formatUnits(v.vaultConfig.stabilityFeeRate, 18)) * 100; // Convert to percentage
+    if (isFinite(mint) && isFinite(feeRate) && mint > 0 && feeRate >= 0) {
       totalMint += mint;
-      weightedSum += mint * a.stabilityFeeRate;
+      weightedSum += mint * feeRate;
     }
   }
   
@@ -294,12 +280,17 @@ export const calculateWeightedAverageAPR = (optimalAllocations: PlanItem[]): num
 };
 
 // Collateral calculation utilities
-export const calculateTotalCollateralValue = (optimalAllocations: PlanItem[]): number => {
+export const calculateTotalCollateralValue = (
+  vaultCandidates: VaultCandidate[]
+): number => {
   let total = 0;
-  optimalAllocations.forEach(alloc => {
-    const depositAmount = parseFloat(alloc.depositAmount || '0');
-    if (depositAmount > 0) {
-      total += parseFloat(alloc.depositAmountUSD || '0');
+  vaultCandidates.forEach(candidate => {
+    if (candidate.allocation && candidate.allocation.depositAmount > 0n) {
+      // Calculate USD value on-the-fly
+      const depositAmountUSD = parseFloat(
+        formatUnits((candidate.allocation.depositAmount * candidate.oraclePrice) / candidate.vaultConfig.unitScale, 18)
+      );
+      total += depositAmountUSD;
     }
   });
   return total;
@@ -317,7 +308,7 @@ export const calculatePositionMetrics = (
   positions: Array<{
     debtAmount: string;
     collateralValueUSD: string;
-    stabilityFeeRate: number;
+    stabilityFeeRate: number;  // Note: this is decimal percentage, not wei
     liquidationRatio: number;
     collateralizationRatio: number;
   }>,
@@ -412,7 +403,7 @@ export const calculateAggregateHealthFactor = (
     depositAmount: number; // New deposit to add (in token units)
     mintAmount: number; // New mint to add (in USDST)
     oraclePrice: bigint;
-    assetScale: bigint;
+    unitScale: bigint;
     liquidationRatio: bigint;
     decimals: number; // Token decimals for parsing deposit
   }>
@@ -436,7 +427,7 @@ export const calculateAggregateHealthFactor = (
     const totalCollateral = vault.currentCollateral + depositWei;
     
     // Calculate collateral value in USD
-    const collateralValueUSD = (totalCollateral * vault.oraclePrice) / vault.assetScale;
+    const collateralValueUSD = (totalCollateral * vault.oraclePrice) / vault.unitScale;
     const collateralUSD = parseFloat(formatUnits(collateralValueUSD, 18));
     const debtUSD = parseFloat(formatUnits(totalDebt, 18));
     
@@ -494,11 +485,11 @@ export const calculateSliderMinHF = (
   if (vaultCandidates.length === 0) return 1.0;
   
   // Find max minCR from all vault candidates (minCR is in WAD format)
-  const maxMinCRWad = vaultCandidates.reduce((max, v) => v.minCR > max ? v.minCR : max, 0n);
+  const maxMinCRWad = vaultCandidates.reduce((max, v) => v.vaultConfig.minCR > max ? v.vaultConfig.minCR : max, 0n);
   const maxMinCRPercent = Number(maxMinCRWad) / Number(WAD) * 100; // Convert to percentage
   
   // Find max liquidation ratio from all vault candidates (liquidationRatio is in WAD format)
-  const maxLRWad = vaultCandidates.reduce((max, v) => v.liquidationRatio > max ? v.liquidationRatio : max, 0n);
+  const maxLRWad = vaultCandidates.reduce((max, v) => v.vaultConfig.liquidationRatio > max ? v.vaultConfig.liquidationRatio : max, 0n);
   const maxLT = Number(maxLRWad) / Number(WAD) * 100; // Convert to percentage
   
   if (maxLT <= 0) return 1.0;

@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import MintAmountInput from './MintAmountInput';
 import HFSlider from './HFSlider';
-import { formatPercentage } from '@/utils/loanUtils';
+import { formatPercentage } from '@/components/cdp/v2/cdpUtils';
 
 interface LoanFormProps {
   // Label configuration

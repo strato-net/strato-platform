@@ -1,4 +1,4 @@
-export interface VaultData {
+export interface Vault {
   asset: string;                               // Collateral asset address
   symbol: string;                              // Asset symbol (e.g., "ETH", "WBTC")
   collateralAmount: string;                    // Raw integer string (wei format)
@@ -34,19 +34,19 @@ export interface AssetConfig {
 // ============================================================================
 
 /**
- * PlanItem for UI display (decimal values)
- * Derived from Allocation with decimal string values for display
+ * PlanItem for UI display (wei values for precision)
+ * Stores raw wei amounts as strings for precision calculations
+ * Wei members use native token decimals (e.g., 18 for ETH, 8 for WBTC)
+ * USD values are calculated on-the-fly from wei amounts and oracle prices
  */
 export interface PlanItem {
   assetAddress: string;
   symbol: string;
-  depositAmount: string;
-  depositAmountUSD: string;
-  mintAmount: string;
-  stabilityFeeRate: number;
-  existingCollateralUSD: string;
-  userBalance: string;
-  userBalanceUSD: string;
+  depositAmountWei: string;              // Deposit amount in wei (native token decimals)
+  mintAmountWei: string;                 // Mint amount in wei (18 decimals for USDST)
+  stabilityFeeRateWei: string;           // Annual stability fee rate in wei (18 decimals, e.g., 0.05e18 = 5%)
+  existingCollateralWei: string;         // Existing collateral in vault in wei (native token decimals)
+  userBalanceWei: string;                // User's available balance in wei (native token decimals)
 }
 
 export interface TransactionResponse {

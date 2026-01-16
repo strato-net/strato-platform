@@ -13,8 +13,8 @@ import VaultsList from '@/components/cdp/VaultsList';
 import LiquidationsView from '@/components/cdp/LiquidationsView';
 import BadDebtView from '@/components/cdp/BadDebtView';
 // New v2 components
-import Mint from '@/components/cdp/v2/Mint';
-import DebtPosition from '@/components/cdp/v2/DebtPosition';
+import Mint from '@/components/cdp/v2/components/Mint/Mint';
+import DebtPosition from '@/components/cdp/v2/components/DebtPosition';
 import { useCDP } from '@/context/CDPContext';
 import { CompactRewardsDisplay } from '@/components/rewards/CompactRewardsDisplay';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';

@@ -6,16 +6,16 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useOracleContext } from '@/context/OracleContext';
 import { cdpService } from '@/services/cdpService';
-import { getOptimalAllocations, computeTotalHeadroom, getMaxAllocations, getAbsoluteMaxAllocations, type VaultCandidate } from '@/services/MintService';
-import type { PlanItem } from '@/services/cdpTypes';
+import { getOptimalAllocations, computeTotalHeadroom, getMaxAllocations, getAbsoluteMaxAllocations } from '@/components/cdp/v2/MintService';
+import type { VaultCandidate, Allocation } from '@/components/cdp/v2/cdpTypes';
 import { formatUnits, parseUnits } from 'ethers';
 import { formatNumberWithCommas, parseCommaNumber } from '@/utils/numberUtils';
 import { useToast } from '@/hooks/use-toast';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 import { CompactRewardsDisplay } from '@/components/rewards/CompactRewardsDisplay';
-import MintProgressModal, { type MintStep } from '../MintProgressModal';
+import MintProgressModal, { type MintStep } from '../../../MintProgressModal';
 import LoanForm from './LoanForm';
-import Allocation from './Allocation';
+import VaultBreakdown from './VaultBreakdown';
 import {
   SAFETY_BUFFER_BPS,
   BPS_SCALE,
@@ -23,7 +23,7 @@ import {
   MINT_FEE_USDST,
   formatUSD,
   parseInputToWei,
-  convertAllocationsToPlanItems,
+  addAllocationsToVaultCandidates,
   calculateTransactionCount,
   calculateTotalFees,
   calculateTotalMaxMintWei,
@@ -32,8 +32,9 @@ import {
   calculateSliderMinHF,
   calculatePositionMetrics,
   calculateAggregateHealthFactor,
-} from '@/utils/loanUtils';
+} from '@/components/cdp/v2/cdpUtils';
 import { formatWeiToDecimalHP } from '@/utils/numberUtils';
+import { UNITS, USD, DECIMAL, ADDRESS } from '@/components/cdp/v2/cdpTypes';
 
 interface MintProps {
   onSuccess?: () => void;
@@ -42,7 +43,7 @@ interface MintProps {
 
 const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   const [mintAmountInput, setMintAmountInput] = useState('');
-  const [riskBuffer, setRiskBuffer] = useState(2.1);
+  const [riskBuffer, setRiskBuffer] = useState<DECIMAL>(2.1);
   const [isMaxMode, setIsMaxMode] = useState(false);
   const [vaultCandidates, setVaultCandidates] = useState<VaultCandidate[]>([]);
   const [loading, setLoading] = useState(false);
@@ -60,7 +61,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   }>>([]);
   const [progressError, setProgressError] = useState<string | undefined>();
   const [autoSupplyCollateral, setAutoSupplyCollateral] = useState(true);
-  const [currentPositionHF, setCurrentPositionHF] = useState<number | undefined>(undefined);
+  const [currentPositionHF, setCurrentPositionHF] = useState<DECIMAL | undefined>(undefined);
   const [shouldRefreshOnClose, setShouldRefreshOnClose] = useState(false);
 
   const navigate = useNavigate();
@@ -85,7 +86,9 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   const fetchVaultCandidates = useCallback(async () => {
     try {
       const { existingVaults, potentialVaults } = await cdpService.getVaultCandidates();
-      setVaultCandidates([...existingVaults, ...potentialVaults]);
+      const candidates = [...existingVaults, ...potentialVaults];
+      console.log('[Mint] vaultCandidates arrived:', candidates);
+      setVaultCandidates(candidates);
     } catch {
       setVaultCandidates([]);
     }
@@ -94,6 +97,10 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   useEffect(() => {
     fetchVaultCandidates();
   }, [fetchVaultCandidates, refreshTrigger]);
+
+  useEffect(() => {
+    console.log('[Mint] vaultCandidates changed:', vaultCandidates);
+  }, [vaultCandidates]);
 
   useEffect(() => {
     setLoading(true);
@@ -126,14 +133,14 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     fetchCurrentPosition();
   }, [refreshTrigger]);
 
-  const mintAmount = useMemo(() => {
+  const mintAmount: USD = useMemo(() => {
     const parsed = parseFloat((mintAmountInput || '').replace(/,/g, ''));
     return isFinite(parsed) && parsed > 0 ? parsed : 0;
   }, [mintAmountInput]);
 
   const mintAmountWei = useMemo(() => parseInputToWei(mintAmountInput), [mintAmountInput]);
 
-  const maxAllocations = useMemo<PlanItem[]>(() => {
+  const maxAllocations = useMemo<VaultCandidate[]>(() => {
     if (vaultCandidates.length === 0) return [];
     try {
       // When slider is at minimum HF (rightmost), use absolute max calculation
@@ -142,38 +149,49 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
       const result = isAtMinHF 
         ? getAbsoluteMaxAllocations(vaultCandidates)
         : getMaxAllocations(vaultCandidates, riskBuffer);
-      return convertAllocationsToPlanItems(result, vaultCandidates);
+      return addAllocationsToVaultCandidates(result, vaultCandidates);
     } catch {
       return [];
     }
   }, [riskBuffer, sliderMinHF, vaultCandidates]);
 
   // Store allocations - updated by auto-supply or manual edits
-  const [customAllocations, setCustomAllocations] = useState<PlanItem[]>([]);
+  // Optimal allocations computed from MintService (auto mode)
+  const [optimalAllocations, setOptimalAllocations] = useState<VaultCandidate[]>([]);
+  // Custom allocations from UI edits (manual mode)
+  const [customAllocations, setCustomAllocations] = useState<VaultCandidate[]>([]);
   const [debtFloorHit, setDebtFloorHit] = useState(false);
   const [debtCeilingHit, setDebtCeilingHit] = useState(false);
   const [hasLowHF, setHasLowHF] = useState(false);
   const [exceedsBalance, setExceedsBalance] = useState(false);
   const [totalManualMint, setTotalManualMint] = useState('0');
   const [exceedsMaxMint, setExceedsMaxMint] = useState(false);
-  const [mintMaxVaults, setMintMaxVaults] = useState<Set<string>>(new Set()); // Vaults that should use mintMax
+  const [mintMaxVaults, setMintMaxVaults] = useState<Set<ADDRESS>>(new Set()); // Vaults that should use mintMax
 
-  // Compute fresh allocations when auto-supply is enabled
+  // Compute optimal allocations from MintService when auto-supply is enabled
   useEffect(() => {
     if (!autoSupplyCollateral) {
-      // Manual mode: keep existing allocations (don't clear) so users can see and adjust them
+      // Manual mode: keep optimal allocations as-is (don't recompute)
       return;
     }
 
     if (isMaxMode) {
-      setCustomAllocations(maxAllocations);
+      console.log('[Mint] optimalAllocations updated (max mode from MintService):', {
+        maxAllocations: maxAllocations.map(v => ({
+          assetAddress: v.vaultConfig.assetAddress,
+          symbol: v.vaultConfig.symbol,
+          depositAmount: v.allocation?.depositAmount?.toString(),
+          mintAmount: v.allocation?.mintAmount?.toString(),
+        })),
+      });
+      setOptimalAllocations(maxAllocations);
       setDebtFloorHit(false);
       setDebtCeilingHit(false);
       
       // In max mode, mark ALL vaults as mintMax to use on-chain mintMax() for absolute maximum
       const maxVaultAddresses = maxAllocations
-        .filter(alloc => parseFloat(alloc.mintAmount || '0') > 0)
-        .map(alloc => alloc.assetAddress);
+        .filter(v => v.allocation && v.allocation.mintAmount > 0n)
+        .map(v => v.vaultConfig.assetAddress);
       setMintMaxVaults(new Set(maxVaultAddresses));
       return;
     }
@@ -182,7 +200,8 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     setMintMaxVaults(new Set());
     
     if (mintAmountWei <= 0n || vaultCandidates.length === 0) {
-      setCustomAllocations([]);
+      console.log('[Mint] optimalAllocations cleared (no mint amount or no candidates)');
+      setOptimalAllocations([]);
       setDebtFloorHit(false);
       setDebtCeilingHit(false);
       return;
@@ -190,84 +209,78 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     
     try {
       const result = getOptimalAllocations(mintAmountWei, riskBuffer, vaultCandidates);
-      const allocations = convertAllocationsToPlanItems(result.allocations, vaultCandidates);
-      setCustomAllocations(allocations);
+      const candidatesWithAllocations = addAllocationsToVaultCandidates(result.allocations, vaultCandidates);
+      console.log('[Mint] optimalAllocations updated (computed from MintService):', {
+        mintAmountWei: mintAmountWei.toString(),
+        riskBuffer,
+        allocations: candidatesWithAllocations.map(v => ({
+          assetAddress: v.vaultConfig.assetAddress,
+          symbol: v.vaultConfig.symbol,
+          depositAmount: v.allocation?.depositAmount?.toString(),
+          mintAmount: v.allocation?.mintAmount?.toString(),
+        })),
+      });
+      setOptimalAllocations(candidatesWithAllocations);
       setDebtFloorHit(result.debtFloorHit);
       setDebtCeilingHit(result.debtCeilingHit);
     } catch {
-      setCustomAllocations([]);
+      console.log('[Mint] optimalAllocations cleared (error computing allocations)');
+      setOptimalAllocations([]);
       setDebtFloorHit(false);
       setDebtCeilingHit(false);
     }
   }, [mintAmountWei, riskBuffer, vaultCandidates, isMaxMode, maxAllocations, autoSupplyCollateral]);
 
-  // Check for debt floor/ceiling violations in manual mode
+  // Initialize customAllocations from optimalAllocations when switching to manual mode
   useEffect(() => {
-    // Only check in manual mode - auto mode handles this in the allocation algorithm
-    if (autoSupplyCollateral) {
-      return;
+    if (!autoSupplyCollateral && optimalAllocations.length > 0 && customAllocations.length === 0) {
+      console.log('[Mint] Initializing customAllocations from optimalAllocations (switching to manual mode):', {
+        optimalAllocations: optimalAllocations.map(v => ({
+          assetAddress: v.vaultConfig.assetAddress,
+          symbol: v.vaultConfig.symbol,
+          depositAmount: v.allocation?.depositAmount?.toString(),
+          mintAmount: v.allocation?.mintAmount?.toString(),
+        })),
+      });
+      setCustomAllocations(optimalAllocations);
     }
+  }, [autoSupplyCollateral, optimalAllocations, customAllocations.length]);
 
-    let hasFloorHit = false;
-    let hasCeilingHit = false;
-
-    // Check each allocation against vault constraints
-    for (const allocation of customAllocations) {
-      const candidate = vaultCandidates.find(v => v.assetAddress === allocation.assetAddress);
-      if (!candidate) continue;
-
-      const mintAmount = parseFloat(allocation.mintAmount || '0');
-      if (mintAmount <= 0) continue;
-
-      // Convert mint amount to wei for comparison
-      const mintWei = parseUnits(mintAmount.toString(), 18);
-      const newTotalDebt = candidate.currentDebt + mintWei;
-
-      // Check debt floor: newTotalDebt must be 0 OR >= debtFloor
-      if (newTotalDebt > 0n && newTotalDebt < candidate.debtFloor) {
-        hasFloorHit = true;
-      }
-
-      // Check debt ceiling: newTotalDebt must be <= debtCeiling (if debtCeiling > 0)
-      if (candidate.debtCeiling > 0n && newTotalDebt > candidate.debtCeiling) {
-        hasCeilingHit = true;
-      }
-    }
-
-    setDebtFloorHit(hasFloorHit);
-    setDebtCeilingHit(hasCeilingHit);
-  }, [customAllocations, vaultCandidates, autoSupplyCollateral]);
-
-  // Use customAllocations as the source of truth
-  const optimalAllocations = customAllocations;
+  // Unified allocations: use optimal when auto mode, custom when manual mode
+  const allocations = autoSupplyCollateral ? optimalAllocations : customAllocations;
 
   // Calculate aggregate HF for projected position (current + planned deposits/mints)
   // Uses the same calculation as DebtPosition.tsx and Allocation.tsx
   const averageVaultHealth = useMemo(() => {
-    if (!autoSupplyCollateral || vaultCandidates.length === 0 || optimalAllocations.length === 0) {
+    if (!autoSupplyCollateral || vaultCandidates.length === 0 || allocations.length === 0) {
       return null;
     }
 
     // Build vault data for all vaults with debt or planned changes
     const vaultData = vaultCandidates.map(candidate => {
-      const allocation = optimalAllocations.find(a => a.assetAddress === candidate.assetAddress);
-      const depositAmt = parseFloat(allocation?.depositAmount || '0');
-      const mintAmt = parseFloat(allocation?.mintAmount || '0');
-      
+      const withAllocation = allocations.find(v => v.vaultConfig.assetAddress === candidate.vaultConfig.assetAddress);
+      const decimals = candidate.vaultConfig.unitScale.toString().length - 1;
+      const depositAmt: DECIMAL = withAllocation?.allocation 
+        ? parseFloat(formatUnits(withAllocation.allocation.depositAmount, decimals))
+        : 0;
+      const mintAmt: DECIMAL = withAllocation?.allocation 
+        ? parseFloat(formatUnits(withAllocation.allocation.mintAmount, 18))
+        : 0;
+
       return {
         currentCollateral: candidate.currentCollateral,
         currentDebt: candidate.currentDebt,
         depositAmount: depositAmt,
         mintAmount: mintAmt,
         oraclePrice: candidate.oraclePrice,
-        assetScale: candidate.assetScale,
-        liquidationRatio: candidate.liquidationRatio,
-        decimals: candidate.assetScale.toString().length - 1,
+        unitScale: candidate.vaultConfig.unitScale,
+        liquidationRatio: candidate.vaultConfig.liquidationRatio,
+        decimals,
       };
     }).filter(v => v.currentDebt > 0n || v.depositAmount > 0 || v.mintAmount > 0);
 
     return calculateAggregateHealthFactor(vaultData);
-  }, [autoSupplyCollateral, vaultCandidates, optimalAllocations]);
+  }, [autoSupplyCollateral, vaultCandidates, allocations]);
 
   const totalHeadroomWei = useMemo(() => 
     vaultCandidates.length === 0 ? 0n : computeTotalHeadroom(riskBuffer, vaultCandidates),
@@ -301,16 +314,16 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   }, [isMaxMode, totalMaxMintWei, riskBuffer]);
 
   const weightedAverageAPR = useMemo(() => 
-    calculateWeightedAverageAPR(optimalAllocations),
-  [optimalAllocations]);
+    calculateWeightedAverageAPR(allocations),
+  [allocations]);
 
   const transactionCount = useMemo(() => 
-    calculateTransactionCount(optimalAllocations),
-  [optimalAllocations]);
+    calculateTransactionCount(allocations),
+  [allocations]);
 
   const totalFees = useMemo(() => 
-    calculateTotalFees(optimalAllocations),
-  [optimalAllocations]);
+    calculateTotalFees(allocations),
+  [allocations]);
 
   const handleMaxClick = useCallback(() => {
     if (isMaxMode) {
@@ -324,8 +337,8 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   }, [totalMaxMintWei, isMaxMode]);
 
   const handleQuickMint = useCallback(async () => {
-    const effectiveMintAmount = autoSupplyCollateral ? mintAmount : parseFloat(totalManualMint);
-    if (effectiveMintAmount <= 0 || optimalAllocations.length === 0) {
+    const effectiveMintAmount: DECIMAL = autoSupplyCollateral ? mintAmount : parseFloat(totalManualMint);
+    if (effectiveMintAmount <= 0 || allocations.length === 0) {
       return;
     }
     setTransactionLoading(true);
@@ -336,27 +349,73 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     try {
       // Use the exact displayed allocations - no recalculation to avoid precision drift
       // Build transactions in execution order: all deposits first, then all mints
-      const transactions: Array<{ type: 'deposit' | 'mint'; asset: string; amount: string; symbol: string }> = [];
+      const transactions: Array<{ type: 'deposit' | 'mint'; asset: ADDRESS; amount: string; symbol: string }> = [];
       
       // First, add all deposits
-      for (const allocation of optimalAllocations) {
-        const depositNum = parseFloat(allocation.depositAmount || '0');
-        const hasDeposit = allocation.depositAmount && depositNum > 0;
-        
+      for (const candidate of allocations) {
+        if (!candidate.allocation) continue;
+        const hasDeposit = candidate.allocation.depositAmount > 0n;
+
         if (hasDeposit) {
-          transactions.push({ type: 'deposit', asset: allocation.assetAddress, amount: allocation.depositAmount, symbol: allocation.symbol });
+          const depositWei = candidate.allocation.depositAmount.toString();
+          console.log('[Mint] 📊 DEPOSIT VALUE - Sending to backend:', {
+            assetAddress: candidate.vaultConfig.assetAddress,
+            symbol: candidate.vaultConfig.symbol,
+            depositWei,
+            depositWeiType: typeof depositWei,
+            note: 'Raw wei value sent directly to backend (no decimal conversion)'
+          });
+          transactions.push({ type: 'deposit', asset: candidate.vaultConfig.assetAddress, amount: depositWei, symbol: candidate.vaultConfig.symbol });
         }
       }
-      
+
       // Then, add all mints
-      for (const allocation of optimalAllocations) {
-        const mintNum = parseFloat(allocation.mintAmount || '0');
-        const hasMint = allocation.mintAmount && mintNum > 0;
-        
+      for (const candidate of allocations) {
+        if (!candidate.allocation) continue;
+        const hasMint = candidate.allocation.mintAmount > 0n;
+
         if (hasMint) {
-          transactions.push({ type: 'mint', asset: allocation.assetAddress, amount: allocation.mintAmount, symbol: allocation.symbol });
+          const mintWei = candidate.allocation.mintAmount.toString();
+          console.log('[Mint] 📊 MINT VALUE - Sending to backend:', {
+            assetAddress: candidate.vaultConfig.assetAddress,
+            symbol: candidate.vaultConfig.symbol,
+            mintWei,
+            mintWeiType: typeof mintWei,
+            note: 'Raw wei value sent directly to backend (no decimal conversion)'
+          });
+          transactions.push({ type: 'mint', asset: candidate.vaultConfig.assetAddress, amount: mintWei, symbol: candidate.vaultConfig.symbol });
         }
       }
+
+      console.log('[Mint] Transactions built for backend (Confirm Mint clicked):', {
+        effectiveMintAmount,
+        autoSupplyCollateral,
+        allocationSource: autoSupplyCollateral ? 'optimalAllocations (from MintService)' : 'customAllocations (from UI)',
+        mintMaxVaults: Array.from(mintMaxVaults),
+        transactions: transactions.map(tx => ({
+          type: tx.type,
+          asset: tx.asset,
+          amount: tx.amount,
+          symbol: tx.symbol,
+          willUseMintMax: tx.type === 'mint' && mintMaxVaults.has(tx.asset),
+        })),
+        backendPayloads: transactions.map(tx => {
+          if (tx.type === 'deposit') {
+            return {
+              endpoint: '/cdp/deposit',
+              payload: { asset: tx.asset, amount: tx.amount },
+              note: 'amount is raw wei string (no conversion needed)',
+            };
+          } else {
+            const useMintMax = mintMaxVaults.has(tx.asset);
+            return {
+              endpoint: useMintMax ? '/cdp/mint-max' : '/cdp/mint',
+              payload: useMintMax ? { asset: tx.asset } : { asset: tx.asset, amount: tx.amount },
+              note: useMintMax ? 'uses on-chain mintMax()' : 'amount is raw wei string (no conversion needed)',
+            };
+          }
+        }),
+      });
 
       if (transactions.length === 0) {
         setTransactionLoading(false);
@@ -364,12 +423,31 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
         return;
       }
 
-      setProgressTransactions(transactions.map(tx => ({
-        symbol: tx.symbol,
-        type: tx.type,
-        amount: tx.amount,
-        status: 'pending' as const,
-      })));
+      // Convert wei amounts to decimals for display in progress modal
+      setProgressTransactions(transactions.map(tx => {
+        let displayAmount: string;
+        
+        if (tx.type === 'deposit') {
+          // Find the candidate to get decimals
+          const candidate = allocations.find(c => c.vaultConfig.assetAddress === tx.asset);
+          if (candidate) {
+            const decimals = candidate.vaultConfig.unitScale.toString().length - 1;
+            displayAmount = formatUnits(tx.amount, decimals);
+          } else {
+            displayAmount = tx.amount; // Fallback to wei if candidate not found
+          }
+        } else {
+          // Mint amounts are always 18 decimals (USDST)
+          displayAmount = formatUnits(tx.amount, 18);
+        }
+        
+        return {
+          symbol: tx.symbol,
+          type: tx.type,
+          amount: displayAmount, // Display decimal amount
+          status: 'pending' as const,
+        };
+      }));
 
       let allSuccessful = true;
       let currentTxIndex = 0;
@@ -388,7 +466,14 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
         });
 
         try {
-          const result = await cdpService.deposit(tx.asset, tx.amount);
+          console.log('[Mint] Sending deposit to backend:', {
+            endpoint: '/cdp/deposit',
+            payload: { asset: tx.asset, amount: tx.amount, isWei: true },
+            symbol: tx.symbol,
+            amountType: typeof tx.amount,
+            note: 'amount is raw wei string (sent directly to blockchain)',
+          });
+          const result = await cdpService.deposit(tx.asset, tx.amount, true); // true = isWei
           if (result.status.toLowerCase() !== 'success') {
             allSuccessful = false;
             setProgressTransactions(prev => {
@@ -448,9 +533,26 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
           // Otherwise use exact amount for manual inputs
           const useMintMax = mintMaxVaults.has(tx.asset);
           
+          if (useMintMax) {
+            console.log('[Mint] Sending mintMax to backend:', {
+              endpoint: '/cdp/mint-max',
+              payload: { asset: tx.asset },
+              symbol: tx.symbol,
+              note: 'uses on-chain mintMax() contract function',
+            });
+          } else {
+            console.log('[Mint] Sending mint to backend:', {
+              endpoint: '/cdp/mint',
+              payload: { asset: tx.asset, amount: tx.amount },
+              symbol: tx.symbol,
+              amountType: typeof tx.amount,
+              note: 'amount is raw wei string (sent directly to blockchain)',
+            });
+          }
+          
           const result = useMintMax 
             ? await cdpService.mintMax(tx.asset)
-            : await cdpService.mint(tx.asset, tx.amount);
+            : await cdpService.mint(tx.asset, tx.amount, true); // true = isWei
             
           if (result.status.toLowerCase() !== 'success') {
             allSuccessful = false;
@@ -504,7 +606,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     } finally {
       setTransactionLoading(false);
     }
-  }, [mintAmount, totalManualMint, autoSupplyCollateral, optimalAllocations, mintMaxVaults]);
+  }, [mintAmount, totalManualMint, autoSupplyCollateral, allocations, mintMaxVaults]);
 
   // Find CDP activity for rewards display
   const cdpActivity = useMemo(() => {
@@ -528,12 +630,12 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     
     // Parse to get raw value for comparison
     const parsed = parseCommaNumber(formattedValue);
-    const inputAmount = parseFloat(parsed);
+    const inputAmount: DECIMAL = parseFloat(parsed);
     
     // Check if input matches or exceeds max available to mint
     if (totalMaxMintWei > 0n) {
       const maxMint = formatUnits(totalMaxMintWei, 18);
-      const maxMintNum = parseFloat(maxMint);
+      const maxMintNum: DECIMAL = parseFloat(maxMint);
       const normalizedInput = parsed.replace(/\.?0+$/, '');
       const normalizedMax = maxMint.replace(/\.?0+$/, '');
       
@@ -548,61 +650,97 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     }
   }, [totalMaxMintWei]);
 
-  const handleRiskBufferChange = useCallback((value: number) => {
+  const handleRiskBufferChange = useCallback((value: DECIMAL) => {
     setRiskBuffer(value);
   }, []);
 
-  // Handle manual deposit amount changes from Allocation component
-  const handleAllocationDepositChange = useCallback((assetAddress: string, amount: string) => {
+  // Handle manual deposit amount changes from VaultBreakdown component
+  // Amount comes in as wei string (already in wei format from VaultBreakdown)
+  const handleAllocationDepositChange = useCallback((assetAddress: ADDRESS, depositWei: string) => {
+    const candidate = vaultCandidates.find(c => c.vaultConfig.assetAddress === assetAddress);
+    if (!candidate) return;
+    
     setCustomAllocations(prev => {
-      const existing = prev.find(a => a.assetAddress === assetAddress);
-      if (existing) {
-        return prev.map(a => a.assetAddress === assetAddress 
-          ? { ...a, depositAmount: amount }
-          : a
-        );
-      }
-      // Add new allocation if not found
-      const candidate = vaultCandidates.find(c => c.assetAddress === assetAddress);
-      if (!candidate) return prev;
-      return [...prev, {
+      const existing = prev.find(v => v.vaultConfig.assetAddress === assetAddress);
+      const updated = existing
+        ? prev.map(v => v.vaultConfig.assetAddress === assetAddress 
+            ? { 
+                ...v, 
+                allocation: { 
+                  assetAddress,
+                  depositAmount: BigInt(depositWei),
+                  mintAmount: v.allocation?.mintAmount || 0n
+                } 
+              }
+            : v
+          )
+        : [...prev, {
+            ...candidate,
+            allocation: {
+              assetAddress,
+              depositAmount: BigInt(depositWei),
+              mintAmount: 0n,
+            },
+          }];
+      
+      console.log('[Mint] customAllocations updated (deposit change from UI):', {
         assetAddress,
-        symbol: candidate.symbol,
-        depositAmount: amount,
-        depositAmountUSD: '0',
-        mintAmount: '0',
-        stabilityFeeRate: 0,
-        existingCollateralUSD: '0',
-        userBalance: '0',
-        userBalanceUSD: '0',
-      }];
+        depositWei,
+        symbol: candidate.vaultConfig.symbol,
+        updatedAllocations: updated.map(v => ({
+          assetAddress: v.vaultConfig.assetAddress,
+          symbol: v.vaultConfig.symbol,
+          depositAmount: v.allocation?.depositAmount?.toString(),
+          mintAmount: v.allocation?.mintAmount?.toString(),
+        })),
+      });
+      
+      return updated;
     });
   }, [vaultCandidates]);
 
-  // Handle manual mint amount changes from Allocation component
-  const handleAllocationMintChange = useCallback((assetAddress: string, amount: string) => {
+  // Handle manual mint amount changes from VaultBreakdown component
+  // Amount comes in as wei string (already in wei format from VaultBreakdown)
+  const handleAllocationMintChange = useCallback((assetAddress: ADDRESS, mintWei: string) => {
+    const candidate = vaultCandidates.find(c => c.vaultConfig.assetAddress === assetAddress);
+    if (!candidate) return;
+    
     setCustomAllocations(prev => {
-      const existing = prev.find(a => a.assetAddress === assetAddress);
-      if (existing) {
-        return prev.map(a => a.assetAddress === assetAddress 
-          ? { ...a, mintAmount: amount }
-          : a
-        );
-      }
-      // Add new allocation if not found
-      const candidate = vaultCandidates.find(c => c.assetAddress === assetAddress);
-      if (!candidate) return prev;
-      return [...prev, {
+      const existing = prev.find(v => v.vaultConfig.assetAddress === assetAddress);
+      const updated = existing
+        ? prev.map(v => v.vaultConfig.assetAddress === assetAddress 
+            ? { 
+                ...v, 
+                allocation: { 
+                  assetAddress,
+                  depositAmount: v.allocation?.depositAmount || 0n,
+                  mintAmount: BigInt(mintWei)
+                } 
+              }
+            : v
+          )
+        : [...prev, {
+            ...candidate,
+            allocation: {
+              assetAddress,
+              depositAmount: 0n,
+              mintAmount: BigInt(mintWei),
+            },
+          }];
+      
+      console.log('[Mint] customAllocations updated (mint change from UI):', {
         assetAddress,
-        symbol: candidate.symbol,
-        depositAmount: '0',
-        depositAmountUSD: '0',
-        mintAmount: amount,
-        stabilityFeeRate: 0,
-        existingCollateralUSD: '0',
-        userBalance: '0',
-        userBalanceUSD: '0',
-      }];
+        mintWei,
+        symbol: candidate.vaultConfig.symbol,
+        updatedAllocations: updated.map(v => ({
+          assetAddress: v.vaultConfig.assetAddress,
+          symbol: v.vaultConfig.symbol,
+          depositAmount: v.allocation?.depositAmount?.toString(),
+          mintAmount: v.allocation?.mintAmount?.toString(),
+        })),
+      });
+      
+      return updated;
     });
   }, [vaultCandidates]);
 
@@ -646,7 +784,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
               (autoSupplyCollateral 
                 ? (mintAmount <= 0 && !isMaxMode) 
                 : parseFloat(totalManualMint) <= 0) || 
-              optimalAllocations.length === 0 || 
+              allocations.length === 0 || 
               (autoSupplyCollateral && (exceedsMaxCollateral || shouldLockInput)) || 
               hasLowHF || exceedsBalance
             }
@@ -680,7 +818,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
                 The requested mint amount exceeds your maximum borrowing capacity ({availableToMint} USDST). Try decreasing the mint amount or moving the Risk Slider to the right.
               </p>
             </div>
-          ) : optimalAllocations.length === 0 && parseFloat(availableToMint.replace(/,/g, '')) <= 0 && autoSupplyCollateral ? (
+          ) : allocations.length === 0 && parseFloat(availableToMint.replace(/,/g, '')) <= 0 && autoSupplyCollateral ? (
             <div className="p-3 rounded-md bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
               <p className="text-sm font-semibold text-yellow-800 dark:text-yellow-200 mb-2">
                 {debtFloorHit ? 'Debt floor prevents allocation' : totalHeadroomWei <= 0n ? 'Vaults at capacity for current risk value' : 'No suitable vaults found'}
@@ -710,7 +848,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
               (autoSupplyCollateral 
                 ? (mintAmount <= 0 && !isMaxMode) 
                 : parseFloat(totalManualMint) <= 0) || 
-              optimalAllocations.length === 0 || 
+              allocations.length === 0 || 
               transactionLoading || 
               (autoSupplyCollateral && (exceedsMaxCollateral || shouldLockInput)) || 
               hasLowHF || exceedsBalance
@@ -722,10 +860,15 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
           </Button>
 
           {/* Allocation Section - always shown when auto-supply is off (custom mode), or when there's a valid allocation in auto mode */}
-          {(!autoSupplyCollateral || !(optimalAllocations.length === 0 && parseFloat(availableToMint.replace(/,/g, '')) <= 0)) && (
-          <Allocation
-            optimalAllocations={optimalAllocations}
-            vaultCandidates={vaultCandidates}
+          {(!autoSupplyCollateral || !(allocations.length === 0 && parseFloat(availableToMint.replace(/,/g, '')) <= 0)) && (
+          <VaultBreakdown
+            vaultCandidates={vaultCandidates.map(candidate => {
+              // Find matching allocation and merge it into the candidate
+              const allocation = allocations.find(a => 
+                a.vaultConfig.assetAddress === candidate.vaultConfig.assetAddress
+              );
+              return allocation || candidate;
+            })}
             showMintAmounts={true}
               autoSupplyCollateral={autoSupplyCollateral}
               isMaxMode={isMaxMode}

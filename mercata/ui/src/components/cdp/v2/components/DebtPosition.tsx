@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { cdpService, VaultData } from '@/services/cdpService';
+import { cdpService } from '@/services/cdpService';
+import type { Vault } from '@/components/cdp/v2/cdpTypes';
 import { formatWeiToDecimalHP } from '@/utils/numberUtils';
 import { formatNumber } from '@/utils/numberUtils';
-import { calculatePositionMetrics } from '@/utils/loanUtils';
+import { calculatePositionMetrics } from '@/components/cdp/v2/cdpUtils';
 
 interface DebtPositionProps {
   refreshTrigger?: number;
 }
 
 const DebtPosition: React.FC<DebtPositionProps> = ({ refreshTrigger }) => {
-  const [positions, setPositions] = useState<VaultData[]>([]);
+  const [positions, setPositions] = useState<Vault[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
