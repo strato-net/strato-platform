@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useSwapContext } from "@/context/SwapContext";
 import { Slider } from "@/components/ui/slider";
 import { usdstAddress, SWAP_FEE } from "@/lib/constants";
+import { setSuppressErrorToasts } from "@/lib/axios";
 import { safeParseUnits, formatBalance, formatAmount, formatUnits, toWei } from "@/utils/numberUtils";
 import {
   Dialog,
@@ -792,16 +793,25 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
       setMaxTransferableError('');
       setEditingField(null);
 
-      await refreshSwapHistory()
-      // Refresh all contexts to ensure borrow page shows updated balances
-      await Promise.all([
-        fetchUsdstBalance(),
-        fetchTokens(),           // Refresh UserTokensContext
-        refreshLoans(),          // Refresh LendingContext
-        refreshCollateral(),     // Refresh LendingContext
-        // Refetch pool data to get updated balances and exchange rates
-        fromAsset?.address && toAsset?.address ? getPoolByTokenPair(fromAsset.address, toAsset.address) : Promise.resolve(),
-      ]);
+      // Suppress error toasts during background refresh - these are non-critical
+      // operations that shouldn't alarm the user if they fail
+      setSuppressErrorToasts(true);
+      try {
+        await refreshSwapHistory()
+        // Refresh all contexts to ensure borrow page shows updated balances
+        await Promise.all([
+          fetchUsdstBalance(),
+          fetchTokens(),           // Refresh UserTokensContext
+          refreshLoans(),          // Refresh LendingContext
+          refreshCollateral(),     // Refresh LendingContext
+          // Refetch pool data to get updated balances and exchange rates
+          fromAsset?.address && toAsset?.address ? getPoolByTokenPair(fromAsset.address, toAsset.address) : Promise.resolve(),
+        ]);
+      } catch {
+        // Silently ignore refresh errors - the swap already succeeded
+      } finally {
+        setSuppressErrorToasts(false);
+      }
     }
   };
 

@@ -9,6 +9,13 @@ const api = axios.create({
   withCredentials: true,
 });
 
+// Flag to temporarily suppress error toasts during background refresh operations
+let suppressErrorToasts = false;
+
+export const setSuppressErrorToasts = (value: boolean) => {
+  suppressErrorToasts = value;
+};
+
 // Request interceptor to add CSRF token to state-changing requests
 api.interceptors.request.use(
   (config) => {
@@ -63,9 +70,12 @@ api.interceptors.response.use(
     if (error.name === 'AbortError' || error.name === 'CanceledError' || error.code === 'ERR_CANCELED') {
       return Promise.reject(error);
     }
-    
+
+    // Skip error toast if request was configured with skipErrorToast or global suppress is enabled
+    const skipToast = error?.config?.skipErrorToast === true || suppressErrorToasts;
+
     const url = error?.config?.url || "";
-    
+
     // Handle CSRF validation errors (403 with CSRF message)
     if (error.response?.status === 403) {
       const errorMessage = extractApiErrorMessage(error);
@@ -78,9 +88,9 @@ api.interceptors.response.use(
         return Promise.reject(error);
       }
     }
-    
-    // Show toast for all API errors (except 401 which is handled separately)
-    if (error.response?.status !== 401) {
+
+    // Show toast for all API errors (except 401 which is handled separately, or if skipToast is set)
+    if (error.response?.status !== 401 && !skipToast) {
       const errorMessage = extractApiErrorMessage(error);
       const errorTitle = getErrorTitle(url);
       toast({
