@@ -364,7 +364,7 @@ export interface PollingReturn {
 export interface PoolPollingConfig {
   fromAsset: any;
   toAsset: any;
-  getPoolByTokenPair: (tokenA: string, tokenB: string, signal?: AbortSignal) => Promise<any>;
+  getPoolByTokenPair: (tokenA: string, tokenB: string, signal?: AbortSignal, silentError?: boolean) => Promise<any>;
   fetchUsdstBalance: () => Promise<void>;
   interval?: number;
 }

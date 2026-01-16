@@ -58,7 +58,7 @@ export interface SwapContextActions {
   
   // Pool operations
   createPool: (data: { tokenA: string; tokenB: string, isStable: boolean }) => Promise<void>;
-  getPoolByTokenPair: (tokenA: string, tokenB: string, signal?: AbortSignal) => Promise<Pool>;
+  getPoolByTokenPair: (tokenA: string, tokenB: string, signal?: AbortSignal, silentError?: boolean) => Promise<Pool>;
   getPoolByAddress: (address: string) => Promise<Pool>;
   fetchPools: () => Promise<Pool[]>;
   setPoolRates: (data: SetPoolRatesParams) => Promise<void>;

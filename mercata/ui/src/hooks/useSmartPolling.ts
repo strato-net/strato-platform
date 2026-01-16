@@ -66,7 +66,8 @@ export const usePoolPolling = ({ fromAsset, toAsset, getPoolByTokenPair, fetchUs
   useSmartPolling({
     fetchFn: async () => {
       if (!fromAsset?.address || !toAsset?.address) return null;
-      const poolData = await getPoolByTokenPair(fromAsset.address, toAsset.address);
+      // Use silentError=true to suppress toast notifications for polling errors
+      const poolData = await getPoolByTokenPair(fromAsset.address, toAsset.address, undefined, true);
       // Also fetch USDST balance to keep it updated
       if (fetchUsdstBalance) {
         await fetchUsdstBalance();

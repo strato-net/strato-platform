@@ -116,10 +116,10 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  const getPoolByTokenPair = useCallback(async (tokenA: string, tokenB: string, signal?: AbortSignal) => {
+  const getPoolByTokenPair = useCallback(async (tokenA: string, tokenB: string, signal?: AbortSignal, silentError?: boolean) => {
     setPoolLoading(true);
     try {
-      const { data } = await api.get(`/swap-pools/${tokenA}/${tokenB}`, { signal });
+      const { data } = await api.get(`/swap-pools/${tokenA}/${tokenB}`, { signal, silentError } as any);
       const poolData: Pool | null = data?.[0] || null;
       if (!poolData) return null;
 

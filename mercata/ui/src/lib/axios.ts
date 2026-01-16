@@ -80,7 +80,8 @@ api.interceptors.response.use(
     }
     
     // Show toast for all API errors (except 401 which is handled separately)
-    if (error.response?.status !== 401) {
+    // Skip toast if silentError is set (used for background polling)
+    if (error.response?.status !== 401 && !error.config?.silentError) {
       const errorMessage = extractApiErrorMessage(error);
       const errorTitle = getErrorTitle(url);
       toast({
