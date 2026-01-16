@@ -110,14 +110,15 @@ function aggregatePrices(
         if (!useProxy) {
             collect(weekdaySources, assetKey);
         } else {
-            const ps = configLoader.getSourcesForProxySymbol(asset.weekendProxy!);
+            const proxySources = configLoader.getSourcesForProxySymbol(asset.weekendProxy!);
             logInfo('CronScheduler', `${assetKey}: Using proxy ${asset.weekendProxy}`);
-            if (collect(ps, asset.weekendProxy!) >= requiredSources) {
-                expectedCount = ps.length;
+            if (collect(proxySources, asset.weekendProxy!) >= requiredSources) {
+                expectedCount = proxySources.length;
             } else {
                 logInfo('CronScheduler', `${assetKey}: Proxy insufficient, falling back`);
+                sources.length = 0;
                 collect(weekdaySources, assetKey);
-                expectedCount = new Set([...ps, ...weekdaySources]).size;
+                expectedCount = weekdaySources.length;
             }
         }
         
