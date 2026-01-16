@@ -117,14 +117,14 @@ const Borrow = () => {
         description: `You supplied ${amount} ${asset._symbol}`,
         variant: "success",
       });
-      setModalLoading(false);
-      setModalState({ isOpen: false, type: null });
-      // Refresh all data after successful supply
+      // Refresh all data after successful supply before closing modal
       await Promise.all([
         refreshLoans(),
         refreshCollateral(),
         fetchUsdstBalance(),
       ]);
+      setModalLoading(false);
+      setModalState({ isOpen: false, type: null });
     } catch (error) {
       setModalLoading(false);
       setModalState({ isOpen: false, type: null });
@@ -147,14 +147,14 @@ const Borrow = () => {
         description: `Withdrawal submitted: ${amount === 'ALL' ? 'max available' : amount} ${asset._symbol}`,
         variant: "success",
       });
-      setModalLoading(false);
-      setModalState({ isOpen: false, type: null });
-      // Refresh all data after successful withdraw
+      // Refresh all data after successful withdraw before closing modal
       await Promise.all([
         refreshLoans(),
         refreshCollateral(),
         fetchUsdstBalance(),
       ]);
+      setModalLoading(false);
+      setModalState({ isOpen: false, type: null });
     } catch (error) {
       console.log(error, "error");
       setModalLoading(false);
