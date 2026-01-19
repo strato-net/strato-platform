@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
-import MobileSidebar from '../components/dashboard/MobileSidebar';
+import MobileBottomNav from '../components/dashboard/MobileBottomNav';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -122,7 +122,6 @@ const createEmptyRevenuePeriod = (): RevenuePeriod => ({
 });
 
 const StratoStats = () => {
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [tokens, setTokens] = useState<TokenWithStats[]>([]);
   const [totalMarketCap, setTotalMarketCap] = useState<string>('0');
   const [loading, setLoading] = useState(true);
@@ -320,25 +319,22 @@ const StratoStats = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-16 md:pb-0">
       <DashboardSidebar />
-      <MobileSidebar
-        isOpen={isMobileSidebarOpen}
-        onClose={() => setIsMobileSidebarOpen(false)}
-      />
-      <div className="transition-all duration-300 md:pl-64" style={{ paddingLeft: 'var(--sidebar-width, 0rem)' }}>
-        <DashboardHeader title="STRATO Stats" onMenuClick={() => setIsMobileSidebarOpen(true)} />
-        <main className="p-6">
+
+      <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
+        <DashboardHeader title="STRATO Stats" />
+        <main className="p-4 md:p-6">
           <div className="max-w-7xl mx-auto">
             <Tabs defaultValue="tokens" className="w-full">
-              <TabsList className="grid w-full grid-cols-3 mb-6">
-                <TabsTrigger value="tokens">
+              <TabsList className="grid w-full grid-cols-3 mb-6 h-auto">
+                <TabsTrigger value="tokens" className="text-xs md:text-sm py-2 px-1 md:px-3">
                   Token Stats
                 </TabsTrigger>
-                <TabsTrigger value="cdp">
+                <TabsTrigger value="cdp" className="text-xs md:text-sm py-2 px-1 md:px-3">
                   CDP Stats
                 </TabsTrigger>
-                <TabsTrigger value="revenue">
+                <TabsTrigger value="revenue" className="text-xs md:text-sm py-2 px-1 md:px-3 whitespace-nowrap">
                   Protocol Revenue
                 </TabsTrigger>
               </TabsList>
@@ -477,30 +473,30 @@ const StratoStats = () => {
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead>Asset</TableHead>
-                              <TableHead className="text-right">Number of Vaults</TableHead>
-                              <TableHead className="text-right">Total Collateral Value</TableHead>
-                              <TableHead className="text-right">Total Debt (USDST)</TableHead>
-                              <TableHead className="text-right">CR</TableHead>
+                              <TableHead className="text-xs md:text-sm pl-2 md:pl-4">Asset</TableHead>
+                              <TableHead className="text-center text-xs md:text-sm px-1 md:px-4">Number of Vaults</TableHead>
+                              <TableHead className="text-center text-xs md:text-sm px-1 md:px-4">Total Collateral Value</TableHead>
+                              <TableHead className="text-center text-xs md:text-sm px-1 md:px-4">Total Debt (USDST)</TableHead>
+                              <TableHead className="text-right text-xs md:text-sm pr-2 md:pr-4">CR</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {cdpAssets.map((asset) => (
                               <TableRow key={asset.asset}>
-                                <TableCell>
+                                <TableCell className="text-xs md:text-sm pl-2 md:pl-4">
                                   <div>
                                     <div>{asset.symbol}</div>
-                                    <div className="text-sm text-muted-foreground">{asset.asset.slice(0, 6)}...{asset.asset.slice(-4)}</div>
+                                    <div className="text-xs text-muted-foreground">{asset.asset.slice(0, 6)}...{asset.asset.slice(-4)}</div>
                                   </div>
                                 </TableCell>
-                                <TableCell className="text-right">{asset.numberOfVaults}</TableCell>
-                                <TableCell className="text-right font-semibold">
+                                <TableCell className="text-center text-xs md:text-sm px-1 md:px-4">{asset.numberOfVaults}</TableCell>
+                                <TableCell className="text-center text-xs md:text-sm px-1 md:px-4 font-semibold">
                                   ${formatLargeNumber(parseFloat(formatUnits(BigInt(asset.collateralValueUSD || '0'), 18)))}
                                 </TableCell>
-                                <TableCell className="text-right font-semibold">
+                                <TableCell className="text-center text-xs md:text-sm px-1 md:px-4 font-semibold">
                                   ${formatLargeNumber(parseFloat(formatUnits(BigInt(asset.totalDebtUSD || '0'), 18)))}
                                 </TableCell>
-                                <TableCell className="text-right">
+                                <TableCell className="text-right text-xs md:text-sm pr-2 md:pr-4">
                                   {formatCR(asset.collateralizationRatio)}
                                 </TableCell>
                               </TableRow>
@@ -690,9 +686,9 @@ const StratoStats = () => {
 
                 {/* Revenue by Asset Table */}
                 <Card>
-                  <CardHeader>
-                    <CardTitle>Combined Revenue by Asset</CardTitle>
-                    <CardDescription>
+                  <CardHeader className="px-4 md:px-6">
+                    <CardTitle className="text-base md:text-xl whitespace-nowrap">Combined Revenue by Asset</CardTitle>
+                    <CardDescription className="text-xs md:text-sm">
                       Total protocol revenue across all sources by asset
                     </CardDescription>
                   </CardHeader>
@@ -743,6 +739,8 @@ const StratoStats = () => {
           </div>
         </main>
       </div>
+
+      <MobileBottomNav />
     </div>
   );
 };

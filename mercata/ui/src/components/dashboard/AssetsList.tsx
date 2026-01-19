@@ -73,26 +73,26 @@ const AssetsList = ({
             <span className="font-bold">Earning Assets</span>
           </div>
         )}
-        <div className="w-full overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
-          <table style={{ minWidth: '700px', width: '100%' }}>
+        <div className="w-full overflow-x-auto md:overflow-visible">
+          <table className="w-full">
             <thead>
               <tr className="bg-muted/50">
-                <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4 min-w-[140px]">
+                <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-3 md:px-4">
                   Asset
                 </th>
-                <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4 min-w-[80px]">
+                <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
                   Price
                 </th>
-                <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4 min-w-[80px]">
+                <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
                   Change
                 </th>
-                <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4 min-w-[100px]">
+                <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-3 md:px-4">
                   Balance
                 </th>
-                <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4 min-w-[100px]">
-                  Collateral Balance
+                <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
+                  Collateral
                 </th>
-                <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4 min-w-[100px]">
+                <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-3 md:px-4">
                   Value
                 </th>
               </tr>
@@ -116,31 +116,31 @@ const AssetsList = ({
                       key={index}
                       className="hover:bg-muted/50 transition-colors"
                     >
-                      <td className="py-4 px-4">
+                      <td className="py-3 md:py-4 px-3 md:px-4">
                         <div className="flex items-center">
                           {asset?.images?.[0] ? (
                             <img
                               src={asset.images[0].value}
                               alt={asset._name}
-                              className="w-8 h-8 rounded-full object-cover"
+                              className="w-7 h-7 md:w-8 md:h-8 rounded-full object-cover"
                             />
                           ) : (
                             <div
-                              className="w-8 h-8 rounded-full flex items-center justify-center text-xs text-white font-medium"
+                              className="w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs text-white font-medium"
                               style={{ backgroundColor: "red" }}
                             >
                               {asset?._symbol?.slice(0, 2) || "??"}
                             </div>
                           )}
-                          <div className="ml-3 min-w-0 flex-1">
+                          <div className="ml-2 md:ml-3 min-w-0 flex-1">
                             <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Link
                                     to={`/dashboard/deposits/${asset?.address || ''}`}
-                                    className="font-medium text-blue-600 truncate hover:text-blue-800 underline transition-colors"
+                                    className="font-medium text-sm md:text-base text-blue-600 truncate hover:text-blue-800 underline transition-colors"
                                   >
-                                    {asset?._name || ""}
+                                    {asset?._symbol || asset?._name || ""}
                                   </Link>
                                 </TooltipTrigger>
                                 <TooltipContent>
@@ -148,29 +148,20 @@ const AssetsList = ({
                                 </TooltipContent>
                               </Tooltip>
                             </TooltipProvider>
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <p className="text-muted-foreground text-xs truncate">
-                                    {asset?._symbol || ""}
-                                  </p>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>{asset?._symbol || ""}</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
+                            <p className="hidden md:block text-muted-foreground text-xs truncate">
+                              {asset?._name || ""}
+                            </p>
                           </div>
                         </div>
                       </td>
-                      <td className="py-4 px-4 whitespace-nowrap text-right">
+                      <td className="hidden md:table-cell py-4 px-4 whitespace-nowrap text-right">
                         <p className="font-medium text-foreground">
                           {!asset?.price
                             ? "-"
                             : formatBalance(asset.price, undefined, 18, 2, 2, true)}
                         </p>
                       </td>
-                      <td className="py-4 px-4 whitespace-nowrap text-right">
+                      <td className="hidden md:table-cell py-4 px-4 whitespace-nowrap text-right">
                         <div
                           className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                             (asset as any)?.["change"] >= 0
@@ -185,22 +176,22 @@ const AssetsList = ({
                             : "-"}
                         </div>
                       </td>
-                      <td className="py-4 px-4 whitespace-nowrap text-right">
-                        <p className="font-medium text-foreground">
+                      <td className="py-3 md:py-4 px-3 md:px-4 whitespace-nowrap text-right">
+                        <p className="font-medium text-sm md:text-base text-foreground">
                           {!asset?.balance || asset.balance === "0"
                             ? "-"
-                            : formatBalance(asset.balance, undefined, 18,1, 4)}
+                            : formatBalance(asset.balance, undefined, 18, 1, 2)}
                         </p>
                       </td>
-                      <td className="py-4 px-4 whitespace-nowrap text-right">
+                      <td className="hidden md:table-cell py-4 px-4 whitespace-nowrap text-right">
                         <p className="font-medium text-foreground">
                           {!asset?.collateralBalance || asset.collateralBalance === "0"
                             ? "-"
-                            : formatBalance(asset.collateralBalance, undefined, 18,1,4)}
+                            : formatBalance(asset.collateralBalance, undefined, 18, 1, 4)}
                         </p>
                       </td>
-                      <td className="py-4 px-4 whitespace-nowrap text-right">
-                        <p className="font-medium text-foreground">
+                      <td className="py-3 md:py-4 px-3 md:px-4 whitespace-nowrap text-right">
+                        <p className="font-medium text-sm md:text-base text-foreground">
                           {!asset?.value || asset.value === "0.00" || parseFloat(asset.value) === 0
                             ? "-"
                             : `$${asset.value}`}
@@ -228,22 +219,20 @@ const AssetsList = ({
 
       {isDashboard && (
         <div>
-          <div className="p-4 text-right border-t border-border flex justify-between">
-            <span className="font-bold">Non-earning Assets</span>
-            <div className="flex gap-4">
-              <Button
-                size="sm"
-                onClick={() => setShowNonEarningAssetsTable((prev) => !prev)}
-              >
-                <div className="flex gap-1 justify-center items-center">
-                  {showNonEarningAssetsTable ? (
-                    <ChevronUp size={20} />
-                  ) : (
-                    <ChevronDown size={20} />
-                  )}
-                </div>
-              </Button>
-            </div>
+          <div className="p-3 md:p-4 text-right border-t border-border flex justify-between items-center">
+            <span className="font-bold text-sm md:text-base">Non-earning Assets</span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowNonEarningAssetsTable((prev) => !prev)}
+              className="h-8 w-8 p-0"
+            >
+              {showNonEarningAssetsTable ? (
+                <ChevronUp size={18} />
+              ) : (
+                <ChevronDown size={18} />
+              )}
+            </Button>
           </div>
           <div
             className={`transition-all duration-300 ease-in-out overflow-hidden ${
@@ -253,13 +242,13 @@ const AssetsList = ({
             }`}
           >
             <div className="overflow-y-auto max-h-[400px]">
-              <table className="w-full table-fixed">
+              <table className="w-full">
                 <thead>
                   <tr className="bg-muted/50">
-                    <th className="w-[50%] text-left text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
+                    <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-3 md:px-4">
                       Asset
                     </th>
-                    <th className="w-[50%] text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
+                    <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-3 md:px-4">
                       Balance
                     </th>
                   </tr>
@@ -268,7 +257,7 @@ const AssetsList = ({
                   {shouldShowInactiveLoading ? (
                     <tr className="hover:bg-muted/50 transition-colors">
                       <td
-                        colSpan={5}
+                        colSpan={2}
                         className="py-4 px-4 whitespace-nowrap w-full"
                       >
                         <div className="w-full flex justify-center items-center h-16">
@@ -282,58 +271,40 @@ const AssetsList = ({
                         key={index}
                         className="hover:bg-muted/50 transition-colors"
                       >
-                        <td className="py-4 px-4">
+                        <td className="py-3 md:py-4 px-3 md:px-4">
                           <div className="flex items-center">
                             {asset?.images?.[0] ? (
                               <img
                                 src={asset.images[0].value}
                                 alt={asset._name}
-                                className="w-8 h-8 rounded-full object-cover"
+                                className="w-7 h-7 md:w-8 md:h-8 rounded-full object-cover"
                               />
                             ) : (
                               <div
-                                className="w-8 h-8 rounded-full flex items-center justify-center text-xs text-white font-medium"
+                                className="w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs text-white font-medium"
                                 style={{ backgroundColor: "red" }}
                               >
                                 {asset?._symbol?.slice(0, 2) || "??"}
                               </div>
                             )}
-                            <div className="ml-3 min-w-0 flex-1">
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Link
-                                      to={`/dashboard/deposits/${asset?.address || ''}`}
-                                      className="font-medium text-blue-600 truncate hover:text-blue-800 underline transition-colors"
-                                    >
-                                      {asset?._name || ""}
-                                    </Link>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p>{asset?._name || ""}</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <p className="text-muted-foreground text-xs truncate">
-                                      {asset?._symbol || ""}
-                                    </p>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p>{asset?._symbol || ""}</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
+                            <div className="ml-2 md:ml-3 min-w-0 flex-1">
+                              <Link
+                                to={`/dashboard/deposits/${asset?.address || ''}`}
+                                className="font-medium text-sm md:text-base text-blue-600 hover:text-blue-800 underline transition-colors block truncate"
+                              >
+                                {asset?._symbol || asset?._name || ""}
+                              </Link>
+                              <p className="text-muted-foreground text-xs truncate">
+                                {asset?._symbol || ""}
+                              </p>
                             </div>
                           </div>
                         </td>
-                        <td className="py-4 px-4 whitespace-nowrap text-right">
-                          <p className="font-medium text-foreground">
+                        <td className="py-3 md:py-4 px-3 md:px-4 whitespace-nowrap text-right">
+                          <p className="font-medium text-sm md:text-base text-foreground">
                             {!asset?.balance || asset.balance === "0"
                               ? "-"
-                              : formatBalance(asset.balance, undefined, 18,1,4)}
+                              : formatBalance(asset.balance, undefined, 18, 1, 2)}
                           </p>
                         </td>
                       </tr>
@@ -341,7 +312,7 @@ const AssetsList = ({
                   ) : (
                     <tr className="hover:bg-muted/50 transition-colors">
                       <td
-                        colSpan={5}
+                        colSpan={2}
                         className="py-4 px-4 whitespace-nowrap w-full"
                       >
                         <div className="w-full flex justify-center items-center h-16">

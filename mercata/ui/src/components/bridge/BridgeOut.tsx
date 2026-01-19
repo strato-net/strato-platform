@@ -313,22 +313,22 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false }) => {
       />
 
       <div className="space-y-1.5">
-        <div className="flex justify-between items-center">
-          <Label htmlFor="amount">{modeLabels.amountLabel}</Label>
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-1">
+          <Label htmlFor="amount" className="text-sm">{modeLabels.amountLabel}</Label>
           {!maxAmount && isBalanceLoading ? (
             <div className="flex items-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-              <p className="text-sm text-muted-foreground">Fetching balance...</p>
+              <p className="text-xs md:text-sm text-muted-foreground">Fetching balance...</p>
             </div>
           ) : (
             maxAmount && (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs md:text-sm text-muted-foreground truncate max-w-[200px] md:max-w-none">
                 Max: {formatBalance(
                   maxAmount,
                   undefined,
                   DECIMAL,
                   2,
-                  DECIMAL
+                  6
                 )}
               </p>
             )

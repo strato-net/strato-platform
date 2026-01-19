@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
-import MobileSidebar from '../components/dashboard/MobileSidebar';
+import MobileBottomNav from '../components/dashboard/MobileBottomNav';
 import { 
   Card, 
   CardContent,  
@@ -30,7 +30,6 @@ const DepositsPage = () => {
   const { loans } = useLendingContext();
   const { totalCDPDebt } = useCDP();
   const { loadNetworksAndTokens, setTargetTransactionTab } = useBridgeContext();
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"easy-savings" | "bridge-in">("easy-savings");
 
   // Extract CATA token from inactive tokens by address
@@ -72,15 +71,12 @@ const DepositsPage = () => {
   }, [location.pathname, userAddress, getEarningAssets, loadNetworksAndTokens]);
 
   return (
-    <div className="h-screen bg-background overflow-hidden">
+    <div className="h-screen bg-background overflow-hidden pb-16 md:pb-0">
       <DashboardSidebar />
-      <MobileSidebar 
-        isOpen={isMobileSidebarOpen} 
-        onClose={() => setIsMobileSidebarOpen(false)} 
-      />
-      <div className="h-screen flex flex-col transition-all duration-300 md:pl-64" style={{ paddingLeft: 'var(--sidebar-width, 0rem)' }}>
-        <DashboardHeader title="Deposits" onMenuClick={() => setIsMobileSidebarOpen(true)} />
-        <main className="flex-1 p-6 overflow-y-auto">
+
+      <div className="h-screen flex flex-col transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
+        <DashboardHeader title="Deposits" />
+        <main className="flex-1 p-4 md:p-6 overflow-y-auto">
           <style>{`
             .custom-tabs .ant-tabs-tab {
               justify-content: center !important;
@@ -102,15 +98,15 @@ const DepositsPage = () => {
           <div className="mb-8 flex flex-col lg:flex-row gap-6 items-stretch">
             <div className="w-full lg:w-[50%] flex">
               <Card className="shadow-sm flex-1 flex flex-col">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle>Deposit Assets</CardTitle>
+                <CardHeader className="pb-2 md:pb-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <CardTitle className="text-base md:text-xl">Deposit Assets</CardTitle>
                     <Link
-                      to="/bridge-transactions"
+                      to="/bridge-transactions?from=deposits"
                       onClick={() => setTargetTransactionTab('DepositRecorded')}
-                      className="flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors"
+                      className="flex items-center gap-1 text-xs md:text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors whitespace-nowrap"
                     >
-                      <ArrowRight size={16} />
+                      <ArrowRight size={14} className="md:w-4 md:h-4" />
                       View Transactions
                     </Link>
                   </div>
@@ -174,7 +170,8 @@ const DepositsPage = () => {
               </Card>
             </div>
           </div>
-          <Card className="shadow-sm">
+          {/* Deposit History - hidden on mobile to avoid horizontal scroll */}
+          <Card className="shadow-sm hidden md:block">
             <CardHeader>
               <CardTitle>Deposit History</CardTitle>
             </CardHeader>
@@ -184,6 +181,8 @@ const DepositsPage = () => {
           </Card>
         </main>
       </div>
+
+      <MobileBottomNav />
     </div>
   );
 };

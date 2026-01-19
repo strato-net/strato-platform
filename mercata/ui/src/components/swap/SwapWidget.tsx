@@ -415,11 +415,11 @@ const SlippageControl = ({ slippage, autoSlippage, onSlippageChange, onAutoToggl
 
   return (
     <div className="flex flex-col gap-1 mt-2">
-      <div className="flex items-center justify-between text-sm mb-1">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 text-sm mb-1">
         <span className="text-muted-foreground">Max slippage</span>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 md:gap-2">
           <button
-            className={`px-3 py-1 rounded-full text-xs font-medium border ${
+            className={`px-2 md:px-3 py-1 rounded-full text-xs font-medium border ${
               autoSlippage ? 'bg-muted text-foreground' : 'bg-transparent text-muted-foreground'
               } border-border`}
             onClick={() => {
@@ -430,14 +430,14 @@ const SlippageControl = ({ slippage, autoSlippage, onSlippageChange, onAutoToggl
             Auto
           </button>
           <button
-            className={`px-3 py-1 rounded-full text-xs font-medium border ${
+            className={`px-2 md:px-3 py-1 rounded-full text-xs font-medium border ${
               !autoSlippage ? 'bg-muted text-foreground' : 'bg-transparent text-muted-foreground'
               } border-border`}
             onClick={() => onAutoToggle(false)}
           >
             Manual
           </button>
-          <span className={`ml-2 px-3 py-1 rounded-full border text-xs font-semibold ${slippageClass}`}>
+          <span className={`ml-1 md:ml-2 px-2 md:px-3 py-1 rounded-full border text-xs font-semibold ${slippageClass}`}>
             {slippage}%
           </span>
         </div>
@@ -914,38 +914,41 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
         );
       })()}
 
-      <div className="flex flex-col gap-2 bg-muted/50 p-4 rounded-lg border border-border">
+      <div className="flex flex-col gap-3 bg-muted/50 p-3 md:p-4 rounded-lg border border-border">
+        {/* Exchange Rate */}
         <div className="flex flex-col gap-1 text-sm">
-          <div className="flex justify-between">
+          <div className="flex flex-col md:flex-row md:justify-between gap-1">
             <span className="text-muted-foreground">Exchange Rate</span>
             {!exchangeRate ? (
               <LoadingSpinner />
             ) : (
-              <span className="font-medium text-foreground">
+              <span className="font-medium text-foreground text-xs md:text-sm">
                 1 {fromAsset?._symbol || ""} ≈ {exchangeRate} ({oracleExchangeRate}*) {toAsset?._symbol || ""}
               </span>
             )}
           </div>
           {exchangeRate && (
             <>
-              <div className="flex justify-end">
-                <span className="text-muted-foreground/70">
+              <div className="md:text-right">
+                <span className="text-muted-foreground/70 text-xs md:text-sm">
                   1 {toAsset?._symbol || ""} ≈ {invertedExchangeRate} ({invertedOracleExchangeRate}*) {fromAsset?._symbol || ""}
                 </span>
               </div>
-              <div className="flex justify-end">
+              <div className="md:text-right">
                 <span className="text-xs text-muted-foreground/70">* spot price</span>
               </div>
             </>
           )}
         </div>
-        <div className="my-1"></div>
-        <div className="flex justify-between text-sm">
+
+        {/* Transaction Fee */}
+        <div className="flex flex-col md:flex-row md:justify-between gap-1 text-sm">
           <span className="text-muted-foreground">Transaction Fee</span>
-          <span className="font-medium">{SWAP_FEE} USDST ({parseFloat(SWAP_FEE) * 100} voucher)</span>
+          <span className="font-medium text-xs md:text-sm">{SWAP_FEE} USDST ({parseFloat(SWAP_FEE) * 100} voucher)</span>
         </div>
-        
-        <div className="flex justify-between text-sm items-center">
+
+        {/* Price Impact */}
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-1 text-sm">
           <div className="flex items-center gap-1">
             <span className="text-muted-foreground">Price Impact</span>
             <Tooltip>
@@ -957,7 +960,7 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
               </TooltipContent>
             </Tooltip>
           </div>
-          <span className={`font-medium ${
+          <span className={`font-medium text-xs md:text-sm ${
             priceImpact === null ? 'text-muted-foreground' :
             priceImpact < 1 ? 'text-foreground' :
             priceImpact < 5 ? 'text-yellow-600' :
