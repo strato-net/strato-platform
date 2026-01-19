@@ -306,7 +306,7 @@ const Dashboard = () => {
         <DashboardHeader title="Portfolio" />
 
         <main className="p-4 md:p-6 pb-24 md:pb-6">
-          <div className={`grid grid-cols-1 ${rewardsEnabled ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-6 mb-8`}>
+          <div className={`grid grid-cols-1 ${rewardsEnabled ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-3 md:gap-6 mb-4 md:mb-8`}>
             <AssetSummary
               title="Net Balance"
               value={`$${totalBalance.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`}
@@ -381,7 +381,7 @@ const Dashboard = () => {
           </div>
 
           {/* Refer a Friend Section */}
-          <div className="mb-8">
+          <div className="mb-4 md:mb-8">
             <div className="bg-card shadow-sm rounded-xl p-4 md:p-6 border border-border">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div className="flex items-center gap-3">

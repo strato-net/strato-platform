@@ -76,7 +76,7 @@ const DepositsPage = () => {
 
       <div className="h-screen flex flex-col transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
         <DashboardHeader title="Deposits" />
-        <main className="flex-1 p-4 md:p-6 overflow-y-auto">
+        <main className="flex-1 p-4 md:p-6 pb-16 md:pb-6 overflow-y-auto">
           <style>{`
             .custom-tabs .ant-tabs-tab {
               justify-content: center !important;

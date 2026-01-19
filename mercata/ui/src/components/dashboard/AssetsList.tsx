@@ -36,9 +36,9 @@ const AssetsList = ({
   }, [tokens]);
 
   return (
-    <div className="w-full overflow-hidden">
+    <div className={`w-full overflow-hidden ${isDashboard ? 'bg-card rounded-xl border border-border shadow-sm' : ''}`}>
       {isDashboard && (
-        <div className="p-5 border-b border-border">
+        <div className="p-4 md:p-5">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
             <h2 className="font-bold text-lg">My Deposits</h2>
             {/* Mobile: full width button */}
@@ -69,15 +69,15 @@ const AssetsList = ({
           </div>
         )}
         {isDashboard && (
-          <div className="p-4 text-right border-t border-border flex justify-between">
-            <span className="font-bold">Earning Assets</span>
+          <div className="p-3 md:p-4 text-right flex justify-between">
+            <span className="font-bold text-sm md:text-base">Earning Assets</span>
           </div>
         )}
-        <div className="w-full overflow-x-auto md:overflow-visible">
+        <div className={`w-full ${isDashboard ? 'overflow-x-auto md:overflow-visible px-3 md:px-0' : 'overflow-hidden'}`}>
           <table className="w-full">
             <thead>
               <tr className="bg-muted/50">
-                <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-3 md:px-4">
+                <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-1 md:px-4">
                   Asset
                 </th>
                 <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
@@ -86,13 +86,13 @@ const AssetsList = ({
                 <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
                   Change
                 </th>
-                <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-3 md:px-4">
+                <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-1 md:px-4">
                   Balance
                 </th>
                 <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
                   Collateral
                 </th>
-                <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-3 md:px-4">
+                <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-1 md:px-4">
                   Value
                 </th>
               </tr>
@@ -219,7 +219,8 @@ const AssetsList = ({
 
       {isDashboard && (
         <div>
-          <div className="p-3 md:p-4 text-right border-t border-border flex justify-between items-center">
+          <div className="mx-3 md:mx-0 border-t border-border"></div>
+          <div className="p-3 md:p-4 text-right flex justify-between items-center">
             <span className="font-bold text-sm md:text-base">Non-earning Assets</span>
             <Button
               size="sm"
@@ -241,14 +242,14 @@ const AssetsList = ({
                 : "max-h-0 opacity-0"
             }`}
           >
-            <div className="overflow-y-auto max-h-[400px]">
+            <div className="overflow-y-auto max-h-[400px] px-3 md:px-0">
               <table className="w-full">
                 <thead>
                   <tr className="bg-muted/50">
-                    <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-3 md:px-4">
+                    <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-1 md:px-4">
                       Asset
                     </th>
-                    <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-3 md:px-4">
+                    <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-1 md:px-4">
                       Balance
                     </th>
                   </tr>
