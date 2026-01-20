@@ -7,10 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Token } from "@/interface";
 
 import { useUser } from "@/context/UserContext";
-import { useTokenContext } from "@/context/TokenContext";
+import { useTokenContext, BulkTransferItem, BulkTransferResponse } from "@/context/TokenContext";
 import { useToast } from "@/hooks/use-toast";
 import { usdstAddress, TRANSFER_FEE } from "@/lib/constants";
 import TransferConfirmationModal from "../components/TransferConfirmationModal";
+import BulkTransferModal from "../components/BulkTransferModal";
 import { safeParseUnits, roundToDecimals, addCommasToInput, formatBalance, formatUnits } from "@/utils/numberUtils";
 
 import {
@@ -18,15 +19,15 @@ import {
   PopoverTrigger,
   PopoverContent,
 } from "@/components/ui/popover";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Upload } from "lucide-react";
 import { handleRecipientAddress, handleAmountInputChange, computeMaxTransferable } from "@/utils/transferValidation";
 import { sortTokensCompareFn } from "@/lib/tokenPriority";
 
 const Transfer = () => {
   const { userAddress } = useUser();
-  const { usdstBalance, voucherBalance, fetchUsdstBalance, loadingUsdstBalance, getTransferableTokens, transferToken } = useTokenContext();
+  const { usdstBalance, voucherBalance, fetchUsdstBalance, loadingUsdstBalance, getTransferableTokens, transferToken, bulkTransferToken } = useTokenContext();
   const { toast } = useToast();
-  
+
   useEffect(() => {
     document.title = "Transfer Assets | STRATO";
   }, []);
@@ -39,6 +40,7 @@ const Transfer = () => {
   const [amountError, setAmountError] = useState("");
   const [tokenPopoverOpen, setTokenPopoverOpen] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showBulkTransferModal, setShowBulkTransferModal] = useState(false);
   const [recipientError, setRecipientError] = useState("");
   const [feeError, setFeeError] = useState("");
   const [showInactiveTokens, setShowInactiveTokens] = useState(false);
@@ -103,7 +105,7 @@ const Transfer = () => {
       setFromAmount("");
       setRecipient("");
       const updatedTokens = await fetchUserTokens();
-      const updatedToken = updatedTokens.find((t: Token) => t.address === fromAsset?.address);      
+      const updatedToken = updatedTokens.find((t: Token) => t.address === fromAsset?.address);
       if (updatedToken) {
         setFromAsset(updatedToken); // triggers re-render with updated balance
       } else {
@@ -119,6 +121,35 @@ const Transfer = () => {
     }
   };
 
+  const handleBulkTransferConfirm = async (transfers: BulkTransferItem[]): Promise<BulkTransferResponse> => {
+    if (!fromAsset) throw new Error("No token selected");
+
+    const response = await bulkTransferToken({
+      address: fromAsset.address,
+      transfers,
+    });
+
+    // Show toast with results
+    toast({
+      title: "Bulk Transfer Complete",
+      description: `${response.successCount} successful, ${response.failureCount} failed`,
+    });
+
+    // Refresh token balances
+    const updatedTokens = await fetchUserTokens();
+    const updatedToken = updatedTokens.find((t: Token) => t.address === fromAsset?.address);
+    if (updatedToken) {
+      setFromAsset(updatedToken);
+    } else {
+      setFromAsset(undefined);
+    }
+
+    // Refresh USDST balance since gas fees were paid
+    await fetchUsdstBalance();
+
+    return response;
+  };
+
   return (
     <div className="min-h-screen bg-background pb-16 md:pb-0">
       <DashboardSidebar />
@@ -127,7 +158,19 @@ const Transfer = () => {
         <DashboardHeader title="Transfer" />
         <main className="p-4 md:p-6">
           <div className="max-w-2xl mx-auto bg-card shadow-md rounded-lg p-6 space-y-6 border border-border">
-            <h2 className="text-xl font-semibold">Transfer your tokens</h2>
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-semibold">Transfer your tokens</h2>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowBulkTransferModal(true)}
+                disabled={!fromAsset}
+                title={!fromAsset ? "Select a token first" : "Upload CSV for bulk transfer"}
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Bulk Transfer
+              </Button>
+            </div>
 
             {/* Token selector */}
             <div className="space-y-2">
@@ -318,6 +361,15 @@ const Transfer = () => {
             recipient={recipient}
             swapLoading={swapLoading}
             onConfirm={handleConfirmTransfer}
+          />
+
+          <BulkTransferModal
+            open={showBulkTransferModal}
+            onOpenChange={setShowBulkTransferModal}
+            fromAsset={fromAsset}
+            userAddress={userAddress}
+            maxBalance={maxAmount}
+            onConfirm={handleBulkTransferConfirm}
           />
         </main>
       </div>
