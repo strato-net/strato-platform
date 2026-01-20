@@ -75,7 +75,7 @@ const Hero = () => {
       </section>
 
       {/* Trust Indicators */}
-      <section className="py-8 lg:py-12">
+      <section className="pb-4 lg:pb-6">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
             {/* Secure & Audited */}
@@ -115,10 +115,10 @@ const Hero = () => {
       </section>
 
       {/* Features Section */}
-      <section className="py-12 lg:py-20">
+      <section className="pt-2 pb-4 lg:py-6">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           {/* Section Header */}
-          <div className="mb-10 lg:mb-12">
+          <div className="mb-6 lg:mb-8">
             <h2 className="text-2xl lg:text-3xl font-bold text-foreground mb-2">Explore Features</h2>
             <p className="text-muted-foreground">Everything you need to manage your digital assets</p>
           </div>
@@ -186,7 +186,7 @@ const Hero = () => {
       </section>
 
       {/* Bottom CTA Section */}
-      <section className="py-8 lg:py-12">
+      <section className="pt-2 pb-4 lg:py-6">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="bg-card rounded-2xl border border-border p-6 lg:p-8">
             <div className="flex flex-col md:flex-row items-center justify-between gap-6">
