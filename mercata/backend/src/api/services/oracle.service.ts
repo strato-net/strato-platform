@@ -353,12 +353,13 @@ export const getPriceHistory = async (
   rawParams: Record<string, string | undefined> = {}
 ): Promise<PriceHistoryResponse> => {
   try {
+    // If the asset is an LP token, calculate the price history as net asset value
     const matchingPool = await findPoolByLPToken(accessToken, assetAddress);
-
     if (matchingPool) {
-      return getLPTokenPriceHistoryInternal(accessToken, assetAddress, matchingPool, rawParams);
+      return getLPTokenPriceHistory(accessToken, assetAddress, matchingPool, rawParams);
     }
 
+    // If the asset is not an LP token, just get the oracle price history
     const oracleAddress = await getOracleAddress(accessToken);
 
     // Calculate time range for the last month
@@ -396,7 +397,7 @@ export const getPriceHistory = async (
   }
 };
 
-const getLPTokenPriceHistoryInternal = async (
+const getLPTokenPriceHistory = async (
   accessToken: string,
   lpTokenAddress: string,
   pool: { address: string; tokenA: string; tokenB: string },
