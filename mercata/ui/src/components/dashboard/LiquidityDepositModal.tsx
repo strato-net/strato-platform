@@ -273,10 +273,10 @@ const LiquidityDepositModal = ({
       const bToARatioWei = safeParseUnits(selectedPool.bToARatio, 18);
       
       // Calculate what Token A amount would be needed for full Token B balance
-      const tokenAAmountForFullB = (availableTokenB * aToBRatioWei) / BigInt(10 ** 18);
+      const tokenAAmountForFullB = (availableTokenB * bToARatioWei) / BigInt(10 ** 18);
       
       // Calculate what Token B amount would be needed for full Token A balance  
-      const tokenBAmountForFullA = (availableTokenA * bToARatioWei) / BigInt(10 ** 18);
+      const tokenBAmountForFullA = (availableTokenA * aToBRatioWei) / BigInt(10 ** 18);
       
       let finalTokenAAmount: bigint;
       let finalTokenBAmount: bigint;
