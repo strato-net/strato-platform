@@ -22,8 +22,8 @@ interface LoanFormProps {
   exceedsMaxMint?: boolean; // Whether input exceeds max available to mint
   
   // Health factor state
-  riskBuffer: number;
-  onRiskBufferChange: (value: number) => void;
+  targetHF: number;
+  onTargetHFChange: (value: number) => void;
   minHF?: number; // Minimum health factor for slider bounds
   currentHF?: number; // Current position health factor
   sliderRangeColor?: string; // Custom color for slider range bar
@@ -50,8 +50,8 @@ const LoanForm: React.FC<LoanFormProps> = ({
   onMaxClick,
   isMaxMode,
   exceedsMaxMint = false,
-  riskBuffer,
-  onRiskBufferChange,
+  targetHF,
+  onTargetHFChange,
   minHF,
   currentHF,
   sliderRangeColor,
@@ -96,8 +96,8 @@ const LoanForm: React.FC<LoanFormProps> = ({
 
           {/* Health Factor Slider */}
           <HFSlider
-            value={riskBuffer}
-            onChange={onRiskBufferChange}
+            value={targetHF}
+            onChange={onTargetHFChange}
             minHF={minHF}
             currentHF={currentHF}
             averageVaultHealth={averageVaultHealth}

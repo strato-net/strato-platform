@@ -1,15 +1,16 @@
 import {
-  WAD,
+  WAD_UNIT,
   INF,
   computeTargetCRFromHF,
-  computeCollateralValueUSD,
   computeRequiredCollateralForCR,
+  computeCollateralValueUSDST,
+  computeHeadroom,
 } from "@/components/cdp/v2/cdpUtils";
-import type { Allocation, VaultCandidate } from "@/components/cdp/v2/cdpTypes";
+import type { Allocation, VaultCandidate, UNITS, WAD, WEI, USD, DECIMAL, ADDRESS } from "@/components/cdp/v2/cdpTypes";
 
 // API response format (all values as strings)
 export interface VaultCandidateAPI {
-  assetAddress: string;
+  assetAddress: ADDRESS;
   symbol: string;
   assetScale: string;
   minCR: string;
@@ -53,25 +54,27 @@ export function apiToVaultCandidate(api: VaultCandidateAPI): VaultCandidate {
  */
 export function getMaxAllocations(
   candidates: VaultCandidate[],
-  riskBuffer: number
+  targetHF: DECIMAL
 ): Allocation[] {
-  if (candidates.length === 0 || riskBuffer <= 0) return [];
+  if (candidates.length === 0 || targetHF <= 0) return [];
   
   const allocations: Allocation[] = [];
+
+  // Track asset balances > 0 for comparison
+  const assetBalances: Array<{ assetAddress: ADDRESS; symbol: string; balance: UNITS }> = [];
 
   for (const candidate of candidates) {
     if ((candidate.potentialCollateral <= 0n && candidate.currentCollateral <= 0n) || candidate.oraclePrice <= 0n) {
       continue;
     }
 
-    const targetCR = computeTargetCRFromHF(candidate.vaultConfig.minCR, riskBuffer, candidate.vaultConfig.liquidationRatio);
-    const headroom = computeHeadroom(candidate, targetCR);
-    
+    const targetCR: DECIMAL = computeTargetCRFromHF(candidate.vaultConfig.minCR, targetHF, candidate.vaultConfig.liquidationRatio);
+    const headroom: WEI = computeHeadroom(candidate, targetCR);
     if (headroom <= 0n) continue;
 
-    // For MAX mode: use headroom as target and force deposit of all collateral
     const result = allocate(candidate, headroom, targetCR, candidate.globalDebt, true);
 
+    // Only push if result is an Allocation (not an error string) with mintAmount > 0
     if (result !== 'DEBT_FLOOR_HIT' && result !== 'DEBT_CEILING_HIT' && result !== 'NO_HEADROOM' && result.mintAmount > 0n) {
       allocations.push(result);
     }
@@ -80,33 +83,42 @@ export function getMaxAllocations(
   return allocations;
 }
 
-// Get absolute max allocations - uses exact same calculation as "Available: x" in Allocation.tsx
 // Only used when HF slider is at rightmost (minimum HF) AND max mode is enabled
 export function getAbsoluteMaxAllocations(candidates: VaultCandidate[]): Allocation[] {
   if (candidates.length === 0) return [];
   
   const allocations: Allocation[] = [];
+  // // Track asset balances > 0 for comparison
+  // const assetBalances: Array<{ assetAddress: ADDRESS; symbol: string; balance: UNITS }> = [];
 
   for (const candidate of candidates) {
     if (candidate.oraclePrice <= 0n) {
       continue;
     }
 
-    // EXACT same calculation as Allocation.tsx calculateMaxMint
-    const totalCollateral = candidate.currentCollateral + candidate.potentialCollateral;
+    const totalCollateral: UNITS = candidate.currentCollateral + candidate.potentialCollateral;
     
     if (totalCollateral <= 0n) {
       continue;
     }
+
+    // // Track balances > 0
+    // if (totalCollateral > 0n) {
+    //   assetBalances.push({
+    //     assetAddress: candidate.vaultConfig.assetAddress,
+    //     symbol: candidate.vaultConfig.symbol,
+    //     balance: totalCollateral,
+    //   });
+    // }
     
-    const collateralValueUSD = (totalCollateral * candidate.oraclePrice) / candidate.vaultConfig.unitScale;
-    const maxBorrowableUSD = (collateralValueUSD * WAD) / candidate.vaultConfig.minCR;
+    const collateralValueUSD: UNITS = (totalCollateral * candidate.oraclePrice) / candidate.vaultConfig.unitScale;
+    const maxBorrowableUSD: UNITS = (collateralValueUSD * WAD_UNIT) / candidate.vaultConfig.minCR;
     
-    let maxMintAmount: bigint;
+    let maxMintAmount: WEI;
     if (maxBorrowableUSD <= candidate.currentDebt) {
       maxMintAmount = 0n;
     } else {
-      const available = maxBorrowableUSD - candidate.currentDebt;
+      const available: UNITS = maxBorrowableUSD - candidate.currentDebt;
       maxMintAmount = available > 1n ? (available - 1n) : 0n;
     }
     
@@ -133,65 +145,32 @@ export function getAbsoluteMaxAllocations(candidates: VaultCandidate[]): Allocat
     }
   }
 
+  // // Log comparison: asset balances vs allocations with deposits
+  // const allocationsWithDeposits = allocations.filter(a => a.depositAmount > 0n);
+  // console.log('[MintService] 🔍 ABSOLUTE MAX MODE ALLOCATION VERIFICATION:', {
+  //   assetBalances: assetBalances.map(b => ({
+  //     assetAddress: b.assetAddress,
+  //     symbol: b.symbol,
+  //     balance: b.balance.toString(),
+  //   })),
+  //   allocationsWithDeposits: allocationsWithDeposits.map(a => ({
+  //     assetAddress: a.assetAddress,
+  //     depositAmount: a.depositAmount.toString(),
+  //     mintAmount: a.mintAmount.toString(),
+  //   })),
+  //   balanceCount: assetBalances.length,
+  //   allocationCount: allocationsWithDeposits.length,
+  //   match: assetBalances.length === allocationsWithDeposits.length && 
+  //     assetBalances.every(b => allocationsWithDeposits.some(a => a.assetAddress === b.assetAddress)),
+  //   note: 'Asset balances and allocations with deposits should match - all eligible balances should be allocated',
+  // });
+
   return allocations;
 }
 
-// Helper to compute headroom for a single candidate (used by both sorting and total headroom calculation)
-// NOTE: 1-wei buffer is applied because on-chain uses strict < check:
-//   require(currentDebt + amountUSD < maxBorrowableUSD)
-// When HF slider is at rightmost (minimum HF), this matches "Available: x" display
-function computeHeadroom(c: VaultCandidate, targetCR: bigint): bigint {
-  const maxCollateral = c.currentCollateral + c.potentialCollateral;
-  const collateralValue = computeCollateralValueUSD(maxCollateral, c.oraclePrice, c.vaultConfig.unitScale);
-  const maxDebtRaw = (collateralValue * WAD) / targetCR;
-  
-  // Apply 1-wei buffer to satisfy strict < inequality on-chain
-  const maxDebtFromCollateral = maxDebtRaw > 1n ? maxDebtRaw - 1n : 0n;
-  const headroomFromCollateral = maxDebtFromCollateral > c.currentDebt 
-    ? maxDebtFromCollateral - c.currentDebt 
-    : 0n;
 
-  const headroomFromCeiling = c.vaultConfig.debtCeiling === 0n
-    ? INF
-    : c.globalDebt >= c.vaultConfig.debtCeiling ? 0n : c.vaultConfig.debtCeiling - c.globalDebt;
-
-  return headroomFromCollateral < headroomFromCeiling ? headroomFromCollateral : headroomFromCeiling;
-}
-
-export function computeTotalHeadroom(
-  riskBuffer: number,
-  candidates: VaultCandidate[]
-): bigint {
-  if (candidates.length === 0 || riskBuffer <= 0) return 0n;
-
-  let totalHeadroom = 0n;
-
-  for (const candidate of candidates) {
-    if ((candidate.potentialCollateral <= 0n && candidate.currentCollateral <= 0n) || candidate.oraclePrice <= 0n) continue;
-
-    const targetCR = computeTargetCRFromHF(candidate.vaultConfig.minCR, riskBuffer, candidate.vaultConfig.liquidationRatio);
-    const headroom = computeHeadroom(candidate, targetCR);
-    totalHeadroom += headroom;
-  }
-
-  return totalHeadroom;
-}
-
-// Compute borrowing power: maxMintable at targetCR given collateral and current debt
-function computeBorrowingPower(
-  totalCollateral: bigint,
-  currentDebt: bigint,
-  oraclePrice: bigint,
-  assetScale: bigint,
-  targetCR: bigint
-): bigint {
-  const collateralValue = computeCollateralValueUSD(totalCollateral, oraclePrice, assetScale);
-  const maxDebt = (collateralValue * WAD) / targetCR;
-  return maxDebt > currentDebt ? maxDebt - currentDebt : 0n;
-}
-
-// Sort candidates: existing vaults first (by borrowing power), then potential vaults (by borrowing power)
-const sortCandidates = (candidates: VaultCandidate[], riskBuffer: number): VaultCandidate[] => {
+// Sort candidates: existing vaults first (by available headroom), then potential vaults (by available headroom)
+const sortCandidates = (candidates: VaultCandidate[], targetHF: DECIMAL): VaultCandidate[] => {
   // Separate existing vaults (have currentCollateral or currentDebt) from potential vaults
   const existingVaults: VaultCandidate[] = [];
   const potentialVaults: VaultCandidate[] = [];
@@ -204,51 +183,25 @@ const sortCandidates = (candidates: VaultCandidate[], riskBuffer: number): Vault
     }
   }
   
-  // Sort existing vaults by borrowing power (descending)
-  // Borrowing power = (currentCollateral + potentialCollateral) value / targetCR - currentDebt
+  // Sort existing vaults by available headroom (descending)
   existingVaults.sort((a, b) => {
-    const targetCRA = computeTargetCRFromHF(a.vaultConfig.minCR, riskBuffer, a.vaultConfig.liquidationRatio);
-    const targetCRB = computeTargetCRFromHF(b.vaultConfig.minCR, riskBuffer, b.vaultConfig.liquidationRatio);
-    const bpA = computeBorrowingPower(
-      a.currentCollateral + a.potentialCollateral,
-      a.currentDebt,
-      a.oraclePrice,
-      a.vaultConfig.unitScale,
-      targetCRA
-    );
-    const bpB = computeBorrowingPower(
-      b.currentCollateral + b.potentialCollateral,
-      b.currentDebt,
-      b.oraclePrice,
-      b.vaultConfig.unitScale,
-      targetCRB
-    );
-    if (bpA > bpB) return -1;
-    if (bpA < bpB) return 1;
+    const targetCRA: DECIMAL = computeTargetCRFromHF(a.vaultConfig.minCR, targetHF, a.vaultConfig.liquidationRatio);
+    const targetCRB: DECIMAL = computeTargetCRFromHF(b.vaultConfig.minCR, targetHF, b.vaultConfig.liquidationRatio);
+    const headroomA = computeHeadroom(a, targetCRA);
+    const headroomB = computeHeadroom(b, targetCRB);
+    if (headroomA > headroomB) return -1;
+    if (headroomA < headroomB) return 1;
     return 0;
   });
   
-  // Sort potential vaults by borrowing power (descending)
-  // Borrowing power = potentialCollateral value / targetCR (no current debt)
+  // Sort potential vaults by available headroom (descending)
   potentialVaults.sort((a, b) => {
-    const targetCRA = computeTargetCRFromHF(a.vaultConfig.minCR, riskBuffer, a.vaultConfig.liquidationRatio);
-    const targetCRB = computeTargetCRFromHF(b.vaultConfig.minCR, riskBuffer, b.vaultConfig.liquidationRatio);
-    const bpA = computeBorrowingPower(
-      a.potentialCollateral,
-      0n,
-      a.oraclePrice,
-      a.vaultConfig.unitScale,
-      targetCRA
-    );
-    const bpB = computeBorrowingPower(
-      b.potentialCollateral,
-      0n,
-      b.oraclePrice,
-      b.vaultConfig.unitScale,
-      targetCRB
-    );
-    if (bpA > bpB) return -1;
-    if (bpA < bpB) return 1;
+    const targetCRA: DECIMAL = computeTargetCRFromHF(a.vaultConfig.minCR, targetHF, a.vaultConfig.liquidationRatio);
+    const targetCRB: DECIMAL = computeTargetCRFromHF(b.vaultConfig.minCR, targetHF, b.vaultConfig.liquidationRatio);
+    const headroomA = computeHeadroom(a, targetCRA);
+    const headroomB = computeHeadroom(b, targetCRB);
+    if (headroomA > headroomB) return -1;
+    if (headroomA < headroomB) return 1;
     return 0;
   });
   
@@ -263,24 +216,24 @@ interface Allocations {
 }
 
 export function getOptimalAllocations(
-  targetMint: bigint,
-  riskBuffer: number,
+  targetMint: UNITS,
+  targetHF: DECIMAL,
   candidates: VaultCandidate[]
 ): Allocations {
-  if (targetMint <= 0n || candidates.length === 0 || riskBuffer <= 0) {
+  if (targetMint <= 0n || candidates.length === 0 || targetHF <= 0) {
     return { allocations: [], debtFloorHit: false, debtCeilingHit: false };
   }
 
   const allocations: Allocation[] = [];
-  let remainingMint = targetMint;
+  let remainingMint: UNITS = targetMint;
   let debtFloorHit = false;
   let debtCeilingHit = false;
 
   // Sort candidates by stability fee rate, then by existing collateral, then by headroom
-  const sortedCandidates = sortCandidates(candidates, riskBuffer);
+  const sortedCandidates = sortCandidates(candidates, targetHF);
 
   // Track global debt as we allocate (updates as we mint)
-  const globalDebtByAsset = new Map<string, bigint>();
+  const globalDebtByAsset = new Map<ADDRESS, UNITS>();
   for (const c of sortedCandidates) {
     globalDebtByAsset.set(c.vaultConfig.assetAddress, c.globalDebt);
   }
@@ -294,7 +247,7 @@ export function getOptimalAllocations(
       continue;
     }
 
-    const targetCR = computeTargetCRFromHF(candidate.vaultConfig.minCR, riskBuffer, candidate.vaultConfig.liquidationRatio);
+    const targetCR: DECIMAL = computeTargetCRFromHF(candidate.vaultConfig.minCR, targetHF, candidate.vaultConfig.liquidationRatio);
     const currentGlobalDebt = globalDebtByAsset.get(candidate.vaultConfig.assetAddress) ?? candidate.globalDebt;
     const result = allocate(candidate, remainingMint, targetCR, currentGlobalDebt, false);
     
@@ -326,54 +279,52 @@ export function getOptimalAllocations(
 
 function allocate(
   candidate: VaultCandidate,
-  remainingMint: bigint,
-  targetCR: bigint,
-  globalDebt: bigint,
+  remainingMint: WEI,
+  targetCR: DECIMAL,
+  globalDebt: WEI,
   maximizeDeposit: boolean = false
 ): Allocation | 'DEBT_FLOOR_HIT' | 'DEBT_CEILING_HIT' | 'NO_HEADROOM' {
-  let mintAmount = remainingMint;
-  let depositAmount = 0n;
+  let mintAmount: WEI = remainingMint;
+  let depositAmount: UNITS = 0n;
 
-  const currentCollateralValue = computeCollateralValueUSD(
+  // Convert targetCR from DECIMAL to WAD format for comparisons
+  const targetCRWad: WAD = BigInt(Math.round(targetCR * Number(WAD_UNIT)));
+
+  const currentCollateralValue: UNITS = computeCollateralValueUSDST(
     candidate.currentCollateral,
     candidate.oraclePrice,
     candidate.vaultConfig.unitScale
   );
-  const maxCollateral = candidate.currentCollateral + candidate.potentialCollateral;
-  const maxCollateralValue = computeCollateralValueUSD(maxCollateral, candidate.oraclePrice, candidate.vaultConfig.unitScale);
+  const maxCollateral: UNITS = candidate.currentCollateral + candidate.potentialCollateral;
+  const maxCollateralValue: UNITS = computeCollateralValueUSDST(maxCollateral, candidate.oraclePrice, candidate.vaultConfig.unitScale);
 
   // STEP 1: Compute deposit and mint amounts
   if (maximizeDeposit) {
-    // MAX mode: deposit everything and compute max mintable
+    // MAX mode: deposit everything, remainingMint is already the available headroom
     depositAmount = candidate.potentialCollateral;
-    const maxDebtRaw = (maxCollateralValue * WAD) / targetCR;
-    // Apply 1-wei buffer (matches "Available: x" calculation)
-    const maxDebtFromCollateral = maxDebtRaw > 1n ? maxDebtRaw - 1n : 0n;
-    mintAmount = maxDebtFromCollateral > candidate.currentDebt
-      ? maxDebtFromCollateral - candidate.currentDebt
-      : 0n;
+    mintAmount = remainingMint;
   } else {
     // Normal mode: minimize deposit while achieving target mint
-    const newDebt = candidate.currentDebt + mintAmount;
-    const currentCR = newDebt > 0n ? (currentCollateralValue * WAD) / newDebt : INF;
+    const newDebt: WEI = candidate.currentDebt + mintAmount;
+    const currentCR: WAD = newDebt > 0n ? (currentCollateralValue * WAD_UNIT) / newDebt : INF;
 
-    if (currentCR >= targetCR) {
+    if (currentCR >= targetCRWad) {
       depositAmount = 0n;
     } else {
-      const maxCR = newDebt > 0n ? (maxCollateralValue * WAD) / newDebt : INF;
+      const maxCR: WAD = newDebt > 0n ? (maxCollateralValue * WAD_UNIT) / newDebt : INF;
 
-      if (maxCR < targetCR) {
-        const maxDebtRaw = (maxCollateralValue * WAD) / targetCR;
-        // Apply 1-wei buffer (matches "Available: x" calculation)
-        const maxDebtFromCollateral = maxDebtRaw > 1n ? maxDebtRaw - 1n : 0n;
+      if (maxCR < targetCRWad) {
+        const maxDebtRaw: WEI = (maxCollateralValue * WAD_UNIT) / targetCRWad;
+        // Apply 1-unit buffer (matches "Available: x" calculation)
+        const maxDebtFromCollateral: WEI = maxDebtRaw > 1n ? maxDebtRaw - 1n : 0n;
         mintAmount = maxDebtFromCollateral > candidate.currentDebt
           ? maxDebtFromCollateral - candidate.currentDebt
           : 0n;
         depositAmount = candidate.potentialCollateral;
       } else {
-        const requiredCollateral = computeRequiredCollateralForCR(
+        const requiredCollateral: UNITS = computeRequiredCollateralForCR(
           newDebt,
-          targetCR,
+          targetCRWad,
           candidate.oraclePrice,
           candidate.vaultConfig.unitScale
         );
@@ -388,7 +339,7 @@ function allocate(
   // STEP 2: Check debt ceiling
   // ═══════════════════════════════════════════════════════════════════════════
   if (candidate.vaultConfig.debtCeiling > 0n) {
-    const ceilingHeadroom = candidate.vaultConfig.debtCeiling > globalDebt
+    const ceilingHeadroom: UNITS = candidate.vaultConfig.debtCeiling > globalDebt
       ? candidate.vaultConfig.debtCeiling - globalDebt
       : 0n;
 
@@ -399,25 +350,25 @@ function allocate(
     if (mintAmount > ceilingHeadroom) {
       // Cap mint to ceiling and recalculate deposit
       mintAmount = ceilingHeadroom;
-      const newDebtAfterCap = candidate.currentDebt + mintAmount;
-      const currentCRAfterCap = newDebtAfterCap > 0n
-        ? (currentCollateralValue * WAD) / newDebtAfterCap
+      const newDebtAfterCap: WEI = candidate.currentDebt + mintAmount;
+      const currentCRAfterCap: WAD = newDebtAfterCap > 0n
+        ? (currentCollateralValue * WAD_UNIT) / newDebtAfterCap
         : INF;
 
-      if (currentCRAfterCap >= targetCR) {
+      if (currentCRAfterCap >= targetCRWad) {
         depositAmount = 0n;
       } else {
-        const maxCRAfterCap = newDebtAfterCap > 0n
-          ? (maxCollateralValue * WAD) / newDebtAfterCap
+        const maxCRAfterCap: WAD = newDebtAfterCap > 0n
+          ? (maxCollateralValue * WAD_UNIT) / newDebtAfterCap
           : INF;
 
-        if (maxCRAfterCap < targetCR) {
+        if (maxCRAfterCap < targetCRWad) {
           return 'DEBT_CEILING_HIT'; // Can't achieve target CR with ceiling constraint
         }
 
-        const requiredCollateral = computeRequiredCollateralForCR(
+        const requiredCollateral: UNITS = computeRequiredCollateralForCR(
           newDebtAfterCap,
-          targetCR,
+          targetCRWad,
           candidate.oraclePrice,
           candidate.vaultConfig.unitScale
         );
@@ -431,7 +382,7 @@ function allocate(
   // ═══════════════════════════════════════════════════════════════════════════
   // STEP 3: Check debt floor (simplified)
   // ═══════════════════════════════════════════════════════════════════════════
-  const newTotalDebt = candidate.currentDebt + mintAmount;
+  const newTotalDebt: WEI = candidate.currentDebt + mintAmount;
 
   if (newTotalDebt > 0n && newTotalDebt < candidate.vaultConfig.debtFloor) {
     return 'DEBT_FLOOR_HIT';
@@ -446,39 +397,35 @@ function allocate(
 
   // ═══════════════════════════════════════════════════════════════════════════
   // STEP 5: Apply final safety buffer for on-chain strict < check
-  // On-chain: require(currentDebt + amountUSD < maxBorrowableUSD)
-  // 
-  // Apply conservative buffer to account for:
-  // 1. Strict < check on-chain (vs >= or <=)
-  // 2. Rate accumulator drift (interest accrual between frontend calc and execution)
-  // 3. Potential staleness in indexed currentDebt value
-  // 
-  // Buffer: 0.1% (1/1000) of mint amount, minimum 1 wei
+  // Skip this buffer in MAX mode (maximizeDeposit=true) to avoid
+  // underestimating the max mintable amount at the target HF.
   // ═══════════════════════════════════════════════════════════════════════════
-  const finalCollateral = candidate.currentCollateral + depositAmount;
-  const finalCollateralValue = computeCollateralValueUSD(finalCollateral, candidate.oraclePrice, candidate.vaultConfig.unitScale);
-  // Use candidate.vaultConfig.minCR (on-chain constraint) not targetCR (user's risk buffer)
-  const maxBorrowableOnChain = (finalCollateralValue * WAD) / candidate.vaultConfig.minCR;
-  const finalDebt = candidate.currentDebt + mintAmount;
-  
-  // Calculate safety buffer: 0.1% of mintAmount, minimum 1 wei
-  const BUFFER_BPS = 1n; // 0.1% = 1 basis point (1/1000)
-  const BPS_SCALE = 1000n;
-  const percentBuffer = (mintAmount * BUFFER_BPS) / BPS_SCALE;
-  const safetyBuffer = percentBuffer > 0n ? percentBuffer : 1n;
-  
-  // On-chain uses strict <, so finalDebt must be < maxBorrowableOnChain
-  // Also subtract safety buffer to account for rate accumulator drift
-  if (finalDebt + safetyBuffer >= maxBorrowableOnChain && mintAmount > 0n) {
-    // Reduce mintAmount to satisfy strict < check with safety margin
-    const safeMaxMint = maxBorrowableOnChain > candidate.currentDebt + safetyBuffer
-      ? maxBorrowableOnChain - candidate.currentDebt - safetyBuffer - 1n 
-      : 0n;
-    mintAmount = safeMaxMint > 0n ? safeMaxMint : 0n;
-  }
+  if (!maximizeDeposit) {
+    const finalCollateral: UNITS = candidate.currentCollateral + depositAmount;
+    const finalCollateralValue: UNITS = computeCollateralValueUSDST(finalCollateral, candidate.oraclePrice, candidate.vaultConfig.unitScale);
+    // Use candidate.vaultConfig.minCR (on-chain constraint) not targetCR (user's risk buffer)
+    const maxBorrowableOnChain: WEI = (finalCollateralValue * WAD_UNIT) / candidate.vaultConfig.minCR;
+    const finalDebt: WEI = candidate.currentDebt + mintAmount;
+    
+    // Calculate safety buffer: 0.1% of mintAmount, minimum 1 unit
+    const BUFFER_BPS: UNITS = 1n; // 0.1% = 1 basis point (1/1000)
+    const BPS_SCALE: UNITS = 1000n;
+    const percentBuffer: UNITS = (mintAmount * BUFFER_BPS) / BPS_SCALE;
+    const safetyBuffer: UNITS = percentBuffer > 0n ? percentBuffer : 1n;
+    
+    // On-chain uses strict <, so finalDebt must be < maxBorrowableOnChain
+    // Also subtract safety buffer to account for rate accumulator drift
+    if (finalDebt + safetyBuffer >= maxBorrowableOnChain && mintAmount > 0n) {
+      // Reduce mintAmount to satisfy strict < check with safety margin
+      const safeMaxMint: WEI = maxBorrowableOnChain > candidate.currentDebt + safetyBuffer
+        ? maxBorrowableOnChain - candidate.currentDebt - safetyBuffer - 1n 
+        : 0n;
+      mintAmount = safeMaxMint > 0n ? safeMaxMint : 0n;
+    }
 
-  if (mintAmount <= 0n) {
-    return 'NO_HEADROOM';
+    if (mintAmount <= 0n) {
+      return 'NO_HEADROOM';
+    }
   }
 
   return {

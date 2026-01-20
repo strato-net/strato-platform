@@ -1,15 +1,16 @@
 import { formatUnits } from 'ethers';
 import { formatNumberWithCommas, parseUnitsWithTruncation } from '@/utils/numberUtils';
 import type { VaultCandidate, Allocation } from '@/components/cdp/v2/cdpTypes';
+import type { DECIMAL, USD, UNITS, WAD, WEI, RAY, ADDRESS } from '@/components/cdp/v2/cdpTypes';
 
 // ============================================================================
 // Constants
 // ============================================================================
 
-// Fixed-point arithmetic constants
-export const RAY = 10n ** 27n;
-export const WAD = 10n ** 18n;
-export const INF = 2n ** 255n;
+// Fixed-point arithmetic constants (values)
+export const RAY_UNIT = 10n ** 27n;
+export const WAD_UNIT = 10n ** 18n;
+export const INF = 2n ** 255n;  // Used as infinity for CR calculations (WAD-scaled)
 
 // Fee constants
 export const DEPOSIT_FEE_USDST = 0.02;
@@ -28,7 +29,7 @@ export const SECONDS_PER_YEAR = 31536000n;
  * Fixed-point exponentiation (matches contract's _rpow)
  * Computes x^n in RAY precision
  */
-function rpow(x: bigint, n: bigint, ray: bigint = RAY): bigint {
+function rpow(x: bigint, n: bigint, ray: bigint = RAY_UNIT): bigint {
   let z = n % 2n !== 0n ? x : ray;
   let xCopy = x;
   let nCopy = n;
@@ -46,18 +47,18 @@ function rpow(x: bigint, n: bigint, ray: bigint = RAY): bigint {
  * @param stabilityFeeRateRay - Per-second rate in RAY format
  * @returns Annual percentage (e.g., 2.8 for 2.8% APR)
  */
-export function convertStabilityFeeRateToAnnualPercentage(stabilityFeeRateRay: bigint): number {
-  if (stabilityFeeRateRay <= RAY) return 0;
+export function convertStabilityFeeRateToAnnualPercentage(stabilityFeeRateRay: RAY): number {
+  if (stabilityFeeRateRay <= RAY_UNIT) return 0;
   
-  const MAX_REASONABLE_RATE = RAY + (RAY / 300000n);
+  const MAX_REASONABLE_RATE = RAY_UNIT + (RAY_UNIT / 300000n);
   const cappedRate = stabilityFeeRateRay > MAX_REASONABLE_RATE ? MAX_REASONABLE_RATE : stabilityFeeRateRay;
   
   const annualFactorRay = rpow(cappedRate, SECONDS_PER_YEAR);
-  const factorMinusOne = annualFactorRay - RAY;
-  const integerPart = factorMinusOne / RAY;
-  const remainder = factorMinusOne % RAY;
+  const factorMinusOne = annualFactorRay - RAY_UNIT;
+  const integerPart = factorMinusOne / RAY_UNIT;
+  const remainder = factorMinusOne % RAY_UNIT;
   const PRECISION_SCALE = BigInt(1e18);
-  const fractionalPart = (remainder * PRECISION_SCALE) / RAY;
+  const fractionalPart = (remainder * PRECISION_SCALE) / RAY_UNIT;
   const annualPercentage = (Number(integerPart) + Number(fractionalPart) / Number(PRECISION_SCALE)) * 100;
   
   return isFinite(annualPercentage) ? annualPercentage : 0;
@@ -78,34 +79,34 @@ export function convertStabilityFeeRateToAnnualPercentage(stabilityFeeRateRay: b
  * @param minCRWad - Minimum CR in WAD format (e.g., 1.5e18 for 150%)
  * @param targetHF - Target health factor (e.g., 1.13)
  * @param liquidationRatioWad - Liquidation ratio in WAD format (e.g., 1.33e18 for 133%)
- * @returns Target CR in WAD format
+ * @returns Target CR as DECIMAL (e.g., 1.5 for 150%)
  */
 export function computeTargetCRFromHF(
-  minCRWad: bigint, 
-  targetHF: number,
-  liquidationRatioWad: bigint
-): bigint {
-  // Use high precision (1e12) to minimize floating-point rounding errors
-  const PRECISION = 1000000000000n; // 1e12
-  const targetHFScaled = BigInt(Math.round(targetHF * 1e12));
+  minCRWad: WAD, 
+  targetHF: DECIMAL,
+  liquidationRatioWad: WAD
+): DECIMAL {
+  // Calculate minimum CR as decimal
+  const minCR: DECIMAL = Number(minCRWad) / Number(WAD_UNIT);
+  
+  // Calculate liquidation ratio as decimal
+  const liquidationRatio: DECIMAL = Number(liquidationRatioWad) / Number(WAD_UNIT);
   
   // targetCR = liquidationRatio * targetHF
-  const targetCRFromHF = (liquidationRatioWad * targetHFScaled) / PRECISION;
+  const targetCRFromHF: DECIMAL = liquidationRatio * targetHF;
   
-  // Calculate the theoretical minimum HF using pure BigInt math: minHF = minCR / liquidationRatio
-  // If targetHF is at or below this minimum, return minCR exactly (avoids rounding issues)
-  // minHF * PRECISION = (minCR * PRECISION) / liquidationRatio
-  const minHFScaled = (minCRWad * PRECISION) / liquidationRatioWad;
+  // Calculate the theoretical minimum HF: minHF = minCR / liquidationRatio
+  const minHF: DECIMAL = minCR / liquidationRatio;
   
   // If targetHF is at or very close to minimum (within 0.01%), snap to minCR
   // This handles floating-point imprecision from the slider
-  const tolerance = minHFScaled / 10000n; // 0.01%
-  if (targetHFScaled <= minHFScaled + tolerance) {
-    return minCRWad;
+  const tolerance: DECIMAL = minHF * 0.0001; // 0.01%
+  if (targetHF <= minHF + tolerance) {
+    return minCR;
   }
   
   // Ensure we don't go below minCR (would fail on-chain)
-  return targetCRFromHF > minCRWad ? targetCRFromHF : minCRWad;
+  return targetCRFromHF > minCR ? targetCRFromHF : minCR;
 }
 
 // ============================================================================
@@ -113,17 +114,17 @@ export function computeTargetCRFromHF(
 // ============================================================================
 
 /**
- * Compute collateral value in USD
+ * Compute collateral value in USDST
  * @param collateralAmount - Collateral amount in native units
- * @param oraclePrice - Oracle price (18 decimals)
+ * @param oraclePrice - Oracle price in WEI (18 decimals)
  * @param assetScale - Asset scale (10^decimals, e.g., 1e18 for 18-decimal tokens)
- * @returns Collateral value in USD (18 decimals)
+ * @returns Collateral value in USDST (18 decimals)
  */
-export function computeCollateralValueUSD(
-  collateralAmount: bigint,
-  oraclePrice: bigint,
-  assetScale: bigint
-): bigint {
+export function computeCollateralValueUSDST(
+  collateralAmount: UNITS,
+  oraclePrice: WEI,
+  assetScale: UNITS
+): UNITS {
   if (assetScale === 0n) return 0n;
   return (collateralAmount * oraclePrice) / assetScale;
 }
@@ -132,40 +133,61 @@ export function computeCollateralValueUSD(
  * Compute required collateral amount for a given debt and target CR
  * @param debtUSD - Debt amount in USD (18 decimals)
  * @param targetCRWad - Target collateralization ratio in WAD format
- * @param oraclePrice - Oracle price (18 decimals)
+ * @param oraclePrice - Oracle price in WEI (18 decimals)
  * @param assetScale - Asset scale (10^decimals)
  * @returns Required collateral amount in native units
  */
 export function computeRequiredCollateralForCR(
-  debtUSD: bigint,
-  targetCRWad: bigint,
-  oraclePrice: bigint,
-  assetScale: bigint
-): bigint {
+  debtUSD: WEI,
+  targetCRWad: WAD,
+  oraclePrice: WEI,
+  assetScale: UNITS
+): UNITS {
   if (oraclePrice === 0n) return 0n;
-  const collateralUSDRequired = (debtUSD * targetCRWad) / WAD;
+  const collateralUSDRequired = (debtUSD * targetCRWad) / WAD_UNIT;
   return (collateralUSDRequired * assetScale) / oraclePrice;
 }
 
 /**
- * Compute maximum mintable debt for given collateral at target HF
- * @param collateralAmount - Collateral amount in native units
- * @param oraclePrice - Oracle price (18 decimals)
- * @param assetScale - Asset scale (10^decimals)
- * @param targetCRWad - Target CR in WAD format
- * @param currentDebt - Current debt (18 decimals)
- * @returns Maximum additional mintable debt (18 decimals)
+ * Compute headroom (available mintable amount) for a vault candidate
+ * @param vaultCandidate - Vault candidate with collateral and debt information
+ * @param targetCR - Target collateralization ratio as DECIMAL (e.g., 1.5 for 150%)
+ * @returns Available headroom in WEI (actual mintable USDST amount, not total max debt)
  */
-export function computeMaxMintableDebt(
-  collateralAmount: bigint,
-  oraclePrice: bigint,
-  assetScale: bigint,
-  targetCRWad: bigint,
-  currentDebt: bigint
-): bigint {
-  const collateralValueUSD = computeCollateralValueUSD(collateralAmount, oraclePrice, assetScale);
-  const maxDebt = (collateralValueUSD * WAD) / targetCRWad;
-  return maxDebt > currentDebt ? maxDebt - currentDebt : 0n;
+export function computeHeadroom(vaultCandidate: VaultCandidate, targetCR: DECIMAL): WEI {
+  const maxCollateral: UNITS = vaultCandidate.currentCollateral + vaultCandidate.potentialCollateral;
+  const collateralValue: UNITS = computeCollateralValueUSDST(maxCollateral, vaultCandidate.oraclePrice, vaultCandidate.vaultConfig.unitScale);
+  
+  // Convert targetCR from decimal to WAD format for calculation
+  const targetCRWad: WAD = BigInt(Math.round(targetCR * Number(WAD_UNIT)));
+  const maxDebtRaw = (collateralValue * WAD_UNIT) / targetCRWad;
+  const maxDebt = maxDebtRaw > 1n ? maxDebtRaw - 1n : 0n; // 1-unit buffer is applied cuz on-chain uses strict < check
+  return maxDebt > vaultCandidate.currentDebt ? maxDebt - vaultCandidate.currentDebt : 0n;
+}
+
+/**
+ * Compute total headroom across all vault candidates
+ * @param targetHF - Target health factor
+ * @param candidates - Array of vault candidates
+ * @returns Total available headroom in WEI across all vaults
+ */
+export function computeTotalHeadroom(
+  targetHF: DECIMAL,
+  candidates: VaultCandidate[]
+): WEI {
+  if (candidates.length === 0 || targetHF <= 0) return 0n;
+
+  let totalHeadroom: WEI = 0n;
+
+  for (const candidate of candidates) {
+    if ((candidate.potentialCollateral <= 0n && candidate.currentCollateral <= 0n) || candidate.oraclePrice <= 0n) continue;
+
+    const targetCR = computeTargetCRFromHF(candidate.vaultConfig.minCR, targetHF, candidate.vaultConfig.liquidationRatio);
+    const headroom = computeHeadroom(candidate, targetCR);
+    totalHeadroom += headroom;
+  }
+
+  return totalHeadroom;
 }
 
 // Formatting utilities
@@ -196,7 +218,7 @@ export const calculateHealthFactor = (cr: number, lt: number): number => {
 };
 
 // Input parsing utilities
-export const parseInputToWei = (input: string): bigint => {
+export const parseDecimalToUnits = (input: string): bigint => {
   const str = (input || '').replace(/,/g, '').trim();
   if (!str || str === '0') return 0n;
   try {
@@ -226,6 +248,59 @@ export function addAllocationsToVaultCandidates(
   });
 }
 
+// ============================================================================
+// Optimal Allocation Computation Helpers
+// ============================================================================
+
+export interface OptimalAllocationResult {
+  optimalAllocations: VaultCandidate[];
+  debtFloorHit: boolean;
+  debtCeilingHit: boolean;
+}
+
+/**
+ * Compute optimal allocations using MintService
+ * Returns empty result if no mint amount or no candidates
+ * 
+ * @param mintAmount - Mint amount in units
+ * @param targetHF - Target health factor
+ * @param vaultCandidates - Available vault candidates
+ * @param getOptimalAllocations - Function to compute optimal allocations
+ * @returns Optimal allocations result with debt floor/ceiling flags
+ */
+export function computeOptimalAllocations(
+  mintAmount: WEI,
+  targetHF: DECIMAL,
+  vaultCandidates: VaultCandidate[],
+  getOptimalAllocations: (mintAmount: WEI, targetHF: DECIMAL, vaultCandidates: VaultCandidate[]) => { allocations: Allocation[]; debtFloorHit: boolean; debtCeilingHit: boolean }
+): OptimalAllocationResult {
+  // No mint amount or candidates - return empty
+  if (mintAmount <= 0n || vaultCandidates.length === 0) {
+    return {
+      optimalAllocations: [],
+      debtFloorHit: false,
+      debtCeilingHit: false,
+    };
+  }
+  
+  // Compute optimal allocations using MintService
+  try {
+    const result = getOptimalAllocations(mintAmount, targetHF, vaultCandidates);
+    const candidatesWithAllocations = addAllocationsToVaultCandidates(result.allocations, vaultCandidates);
+    return {
+      optimalAllocations: candidatesWithAllocations,
+      debtFloorHit: result.debtFloorHit,
+      debtCeilingHit: result.debtCeilingHit,
+    };
+  } catch {
+    return {
+      optimalAllocations: [],
+      debtFloorHit: false,
+      debtCeilingHit: false,
+    };
+  }
+}
+
 // Fee calculation utilities
 export const calculateTransactionCount = (vaultCandidates: VaultCandidate[]): number => {
   return vaultCandidates.reduce((count, v) => {
@@ -244,16 +319,16 @@ export const calculateTotalFees = (vaultCandidates: VaultCandidate[]): number =>
 };
 
 // Amount calculation utilities
-export const calculateTotalMaxMintWei = (vaultCandidates: VaultCandidate[]): bigint => {
-  // mintAmount is already in wei format (bigint)
+export const calculateTotalMaxMint = (vaultCandidates: VaultCandidate[]): WEI => {
+  // mintAmount is in WEI (USDST, always 18 decimals)
   return vaultCandidates.reduce((sum, v) => {
     return sum + (v.allocation?.mintAmount || 0n);
   }, 0n);
 };
 
-export const calculateAvailableToMint = (totalMaxMintWei: bigint): string => {
-  if (totalMaxMintWei > 0n) {
-    const amount = parseFloat(formatUnits(totalMaxMintWei, 18));
+export const calculateAvailableToMint = (totalMaxMint: WEI): string => {
+  if (totalMaxMint > 0n) {
+    const amount = parseFloat(formatUnits(totalMaxMint, 18));
     const rounded = Math.round(amount * 100) / 100; // Round to 2 decimals
     return formatNumberWithCommas(rounded.toFixed(2));
   }
@@ -261,14 +336,16 @@ export const calculateAvailableToMint = (totalMaxMintWei: bigint): string => {
 };
 
 // APR calculation utilities
-export const calculateWeightedAverageAPR = (vaultCandidates: VaultCandidate[]): number => {
+export const calculateWeightedAverageAPR = (vaultCandidates: VaultCandidate[]): DECIMAL => {
   if (vaultCandidates.length === 0) return 0;
-  let totalMint = 0, weightedSum = 0;
+  let totalMint: DECIMAL = 0;
+  let weightedSum: DECIMAL = 0;
   
   for (const v of vaultCandidates) {
     if (!v.allocation) continue;
     const mint = parseFloat(formatUnits(v.allocation.mintAmount, 18));
-    const feeRate = parseFloat(formatUnits(v.vaultConfig.stabilityFeeRate, 18)) * 100; // Convert to percentage
+    // stabilityFeeRate is in RAY format (27 decimals), convert to annual percentage
+    const feeRate = convertStabilityFeeRateToAnnualPercentage(v.vaultConfig.stabilityFeeRate);
     if (isFinite(mint) && isFinite(feeRate) && mint > 0 && feeRate >= 0) {
       totalMint += mint;
       weightedSum += mint * feeRate;
@@ -298,48 +375,48 @@ export const calculateTotalCollateralValue = (
 
 // Position calculation utilities
 export interface PositionCalculationResult {
-  totalMinted: number;
-  weightedAverageFee: number;
-  totalCollateralUSD: number;
-  overallHealthFactor: number;
+  totalDebt: USD;
+  weightedAverageFee: DECIMAL;
+  totalCollateralUSD: USD;
+  overallHealthFactor: DECIMAL;
 }
 
 export const calculatePositionMetrics = (
   positions: Array<{
     debtAmount: string;
     collateralValueUSD: string;
-    stabilityFeeRate: number;  // Note: this is decimal percentage, not wei
-    liquidationRatio: number;
-    collateralizationRatio: number;
+    stabilityFeeRate: DECIMAL;  // Note: this is decimal percentage, not units
+    liquidationRatio: DECIMAL;
+    collateralizationRatio: DECIMAL;
   }>,
   formatWeiToDecimalHP: (value: string, decimals: number) => string
 ): PositionCalculationResult => {
-  const totalMinted = positions.reduce((sum, pos) => {
-    const debt = parseFloat(formatWeiToDecimalHP(pos.debtAmount, 18));
+  const totalMinted: USD = positions.reduce((sum, pos) => {
+    const debt: USD = parseFloat(formatWeiToDecimalHP(pos.debtAmount, 18));
     return sum + debt;
   }, 0);
 
-  let totalDebt = 0;
-  let weightedSum = 0;
+  let totalDebt: USD = 0;
+  let weightedSum: DECIMAL = 0;
   
   positions.forEach(pos => {
-    const debt = parseFloat(formatWeiToDecimalHP(pos.debtAmount, 18));
+    const debt: USD = parseFloat(formatWeiToDecimalHP(pos.debtAmount, 18));
     if (debt > 0) {
       totalDebt += debt;
       weightedSum += debt * pos.stabilityFeeRate;
     }
   });
   
-  const weightedAverageFee = totalDebt > 0 ? weightedSum / totalDebt : 0;
+  const weightedAverageFee: DECIMAL = totalDebt > 0 ? weightedSum / totalDebt : 0;
 
-  const totalCollateralUSD = positions.reduce((sum, pos) => {
-    const collateralUSD = parseFloat(formatWeiToDecimalHP(pos.collateralValueUSD, 18));
+  const totalCollateralUSD: USD = positions.reduce((sum, pos) => {
+    const collateralUSD: USD = parseFloat(formatWeiToDecimalHP(pos.collateralValueUSD, 18));
     return sum + collateralUSD;
   }, 0);
 
-  if (totalMinted === 0) {
+  if (totalDebt === 0) {
     return {
-      totalMinted,
+      totalDebt,
       weightedAverageFee,
       totalCollateralUSD,
       overallHealthFactor: Infinity,
@@ -347,11 +424,11 @@ export const calculatePositionMetrics = (
   }
   
   // Calculate weighted average liquidation ratio
-  let totalDebtForLT = 0;
-  let weightedLT = 0;
+  let totalDebtForLT: USD = 0;
+  let weightedLT: DECIMAL = 0;
   
   positions.forEach(pos => {
-    const debt = parseFloat(formatWeiToDecimalHP(pos.debtAmount, 18));
+    const debt: USD = parseFloat(formatWeiToDecimalHP(pos.debtAmount, 18));
     if (debt > 0) {
       totalDebtForLT += debt;
       weightedLT += debt * pos.liquidationRatio;
@@ -360,7 +437,7 @@ export const calculatePositionMetrics = (
   
   if (totalDebtForLT === 0) {
     return {
-      totalMinted,
+      totalDebt,
       weightedAverageFee,
       totalCollateralUSD,
       overallHealthFactor: Infinity,
@@ -368,12 +445,12 @@ export const calculatePositionMetrics = (
   }
   
   const avgLT = weightedLT / totalDebtForLT;
-  const cr = (totalCollateralUSD / totalMinted) * 100;
+  const cr = (totalCollateralUSD / totalDebt) * 100;
   
   const overallHealthFactor = cr / avgLT;
 
   return {
-    totalMinted,
+    totalDebt,
     weightedAverageFee,
     totalCollateralUSD,
     overallHealthFactor,
@@ -398,41 +475,41 @@ export const calculatePositionMetrics = (
  */
 export const calculateAggregateHealthFactor = (
   vaults: Array<{
-    currentCollateral: bigint;
-    currentDebt: bigint;
+    currentCollateral: UNITS;
+    currentDebt: WEI;
     depositAmount: number; // New deposit to add (in token units)
     mintAmount: number; // New mint to add (in USDST)
-    oraclePrice: bigint;
-    unitScale: bigint;
-    liquidationRatio: bigint;
+    oraclePrice: WEI;
+    unitScale: UNITS;
+    liquidationRatio: WAD;
     decimals: number; // Token decimals for parsing deposit
   }>
 ): string | null => {
-  let totalCollateralUSD = 0;
-  let totalDebtUSD = 0;
-  let weightedLTSum = 0;
+  let totalCollateralUSD: USD = 0;
+  let totalDebtUSD: USD = 0;
+  let weightedLTSum: DECIMAL = 0;
   
   for (const vault of vaults) {
     // Calculate total debt for this vault (existing + new mint)
     // Use parseUnitsWithTruncation to handle amounts with too many decimal places
-    const mintWei = vault.mintAmount > 0 ? parseUnitsWithTruncation(vault.mintAmount.toString(), 18) : 0n;
-    const totalDebt = vault.currentDebt + mintWei;
+    const mintUnits: WEI = vault.mintAmount > 0 ? parseUnitsWithTruncation(vault.mintAmount.toString(), 18) : 0n;
+    const totalDebt: WEI = vault.currentDebt + mintUnits;
     
     // Skip vaults with zero debt (they have infinite HF)
     if (totalDebt <= 0n) continue;
 
     // Calculate total collateral (existing + new deposit)
     // Use parseUnitsWithTruncation to handle amounts with too many decimal places
-    const depositWei = vault.depositAmount > 0 ? parseUnitsWithTruncation(vault.depositAmount.toString(), vault.decimals) : 0n;
-    const totalCollateral = vault.currentCollateral + depositWei;
+    const depositUnits: UNITS = vault.depositAmount > 0 ? parseUnitsWithTruncation(vault.depositAmount.toString(), vault.decimals) : 0n;
+    const totalCollateral: UNITS = vault.currentCollateral + depositUnits;
     
     // Calculate collateral value in USD
-    const collateralValueUSD = (totalCollateral * vault.oraclePrice) / vault.unitScale;
-    const collateralUSD = parseFloat(formatUnits(collateralValueUSD, 18));
-    const debtUSD = parseFloat(formatUnits(totalDebt, 18));
+    const collateralValueUSD: UNITS = (totalCollateral * vault.oraclePrice) / vault.unitScale;
+    const collateralUSD: USD = parseFloat(formatUnits(collateralValueUSD, 18));
+    const debtUSD: USD = parseFloat(formatUnits(totalDebt, 18));
     
     // Liquidation ratio as percentage (e.g., 1.33e18 -> 133)
-    const lt = parseFloat(formatUnits(vault.liquidationRatio, 18)) * 100;
+    const lt: DECIMAL = parseFloat(formatUnits(vault.liquidationRatio, 18)) * 100;
     
     // Accumulate totals for aggregate calculation
     totalCollateralUSD += collateralUSD;
@@ -444,7 +521,7 @@ export const calculateAggregateHealthFactor = (
   if (totalDebtUSD <= 0) return null;
 
   // Calculate weighted average liquidation threshold
-  const weightedAvgLT = weightedLTSum / totalDebtUSD;
+  const weightedAvgLT: DECIMAL = weightedLTSum / totalDebtUSD;
   
   // Calculate aggregate collateralization ratio
   const aggregateCR = (totalCollateralUSD / totalDebtUSD) * 100;
@@ -468,8 +545,134 @@ export const getAssetColor = (symbol: string): string => {
 };
 
 // ============================================================================
+// Vault Calculation Utilities
+// ============================================================================
+
+/**
+ * Calculate minimum health factor for a specific vault
+ * minHF = minCR / liquidationRatio
+ */
+export const calculateVaultMinHF = (candidate: VaultCandidate): number => {
+  const minCRPercent = parseFloat(formatUnits(candidate.vaultConfig.minCR, 18)) * 100;
+  const ltPercent = parseFloat(formatUnits(candidate.vaultConfig.liquidationRatio, 18)) * 100;
+  if (ltPercent <= 0) return 1.0;
+  return Math.round((minCRPercent / ltPercent) * 100) / 100;
+};
+
+/**
+ * Calculate raw health factor for a vault with given deposit and mint amounts
+ * Returns null for infinite/invalid values
+ */
+export const calculateVaultHFRaw = (
+  candidate: VaultCandidate,
+  depositAmt: DECIMAL,
+  mintAmt: DECIMAL
+): DECIMAL | null => {
+  try {
+    const decimals = candidate.vaultConfig.unitScale.toString().length - 1;
+    const depositUnits: UNITS = depositAmt > 0 ? parseUnitsWithTruncation(depositAmt.toString(), decimals) : 0n;
+    const mintUnits: WEI = mintAmt > 0 ? parseUnitsWithTruncation(mintAmt.toString(), 18) : 0n;
+
+    const totalCollateral: UNITS = candidate.currentCollateral + depositUnits;
+    const totalDebt: WEI = candidate.currentDebt + mintUnits;
+
+    if (totalDebt <= 0n) return null;
+
+    const collateralValueUSD: UNITS = (totalCollateral * candidate.oraclePrice) / candidate.vaultConfig.unitScale;
+    const collateralUSD: USD = parseFloat(formatUnits(collateralValueUSD, 18));
+    const debtUSD: USD = parseFloat(formatUnits(totalDebt, 18));
+
+    const cr: DECIMAL = (collateralUSD / debtUSD) * 100;
+    const lt: DECIMAL = parseFloat(formatUnits(candidate.vaultConfig.liquidationRatio, 18)) * 100;
+    const hf: DECIMAL = cr / lt;
+
+    if (!isFinite(hf) || isNaN(hf) || hf >= 999) return null;
+    return hf;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Calculate health factor for display (formatted string)
+ */
+export const calculateVaultHF = (
+  candidate: VaultCandidate,
+  depositAmt: DECIMAL,
+  mintAmt: DECIMAL
+): string => {
+  const mintUnits: WEI = mintAmt > 0 ? parseUnitsWithTruncation(mintAmt.toString(), 18) : 0n;
+  const totalDebt: WEI = candidate.currentDebt + mintUnits;
+  if (totalDebt <= 0n) return '∞';
+
+  const hfRaw = calculateVaultHFRaw(candidate, depositAmt, mintAmt);
+  return hfRaw !== null ? hfRaw.toFixed(2) : '∞';
+};
+
+/**
+ * Calculate maximum mintable amount for a vault (returns DECIMAL)
+ * Wrapper around calculateMaxMintUnitsForVault that converts to decimal
+ */
+export const calculateMaxMintForVault = (candidate: VaultCandidate, depositAmt: DECIMAL): DECIMAL => {
+  const decimals = candidate.vaultConfig.unitScale.toString().length - 1;
+  const depositUnits: UNITS = depositAmt > 0 ? parseUnitsWithTruncation(depositAmt.toString(), decimals) : 0n;
+  const maxMintUnits: WEI = calculateMaxMintUnitsForVault(candidate, depositUnits);
+  return parseFloat(formatUnits(maxMintUnits, 18));
+};
+
+/**
+ * Calculate max mintable units for a vault (used for exact comparisons)
+ * Uses minCR (on-chain constraint) not targetCR (user's risk buffer)
+ * Applies 1-unit buffer for on-chain strict < check
+ */
+export const calculateMaxMintUnitsForVault = (
+  candidate: VaultCandidate,
+  depositUnits: UNITS
+): WEI => {
+  const totalCollateral: UNITS = candidate.currentCollateral + depositUnits;
+  const collateralValueUSD: UNITS = (totalCollateral * candidate.oraclePrice) / candidate.vaultConfig.unitScale;
+  const maxBorrowableUSD: UNITS = (collateralValueUSD * WAD_UNIT) / candidate.vaultConfig.minCR;
+  
+  if (maxBorrowableUSD <= candidate.currentDebt) return 0n;
+  const available: UNITS = maxBorrowableUSD - candidate.currentDebt;
+  return available > 1n ? (available - 1n) : 0n;
+};
+
+/**
+ * Truncate number for display (6 significant figures)
+ */
+export const truncateForDisplay = (value: number): string => {
+  if (isNaN(value) || value === 0) return '0';
+  if (Math.abs(value) < 0.000001) return value.toExponential(2);
+  const precision = Math.max(0, 6 - Math.floor(Math.log10(Math.abs(value))) - 1);
+  return value.toFixed(Math.min(precision, 6));
+};
+
+/**
+ * Get HF color class based on value
+ */
+export const getHFColorClass = (hf: string, hfNum: number): string => {
+  if (isNaN(hfNum) || hf === '∞') return 'text-green-600';
+  if (hfNum >= 2.0) return 'text-green-600';
+  if (hfNum >= 1.5) return 'text-yellow-600';
+  return 'text-red-600';
+};
+
+// ============================================================================
 // Health Factor Slider Utilities
 // ============================================================================
+
+/**
+ * Get slider color based on target health factor
+ * @param targetHF - Target health factor value
+ * @returns CSS color string
+ */
+export const getSliderColor = (targetHF: number): string => {
+  if (targetHF >= 2.5) return '#10b981'; // green
+  if (targetHF >= 2.0) return '#3b82f6'; // blue
+  if (targetHF >= 1.5) return '#eab308'; // yellow
+  return '#ef4444'; // red
+};
 
 /**
  * Calculate the minimum health factor for the HF slider based on vault data

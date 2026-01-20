@@ -30,7 +30,7 @@ const DebtPosition: React.FC<DebtPositionProps> = ({ refreshTrigger }) => {
     fetchPositions();
   }, [refreshTrigger]);
 
-  const { totalMinted, weightedAverageFee, totalCollateralUSD, overallHealthFactor } = useMemo(() => 
+  const { totalDebt, weightedAverageFee, totalCollateralUSD, overallHealthFactor } = useMemo(() => 
     calculatePositionMetrics(
       positions.map(pos => ({
         debtAmount: pos.debtAmount,
@@ -65,7 +65,7 @@ const DebtPosition: React.FC<DebtPositionProps> = ({ refreshTrigger }) => {
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">Total Debt</span>
-            <span className="text-sm font-semibold">{formatNumber(totalMinted, 2)} USDST</span>
+            <span className="text-sm font-semibold">{formatNumber(totalDebt, 2)} USDST</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">Average Stability Fee</span>

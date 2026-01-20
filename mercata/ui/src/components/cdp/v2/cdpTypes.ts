@@ -1,39 +1,41 @@
 export type UNITS = bigint;
+export type WAD = bigint;
 export type USD = number;
 export type DECIMAL = number;
+export type RAY = bigint;
+export type WEI = bigint;
 export type ADDRESS = string;
+export interface VaultCandidate {
+  vaultConfig: VaultConfig;
+  oraclePrice: WEI;
+  currentCollateral: UNITS;
+  potentialCollateral: UNITS;
+  currentDebt: WEI;
+  globalDebt: WEI;
+  allocation?: Allocation;
+}
 
 export interface Allocation {
   assetAddress: ADDRESS;
   depositAmount: UNITS;
-  mintAmount: UNITS;
-}
-
-export interface VaultCandidate {
-  vaultConfig: VaultConfig;
-  oraclePrice: UNITS;
-  currentCollateral: UNITS;
-  potentialCollateral: UNITS;
-  currentDebt: UNITS;
-  globalDebt: UNITS;
-  allocation?: Allocation;
+  mintAmount: WEI;
 }
 
 interface VaultConfig {
   assetAddress: ADDRESS;
   symbol: string;
   unitScale: UNITS;
-  minCR: UNITS;
-  liquidationRatio: UNITS;
-  stabilityFeeRate: UNITS;
-  debtFloor: UNITS;
-  debtCeiling: UNITS;
+  minCR: WAD;
+  liquidationRatio: WAD;
+  stabilityFeeRate: RAY;
+  debtFloor: WEI;
+  debtCeiling: WEI;
 }
 
 export interface PositionMetrics {
-  totalMinted: number;
+  totalDebt: USD;
   weightedAverageFee: number;
-  totalCollateralUSD: number;
+  totalCollateralUSD: USD;
   overallHealthFactor: number;
 }
 
@@ -60,31 +62,31 @@ export interface FeeCalculation {
 
 export interface MintCalculation {
   unitScale: UNITS;
-  mintAmount: UNITS;
+  mintAmount: WEI;
   mintAmountUSD: USD;
-  availableToMint: UNITS;
-  totalMaxMint: UNITS;
+  availableToMint: WEI;
+  totalMaxMint: WEI;
   weightedAverageAPR: number;
 }
 
-// // Transaction types
-// export type TransactionType = 'deposit' | 'mint' | 'withdraw' | 'repay';
+// Transaction types
+export type TransactionType = 'deposit' | 'mint' | 'withdraw' | 'repay';
 
-// export interface Transaction {
-//   type: TransactionType;
-//   asset: ADDRESS;
-//   amount: string;
-//   symbol: string;
-// }
+export interface Transaction {
+  type: TransactionType;
+  asset: ADDRESS;
+  amount: string;
+  symbol: string;
+}
 
-// export interface TransactionProgress {
-//   symbol: string;
-//   type: 'deposit' | 'mint';
-//   amount: string;
-//   status: 'pending' | 'processing' | 'completed' | 'error';
-//   hash?: string;
-//   error?: string;
-// }
+export interface TransactionProgress {
+  symbol: string;
+  type: 'deposit' | 'mint';
+  amount: string;
+  status: 'pending' | 'processing' | 'completed' | 'error';
+  hash?: string;
+  error?: string;
+}
 
 // // ============================================================================
 // // Vault Data Types
@@ -93,15 +95,15 @@ export interface MintCalculation {
 // export interface Vault {
 //   asset: ADDRESS;
 //   symbol: string;
-//   collateralAmountWei: string;
+//   collateralAmountUnits: string;
 //   collateralAmountDecimals: number;
-//   collateralValueUSDWei: string;
-//   debtAmountWei: string;
+//   collateralValueUSDUnits: string;
+//   debtAmountUnits: string;
 //   collateralizationRatio: number;
 //   liquidationRatio: number;
 //   healthFactor: number;
 //   stabilityFeeRate: number;
 //   borrower?: ADDRESS;
-//   scaledDebtWei: string;
+//   scaledDebtUnits: string;
 //   rateAccumulator: string;
 // }
