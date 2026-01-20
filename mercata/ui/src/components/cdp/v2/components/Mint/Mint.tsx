@@ -8,7 +8,7 @@ import { useOracleContext } from '@/context/OracleContext';
 import { cdpService } from '@/services/cdpService';
 import { getOptimalAllocations, getMaxAllocations, getAbsoluteMaxAllocations } from '@/components/cdp/v2/MintService';
 import { computeTotalHeadroom } from '@/components/cdp/v2/cdpUtils';
-import type { VaultCandidate, Allocation, TransactionProgress } from '@/components/cdp/v2/cdpTypes';
+import type { VaultCandidate, Allocation, TransactionProgress, WEI } from '@/components/cdp/v2/cdpTypes';
 import { formatUnits } from 'ethers';
 import { formatNumberWithCommas, parseCommaNumber } from '@/utils/numberUtils';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';

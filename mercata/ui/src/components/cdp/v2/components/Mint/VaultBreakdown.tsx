@@ -6,7 +6,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { ChevronUp, ChevronDown } from 'lucide-react';
 import { formatUnits } from 'ethers';
 import { NumericFormat } from 'react-number-format';
-import type { VaultCandidate } from '@/components/cdp/v2/cdpTypes';
+import type { VaultCandidate, WEI } from '@/components/cdp/v2/cdpTypes';
 import {
   formatPercentage,
   getAssetColor,

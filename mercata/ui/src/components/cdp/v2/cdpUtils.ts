@@ -76,34 +76,22 @@ export function convertStabilityFeeRateToAnnualPercentage(stabilityFeeRateRay: R
  * 
  * Ensures targetCR >= minCR to pass on-chain validation.
  * 
- * @param minCRWad - Minimum CR in WAD format (e.g., 1.5e18 for 150%)
+ * @param minCR - Minimum CR in WAD format (e.g., 1.5e18 for 150%)
  * @param targetHF - Target health factor (e.g., 1.13)
- * @param liquidationRatioWad - Liquidation ratio in WAD format (e.g., 1.33e18 for 133%)
- * @returns Target CR as DECIMAL (e.g., 1.5 for 150%)
+ * @param liquidationRatio - Liquidation ratio in WAD format (e.g., 1.33e18 for 133%)
+ * @returns Target CR in WAD format (e.g., 1.5e18 for 150%)
  */
 export function computeTargetCRFromHF(
-  minCRWad: WAD, 
+  minCR: WAD, 
   targetHF: DECIMAL,
-  liquidationRatioWad: WAD
-): DECIMAL {
-  // Calculate minimum CR as decimal
-  const minCR: DECIMAL = Number(minCRWad) / Number(WAD_UNIT);
+  liquidationRatio: WAD
+): WAD {
+  // Use high precision (1e12) to minimize floating-point rounding errors
+  const PRECISION = 1000000000000n; // 1e12
+  const targetHFScaled = BigInt(Math.round(targetHF * 1e12));
   
-  // Calculate liquidation ratio as decimal
-  const liquidationRatio: DECIMAL = Number(liquidationRatioWad) / Number(WAD_UNIT);
-  
-  // targetCR = liquidationRatio * targetHF
-  const targetCRFromHF: DECIMAL = liquidationRatio * targetHF;
-  
-  // Calculate the theoretical minimum HF: minHF = minCR / liquidationRatio
-  const minHF: DECIMAL = minCR / liquidationRatio;
-  
-  // If targetHF is at or very close to minimum (within 0.01%), snap to minCR
-  // This handles floating-point imprecision from the slider
-  const tolerance: DECIMAL = minHF * 0.0001; // 0.01%
-  if (targetHF <= minHF + tolerance) {
-    return minCR;
-  }
+  // targetCR = liquidationRatio * targetHF (in WAD format)
+  const targetCRFromHF = (liquidationRatio * targetHFScaled) / PRECISION;
   
   // Ensure we don't go below minCR (would fail on-chain)
   return targetCRFromHF > minCR ? targetCRFromHF : minCR;
@@ -151,16 +139,14 @@ export function computeRequiredCollateralForCR(
 /**
  * Compute headroom (available mintable amount) for a vault candidate
  * @param vaultCandidate - Vault candidate with collateral and debt information
- * @param targetCR - Target collateralization ratio as DECIMAL (e.g., 1.5 for 150%)
+ * @param targetCR - Target collateralization ratio in WAD format (e.g., 1.5e18 for 150%)
  * @returns Available headroom in WEI (actual mintable USDST amount, not total max debt)
  */
-export function computeHeadroom(vaultCandidate: VaultCandidate, targetCR: DECIMAL): WEI {
+export function computeHeadroom(vaultCandidate: VaultCandidate, targetCR: WAD): WEI {
   const maxCollateral: UNITS = vaultCandidate.currentCollateral + vaultCandidate.potentialCollateral;
   const collateralValue: UNITS = computeCollateralValueUSDST(maxCollateral, vaultCandidate.oraclePrice, vaultCandidate.vaultConfig.unitScale);
   
-  // Convert targetCR from decimal to WAD format for calculation
-  const targetCRWad: WAD = BigInt(Math.round(targetCR * Number(WAD_UNIT)));
-  const maxDebtRaw = (collateralValue * WAD_UNIT) / targetCRWad;
+  const maxDebtRaw = (collateralValue * WAD_UNIT) / targetCR;
   const maxDebt = maxDebtRaw > 1n ? maxDebtRaw - 1n : 0n; // 1-unit buffer is applied cuz on-chain uses strict < check
   return maxDebt > vaultCandidate.currentDebt ? maxDebt - vaultCandidate.currentDebt : 0n;
 }
@@ -182,7 +168,7 @@ export function computeTotalHeadroom(
   for (const candidate of candidates) {
     if ((candidate.potentialCollateral <= 0n && candidate.currentCollateral <= 0n) || candidate.oraclePrice <= 0n) continue;
 
-    const targetCR = computeTargetCRFromHF(candidate.vaultConfig.minCR, targetHF, candidate.vaultConfig.liquidationRatio);
+    const targetCR: WAD = computeTargetCRFromHF(candidate.vaultConfig.minCR, targetHF, candidate.vaultConfig.liquidationRatio);
     const headroom = computeHeadroom(candidate, targetCR);
     totalHeadroom += headroom;
   }
@@ -689,11 +675,11 @@ export const calculateSliderMinHF = (
   
   // Find max minCR from all vault candidates (minCR is in WAD format)
   const maxMinCRWad = vaultCandidates.reduce((max, v) => v.vaultConfig.minCR > max ? v.vaultConfig.minCR : max, 0n);
-  const maxMinCRPercent = Number(maxMinCRWad) / Number(WAD) * 100; // Convert to percentage
+  const maxMinCRPercent = Number(maxMinCRWad) / Number(WAD_UNIT) * 100; // Convert to percentage
   
   // Find max liquidation ratio from all vault candidates (liquidationRatio is in WAD format)
   const maxLRWad = vaultCandidates.reduce((max, v) => v.vaultConfig.liquidationRatio > max ? v.vaultConfig.liquidationRatio : max, 0n);
-  const maxLT = Number(maxLRWad) / Number(WAD) * 100; // Convert to percentage
+  const maxLT = Number(maxLRWad) / Number(WAD_UNIT) * 100; // Convert to percentage
   
   if (maxLT <= 0) return 1.0;
   
