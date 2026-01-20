@@ -3,6 +3,7 @@ import { logInfo, logError, logFeedUpdate } from './utils/logger';
 import { fetchPrices, generateConstantPrices } from './adapters/genericRestAdapter';
 import { pushAssetPrices } from './utils/oraclePusher';
 import { checkBalances } from './utils/balanceChecker';
+import { fetchPreviousPrices } from './utils/priceReader';
 import { withTimeout } from './utils/apiClient';
 import { ConfigLoader } from './utils/configLoader';
 import { SourceResult, AggregatedPrice, SourceConfig } from './types';
@@ -19,6 +20,38 @@ function calculateMedian(prices: number[]): number {
     return sorted.length % 2 !== 0
         ? sorted[mid]
         : Math.floor((sorted[mid - 1] + sorted[mid]) / 2);
+}
+
+function checkPriceChange(assetKey: string, newPrice: number, previousPrice: number): void {
+    // Skip if previous price is 0 or missing (new asset)
+    if (previousPrice <= 0 || newPrice <= 0) return;
+    
+    const changePercent = Math.abs((newPrice - previousPrice) / previousPrice) * 100;
+    
+    if (changePercent > ORACLE_CONFIG.MAX_PRICE_CHANGE_PERCENT) {
+        const oldPriceUSD = (previousPrice / 1e18).toFixed(2);
+        const newPriceUSD = (newPrice / 1e18).toFixed(2);
+        const direction = newPrice > previousPrice ? 'increased' : 'decreased';
+        logError('CronScheduler', new Error(
+            `Significant price change alert for ${assetKey}: ${direction} ${changePercent.toFixed(2)}% (max ${ORACLE_CONFIG.MAX_PRICE_CHANGE_PERCENT}%). Previous: $${oldPriceUSD}, New: $${newPriceUSD}`
+        ));
+    }
+}
+
+function checkSourceDivergence(assetKey: string, sources: Array<{ name: string; price: number }>, medianPrice: number): void {
+    if (sources.length < 2 || medianPrice === 0) return;
+    
+    const prices = sources.map(s => s.price);
+    const minPrice = Math.min(...prices);
+    const maxPrice = Math.max(...prices);
+    const spreadPercent = ((maxPrice - minPrice) / medianPrice) * 100;
+    
+    if (spreadPercent > ORACLE_CONFIG.MAX_SOURCE_DIVERGENCE_PERCENT) {
+        const sourcePrices = sources.map(s => `${s.name}: $${(s.price / 1e18).toFixed(2)}`).join(', ');
+        logError('CronScheduler', new Error(
+            `Source divergence alert for ${assetKey}: ${spreadPercent.toFixed(2)}% spread (max ${ORACLE_CONFIG.MAX_SOURCE_DIVERGENCE_PERCENT}%). Sources: [${sourcePrices}]`
+        ));
+    }
 }
 
 function isMetalsMarketClosed(): boolean {
@@ -90,7 +123,8 @@ async function fetchFromAllSources(configLoader: ConfigLoader): Promise<Map<stri
 function aggregatePrices(
     configLoader: ConfigLoader,
     sourceResults: Map<string, SourceResult>,
-    marketClosed: boolean
+    marketClosed: boolean,
+    previousPrices: Map<string, number>
 ): AggregatedPrice[] {
     return Object.entries(configLoader.getAllAssets()).map(([assetKey, asset]) => {
         const useProxy = asset.weekendProxy && marketClosed;
@@ -125,9 +159,19 @@ function aggregatePrices(
         const isValid = sources.length >= requiredSources;
         if (!isValid) logError('CronScheduler', new Error(`Insufficient sources for ${assetKey}: got ${sources.length}, need ${requiredSources}`));
         
+        const medianPrice = isValid ? calculateMedian(sources.map(s => s.price)) : 0;
+        
+        // Check for source divergence (alert only, still submit)
+        if (isValid) {
+            checkSourceDivergence(assetKey, sources, medianPrice);
+            // Check for significant price change vs previous on-chain price
+            const previousPrice = previousPrices.get(asset.targetAssetAddress.toLowerCase()) || 0;
+            checkPriceChange(assetKey, medianPrice, previousPrice);
+        }
+        
         return {
             assetKey,
-            medianPrice: isValid ? calculateMedian(sources.map(s => s.price)) : 0,
+            medianPrice,
             targetAddress: asset.targetAssetAddress,
             sources,
             expectedSourceCount: expectedCount,
@@ -141,14 +185,18 @@ function aggregatePrices(
 // ============================================================================
 
 async function processAllAssets(configLoader: ConfigLoader): Promise<void> {
-    await checkBalances();
+    const [, previousPrices] = await Promise.all([
+        checkBalances(),
+        fetchPreviousPrices()
+    ]);
+    
     const marketClosed = isMetalsMarketClosed();
     const assetCount = Object.keys(configLoader.getAllAssets()).length;
     
     logInfo('CronScheduler', `Market ${marketClosed ? 'closed' : 'open'}, processing ${assetCount} assets`);
     
     const sourceResults = await fetchFromAllSources(configLoader);
-    const aggregatedPrices = aggregatePrices(configLoader, sourceResults, marketClosed);
+    const aggregatedPrices = aggregatePrices(configLoader, sourceResults, marketClosed, previousPrices);
     
     // Partition into valid and failed prices in single pass
     const validPrices: AggregatedPrice[] = [];
