@@ -11,7 +11,6 @@ import {
   formatPercentage,
   getAssetColor,
   convertStabilityFeeRateToAnnualPercentage,
-  calculateAggregateHealthFactor,
   calculateVaultMinHF,
   calculateVaultHFRaw,
   calculateVaultHF,
@@ -40,6 +39,7 @@ interface VaultBreakdownProps {
   onMintMaxVaultsChange?: (vaults: Set<ADDRESS>) => void;
   exceedsBalance?: boolean;
   hasLowHF?: boolean;
+  projectedVaultHealth?: string | null; // Passed from parent (Mint.tsx)
 }
 
 const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
@@ -58,6 +58,7 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
   onTotalManualMintChange,
   onAverageVaultHealthChange,
   onMintMaxVaultsChange,
+  projectedVaultHealth,
 }) => {
 
   // ============================================================================
@@ -177,32 +178,7 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
   const isSliderAtMin = targetHF !== undefined && minHF !== undefined && Math.abs(targetHF - minHF) < 0.01;
   const isFullMaxMode = autoAllocate && isMaxMode && isSliderAtMin;
 
-  const projectedVaultHealth = useMemo(() => {
-    if (vaultCandidates.length === 0) return null;
-
-    const vaultData = vaultCandidates.map(candidate => {
-      const decimals = candidate.vaultConfig.unitScale.toString().length - 1;
-      const depositAmt = candidate.allocation 
-        ? parseFloat(formatUnits(candidate.allocation.depositAmount, decimals))
-        : 0;
-      const mintAmt = candidate.allocation 
-        ? parseFloat(formatUnits(candidate.allocation.mintAmount, 18))
-        : 0;
-      
-      return {
-        currentCollateral: candidate.currentCollateral,
-        currentDebt: candidate.currentDebt,
-        depositAmount: depositAmt,
-        mintAmount: mintAmt,
-        oraclePrice: candidate.oraclePrice,
-        unitScale: candidate.vaultConfig.unitScale,
-        liquidationRatio: candidate.vaultConfig.liquidationRatio,
-        decimals,
-      };
-    }).filter(v => v.currentDebt > 0n || v.depositAmount > 0 || v.mintAmount > 0);
-
-    return calculateAggregateHealthFactor(vaultData);
-  }, [vaultCandidates]);
+  // projectedVaultHealth is now passed as a prop from Mint.tsx to avoid duplication
 
   const getGridClass = useCallback(() => {
     if (showMintAmounts) {
@@ -234,11 +210,7 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
     }
   }, [mintMaxVaults, onMintMaxVaultsChange]);
 
-  useEffect(() => {
-    if (onAverageVaultHealthChange) {
-      onAverageVaultHealthChange(autoAllocate ? projectedVaultHealth : null);
-    }
-  }, [projectedVaultHealth, autoAllocate, onAverageVaultHealthChange]);
+  // No longer needed - projectedVaultHealth is passed as prop
 
   // ============================================================================
   // Effects - UI State Sync

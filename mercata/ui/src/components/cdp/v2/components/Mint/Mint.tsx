@@ -187,11 +187,14 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     calculateAvailableToMint(totalMaxMint),
   [totalMaxMint]);
 
+  // Recalculates whenever allocations change (optimalAllocations or manualAllocations)
   const projectedVaultHealth = useMemo(() => {
-    if (!autoAllocate || vaultCandidates.length === 0 || allocations.length === 0) {
+    // Need vaultCandidates and allocations to calculate
+    if (vaultCandidates.length === 0 || allocations.length === 0) {
       return null;
     }
 
+    // Map vaultCandidates with their allocations
     const vaultData = vaultCandidates.map(candidate => {
       const withAllocation = allocations.find(v => v.vaultConfig.assetAddress === candidate.vaultConfig.assetAddress);
       const decimals = candidate.vaultConfig.unitScale.toString().length - 1;
@@ -215,7 +218,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     }).filter(v => v.currentDebt > 0n || v.depositAmount > 0 || v.mintAmount > 0);
 
     return calculateAggregateHealthFactor(vaultData);
-  }, [autoAllocate, vaultCandidates, allocations]);
+  }, [vaultCandidates, allocations]); // Recalculates when vaultCandidates or allocations change
 
   const weightedAverageAPR = useMemo(() => calculateWeightedAverageAPR(allocations), [allocations]);
 
@@ -782,6 +785,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
               onMintMaxVaultsChange={setMintMaxVaults}
               exceedsBalance={exceedsBalance}
               hasLowHF={hasLowHF}
+              projectedVaultHealth={projectedVaultHealth}
             />
           )}
 
