@@ -21,7 +21,6 @@ import {
   getHFColorClass,
 } from '@/components/cdp/v2/cdpUtils';
 import { useTokenContext } from '@/context/TokenContext';
-import { useUserTokens } from '@/context/UserTokensContext';
 import { parseUnitsWithTruncation } from '@/utils/numberUtils';
 import { UNITS, USD, DECIMAL, ADDRESS } from '@/components/cdp/v2/cdpTypes';
 
@@ -66,7 +65,6 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
   // ============================================================================
 
   const { earningAssets, inactiveTokens } = useTokenContext();
-  const { activeTokens } = useUserTokens();
 
 
 
@@ -79,12 +77,25 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
   const [focusedInput, setFocusedInput] = useState<string | null>(null);
 
   // ============================================================================
-  // State - Input Values
+  // State - Input Display Values (what's shown in input fields)
+  // Source of truth for chain values is vaultCandidates.allocation (from parent)
   // ============================================================================
 
-  const [depositDisplayInputs, setDepositDisplayInputs] = useState<Record<ADDRESS, string>>({});
-  const [depositCanonical, setDepositCanonical] = useState<Record<ADDRESS, string>>({});
-  const [mintInputs, setMintInputs] = useState<Record<ADDRESS, string>>({});
+  const [vaultInputs, setVaultInputs] = useState<Record<ADDRESS, { depositAmount: string; mintAmount: string }>>({});
+  
+  // ============================================================================
+  // State - Pre-calculated representations for auto-to-manual transition
+  // Stores both Amount and Value representations to detect display mode switches vs real edits
+  // ============================================================================
+  
+  const [allocationRepresentations, setAllocationRepresentations] = useState<Record<ADDRESS, {
+    depositAmountToken: UNITS;  // Source of truth in token units
+    depositAmountDisplay: string;  // Amount mode representation
+    depositValueDisplay: string;   // Value mode representation
+    mintAmountToken: WEI;  // Source of truth
+    mintAmountDisplay: string;  // Amount mode representation (always same as token for mint)
+    mintValueDisplay: string;   // Value mode representation
+  }>>({});
 
   // ============================================================================
   // State - Tracking
@@ -102,6 +113,7 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
   const prevAutoSupplyRef = useRef<boolean>(autoAllocate);
   const depositInputRefs = useRef<Record<ADDRESS, HTMLInputElement | null>>({});
   const mintInputRefs = useRef<Record<ADDRESS, HTMLInputElement | null>>({});
+  const isInitializingRef = useRef<boolean>(false);
 
 
 
@@ -114,34 +126,47 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
     return isNaN(num) ? 0 : num;
   }, []);
 
-  const getPrice = useCallback((assetAddress: ADDRESS): USD => {
-    const c = vaultCandidates.find(v => v.vaultConfig.assetAddress === assetAddress);
-    return c ? parseFloat(formatUnits(c.oraclePrice, 18)) : 0;
+  const getPrice = useCallback((assetAddress: ADDRESS): WEI => {
+    const vaultCandidate = vaultCandidates.find(candidate => candidate.vaultConfig.assetAddress === assetAddress);
+    return vaultCandidate ? vaultCandidate.oraclePrice : 0n;
   }, [vaultCandidates]);
 
-  const getAvailableBalance = useCallback((candidate: VaultCandidate): UNITS => {
-    const userToken = activeTokens.find(token => 
-      token.address?.toLowerCase() === candidate.vaultConfig.assetAddress?.toLowerCase()
-    );
-    return userToken?.balance ? BigInt(userToken.balance) : 0n;
-  }, [activeTokens]);
-
-  const wadToUSD = useCallback((wadAmount: string, assetAddress: ADDRESS, roundForDisplay: boolean = true): string => {
-    if (!wadAmount || wadAmount === '0') return '';
-    const tokenAmount: DECIMAL = toNumber(wadAmount);
-    const price: USD = getPrice(assetAddress);
-    const usdValue: USD = tokenAmount * price;
-    if (usdValue <= 0) return '';
+  const amountToValue = useCallback((amount: string, assetAddress: ADDRESS, roundForDisplay: boolean = true): string => {
+    if (!amount || amount === '0') return '';
+    const vaultCandidate = vaultCandidates.find(candidate => candidate.vaultConfig.assetAddress === assetAddress);
+    if (!vaultCandidate) return '';
+    
+    const price: WEI = getPrice(assetAddress);
+    if (price === 0n) return '';
+    
+    const decimals = vaultCandidate.vaultConfig.unitScale.toString().length - 1;
+    const amountUnits: UNITS = parseUnitsWithTruncation(amount, decimals);
+    
+    // value = (amount * price) / unitScale
+    const valueUnits: WEI = (amountUnits * price) / vaultCandidate.vaultConfig.unitScale;
+    if (valueUnits <= 0n) return '';
+    
+    const usdValue = parseFloat(formatUnits(valueUnits, 18));
     return roundForDisplay ? usdValue.toFixed(2) : String(usdValue);
-  }, [toNumber, getPrice]);
+  }, [vaultCandidates, getPrice]);
 
-  const usdToWad = useCallback((usdValue: string, assetAddress: ADDRESS): string => {
-    if (!usdValue || usdValue === '0') return '';
-    const usd: USD = toNumber(usdValue);
-    const price: USD = getPrice(assetAddress);
-    const tokenAmount: DECIMAL = price > 0 ? usd / price : 0;
-    return tokenAmount > 0 ? String(tokenAmount) : '';
-  }, [toNumber, getPrice]);
+  const valueToAmount = useCallback((value: string, assetAddress: ADDRESS): string => {
+    if (!value || value === '0') return '';
+    const vaultCandidate = vaultCandidates.find(candidate => candidate.vaultConfig.assetAddress === assetAddress);
+    if (!vaultCandidate) return '';
+    
+    const price: WEI = getPrice(assetAddress);
+    if (price === 0n) return '';
+    
+    const decimals = vaultCandidate.vaultConfig.unitScale.toString().length - 1;
+    const valueUnits: WEI = parseUnitsWithTruncation(value, 18);
+    
+    // amount = (value * unitScale) / price
+    const amountUnits: UNITS = (valueUnits * vaultCandidate.vaultConfig.unitScale) / price;
+    if (amountUnits <= 0n) return '';
+    
+    return formatUnits(amountUnits, decimals);
+  }, [vaultCandidates, getPrice]);
 
 
 
@@ -156,19 +181,13 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
     if (vaultCandidates.length === 0) return null;
 
     const vaultData = vaultCandidates.map(candidate => {
-      let depositAmt: DECIMAL = 0;
-      let mintAmt: DECIMAL = 0;
-      
-      if (autoAllocate) {
-        if (candidate.allocation) {
-          const decimals = candidate.vaultConfig.unitScale.toString().length - 1;
-          depositAmt = parseFloat(formatUnits(candidate.allocation.depositAmount, decimals));
-          mintAmt = parseFloat(formatUnits(candidate.allocation.mintAmount, 18));
-        }
-      } else {
-        depositAmt = toNumber(depositCanonical[candidate.vaultConfig.assetAddress] || '');
-        mintAmt = toNumber(mintInputs[candidate.vaultConfig.assetAddress] || '');
-      }
+      const decimals = candidate.vaultConfig.unitScale.toString().length - 1;
+      const depositAmt = candidate.allocation 
+        ? parseFloat(formatUnits(candidate.allocation.depositAmount, decimals))
+        : 0;
+      const mintAmt = candidate.allocation 
+        ? parseFloat(formatUnits(candidate.allocation.mintAmount, 18))
+        : 0;
       
       return {
         currentCollateral: candidate.currentCollateral,
@@ -178,12 +197,12 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
         oraclePrice: candidate.oraclePrice,
         unitScale: candidate.vaultConfig.unitScale,
         liquidationRatio: candidate.vaultConfig.liquidationRatio,
-        decimals: candidate.vaultConfig.unitScale.toString().length - 1,
+        decimals,
       };
     }).filter(v => v.currentDebt > 0n || v.depositAmount > 0 || v.mintAmount > 0);
 
     return calculateAggregateHealthFactor(vaultData);
-  }, [vaultCandidates, depositCanonical, mintInputs, toNumber, autoAllocate]);
+  }, [vaultCandidates]);
 
   const getGridClass = useCallback(() => {
     if (showMintAmounts) {
@@ -256,50 +275,110 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
       const hasAllocations = vaultCandidates.some(c => c.allocation?.depositAmount || c.allocation?.mintAmount);
       if (!hasAllocations) return;
 
+      // Set flag to prevent callbacks during initialization
+      isInitializingRef.current = true;
+      console.log('[VaultBreakdown] Starting auto-to-manual initialization');
+
       const newMintMaxVaults = new Set<string>();
-      const newCanonical: Record<ADDRESS, string> = {};
-      const newDisplay: Record<ADDRESS, string> = {};
-      const newMints: Record<ADDRESS, string> = {};
+      const newInputs: Record<ADDRESS, { depositAmount: string; mintAmount: string }> = {};
+      const newRepresentations: Record<ADDRESS, {
+        depositAmountToken: UNITS;
+        depositAmountDisplay: string;
+        depositValueDisplay: string;
+        mintAmountToken: WEI;
+        mintAmountDisplay: string;
+        mintValueDisplay: string;
+      }> = {};
 
       vaultCandidates.forEach(c => {
         const decimals = c.vaultConfig.unitScale.toString().length - 1;
         const depositBigInt = c.allocation?.depositAmount || 0n;
         const mintBigInt = c.allocation?.mintAmount || 0n;
 
-        // Initialize deposit canonical and display
+        // Pre-calculate BOTH representations for deposit
+        let depositAmountDisplay = '';
+        let depositValueDisplay = '';
         if (depositBigInt > 0n) {
-          const canonicalVal = formatUnits(depositBigInt, decimals);
-          newCanonical[c.vaultConfig.assetAddress] = canonicalVal;
-          newDisplay[c.vaultConfig.assetAddress] = displayMode === 'Value' 
-            ? wadToUSD(canonicalVal, c.vaultConfig.assetAddress, false) 
-            : canonicalVal;
-        } else {
-          newCanonical[c.vaultConfig.assetAddress] = '';
-          newDisplay[c.vaultConfig.assetAddress] = '';
+          const tokenAmount = formatUnits(depositBigInt, decimals);
+          depositAmountDisplay = tokenAmount;
+          depositValueDisplay = amountToValue(tokenAmount, c.vaultConfig.assetAddress, false);
         }
 
-        // Initialize mint inputs and check for max
+        // Pre-calculate BOTH representations for mint
+        let mintAmountDisplay = '';
+        let mintValueDisplay = '';
         if (mintBigInt > 0n) {
-          newMints[c.vaultConfig.assetAddress] = formatUnits(mintBigInt, 18);
+          const mintDecimal = formatUnits(mintBigInt, 18);
+          mintAmountDisplay = mintDecimal;
+          mintValueDisplay = parseFloat(mintDecimal).toFixed(2);
           
           const depositUnits = depositBigInt || 0n;
           const maxMintUnits = calculateMaxMintUnitsForVault(c, depositUnits);
           if (mintBigInt === maxMintUnits && maxMintUnits > 0n) {
             newMintMaxVaults.add(c.vaultConfig.assetAddress);
           }
-        } else {
-          newMints[c.vaultConfig.assetAddress] = '';
         }
+
+        // Store both representations
+        newRepresentations[c.vaultConfig.assetAddress] = {
+          depositAmountToken: depositBigInt,
+          depositAmountDisplay,
+          depositValueDisplay,
+          mintAmountToken: mintBigInt,
+          mintAmountDisplay,
+          mintValueDisplay,
+        };
+
+        // Set display based on current mode
+        newInputs[c.vaultConfig.assetAddress] = {
+          depositAmount: displayMode === 'Value' ? depositValueDisplay : depositAmountDisplay,
+          mintAmount: displayMode === 'Value' ? mintValueDisplay : mintAmountDisplay,
+        };
       });
 
-      setDepositCanonical(newCanonical);
-      setDepositDisplayInputs(newDisplay);
-      setMintInputs(newMints);
+      setAllocationRepresentations(newRepresentations);
+      setVaultInputs(newInputs);
       setMintMaxVaults(newMintMaxVaults);
+      
+      // Clear flag after a brief delay to allow NumericFormat to settle
+      setTimeout(() => {
+        isInitializingRef.current = false;
+        console.log('[VaultBreakdown] Initialization complete');
+      }, 100);
     }
     
     prevAutoSupplyRef.current = autoAllocate;
-  }, [autoAllocate, vaultCandidates, displayMode, wadToUSD]);
+  }, [autoAllocate, vaultCandidates, displayMode, amountToValue]);
+
+  // ============================================================================
+  // Effects - Display Mode Sync (Manual Mode)
+  // When display mode changes in manual mode, update inputs from pre-calculated representations
+  // ============================================================================
+  
+  useEffect(() => {
+    if (autoAllocate || Object.keys(allocationRepresentations).length === 0) return;
+    
+    // Set flag to prevent callbacks during display mode switch
+    isInitializingRef.current = true;
+    
+    setVaultInputs(prev => {
+      const newInputs: Record<ADDRESS, { depositAmount: string; mintAmount: string }> = {};
+      
+      Object.entries(allocationRepresentations).forEach(([address, reps]) => {
+        newInputs[address as ADDRESS] = {
+          depositAmount: displayMode === 'Value' ? reps.depositValueDisplay : reps.depositAmountDisplay,
+          mintAmount: displayMode === 'Value' ? reps.mintValueDisplay : reps.mintAmountDisplay,
+        };
+      });
+      
+      return newInputs;
+    });
+    
+    // Clear flag after NumericFormat settles
+    setTimeout(() => {
+      isInitializingRef.current = false;
+    }, 100);
+  }, [displayMode, autoAllocate, allocationRepresentations]);
 
   // ============================================================================
   // Effects - Auto Mode Sync
@@ -308,60 +387,46 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
   useEffect(() => {
     if (!autoAllocate) return;
 
-    // Sync deposit canonical values
-    setDepositCanonical(prev => {
-      const newCanonical: Record<ADDRESS, string> = {};
+    setVaultInputs(prev => {
+      const newInputs: Record<ADDRESS, { depositAmount: string; mintAmount: string }> = {};
+      
       vaultCandidates.forEach(c => {
+        const decimals = c.vaultConfig.unitScale.toString().length - 1;
         const depositBigInt = c.allocation?.depositAmount || 0n;
-        if (depositBigInt > 0n) {
-          const decimals = c.vaultConfig.unitScale.toString().length - 1;
-          newCanonical[c.vaultConfig.assetAddress] = formatUnits(depositBigInt, decimals);
-        } else {
-          newCanonical[c.vaultConfig.assetAddress] = '';
-        }
-      });
-      const hasChanges = Object.keys(newCanonical).some(key => newCanonical[key] !== prev[key]) ||
-        Object.keys(prev).some(key => !newCanonical[key] && prev[key]);
-      return hasChanges ? newCanonical : prev;
-    });
-
-    // Sync deposit display values
-    setDepositDisplayInputs(prev => {
-      const newDisplay: Record<ADDRESS, string> = {};
-      vaultCandidates.forEach(c => {
-        const depositBigInt = c.allocation?.depositAmount || 0n;
-        if (depositBigInt > 0n) {
-          const decimals = c.vaultConfig.unitScale.toString().length - 1;
-          const canonicalVal = formatUnits(depositBigInt, decimals);
-          newDisplay[c.vaultConfig.assetAddress] = displayMode === 'Value' 
-            ? wadToUSD(canonicalVal, c.vaultConfig.assetAddress, true) 
-            : canonicalVal;
-        } else {
-          newDisplay[c.vaultConfig.assetAddress] = '';
-        }
-      });
-      const hasChanges = Object.keys(newDisplay).some(key => newDisplay[key] !== prev[key]) ||
-        Object.keys(prev).some(key => !newDisplay[key] && prev[key]);
-      return hasChanges ? newDisplay : prev;
-    });
-
-    // Sync mint inputs
-    setMintInputs(prev => {
-      const newMints: Record<ADDRESS, string> = {};
-      vaultCandidates.forEach(c => {
         const mintBigInt = c.allocation?.mintAmount || 0n;
+
+        // Deposit display value
+        let depositDisplay = '';
+        if (depositBigInt > 0n) {
+          const tokenAmount = formatUnits(depositBigInt, decimals);
+          depositDisplay = displayMode === 'Value' 
+            ? amountToValue(tokenAmount, c.vaultConfig.assetAddress, true) 
+            : tokenAmount;
+        }
+
+        // Mint display value
+        let mintDisplay = '';
         if (mintBigInt > 0n) {
           const mintDecimal = formatUnits(mintBigInt, 18);
-          newMints[c.vaultConfig.assetAddress] = displayMode === 'Value' 
+          mintDisplay = displayMode === 'Value' 
             ? parseFloat(mintDecimal).toFixed(2) 
             : mintDecimal;
-        } else {
-          newMints[c.vaultConfig.assetAddress] = '';
         }
+
+        newInputs[c.vaultConfig.assetAddress] = {
+          depositAmount: depositDisplay,
+          mintAmount: mintDisplay,
+        };
       });
-      const hasChanges = Object.keys(newMints).some(key => newMints[key] !== prev[key]) ||
-        Object.keys(prev).some(key => !newMints[key] && prev[key]);
-      return hasChanges ? newMints : prev;
+
+      // Check if anything changed
+      const hasChanges = vaultCandidates.some(c => {
+        const oldInput = prev[c.vaultConfig.assetAddress];
+        const newInput = newInputs[c.vaultConfig.assetAddress];
+        return !oldInput || oldInput.depositAmount !== newInput.depositAmount || oldInput.mintAmount !== newInput.mintAmount;
+      });
+
+      return hasChanges ? newInputs : prev;
     });
 
     // Check for mint max matches
@@ -390,67 +455,39 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
   // ============================================================================
 
   useEffect(() => {
-    if (autoAllocate) {
-      // Auto mode: convert from allocation amounts
-      const newDisplay: Record<ADDRESS, string> = {};
-      const newMints: Record<ADDRESS, string> = {};
+    // Convert display values when displayMode changes
+    const newInputs: Record<ADDRESS, { depositAmount: string; mintAmount: string }> = {};
+    
+    vaultCandidates.forEach(c => {
+      const decimals = c.vaultConfig.unitScale.toString().length - 1;
+      const depositBigInt = c.allocation?.depositAmount || 0n;
+      const mintBigInt = c.allocation?.mintAmount || 0n;
       
-      vaultCandidates.forEach(c => {
-        const depositBigInt = c.allocation?.depositAmount || 0n;
-        const mintBigInt = c.allocation?.mintAmount || 0n;
-        const decimals = c.vaultConfig.unitScale.toString().length - 1;
-        
-        if (depositBigInt > 0n) {
-          const canonicalVal = formatUnits(depositBigInt, decimals);
-          newDisplay[c.vaultConfig.assetAddress] = displayMode === 'Value' 
-            ? wadToUSD(canonicalVal, c.vaultConfig.assetAddress, true) 
-            : canonicalVal;
-        } else {
-          newDisplay[c.vaultConfig.assetAddress] = '';
-        }
-        
-        if (mintBigInt > 0n) {
-          const mintDecimal = formatUnits(mintBigInt, 18);
-          newMints[c.vaultConfig.assetAddress] = displayMode === 'Value' 
-            ? parseFloat(mintDecimal).toFixed(2) 
-            : mintDecimal;
-        } else {
-          newMints[c.vaultConfig.assetAddress] = '';
-        }
-      });
+      // Deposit display
+      let depositDisplay = '';
+      if (depositBigInt > 0n) {
+        const tokenAmount = formatUnits(depositBigInt, decimals);
+        depositDisplay = displayMode === 'Value' 
+          ? amountToValue(tokenAmount, c.vaultConfig.assetAddress, true) 
+          : tokenAmount;
+      }
       
-      setDepositDisplayInputs(newDisplay);
-      setMintInputs(newMints);
-    } else {
-      // Manual mode: convert using canonical values
-      const newDepositDisplay: Record<ADDRESS, string> = {};
-      
-      vaultCandidates.forEach(c => {
-        const canonical = depositCanonical[c.vaultConfig.assetAddress] || '';
-        if (!canonical) {
-          newDepositDisplay[c.vaultConfig.assetAddress] = '';
-          return;
-        }
-        
-        const depositBigInt = c.allocation?.depositAmount || 0n;
-        const isDepositMax = depositBigInt > 0n && depositBigInt === c.potentialCollateral;
-        const decimals = c.vaultConfig.unitScale.toString().length - 1;
-        
-        if (isDepositMax) {
-          const potentialDecimal = formatUnits(c.potentialCollateral, decimals);
-          const potentialNum = parseFloat(potentialDecimal);
-          newDepositDisplay[c.vaultConfig.assetAddress] = displayMode === 'Value'
-            ? (potentialNum * getPrice(c.vaultConfig.assetAddress)).toFixed(2)
-            : potentialDecimal;
-        } else {
-          newDepositDisplay[c.vaultConfig.assetAddress] = displayMode === 'Value'
-            ? (parseFloat(canonical) * getPrice(c.vaultConfig.assetAddress)).toFixed(2)
-            : canonical;
-        }
-      });
-      
-      setDepositDisplayInputs(newDepositDisplay);
-    }
+      // Mint display
+      let mintDisplay = '';
+      if (mintBigInt > 0n) {
+        const mintDecimal = formatUnits(mintBigInt, 18);
+        mintDisplay = displayMode === 'Value' 
+          ? parseFloat(mintDecimal).toFixed(2) 
+          : mintDecimal;
+      }
+
+      newInputs[c.vaultConfig.assetAddress] = {
+        depositAmount: depositDisplay,
+        mintAmount: mintDisplay,
+      };
+    });
+    
+    setVaultInputs(newInputs);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayMode]);
 
@@ -458,15 +495,20 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
   // Effects - Validation
   // ============================================================================
 
+  // Validate Health Factor - Checks if any vault has health factor below minimum
   useEffect(() => {
     if (!onHFValidationChange || autoAllocate) return;
 
     let hasLowHF = false;
     for (const candidate of vaultCandidates) {
-      const mintAmt = toNumber(mintInputs[candidate.vaultConfig.assetAddress] || '');
+      if (!candidate.allocation) continue;
+      
+      const decimals = candidate.vaultConfig.unitScale.toString().length - 1;
+      const depositAmt = parseFloat(formatUnits(candidate.allocation.depositAmount, decimals));
+      const mintAmt = parseFloat(formatUnits(candidate.allocation.mintAmount, 18));
+      
       if (mintAmt === 0) continue;
       
-      const depositAmt = toNumber(depositCanonical[candidate.vaultConfig.assetAddress] || '');
       const hfRaw = calculateVaultHFRaw(candidate, depositAmt, mintAmt);
       const vaultMinHF = calculateVaultMinHF(candidate);
       
@@ -477,29 +519,35 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
     }
     
     onHFValidationChange(hasLowHF);
-  }, [depositCanonical, mintInputs, vaultCandidates, autoAllocate, onHFValidationChange, toNumber]);
+  }, [vaultCandidates, autoAllocate, onHFValidationChange]);
 
+  // Validate Balance - Checks if any deposit amount exceeds available user balance
   useEffect(() => {
     if (!onBalanceExceededChange || autoAllocate) return;
 
     let exceedsBalance = false;
     for (const candidate of vaultCandidates) {
-      const depositAmt = toNumber(depositCanonical[candidate.vaultConfig.assetAddress] || '');
-      if (depositAmt === 0) continue;
+      if (!candidate.allocation) continue;
       
-      const availableBalanceUnits = getAvailableBalance(candidate);
-      const decimals = candidate.vaultConfig.unitScale.toString().length - 1;
-      const availableBalance = parseFloat(formatUnits(availableBalanceUnits, decimals));
+      const depositAmount: UNITS = candidate.allocation.depositAmount;
+      if (depositAmount === 0n) continue;
       
-      if (depositAmt - availableBalance > 0.000001) {
+      const availableBalance: UNITS = candidate.potentialCollateral;
+      
+      if (depositAmount > availableBalance) {
+        console.log("--------------------------------");
+        console.log('depositAmount', depositAmount);
+        console.log('availableBalance', availableBalance);
+        console.log("--------------------------------");
         exceedsBalance = true;
         break;
       }
     }
     
     onBalanceExceededChange(exceedsBalance);
-  }, [depositCanonical, vaultCandidates, autoAllocate, onBalanceExceededChange, toNumber, getAvailableBalance]);
+  }, [vaultCandidates, autoAllocate, onBalanceExceededChange]);
 
+  // Calculate Total Manual Mint - Sums all mint amounts across vaults for display
   useEffect(() => {
     if (!onTotalManualMintChange || autoAllocate) return;
 
@@ -523,64 +571,91 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
     floatValue: USD | DECIMAL | undefined, 
     formattedValue: string
   ) => {
+    // GUARD: Skip all callbacks during auto-to-manual initialization
+    if (isInitializingRef.current) {
+      console.log('[VaultBreakdown] Skipping callback during initialization');
+      return;
+    }
+    
     const candidate = vaultCandidates.find(c => c.vaultConfig.assetAddress === assetAddress);
     if (!candidate) return;
     
     if (floatValue === undefined || formattedValue === '') {
-      setDepositDisplayInputs(prev => ({ ...prev, [assetAddress]: '' }));
-      setDepositCanonical(prev => ({ ...prev, [assetAddress]: '' }));
+      setVaultInputs(prev => ({ 
+        ...prev, 
+        [assetAddress]: { ...prev[assetAddress], depositAmount: '' } 
+      }));
       if (!autoAllocate && onDepositAmountChange) {
         onDepositAmountChange(assetAddress, '0');
       }
       return;
     }
 
-    setDepositDisplayInputs(prev => ({ ...prev, [assetAddress]: formattedValue }));
-    
-    const valueStr = String(floatValue);
-    let canonicalValue = displayMode === 'Value' ? usdToWad(valueStr, assetAddress) : valueStr;
-    let useExactPotentialCollateral = false;
-    
-    if (candidate.potentialCollateral > 0n) {
-      const decimals = candidate.vaultConfig.unitScale.toString().length - 1;
-      let inputUnits: UNITS;
-
-      if (displayMode === 'Value') {
-        const roundedUSD = parseFloat(floatValue.toFixed(2));
-        const price = getPrice(assetAddress);
-        const tokenAmount = price > 0 ? roundedUSD / price : 0;
-        inputUnits = tokenAmount > 0 ? parseUnitsWithTruncation(tokenAmount.toString(), decimals) : 0n;
-      } else {
-        inputUnits = parseUnitsWithTruncation(String(floatValue), decimals);
-      }
-
-      if (inputUnits === candidate.potentialCollateral) {
-        canonicalValue = formatUnits(candidate.potentialCollateral, decimals);
-        useExactPotentialCollateral = true;
-      }
-    }
-    
-    setDepositCanonical(prev => ({ ...prev, [assetAddress]: canonicalValue }));
+    setVaultInputs(prev => ({ 
+      ...prev, 
+      [assetAddress]: { ...prev[assetAddress], depositAmount: formattedValue } 
+    }));
     
     if (!autoAllocate && onDepositAmountChange) {
       const decimals = candidate.vaultConfig.unitScale.toString().length - 1;
-      const depositAmountStr = useExactPotentialCollateral
-        ? candidate.potentialCollateral.toString()
-        : parseUnitsWithTruncation(canonicalValue, decimals).toString();
-      onDepositAmountChange(assetAddress, depositAmountStr);
+      let depositUnits: UNITS;
+
+      if (displayMode === 'Value') {
+        // User entered USD value, convert to token amount
+        const roundedUSD = parseFloat(floatValue.toFixed(2));
+        const price: WEI = getPrice(assetAddress);
+        if (price > 0n) {
+          const valueUnits: WEI = parseUnitsWithTruncation(roundedUSD.toString(), 18);
+          // amount = (value * unitScale) / price
+          depositUnits = (valueUnits * candidate.vaultConfig.unitScale) / price;
+        } else {
+          depositUnits = 0n;
+        }
+      } else {
+        // User entered token amount directly
+        depositUnits = parseUnitsWithTruncation(String(floatValue), decimals);
+      }
+
+      // GUARD: Check if this matches a pre-calculated representation
+      // This detects display mode switches vs real user edits
+      const representations = allocationRepresentations[assetAddress];
+      if (representations && depositUnits === representations.depositAmountToken) {
+        console.log('[VaultBreakdown] Skipping callback - matches pre-calculated representation:', {
+          asset: candidate.vaultConfig.symbol,
+          value: depositUnits.toString(),
+          mode: displayMode,
+        });
+        return;
+      }
+
+      // Check if input matches potential collateral exactly
+      if (depositUnits === candidate.potentialCollateral && candidate.potentialCollateral > 0n) {
+        onDepositAmountChange(assetAddress, candidate.potentialCollateral.toString());
+      } else {
+        onDepositAmountChange(assetAddress, depositUnits.toString());
+      }
     }
-  }, [vaultCandidates, autoAllocate, displayMode, getPrice, usdToWad, onDepositAmountChange]);
+  }, [vaultCandidates, autoAllocate, displayMode, getPrice, onDepositAmountChange, allocationRepresentations]);
 
   const handleMintChange = useCallback((
     assetAddress: ADDRESS, 
     floatValue: DECIMAL | undefined, 
     formattedValue: string
   ) => {
+    // GUARD: Skip all callbacks during auto-to-manual initialization
+    if (isInitializingRef.current) {
+      console.log('[VaultBreakdown] Skipping mint callback during initialization');
+      return;
+    }
+    
     const candidate = vaultCandidates.find(c => c.vaultConfig.assetAddress === assetAddress);
     if (!candidate) return;
     
     if (floatValue === undefined || formattedValue === '') {
-      setMintInputs(prev => ({ ...prev, [assetAddress]: '' }));
+      setVaultInputs(prev => ({ 
+        ...prev, 
+        [assetAddress]: { ...prev[assetAddress], mintAmount: '' } 
+      }));
       setMintMaxVaults(prev => {
         const newSet = new Set(prev);
         newSet.delete(assetAddress);
@@ -592,32 +667,44 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
       return;
     }
 
-    setMintInputs(prev => ({ ...prev, [assetAddress]: formattedValue }));
+    setVaultInputs(prev => ({ 
+      ...prev, 
+      [assetAddress]: { ...prev[assetAddress], mintAmount: formattedValue } 
+    }));
 
-    const depositAmt = parseFloat(depositCanonical[assetAddress] || '0');
-    const decimals = candidate.vaultConfig.unitScale.toString().length - 1;
-    const depositUnits = depositAmt > 0 ? parseUnitsWithTruncation(depositAmt.toString(), decimals) : 0n;
-    const maxMintUnits = calculateMaxMintUnitsForVault(candidate, depositUnits);
-    const inputUnits = parseUnitsWithTruncation(String(floatValue), 18);
-    
-    if (inputUnits === maxMintUnits && maxMintUnits > 0n) {
-      setMintMaxVaults(prev => {
-        const newSet = new Set(prev);
-        newSet.add(assetAddress);
-        return newSet;
-      });
-    } else {
-      setMintMaxVaults(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(assetAddress);
-        return newSet;
-      });
-    }
-    
     if (!autoAllocate && onMintAmountChange) {
+      const depositUnits = candidate.allocation?.depositAmount || 0n;
+      const maxMintUnits = calculateMaxMintUnitsForVault(candidate, depositUnits);
+      const inputUnits = parseUnitsWithTruncation(String(floatValue), 18);
+      
+      // GUARD: Check if this matches a pre-calculated representation
+      const representations = allocationRepresentations[assetAddress];
+      if (representations && inputUnits === representations.mintAmountToken) {
+        console.log('[VaultBreakdown] Skipping mint callback - matches pre-calculated representation:', {
+          asset: candidate.vaultConfig.symbol,
+          value: inputUnits.toString(),
+          mode: displayMode,
+        });
+        return;
+      }
+      
+      if (inputUnits === maxMintUnits && maxMintUnits > 0n) {
+        setMintMaxVaults(prev => {
+          const newSet = new Set(prev);
+          newSet.add(assetAddress);
+          return newSet;
+        });
+      } else {
+        setMintMaxVaults(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(assetAddress);
+          return newSet;
+        });
+      }
+      
       onMintAmountChange(assetAddress, inputUnits.toString());
     }
-  }, [vaultCandidates, depositCanonical, autoAllocate, onMintAmountChange]);
+  }, [vaultCandidates, autoAllocate, onMintAmountChange, allocationRepresentations, displayMode]);
 
   const handleDepositAvailableClick = useCallback((
     e: React.MouseEvent, 
@@ -627,16 +714,26 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
     e.stopPropagation();
     
     const decimals = candidate.vaultConfig.unitScale.toString().length - 1;
-    const canonicalVal = formatUnits(candidate.potentialCollateral, decimals);
-    const availableAmountNum = parseFloat(canonicalVal);
+    const tokenAmount = formatUnits(candidate.potentialCollateral, decimals);
     
+    let displayValue: string;
     if (displayMode === 'Value') {
-      const availableUSD = availableAmountNum * getPrice(candidate.vaultConfig.assetAddress);
-      setDepositDisplayInputs(prev => ({ ...prev, [candidate.vaultConfig.assetAddress]: availableUSD.toFixed(2) }));
+      const price: WEI = getPrice(candidate.vaultConfig.assetAddress);
+      // value = (amount * price) / unitScale
+      const valueUnits: WEI = (candidate.potentialCollateral * price) / candidate.vaultConfig.unitScale;
+      const usdValue = parseFloat(formatUnits(valueUnits, 18));
+      displayValue = usdValue.toFixed(2);
     } else {
-      setDepositDisplayInputs(prev => ({ ...prev, [candidate.vaultConfig.assetAddress]: canonicalVal }));
+      displayValue = tokenAmount;
     }
-    setDepositCanonical(prev => ({ ...prev, [candidate.vaultConfig.assetAddress]: canonicalVal }));
+
+    setVaultInputs(prev => ({ 
+      ...prev, 
+      [candidate.vaultConfig.assetAddress]: { 
+        ...prev[candidate.vaultConfig.assetAddress], 
+        depositAmount: displayValue 
+      } 
+    }));
     
     if (!autoAllocate && onDepositAmountChange) {
       onDepositAmountChange(candidate.vaultConfig.assetAddress, candidate.potentialCollateral.toString());
@@ -667,7 +764,10 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
     
     // Populate both deposit and mint
     if (displayMode === 'Value') {
-      const maxDepositUSD = maxDepositAmount * getPrice(candidate.vaultConfig.assetAddress);
+      const price: WEI = getPrice(candidate.vaultConfig.assetAddress);
+      // value = (amount * price) / unitScale
+      const valueUnits: WEI = (candidate.potentialCollateral * price) / candidate.vaultConfig.unitScale;
+      const maxDepositUSD = parseFloat(formatUnits(valueUnits, 18));
       handleDepositChange(candidate.vaultConfig.assetAddress, maxDepositUSD, String(maxDepositUSD));
     } else {
       const maxDepositStr = formatUnits(candidate.potentialCollateral, decimals);
@@ -754,10 +854,14 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
                 );
                 const tokenImage = token?.images?.[0]?.value;
 
-                const canonicalDeposit = depositCanonical[candidate.vaultConfig.assetAddress] || '';
-                const depositAmt = toNumber(canonicalDeposit);
-                const mintInput = mintInputs[candidate.vaultConfig.assetAddress] || '';
-                const mintAmt = toNumber(mintInput);
+                // Get actual amounts from allocation (source of truth)
+                const decimals = candidate.vaultConfig.unitScale.toString().length - 1;
+                const depositAmt = candidate.allocation 
+                  ? parseFloat(formatUnits(candidate.allocation.depositAmount, decimals))
+                  : 0;
+                const mintAmt = candidate.allocation 
+                  ? parseFloat(formatUnits(candidate.allocation.mintAmount, 18))
+                  : 0;
                 
                 const hf = calculateVaultHF(candidate, depositAmt, mintAmt);
                 const hfNum = parseFloat(hf);
@@ -765,32 +869,33 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
                 
                 const vaultMinHF = calculateVaultMinHF(candidate);
                 const vaultHasLowHF = !autoAllocate && 
-                  mintInput && mintAmt > 0 &&
+                  mintAmt > 0 &&
                   hfNum !== Infinity && !isNaN(hfNum) && hfNum < vaultMinHF;
 
-                const availableBalanceUnits = getAvailableBalance(candidate);
-                const decimals = candidate.vaultConfig.unitScale.toString().length - 1;
-                const availableBalance = parseFloat(formatUnits(availableBalanceUnits, decimals));
-                const vaultExceedsBalance = !autoAllocate && depositAmt > 0 && (depositAmt - availableBalance > 0.000001);
+                const vaultExceedsBalance = !autoAllocate && 
+                  candidate.allocation && 
+                  candidate.allocation.depositAmount > candidate.potentialCollateral;
 
-                const depositDisplayValue = depositDisplayInputs[candidate.vaultConfig.assetAddress] || '';
+                // Get display values from vaultInputs
+                const inputs = vaultInputs[candidate.vaultConfig.assetAddress] || { depositAmount: '', mintAmount: '' };
+                const depositDisplayValue = inputs.depositAmount;
                 const depositDisplayNum = toNumber(depositDisplayValue);
-                let depositMatchesAvailable = false;
-                if (depositDisplayNum > 0) {
-                  if (displayMode === 'Value') {
-                    const availableUSD = availableBalance * getPrice(candidate.vaultConfig.assetAddress);
-                    depositMatchesAvailable = Math.abs(depositDisplayNum - availableUSD) < 0.01;
-                  } else {
-                    depositMatchesAvailable = Math.abs(depositDisplayNum - availableBalance) < 0.000001;
-                  }
-                }
+                
+                // Check if deposit matches available balance (for blue border)
+                const depositMatchesAvailable = candidate.allocation 
+                  ? candidate.allocation.depositAmount === candidate.potentialCollateral && candidate.potentialCollateral > 0n
+                  : false;
 
-                const mintDisplayNum = toNumber(mintInput);
-                let mintMatchesAvailable = false;
-                if (mintDisplayNum > 0) {
-                  const maxMint = calculateMaxMintForVault(candidate, availableBalance);
-                  mintMatchesAvailable = Math.abs(mintDisplayNum - maxMint) < 0.01;
-                }
+                const mintDisplayValue = inputs.mintAmount;
+                const mintDisplayNum = toNumber(mintDisplayValue);
+                
+                // Check if mint matches max mintable (for blue border)
+                const maxMintUnits = candidate.allocation 
+                  ? calculateMaxMintUnitsForVault(candidate, candidate.allocation.depositAmount)
+                  : 0n;
+                const mintMatchesAvailable = candidate.allocation 
+                  ? candidate.allocation.mintAmount === maxMintUnits && maxMintUnits > 0n
+                  : false;
 
                 return (
                   <div key={candidate.vaultConfig.assetAddress} className={`grid gap-2 items-center text-sm ${getGridClass()}`}>
@@ -819,7 +924,7 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
                           <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none z-10">$</span>
                         )}
                         <NumericFormat
-                          value={depositDisplayInputs[candidate.vaultConfig.assetAddress] || ''}
+                          value={inputs.depositAmount}
                           onValueChange={(values) => handleDepositChange(candidate.vaultConfig.assetAddress, values.floatValue, values.formattedValue)}
                           onFocus={() => { 
                             setFocusedInput(`deposit-${candidate.vaultConfig.assetAddress}`);
@@ -829,6 +934,7 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
                           }}
                           getInputRef={(el) => { depositInputRefs.current[candidate.vaultConfig.assetAddress] = el; }}
                           allowNegative={false}
+                          thousandSeparator=","
                           decimalScale={autoAllocate && displayMode === 'Value' ? 2 : undefined}
                           customInput={Input}
                           placeholder="0"
@@ -847,7 +953,10 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
                         const availableAmountNum = parseFloat(availableAmount);
                         
                         if (displayMode === 'Value') {
-                          const availableUSD = availableAmountNum * getPrice(candidate.vaultConfig.assetAddress);
+                          const price: WEI = getPrice(candidate.vaultConfig.assetAddress);
+                          // value = (amount * price) / unitScale
+                          const valueUnits: WEI = (candidate.potentialCollateral * price) / candidate.vaultConfig.unitScale;
+                          const availableUSD = parseFloat(formatUnits(valueUnits, 18));
                           return (
                             <div 
                               className="text-xs text-muted-foreground cursor-pointer hover:text-foreground hover:underline"
@@ -877,7 +986,7 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
                             <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none z-10">$</span>
                           )}
                           <NumericFormat
-                            value={mintInputs[candidate.vaultConfig.assetAddress] || ''}
+                            value={inputs.mintAmount}
                             onValueChange={(values) => handleMintChange(candidate.vaultConfig.assetAddress, values.floatValue, values.formattedValue)}
                             onFocus={() => { 
                               setFocusedInput(`mint-${candidate.vaultConfig.assetAddress}`);
@@ -887,6 +996,7 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
                             }}
                             getInputRef={(el) => { mintInputRefs.current[candidate.vaultConfig.assetAddress] = el; }}
                             allowNegative={false}
+                            thousandSeparator=","
                             decimalScale={autoAllocate && displayMode === 'Value' ? 2 : undefined}
                             customInput={Input}
                             placeholder="0"
@@ -936,8 +1046,11 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
                   <span className="text-sm font-medium text-muted-foreground">Total Mint Amount:</span>
                   <span className="text-sm font-bold tabular-nums">
                     {vaultCandidates.reduce((sum, candidate) => {
-                      return sum + toNumber(mintInputs[candidate.vaultConfig.assetAddress] || '');
-                    }, 0)} USDST
+                      const mintAmt = candidate.allocation 
+                        ? parseFloat(formatUnits(candidate.allocation.mintAmount, 18))
+                        : 0;
+                      return sum + mintAmt;
+                    }, 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDST
                   </span>
                 </div>
                 {projectedVaultHealth && (

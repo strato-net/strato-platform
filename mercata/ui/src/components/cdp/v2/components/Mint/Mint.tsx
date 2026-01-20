@@ -149,12 +149,26 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   const allocations = autoAllocate ? optimalAllocations : manualAllocations;
 
   const mergedVaultCandidates = useMemo(() => {
-    return vaultCandidates.map(candidate => {
-      const allocation = allocations.find(a => 
+    const result = vaultCandidates.map(candidate => {
+      const allocationCandidate = allocations.find(a => 
         a.vaultConfig.assetAddress === candidate.vaultConfig.assetAddress
       );
-      return allocation || candidate;
+      // Always use CURRENT candidate data (fresh potentialCollateral, etc.)
+      // and only attach the allocation from the computed allocations
+      if (allocationCandidate?.allocation) {
+        const merged = { ...candidate, allocation: allocationCandidate.allocation };
+        console.log('[Mint] mergedVaultCandidates:', {
+          asset: candidate.vaultConfig.symbol,
+          freshPotentialCollateral: candidate.potentialCollateral.toString(),
+          stalePotentialCollateral: allocationCandidate.potentialCollateral.toString(),
+          depositAmount: allocationCandidate.allocation.depositAmount.toString(),
+          usingFresh: merged.potentialCollateral.toString(),
+        });
+        return merged;
+      }
+      return candidate;
     });
+    return result;
   }, [vaultCandidates, allocations]);
 
   // ============================================================================
@@ -316,6 +330,11 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   useEffect(() => {
     if (prevAutoSupplyRef.current === true && autoAllocate === false && optimalAllocations.length > 0) {
       console.log('[Mint] Switching to manual mode - initializing manualAllocations');
+      console.log('[Mint] optimalAllocations being copied:', optimalAllocations.map(a => ({
+        asset: a.vaultConfig.symbol,
+        depositAmount: a.allocation?.depositAmount.toString(),
+        potentialCollateral: a.potentialCollateral.toString(),
+      })));
       setManualAllocations(optimalAllocations);
     }
     prevAutoSupplyRef.current = autoAllocate;

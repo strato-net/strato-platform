@@ -245,6 +245,31 @@ export function getOptimalAllocations(
   return { allocations, debtFloorHit, debtCeilingHit };
 }
 
+/**
+ * Helper: Deposit all available collateral and calculate maximum safe mint
+ * Used when we can't reach targetCR with desired mint, or when rounding errors occur
+ */
+function depositAllAndCalculateMint(
+  candidate: VaultCandidate,
+  targetCR: WAD
+): { depositAmount: UNITS; mintAmount: WEI } {
+  const depositAmount = candidate.potentialCollateral;
+  const actualCollateral = candidate.currentCollateral + depositAmount;
+  const actualCollateralValue = computeCollateralValueUSDST(
+    actualCollateral,
+    candidate.oraclePrice,
+    candidate.vaultConfig.unitScale
+  );
+  const maxDebtRaw: WEI = (actualCollateralValue * WAD_UNIT) / targetCR;
+  // Apply 1-unit buffer (matches "Available: x" calculation)
+  const maxDebtFromCollateral: WEI = maxDebtRaw > 1n ? maxDebtRaw - 1n : 0n;
+  const mintAmount = maxDebtFromCollateral > candidate.currentDebt
+    ? maxDebtFromCollateral - candidate.currentDebt
+    : 0n;
+  
+  return { depositAmount, mintAmount };
+}
+
 function allocate(
   candidate: VaultCandidate,
   remainingMint: WEI,
@@ -255,9 +280,9 @@ function allocate(
   let mintAmount: WEI = remainingMint;
   let depositAmount: UNITS = 0n;
 
-  const currentCollateralValue: UNITS = computeCollateralValueUSDST(candidate.currentCollateral, candidate.oraclePrice, candidate.vaultConfig.unitScale);
+  const currentCollateralValue: WEI = computeCollateralValueUSDST(candidate.currentCollateral, candidate.oraclePrice, candidate.vaultConfig.unitScale);
   const maxCollateral: UNITS = candidate.currentCollateral + candidate.potentialCollateral;
-  const maxCollateralValue: UNITS = computeCollateralValueUSDST(maxCollateral, candidate.oraclePrice, candidate.vaultConfig.unitScale);
+  const maxCollateralValue: WEI = computeCollateralValueUSDST(maxCollateral, candidate.oraclePrice, candidate.vaultConfig.unitScale);
 
   // STEP 1: Compute deposit and mint amounts
   if (maximizeDeposit) {
@@ -275,13 +300,10 @@ function allocate(
       const maxCR: WAD = newDebt > 0n ? (maxCollateralValue * WAD_UNIT) / newDebt : INF;
 
       if (maxCR < targetCR) {
-        const maxDebtRaw: WEI = (maxCollateralValue * WAD_UNIT) / targetCR;
-        // Apply 1-unit buffer (matches "Available: x" calculation)
-        const maxDebtFromCollateral: WEI = maxDebtRaw > 1n ? maxDebtRaw - 1n : 0n;
-        mintAmount = maxDebtFromCollateral > candidate.currentDebt
-          ? maxDebtFromCollateral - candidate.currentDebt
-          : 0n;
-        depositAmount = candidate.potentialCollateral;
+        // Can't reach targetCR even with all collateral - deposit all and reduce mint
+        const result = depositAllAndCalculateMint(candidate, targetCR);
+        depositAmount = result.depositAmount;
+        mintAmount = result.mintAmount;
       } else {
         const requiredCollateral: UNITS = computeRequiredCollateralForCR(
           newDebt,
@@ -289,9 +311,18 @@ function allocate(
           candidate.oraclePrice,
           candidate.vaultConfig.unitScale
         );
-        depositAmount = requiredCollateral > candidate.currentCollateral
+        const neededDeposit = requiredCollateral > candidate.currentCollateral
           ? requiredCollateral - candidate.currentCollateral
           : 0n;
+        
+        if (neededDeposit > candidate.potentialCollateral) {
+          // Rounding error: deposit all available, reduce mint to maintain targetCR
+          const result = depositAllAndCalculateMint(candidate, targetCR);
+          depositAmount = result.depositAmount;
+          mintAmount = result.mintAmount;
+        } else {
+          depositAmount = neededDeposit;
+        }
       }
     }
   }
@@ -333,9 +364,18 @@ function allocate(
           candidate.oraclePrice,
           candidate.vaultConfig.unitScale
         );
-        depositAmount = requiredCollateral > candidate.currentCollateral
+        const neededDeposit = requiredCollateral > candidate.currentCollateral
           ? requiredCollateral - candidate.currentCollateral
           : 0n;
+        
+        if (neededDeposit > candidate.potentialCollateral) {
+          // Rounding error: deposit all available, reduce mint to maintain targetCR
+          const result = depositAllAndCalculateMint(candidate, targetCR);
+          depositAmount = result.depositAmount;
+          mintAmount = result.mintAmount;
+        } else {
+          depositAmount = neededDeposit;
+        }
       }
     }
   }
@@ -389,10 +429,47 @@ function allocate(
     }
   }
 
-  return {
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FINAL SANITY CHECK: Ensure deposit never exceeds available collateral
+  // This guards against any edge cases or rounding errors we may have missed
+  // ═══════════════════════════════════════════════════════════════════════════
+  console.log("--------------------------------");
+  console.log("SANITY CHECK:");
+  console.log('depositAmount', depositAmount);
+  console.log('candidate.potentialCollateral', candidate.potentialCollateral);
+  // console log equivalnce check:
+  console.log('depositAmount === candidate.potentialCollateral', depositAmount === candidate.potentialCollateral);
+  console.log("--------------------------------");
+  if (depositAmount > candidate.potentialCollateral) {
+    console.warn('[allocate] SANITY CHECK TRIGGERED: depositAmount > potentialCollateral', {
+      depositAmount,
+      potentialCollateral: candidate.potentialCollateral,
+      diff: depositAmount - candidate.potentialCollateral,
+      asset: candidate.vaultConfig.symbol,
+    });
+    const result = depositAllAndCalculateMint(candidate, targetCR);
+    depositAmount = result.depositAmount;
+    mintAmount = result.mintAmount;
+    
+    if (mintAmount <= 0n) {
+      return 'NO_HEADROOM';
+    }
+  }
+
+  const allocation = {
     assetAddress: candidate.vaultConfig.assetAddress,
     mintAmount: mintAmount,
     depositAmount: depositAmount,
   };
+  
+  console.log('[allocate] RETURNING:', {
+    asset: candidate.vaultConfig.symbol,
+    depositAmount: depositAmount.toString(),
+    mintAmount: mintAmount.toString(),
+    potentialCollateral: candidate.potentialCollateral.toString(),
+    exceeds: depositAmount > candidate.potentialCollateral,
+  });
+  
+  return allocation;
 }
 

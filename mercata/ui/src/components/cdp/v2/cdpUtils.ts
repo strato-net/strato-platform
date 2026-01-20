@@ -112,7 +112,7 @@ export function computeCollateralValueUSDST(
   collateralAmount: UNITS,
   oraclePrice: WEI,
   assetScale: UNITS
-): UNITS {
+): WEI {
   if (assetScale === 0n) return 0n;
   return (collateralAmount * oraclePrice) / assetScale;
 }
