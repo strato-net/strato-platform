@@ -6,12 +6,60 @@ import { extractContractName } from "../../utils/utils";
 import { getPool } from "./lending.service";
 import { PriceHistoryEntry, PriceHistoryResponse, OraclePriceEntry, OraclePriceMap } from "@mercata/shared-types";
 import { toUTCTime } from "../helpers/cirrusHelpers";
+import { calculateLPTokenPrice } from "../helpers/swapping.helper";
+import { getHistory, StorageHistoryElement } from "../helpers/history.helper";
 
 const {
   PriceOracle,
   PriceOracleEvents,
   PriceOracleBatchUpdateEvents,
+  Pool,
 } = constants;
+
+/**
+ * Check if an address is an LP token by querying the PoolFactory's allPools array
+ * @param accessToken - User access token
+ * @param lpTokenAddress - Address to check
+ * @returns Pool info if it's an LP token, null otherwise
+ */
+const findPoolByLPToken = async (
+  accessToken: string,
+  lpTokenAddress: string
+): Promise<{ address: string; tokenA: string; tokenB: string } | null> => {
+  // Query the PoolFactory's allPools array
+  const { data: allPoolsData } = await cirrus.get(accessToken, `/${constants.PoolFactory}-allPools`, {
+    params: {
+      address: `eq.${constants.poolFactory}`,
+      select: "value"
+    }
+  }).catch(() => ({ data: [] }));
+
+  // Get pool addresses from the allPools array
+  const poolAddresses = allPoolsData ? allPoolsData.map((entry: any) => entry.value) : [];
+
+  if (poolAddresses.length === 0) {
+    return null;
+  }
+
+  // Query pools registered in this factory to find one with matching lpToken
+  const { data: poolsData } = await cirrus.get(accessToken, `/${Pool}`, {
+    params: {
+      address: `in.(${poolAddresses.join(',')})`,
+      lpToken: `eq.${lpTokenAddress}`,
+      select: "address,tokenA,tokenB"
+    }
+  }).catch(() => ({ data: [] }));
+
+  if (poolsData && poolsData.length > 0) {
+    return {
+      address: poolsData[0].address,
+      tokenA: poolsData[0].tokenA,
+      tokenB: poolsData[0].tokenB
+    };
+  }
+
+  return null;
+};
 
 export const getOraclePrices = async (
   accessToken: string,
@@ -82,12 +130,7 @@ export const setPrice = async (
   }
 };
 
-export const getPriceHistory = async (
-  accessToken: string,
-  assetAddress: string,
-  rawParams: Record<string, string | undefined> = {}
-): Promise<PriceHistoryResponse> => {
-  try {
+const getOracleAddress = async (accessToken: string): Promise<string> => {
     // Get the oracle address from the lending registry
     const registry = await getPool(accessToken, {
       select: "priceOracle",
@@ -97,16 +140,20 @@ export const getPriceHistory = async (
       throw new Error("Price oracle not found");
     }
 
-    const oracleAddress = registry.priceOracle.address || registry.priceOracle;
+    return registry.priceOracle.address || registry.priceOracle;
+};
 
-    // Calculate time range for the last month
-    const oneMonthAgo = new Date();
-    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-
+const fetchPriceEvents = async (
+  accessToken: string,
+  oracleAddress: string,
+  assetAddress: string,
+  oneMonthAgo: Date,
+  order: string
+): Promise<PriceHistoryEntry[]> => {
     const params = {
       address: `eq.${oracleAddress}`,
       block_timestamp: `gte.${toUTCTime(oneMonthAgo)}`,
-      order: rawParams.order || "block_timestamp.asc",
+      order,
     };
 
     // --- Query both tables ---
@@ -160,15 +207,13 @@ export const getPriceHistory = async (
       });
     }
 
-    if (priceEvents.length === 0) {
-      console.log(`[getPriceHistory] No data found for ${assetAddress}`);
-      return { data: [], totalCount: 0 };
-    }
+    return priceEvents;
+};
 
-    // Process events and create hourly data points
+const createHourlyPriceMap = (priceEvents: PriceHistoryEntry[]): Map<string, PriceHistoryEntry> => {
     const hourlyPrices = new Map<string, PriceHistoryEntry>();
 
-    priceEvents.forEach((event: any) => {
+    priceEvents.forEach((event) => {
       const blockTimestamp = event.blockTimestamp;
 
       // Create hourly bucket (round down to the hour)
@@ -182,10 +227,25 @@ export const getPriceHistory = async (
       }
     });
 
-    // If no historical data, return empty
+    return hourlyPrices;
+};
+
+const extractHourlyPriceMap = (priceEvents: PriceHistoryEntry[]): Map<string, string> => {
+    const hourlyMap = createHourlyPriceMap(priceEvents);
+    const priceMap = new Map<string, string>();
+    hourlyMap.forEach((entry, hourKey) => {
+      priceMap.set(hourKey, entry.price);
+    });
+    return priceMap;
+};
+
+const forwardFillPriceHistory = (
+  hourlyPrices: Map<string, PriceHistoryEntry>,
+  assetAddress: string
+): PriceHistoryEntry[] => {
     if (hourlyPrices.size === 0) {
       console.log(`[getPriceHistory] No historical oracle data found for ${assetAddress}`);
-      return { data: [], totalCount: 0 };
+      return [];
     }
 
     // Find the earliest and latest actual data points
@@ -226,13 +286,190 @@ export const getPriceHistory = async (
           blockTimestamp: new Date(currentHour)
         });
       }
-      
     }
 
+    return filledPriceHistory;
+};
+
+export const getPriceHistory = async (
+  accessToken: string,
+  assetAddress: string,
+  rawParams: Record<string, string | undefined> = {}
+): Promise<PriceHistoryResponse> => {
+  try {
+    const matchingPool = await findPoolByLPToken(accessToken, assetAddress);
+
+    if (matchingPool) {
+      return getLPTokenPriceHistoryInternal(accessToken, assetAddress, matchingPool, rawParams);
+    }
+
+    const oracleAddress = await getOracleAddress(accessToken);
+
+    // Calculate time range for the last month
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
+    const priceEvents = await fetchPriceEvents(
+      accessToken,
+      oracleAddress,
+      assetAddress,
+      oneMonthAgo,
+      rawParams.order || "block_timestamp.asc"
+    );
+
+    if (priceEvents.length === 0) {
+      console.log(`[getPriceHistory] No data found for ${assetAddress}`);
+      return { data: [], totalCount: 0 };
+    }
+
+    // Process events and create hourly data points
+    const hourlyPrices = createHourlyPriceMap(priceEvents);
+
+    // If no historical data, return empty
+    if (hourlyPrices.size === 0) {
+      console.log(`[getPriceHistory] No historical oracle data found for ${assetAddress}`);
+      return { data: [], totalCount: 0 };
+    }
+
+    const filledPriceHistory = forwardFillPriceHistory(hourlyPrices, assetAddress);
 
     return { data: filledPriceHistory, totalCount: filledPriceHistory.length };
   } catch (error) {
     console.error('Error fetching price history:', error);
     throw new Error('Failed to fetch price history');
+  }
+};
+
+const getLPTokenPriceHistoryInternal = async (
+  accessToken: string,
+  lpTokenAddress: string,
+  pool: { address: string; tokenA: string; tokenB: string },
+  rawParams: Record<string, string | undefined> = {}
+): Promise<PriceHistoryResponse> => {
+  try {
+    const poolAddress = pool.address;
+    const tokenA = pool.tokenA;
+    const tokenB = pool.tokenB;
+
+    const oracleAddress = await getOracleAddress(accessToken);
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+    const order = rawParams.order || "block_timestamp.asc";
+
+    const [tokenAPriceEvents, tokenBPriceEvents] = await Promise.all([
+      fetchPriceEvents(accessToken, oracleAddress, tokenA, oneMonthAgo, order),
+      fetchPriceEvents(accessToken, oracleAddress, tokenB, oneMonthAgo, order)
+    ]);
+
+    const tokenAPriceMap = extractHourlyPriceMap(tokenAPriceEvents);
+    const tokenBPriceMap = extractHourlyPriceMap(tokenBPriceEvents);
+
+    const historyParams = {
+      endTimestamp: Date.now(),
+      interval: 1000 * 60 * 60, // 1 hour
+      numTicks: 24 * 30 // 30 days
+    };
+
+    const poolStorageReducer = (data: any, h: StorageHistoryElement): any => {
+      const tokenABalance = h.data?.tokenABalance || data.tokenABalance || "0";
+      const tokenBBalance = h.data?.tokenBBalance || data.tokenBBalance || "0";
+      return {
+        tokenABalance,
+        tokenBBalance,
+        lpTokenTotalSupply: data.lpTokenTotalSupply || "0"
+      };
+    };
+
+    const lpTokenStorageReducer = (data: any, h: StorageHistoryElement): any => {
+      const lpTokenTotalSupply = h.data?._totalSupply || data.lpTokenTotalSupply || "0";
+      return {
+        tokenABalance: data.tokenABalance || "0",
+        tokenBBalance: data.tokenBBalance || "0",
+        lpTokenTotalSupply
+      };
+    };
+
+    const combinedReducer = (data: any, h: StorageHistoryElement): any => {
+      if (h.address.toLowerCase() === poolAddress.toLowerCase()) {
+        return poolStorageReducer(data, h);
+      } else if (h.address.toLowerCase() === lpTokenAddress.toLowerCase()) {
+        return lpTokenStorageReducer(data, h);
+      }
+      return data;
+    };
+
+    const poolHistory = await getHistory(
+      accessToken,
+      historyParams,
+      [`address.eq.${poolAddress}`, `address.eq.${lpTokenAddress}`],
+      [],
+      [],
+      { tokenABalance: "0", tokenBBalance: "0", lpTokenTotalSupply: "0" },
+      combinedReducer,
+      ((s, _) => s),
+      ((s, _) => s)
+    );
+
+    if (poolHistory.length === 0) {
+      console.log(`[getLPTokenPriceHistory] No pool history found for ${poolAddress}`);
+      return { data: [], totalCount: 0 };
+    }
+
+    const hourlyLPPrices = new Map<string, PriceHistoryEntry>();
+    let lastTokenAPrice = "0";
+    let lastTokenBPrice = "0";
+
+    poolHistory.forEach((snapshot) => {
+      const timestamp = new Date(snapshot.timestamp);
+      timestamp.setMinutes(0, 0, 0);
+      const hourKey = timestamp.toISOString();
+
+      const tokenAPrice = tokenAPriceMap.get(hourKey) || lastTokenAPrice;
+      const tokenBPrice = tokenBPriceMap.get(hourKey) || lastTokenBPrice;
+
+      if (tokenAPrice !== "0") lastTokenAPrice = tokenAPrice;
+      if (tokenBPrice !== "0") lastTokenBPrice = tokenBPrice;
+
+      const { tokenABalance, tokenBBalance, lpTokenTotalSupply } = snapshot.data;
+
+      if (!tokenABalance || !tokenBBalance || !lpTokenTotalSupply ||
+          tokenABalance === "0" || tokenBBalance === "0" || lpTokenTotalSupply === "0") {
+        return;
+      }
+
+      if (tokenAPrice === "0" || tokenBPrice === "0") {
+        return;
+      }
+
+      const lpTokenPrice = calculateLPTokenPrice(
+        tokenABalance,
+        tokenBBalance,
+        tokenAPrice,
+        tokenBPrice,
+        lpTokenTotalSupply
+      );
+
+      if (!hourlyLPPrices.has(hourKey) || timestamp > hourlyLPPrices.get(hourKey)!.blockTimestamp) {
+        hourlyLPPrices.set(hourKey, {
+          id: `lp-${timestamp.getTime()}`,
+          timestamp: timestamp,
+          asset: lpTokenAddress,
+          price: lpTokenPrice,
+          blockTimestamp: timestamp
+        });
+      }
+    });
+
+    if (hourlyLPPrices.size === 0) {
+      console.log(`[getLPTokenPriceHistory] No LP token price data found for ${lpTokenAddress}`);
+      return { data: [], totalCount: 0 };
+    }
+
+    const filledPriceHistory = forwardFillPriceHistory(hourlyLPPrices, lpTokenAddress);
+
+    return { data: filledPriceHistory, totalCount: filledPriceHistory.length };
+  } catch (error) {
+    console.error('Error fetching LP token price history:', error);
+    throw new Error('Failed to fetch LP token price history');
   }
 };
