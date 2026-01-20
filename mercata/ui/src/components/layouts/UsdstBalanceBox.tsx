@@ -149,7 +149,7 @@ const UsdstBalanceBox: React.FC = () => {
   if (isMinimized) {
     return (
       <Card
-        className={`fixed bottom-4 right-4 z-50 w-12 h-12 shadow-lg ${getCardClasses()} backdrop-blur-sm`}
+        className={`fixed bottom-20 md:bottom-4 right-4 z-50 w-12 h-12 shadow-lg ${getCardClasses()} backdrop-blur-sm`}
       >
         <CardContent className="p-0 h-full flex items-center justify-center">
           <Button
@@ -167,7 +167,7 @@ const UsdstBalanceBox: React.FC = () => {
 
   return (
     <Card
-      className={`fixed bottom-4 right-4 z-50 w-60 shadow-lg ${getCardClasses()} backdrop-blur-sm`}
+      className={`fixed bottom-20 md:bottom-4 right-4 z-50 w-60 shadow-lg ${getCardClasses()} backdrop-blur-sm`}
     >
       <CardContent className="p-3">
         <div className="flex items-center space-x-2">

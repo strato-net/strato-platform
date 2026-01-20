@@ -382,10 +382,10 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
       `}</style>
       {/* Main Card */}
       <Card>
-        <CardHeader>
-          <CardTitle>Liquidatable Positions</CardTitle>
+        <CardHeader className="px-4 md:px-6 pb-2 md:pb-4">
+          <CardTitle className="text-base md:text-xl">Liquidatable Positions</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 px-4 md:px-6">
           {liquidatableVaults.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No liquidatable positions found
@@ -401,26 +401,26 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
                 <div key={vaultKey} className="border rounded-lg">
                   {/* Collapsed View */}
                   <div 
-                    className="p-4 cursor-pointer hover:bg-muted/50 flex items-center justify-between"
+                    className="p-3 md:p-4 cursor-pointer hover:bg-muted/50 flex items-center gap-2 md:gap-4"
                     onClick={() => toggleExpanded(vaultKey)}
                   >
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center shrink-0">
                       {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                     </div>
-                    <div className="flex items-center space-x-8">
-                      <div>
-                        <span className="text-muted-foreground">Borrower</span>
-                        <div className="font-medium font-mono text-sm">
+                    <div className="flex-1 grid grid-cols-3 gap-2 md:gap-8">
+                      <div className="min-w-0">
+                        <span className="text-xs md:text-sm text-muted-foreground">Borrower</span>
+                        <div className="font-medium font-mono text-xs md:text-sm truncate">
                           {vault.borrower ? `${vault.borrower.slice(0, 6)}...${vault.borrower.slice(-4)}` : "Unknown"}
                         </div>
                       </div>
-                      <div>
-                        <span className="text-muted-foreground">Borrowed</span>
-                        <div className="font-medium">{formatNumber(parseFloat(formatWeiToDecimalHP(vault.debtAmount, 18)))} USDST</div>
+                      <div className="min-w-0">
+                        <span className="text-xs md:text-sm text-muted-foreground">Borrowed</span>
+                        <div className="font-medium text-xs md:text-sm">{formatNumber(parseFloat(formatWeiToDecimalHP(vault.debtAmount, 18)))} USDST</div>
                       </div>
-                      <div>
-                        <span className="text-muted-foreground">Health Factor</span>
-                        <div className="font-medium text-red-600 dark:text-red-400">{formatNumber(vault.healthFactor)}</div>
+                      <div className="min-w-0 text-right md:text-left">
+                        <span className="text-xs md:text-sm text-muted-foreground whitespace-nowrap">Health Factor</span>
+                        <div className="font-medium text-xs md:text-sm text-red-600 dark:text-red-400">{formatNumber(vault.healthFactor)}</div>
                       </div>
                     </div>
                   </div>
@@ -429,64 +429,67 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
                   {isExpanded && (
                     <div className="border-t bg-muted/30">
                       {/* Table Header */}
-                      <div className="grid grid-cols-4 gap-4 p-4 text-sm text-muted-foreground font-medium border-b border-border">
-                        <div>Collateral Asset</div>
+                      <div className="grid grid-cols-4 gap-2 md:gap-4 p-3 md:p-4 text-xs md:text-sm text-muted-foreground font-medium border-b border-border">
+                        <div>Asset</div>
                         <div>Amount</div>
-                        <div>Value (USD)</div>
-                        <div>Expected Profit</div>
+                        <div>Value</div>
+                        <div>Profit</div>
                       </div>
                       
                       {/* Table Row - Position Values */}
-                      <div className="grid grid-cols-4 gap-4 p-4 items-center border-b">
-                        <div className="flex items-center space-x-1.5 min-w-0">
-                          <div className="w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                      <div className="grid grid-cols-4 gap-2 md:gap-4 p-3 md:p-4 items-center border-b text-xs md:text-sm">
+                        <div className="flex items-center space-x-1 md:space-x-1.5 min-w-0">
+                          <div className="w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-white text-[10px] md:text-xs font-bold flex-shrink-0">
                             {vault.symbol.charAt(0)}
                           </div>
-                          <span className="font-medium truncate min-w-[80px]">{vault.symbol}</span>
+                          <span className="font-medium truncate">{vault.symbol}</span>
                         </div>
-                        <div>{formatNumber(parseFloat(formatWeiToDecimalHP(vault.collateralAmount, vault.collateralAmountDecimals)))}</div>
-                        <div>${formatNumber(parseFloat(formatWeiToDecimalHP(vault.collateralValueUSD, 18)))}</div>
-                        <div className="text-green-600 font-medium">
+                        <div className="truncate">{formatNumber(parseFloat(formatWeiToDecimalHP(vault.collateralAmount, vault.collateralAmountDecimals)))}</div>
+                        <div className="truncate">${formatNumber(parseFloat(formatWeiToDecimalHP(vault.collateralValueUSD, 18)))}</div>
+                        <div className="text-green-600 font-medium truncate">
                           {calculateExpectedProfit(vault, liquidationAmount)}
                         </div>
                       </div>
                       
                       {/* Action Row - Input and Button */}
-                      <div className="p-4">
+                      <div className="p-3 md:p-4">
                         {/* Transaction Fee Display */}
-                        <div className="text-center mb-3">
+                        <div className="text-center mb-2 md:mb-3">
                           <p className="text-xs text-muted-foreground">
                             Transaction Fee: 0.02 USDST
                           </p>
                         </div>
                         
                         <div className="flex flex-col items-center space-y-2">
-                          <div className="flex items-center space-x-3">
+                          <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 md:space-x-3 w-full md:w-auto">
                             <Input
                               type="number"
                               placeholder="Amount to liquidate"
                               value={liquidationAmount}
                               onChange={(e) => handleLiquidationAmountChange(vaultKey, e.target.value)}
-                              className={`w-40 ${isAmountExceedsMax(vaultKey) ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+                              className={`w-full md:w-40 text-sm ${isAmountExceedsMax(vaultKey) ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
                               min="0"
                               step="0.01"
                             />
-                            <Button 
-                              variant={maxStates[vaultKey] ? "default" : "outline"}
-                              size="sm" 
-                              className={`min-w-[50px] ${maxStates[vaultKey] ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}`}
-                              onClick={() => handleMaxClick(vault, vaultKey)}
-                              disabled={isUsdstBalanceInsufficient()}
-                            >
-                              MAX
-                            </Button>
-                            <Button 
-                              className="bg-red-600 hover:bg-red-700 text-white"
-                              onClick={() => handleLiquidate(vault, vaultKey)}
-                              disabled={isLiquidating || !liquidationAmount || isAmountExceedsMax(vaultKey) || isUsdstBalanceInsufficient()}
-                            >
-                              {isLiquidating ? "Liquidating..." : "Liquidate"}
-                            </Button>
+                            <div className="flex gap-2">
+                              <Button 
+                                variant={maxStates[vaultKey] ? "default" : "outline"}
+                                size="sm" 
+                                className={`flex-1 md:flex-none min-w-[50px] ${maxStates[vaultKey] ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}`}
+                                onClick={() => handleMaxClick(vault, vaultKey)}
+                                disabled={isUsdstBalanceInsufficient()}
+                              >
+                                MAX
+                              </Button>
+                              <Button 
+                                className="flex-1 md:flex-none bg-red-600 hover:bg-red-700 text-white text-sm"
+                                size="sm"
+                                onClick={() => handleLiquidate(vault, vaultKey)}
+                                disabled={isLiquidating || !liquidationAmount || isAmountExceedsMax(vaultKey) || isUsdstBalanceInsufficient()}
+                              >
+                                {isLiquidating ? "Liquidating..." : "Liquidate"}
+                              </Button>
+                            </div>
                           </div>
                           
                           {/* Error message when amount exceeds max */}
