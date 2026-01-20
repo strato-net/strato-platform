@@ -847,7 +847,18 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
                 {!autoAllocate && <div className="text-right pr-3">HF</div>}
               </div>
               
-              {vaultCandidates.map((candidate) => {
+              {vaultCandidates
+                .filter((candidate) => {
+                  // In auto mode, omit vaults with 0 deposit and 0 mint
+                  if (autoAllocate) {
+                    const hasDeposit = candidate.allocation?.depositAmount && candidate.allocation.depositAmount > 0n;
+                    const hasMint = candidate.allocation?.mintAmount && candidate.allocation.mintAmount > 0n;
+                    return hasDeposit || hasMint;
+                  }
+                  // In manual mode, show all vaults
+                  return true;
+                })
+                .map((candidate) => {
                 const stabilityFeeRate = convertStabilityFeeRateToAnnualPercentage(candidate.vaultConfig.stabilityFeeRate);
                 const token = [...earningAssets, ...inactiveTokens].find(
                   t => t.address?.toLowerCase() === candidate.vaultConfig.assetAddress?.toLowerCase()
