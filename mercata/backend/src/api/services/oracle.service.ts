@@ -239,6 +239,62 @@ const extractHourlyPriceMap = (priceEvents: PriceHistoryEntry[]): Map<string, st
     return priceMap;
 };
 
+const fetchPoolHistory = async (
+  accessToken: string,
+  poolAddress: string,
+  lpTokenAddress: string
+): Promise<Array<{ timestamp: number; data: { tokenABalance: string; tokenBBalance: string; lpTokenTotalSupply: string } }>> => {
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+    const oneMonthInHours = 24 * 30;
+
+    const historyParams = {
+      endTimestamp: Date.now(),
+      interval: 1000 * 60 * 60, // 1 hour
+      numTicks: oneMonthInHours
+    };
+
+    const poolStorageReducer = (data: any, h: StorageHistoryElement): any => {
+      const tokenABalance = h.data?.tokenABalance || data.tokenABalance || "0";
+      const tokenBBalance = h.data?.tokenBBalance || data.tokenBBalance || "0";
+      return {
+        tokenABalance,
+        tokenBBalance,
+        lpTokenTotalSupply: data.lpTokenTotalSupply || "0"
+      };
+    };
+
+    const lpTokenStorageReducer = (data: any, h: StorageHistoryElement): any => {
+      const lpTokenTotalSupply = h.data?._totalSupply || data.lpTokenTotalSupply || "0";
+      return {
+        tokenABalance: data.tokenABalance || "0",
+        tokenBBalance: data.tokenBBalance || "0",
+        lpTokenTotalSupply
+      };
+    };
+
+    const combinedReducer = (data: any, h: StorageHistoryElement): any => {
+      if (h.address.toLowerCase() === poolAddress.toLowerCase()) {
+        return poolStorageReducer(data, h);
+      } else if (h.address.toLowerCase() === lpTokenAddress.toLowerCase()) {
+        return lpTokenStorageReducer(data, h);
+      }
+      return data;
+    };
+
+    return await getHistory(
+      accessToken,
+      historyParams,
+      [`address.eq.${poolAddress}`, `address.eq.${lpTokenAddress}`],
+      [],
+      [],
+      { tokenABalance: "0", tokenBBalance: "0", lpTokenTotalSupply: "0" },
+      combinedReducer,
+      ((s, _) => s),
+      ((s, _) => s)
+    );
+};
+
 const forwardFillPriceHistory = (
   hourlyPrices: Map<string, PriceHistoryEntry>,
   assetAddress: string
@@ -364,51 +420,7 @@ const getLPTokenPriceHistoryInternal = async (
     const tokenAPriceMap = extractHourlyPriceMap(tokenAPriceEvents);
     const tokenBPriceMap = extractHourlyPriceMap(tokenBPriceEvents);
 
-    const historyParams = {
-      endTimestamp: Date.now(),
-      interval: 1000 * 60 * 60, // 1 hour
-      numTicks: 24 * 30 // 30 days
-    };
-
-    const poolStorageReducer = (data: any, h: StorageHistoryElement): any => {
-      const tokenABalance = h.data?.tokenABalance || data.tokenABalance || "0";
-      const tokenBBalance = h.data?.tokenBBalance || data.tokenBBalance || "0";
-      return {
-        tokenABalance,
-        tokenBBalance,
-        lpTokenTotalSupply: data.lpTokenTotalSupply || "0"
-      };
-    };
-
-    const lpTokenStorageReducer = (data: any, h: StorageHistoryElement): any => {
-      const lpTokenTotalSupply = h.data?._totalSupply || data.lpTokenTotalSupply || "0";
-      return {
-        tokenABalance: data.tokenABalance || "0",
-        tokenBBalance: data.tokenBBalance || "0",
-        lpTokenTotalSupply
-      };
-    };
-
-    const combinedReducer = (data: any, h: StorageHistoryElement): any => {
-      if (h.address.toLowerCase() === poolAddress.toLowerCase()) {
-        return poolStorageReducer(data, h);
-      } else if (h.address.toLowerCase() === lpTokenAddress.toLowerCase()) {
-        return lpTokenStorageReducer(data, h);
-      }
-      return data;
-    };
-
-    const poolHistory = await getHistory(
-      accessToken,
-      historyParams,
-      [`address.eq.${poolAddress}`, `address.eq.${lpTokenAddress}`],
-      [],
-      [],
-      { tokenABalance: "0", tokenBBalance: "0", lpTokenTotalSupply: "0" },
-      combinedReducer,
-      ((s, _) => s),
-      ((s, _) => s)
-    );
+    const poolHistory = await fetchPoolHistory(accessToken, poolAddress, lpTokenAddress);
 
     if (poolHistory.length === 0) {
       console.log(`[getLPTokenPriceHistory] No pool history found for ${poolAddress}`);
