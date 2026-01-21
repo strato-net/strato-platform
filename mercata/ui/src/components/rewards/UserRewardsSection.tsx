@@ -16,6 +16,8 @@ import { useState } from "react";
 import { useUser } from "@/context/UserContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatDistanceToNow } from "date-fns";
+import { Link } from "react-router-dom";
+import { getActivityLink } from "@/lib/rewards/activityLinks";
 
 interface UserRewardsSectionProps {
   userRewards: UserRewardsData | null;
@@ -328,16 +330,30 @@ export const UserRewardsSection = ({
             const lastUpdate = lastUpdateTimeStr ? new Date(Number(lastUpdateTimeStr) * 1000) : null;
             const timeAgo = lastUpdate ? formatDistanceToNow(lastUpdate, { addSuffix: true }) : "?";
 
+            const activityLink = activity?.name ? getActivityLink(activity.name) : null;
+            const displayName = activity?.name 
+              ? (activity.name.length > 30 
+                  ? activity.name.substring(0, 30) + "..." 
+                  : activity.name)
+              : "?";
+
             return (
               <Card key={activity.activityId}>
                 <CardHeader>
                   <div>
                     <CardTitle className="text-lg flex items-center gap-2">
-                      {activity?.name 
-                        ? (activity.name.length > 30 
-                            ? activity.name.substring(0, 30) + "..." 
-                            : activity.name)
-                        : "?"}
+                      {activity?.name ? (
+                        activityLink ? (
+                          <Link
+                            to={activityLink}
+                            className="text-primary hover:underline transition-colors"
+                          >
+                            {displayName}
+                          </Link>
+                        ) : (
+                          displayName
+                        )
+                      ) : "?"}
                       <Badge variant="secondary">
                         {activity?.activityType !== undefined && activity?.activityType !== null
                           ? (activity.activityType === 1 ? "One-Time" : "Position")

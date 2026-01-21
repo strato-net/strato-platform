@@ -8,6 +8,8 @@ import { formatEmissionRatePerDay, formatEmissionRatePerWeek, roundByMagnitude, 
 import { formatDistanceToNow } from "date-fns";
 import { Info } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Link } from "react-router-dom";
+import { getActivityLink } from "@/lib/rewards/activityLinks";
 
 interface ActivitiesTableProps {
   activities: Activity[];
@@ -111,6 +113,7 @@ export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) =
                 const lastUpdateTimeStr = activity?.lastUpdateTime || null;
                 const lastUpdate = lastUpdateTimeStr ? new Date(Number(lastUpdateTimeStr) * 1000) : null;
                 const timeAgo = lastUpdate ? formatDistanceToNow(lastUpdate, { addSuffix: true }) : "?";
+                const activityLink = activity?.name ? getActivityLink(activity.name) : null;
 
                 return (
                   <TableRow
@@ -120,7 +123,18 @@ export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) =
                       {activity?.activityId !== undefined && activity?.activityId !== null ? activity.activityId : "?"}
                     </TableCell>
                     <TableCell className="font-medium">
-                      {activity?.name ? truncateActivityName(activity.name) : "?"}
+                      {activity?.name ? (
+                        activityLink ? (
+                          <Link
+                            to={activityLink}
+                            className="flex items-center gap-1 text-primary hover:underline"
+                          >
+                            {truncateActivityName(activity.name)}
+                          </Link>
+                        ) : (
+                          truncateActivityName(activity.name)
+                        )
+                      ) : "?"}
                     </TableCell>
                     <TableCell>
                       <Badge variant="secondary">
