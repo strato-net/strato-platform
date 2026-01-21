@@ -237,9 +237,9 @@ export const calculateAvailableToBorrowUSD = (
   loanData: NewLoanData,
   healthFactor: Number,
   newCollateral: Map<CollateralData, bigint>,
-): Number => {
+): bigint => {
   const targetHFRaw = BigInt(Math.round(Number(healthFactor) * 1e18));
-  if (targetHFRaw <= 0n) return 0;
+  if (targetHFRaw <= 0n) return 0n;
 
   let totalCollateralValueUSD = BigInt(loanData?.totalCollateralValueUSD ?? "0"); // supplied collat, LT weighted
   
@@ -260,11 +260,11 @@ export const calculateAvailableToBorrowUSD = (
 
   // Available to borrow = maxDebt - currentDebt (clamped to 0)
   // Floor to cents in BigInt space to avoid precision loss
-  if (maxDebtForTargetHF <= currentDebtUSD) return 0.00;
+  if (maxDebtForTargetHF <= currentDebtUSD) return 0n;
   const centsInWei = 10n ** 16n; // 0.01 USD = 1e16 wei
-  const availableWei = (maxDebtForTargetHF - currentDebtUSD) / centsInWei * centsInWei;
+  const availableWei = maxDebtForTargetHF - currentDebtUSD;
   const flooredToCentsWei = (availableWei / centsInWei) * centsInWei; // using BigInt floored division
-  return Number(flooredToCentsWei) / 1e18;
+  return flooredToCentsWei;
 };
 
 /**
@@ -308,13 +308,16 @@ export const calculateHFSliderExtrema = (
 // Returns a string including newlines for line breaks; should by formatted by a UI component that parses this. (whitespace-pre-line)
 export const determineErrorMessage = (
   borrowAmount: Number,
-  maxAtRequestedHF: Number,
-  maxAtMinHF: Number
+  maxAtRequestedHF: bigint,
+  maxAtMinHF: bigint
 ) : string => {
+
+  const borrowAmountWei = safeParseUnits(borrowAmount.toString(), 18);
+
   // Check if borrow amount exceeds maximum at requested health factor
-  if (borrowAmount > maxAtRequestedHF) {
+  if (borrowAmountWei > maxAtRequestedHF) {
     // If even at minimum health factor the max is still too low, don't suggest increasing risk
-    if (borrowAmount > maxAtMinHF) {
+    if (borrowAmountWei > maxAtMinHF) {
       return "Borrow amount exceeds the maximum at this health factor.\nConsider bridging in more collateral.";
     }
     // Otherwise, suggest increasing risk level as an option
