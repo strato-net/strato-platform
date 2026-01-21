@@ -206,9 +206,7 @@ unseqEventHandler events = do
 
 bootstrapBlockstanbul :: (MonadBlockstanbul m, Mod.Accessible View m) =>
                          ConduitT i SeqOutEvent m ()
-bootstrapBlockstanbul = do
-  yieldToVm [VmCreateBlockCommand]
-  lift createFirstTimer
+bootstrapBlockstanbul = lift createFirstTimer
 
 blockstanbulSend ::
   ( MonadLogger m,
@@ -227,25 +225,27 @@ blockstanbulSend' ::
   InEvent -> ConduitT i SeqOutEvent m ()
 blockstanbulSend' msg = do
   (p2pevs, vmevs) <- lift $ do
+    case msg of
+      UnannouncedBlock{} -> createNewViewTimer
+      _ -> pure ()
     resp <- sendAllMessages [msg]
     let blocks = [b | ToCommit b <- resp]
     for_ resp $ \case
       ResetTimer rn -> createNewTimer rn
       FailedHistoric blk -> A.delete (Proxy @DependentBlockEntry) (blockHash blk) -- First time using `delete`
       _ -> pure ()
+    updateViewTimer
     $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ format (blockHash <$> blocks)
 
     let getSequencedBlock =
           ingestBlockToSequencedBlock
             . blockToIngestBlock TO.Blockstanbul
-        creates = [VmCreateBlockCommand | MakeBlockCommand <- resp]
     let rBlocks = catMaybes (map getSequencedBlock blocks)
     committedBlocks <- catMaybes <$> traverse insertEmitted rBlocks
     let (vms, p2ps) = vmEvenP2pCheckptFilterHelper resp
 
     let vmevs =
-          creates
-            ++ (VmBlock <$> committedBlocks)
+            (VmBlock <$> committedBlocks)
             ++ vms
     let p2pevs =
           (P2pBlock <$> committedBlocks)
