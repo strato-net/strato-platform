@@ -106,6 +106,7 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
   // ============================================================================
 
   const [mintMaxVaults, setMintMaxVaults] = useState<Set<ADDRESS>>(new Set());
+  const [depositMaxVaults, setDepositMaxVaults] = useState<Set<ADDRESS>>(new Set());
 
 
 
@@ -184,6 +185,71 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
 
   // projectedVaultHealth is now passed as a prop from Mint.tsx to avoid duplication
 
+  // Memoized computed values for each vault - used for validation and display
+  type VaultComputedValues = {
+    // Deposit (potentialCollateral)
+    depositMaxUnits: UNITS;           // Raw potentialCollateral units
+    depositMaxAmount: string;         // Formatted token amount (e.g., "1234.567890")
+    depositMaxValue: string;          // Formatted USD value (e.g., "2345.67")
+    depositMaxAmountNum: number;      // Parsed number for comparison
+    depositMaxValueNum: number;       // Parsed number for comparison
+    // Mint (max mintable at full deposit)
+    mintMaxUnits: WEI;                // Raw max mint units
+    mintMaxAmount: string;            // Formatted USDST amount (same as value for stablecoin)
+    mintMaxValue: string;             // Formatted USD value (same as amount for stablecoin)
+    mintMaxAmountNum: number;         // Parsed number for comparison
+    mintMaxValueNum: number;          // Parsed number for comparison
+    // Decimals for convenience
+    decimals: number;
+  };
+
+  const vaultComputedValues = useMemo<Record<ADDRESS, VaultComputedValues>>(() => {
+    const values: Record<ADDRESS, VaultComputedValues> = {};
+    
+    for (const candidate of vaultCandidates) {
+      const decimals = candidate.vaultConfig.unitScale.toString().length - 1;
+      const price: WEI = candidate.oraclePrice;
+      
+      // Deposit max calculations
+      const depositMaxUnits = candidate.potentialCollateral;
+      const depositMaxAmount = formatUnits(depositMaxUnits, decimals);
+      const depositMaxAmountNum = parseFloat(depositMaxAmount);
+      
+      // Calculate deposit value: value = (amount * price) / unitScale
+      let depositMaxValue = '0.00';
+      let depositMaxValueNum = 0;
+      if (price > 0n && depositMaxUnits > 0n) {
+        const valueUnits: WEI = (depositMaxUnits * price) / candidate.vaultConfig.unitScale;
+        depositMaxValueNum = parseFloat(formatUnits(valueUnits, 18));
+        depositMaxValue = depositMaxValueNum.toFixed(2);
+      }
+      
+      // Mint max calculations
+      const mintMaxUnits = calculateMaxMintUnitsForVault(candidate, candidate.potentialCollateral);
+      const mintMaxAmount = formatUnits(mintMaxUnits, 18);
+      const mintMaxAmountNum = parseFloat(mintMaxAmount);
+      // For USDST, amount === value (it's a stablecoin)
+      const mintMaxValue = mintMaxAmountNum.toFixed(2);
+      const mintMaxValueNum = parseFloat(mintMaxValue);
+      
+      values[candidate.vaultConfig.assetAddress] = {
+        depositMaxUnits,
+        depositMaxAmount,
+        depositMaxValue,
+        depositMaxAmountNum,
+        depositMaxValueNum,
+        mintMaxUnits,
+        mintMaxAmount,
+        mintMaxValue,
+        mintMaxAmountNum,
+        mintMaxValueNum,
+        decimals,
+      };
+    }
+    
+    return values;
+  }, [vaultCandidates]);
+
   const getGridClass = useCallback(() => {
     if (showMintAmounts) {
       return !autoAllocate 
@@ -227,22 +293,18 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
     });
   }, [mintMaxVaults, vaultCandidates]);
 
-  // Log depositMaxVaults whenever they change (computed from vaultCandidates)
+  // Log depositMaxVaults whenever they change
   useEffect(() => {
-    const depositMaxVaults = vaultCandidates
-      .filter(c => c.allocation && c.allocation.depositAmount === c.potentialCollateral && c.potentialCollateral > 0n)
-      .map(c => ({
-        address: c.vaultConfig.assetAddress,
-        symbol: c.vaultConfig.symbol,
-      }));
-    
-    console.log('[VaultBreakdown] 🔵 depositMaxVaults changed:', {
-      vaults: depositMaxVaults,
-      addresses: depositMaxVaults.map(v => v.address),
-      symbols: depositMaxVaults.map(v => v.symbol),
-      count: depositMaxVaults.length,
+    const vaultSymbols = Array.from(depositMaxVaults).map(address => {
+      const candidate = vaultCandidates.find(c => c.vaultConfig.assetAddress === address);
+      return candidate ? candidate.vaultConfig.symbol : address;
     });
-  }, [vaultCandidates]);
+    console.log('[VaultBreakdown] 🔵 depositMaxVaults changed:', {
+      addresses: Array.from(depositMaxVaults),
+      symbols: vaultSymbols,
+      count: depositMaxVaults.size,
+    });
+  }, [depositMaxVaults, vaultCandidates]);
 
   // No longer needed - projectedVaultHealth is passed as prop
 
@@ -288,6 +350,7 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
       isInitializingRef.current = true;
 
       const newMintMaxVaults = new Set<string>();
+      const newDepositMaxVaults = new Set<string>();
       const newInputs: Record<ADDRESS, { depositAmount: string; mintAmount: string }> = {};
       const newRepresentations: Record<ADDRESS, {
         depositAmountToken: UNITS;
@@ -310,6 +373,12 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
           const tokenAmount = formatUnits(depositBigInt, decimals);
           depositAmountDisplay = tokenAmount;
           depositValueDisplay = amountToValue(tokenAmount, c.vaultConfig.assetAddress, false);
+          
+          // Check if deposit equals potentialCollateral
+          const shouldAddToDepositMax = depositBigInt === c.potentialCollateral && c.potentialCollateral > 0n;
+          if (shouldAddToDepositMax) {
+            newDepositMaxVaults.add(c.vaultConfig.assetAddress);
+          }
         }
 
         // Pre-calculate BOTH representations for mint
@@ -348,6 +417,7 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
       setAllocationRepresentations(newRepresentations);
       setVaultInputs(newInputs);
       setMintMaxVaults(newMintMaxVaults);
+      setDepositMaxVaults(newDepositMaxVaults);
       
       // Clear flag after a brief delay to allow NumericFormat to settle
       setTimeout(() => {
@@ -383,19 +453,19 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
     const newInputs: Record<ADDRESS, { depositAmount: string; mintAmount: string }> = {};
     
     vaultCandidates.forEach(c => {
-      const decimals = c.vaultConfig.unitScale.toString().length - 1;
+      const computed = vaultComputedValues[c.vaultConfig.assetAddress];
+      const decimals = computed?.decimals || (c.vaultConfig.unitScale.toString().length - 1);
       const isDepositMax = c.allocation && c.allocation.depositAmount === c.potentialCollateral && c.potentialCollateral > 0n;
       const isMintMax = mintMaxVaults.has(c.vaultConfig.assetAddress);
       
       let depositDisplay = '';
       let mintDisplay = '';
       
-      // For deposit: if in deposit max, use raw potentialCollateral value
-      if (isDepositMax) {
-        const depositAmountRaw = formatUnits(c.potentialCollateral, decimals);
+      // For deposit: if in deposit max, use memoized values
+      if (isDepositMax && computed) {
         depositDisplay = displayMode === 'Value' 
-          ? amountToValue(depositAmountRaw, c.vaultConfig.assetAddress, true)
-          : depositAmountRaw;
+          ? computed.depositMaxValue
+          : computed.depositMaxAmount;
       } else if (c.allocation?.depositAmount && c.allocation.depositAmount > 0n) {
         const tokenAmount = formatUnits(c.allocation.depositAmount, decimals);
         depositDisplay = displayMode === 'Value' 
@@ -403,14 +473,11 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
           : tokenAmount;
       }
       
-      // For mint: if in mint max, use raw calculateMaxMintUnitsForVault value
-      if (isMintMax) {
-        const depositForCalc = c.allocation?.depositAmount || c.potentialCollateral || 0n;
-        const maxMintUnits = calculateMaxMintUnitsForVault(c, depositForCalc);
-        const mintAmountRaw = formatUnits(maxMintUnits, 18);
+      // For mint: if in mint max, use memoized values
+      if (isMintMax && computed) {
         mintDisplay = displayMode === 'Value' 
-          ? parseFloat(mintAmountRaw).toFixed(2)
-          : mintAmountRaw;
+          ? computed.mintMaxValue
+          : computed.mintMaxAmount;
       } else if (c.allocation?.mintAmount && c.allocation.mintAmount > 0n) {
         const mintDecimal = formatUnits(c.allocation.mintAmount, 18);
         mintDisplay = displayMode === 'Value' 
@@ -432,7 +499,7 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
     }, 100);
     
     prevDisplayModeRef.current = displayMode;
-  }, [displayMode, autoAllocate, vaultCandidates, mintMaxVaults, amountToValue]);
+  }, [displayMode, autoAllocate, vaultCandidates, vaultComputedValues, mintMaxVaults, amountToValue]);
 
   // ============================================================================
   // Effects - Auto Mode Sync
@@ -483,11 +550,22 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
       return hasChanges ? newInputs : prev;
     });
 
-    // Check for mint max matches
+    // Check for mint max and deposit max matches
     const newMintMaxVaults = new Set<ADDRESS>();
+    const newDepositMaxVaults = new Set<ADDRESS>();
     vaultCandidates.forEach(c => {
       const depositBigInt = c.allocation?.depositAmount || 0n;
       const mintBigInt = c.allocation?.mintAmount || 0n;
+      
+      // Check deposit max
+      if (depositBigInt > 0n) {
+        const shouldAddToDepositMax = depositBigInt === c.potentialCollateral && c.potentialCollateral > 0n;
+        if (shouldAddToDepositMax) {
+          newDepositMaxVaults.add(c.vaultConfig.assetAddress);
+        }
+      }
+      
+      // Check mint max
       if (mintBigInt > 0n) {
         const maxMintUnits = calculateMaxMintUnitsForVault(c, depositBigInt);
         const shouldAddToMintMax = mintBigInt === maxMintUnits && maxMintUnits > 0n;
@@ -495,6 +573,12 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
           newMintMaxVaults.add(c.vaultConfig.assetAddress);
         }
       }
+    });
+
+    setDepositMaxVaults(prev => {
+      const changed = prev.size !== newDepositMaxVaults.size ||
+        Array.from(newDepositMaxVaults).some(v => !prev.has(v));
+      return changed ? newDepositMaxVaults : prev;
     });
 
     setMintMaxVaults(prev => {
@@ -674,18 +758,19 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
       const mintAmount = candidate.allocation.mintAmount;
       if (mintAmount === 0n) continue;
       
-      // Calculate max mint based on full potential collateral
-      const maxMintUnits = calculateMaxMintUnitsForVault(candidate, candidate.potentialCollateral);
+      // Use memoized max mint units
+      const computed = vaultComputedValues[candidate.vaultConfig.assetAddress];
+      if (!computed) continue;
       
       // Check if mint exceeds max
-      if (mintAmount > maxMintUnits) {
+      if (mintAmount > computed.mintMaxUnits) {
         anyMintExceedsMax = true;
         break;
       }
     }
     
     onMintExceedsMaxChange(anyMintExceedsMax);
-  }, [vaultCandidates, autoAllocate, onMintExceedsMaxChange]);
+  }, [vaultCandidates, vaultComputedValues, autoAllocate, onMintExceedsMaxChange]);
 
   // Calculate Total Manual Mint - Sums all mint amounts across vaults for display
   useEffect(() => {
@@ -722,6 +807,11 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
         ...prev, 
         [assetAddress]: { ...prev[assetAddress], depositAmount: '' } 
       }));
+      setDepositMaxVaults(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(assetAddress);
+        return newSet;
+      });
       if (!autoAllocate && onDepositAmountChange) {
         onDepositAmountChange(assetAddress, '0');
       }
@@ -734,32 +824,23 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
     }));
     
     if (!autoAllocate && onDepositAmountChange) {
-      const decimals = candidate.vaultConfig.unitScale.toString().length - 1;
+      const computed = vaultComputedValues[assetAddress];
+      if (!computed) return;
       
-      // Calculate max deposit display value for comparison
-      const maxDepositDecimal = formatUnits(candidate.potentialCollateral, decimals);
-      let maxDepositDisplayValue: string;
-      if (displayMode === 'Value') {
-        const price: WEI = getPrice(assetAddress);
-        const valueUnits: WEI = (candidate.potentialCollateral * price) / candidate.vaultConfig.unitScale;
-        const availableUSD = parseFloat(formatUnits(valueUnits, 18));
-        maxDepositDisplayValue = availableUSD.toFixed(2);
-      } else {
-        maxDepositDisplayValue = maxDepositDecimal;
-      }
-      
-      // Compare display values (the input floatValue vs max display value)
-      const inputDisplayNum = floatValue;
-      const maxDisplayNum = parseFloat(maxDepositDisplayValue);
+      // Get the max display value based on displayMode
+      // Parse the display string to match what user sees/types
+      const maxDisplayNum = displayMode === 'Value' 
+        ? parseFloat(computed.depositMaxValue)
+        : parseFloat(computed.depositMaxAmount);
       
       // Check if input matches max available
-      const matchesMax = inputDisplayNum === maxDisplayNum && maxDisplayNum > 0;
+      const matchesMax = floatValue === maxDisplayNum && maxDisplayNum > 0;
       
       // If input matches max, use exact potentialCollateral to avoid precision loss
       // Otherwise, convert the input to units
       let depositUnits: UNITS;
       if (matchesMax) {
-        depositUnits = candidate.potentialCollateral;
+        depositUnits = computed.depositMaxUnits;
       } else {
         if (displayMode === 'Value') {
           // User entered USD value, convert to token amount
@@ -774,7 +855,7 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
           }
         } else {
           // User entered token amount directly
-          depositUnits = parseUnitsWithTruncation(String(floatValue), decimals);
+          depositUnits = parseUnitsWithTruncation(String(floatValue), computed.decimals);
         }
       }
 
@@ -785,9 +866,24 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
         return;
       }
       
+      // Update depositMaxVaults set
+      if (matchesMax) {
+        setDepositMaxVaults(prev => {
+          const newSet = new Set(prev);
+          newSet.add(assetAddress);
+          return newSet;
+        });
+      } else {
+        setDepositMaxVaults(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(assetAddress);
+          return newSet;
+        });
+      }
+      
       onDepositAmountChange(assetAddress, depositUnits.toString());
     }
-  }, [vaultCandidates, autoAllocate, displayMode, getPrice, onDepositAmountChange, allocationRepresentations]);
+  }, [vaultCandidates, vaultComputedValues, autoAllocate, displayMode, getPrice, onDepositAmountChange, allocationRepresentations]);
 
   const handleMintChange = useCallback((
     assetAddress: ADDRESS, 
@@ -822,27 +918,23 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
     }));
 
     if (!autoAllocate && onMintAmountChange) {
-      // Calculate max mint based on full potential collateral (same as "Available: x")
-      const maxMintUnitsFullDeposit = calculateMaxMintUnitsForVault(candidate, candidate.potentialCollateral);
-      const maxMintDecimal = formatUnits(maxMintUnitsFullDeposit, 18);
+      const computed = vaultComputedValues[assetAddress];
+      if (!computed) return;
       
-      // Convert to display value based on displayMode for comparison
-      const maxMintDisplayValue = displayMode === 'Value' 
-        ? parseFloat(maxMintDecimal).toFixed(2)
-        : maxMintDecimal;
-      
-      // Compare display values (the input floatValue vs max display value)
-      const inputDisplayNum = floatValue;
-      const maxDisplayNum = parseFloat(maxMintDisplayValue);
+      // Get the max display value based on displayMode (for USDST, amount === value)
+      // Parse the display string to match what user sees/types
+      const maxDisplayNum = displayMode === 'Value' 
+        ? parseFloat(computed.mintMaxValue)
+        : parseFloat(computed.mintMaxAmount);
       
       // Check if input matches max available
-      const matchesMax = inputDisplayNum === maxDisplayNum && maxDisplayNum > 0;
+      const matchesMax = floatValue === maxDisplayNum && maxDisplayNum > 0;
       
       // If input matches max, use exact maxMintUnits to avoid precision loss
       // Otherwise, convert the input to units
       let mintUnits: WEI;
       if (matchesMax) {
-        mintUnits = maxMintUnitsFullDeposit;
+        mintUnits = computed.mintMaxUnits;
       } else {
         mintUnits = parseUnitsWithTruncation(String(floatValue), 18);
       }
@@ -870,7 +962,7 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
       
       onMintAmountChange(assetAddress, mintUnits.toString());
     }
-  }, [vaultCandidates, autoAllocate, onMintAmountChange, allocationRepresentations, displayMode]);
+  }, [vaultCandidates, vaultComputedValues, autoAllocate, onMintAmountChange, allocationRepresentations, displayMode]);
 
   const handleDepositAvailableClick = useCallback((
     e: React.MouseEvent, 
@@ -879,23 +971,24 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
     e.preventDefault();
     e.stopPropagation();
     
+    const computed = vaultComputedValues[candidate.vaultConfig.assetAddress];
+    if (!computed) return;
+    
     // Set flag to prevent handleDepositChange from being triggered
     // when NumericFormat fires onValueChange after we programmatically set values
     isInitializingRef.current = true;
     
-    const decimals = candidate.vaultConfig.unitScale.toString().length - 1;
-    const tokenAmount = formatUnits(candidate.potentialCollateral, decimals);
+    // Add to depositMaxVaults
+    setDepositMaxVaults(prev => {
+      const newSet = new Set(prev);
+      newSet.add(candidate.vaultConfig.assetAddress);
+      return newSet;
+    });
     
-    let displayValue: string;
-    if (displayMode === 'Value') {
-      const price: WEI = getPrice(candidate.vaultConfig.assetAddress);
-      // value = (amount * price) / unitScale
-      const valueUnits: WEI = (candidate.potentialCollateral * price) / candidate.vaultConfig.unitScale;
-      const usdValue = parseFloat(formatUnits(valueUnits, 18));
-      displayValue = usdValue.toFixed(2);
-    } else {
-      displayValue = tokenAmount;
-    }
+    // Use memoized display value based on displayMode
+    const displayValue = displayMode === 'Value' 
+      ? computed.depositMaxValue 
+      : computed.depositMaxAmount;
 
     setVaultInputs(prev => ({ 
       ...prev, 
@@ -906,7 +999,8 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
     }));
     
     if (!autoAllocate && onDepositAmountChange) {
-      onDepositAmountChange(candidate.vaultConfig.assetAddress, candidate.potentialCollateral.toString());
+      // Use exact memoized units to avoid precision loss
+      onDepositAmountChange(candidate.vaultConfig.assetAddress, computed.depositMaxUnits.toString());
     }
     
     // Clear the flag after NumericFormat has settled
@@ -918,7 +1012,7 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
       depositInputRefs.current[candidate.vaultConfig.assetAddress]?.blur();
       setFocusedInput(null);
     }, 0);
-  }, [displayMode, getPrice, autoAllocate, onDepositAmountChange]);
+  }, [displayMode, vaultComputedValues, autoAllocate, onDepositAmountChange]);
 
   const handleMintAvailableClick = useCallback((
     e: React.MouseEvent, 
@@ -927,16 +1021,12 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
     e.preventDefault();
     e.stopPropagation();
     
+    const computed = vaultComputedValues[candidate.vaultConfig.assetAddress];
+    if (!computed) return;
+    
     // Set flag to prevent handleMintChange/handleDepositChange from being triggered
     // when NumericFormat fires onValueChange after we programmatically set values
     isInitializingRef.current = true;
-    
-    const decimals = candidate.vaultConfig.unitScale.toString().length - 1;
-    
-    // Use exact BigInt calculation to avoid precision loss from float conversion
-    // This ensures the value matches exactly what calculateMaxMintUnitsForVault returns
-    const maxMintUnits: WEI = calculateMaxMintUnitsForVault(candidate, candidate.potentialCollateral);
-    const maxMintDecimal = formatUnits(maxMintUnits, 18);
     
     // Add to mintMaxVaults
     setMintMaxVaults(prev => {
@@ -945,24 +1035,14 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
       return newSet;
     });
     
-    // Populate deposit input and call parent callback
-    let depositDisplayValue: string;
-    if (displayMode === 'Value') {
-      const price: WEI = getPrice(candidate.vaultConfig.assetAddress);
-      const valueUnits: WEI = (candidate.potentialCollateral * price) / candidate.vaultConfig.unitScale;
-      const usdValue = parseFloat(formatUnits(valueUnits, 18));
-      depositDisplayValue = usdValue.toFixed(2);
-    } else {
-      depositDisplayValue = formatUnits(candidate.potentialCollateral, decimals);
-    }
+    // Use memoized display values based on displayMode
+    const depositDisplayValue = displayMode === 'Value' 
+      ? computed.depositMaxValue 
+      : computed.depositMaxAmount;
     
-    // Populate mint input - use exact BigInt formatted value
-    let mintDisplayValue: string;
-    if (displayMode === 'Value') {
-      mintDisplayValue = parseFloat(maxMintDecimal).toFixed(2);
-    } else {
-      mintDisplayValue = maxMintDecimal;
-    }
+    const mintDisplayValue = displayMode === 'Value' 
+      ? computed.mintMaxValue 
+      : computed.mintMaxAmount;
     
     // Update display values
     setVaultInputs(prev => ({ 
@@ -973,13 +1053,13 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
       } 
     }));
     
-    // Call parent callbacks with exact BigInt strings
+    // Call parent callbacks with exact memoized BigInt strings
     if (!autoAllocate) {
       if (onDepositAmountChange) {
-        onDepositAmountChange(candidate.vaultConfig.assetAddress, candidate.potentialCollateral.toString());
+        onDepositAmountChange(candidate.vaultConfig.assetAddress, computed.depositMaxUnits.toString());
       }
       if (onMintAmountChange) {
-        onMintAmountChange(candidate.vaultConfig.assetAddress, maxMintUnits.toString());
+        onMintAmountChange(candidate.vaultConfig.assetAddress, computed.mintMaxUnits.toString());
       }
     }
     
@@ -993,7 +1073,7 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
       mintInputRefs.current[candidate.vaultConfig.assetAddress]?.blur();
       setFocusedInput(null);
     }, 0);
-  }, [displayMode, getPrice, autoAllocate, onDepositAmountChange, onMintAmountChange]);
+  }, [displayMode, vaultComputedValues, autoAllocate, onDepositAmountChange, onMintAmountChange]);
 
 
 
@@ -1078,8 +1158,11 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
                 );
                 const tokenImage = token?.images?.[0]?.value;
 
+                // Get memoized computed values for this vault
+                const computed = vaultComputedValues[candidate.vaultConfig.assetAddress];
+                const decimals = computed?.decimals || (candidate.vaultConfig.unitScale.toString().length - 1);
+                
                 // Get actual amounts from allocation (source of truth)
-                const decimals = candidate.vaultConfig.unitScale.toString().length - 1;
                 const depositAmt = candidate.allocation 
                   ? parseFloat(formatUnits(candidate.allocation.depositAmount, decimals))
                   : 0;
@@ -1098,23 +1181,17 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
 
                 // Get display values from vaultInputs
                 const inputs = vaultInputs[candidate.vaultConfig.assetAddress] || { depositAmount: '', mintAmount: '' };
-                const depositDisplayValue = inputs.depositAmount;
-                const depositDisplayNum = toNumber(depositDisplayValue);
+                const depositDisplayNum = toNumber(inputs.depositAmount);
+                const mintDisplayNum = toNumber(inputs.mintAmount);
                 
-                // Calculate max deposit based on potential collateral (this is what "Available: x" shows)
-                const maxDepositDecimal = formatUnits(candidate.potentialCollateral, decimals);
-                
-                // Convert max deposit to display value based on displayMode
-                let maxDepositDisplayValue: string;
-                if (displayMode === 'Value') {
-                  const price: WEI = getPrice(candidate.vaultConfig.assetAddress);
-                  const valueUnits: WEI = (candidate.potentialCollateral * price) / candidate.vaultConfig.unitScale;
-                  const availableUSD = parseFloat(formatUnits(valueUnits, 18));
-                  maxDepositDisplayValue = availableUSD.toFixed(2);
-                } else {
-                  maxDepositDisplayValue = maxDepositDecimal;
-                }
-                const maxDepositDisplayNum = parseFloat(maxDepositDisplayValue);
+                // Use memoized max values based on displayMode
+                // Parse the display strings to match what user sees/types
+                const maxDepositDisplayNum = computed 
+                  ? (displayMode === 'Value' ? parseFloat(computed.depositMaxValue) : parseFloat(computed.depositMaxAmount))
+                  : 0;
+                const maxMintDisplayNum = computed
+                  ? (displayMode === 'Value' ? parseFloat(computed.mintMaxValue) : parseFloat(computed.mintMaxAmount))
+                  : 0;
                 
                 // Check if deposit exceeds max available (red border condition for deposit)
                 const depositExceedsMax = !autoAllocate && 
@@ -1122,24 +1199,8 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
                   depositDisplayNum > maxDepositDisplayNum;
                 
                 // Check if deposit matches available balance (for blue border)
-                // Compare display values to handle precision differences across displayModes
-                const depositMatchesAvailable = !autoAllocate &&
-                  depositDisplayNum > 0 &&
-                  depositDisplayNum === maxDepositDisplayNum;
-
-
-                const mintDisplayValue = inputs.mintAmount;
-                const mintDisplayNum = toNumber(mintDisplayValue);
-                
-                // Calculate max mint based on full potential collateral (this is what "Available: x" shows)
-                const maxMintUnitsFullDeposit: WEI = calculateMaxMintUnitsForVault(candidate, candidate.potentialCollateral);
-                const maxMintDecimalFullDeposit = formatUnits(maxMintUnitsFullDeposit, 18);
-                
-                // Convert max mint to display value based on displayMode
-                const maxMintDisplayValue = displayMode === 'Value' 
-                  ? parseFloat(maxMintDecimalFullDeposit).toFixed(2)
-                  : maxMintDecimalFullDeposit;
-                const maxMintDisplayNum = parseFloat(maxMintDisplayValue);
+                // Use depositMaxVaults set as source of truth
+                const depositMatchesAvailable = depositMaxVaults.has(candidate.vaultConfig.assetAddress);
                 
                 // Check if mint exceeds max available (red border condition for mint)
                 const mintExceedsMax = !autoAllocate && 
@@ -1147,10 +1208,8 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
                   mintDisplayNum > maxMintDisplayNum;
                 
                 // Check if mint matches max mintable (for blue border)
-                // Compare display values to handle precision differences across displayModes
-                const mintMatchesAvailable = !autoAllocate &&
-                  mintDisplayNum > 0 &&
-                  mintDisplayNum === maxMintDisplayNum;
+                // Use mintMaxVaults set as source of truth
+                const mintMatchesAvailable = mintMaxVaults.has(candidate.vaultConfig.assetAddress);
 
 
                 return (
@@ -1204,34 +1263,23 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
                           disabled={autoAllocate}
                         />
                       </div>
-                      {focusedInput === `deposit-${candidate.vaultConfig.assetAddress}` && (() => {
-                        const availableAmount = formatUnits(candidate.potentialCollateral, decimals);
-                        const availableAmountNum = parseFloat(availableAmount);
-                        
-                        if (displayMode === 'Value') {
-                          const price: WEI = getPrice(candidate.vaultConfig.assetAddress);
-                          // value = (amount * price) / unitScale
-                          const valueUnits: WEI = (candidate.potentialCollateral * price) / candidate.vaultConfig.unitScale;
-                          const availableUSD = parseFloat(formatUnits(valueUnits, 18));
-                          return (
-                            <div 
-                              className="text-xs text-muted-foreground cursor-pointer hover:text-foreground hover:underline"
-                              onMouseDown={(e) => handleDepositAvailableClick(e, candidate)}
-                            >
-                              Available: ${truncateForDisplay(availableUSD)}
-                            </div>
-                          );
-                        } else {
-                          return (
-                            <div 
-                              className="text-xs text-muted-foreground cursor-pointer hover:text-foreground hover:underline"
-                              onMouseDown={(e) => handleDepositAvailableClick(e, candidate)}
-                            >
-                              Available: {truncateForDisplay(availableAmountNum)} {candidate.vaultConfig.symbol}
-                            </div>
-                          );
-                        }
-                      })()}
+                      {focusedInput === `deposit-${candidate.vaultConfig.assetAddress}` && computed && (
+                        displayMode === 'Value' ? (
+                          <div 
+                            className="text-xs text-muted-foreground cursor-pointer hover:text-foreground hover:underline"
+                            onMouseDown={(e) => handleDepositAvailableClick(e, candidate)}
+                          >
+                            Available: ${truncateForDisplay(computed.depositMaxValueNum)}
+                          </div>
+                        ) : (
+                          <div 
+                            className="text-xs text-muted-foreground cursor-pointer hover:text-foreground hover:underline"
+                            onMouseDown={(e) => handleDepositAvailableClick(e, candidate)}
+                          >
+                            Available: {truncateForDisplay(computed.depositMaxAmountNum)} {candidate.vaultConfig.symbol}
+                          </div>
+                        )
+                      )}
                     </div>
                     
                     {/* Mint Input */}
@@ -1266,19 +1314,14 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
                             disabled={autoAllocate}
                           />
                         </div>
-                        {focusedInput === `mint-${candidate.vaultConfig.assetAddress}` && (() => {
-                          const maxDepositAmount = parseFloat(formatUnits(candidate.potentialCollateral, decimals));
-                          const maxMint = calculateMaxMintForVault(candidate, maxDepositAmount);
-                          
-                          return (
-                            <div 
-                              className="text-xs text-muted-foreground cursor-pointer hover:text-foreground hover:underline"
-                              onMouseDown={(e) => handleMintAvailableClick(e, candidate)}
-                            >
-                              Available: {truncateForDisplay(maxMint)} USDST
-                            </div>
-                          );
-                        })()}
+                        {focusedInput === `mint-${candidate.vaultConfig.assetAddress}` && computed && (
+                          <div 
+                            className="text-xs text-muted-foreground cursor-pointer hover:text-foreground hover:underline"
+                            onMouseDown={(e) => handleMintAvailableClick(e, candidate)}
+                          >
+                            Available: {truncateForDisplay(computed.mintMaxAmountNum)} USDST
+                          </div>
+                        )}
                       </div>
                     )}
                     
