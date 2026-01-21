@@ -30,6 +30,7 @@ import {
   calculateAggregateHealthFactor,
   computeOptimalAllocations,
   getSliderColor,
+  findMaxAchievableHF,
   type OptimalAllocationResult,
 } from '@/components/cdp/v2/cdpUtils';
 import { formatWeiToDecimalHP } from '@/utils/numberUtils';
@@ -61,6 +62,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   const [targetHF, setTargetHF] = useState<DECIMAL>(2.1);
   const [isMaxMode, setIsMaxMode] = useState(false);
   const [autoAllocate, setAutoAllocate] = useState(true);
+  const [hasInitializedHF, setHasInitializedHF] = useState(false);
 
   // ============================================================================
   // State - Data
@@ -258,6 +260,15 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   useEffect(() => {
     fetchVaultCandidates();
   }, [fetchVaultCandidates, refreshTrigger]);
+
+  // Initialize targetHF to the maximum achievable HF on first load
+  useEffect(() => {
+    if (!hasInitializedHF && vaultCandidates.length > 0 && sliderMinHF > 0) {
+      const optimalHF = findMaxAchievableHF(vaultCandidates, sliderMinHF, 2.1, 0.01);
+      setTargetHF(optimalHF);
+      setHasInitializedHF(true);
+    }
+  }, [vaultCandidates, sliderMinHF, hasInitializedHF]);
 
   useEffect(() => {
     setLoading(true);

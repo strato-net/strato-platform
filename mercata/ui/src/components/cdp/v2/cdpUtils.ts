@@ -2,6 +2,7 @@ import { formatUnits } from 'ethers';
 import { formatNumberWithCommas, parseUnitsWithTruncation } from '@/utils/numberUtils';
 import type { VaultCandidate, Allocation } from '@/components/cdp/v2/cdpTypes';
 import type { DECIMAL, USD, UNITS, WAD, WEI, RAY, ADDRESS } from '@/components/cdp/v2/cdpTypes';
+import { getMaxAllocations, getAbsoluteMaxAllocations } from '@/components/cdp/v2/MintService';
 
 // ============================================================================
 // Constants
@@ -746,5 +747,50 @@ export const calculateSliderMinHFFromPercentages = (
   const roundedMinHF = Math.round((maxMinCR / maxLT) * 100) / 100;
   
   return roundedMinHF;
+};
+
+/**
+ * Find the maximum achievable health factor that allows minting
+ * Starts at a high HF and decreases until available to mint > 0
+ * @param vaultCandidates - Array of vault candidates
+ * @param minHF - Minimum allowed health factor (from slider)
+ * @param startHF - Starting health factor to try
+ * @param step - Step size to decrease HF by
+ * @returns The optimal health factor, or minHF if none found
+ */
+export const findMaxAchievableHF = (
+  vaultCandidates: VaultCandidate[],
+  minHF: number,
+  startHF: number,
+  step: number
+): number => {
+  if (vaultCandidates.length === 0) return startHF;
+  
+  let currentHF = startHF;
+  
+  // Try HF values from startHF down to minHF
+  while (currentHF >= minHF) {
+    try {
+      const isAtMinHF = Math.abs(currentHF - minHF) < 0.01;
+      const allocations = isAtMinHF
+        ? getAbsoluteMaxAllocations(vaultCandidates)
+        : getMaxAllocations(vaultCandidates, currentHF);
+      
+      const vaultsWithAllocations = addAllocationsToVaultCandidates(allocations, vaultCandidates);
+      const totalMaxMint = calculateTotalMaxMint(vaultsWithAllocations);
+      
+      // If we can mint something at this HF, return it
+      if (totalMaxMint > 0n) {
+        return Math.round(currentHF * 100) / 100; // Round to 2 decimal places
+      }
+    } catch (error) {
+      console.warn(`[findMaxAchievableHF] Error at HF ${currentHF}:`, error);
+    }
+    
+    currentHF -= step;
+  }
+  
+  // If no HF worked, return minHF as fallback
+  return minHF;
 };
 
