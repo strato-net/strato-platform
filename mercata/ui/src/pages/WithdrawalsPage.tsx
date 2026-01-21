@@ -23,8 +23,8 @@ const WithdrawalsPage = () => {
 
   useEffect(() => {
     const tabParam = searchParams.get("tab");
-    if (tabParam === "bridge-out") {
-      setActiveTab("bridge-out");
+    if (tabParam && ['from-savings', 'bridge-out'].includes(tabParam)) {
+      setActiveTab(tabParam as "from-savings" | "bridge-out");
     }
   }, [searchParams]);
 

@@ -1,4 +1,5 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import MobileBottomNav from '../components/dashboard/MobileBottomNav';
@@ -21,8 +22,23 @@ import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 import { useUserTokens } from '@/context/UserTokensContext';
 
 const Advanced = () => {
+  const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<"lending" | "swap" | "liquidations" | "safety" | "mint">("mint");
   const [borrowActiveTab, setBorrowActiveTab] = useState('vaults');
+
+  // Handle query parameters for tab navigation from rewards page
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    const subtabParam = searchParams.get('subtab');
+
+    if (tabParam && ['lending', 'swap', 'liquidations', 'safety', 'mint'].includes(tabParam)) {
+      setActiveTab(tabParam as "lending" | "swap" | "liquidations" | "safety" | "mint");
+    }
+
+    if (subtabParam && ['vaults', 'bad-debt', 'liquidations'].includes(subtabParam)) {
+      setBorrowActiveTab(subtabParam);
+    }
+  }, [searchParams]);
   const { refreshVaults } = useCDP();
   const [vaultsRefreshTrigger, setVaultsRefreshTrigger] = useState(0);
   const [mintPlannerRefreshTrigger, setMintPlannerRefreshTrigger] = useState(0);
