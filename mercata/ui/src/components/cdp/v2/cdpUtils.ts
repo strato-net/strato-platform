@@ -471,9 +471,10 @@ export const calculateAggregateHealthFactor = (
     decimals: number; // Token decimals for parsing deposit
   }>
 ): string | null => {
-  let totalCollateralUSD: USD = 0;
-  let totalDebtUSD: USD = 0;
-  let weightedLTSum: DECIMAL = 0;
+  // Use BigInt accumulators for precision
+  let totalCollateralUSD: WEI = 0n;
+  let totalDebtUSD: WEI = 0n;
+  let weightedLTSum: bigint = 0n; // Sum of (debt * LT) in WAD format
   
   for (const vault of vaults) {
     // Calculate total debt for this vault (existing + new mint)
@@ -489,31 +490,43 @@ export const calculateAggregateHealthFactor = (
     const depositUnits: UNITS = vault.depositAmount > 0 ? parseUnitsWithTruncation(vault.depositAmount.toString(), vault.decimals) : 0n;
     const totalCollateral: UNITS = vault.currentCollateral + depositUnits;
     
-    // Calculate collateral value in USD
-    const collateralValueUSD: UNITS = (totalCollateral * vault.oraclePrice) / vault.unitScale;
-    const collateralUSD: USD = parseFloat(formatUnits(collateralValueUSD, 18));
-    const debtUSD: USD = parseFloat(formatUnits(totalDebt, 18));
+    // Calculate collateral value in USD (keep as BigInt)
+    const collateralValueUSD: WEI = (totalCollateral * vault.oraclePrice) / vault.unitScale;
     
-    // Liquidation ratio as percentage (e.g., 1.33e18 -> 133)
-    const lt: DECIMAL = parseFloat(formatUnits(vault.liquidationRatio, 18)) * 100;
+    // Liquidation ratio is in WAD format (e.g., 1.5e18 for 150%)
+    // Multiply by 100 to get percentage in WAD format (e.g., 150e18 for 150%)
+    const ltWAD: bigint = vault.liquidationRatio * 100n;
     
-    // Accumulate totals for aggregate calculation
-    totalCollateralUSD += collateralUSD;
-    totalDebtUSD += debtUSD;
-    weightedLTSum += debtUSD * lt;
+    // Accumulate totals for aggregate calculation (all in BigInt)
+    totalCollateralUSD += collateralValueUSD;
+    totalDebtUSD += totalDebt;
+    
+    // weightedLTSum = sum of (debt * LT) where LT is in percentage WAD format
+    // debt is in WEI (18 decimals), LT is in WAD (18 decimals)
+    // To keep precision, we calculate: (totalDebt * ltWAD) / WAD_UNIT
+    weightedLTSum += (totalDebt * ltWAD) / WAD_UNIT;
   }
 
   // Need at least some debt to calculate HF
-  if (totalDebtUSD <= 0) return null;
+  if (totalDebtUSD <= 0n) return null;
 
   // Calculate weighted average liquidation threshold
-  const weightedAvgLT: DECIMAL = weightedLTSum / totalDebtUSD;
+  // weightedLTSum is sum of (debt * LT), so divide by totalDebtUSD to get weighted avg
+  // Result is in percentage (e.g., 150 for 150%)
+  // We need to scale up to WAD precision: (weightedLTSum * WAD) / totalDebtUSD
+  const weightedAvgLTWAD: bigint = (weightedLTSum * WAD_UNIT) / totalDebtUSD;
   
-  // Calculate aggregate collateralization ratio
-  const aggregateCR = (totalCollateralUSD / totalDebtUSD) * 100;
+  // Calculate aggregate collateralization ratio as percentage in WAD format
+  // CR = (totalCollateralUSD / totalDebtUSD) * 100
+  // To maintain precision: (totalCollateralUSD * 100 * WAD) / totalDebtUSD
+  const aggregateCRWAD: bigint = (totalCollateralUSD * 100n * WAD_UNIT) / totalDebtUSD;
   
-  // Calculate overall health factor
-  const overallHF = aggregateCR / weightedAvgLT;
+  // Calculate overall health factor: CR / weightedAvgLT (both in WAD format)
+  // HF = (aggregateCRWAD * WAD) / weightedAvgLTWAD
+  const overallHFWAD: bigint = (aggregateCRWAD * WAD_UNIT) / weightedAvgLTWAD;
+  
+  // Convert to decimal only at the very end
+  const overallHF = parseFloat(formatUnits(overallHFWAD, 18));
   
   if (!isFinite(overallHF) || isNaN(overallHF)) return null;
   
@@ -564,13 +577,22 @@ export const calculateVaultHFRaw = (
 
     if (totalDebt <= 0n) return null;
 
-    const collateralValueUSD: UNITS = (totalCollateral * candidate.oraclePrice) / candidate.vaultConfig.unitScale;
-    const collateralUSD: USD = parseFloat(formatUnits(collateralValueUSD, 18));
-    const debtUSD: USD = parseFloat(formatUnits(totalDebt, 18));
-
-    const cr: DECIMAL = (collateralUSD / debtUSD) * 100;
-    const lt: DECIMAL = parseFloat(formatUnits(candidate.vaultConfig.liquidationRatio, 18)) * 100;
-    const hf: DECIMAL = cr / lt;
+    // Keep all calculations in BigInt for maximum precision
+    const collateralValueUSD: WEI = (totalCollateral * candidate.oraclePrice) / candidate.vaultConfig.unitScale;
+    
+    // Calculate CR as WAD: (collateralValueUSD * WAD * 100) / totalDebt
+    // This gives us CR as a percentage in WAD format (e.g., 155% = 155e18)
+    const crWAD: bigint = (collateralValueUSD * WAD_UNIT * 100n) / totalDebt;
+    
+    // LT is already in WAD format (e.g., 1.5e18 for 150%), multiply by 100 to get percentage
+    const ltWAD: bigint = candidate.vaultConfig.liquidationRatio * 100n;
+    
+    // Calculate HF: (crWAD * WAD) / ltWAD
+    // This gives us HF in WAD format (e.g., 1.03e18 for HF of 1.03)
+    const hfWAD: bigint = (crWAD * WAD_UNIT) / ltWAD;
+    
+    // Convert to decimal only at the very end
+    const hf = parseFloat(formatUnits(hfWAD, 18));
 
     if (!isFinite(hf) || isNaN(hf) || hf >= 999) return null;
     return hf;
