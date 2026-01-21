@@ -295,6 +295,57 @@ const fetchPoolHistory = async (
     );
 };
 
+const calculateHourlyLPPrices = (
+  poolHistory: Array<{ timestamp: number; data: { tokenABalance: string; tokenBBalance: string; lpTokenTotalSupply: string } }>,
+  tokenAPriceMap: Map<string, string>,
+  tokenBPriceMap: Map<string, string>,
+  lpTokenAddress: string
+): Map<string, PriceHistoryEntry> => {
+    const hourlyLPPrices = new Map<string, PriceHistoryEntry>();
+    let lastTokenAPrice = "0";
+    let lastTokenBPrice = "0";
+
+    poolHistory.forEach((snapshot) => {
+      const timestamp = new Date(snapshot.timestamp);
+      timestamp.setMinutes(0, 0, 0);
+      const hourKey = timestamp.toISOString();
+
+      const tokenAPrice = tokenAPriceMap.get(hourKey) || lastTokenAPrice;
+      const tokenBPrice = tokenBPriceMap.get(hourKey) || lastTokenBPrice;
+
+      if (tokenAPrice !== "0") lastTokenAPrice = tokenAPrice;
+      if (tokenBPrice !== "0") lastTokenBPrice = tokenBPrice;
+
+      const { tokenABalance, tokenBBalance, lpTokenTotalSupply } = snapshot.data;
+
+      if (!tokenABalance || !tokenBBalance || !lpTokenTotalSupply ||
+          tokenABalance === "0" || tokenBBalance === "0" || lpTokenTotalSupply === "0" ||
+          tokenAPrice === "0" || tokenBPrice === "0") {
+        return;
+      }
+
+      const lpTokenPrice = calculateLPTokenPrice(
+        tokenABalance,
+        tokenBBalance,
+        tokenAPrice,
+        tokenBPrice,
+        lpTokenTotalSupply
+      );
+
+      if (!hourlyLPPrices.has(hourKey) || timestamp > hourlyLPPrices.get(hourKey)!.blockTimestamp) {
+        hourlyLPPrices.set(hourKey, {
+          id: `lp-${timestamp.getTime()}`,
+          timestamp: timestamp,
+          asset: lpTokenAddress,
+          price: lpTokenPrice,
+          blockTimestamp: timestamp
+        });
+      }
+    });
+
+    return hourlyLPPrices;
+};
+
 const forwardFillPriceHistory = (
   hourlyPrices: Map<string, PriceHistoryEntry>,
   assetAddress: string
@@ -428,50 +479,12 @@ const getLPTokenPriceHistory = async (
       return { data: [], totalCount: 0 };
     }
 
-    const hourlyLPPrices = new Map<string, PriceHistoryEntry>();
-    let lastTokenAPrice = "0";
-    let lastTokenBPrice = "0";
-
-    poolHistory.forEach((snapshot) => {
-      const timestamp = new Date(snapshot.timestamp);
-      timestamp.setMinutes(0, 0, 0);
-      const hourKey = timestamp.toISOString();
-
-      const tokenAPrice = tokenAPriceMap.get(hourKey) || lastTokenAPrice;
-      const tokenBPrice = tokenBPriceMap.get(hourKey) || lastTokenBPrice;
-
-      if (tokenAPrice !== "0") lastTokenAPrice = tokenAPrice;
-      if (tokenBPrice !== "0") lastTokenBPrice = tokenBPrice;
-
-      const { tokenABalance, tokenBBalance, lpTokenTotalSupply } = snapshot.data;
-
-      if (!tokenABalance || !tokenBBalance || !lpTokenTotalSupply ||
-          tokenABalance === "0" || tokenBBalance === "0" || lpTokenTotalSupply === "0") {
-        return;
-      }
-
-      if (tokenAPrice === "0" || tokenBPrice === "0") {
-        return;
-      }
-
-      const lpTokenPrice = calculateLPTokenPrice(
-        tokenABalance,
-        tokenBBalance,
-        tokenAPrice,
-        tokenBPrice,
-        lpTokenTotalSupply
-      );
-
-      if (!hourlyLPPrices.has(hourKey) || timestamp > hourlyLPPrices.get(hourKey)!.blockTimestamp) {
-        hourlyLPPrices.set(hourKey, {
-          id: `lp-${timestamp.getTime()}`,
-          timestamp: timestamp,
-          asset: lpTokenAddress,
-          price: lpTokenPrice,
-          blockTimestamp: timestamp
-        });
-      }
-    });
+    const hourlyLPPrices = calculateHourlyLPPrices(
+      poolHistory,
+      tokenAPriceMap,
+      tokenBPriceMap,
+      lpTokenAddress
+    );
 
     if (hourlyLPPrices.size === 0) {
       console.log(`[getLPTokenPriceHistory] No LP token price data found for ${lpTokenAddress}`);
