@@ -1028,8 +1028,14 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
     // when NumericFormat fires onValueChange after we programmatically set values
     isInitializingRef.current = true;
     
-    // Add to mintMaxVaults
+    // Add to both mintMaxVaults and depositMaxVaults since we're setting both to max
     setMintMaxVaults(prev => {
+      const newSet = new Set(prev);
+      newSet.add(candidate.vaultConfig.assetAddress);
+      return newSet;
+    });
+    
+    setDepositMaxVaults(prev => {
       const newSet = new Set(prev);
       newSet.add(candidate.vaultConfig.assetAddress);
       return newSet;
