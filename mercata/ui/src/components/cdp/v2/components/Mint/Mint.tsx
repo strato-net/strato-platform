@@ -156,15 +156,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
       // Always use CURRENT candidate data (fresh potentialCollateral, etc.)
       // and only attach the allocation from the computed allocations
       if (allocationCandidate?.allocation) {
-        const merged = { ...candidate, allocation: allocationCandidate.allocation };
-        console.log('[Mint] mergedVaultCandidates:', {
-          asset: candidate.vaultConfig.symbol,
-          freshPotentialCollateral: candidate.potentialCollateral.toString(),
-          stalePotentialCollateral: allocationCandidate.potentialCollateral.toString(),
-          depositAmount: allocationCandidate.allocation.depositAmount.toString(),
-          usingFresh: merged.potentialCollateral.toString(),
-        });
-        return merged;
+        return { ...candidate, allocation: allocationCandidate.allocation };
       }
       return candidate;
     });
@@ -257,7 +249,6 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     try {
       const { existingVaults, potentialVaults } = await cdpService.getVaultCandidates();
       const candidates = [...existingVaults, ...potentialVaults];
-      console.log('[Mint] vaultCandidates arrived:', candidates);
       setVaultCandidates(candidates);
     } catch {
       setVaultCandidates([]);
@@ -313,7 +304,6 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
         debtFloorHit: false,
         debtCeilingHit: false,
       };
-      console.log('[Mint] Using max mode allocations:', result.optimalAllocations);
     } else {
       result = computeOptimalAllocations(
         mintAmountUSDST,
@@ -321,7 +311,6 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
         vaultCandidates,
         getOptimalAllocations
       );
-      console.log('[Mint] Computed optimal allocations:', result.optimalAllocations);
       setMintMaxVaults(new Set());
     }
 
@@ -332,12 +321,6 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
 
   useEffect(() => {
     if (prevAutoSupplyRef.current === true && autoAllocate === false && optimalAllocations.length > 0) {
-      console.log('[Mint] Switching to manual mode - initializing manualAllocations');
-      console.log('[Mint] optimalAllocations being copied:', optimalAllocations.map(a => ({
-        asset: a.vaultConfig.symbol,
-        depositAmount: a.allocation?.depositAmount.toString(),
-        potentialCollateral: a.potentialCollateral.toString(),
-      })));
       setManualAllocations(optimalAllocations);
     }
     prevAutoSupplyRef.current = autoAllocate;
@@ -359,16 +342,6 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     }
   }, [isMaxMode, totalMaxMint, targetHF]);
 
-  // ============================================================================
-  // Effects - Debug Logging
-  // ============================================================================
-
-  useEffect(() => {
-    console.log('[Mint] 🎯 mintMaxVaults updated:', {
-      mintMaxVaults: Array.from(mintMaxVaults),
-      note: 'Vaults where mint input matches "Available: x" - will use mintMax() on-chain',
-    });
-  }, [mintMaxVaults]);
 
 
 
@@ -428,7 +401,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     
     setManualAllocations(prev => {
       const existing = prev.find(v => v.vaultConfig.assetAddress === assetAddress);
-      const updated = existing
+      return existing
         ? prev.map(v => v.vaultConfig.assetAddress === assetAddress 
             ? { 
                 ...v, 
@@ -448,14 +421,6 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
               mintAmount: 0n,
             },
           }];
-      
-      console.log('[Mint] manualAllocations updated (deposit):', {
-        assetAddress,
-        depositAmountStr,
-        symbol: candidate.vaultConfig.symbol,
-      });
-      
-      return updated;
     });
   }, [vaultCandidates]);
 
@@ -465,7 +430,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     
     setManualAllocations(prev => {
       const existing = prev.find(v => v.vaultConfig.assetAddress === assetAddress);
-      const updated = existing
+      return existing
         ? prev.map(v => v.vaultConfig.assetAddress === assetAddress 
             ? { 
                 ...v, 
@@ -485,14 +450,6 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
               mintAmount: BigInt(mintAmountStr),
             },
           }];
-      
-      console.log('[Mint] manualAllocations updated (mint):', {
-        assetAddress,
-        mintAmountStr,
-        symbol: candidate.vaultConfig.symbol,
-      });
-      
-      return updated;
     });
   }, [vaultCandidates]);
 
@@ -536,16 +493,6 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
           });
         }
       }
-
-      console.log('[Mint] Transactions built:', {
-        effectiveMintAmount,
-        autoAllocate,
-        mintMaxVaults: Array.from(mintMaxVaults),
-        transactions: transactions.map(tx => ({
-          ...tx,
-          willUseMintMax: tx.type === 'mint' && mintMaxVaults.has(tx.asset),
-        })),
-      });
 
       if (transactions.length === 0) {
         setTransactionsExecuting(false);

@@ -210,6 +210,36 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
     }
   }, [mintMaxVaults, onMintMaxVaultsChange]);
 
+  // Log mintMaxVaults whenever it changes
+  useEffect(() => {
+    const vaultSymbols = Array.from(mintMaxVaults).map(address => {
+      const candidate = vaultCandidates.find(c => c.vaultConfig.assetAddress === address);
+      return candidate ? candidate.vaultConfig.symbol : address;
+    });
+    console.log('[VaultBreakdown] mintMaxVaults changed:', {
+      addresses: Array.from(mintMaxVaults),
+      symbols: vaultSymbols,
+      count: mintMaxVaults.size,
+    });
+  }, [mintMaxVaults, vaultCandidates]);
+
+  // Log depositMaxVaults (vaults where depositAmount === potentialCollateral) whenever they change
+  useEffect(() => {
+    const depositMaxVaults = vaultCandidates
+      .filter(c => c.allocation && c.allocation.depositAmount === c.potentialCollateral && c.potentialCollateral > 0n)
+      .map(c => ({
+        address: c.vaultConfig.assetAddress,
+        symbol: c.vaultConfig.symbol,
+        depositAmount: c.allocation!.depositAmount.toString(),
+        potentialCollateral: c.potentialCollateral.toString(),
+      }));
+    
+    console.log('[VaultBreakdown] depositMaxVaults changed:', {
+      vaults: depositMaxVaults,
+      count: depositMaxVaults.length,
+    });
+  }, [vaultCandidates]);
+
   // No longer needed - projectedVaultHealth is passed as prop
 
   // ============================================================================
@@ -249,7 +279,6 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
 
       // Set flag to prevent callbacks during initialization
       isInitializingRef.current = true;
-      console.log('[VaultBreakdown] Starting auto-to-manual initialization');
 
       const newMintMaxVaults = new Set<string>();
       const newInputs: Record<ADDRESS, { depositAmount: string; mintAmount: string }> = {};
@@ -286,7 +315,8 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
           
           const depositUnits = depositBigInt || 0n;
           const maxMintUnits = calculateMaxMintUnitsForVault(c, depositUnits);
-          if (mintBigInt === maxMintUnits && maxMintUnits > 0n) {
+          const shouldAddToMintMax = mintBigInt === maxMintUnits && maxMintUnits > 0n;
+          if (shouldAddToMintMax) {
             newMintMaxVaults.add(c.vaultConfig.assetAddress);
           }
         }
@@ -315,7 +345,6 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
       // Clear flag after a brief delay to allow NumericFormat to settle
       setTimeout(() => {
         isInitializingRef.current = false;
-        console.log('[VaultBreakdown] Initialization complete');
       }, 100);
     }
     
@@ -408,7 +437,8 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
       const mintBigInt = c.allocation?.mintAmount || 0n;
       if (mintBigInt > 0n) {
         const maxMintUnits = calculateMaxMintUnitsForVault(c, depositBigInt);
-        if (mintBigInt === maxMintUnits && maxMintUnits > 0n) {
+        const shouldAddToMintMax = mintBigInt === maxMintUnits && maxMintUnits > 0n;
+        if (shouldAddToMintMax) {
           newMintMaxVaults.add(c.vaultConfig.assetAddress);
         }
       }
@@ -507,10 +537,6 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
       const availableBalance: UNITS = candidate.potentialCollateral;
       
       if (depositAmount > availableBalance) {
-        console.log("--------------------------------");
-        console.log('depositAmount', depositAmount);
-        console.log('availableBalance', availableBalance);
-        console.log("--------------------------------");
         exceedsBalance = true;
         break;
       }
@@ -545,7 +571,6 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
   ) => {
     // GUARD: Skip all callbacks during auto-to-manual initialization
     if (isInitializingRef.current) {
-      console.log('[VaultBreakdown] Skipping callback during initialization');
       return;
     }
     
@@ -592,11 +617,6 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
       // This detects display mode switches vs real user edits
       const representations = allocationRepresentations[assetAddress];
       if (representations && depositUnits === representations.depositAmountToken) {
-        console.log('[VaultBreakdown] Skipping callback - matches pre-calculated representation:', {
-          asset: candidate.vaultConfig.symbol,
-          value: depositUnits.toString(),
-          mode: displayMode,
-        });
         return;
       }
 
@@ -616,7 +636,6 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
   ) => {
     // GUARD: Skip all callbacks during auto-to-manual initialization
     if (isInitializingRef.current) {
-      console.log('[VaultBreakdown] Skipping mint callback during initialization');
       return;
     }
     
@@ -652,15 +671,12 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
       // GUARD: Check if this matches a pre-calculated representation
       const representations = allocationRepresentations[assetAddress];
       if (representations && inputUnits === representations.mintAmountToken) {
-        console.log('[VaultBreakdown] Skipping mint callback - matches pre-calculated representation:', {
-          asset: candidate.vaultConfig.symbol,
-          value: inputUnits.toString(),
-          mode: displayMode,
-        });
         return;
       }
       
-      if (inputUnits === maxMintUnits && maxMintUnits > 0n) {
+      const shouldAddToMintMax = inputUnits === maxMintUnits && maxMintUnits > 0n;
+      
+      if (shouldAddToMintMax) {
         setMintMaxVaults(prev => {
           const newSet = new Set(prev);
           newSet.add(assetAddress);
@@ -684,6 +700,10 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
   ) => {
     e.preventDefault();
     e.stopPropagation();
+    
+    // Set flag to prevent handleDepositChange from being triggered
+    // when NumericFormat fires onValueChange after we programmatically set values
+    isInitializingRef.current = true;
     
     const decimals = candidate.vaultConfig.unitScale.toString().length - 1;
     const tokenAmount = formatUnits(candidate.potentialCollateral, decimals);
@@ -711,6 +731,11 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
       onDepositAmountChange(candidate.vaultConfig.assetAddress, candidate.potentialCollateral.toString());
     }
     
+    // Clear the flag after NumericFormat has settled
+    setTimeout(() => {
+      isInitializingRef.current = false;
+    }, 100);
+    
     setTimeout(() => {
       depositInputRefs.current[candidate.vaultConfig.assetAddress]?.blur();
       setFocusedInput(null);
@@ -724,42 +749,80 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
     e.preventDefault();
     e.stopPropagation();
     
-    const decimals = candidate.vaultConfig.unitScale.toString().length - 1;
-    const maxDepositAmount = parseFloat(formatUnits(candidate.potentialCollateral, decimals));
-    const maxMint = calculateMaxMintForVault(candidate, maxDepositAmount);
+    // Set flag to prevent handleMintChange/handleDepositChange from being triggered
+    // when NumericFormat fires onValueChange after we programmatically set values
+    isInitializingRef.current = true;
     
+    const decimals = candidate.vaultConfig.unitScale.toString().length - 1;
+    
+    // Use exact BigInt calculation to avoid precision loss from float conversion
+    // This ensures the value matches exactly what calculateMaxMintUnitsForVault returns
+    const maxMintUnits: WEI = calculateMaxMintUnitsForVault(candidate, candidate.potentialCollateral);
+    const maxMintDecimal = formatUnits(maxMintUnits, 18);
+    
+    // Add to mintMaxVaults
     setMintMaxVaults(prev => {
       const newSet = new Set(prev);
       newSet.add(candidate.vaultConfig.assetAddress);
       return newSet;
     });
     
-    // Populate both deposit and mint
+    // Populate deposit input and call parent callback
+    let depositDisplayValue: string;
     if (displayMode === 'Value') {
       const price: WEI = getPrice(candidate.vaultConfig.assetAddress);
-      // value = (amount * price) / unitScale
       const valueUnits: WEI = (candidate.potentialCollateral * price) / candidate.vaultConfig.unitScale;
-      const maxDepositUSD = parseFloat(formatUnits(valueUnits, 18));
-      handleDepositChange(candidate.vaultConfig.assetAddress, maxDepositUSD, String(maxDepositUSD));
+      const usdValue = parseFloat(formatUnits(valueUnits, 18));
+      depositDisplayValue = usdValue.toFixed(2);
     } else {
-      const maxDepositStr = formatUnits(candidate.potentialCollateral, decimals);
-      handleDepositChange(candidate.vaultConfig.assetAddress, maxDepositAmount, maxDepositStr);
+      depositDisplayValue = formatUnits(candidate.potentialCollateral, decimals);
     }
     
-    handleMintChange(candidate.vaultConfig.assetAddress, maxMint, String(maxMint));
+    // Populate mint input - use exact BigInt formatted value
+    let mintDisplayValue: string;
+    if (displayMode === 'Value') {
+      mintDisplayValue = parseFloat(maxMintDecimal).toFixed(2);
+    } else {
+      mintDisplayValue = maxMintDecimal;
+    }
+    
+    // Update display values
+    setVaultInputs(prev => ({ 
+      ...prev, 
+      [candidate.vaultConfig.assetAddress]: { 
+        depositAmount: depositDisplayValue,
+        mintAmount: mintDisplayValue,
+      } 
+    }));
+    
+    // Call parent callbacks with exact BigInt strings
+    if (!autoAllocate) {
+      if (onDepositAmountChange) {
+        onDepositAmountChange(candidate.vaultConfig.assetAddress, candidate.potentialCollateral.toString());
+      }
+      if (onMintAmountChange) {
+        onMintAmountChange(candidate.vaultConfig.assetAddress, maxMintUnits.toString());
+      }
+    }
+    
+    // Clear the flag after NumericFormat has settled
+    setTimeout(() => {
+      isInitializingRef.current = false;
+    }, 100);
     
     setTimeout(() => {
       depositInputRefs.current[candidate.vaultConfig.assetAddress]?.blur();
       mintInputRefs.current[candidate.vaultConfig.assetAddress]?.blur();
       setFocusedInput(null);
     }, 0);
-  }, [displayMode, getPrice, handleDepositChange, handleMintChange]);
+  }, [displayMode, getPrice, autoAllocate, onDepositAmountChange, onMintAmountChange]);
 
 
 
   // ============================================================================
   // Render
   // ============================================================================
+
 
   return (
     <div className="space-y-2">
@@ -869,16 +932,23 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
                   ? candidate.allocation.depositAmount === candidate.potentialCollateral && candidate.potentialCollateral > 0n
                   : false;
 
+
                 const mintDisplayValue = inputs.mintAmount;
                 const mintDisplayNum = toNumber(mintDisplayValue);
                 
                 // Check if mint matches max mintable (for blue border)
-                const maxMintUnits = candidate.allocation 
-                  ? calculateMaxMintUnitsForVault(candidate, candidate.allocation.depositAmount)
+                // Use mintMaxVaults set as source of truth (set explicitly when user clicks Available)
+                // Also check allocation match as fallback for when values sync
+                const depositForMintCalc = candidate.allocation?.depositAmount || candidate.potentialCollateral || 0n;
+                const maxMintUnits = depositForMintCalc > 0n
+                  ? calculateMaxMintUnitsForVault(candidate, depositForMintCalc)
                   : 0n;
-                const mintMatchesAvailable = candidate.allocation 
-                  ? candidate.allocation.mintAmount === maxMintUnits && maxMintUnits > 0n
-                  : false;
+                const mintMatchesAvailable = mintMaxVaults.has(candidate.vaultConfig.assetAddress) || (
+                  candidate.allocation 
+                    ? candidate.allocation.mintAmount === maxMintUnits && maxMintUnits > 0n
+                    : false
+                );
+
 
                 return (
                   <div key={candidate.vaultConfig.assetAddress} className={`grid gap-2 items-center text-sm ${getGridClass()}`}>

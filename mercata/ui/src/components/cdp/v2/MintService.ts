@@ -433,13 +433,6 @@ function allocate(
   // FINAL SANITY CHECK: Ensure deposit never exceeds available collateral
   // This guards against any edge cases or rounding errors we may have missed
   // ═══════════════════════════════════════════════════════════════════════════
-  console.log("--------------------------------");
-  console.log("SANITY CHECK:");
-  console.log('depositAmount', depositAmount);
-  console.log('candidate.potentialCollateral', candidate.potentialCollateral);
-  // console log equivalnce check:
-  console.log('depositAmount === candidate.potentialCollateral', depositAmount === candidate.potentialCollateral);
-  console.log("--------------------------------");
   if (depositAmount > candidate.potentialCollateral) {
     console.warn('[allocate] SANITY CHECK TRIGGERED: depositAmount > potentialCollateral', {
       depositAmount,
@@ -456,20 +449,10 @@ function allocate(
     }
   }
 
-  const allocation = {
+  return {
     assetAddress: candidate.vaultConfig.assetAddress,
     mintAmount: mintAmount,
     depositAmount: depositAmount,
   };
-  
-  console.log('[allocate] RETURNING:', {
-    asset: candidate.vaultConfig.symbol,
-    depositAmount: depositAmount.toString(),
-    mintAmount: mintAmount.toString(),
-    potentialCollateral: candidate.potentialCollateral.toString(),
-    exceeds: depositAmount > candidate.potentialCollateral,
-  });
-  
-  return allocation;
 }
 
