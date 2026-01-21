@@ -430,6 +430,12 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     const candidate = vaultCandidates.find(c => c.vaultConfig.assetAddress === assetAddress);
     if (!candidate) return;
     
+    console.log(`[Mint] 📝 handleAllocationDepositChange called`, {
+      symbol: candidate.vaultConfig.symbol,
+      depositAmountStr,
+      depositAmountFormatted: parseFloat(formatUnits(BigInt(depositAmountStr), candidate.vaultConfig.unitScale.toString().length - 1)).toLocaleString('en-US'),
+    });
+    
     setManualAllocations(prev => {
       const existing = prev.find(v => v.vaultConfig.assetAddress === assetAddress);
       return existing
@@ -458,6 +464,12 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   const handleAllocationMintChange = useCallback((assetAddress: ADDRESS, mintAmountStr: string) => {
     const candidate = vaultCandidates.find(c => c.vaultConfig.assetAddress === assetAddress);
     if (!candidate) return;
+    
+    console.log(`[Mint] 📝 handleAllocationMintChange called`, {
+      symbol: candidate.vaultConfig.symbol,
+      mintAmountStr,
+      mintAmountFormatted: parseFloat(formatUnits(BigInt(mintAmountStr), 18)).toLocaleString('en-US'),
+    });
     
     setManualAllocations(prev => {
       const existing = prev.find(v => v.vaultConfig.assetAddress === assetAddress);
@@ -503,7 +515,6 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
         
         return {
           symbol: v.vaultConfig.symbol,
-          assetAddress: v.vaultConfig.assetAddress,
           depositAmount: {
             raw: depositAmount.toString(),
             formatted: `${depositFormatted} ${v.vaultConfig.symbol}`,
@@ -515,10 +526,9 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
         };
       });
     
-    console.log('[Mint] 💾 Transaction data structure (manualAllocations) changed:', {
+    console.log('[Mint] 💾 manualAllocations changed:', {
       vaults: transactionData,
       count: transactionData.length,
-      totalVaults: manualAllocations.length,
     });
   }, [manualAllocations, autoAllocate]);
 

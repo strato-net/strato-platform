@@ -113,6 +113,7 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
 
   const prevMintMaxVaultsRef = useRef<Set<ADDRESS>>(new Set());
   const prevAutoSupplyRef = useRef<boolean>(autoAllocate);
+  const prevDisplayModeRef = useRef<'Value' | 'Amount'>(displayMode);
   const depositInputRefs = useRef<Record<ADDRESS, HTMLInputElement | null>>({});
   const mintInputRefs = useRef<Record<ADDRESS, HTMLInputElement | null>>({});
   const isInitializingRef = useRef<boolean>(false);
@@ -211,53 +212,22 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
     }
   }, [mintMaxVaults, onMintMaxVaultsChange]);
 
-  // Log mintMaxVaults whenever it changes
+  // Track when vaultInputs change and what caused it
   useEffect(() => {
-    const vaultSymbols = Array.from(mintMaxVaults).map(address => {
-      const candidate = vaultCandidates.find(c => c.vaultConfig.assetAddress === address);
-      return candidate ? candidate.vaultConfig.symbol : address;
-    });
-    console.log('[VaultBreakdown] mintMaxVaults changed:', {
-      addresses: Array.from(mintMaxVaults),
-      symbols: vaultSymbols,
-      count: mintMaxVaults.size,
-    });
-  }, [mintMaxVaults, vaultCandidates]);
-
-  // Log display values (vaultInputs) whenever they change
-  useEffect(() => {
-    const displayData = Object.entries(vaultInputs).map(([address, inputs]) => {
+    const inputSnapshot = Object.entries(vaultInputs).map(([address, inputs]) => {
       const candidate = vaultCandidates.find(c => c.vaultConfig.assetAddress === address);
       return {
         symbol: candidate?.vaultConfig.symbol || address,
-        assetAddress: address,
-        depositAmount: inputs.depositAmount,
-        mintAmount: inputs.mintAmount,
+        deposit: inputs.depositAmount,
+        mint: inputs.mintAmount,
       };
     });
-    console.log('[VaultBreakdown] 📊 Display values (vaultInputs) changed:', {
+    console.log('[VaultBreakdown] 📊 vaultInputs changed:', {
+      autoAllocate,
       displayMode,
-      vaults: displayData,
-      count: displayData.length,
+      inputs: inputSnapshot,
     });
-  }, [vaultInputs, vaultCandidates, displayMode]);
-
-  // Log depositMaxVaults (vaults where depositAmount === potentialCollateral) whenever they change
-  useEffect(() => {
-    const depositMaxVaults = vaultCandidates
-      .filter(c => c.allocation && c.allocation.depositAmount === c.potentialCollateral && c.potentialCollateral > 0n)
-      .map(c => ({
-        address: c.vaultConfig.assetAddress,
-        symbol: c.vaultConfig.symbol,
-        depositAmount: c.allocation!.depositAmount.toString(),
-        potentialCollateral: c.potentialCollateral.toString(),
-      }));
-    
-    console.log('[VaultBreakdown] depositMaxVaults changed:', {
-      vaults: depositMaxVaults,
-      count: depositMaxVaults.length,
-    });
-  }, [vaultCandidates]);
+  }, [vaultInputs, vaultCandidates, autoAllocate, displayMode]);
 
   // No longer needed - projectedVaultHealth is passed as prop
 
@@ -292,10 +262,22 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
   // ============================================================================
 
   useEffect(() => {
+    console.log('[VaultBreakdown] 🔄 Mode Transition effect triggered', {
+      prevAutoSupply: prevAutoSupplyRef.current,
+      currentAutoAllocate: autoAllocate,
+      transition: prevAutoSupplyRef.current === true && autoAllocate === false ? 'AUTO→MANUAL' : 'none',
+    });
+    
     if (prevAutoSupplyRef.current === true && autoAllocate === false) {
       const hasAllocations = vaultCandidates.some(c => c.allocation?.depositAmount || c.allocation?.mintAmount);
-      if (!hasAllocations) return;
+      if (!hasAllocations) {
+        console.log('[VaultBreakdown] ⏭️  Mode Transition skipped (no allocations)');
+        prevAutoSupplyRef.current = autoAllocate;
+        return;
+      }
 
+      console.log('[VaultBreakdown] ✅ Mode Transition executing (AUTO→MANUAL)...');
+      
       // Set flag to prevent callbacks during initialization
       isInitializingRef.current = true;
 
@@ -377,7 +359,30 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
   // ============================================================================
   
   useEffect(() => {
-    if (autoAllocate) return;
+    const displayModeChanged = prevDisplayModeRef.current !== displayMode;
+    
+    console.log('[VaultBreakdown] 🔄 Display Mode Sync effect triggered', {
+      autoAllocate,
+      displayMode,
+      prevDisplayMode: prevDisplayModeRef.current,
+      displayModeChanged,
+      vaultCount: vaultCandidates.length,
+      mintMaxCount: mintMaxVaults.size,
+    });
+    
+    if (autoAllocate) {
+      console.log('[VaultBreakdown] ⏭️  Display Mode Sync skipped (auto mode)');
+      prevDisplayModeRef.current = displayMode;
+      return;
+    }
+    
+    // Only execute when displayMode actually changes, not on every vaultCandidates update
+    if (!displayModeChanged) {
+      console.log('[VaultBreakdown] ⏭️  Display Mode Sync skipped (displayMode unchanged)');
+      return;
+    }
+    
+    console.log('[VaultBreakdown] ✅ Display Mode Sync executing (mode changed)...');
     
     // Set flag to prevent callbacks during display mode switch
     isInitializingRef.current = true;
@@ -426,12 +431,23 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
       };
     });
     
+    console.log('[VaultBreakdown] 🔧 Display Mode Sync updating ALL vaultInputs:', {
+      vaultCount: Object.keys(newInputs).length,
+      newInputs: Object.entries(newInputs).map(([addr, vals]) => ({
+        vault: vaultCandidates.find(v => v.vaultConfig.assetAddress === addr)?.vaultConfig.symbol || addr,
+        deposit: vals.depositAmount,
+        mint: vals.mintAmount,
+      })),
+    });
+    
     setVaultInputs(newInputs);
     
     // Clear flag after NumericFormat settles
     setTimeout(() => {
       isInitializingRef.current = false;
     }, 100);
+    
+    prevDisplayModeRef.current = displayMode;
   }, [displayMode, autoAllocate, vaultCandidates, mintMaxVaults, amountToValue]);
 
   // ============================================================================
@@ -439,8 +455,17 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
   // ============================================================================
 
   useEffect(() => {
-    if (!autoAllocate) return;
+    console.log('[VaultBreakdown] 🔄 Auto Mode Sync effect triggered', {
+      autoAllocate,
+      vaultCount: vaultCandidates.length,
+    });
+    
+    if (!autoAllocate) {
+      console.log('[VaultBreakdown] ⏭️  Auto Mode Sync skipped (manual mode)');
+      return;
+    }
 
+    console.log('[VaultBreakdown] ✅ Auto Mode Sync executing...');
     setVaultInputs(prev => {
       const newInputs: Record<ADDRESS, { depositAmount: string; mintAmount: string }> = {};
       
@@ -686,12 +711,22 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
     floatValue: USD | DECIMAL | undefined, 
     formattedValue: string
   ) => {
+    const candidate = vaultCandidates.find(c => c.vaultConfig.assetAddress === assetAddress);
+    const symbol = candidate?.vaultConfig.symbol || assetAddress;
+    
+    console.log(`[VaultBreakdown] 📝 handleDepositChange called (${symbol})`, {
+      floatValue,
+      formattedValue,
+      isInitializing: isInitializingRef.current,
+      autoAllocate,
+    });
+    
     // GUARD: Skip all callbacks during auto-to-manual initialization
     if (isInitializingRef.current) {
+      console.log(`[VaultBreakdown] ⏭️  handleDepositChange skipped (${symbol}) - isInitializing`);
       return;
     }
     
-    const candidate = vaultCandidates.find(c => c.vaultConfig.assetAddress === assetAddress);
     if (!candidate) return;
     
     if (floatValue === undefined || formattedValue === '') {
@@ -705,6 +740,7 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
       return;
     }
 
+    console.log(`[VaultBreakdown] 🔧 Updating vaultInputs (${symbol}) - deposit only`);
     setVaultInputs(prev => ({ 
       ...prev, 
       [assetAddress]: { ...prev[assetAddress], depositAmount: formattedValue } 
@@ -751,12 +787,22 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
     floatValue: DECIMAL | undefined, 
     formattedValue: string
   ) => {
+    const candidate = vaultCandidates.find(c => c.vaultConfig.assetAddress === assetAddress);
+    const symbol = candidate?.vaultConfig.symbol || assetAddress;
+    
+    console.log(`[VaultBreakdown] 📝 handleMintChange called (${symbol})`, {
+      floatValue,
+      formattedValue,
+      isInitializing: isInitializingRef.current,
+      autoAllocate,
+    });
+    
     // GUARD: Skip all callbacks during auto-to-manual initialization
     if (isInitializingRef.current) {
+      console.log(`[VaultBreakdown] ⏭️  handleMintChange skipped (${symbol}) - isInitializing`);
       return;
     }
     
-    const candidate = vaultCandidates.find(c => c.vaultConfig.assetAddress === assetAddress);
     if (!candidate) return;
     
     if (floatValue === undefined || formattedValue === '') {
@@ -775,6 +821,7 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
       return;
     }
 
+    console.log(`[VaultBreakdown] 🔧 Updating vaultInputs (${symbol}) - mint only`);
     setVaultInputs(prev => ({ 
       ...prev, 
       [assetAddress]: { ...prev[assetAddress], mintAmount: formattedValue } 
