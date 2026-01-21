@@ -453,6 +453,44 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     });
   }, [vaultCandidates]);
 
+  // Log transaction data structure (manualAllocations) whenever it changes
+  useEffect(() => {
+    if (autoAllocate) return; // Only log in manual mode
+    
+    const transactionData = manualAllocations
+      .filter(v => v.allocation && (v.allocation.depositAmount > 0n || v.allocation.mintAmount > 0n))
+      .map(v => {
+        const decimals = v.vaultConfig.unitScale.toString().length - 1;
+        const depositAmount = v.allocation!.depositAmount;
+        const mintAmount = v.allocation!.mintAmount;
+        const depositFormatted = depositAmount > 0n 
+          ? parseFloat(formatUnits(depositAmount, decimals)).toLocaleString('en-US', { maximumFractionDigits: 6 })
+          : '0';
+        const mintFormatted = mintAmount > 0n
+          ? parseFloat(formatUnits(mintAmount, 18)).toLocaleString('en-US', { maximumFractionDigits: 2 })
+          : '0';
+        
+        return {
+          symbol: v.vaultConfig.symbol,
+          assetAddress: v.vaultConfig.assetAddress,
+          depositAmount: {
+            raw: depositAmount.toString(),
+            formatted: `${depositFormatted} ${v.vaultConfig.symbol}`,
+          },
+          mintAmount: {
+            raw: mintAmount.toString(),
+            formatted: `${mintFormatted} USD`,
+          },
+        };
+      });
+    
+    console.log('[Mint] 💾 Transaction data structure (manualAllocations) changed:', {
+      vaults: transactionData,
+      count: transactionData.length,
+      totalVaults: manualAllocations.length,
+    });
+  }, [manualAllocations, autoAllocate]);
+
   // ============================================================================
   // Callbacks - Transaction Execution
   // ============================================================================

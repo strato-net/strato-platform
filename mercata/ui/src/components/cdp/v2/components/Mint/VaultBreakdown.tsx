@@ -223,6 +223,24 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
     });
   }, [mintMaxVaults, vaultCandidates]);
 
+  // Log display values (vaultInputs) whenever they change
+  useEffect(() => {
+    const displayData = Object.entries(vaultInputs).map(([address, inputs]) => {
+      const candidate = vaultCandidates.find(c => c.vaultConfig.assetAddress === address);
+      return {
+        symbol: candidate?.vaultConfig.symbol || address,
+        assetAddress: address,
+        depositAmount: inputs.depositAmount,
+        mintAmount: inputs.mintAmount,
+      };
+    });
+    console.log('[VaultBreakdown] 📊 Display values (vaultInputs) changed:', {
+      displayMode,
+      vaults: displayData,
+      count: displayData.length,
+    });
+  }, [vaultInputs, vaultCandidates, displayMode]);
+
   // Log depositMaxVaults (vaults where depositAmount === potentialCollateral) whenever they change
   useEffect(() => {
     const depositMaxVaults = vaultCandidates
@@ -353,33 +371,67 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
 
   // ============================================================================
   // Effects - Display Mode Sync (Manual Mode)
-  // When display mode changes in manual mode, update inputs from pre-calculated representations
+  // When display mode changes, recalculate display values
+  // For vaults in max arrays, use the same raw values that "Available: x" click uses
   // ============================================================================
   
   useEffect(() => {
-    if (autoAllocate || Object.keys(allocationRepresentations).length === 0) return;
+    if (autoAllocate) return;
     
     // Set flag to prevent callbacks during display mode switch
     isInitializingRef.current = true;
     
-    setVaultInputs(prev => {
-      const newInputs: Record<ADDRESS, { depositAmount: string; mintAmount: string }> = {};
+    const newInputs: Record<ADDRESS, { depositAmount: string; mintAmount: string }> = {};
+    
+    vaultCandidates.forEach(c => {
+      const decimals = c.vaultConfig.unitScale.toString().length - 1;
+      const isDepositMax = c.allocation && c.allocation.depositAmount === c.potentialCollateral && c.potentialCollateral > 0n;
+      const isMintMax = mintMaxVaults.has(c.vaultConfig.assetAddress);
       
-      Object.entries(allocationRepresentations).forEach(([address, reps]) => {
-        newInputs[address as ADDRESS] = {
-          depositAmount: displayMode === 'Value' ? reps.depositValueDisplay : reps.depositAmountDisplay,
-          mintAmount: displayMode === 'Value' ? reps.mintValueDisplay : reps.mintAmountDisplay,
-        };
-      });
+      let depositDisplay = '';
+      let mintDisplay = '';
       
-      return newInputs;
+      // For deposit: if in deposit max, use raw potentialCollateral value
+      if (isDepositMax) {
+        const depositAmountRaw = formatUnits(c.potentialCollateral, decimals);
+        depositDisplay = displayMode === 'Value' 
+          ? amountToValue(depositAmountRaw, c.vaultConfig.assetAddress, true)
+          : depositAmountRaw;
+      } else if (c.allocation?.depositAmount && c.allocation.depositAmount > 0n) {
+        const tokenAmount = formatUnits(c.allocation.depositAmount, decimals);
+        depositDisplay = displayMode === 'Value' 
+          ? amountToValue(tokenAmount, c.vaultConfig.assetAddress, true)
+          : tokenAmount;
+      }
+      
+      // For mint: if in mint max, use raw calculateMaxMintUnitsForVault value
+      if (isMintMax) {
+        const depositForCalc = c.allocation?.depositAmount || c.potentialCollateral || 0n;
+        const maxMintUnits = calculateMaxMintUnitsForVault(c, depositForCalc);
+        const mintAmountRaw = formatUnits(maxMintUnits, 18);
+        mintDisplay = displayMode === 'Value' 
+          ? parseFloat(mintAmountRaw).toFixed(2)
+          : mintAmountRaw;
+      } else if (c.allocation?.mintAmount && c.allocation.mintAmount > 0n) {
+        const mintDecimal = formatUnits(c.allocation.mintAmount, 18);
+        mintDisplay = displayMode === 'Value' 
+          ? parseFloat(mintDecimal).toFixed(2)
+          : mintDecimal;
+      }
+
+      newInputs[c.vaultConfig.assetAddress] = {
+        depositAmount: depositDisplay,
+        mintAmount: mintDisplay,
+      };
     });
+    
+    setVaultInputs(newInputs);
     
     // Clear flag after NumericFormat settles
     setTimeout(() => {
       isInitializingRef.current = false;
     }, 100);
-  }, [displayMode, autoAllocate, allocationRepresentations]);
+  }, [displayMode, autoAllocate, vaultCandidates, mintMaxVaults, amountToValue]);
 
   // ============================================================================
   // Effects - Auto Mode Sync
@@ -502,6 +554,15 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
     if (!onHFValidationChange || autoAllocate) return;
 
     let hasLowHF = false;
+    const failingVaults: Array<{
+      symbol: string;
+      assetAddress: ADDRESS;
+      healthFactor: number;
+      minimumHF: number;
+      depositAmount: string;
+      mintAmount: string;
+    }> = [];
+
     for (const candidate of vaultCandidates) {
       if (!candidate.allocation) continue;
       
@@ -516,8 +577,29 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
       
       if (hfRaw !== null && hfRaw < vaultMinHF) {
         hasLowHF = true;
-        break;
+        failingVaults.push({
+          symbol: candidate.vaultConfig.symbol,
+          assetAddress: candidate.vaultConfig.assetAddress,
+          healthFactor: hfRaw,
+          minimumHF: vaultMinHF,
+          depositAmount: depositAmt.toLocaleString('en-US', { maximumFractionDigits: 6 }),
+          mintAmount: mintAmt.toLocaleString('en-US', { maximumFractionDigits: 2 }),
+        });
       }
+    }
+    
+    if (hasLowHF && failingVaults.length > 0) {
+      console.error('[VaultBreakdown] ❌ HEALTH FACTOR BELOW MINIMUM WARNING:', {
+        failingCondition: 'healthFactor < minimumHF',
+        failingVaults: failingVaults.map(v => ({
+          symbol: v.symbol,
+          assetAddress: v.assetAddress,
+          expected: `≥ ${v.minimumHF.toLocaleString('en-US', { maximumFractionDigits: 4 })}`,
+          actual: `${v.healthFactor.toLocaleString('en-US', { maximumFractionDigits: 4 })}`,
+          depositAmount: `${v.depositAmount} ${v.symbol}`,
+          mintAmount: `${v.mintAmount} USD`,
+        })),
+      });
     }
     
     onHFValidationChange(hasLowHF);
@@ -528,6 +610,15 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
     if (!onBalanceExceededChange || autoAllocate) return;
 
     let exceedsBalance = false;
+    const failingVaults: Array<{
+      symbol: string;
+      assetAddress: ADDRESS;
+      depositAmount: string;
+      availableBalance: string;
+      depositAmountFormatted: string;
+      availableBalanceFormatted: string;
+    }> = [];
+
     for (const candidate of vaultCandidates) {
       if (!candidate.allocation) continue;
       
@@ -538,8 +629,33 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
       
       if (depositAmount > availableBalance) {
         exceedsBalance = true;
-        break;
+        const decimals = candidate.vaultConfig.unitScale.toString().length - 1;
+        const depositFormatted = formatUnits(depositAmount, decimals);
+        const availableFormatted = formatUnits(availableBalance, decimals);
+        
+        failingVaults.push({
+          symbol: candidate.vaultConfig.symbol,
+          assetAddress: candidate.vaultConfig.assetAddress,
+          depositAmount: depositAmount.toString(),
+          availableBalance: availableBalance.toString(),
+          depositAmountFormatted: parseFloat(depositFormatted).toLocaleString('en-US', { maximumFractionDigits: 6 }),
+          availableBalanceFormatted: parseFloat(availableFormatted).toLocaleString('en-US', { maximumFractionDigits: 6 }),
+        });
       }
+    }
+    
+    if (exceedsBalance && failingVaults.length > 0) {
+      console.error('[VaultBreakdown] ❌ INSUFFICIENT COLLATERAL WARNING:', {
+        failingCondition: 'depositAmount > availableBalance',
+        failingVaults: failingVaults.map(v => ({
+          symbol: v.symbol,
+          assetAddress: v.assetAddress,
+          expected: `≤ ${v.availableBalanceFormatted} ${v.symbol}`,
+          actual: `${v.depositAmountFormatted} ${v.symbol}`,
+          expectedRaw: v.availableBalance,
+          actualRaw: v.depositAmount,
+        })),
+      });
     }
     
     onBalanceExceededChange(exceedsBalance);
