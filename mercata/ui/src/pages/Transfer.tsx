@@ -111,43 +111,37 @@ const Transfer = () => {
       } else {
         setFromAsset(null)
       }
-      // Refresh USDST balance since gas fees were paid
       await fetchUsdstBalance();
     } catch (error) {
-      // Error handling is now done globally by axios interceptor
       console.error("Transfer error:", error);
     } finally {
       setSwapLoading(false);
     }
   };
 
-  const handleBulkTransferConfirm = async (transfers: BulkTransferItem[]): Promise<BulkTransferResponse> => {
-    if (!fromAsset) throw new Error("No token selected");
-
+  const handleBulkTransferConfirm = async (tokenAddress: string, transfers: BulkTransferItem[]): Promise<BulkTransferResponse> => {
     const response = await bulkTransferToken({
-      address: fromAsset.address,
+      address: tokenAddress,
       transfers,
     });
 
-    // Show toast with results
-    toast({
-      title: "Bulk Transfer Complete",
-      description: `${response.successCount} successful, ${response.failureCount} failed`,
-    });
+    return response;
+  };
 
-    // Refresh token balances
+  const handleBulkTransferComplete = async () => {
+    // Refresh token balances after bulk transfer modal closes
     const updatedTokens = await fetchUserTokens();
-    const updatedToken = updatedTokens.find((t: Token) => t.address === fromAsset?.address);
-    if (updatedToken) {
-      setFromAsset(updatedToken);
-    } else {
-      setFromAsset(undefined);
+    if (fromAsset) {
+      const updatedToken = updatedTokens.find((t: Token) => t.address === fromAsset.address);
+      if (updatedToken) {
+        setFromAsset(updatedToken);
+      } else {
+        setFromAsset(undefined);
+      }
     }
 
     // Refresh USDST balance since gas fees were paid
     await fetchUsdstBalance();
-
-    return response;
   };
 
   return (
@@ -164,8 +158,8 @@ const Transfer = () => {
                 variant="outline"
                 size="sm"
                 onClick={() => setShowBulkTransferModal(true)}
-                disabled={!fromAsset}
-                title={!fromAsset ? "Select a token first" : "Upload CSV for bulk transfer"}
+                disabled={tokens.length === 0}
+                title={tokens.length === 0 ? "No tokens available" : "Upload CSV for bulk transfer"}
               >
                 <Upload className="h-4 w-4 mr-2" />
                 Bulk Transfer
@@ -365,10 +359,14 @@ const Transfer = () => {
 
           <BulkTransferModal
             open={showBulkTransferModal}
-            onOpenChange={setShowBulkTransferModal}
-            fromAsset={fromAsset}
+            onOpenChange={(open) => {
+              setShowBulkTransferModal(open);
+              if (!open) {
+                handleBulkTransferComplete();
+              }
+            }}
             userAddress={userAddress}
-            maxBalance={maxAmount}
+            tokens={tokens}
             onConfirm={handleBulkTransferConfirm}
           />
         </main>
