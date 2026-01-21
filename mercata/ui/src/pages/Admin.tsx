@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Shield, Coins, DollarSign, Droplets, Settings, ArrowLeft, ToggleLeft, Cog, CreditCard, TrendingUp, Vote, Database, ChevronDown, ArrowRightLeft } from 'lucide-react';
+import { Shield, Coins, DollarSign, Droplets, Settings, ArrowLeft, ToggleLeft, Cog, CreditCard, TrendingUp, Vote, Database, ChevronDown, ArrowRightLeft, Vault } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import CreateTokenForm from '@/components/admin/CreateTokenForm';
 import CreatePoolForm from '@/components/admin/CreatePoolForm';
@@ -15,6 +15,7 @@ import LendingTab from '@/components/admin/LendingTab';
 import CollateralConfigManager from '@/components/admin/CollateralConfigManager';
 import VoteTab from '@/components/admin/VoteTab';
 import BridgeTransactionsPage from '@/components/dashboard/BridgeTransactionsPage';
+import VaultAdminTab from '@/components/admin/VaultAdminTab';
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -54,7 +55,7 @@ const Admin = () => {
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 ">
           <div className="w-full overflow-x-auto">
-            <TabsList className="grid grid-cols-6 w-full min-w-[600px] md:min-w-0">
+            <TabsList className="grid grid-cols-7 w-full min-w-[700px] md:min-w-0">
               <TabsTrigger value="pools" className="flex items-center space-x-1 md:space-x-2 text-xs md:text-sm">
                 <Droplets className="h-3 w-3 md:h-4 md:w-4" />
                 <span className="hidden sm:inline">Create Pools</span>
@@ -63,11 +64,10 @@ const Admin = () => {
               <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>
                   <button
-                    className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-xs md:text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 space-x-1 md:space-x-2 ${
-                      ['lending', 'configs'].includes(activeTab)
+                    className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-xs md:text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 space-x-1 md:space-x-2 ${['lending', 'configs'].includes(activeTab)
                         ? 'bg-background text-foreground shadow-sm dark:bg-muted dark:text-primary-foreground'
                         : 'hover:bg-muted hover:text-accent-foreground dark:hover:bg-muted/50 dark:hover:text-primary-foreground'
-                    }`}
+                      }`}
                   >
                     <TrendingUp className="h-3 w-3 md:h-4 md:w-4" />
                     <span className="hidden sm:inline">Lending</span>
@@ -89,11 +89,10 @@ const Admin = () => {
               <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>
                   <button
-                    className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-xs md:text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 space-x-1 md:space-x-2 ${
-                      ['tokens', 'pricing', 'status'].includes(activeTab)
+                    className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-xs md:text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 space-x-1 md:space-x-2 ${['tokens', 'pricing', 'status'].includes(activeTab)
                         ? 'bg-background text-foreground shadow-sm dark:bg-muted dark:text-primary-foreground'
                         : 'hover:bg-muted hover:text-accent-foreground dark:hover:bg-muted/50 dark:hover:text-primary-foreground'
-                    }`}
+                      }`}
                   >
                     <Settings className="h-3 w-3 md:h-4 md:w-4" />
                     <span className="hidden sm:inline">Token</span>
@@ -130,6 +129,11 @@ const Admin = () => {
                 <ArrowRightLeft className="h-3 w-3 md:h-4 md:w-4" />
                 <span className="hidden sm:inline">Bridge</span>
                 <span className="sm:hidden">Bridge</span>
+              </TabsTrigger>
+              <TabsTrigger value="vault" className="flex items-center space-x-1 md:space-x-2 text-xs md:text-sm">
+                <Vault className="h-3 w-3 md:h-4 md:w-4" />
+                <span className="hidden sm:inline">Vault</span>
+                <span className="sm:hidden">Vault</span>
               </TabsTrigger>
             </TabsList>
           </div>
@@ -198,6 +202,9 @@ const Admin = () => {
           </TabsContent>
           <TabsContent value="bridge" className="space-y-6">
             <BridgeTransactionsPage isAdmin={true} />
+          </TabsContent>
+          <TabsContent value="vault" className="space-y-6">
+            <VaultAdminTab />
           </TabsContent>
         </Tabs>
       </div>
