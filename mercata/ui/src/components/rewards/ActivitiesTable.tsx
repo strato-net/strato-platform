@@ -23,12 +23,12 @@ export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) =
   if (loading) {
     return (
       <Card>
-        <CardHeader>
+        <CardHeader className="px-3 md:px-6">
           <CardTitle>Activities</CardTitle>
           <CardDescription>All reward activities</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
+        <CardContent className="px-0 md:px-6">
+          <div className="space-y-2 px-3 md:px-0">
             <Skeleton className="h-12 w-full" />
             <Skeleton className="h-12 w-full" />
             <Skeleton className="h-12 w-full" />
@@ -41,11 +41,11 @@ export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) =
   if (activities.length === 0) {
     return (
       <Card>
-        <CardHeader>
+        <CardHeader className="px-3 md:px-6">
           <CardTitle>Activities</CardTitle>
           <CardDescription>All reward activities</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-3 md:px-6">
           <p className="text-muted-foreground text-center py-8">No activities found</p>
         </CardContent>
       </Card>
@@ -54,12 +54,12 @@ export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) =
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="px-3 md:px-6">
         <CardTitle>Activities</CardTitle>
         <CardDescription>All reward activities</CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className="rounded-md border">
+      <CardContent className="px-0 md:px-6">
+        <div className="rounded-none md:rounded-md border-x-0 md:border-x border">
           <Table>
             <TableHeader>
               <TableRow>

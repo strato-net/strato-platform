@@ -189,9 +189,9 @@ getContractsState _ address mName mCount mOffset _ = do
             Text.pack $ unlines $ map (\s -> ("  " ++) . show $ (key s, value s)) $ storage',
             "End of storage"
           ]
-      return $
-        (first Text.pack <$> contractFuncs contract')
-          ++ (decodeSolidVMValues $ map (key &&& value) storage')
+      return $ case (decodeSolidVMValues $ map (key &&& value) storage') of
+        Left err -> error $ Text.unpack err
+        Right vals -> (first Text.pack <$> contractFuncs contract') ++ vals
     (StorageAddress {} : _, Just name) ->
       error $ "unimplemented: range based solidVM queries" ++ Text.unpack name
     ([], Nothing) -> return $ (first Text.pack <$> contractFuncs contract')

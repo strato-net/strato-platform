@@ -745,33 +745,42 @@ router.post("/safety/redeem-all", authHandler.authorizeRequest(), SafetyControll
  * @openapi
  * /lending/interest:
  *   get:
- *     summary: Get interest accrued for lending pool for multiple time periods
+ *     summary: Get estimated protocol revenue from lending pool for multiple time periods
+ *     description: |
+ *       Returns the estimated protocol revenue (FeeCollector portion) from lending interest.
+ *       
+ *       Revenue calculation:
+ *       - Total interest accrues on borrowed debt
+ *       - Only `reserveFactor` portion of interest goes to reserves
+ *       - Of reserves, only `(10000 - safetyShareBps) / 10000` portion goes to FeeCollector as revenue
+ *       
+ *       Formula: revenue = interest × (reserveFactor / 10000) × ((10000 - safetyShareBps) / 10000)
  *     tags: [Lending]
  *     security:
  *       - BearerAuth: []
  *     responses:
  *       200:
- *         description: Interest accrued for daily, weekly, monthly, YTD, and all-time periods
+ *         description: Estimated protocol revenue for daily, weekly, monthly, YTD, and all-time periods
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 totalDailyInterestUSD:
+ *                 totalDailyRevenueUSD:
  *                   type: string
- *                   description: Total daily interest accrued in USD (18 decimals)
- *                 totalWeeklyInterestUSD:
+ *                   description: Total daily protocol revenue in USD (18 decimals)
+ *                 totalWeeklyRevenueUSD:
  *                   type: string
- *                   description: Total weekly interest accrued in USD (18 decimals)
- *                 totalMonthlyInterestUSD:
+ *                   description: Total weekly protocol revenue in USD (18 decimals)
+ *                 totalMonthlyRevenueUSD:
  *                   type: string
- *                   description: Total monthly interest accrued in USD (18 decimals)
- *                 totalYtdInterestUSD:
+ *                   description: Total monthly protocol revenue in USD (18 decimals)
+ *                 totalYtdRevenueUSD:
  *                   type: string
- *                   description: Total year-to-date interest accrued in USD (18 decimals)
- *                 totalAllTimeInterestUSD:
+ *                   description: Total year-to-date protocol revenue in USD (18 decimals)
+ *                 totalAllTimeRevenueUSD:
  *                   type: string
- *                   description: Total all-time interest accrued in USD (18 decimals)
+ *                   description: Total all-time protocol revenue in USD (18 decimals)
  *                 borrowableAsset:
  *                   type: object
  *                   properties:
@@ -787,21 +796,21 @@ router.post("/safety/redeem-all", authHandler.authorizeRequest(), SafetyControll
  *                     annualRatePercent:
  *                       type: number
  *                       description: Annual interest rate as percentage
- *                     dailyInterestUSD:
+ *                     dailyRevenueUSD:
  *                       type: string
- *                       description: Daily interest accrued in USD (18 decimals)
- *                     weeklyInterestUSD:
+ *                       description: Daily protocol revenue in USD (18 decimals)
+ *                     weeklyRevenueUSD:
  *                       type: string
- *                       description: Weekly interest accrued in USD (18 decimals)
- *                     monthlyInterestUSD:
+ *                       description: Weekly protocol revenue in USD (18 decimals)
+ *                     monthlyRevenueUSD:
  *                       type: string
- *                       description: Monthly interest accrued in USD (18 decimals)
- *                     ytdInterestUSD:
+ *                       description: Monthly protocol revenue in USD (18 decimals)
+ *                     ytdRevenueUSD:
  *                       type: string
- *                       description: Year-to-date interest accrued in USD (18 decimals)
- *                     allTimeInterestUSD:
+ *                       description: Year-to-date protocol revenue in USD (18 decimals)
+ *                     allTimeRevenueUSD:
  *                       type: string
- *                       description: All-time interest accrued in USD (18 decimals)
+ *                       description: All-time protocol revenue in USD (18 decimals)
  */
 router.get("/interest", authHandler.authorizeRequest(true), LendingController.getInterestAccrued);
 

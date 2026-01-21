@@ -103,7 +103,7 @@ const LiquidityDepositModal = ({
   const handleClose = () => {
     setToken1Amount('');
     setToken2Amount('');
-    setDepositMode('A');
+    setDepositMode('A&B');
     setStakeLPToken(rewardsEnabled); // Reset to default based on rewardsEnabled
     onClose();
   };
@@ -273,10 +273,10 @@ const LiquidityDepositModal = ({
       const bToARatioWei = safeParseUnits(selectedPool.bToARatio, 18);
       
       // Calculate what Token A amount would be needed for full Token B balance
-      const tokenAAmountForFullB = (availableTokenB * aToBRatioWei) / BigInt(10 ** 18);
+      const tokenAAmountForFullB = (availableTokenB * bToARatioWei) / BigInt(10 ** 18);
       
       // Calculate what Token B amount would be needed for full Token A balance  
-      const tokenBAmountForFullA = (availableTokenA * bToARatioWei) / BigInt(10 ** 18);
+      const tokenBAmountForFullA = (availableTokenA * aToBRatioWei) / BigInt(10 ** 18);
       
       let finalTokenAAmount: bigint;
       let finalTokenBAmount: bigint;
@@ -408,7 +408,7 @@ const LiquidityDepositModal = ({
 
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Deposit Liquidity</DialogTitle>
@@ -675,30 +675,29 @@ const LiquidityDepositModal = ({
             }
           })()}
 
-          <div className="rounded-lg bg-muted/50 p-3">
-            <div className="flex justify-between items-center text-sm text-muted-foreground">
-
+          <div className="rounded-lg bg-muted/50 p-2 md:p-3">
+            <div className="flex justify-between items-center text-xs md:text-sm text-muted-foreground">
               <span>APY</span>
               <span className="font-medium">{selectedPool?.apy ? `${selectedPool.apy}%` : "N/A"}</span>
             </div>
-            <div className="flex justify-between items-center text-sm mt-2 text-muted-foreground">
-              <span>Current pool ratio</span>
-              <span className="font-medium">
+            <div className="flex flex-col md:flex-row md:justify-between md:items-center text-xs md:text-sm mt-2 text-muted-foreground gap-0.5">
+              <span className="shrink-0">Current pool ratio</span>
+              <span className="font-medium text-right break-all">
                 {selectedPool && `1 ${selectedPool.tokenA._symbol} = ${formatNumber(selectedPool.aToBRatio)} ${selectedPool.tokenB._symbol}`}
               </span>
             </div>
-            <div className="flex justify-between items-center text-sm mt-2 text-muted-foreground">
+            <div className="flex justify-between items-center text-xs md:text-sm mt-2 text-muted-foreground">
               <span>Transaction fee</span>
               <span>{DEPOSIT_FEE} USDST ({parseFloat(DEPOSIT_FEE) * 100} voucher)</span>
             </div>
             {selectedPool && BigInt(selectedPool.lpToken._totalSupply) === BigInt(0) && (
-              <div className="flex justify-between items-center mt-2 text-sm text-muted-foreground">
+              <div className="flex flex-col md:flex-row md:justify-between md:items-center mt-2 text-xs md:text-sm text-muted-foreground gap-0.5">
                 <span>Initial liquidity provider:</span>
-                <span>You set the initial price ratio</span>
+                <span className="text-right">You set the initial price ratio</span>
               </div>
             )}
             {selectedPool && BigInt(selectedPool.lpToken._totalSupply) > BigInt(0) && (
-              <div className="flex justify-between items-center mt-2 text-sm text-muted-foreground">
+              <div className="flex flex-col md:flex-row md:justify-between md:items-center mt-2 text-xs md:text-sm text-muted-foreground gap-0.5">
                 <span>Subsequent liquidity:</span>
                 <span className="text-right">Token A amount is calculated based on current pool ratio</span>
               </div>

@@ -89,12 +89,12 @@ export const LeaderboardTable = ({
   if (loading) {
     return (
       <Card>
-        <CardHeader>
+        <CardHeader className="px-3 md:px-6">
           <CardTitle>Top Reward Earners</CardTitle>
           <CardDescription>Leaderboard ranked by highest total rewards</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
+        <CardContent className="px-0 md:px-6">
+          <div className="space-y-2 px-3 md:px-0">
             <Skeleton className="h-12 w-full" />
             <Skeleton className="h-12 w-full" />
             <Skeleton className="h-12 w-full" />
@@ -107,12 +107,12 @@ export const LeaderboardTable = ({
   return (
     <div className="ant-table-themed">
       <Card>
-        <CardHeader>
+        <CardHeader className="px-3 md:px-6">
           <CardTitle>Top Reward Earners</CardTitle>
           <CardDescription>Leaderboard ranked by highest total rewards</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="rounded-md border border-border overflow-hidden">
+        <CardContent className="px-0 md:px-6">
+          <div className="rounded-none md:rounded-md border-x-0 md:border-x border border-border overflow-hidden">
             <Table
               columns={columns}
               dataSource={entries}

@@ -25,20 +25,20 @@ const Admin = () => {
       {/* Header */}
       <div className="bg-card border-b border-border">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-4">
+          <div className="flex items-center justify-between h-14 md:h-16">
+            <div className="flex items-center gap-2 md:space-x-4">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => navigate('/dashboard')}
-                className="flex items-center space-x-2"
+                className="flex items-center gap-1 md:space-x-2 px-2 md:px-3"
               >
                 <ArrowLeft className="h-4 w-4" />
-                <span>Back to Dashboard</span>
+                <span className="text-xs md:text-sm">Back</span>
               </Button>
-              <div className="flex items-center space-x-2">
-                <Shield className="h-6 w-6 text-strato-blue" />
-                <h1 className="text-xl font-bold">Admin Panel</h1>
+              <div className="flex items-center gap-1 md:space-x-2">
+                <Shield className="h-5 w-5 md:h-6 md:w-6 text-strato-blue" />
+                <h1 className="text-base md:text-xl font-bold whitespace-nowrap">Admin Panel</h1>
               </div>
             </div>
           </div>
@@ -46,10 +46,10 @@ const Admin = () => {
       </div>
 
       {/* Main Content */}
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold mb-2 text-foreground">Platform Administration</h2>
-          <p className="text-muted-foreground">Manage tokens, pools, liquidity, and asset pricing</p>
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8">
+        <div className="mb-4 md:mb-8">
+          <h2 className="text-xl md:text-3xl font-bold mb-1 md:mb-2 text-foreground">Platform Administration</h2>
+          <p className="text-xs md:text-base text-muted-foreground">Manage tokens, pools, liquidity, and asset pricing</p>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 ">
