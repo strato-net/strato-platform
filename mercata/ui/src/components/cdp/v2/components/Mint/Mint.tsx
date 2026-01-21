@@ -380,6 +380,26 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     setTargetHF(value);
   }, []);
 
+  // Recalculate exceedsMaxMint whenever totalMaxMint or mintAmountInput changes
+  // This ensures the red highlight disappears when HF is adjusted to accommodate the entered amount
+  useEffect(() => {
+    if (!mintAmountInput || mintAmountInput === '') {
+      setExceedsMaxMint(false);
+      return;
+    }
+
+    const parsed = parseCommaNumber(mintAmountInput);
+    const inputAmount: DECIMAL = parseFloat(parsed);
+
+    if (totalMaxMint > 0n) {
+      const maxMint = formatUnits(totalMaxMint, 18);
+      const maxMintNum: DECIMAL = parseFloat(maxMint);
+      setExceedsMaxMint(!isNaN(inputAmount) && inputAmount > maxMintNum);
+    } else {
+      setExceedsMaxMint(false);
+    }
+  }, [totalMaxMint, mintAmountInput]);
+
   const handleMaxClick = useCallback(() => {
     if (isMaxMode) {
       setIsMaxMode(false);
@@ -655,7 +675,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     (autoAllocate ? (mintAmount <= 0 && !isMaxMode) : parseFloat(totalManualMint) <= 0) || 
     allocations.length === 0 || 
     transactionsExecuting || 
-    (autoAllocate && (exceedsMaxCollateral || shouldLockInput)) || 
+    (autoAllocate && (exceedsMaxCollateral || shouldLockInput || exceedsMaxMint)) || 
     hasLowHF || 
     exceedsBalance;
 

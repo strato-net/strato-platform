@@ -87,6 +87,7 @@ const LoanForm: React.FC<LoanFormProps> = ({
             onMaxClick={onMaxClick}
             isMaxMode={isMaxMode}
             exceedsMax={exceedsMaxMint}
+            maxAvailable={availableAmount}
             label="Mint Amount"
             placeholder="0"
             unit="USDST"
