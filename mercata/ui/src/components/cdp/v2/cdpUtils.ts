@@ -653,7 +653,14 @@ export const truncateForDisplay = (value: number): string => {
   if (isNaN(value) || value === 0) return '0';
   if (Math.abs(value) < 0.000001) return value.toExponential(2);
   const precision = Math.max(0, 6 - Math.floor(Math.log10(Math.abs(value))) - 1);
-  return value.toFixed(Math.min(precision, 6));
+  const truncated = value.toFixed(Math.min(precision, 6));
+  
+  // Add comma formatting
+  const num = parseFloat(truncated);
+  return num.toLocaleString('en-US', { 
+    minimumFractionDigits: 0,
+    maximumFractionDigits: Math.min(precision, 6)
+  });
 };
 
 /**
