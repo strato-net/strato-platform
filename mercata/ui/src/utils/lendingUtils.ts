@@ -30,6 +30,17 @@ export const getHealthFactorColor = (healthFactor: number) => {
   return "text-red-600";
 };
 
+// Get text color for health factor display (RGB color string)
+// Returns green for high values, red for low values, interpolated in between
+export const getTextColor = (value: number, maxValue = 10, noLoan = false): string => {
+  if (noLoan) return 'rgb(0, 255, 0)';
+  const clamped = Math.min(Math.max(value, 1), maxValue);
+  const ratio = (clamped - 1) / (maxValue - 1);
+  const red = Math.round(255 * (1 - ratio));
+  const green = Math.round(255 * ratio);
+  return `rgb(${red}, ${green}, 0)`;
+};
+
 // Calculate health impact of collateral operations (supply/withdraw) using BigInt and healthFactorRaw
 export const calculateCollateralHealthImpact = (
   amountWei: bigint,
@@ -301,7 +312,7 @@ export const calculateHFSliderExtrema = (
     ? Math.max(DEFAULT_MAX_HEALTH_FACTOR, currentHF)
     : DEFAULT_MAX_HEALTH_FACTOR;
   
-  return { min: centCeil(minHF), max: centFloor(maxHF) };
+  return { min: centCeil(minHF), max: Math.round(maxHF * 100) / 100 };
 };
 
 // Determine the error message to display, suggesting options for the user while avoiding unavailable solutions.

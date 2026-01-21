@@ -20,9 +20,10 @@ import {
   sortCollateralAssets,
   calculateMaxCollateralValueUSDCentFloored,
   centCeil,
-  centFloor
+  centFloor,
+  getTextColor,
+  getRiskLabel
 } from "@/utils/lendingUtils";
-import { getRiskLabel } from "@/utils/lendingUtils";
 import { useLendingContext } from "@/context/LendingContext";
 import { handleAmountInputChange } from "@/utils/transferValidation";
 import { UserRewardsData } from "@/services/rewardsService";
@@ -552,9 +553,15 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
           <div className="flex justify-between items-center text-sm border-t pt-3">
             <span className="text-muted-foreground">Health Impact</span>
             <span className="font-medium tabular-nums">
-              {currentHF === null ? 'No Loan' : currentHF.toFixed(2)}
+              {currentHF === null ? (
+                <span style={{ color: getTextColor(0, 3, true) }}>No Loan</span>
+              ) : (
+                <span style={{ color: getTextColor(currentHF, 3) }}>{currentHF.toFixed(2)}</span>
+              )}
               {' → '}
-              {afterBorrowHF && !customBorrowError ? afterBorrowHF.toFixed(2) : '-'}
+              {afterBorrowHF && !customBorrowError ? (
+                <span style={{ color: getTextColor(Number(afterBorrowHF), 3) }}>{Number(afterBorrowHF).toFixed(2)}</span>
+              ) : '-'}
             </span>
           </div>
         </div>
