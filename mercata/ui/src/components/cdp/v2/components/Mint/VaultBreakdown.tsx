@@ -370,14 +370,27 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
         let depositAmountDisplay = '';
         let depositValueDisplay = '';
         if (depositBigInt > 0n) {
-          const tokenAmount = formatUnits(depositBigInt, decimals);
-          depositAmountDisplay = tokenAmount;
-          depositValueDisplay = amountToValue(tokenAmount, c.vaultConfig.assetAddress, false);
-          
-          // Check if deposit equals potentialCollateral
+          // Check if deposit equals potentialCollateral (max mode)
           const shouldAddToDepositMax = depositBigInt === c.potentialCollateral && c.potentialCollateral > 0n;
+          
           if (shouldAddToDepositMax) {
+            // Use memoized formatted display values for max mode to avoid precision issues
+            const computed = vaultComputedValues[c.vaultConfig.assetAddress];
+            if (computed) {
+              depositAmountDisplay = computed.depositMaxAmount;
+              depositValueDisplay = computed.depositMaxValue;
+            } else {
+              // Fallback if computed not available
+              const tokenAmount = formatUnits(depositBigInt, decimals);
+              depositAmountDisplay = tokenAmount;
+              depositValueDisplay = amountToValue(tokenAmount, c.vaultConfig.assetAddress, false);
+            }
             newDepositMaxVaults.add(c.vaultConfig.assetAddress);
+          } else {
+            // For non-max values, use standard conversion
+            const tokenAmount = formatUnits(depositBigInt, decimals);
+            depositAmountDisplay = tokenAmount;
+            depositValueDisplay = amountToValue(tokenAmount, c.vaultConfig.assetAddress, false);
           }
         }
 
@@ -385,15 +398,29 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
         let mintAmountDisplay = '';
         let mintValueDisplay = '';
         if (mintBigInt > 0n) {
-          const mintDecimal = formatUnits(mintBigInt, 18);
-          mintAmountDisplay = mintDecimal;
-          mintValueDisplay = parseFloat(mintDecimal).toFixed(2);
-          
+          // Check if mint equals max mintable for current deposit (max mode)
           const depositUnits = depositBigInt || 0n;
           const maxMintUnits = calculateMaxMintUnitsForVault(c, depositUnits);
           const shouldAddToMintMax = mintBigInt === maxMintUnits && maxMintUnits > 0n;
+          
           if (shouldAddToMintMax) {
+            // Use memoized formatted display values for max mode to avoid precision issues
+            const computed = vaultComputedValues[c.vaultConfig.assetAddress];
+            if (computed) {
+              mintAmountDisplay = computed.mintMaxAmount;
+              mintValueDisplay = computed.mintMaxValue;
+            } else {
+              // Fallback if computed not available
+              const mintDecimal = formatUnits(mintBigInt, 18);
+              mintAmountDisplay = mintDecimal;
+              mintValueDisplay = parseFloat(mintDecimal).toFixed(2);
+            }
             newMintMaxVaults.add(c.vaultConfig.assetAddress);
+          } else {
+            // For non-max values, use standard conversion
+            const mintDecimal = formatUnits(mintBigInt, 18);
+            mintAmountDisplay = mintDecimal;
+            mintValueDisplay = parseFloat(mintDecimal).toFixed(2);
           }
         }
 
@@ -426,7 +453,7 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
     }
     
     prevAutoSupplyRef.current = autoAllocate;
-  }, [autoAllocate, vaultCandidates, displayMode, amountToValue]);
+  }, [autoAllocate, vaultCandidates, displayMode, amountToValue, vaultComputedValues]);
 
   // ============================================================================
   // Effects - Display Mode Sync (Manual Mode)
