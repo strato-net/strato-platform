@@ -299,18 +299,19 @@ const BulkTransferModal = ({
         const response = await onConfirm(transfer.tokenAddress, [transferItem]);
         const result = response.results[0];
 
-        // Update status based on result
+        // Update status based on result (backend returns "Success" capitalized)
+        const isSuccess = result.status?.toLowerCase() === "success";
         setProcessingTransfers(prev => prev.map((t, idx) =>
           idx === i ? {
             ...t,
-            status: result.status === "success" ? "success" : "failed",
+            status: isSuccess ? "success" : "failed",
             hash: result.hash,
             error: result.error,
           } : t
         ));
 
         allResults.push({ ...result, tokenAddress: transfer.tokenAddress });
-        if (result.status === "success") {
+        if (isSuccess) {
           totalSuccess++;
         } else {
           totalFailure++;
@@ -672,7 +673,7 @@ const BulkTransferModal = ({
                       {formatBalance(result.value, undefined, 18, 0, 4)}
                     </TableCell>
                     <TableCell>
-                      {result.status === "success" ? (
+                      {result.status?.toLowerCase() === "success" ? (
                         <span className="flex items-center text-green-600 text-xs">
                           <CheckCircle2 className="h-4 w-4 mr-1" />
                           Success
