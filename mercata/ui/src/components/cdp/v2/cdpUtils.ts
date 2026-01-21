@@ -549,7 +549,7 @@ export const getAssetColor = (symbol: string): string => {
 // ============================================================================
 
 /**
- * Calculate minimum health factor for a specific vault
+ * Calculate minimum health factor for a specific vault (for display, rounded)
  * minHF = minCR / liquidationRatio
  */
 export const calculateVaultMinHF = (candidate: VaultCandidate): number => {
@@ -557,6 +557,16 @@ export const calculateVaultMinHF = (candidate: VaultCandidate): number => {
   const ltPercent = parseFloat(formatUnits(candidate.vaultConfig.liquidationRatio, 18)) * 100;
   if (ltPercent <= 0) return 1.0;
   return Math.round((minCRPercent / ltPercent) * 100) / 100;
+};
+
+/**
+ * Calculate minimum health factor for validation (unrounded for precise comparisons)
+ */
+export const calculateVaultMinHFRaw = (candidate: VaultCandidate): number => {
+  const minCRPercent = parseFloat(formatUnits(candidate.vaultConfig.minCR, 18)) * 100;
+  const ltPercent = parseFloat(formatUnits(candidate.vaultConfig.liquidationRatio, 18)) * 100;
+  if (ltPercent <= 0) return 1.0;
+  return minCRPercent / ltPercent;
 };
 
 /**

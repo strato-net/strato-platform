@@ -12,7 +12,7 @@ import {
   formatPercentage,
   getAssetColor,
   convertStabilityFeeRateToAnnualPercentage,
-  calculateVaultMinHF,
+  calculateVaultMinHFRaw,
   calculateVaultHFRaw,
   calculateVaultHF,
   calculateMaxMintForVault,
@@ -657,16 +657,23 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
       
       if (mintAmt === 0) continue;
       
-      const hfRaw = calculateVaultHFRaw(candidate, depositAmt, mintAmt);
-      const vaultMinHF = calculateVaultMinHF(candidate);
+      // Check if both inputs are in max mode (deposit and mint both at max)
+      const isInMaxMode = depositMaxVaults.has(candidate.vaultConfig.assetAddress) && 
+                         mintMaxVaults.has(candidate.vaultConfig.assetAddress);
       
-      if (hfRaw !== null && hfRaw < vaultMinHF) {
+      // Skip HF validation if both inputs are at max (by definition, max values are calculated to be valid)
+      if (isInMaxMode) continue;
+      
+      const hfRaw = calculateVaultHFRaw(candidate, depositAmt, mintAmt);
+      const vaultMinHFRaw = calculateVaultMinHFRaw(candidate);
+      
+      if (hfRaw !== null && hfRaw < vaultMinHFRaw) {
         hasLowHF = true;
         failingVaults.push({
           symbol: candidate.vaultConfig.symbol,
           assetAddress: candidate.vaultConfig.assetAddress,
           healthFactor: hfRaw,
-          minimumHF: vaultMinHF,
+          minimumHF: vaultMinHFRaw,
           depositAmount: depositAmt.toLocaleString('en-US', { maximumFractionDigits: 6 }),
           mintAmount: mintAmt.toLocaleString('en-US', { maximumFractionDigits: 2 }),
         });
@@ -688,7 +695,7 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
     }
     
     onHFValidationChange(hasLowHF);
-  }, [vaultCandidates, autoAllocate, onHFValidationChange]);
+  }, [vaultCandidates, autoAllocate, depositMaxVaults, mintMaxVaults, onHFValidationChange]);
 
   // Validate Balance - Checks if any deposit amount exceeds available user balance
   useEffect(() => {
@@ -1180,10 +1187,19 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
                 const hfNum = parseFloat(hf);
                 const hfColor = getHFColorClass(hf, hfNum);
                 
-                const vaultMinHF = calculateVaultMinHF(candidate);
+                // Use RAW (unrounded) HF and minHF for validation to catch small changes
+                const hfRaw = calculateVaultHFRaw(candidate, depositAmt, mintAmt);
+                const vaultMinHFRaw = calculateVaultMinHFRaw(candidate);
+                
+                // Check if both inputs are in max mode (deposit and mint both at max)
+                const isInMaxMode = depositMaxVaults.has(candidate.vaultConfig.assetAddress) && 
+                                   mintMaxVaults.has(candidate.vaultConfig.assetAddress);
+                
+                // Skip HF validation if both inputs are at max (by definition, max values are calculated to be valid)
                 const vaultHasLowHF = !autoAllocate && 
+                  !isInMaxMode &&  // Exception: don't validate when both at max
                   mintAmt > 0 &&
-                  hfNum !== Infinity && !isNaN(hfNum) && hfNum < vaultMinHF;
+                  hfRaw !== null && hfRaw < vaultMinHFRaw;
 
                 // Get display values from vaultInputs
                 const inputs = vaultInputs[candidate.vaultConfig.assetAddress] || { depositAmount: '', mintAmount: '' };
