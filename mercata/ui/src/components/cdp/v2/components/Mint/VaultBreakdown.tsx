@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 import { formatUnits } from 'ethers';
 import { NumericFormat } from 'react-number-format';
@@ -1209,27 +1210,45 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
             </div>
 
             {/* Summary Section */}
-            {!autoAllocate && (
-              <div className="pt-2 border-t border-border space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-muted-foreground">Total Mint Amount:</span>
-                  <span className="text-sm font-bold tabular-nums">
-                    {vaultCandidates.reduce((sum, candidate) => {
-                      const mintAmt = candidate.allocation 
-                        ? parseFloat(formatUnits(candidate.allocation.mintAmount, 18))
-                        : 0;
-                      return sum + mintAmt;
-                    }, 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDST
-                  </span>
-                </div>
-                {projectedVaultHealth && (
+            {!autoAllocate && (() => {
+              // Calculate total wei and formatted display value
+              const totalMintWei: WEI = vaultCandidates.reduce((sum, candidate) => {
+                return sum + (candidate.allocation?.mintAmount || 0n);
+              }, 0n);
+              
+              const totalMintDisplay = vaultCandidates.reduce((sum, candidate) => {
+                const mintAmt = candidate.allocation 
+                  ? parseFloat(formatUnits(candidate.allocation.mintAmount, 18))
+                  : 0;
+                return sum + mintAmt;
+              }, 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+              return (
+                <div className="pt-2 border-t border-border space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-muted-foreground">Projected Vault Health:</span>
-                    <span className="text-sm font-bold tabular-nums">{projectedVaultHealth}</span>
+                    <span className="text-sm font-medium text-muted-foreground">Total Mint Amount:</span>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="text-sm font-bold tabular-nums cursor-help">
+                            {totalMintDisplay} USDST
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="text-xs font-mono">{totalMintWei.toString()} USDST</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </div>
-                )}
-              </div>
-            )}
+                  {projectedVaultHealth && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-muted-foreground">Projected Vault Health:</span>
+                      <span className="text-sm font-bold tabular-nums">{projectedVaultHealth}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </CollapsibleContent>
       </Collapsible>
