@@ -12,7 +12,7 @@ import { Pool } from "@/interface";
 // TYPES
 // ============================================================================
 
-interface CompactRewardsDisplayProps {
+interface RewardsWidgetProps {
   userRewards: UserRewardsData | null;
   activityName: string;
   // For most activities: direct input amount
@@ -159,7 +159,7 @@ const calculatePercentageChange = (
 // COMPONENT
 // ============================================================================
 
-export const CompactRewardsDisplay = ({
+export const RewardsWidget = ({
   userRewards,
   activityName,
   inputAmount,
@@ -170,7 +170,7 @@ export const CompactRewardsDisplay = ({
   withdrawPercent,
   availableLPBalance,
   actionLabel = isWithdrawal ? "Withdraw" : "Deposit",
-}: CompactRewardsDisplayProps) => {
+}: RewardsWidgetProps) => {
   // ─────────────────────────────────────────────────────────────────────────
   // FILTER MATCHING ACTIVITIES
   // ─────────────────────────────────────────────────────────────────────────
