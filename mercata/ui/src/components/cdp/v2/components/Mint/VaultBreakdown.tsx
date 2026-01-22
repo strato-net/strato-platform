@@ -190,6 +190,7 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
     if (autoAllocate || !candidate.allocation) return false;
     
     // Skip if both inputs are in max mode (by definition, max values are valid)
+    // This includes the case where deposit=0 (potentialCollateral=0) but still "at max"
     if (skipIfMaxMode) {
       const isInMaxMode = depositMaxVaults.has(candidate.vaultConfig.assetAddress) && 
                          mintMaxVaults.has(candidate.vaultConfig.assetAddress);
@@ -1269,8 +1270,9 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
                   depositDisplayNum > maxDepositDisplayNum;
                 
                 // Check if deposit matches available balance (for blue border)
-                // Use depositMaxVaults set as source of truth
-                const depositMatchesAvailable = depositMaxVaults.has(candidate.vaultConfig.assetAddress);
+                // Only show blue highlight if in max set AND value is not 0
+                const depositMatchesAvailable = depositMaxVaults.has(candidate.vaultConfig.assetAddress) && 
+                  depositDisplayNum > 0;
                 
                 // Check if mint exceeds max available (red border condition for mint)
                 const mintExceedsMax = !autoAllocate && 
@@ -1278,8 +1280,9 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
                   mintDisplayNum > maxMintDisplayNum;
                 
                 // Check if mint matches max mintable (for blue border)
-                // Use mintMaxVaults set as source of truth
-                const mintMatchesAvailable = mintMaxVaults.has(candidate.vaultConfig.assetAddress);
+                // Only show blue highlight if in max set AND value is not 0
+                const mintMatchesAvailable = mintMaxVaults.has(candidate.vaultConfig.assetAddress) && 
+                  mintDisplayNum > 0;
 
 
                 return (
