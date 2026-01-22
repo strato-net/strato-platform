@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ChevronDown, ChevronUp, Info, AlertTriangle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { cdpService, VaultData, AssetConfig } from "@/services/cdpService";
+import { cdpService, Vault, AssetConfig } from "@/services/cdpService";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
@@ -17,7 +17,7 @@ interface LiquidationsViewProps {
 }
 
 const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
-  const [liquidatableVaults, setLiquidatableVaults] = useState<VaultData[]>([]);
+  const [liquidatableVaults, setLiquidatableVaults] = useState<Vault[]>([]);
   const [assetConfigs, setAssetConfigs] = useState<Record<string, AssetConfig>>({});
   const [loading, setLoading] = useState(true);
   const [expandedVaults, setExpandedVaults] = useState<Record<string, boolean>>({});
@@ -211,7 +211,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
   };
 
   // Handle MAX button click
-  const handleMaxClick = async (vault: VaultData, vaultKey: string) => {
+  const handleMaxClick = async (vault: Vault, vaultKey: string) => {
     const isCurrentlyMax = maxStates[vaultKey];
     if (isCurrentlyMax) {
       // Clear max state and amount
@@ -283,13 +283,13 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
   };
 
   // Helper to get consistent vault key
-  const getVaultKey = (vault: VaultData, index?: number): string => {
+  const getVaultKey = (vault: Vault, index?: number): string => {
     const idx = index ?? liquidatableVaults.findIndex(v => v.borrower === vault.borrower && v.asset === vault.asset);
     return `${vault.borrower || 'unknown'}-${vault.asset}-${idx}`;
   };
 
   // Calculate max profit (full opportunity from position - not balance limited)
-  const calculateMaxProfit = (vault: VaultData, index: number): string => {
+  const calculateMaxProfit = (vault: Vault, index: number): string => {
     const vaultKey = getVaultKey(vault, index);
     const positionMax = positionMaxValues[vaultKey];
     if (!positionMax || positionMax <= 0) return "$0.00";
@@ -300,7 +300,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
   };
 
   // Calculate your profit (balance-limited)
-  const calculateYourProfit = (vault: VaultData, liquidationAmount: string, index: number): string => {
+  const calculateYourProfit = (vault: Vault, liquidationAmount: string, index: number): string => {
     const vaultKey = getVaultKey(vault, index);
     const amount = parseFloat(liquidationAmount);
     
@@ -339,7 +339,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
     return positionMax !== undefined && actualMax !== undefined && actualMax < positionMax - 0.01;
   };
 
-  const handleLiquidate = async (vault: VaultData, vaultKey: string) => {
+  const handleLiquidate = async (vault: Vault, vaultKey: string) => {
     const liquidationAmount = liquidationAmounts[vaultKey];
     
     if (!liquidationAmount || parseFloat(liquidationAmount) <= 0) {
