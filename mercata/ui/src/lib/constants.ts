@@ -53,3 +53,9 @@ export const SAFETY_REDEEM_FEE = "0.01"; // USDST fee for SafetyModule redeem tr
 // Withdrawal limits
 // ============================================
 export const MIN_USDST_WITHDRAWAL = "10.0"; // Minimum USDST withdrawal amount
+
+// ============================================
+// Admin constants
+// ============================================
+
+export const ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE = 10; // # of executed issues/page to display on the vote tab
