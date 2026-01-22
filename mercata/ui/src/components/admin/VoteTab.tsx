@@ -9,10 +9,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 import { useUser } from '@/context/UserContext';
-import { Loader2, MoreVertical, CheckCircle2 } from 'lucide-react';
+import { Loader2, CheckCircle2, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import CopyButton from '../ui/copy';
 import CreateAdminIssueModal from './CreateAdminIssueModal';
 import CastVoteModal from './CastVoteModal';
@@ -403,6 +402,17 @@ const VoteTab = () => {
                 <div className="mt-4 flex items-center justify-center">
                   <Pagination>
                     <PaginationContent>
+                      {executedPage > 2 && (
+                        <PaginationItem>
+                          <PaginationLink
+                            onClick={() => setExecutedPage(1)}
+                            className={executedIssuesLoading ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                          >
+                            <ChevronsLeft className="h-4 w-4" />
+                            <span className="sr-only">Go to first page</span>
+                          </PaginationLink>
+                        </PaginationItem>
+                      )}
                       <PaginationItem>
                         <PaginationPrevious 
                           onClick={() => setExecutedPage(prev => Math.max(1, prev - 1))}
@@ -420,6 +430,17 @@ const VoteTab = () => {
                           className={executedPage === executedTotalPages || executedIssuesLoading ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                         />
                       </PaginationItem>
+                      {executedPage < executedTotalPages - 1 && (
+                        <PaginationItem>
+                          <PaginationLink
+                            onClick={() => setExecutedPage(executedTotalPages)}
+                            className={executedIssuesLoading ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                          >
+                            <ChevronsRight className="h-4 w-4" />
+                            <span className="sr-only">Go to last page</span>
+                          </PaginationLink>
+                        </PaginationItem>
+                      )}
                     </PaginationContent>
                   </Pagination>
                 </div>
