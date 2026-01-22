@@ -103,7 +103,6 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
 
   const [totalManualMint, setTotalManualMint] = useState('0');
   const [mintMaxVaults, setMintMaxVaults] = useState<Set<ADDRESS>>(new Set());
-  const [manualDirty, setManualDirty] = useState(false);
 
 
 
@@ -341,12 +340,6 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     optimalAllocationsRef.current = optimalAllocations;
   }, [optimalAllocations]);
 
-  useEffect(() => {
-    if (autoAllocate || manualDirty) return;
-    if (optimalAllocations.length === 0) return;
-    setManualAllocations(optimalAllocations);
-  }, [autoAllocate, manualDirty, optimalAllocations]);
-
   // ============================================================================
   // Effects - Max Mode Sync
   // ============================================================================
@@ -435,7 +428,6 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   const handleAutoAllocateChange = useCallback((checked: boolean) => {
     // When switching to manual mode, snapshot current optimal allocations
     if (!checked && optimalAllocationsRef.current.length > 0) {
-      setManualDirty(false);
       setManualAllocations(optimalAllocationsRef.current);
     }
     setAutoAllocate(checked);
@@ -449,7 +441,6 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     const candidate = vaultCandidates.find(c => c.vaultConfig.assetAddress === assetAddress);
     if (!candidate) return;
     
-    setManualDirty(true);
     setManualAllocations(prev => {
       const existing = prev.find(v => v.vaultConfig.assetAddress === assetAddress);
       return existing
@@ -479,7 +470,6 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     const candidate = vaultCandidates.find(c => c.vaultConfig.assetAddress === assetAddress);
     if (!candidate) return;
     
-    setManualDirty(true);
     setManualAllocations(prev => {
       const existing = prev.find(v => v.vaultConfig.assetAddress === assetAddress);
       return existing
