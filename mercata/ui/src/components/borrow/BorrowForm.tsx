@@ -26,7 +26,7 @@ import { getRiskLabel } from "@/utils/lendingUtils";
 import { useLendingContext } from "@/context/LendingContext";
 import { handleAmountInputChange } from "@/utils/transferValidation";
 import { UserRewardsData } from "@/services/rewardsService";
-import { CompactRewardsDisplay } from "../rewards/CompactRewardsDisplay";
+import { RewardsWidget } from "../rewards/RewardsWidget";
 import BorrowProgressModal, { BorrowStep } from "./BorrowProgressModal";
 
 interface BorrowFormProps {
@@ -799,7 +799,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
       )}
 
       {/* Rewards Display */}
-      <CompactRewardsDisplay
+      <RewardsWidget
         userRewards={userRewards}
         activityName="Lending Pool Borrow"
         inputAmount={borrowAmount}

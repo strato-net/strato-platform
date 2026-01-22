@@ -28,7 +28,7 @@ import { usePoolPolling } from "@/hooks/useSmartPolling";
 import { calculateSwapOutput, calculateSwapInput, calculateImpact } from "@/helpers/swapCalculations";
 import { computeMaxTransferable, handleAmountInputChange } from "@/utils/transferValidation";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { CompactRewardsDisplay } from "@/components/rewards/CompactRewardsDisplay";
+import { RewardsWidget } from "@/components/rewards/RewardsWidget";
 import { UserRewardsData } from "@/services/rewardsService";
 
 // ============================================================================
@@ -914,7 +914,7 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
         const inputAmount = isFromUsdst ? fromAmount : toAmount;
 
         return (
-          <CompactRewardsDisplay
+          <RewardsWidget
             userRewards={userRewards}
             activityName={activity.activity.name}
             inputAmount={inputAmount}
