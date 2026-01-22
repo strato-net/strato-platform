@@ -181,7 +181,7 @@ router.delete("/collateral", authHandler.authorizeRequest(), LendingController.w
  *               type: object
  *               additionalProperties: true
  */
-router.get("/liquidity", authHandler.authorizeRequest(), LendingController.getLiquidityAndBalance);
+router.get("/liquidity", authHandler.authorizeRequest(true), LendingController.getLiquidityAndBalance);
 
 /**
  * @openapi
@@ -639,7 +639,7 @@ router.post("/admin/unpause", authHandler.authorizeRequest(), LendingController.
  *               type: object
  *               additionalProperties: true
  */
-router.get("/safety/info", authHandler.authorizeRequest(), SafetyController.getInfo);
+router.get("/safety/info", authHandler.authorizeRequest(true), SafetyController.getInfo);
 
 /**
  * @openapi

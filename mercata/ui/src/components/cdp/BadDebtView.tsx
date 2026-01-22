@@ -7,9 +7,13 @@ import { useToast } from "@/hooks/use-toast";
 import { RefreshCw, AlertTriangle } from "lucide-react";
 import { formatWeiToDecimalHP, formatNumber } from "@/utils/numberUtils";
 import JuniorNoteView from "./JuniorNoteView";
+import GuestSignInPrompt from "@/components/ui/GuestSignInPrompt";
 
+interface BadDebtViewProps {
+  guestMode?: boolean;
+}
 
-const BadDebtView: React.FC = () => {
+const BadDebtView: React.FC<BadDebtViewProps> = ({ guestMode = false }) => {
   const [badDebtData, setBadDebtData] = useState<BadDebt[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -58,12 +62,29 @@ const BadDebtView: React.FC = () => {
   }, [toast]);
 
   useEffect(() => {
-    fetchBadDebtData();
-  }, [fetchBadDebtData]);
+    if (!guestMode) {
+      fetchBadDebtData();
+    }
+  }, [fetchBadDebtData, guestMode]);
 
   const handleRefresh = () => {
     fetchBadDebtData(true);
   };
+
+  // Guest mode: show static overview without fetching data
+  if (guestMode) {
+    return (
+      <div className="space-y-4">
+        <GuestSignInPrompt
+          title="Bad Debt & Recovery"
+          description="Bad debt occurs when underwater positions are liquidated but collateral value doesn't fully cover the debt. The protocol has mechanisms to recover bad debt through Junior Notes."
+          buttonText="Sign In to View Details"
+        />
+        {/* Junior Note Section (guest mode - will hide action tabs) */}
+        <JuniorNoteView badDebtData={[]} guestMode={true} />
+      </div>
+    );
+  }
 
   if (loading) {
     return (

@@ -55,6 +55,47 @@ function extractApiErrorMessage(error: any): string {
   return error?.message || "An unexpected error occurred.";
 }
 
+// URLs that are expected to fail for non-authenticated users (should not redirect to login)
+const GUEST_SAFE_URLS = [
+  '/user/me',
+  // DepositsGuestPage
+  '/tokens/v2/earning-assets',
+  '/bridge/networkConfigs',
+  '/bridge/bridgeableTokens',
+  // Borrow page
+  '/lending/collateral',
+  '/lending/loans',
+  '/cdp/vaults',
+  '/cdp/assets',
+  // StratoStats page
+  '/tokens/stats',
+  '/cdp/stats',
+  '/cdp/interest',
+  '/lending/interest',
+  '/protocol-fees/revenue',
+  // Advanced page - Mint tab - Liquidations sub-tab
+  '/cdp/liquidatable',
+  '/cdp/config',
+  '/cdp/admin/global-paused',
+  // Advanced page - Lending tab
+  '/lending/liquidity',
+  // Advanced page - Swap tab
+  '/swap-pools',
+  // Advanced page - Safety tab
+  '/lending/safety/info',
+  // Rewards page
+  '/rewards/pending',
+  '/rewards/overview',
+  '/rewards/activities',
+  // ActivityFeed page
+  '/events',
+];
+
+// Check if a URL is expected to fail silently for guests
+function isGuestSafeUrl(url: string): boolean {
+  return GUEST_SAFE_URLS.some(safeUrl => url.includes(safeUrl));
+}
+
 // Response interceptor to catch 401, 403 (CSRF), and show global toast for all APIs
 api.interceptors.response.use(
   (response) => response,
@@ -79,20 +120,15 @@ api.interceptors.response.use(
       }
     }
     
-    // Show toast for all API errors (except 401 which is handled separately)
-    if (error.response?.status !== 401) {
-      const errorMessage = extractApiErrorMessage(error);
-      const errorTitle = getErrorTitle(url);
-      toast({
-        title: errorTitle,
-        description: typeof errorMessage === "string"
-          ? errorMessage
-          : "An unexpected error occurred.",
-        variant: "destructive",
-      });
-    }
-    
-    if (error.response?.status === 401 && url !== '/user/me') {
+    // For 401 errors, handle based on whether the URL is guest-safe
+    if (error.response?.status === 401) {
+      // If URL is guest-safe, silently reject without toast or redirect
+      // This prevents errors when guests browse public pages that call user-specific APIs
+      if (isGuestSafeUrl(url)) {
+        return Promise.reject(error);
+      }
+      
+      // For non-guest-safe URLs, show session expired message and redirect
       toast({
         title: "Session Expired",
         description: "Redirecting to login...",
@@ -102,7 +138,20 @@ api.interceptors.response.use(
         const theme = localStorage.getItem('theme') || 'light';
         window.location.href = `/login?theme=${theme}`;
       }, 1500);
+      return Promise.reject(error);
     }
+    
+    // Show toast for all other API errors
+    const errorMessage = extractApiErrorMessage(error);
+    const errorTitle = getErrorTitle(url);
+    toast({
+      title: errorTitle,
+      description: typeof errorMessage === "string"
+        ? errorMessage
+        : "An unexpected error occurred.",
+      variant: "destructive",
+    });
+    
     return Promise.reject(error);
   }
 );

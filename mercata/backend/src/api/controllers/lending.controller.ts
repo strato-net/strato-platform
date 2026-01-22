@@ -231,9 +231,9 @@ class LendingController {
   ): Promise<void> {
     try {
       const { accessToken, address: userAddress } = req;
-      validateUserAddress(userAddress);
+      // userAddress is optional - if not provided, only pool stats are returned
 
-      const result = await liquidityAndBalance(accessToken, userAddress as string);
+      const result = await liquidityAndBalance(accessToken, userAddress);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);

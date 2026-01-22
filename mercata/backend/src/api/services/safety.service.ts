@@ -63,7 +63,7 @@ export const getSafetyModuleConfig = (): SafetyModuleConfig => {
 
 export const getSafetyModuleInfo = async (
   accessToken: string,
-  userAddress: string
+  userAddress?: string
 ): Promise<SafetyModuleInfo> => {
   const safetyModuleConfig = getSafetyModuleConfig();
   const safetyModuleAddress = safetyModuleConfig.safetyModule.address;
@@ -73,8 +73,8 @@ export const getSafetyModuleInfo = async (
     // Note: We need to query multiple sources for complete SafetyModule data:
     // 1. SafetyModule contract config and _managedAssets (COOLDOWN_SECONDS, UNSTAKE_WINDOW, _managedAssets, etc.)
     // 2. sToken totalSupply (this is totalShares)
-    // 3. User's sToken balance
-    // 4. User's cooldown start time
+    // 3. User's sToken balance (only if userAddress provided)
+    // 4. User's cooldown start time (only if userAddress provided)
     
     let safetyModuleData: any[] = [];
     let sTokenTotalSupply: any[] = [];
@@ -115,40 +115,43 @@ export const getSafetyModuleInfo = async (
       console.warn("sToken total supply query failed:", error);
     }
 
-    try {
-      // Query user's sUSDST token balance using nested relationship pattern
-      const response3 = await cirrus.get(
-        accessToken,
-        `/BlockApps-Token`,
-        {
-          params: {
-            address: `eq.${sTokenAddress}`,
-            select: `address,balances:BlockApps-Token-_balances(user:key,balance:value::text)`,
-            "balances.key": `eq.${userAddress.toLowerCase()}`
+    // User-specific queries - only run if userAddress is provided
+    if (userAddress) {
+      try {
+        // Query user's sUSDST token balance using nested relationship pattern
+        const response3 = await cirrus.get(
+          accessToken,
+          `/BlockApps-Token`,
+          {
+            params: {
+              address: `eq.${sTokenAddress}`,
+              select: `address,balances:BlockApps-Token-_balances(user:key,balance:value::text)`,
+              "balances.key": `eq.${userAddress.toLowerCase()}`
+            }
           }
-        }
-      );
-      const tokenData = response3.data || [];
-      userTokenBalance = tokenData?.[0]?.balances || [];
-    } catch (error) {
-      console.warn("sUSDST token balance query failed:", error);
-    }
+        );
+        const tokenData = response3.data || [];
+        userTokenBalance = tokenData?.[0]?.balances || [];
+      } catch (error) {
+        console.warn("sUSDST token balance query failed:", error);
+      }
 
-    try {
-      // Query user's cooldown start from SafetyModule
-      const response4 = await cirrus.get(
-        accessToken,
-        `/BlockApps-SafetyModule-cooldownStart`,
-        {
-          params: {
-            key: `eq.${userAddress.toLowerCase()}`,
-            select: "value::text"
+      try {
+        // Query user's cooldown start from SafetyModule
+        const response4 = await cirrus.get(
+          accessToken,
+          `/BlockApps-SafetyModule-cooldownStart`,
+          {
+            params: {
+              key: `eq.${userAddress.toLowerCase()}`,
+              select: "value::text"
+            }
           }
-        }
-      );
-      cooldownData = response4.data || [];
-    } catch (error) {
-      console.warn("SafetyModule cooldown data query failed:", error);
+        );
+        cooldownData = response4.data || [];
+      } catch (error) {
+        console.warn("SafetyModule cooldown data query failed:", error);
+      }
     }
 
     // Extract data from responses
@@ -168,14 +171,16 @@ export const getSafetyModuleInfo = async (
     const userShares = userTokenBalance?.[0]?.balance || "0";
     const cooldownStart = cooldownData?.[0]?.value || "0";
 
-    // Get user's staked sUSDST balance from RewardsChef
-    // Find the pool for this sToken
-    const poolForSToken = await findPoolByLpToken(accessToken, config.rewardsChef, sTokenAddress);
-
-    // If no pool found, staked balance is 0
-    const stakedSTokenBalance = poolForSToken
-      ? await getStakedBalance(accessToken, config.rewardsChef, poolForSToken.poolIdx, userAddress)
-      : "0";
+    // Get user's staked sUSDST balance from RewardsChef (only if userAddress provided)
+    let stakedSTokenBalance = "0";
+    if (userAddress) {
+      // Find the pool for this sToken
+      const poolForSToken = await findPoolByLpToken(accessToken, config.rewardsChef, sTokenAddress);
+      // If no pool found, staked balance is 0
+      stakedSTokenBalance = poolForSToken
+        ? await getStakedBalance(accessToken, config.rewardsChef, poolForSToken.poolIdx, userAddress)
+        : "0";
+    }
 
     // Calculate exchange rate (assets per share)
     const exchangeRate = totalShares !== "0" && BigInt(totalShares) > 0n 

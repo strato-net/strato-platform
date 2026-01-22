@@ -552,10 +552,10 @@ export const collateralAndBalance = async (
 
 export const liquidityAndBalance = async (
   accessToken: string,
-  userAddress: string,
+  userAddress?: string,
 ) => {
-  // Fetch pool data with explicit select (index fields + userLoan + prices + pause status)
-  const registry = await getPool(accessToken, {
+  // Build query - userLoan filter only if userAddress provided
+  const queryParams: Record<string, string> = {
     select:
       `lendingPool:lendingPool_fkey(` +
         `address,borrowableAsset,mToken,_paused,` +
@@ -570,9 +570,15 @@ export const liquidityAndBalance = async (
         `prices:${PriceOracle}-prices(asset:key,price:value::text)` +
       `),` +
       `liquidityPool:liquidityPool_fkey(address)`
-  ,
-    "lendingPool.userLoan.key": `eq.${userAddress}`
-  });
+  };
+  
+  // Only filter userLoan if userAddress is provided
+  if (userAddress) {
+    queryParams["lendingPool.userLoan.key"] = `eq.${userAddress}`;
+  }
+
+  // Fetch pool data with explicit select (index fields + userLoan + prices + pause status)
+  const registry = await getPool(accessToken, queryParams);
 
   const { borrowableAsset, mToken, assetConfigs, _paused } = registry.lendingPool || {};
   const allCollaterals = registry.collateralVault?.userCollaterals || [];
@@ -583,18 +589,28 @@ export const liquidityAndBalance = async (
   }
 
   // Fetch token metadata with balances included
+  // Only include user address in balance query if provided
+  const balanceKeys = userAddress 
+    ? `in.(${userAddress},${registry.liquidityPool?.address || ''})` 
+    : `eq.${registry.liquidityPool?.address || ''}`;
+  
   const tokenData = await getTokens(accessToken, {
     address: `in.(${borrowableAsset},${mToken})`,
     select: `address,_name,_symbol,_owner,_totalSupply::text,customDecimals,balances:${Token}-_balances(user:key,balance:value::text)`,
-    "balances.key": `in.(${userAddress},${registry.liquidityPool?.address || ''})`
+    "balances.key": balanceKeys
   });
 
   // Extract token data and user balances
   const borrowableToken = tokenData.find(token => token.address === borrowableAsset);
   const mTokenInfo = tokenData.find(token => token.address === mToken);
 
-  const borrowableBalance = borrowableToken?.balances?.find((b: any) => b.user === userAddress)?.balance || "0";
-  const mTokenBalance = mTokenInfo?.balances?.find((b: any) => b.user === userAddress)?.balance || "0";
+  // User balances - only if userAddress is provided
+  const borrowableBalance = userAddress 
+    ? borrowableToken?.balances?.find((b: any) => b.user === userAddress)?.balance || "0"
+    : "0";
+  const mTokenBalance = userAddress 
+    ? mTokenInfo?.balances?.find((b: any) => b.user === userAddress)?.balance || "0"
+    : "0";
 
   // Supply/token state
   const totalMTokenSupply = mTokenInfo?._totalSupply || "0";
@@ -668,14 +684,17 @@ export const liquidityAndBalance = async (
     borrowableAsset
   );
 
-  // Get user's staked balance from RewardsChef
+  // Get user's staked balance from RewardsChef (only if userAddress provided)
+  let stakedMTokenBalance = "0";
+  if (userAddress) {
   // Find the pool for this mToken
   const rewardsPool = await findPoolByLpToken(accessToken, config.rewardsChef, mToken);
 
   // If no pool found, staked balance is 0
-  const stakedMTokenBalance = rewardsPool
+    stakedMTokenBalance = rewardsPool
     ? await getStakedBalance(accessToken, config.rewardsChef, rewardsPool.poolIdx, userAddress)
     : "0";
+  }
 
   // User's withdrawable underlying (min of user mToken value and pool cash)
   const userMTokenBalance = BigInt(mTokenBalance);

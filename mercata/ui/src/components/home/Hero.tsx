@@ -12,9 +12,11 @@ import {
 } from 'lucide-react';
 import heroBackground from '../../assets/home/hero-background.png';
 import darkThemeBackground from '../../assets/home/darktheme-hero-bg.png';
+import { useUser } from '@/context/UserContext';
 
 const Hero = () => {
   const { resolvedTheme } = useTheme();
+  const { isLoggedIn } = useUser();
   const backgroundImage = resolvedTheme === 'dark' ? darkThemeBackground : heroBackground;
 
   return (
@@ -136,7 +138,7 @@ const Hero = () => {
                 Deposit your assets and watch them grow. Earn competitive yields automatically with our simple savings solution.
               </p>
               <Link 
-                to="/dashboard/deposits"
+                to={isLoggedIn ? "/dashboard/deposits" : "/deposits-preview"}
                 className="inline-flex items-center gap-2 text-strato-lightblue font-medium hover:gap-3 transition-all duration-300"
               >
                 Start Saving

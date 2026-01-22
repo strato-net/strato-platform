@@ -77,7 +77,8 @@ export const LendingProvider = ({
   const loansAbortControllerRef = useRef<AbortController | null>(null);
 
   const fetchLiquidityInfo = useCallback(async (signal?: AbortSignal) => {
-    if (!isLoggedIn) return;
+    // Fetch liquidity info for all users (logged in or guest)
+    // Pool stats are public, user-specific data will be "0" for guests
     setLoadingLiquidity(true);
     try {
       const res = await api.get<LiquidityData>("/lending/liquidity", {
@@ -91,7 +92,7 @@ export const LendingProvider = ({
     } finally {
       setLoadingLiquidity(false);
     }
-  }, [isLoggedIn]);
+  }, []);
 
   const fetchCollateralInfo = useCallback(async (signal?: AbortSignal) => {
     if (!isLoggedIn) return;
@@ -233,10 +234,10 @@ export const LendingProvider = ({
   };
 
 
-  // Run initialization only when the user is logged in
+  // Run initialization - liquidity info for all users, collateral only when logged in
   useEffect(() => {
+    fetchLiquidityInfo(); // Pool stats are public
     if (isLoggedIn) {
-      fetchLiquidityInfo();
       fetchCollateralInfo();
     }
   }, [isLoggedIn, fetchLiquidityInfo, fetchCollateralInfo]);

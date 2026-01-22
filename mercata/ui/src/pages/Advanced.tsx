@@ -9,15 +9,15 @@ import LendingPoolSection from '@/components/dashboard/LendingPoolSection';
 import SwapPoolsSection from '@/components/dashboard/SwapPoolsSection';
 import LiquidationsSection from '@/components/dashboard/LiquidationsSection';
 import SafetyModuleSection from '@/components/dashboard/SafetyModuleSection';
-import MintPlanner from '@/components/cdp/MintPlanner';
 import VaultsList from '@/components/cdp/VaultsList';
 import LiquidationsView from '@/components/cdp/LiquidationsView';
 import BadDebtView from '@/components/cdp/BadDebtView';
+import GuestVaultsView from '@/components/cdp/GuestVaultsView';
 // New v2 components
 import Mint from '@/components/cdp/v2/Mint';
 import DebtPosition from '@/components/cdp/v2/DebtPosition';
 import { useCDP } from '@/context/CDPContext';
-import { CompactRewardsDisplay } from '@/components/rewards/CompactRewardsDisplay';
+import { useUser } from '@/context/UserContext';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 import { useUserTokens } from '@/context/UserTokensContext';
 
@@ -39,10 +39,11 @@ const Advanced = () => {
       setBorrowActiveTab(subtabParam);
     }
   }, [searchParams]);
-  const { refreshVaults } = useCDP();
+  const { refreshVaults, cdpAssets, loadingAssets } = useCDP();
+  const { isLoggedIn } = useUser();
   const [vaultsRefreshTrigger, setVaultsRefreshTrigger] = useState(0);
   const [mintPlannerRefreshTrigger, setMintPlannerRefreshTrigger] = useState(0);
-  const { userRewards, loading: rewardsLoading, refetch: refetchRewards } = useRewardsUserInfo();
+  const { refetch: refetchRewards } = useRewardsUserInfo();
   const { fetchTokens } = useUserTokens();
 
   // Unified refresh function that refreshes ALL CDP components after any transaction
@@ -113,30 +114,34 @@ const Advanced = () => {
                       </TabsTrigger>
                     </TabsList>
                     <TabsContent value="vaults">
-                      <div className="flex flex-col lg:flex-row gap-6">
-                        {/* Left Column - Mint Section (New v2) */}
-                        <div className="w-full lg:w-[60%]">
-                          <Mint
-                            onSuccess={handleQuickMintSuccess}
-                            refreshTrigger={mintPlannerRefreshTrigger}
-                          />
-                        </div>
+                      {isLoggedIn ? (
+                        <div className="flex flex-col lg:flex-row gap-6">
+                          {/* Left Column - Mint Section (New v2) */}
+                          <div className="w-full lg:w-[60%]">
+                            <Mint
+                              onSuccess={handleQuickMintSuccess}
+                              refreshTrigger={mintPlannerRefreshTrigger}
+                            />
+                          </div>
 
-                        {/* Right Column - Position and Vaults (New v2) */}
-                        <div className="w-full lg:w-[40%] space-y-6">
-                          <DebtPosition refreshTrigger={vaultsRefreshTrigger} />
-                          <VaultsList
-                            refreshTrigger={vaultsRefreshTrigger}
-                            onVaultActionSuccess={handleVaultActionSuccess}
-                          />
+                          {/* Right Column - Position and Vaults (New v2) */}
+                          <div className="w-full lg:w-[40%] space-y-6">
+                            <DebtPosition refreshTrigger={vaultsRefreshTrigger} />
+                            <VaultsList
+                              refreshTrigger={vaultsRefreshTrigger}
+                              onVaultActionSuccess={handleVaultActionSuccess}
+                            />
+                          </div>
                         </div>
-                      </div>
+                      ) : (
+                        <GuestVaultsView cdpAssets={cdpAssets} loadingAssets={loadingAssets} />
+                      )}
                     </TabsContent>
                     <TabsContent value="bad-debt">
-                      <BadDebtView />
+                      <BadDebtView guestMode={!isLoggedIn} />
                     </TabsContent>
                     <TabsContent value="liquidations">
-                      <LiquidationsView />
+                      <LiquidationsView guestMode={!isLoggedIn} />
                     </TabsContent>
                   </Tabs>
                 </TabsContent>

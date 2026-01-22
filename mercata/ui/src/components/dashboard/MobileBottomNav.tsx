@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -19,14 +19,6 @@ import {
 import { Drawer, DrawerClose, DrawerContent } from '@/components/ui/drawer';
 import { useUser } from '@/context/UserContext';
 
-// Primary navigation items shown in bottom bar
-const PRIMARY_NAV_ITEMS = [
-  { icon: LayoutDashboard, label: 'Portfolio', path: '/dashboard' },
-  { icon: ArrowUpDown, label: 'Deposit', path: '/dashboard/deposits' },
-  { icon: Landmark, label: 'Borrow', path: '/dashboard/borrow' },
-  { icon: ArrowLeftRight, label: 'Swap', path: '/dashboard/swap' },
-];
-
 // Items shown in "More" drawer
 const MORE_ITEMS = [
   { icon: Send, label: 'Transfer', path: '/dashboard/transfer' },
@@ -43,10 +35,24 @@ const MobileBottomNav = () => {
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const { isAdmin } = useUser();
+  const { isAdmin, isLoggedIn } = useUser();
 
-  const isActive = (path: string) => 
-    path === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(path);
+  // Primary navigation items - dynamically set Deposit path based on login status
+  const PRIMARY_NAV_ITEMS = useMemo(() => [
+    { icon: LayoutDashboard, label: 'Portfolio', path: '/dashboard' },
+    { icon: ArrowUpDown, label: 'Deposit', path: isLoggedIn ? '/dashboard/deposits' : '/deposits-preview' },
+    { icon: Landmark, label: 'Borrow', path: '/dashboard/borrow' },
+    { icon: ArrowLeftRight, label: 'Swap', path: '/dashboard/swap' },
+  ], [isLoggedIn]);
+
+  const isActive = (path: string) => {
+    if (path === '/dashboard') return pathname === '/dashboard';
+    // Handle deposits-preview as active for Deposit tab
+    if (path === '/deposits-preview' || path === '/dashboard/deposits') {
+      return pathname === '/dashboard/deposits' || pathname === '/deposits-preview';
+    }
+    return pathname.startsWith(path);
+  };
 
   const isMoreActive = MORE_ITEMS.some(item => isActive(item.path));
 

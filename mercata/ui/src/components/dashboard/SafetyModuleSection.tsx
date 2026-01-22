@@ -17,7 +17,7 @@ import { CompactRewardsDisplay } from "@/components/rewards/CompactRewardsDispla
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 
 const SafetyModuleSection = () => {
-  const { userAddress } = useUser();
+  const { isLoggedIn } = useUser();
   const { activeTokens: tokens, loading: tokensLoading, fetchTokens } = useUserTokens();
   const { fetchUsdstBalance, usdstBalance, approveToken } = useTokenContext();
   const {
@@ -39,9 +39,11 @@ const SafetyModuleSection = () => {
 
 
   const refreshData = (signal?: AbortSignal) => {
-    fetchTokens(signal);
-    refreshSafetyInfo(signal);
-    fetchUsdstBalance();
+    refreshSafetyInfo(signal); // Always fetch public safety info
+    if (isLoggedIn) {
+      fetchTokens(signal);
+      fetchUsdstBalance();
+    }
   };
 
   // Fetch on mount, with abort controller
@@ -242,13 +244,14 @@ const SafetyModuleSection = () => {
                         value={stakeAmount}
                         onChange={(e) => setStakeAmount(e.target.value)}
                         className={`pl-16 ${!isStakeAmountValid() ? 'text-red-600' : ''}`}
+                        disabled={!isLoggedIn}
                       />
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-medium">USDST</span>
                     </div>
                     <Button
                       onClick={handleStakeAction}
                       className="bg-strato-blue hover:bg-strato-blue/90 w-full sm:w-28 hidden sm:flex sm:items-center sm:justify-center"
-                      disabled={tokensLoading || isProcessing || !isStakeAmountValid()}
+                      disabled={tokensLoading || isProcessing || !isStakeAmountValid() || !isLoggedIn}
                     >
                       {isProcessing ? (
                         "Processing..."
@@ -260,38 +263,43 @@ const SafetyModuleSection = () => {
                       )}
                     </Button>
                   </div>
-                  <div className="text-sm text-muted-foreground mt-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const availableWei = BigInt(usdstBalance);
-                        const feeWei = safeParseUnits(SAFETY_STAKE_FEE, 18);
-                        const maxStakeableWei = availableWei > feeWei ? availableWei - feeWei : 0n;
-                        const formatted = formatUnits(maxStakeableWei, 18);
+                  {/* User-specific balance info - only show when logged in */}
+                  {isLoggedIn && (
+                    <>
+                      <div className="text-sm text-muted-foreground mt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const availableWei = BigInt(usdstBalance);
+                            const feeWei = safeParseUnits(SAFETY_STAKE_FEE, 18);
+                            const maxStakeableWei = availableWei > feeWei ? availableWei - feeWei : 0n;
+                            const formatted = formatUnits(maxStakeableWei, 18);
 
-                        // Clamp to 18 decimals
-                        const [whole, frac = ""] = formatted.split(".");
-                        const clamped = `${whole}.${frac.slice(0, 18)}`;
-                        setStakeAmount(clamped);
-                      }}
-                      className="text-blue-600 hover:underline mr-2"
-                    >
-                      Max
-                    </button>
-                    Available:{" "}
-                    {tokensLoading ?
-                      <span className="text-muted-foreground animate-pulse">
-                        Loading...
-                      </span>
-                      : usdstBalance
-                        ? formatBalance(usdstBalance || 0n, undefined, 18, 2)
-                        : "0.00"}{" "}
-                    USDST
-                  </div>
-                  {/* Fee Display */}
-                  <div className="text-sm text-muted-foreground mt-1">
-                    Transaction Fee: {SAFETY_STAKE_FEE} USDST
-                  </div>
+                            // Clamp to 18 decimals
+                            const [whole, frac = ""] = formatted.split(".");
+                            const clamped = `${whole}.${frac.slice(0, 18)}`;
+                            setStakeAmount(clamped);
+                          }}
+                          className="text-blue-600 hover:underline mr-2"
+                        >
+                          Max
+                        </button>
+                        Available:{" "}
+                        {tokensLoading ?
+                          <span className="text-muted-foreground animate-pulse">
+                            Loading...
+                          </span>
+                          : usdstBalance
+                            ? formatBalance(usdstBalance || 0n, undefined, 18, 2)
+                            : "0.00"}{" "}
+                        USDST
+                      </div>
+                      {/* Fee Display */}
+                      <div className="text-sm text-muted-foreground mt-1">
+                        Transaction Fee: {SAFETY_STAKE_FEE} USDST
+                      </div>
+                    </>
+                  )}
                   {/* Estimated Rewards */}
                   <CompactRewardsDisplay
                     userRewards={userRewards}
@@ -327,8 +335,8 @@ const SafetyModuleSection = () => {
                       </Tooltip>
                     </div>
                   )}
-                  {/* Fee Warning */}
-                  {(() => {
+                  {/* Fee Warning - only show when logged in */}
+                  {isLoggedIn && (() => {
                     const availableWei = BigInt(usdstBalance);
                     const feeWei = safeParseUnits(SAFETY_STAKE_FEE, 18);
                     const stakeAmountWei = stakeAmount ? safeParseUnits(stakeAmount, 18) : 0n;
@@ -359,7 +367,7 @@ const SafetyModuleSection = () => {
                   <Button
                     onClick={handleStakeAction}
                     className="bg-strato-blue hover:bg-strato-blue/90 w-full mt-4 sm:hidden"
-                    disabled={tokensLoading || isProcessing || !isStakeAmountValid()}
+                    disabled={tokensLoading || isProcessing || !isStakeAmountValid() || !isLoggedIn}
                   >
                     {isProcessing ? (
                       "Processing..."
@@ -631,50 +639,55 @@ const SafetyModuleSection = () => {
                     )}
                   </span>
                 </div>
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-muted-foreground text-sm sm:text-base">Your sUSDST (Total)</span>
-                  <span className="font-medium text-sm sm:text-base sm:text-right">
-                    {loading ? (
-                      <span className="text-muted-foreground animate-pulse">
-                        Loading...
-                      </span>
-                    ) : safetyInfo?.userSharesTotal ? (
-                      formatBalance(safetyInfo.userSharesTotal || 0n, undefined, 18, 2, 2)
-                    ) : (
-                      "0.00"
-                    )}
-                  </span>
-                </div>
-                {rewardsEnabled && (
+                {/* User-specific data - only show when logged in */}
+                {isLoggedIn && (
                   <>
-                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start pl-4">
-                      <span className="text-muted-foreground text-xs sm:text-sm">• Staked</span>
-                      <span className="font-medium text-xs sm:text-sm sm:text-right">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
+                      <span className="text-muted-foreground text-sm sm:text-base">Your sUSDST (Total)</span>
+                      <span className="font-medium text-sm sm:text-base sm:text-right">
                         {loading ? (
                           <span className="text-muted-foreground animate-pulse">
                             Loading...
                           </span>
-                        ) : safetyInfo?.userSharesStaked ? (
-                          formatBalance(safetyInfo.userSharesStaked || 0n, undefined, 18, 2, 2)
+                        ) : safetyInfo?.userSharesTotal ? (
+                          formatBalance(safetyInfo.userSharesTotal || 0n, undefined, 18, 2, 2)
                         ) : (
                           "0.00"
                         )}
                       </span>
                     </div>
-                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start pl-4">
-                      <span className="text-muted-foreground text-xs sm:text-sm">• Unstaked</span>
-                      <span className="font-medium text-xs sm:text-sm sm:text-right">
-                        {loading ? (
-                          <span className="text-muted-foreground animate-pulse">
-                            Loading...
+                    {rewardsEnabled && (
+                      <>
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start pl-4">
+                          <span className="text-muted-foreground text-xs sm:text-sm">• Staked</span>
+                          <span className="font-medium text-xs sm:text-sm sm:text-right">
+                            {loading ? (
+                              <span className="text-muted-foreground animate-pulse">
+                                Loading...
+                              </span>
+                            ) : safetyInfo?.userSharesStaked ? (
+                              formatBalance(safetyInfo.userSharesStaked || 0n, undefined, 18, 2, 2)
+                            ) : (
+                              "0.00"
+                            )}
                           </span>
-                        ) : safetyInfo?.userShares ? (
-                          formatBalance(safetyInfo.userShares || 0n, undefined, 18, 2, 2)
-                        ) : (
-                          "0.00"
-                        )}
-                      </span>
-                    </div>
+                        </div>
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start pl-4">
+                          <span className="text-muted-foreground text-xs sm:text-sm">• Unstaked</span>
+                          <span className="font-medium text-xs sm:text-sm sm:text-right">
+                            {loading ? (
+                              <span className="text-muted-foreground animate-pulse">
+                                Loading...
+                              </span>
+                            ) : safetyInfo?.userShares ? (
+                              formatBalance(safetyInfo.userShares || 0n, undefined, 18, 2, 2)
+                            ) : (
+                              "0.00"
+                            )}
+                          </span>
+                        </div>
+                      </>
+                    )}
                   </>
                 )}
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
@@ -695,7 +708,8 @@ const SafetyModuleSection = () => {
                     }
                   </span>
                 </div>
-                {safetyInfo?.cooldownActive && (
+                {/* User-specific cooldown status - only show when logged in */}
+                {isLoggedIn && safetyInfo?.cooldownActive && (
                   <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
                     <span className="text-muted-foreground text-sm sm:text-base">Cooldown Status</span>
                     <span className="font-medium text-sm sm:text-base sm:text-right">

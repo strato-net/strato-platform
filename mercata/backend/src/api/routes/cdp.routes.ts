@@ -407,7 +407,7 @@ router.post("/liquidate", authHandler.authorizeRequest(), CDPController.liquidat
  *                 type: object
  *                 additionalProperties: true
  */
-router.get("/liquidatable", authHandler.authorizeRequest(), CDPController.getLiquidatable);
+router.get("/liquidatable", authHandler.authorizeRequest(true), CDPController.getLiquidatable);
 
 /**
  * @openapi
@@ -885,7 +885,7 @@ router.post("/bad-debt/claim-junior-note", authHandler.authorizeRequest(), CDPCo
  *                         type: integer
  *                         description: Number of vaults for this asset
  */
-router.get("/stats", authHandler.authorizeRequest(), CDPController.getCDPStats);
+router.get("/stats", authHandler.authorizeRequest(true), CDPController.getCDPStats);
 
 /**
  * @openapi

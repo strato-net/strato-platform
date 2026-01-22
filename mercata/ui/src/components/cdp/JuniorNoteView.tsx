@@ -8,19 +8,22 @@ import { BadDebt } from "@/services/cdpService";
 interface JuniorNoteViewProps {
   badDebtData: BadDebt[];
   onBadDebtUpdate?: () => void; // Callback to refresh bad debt data
+  guestMode?: boolean;
 }
 
-const JuniorNoteView: React.FC<JuniorNoteViewProps> = ({ badDebtData, onBadDebtUpdate }) => {
+const JuniorNoteView: React.FC<JuniorNoteViewProps> = ({ badDebtData, onBadDebtUpdate, guestMode = false }) => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Convert BadDebt array to Record<string, string> format for easier lookup
+  // Skip computation in guest mode since badDebtData is empty
   const assetBadDebtMap = React.useMemo(() => {
+    if (guestMode) return {};
     const map: Record<string, string> = {};
     badDebtData.forEach(item => {
       map[item.asset] = item.badDebt;
     });
     return map;
-  }, [badDebtData]);
+  }, [badDebtData, guestMode]);
 
   // Callback to refresh notes list when a note is opened
   const handleNoteOpened = () => {
@@ -58,28 +61,30 @@ const JuniorNoteView: React.FC<JuniorNoteViewProps> = ({ badDebtData, onBadDebtU
         </CardContent>
       </Card>
 
-      {/* Action Tabs */}
-      <Tabs defaultValue="claim" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 h-auto">
-          <TabsTrigger value="claim" className="text-xs md:text-sm py-2">My Junior Note</TabsTrigger>
-          <TabsTrigger value="open" className="text-xs md:text-sm py-2">Cover Bad Debt</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="claim" className="space-y-4">
-          <JuniorNote 
-            refreshTrigger={refreshTrigger}
-            onNoteActionSuccess={handleNoteActionSuccess}
-          />
-        </TabsContent>
-        
-        <TabsContent value="open" className="space-y-4">
-          <OpenJuniorNoteWidget 
-            onSuccess={handleNoteOpened} 
-            assetBadDebt={assetBadDebtMap}
-            onBadDebtCovered={onBadDebtUpdate}
-          />
-        </TabsContent>
-      </Tabs>
+      {/* Action Tabs - Hidden for guests */}
+      {!guestMode && (
+        <Tabs defaultValue="claim" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 h-auto">
+            <TabsTrigger value="claim" className="text-xs md:text-sm py-2">My Junior Note</TabsTrigger>
+            <TabsTrigger value="open" className="text-xs md:text-sm py-2">Cover Bad Debt</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="claim" className="space-y-4">
+            <JuniorNote 
+              refreshTrigger={refreshTrigger}
+              onNoteActionSuccess={handleNoteActionSuccess}
+            />
+          </TabsContent>
+          
+          <TabsContent value="open" className="space-y-4">
+            <OpenJuniorNoteWidget 
+              onSuccess={handleNoteOpened} 
+              assetBadDebt={assetBadDebtMap}
+              onBadDebtCovered={onBadDebtUpdate}
+            />
+          </TabsContent>
+        </Tabs>
+      )}
 
       {/* Additional Information */}
       <Card>

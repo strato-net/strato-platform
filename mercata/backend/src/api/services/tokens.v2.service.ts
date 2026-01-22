@@ -100,6 +100,7 @@ export const getEarningAssets = async (
       balance,
       price,
       collateralBalance,
+      totalBalance: totalBalance.toString(),
       isPoolToken:
         t._symbol?.endsWith("-LP") ||
         t._symbol === "SUSDST" ||

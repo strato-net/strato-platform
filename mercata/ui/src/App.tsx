@@ -19,6 +19,7 @@ import Dashboard from "./pages/Dashboard";
 import SwapAsset from "./pages/SwapAsset";
 import Transfer from "./pages/Transfer";
 import DepositsPage from "./pages/DepositsPage";
+import DepositsGuestPage from "./pages/DepositsGuestPage";
 import AssetDetail from "./pages/AssetDetail";
 import Advanced from "./pages/Advanced";
 import ActivityFeed from "./pages/ActivityFeed";
@@ -35,6 +36,7 @@ import BridgeTransactionsPage from "./pages/BridgeTransactionsPage";
 import WithdrawalsPage from "./pages/WithdrawalsPage";
 import Admin from "./pages/Admin";
 import ProtectedRoute from "./components/ProtectedRoute";
+import GuestAccessibleRoute from "./components/GuestAccessibleRoute";
 import {
   coinbaseWallet,
   metaMaskWallet,
@@ -138,6 +140,7 @@ const App = () => {
                               <UsdstBalanceBox />
                               <Routes>
                                 <Route path="/" element={<Index />} />
+                                <Route path="/deposits-preview" element={<DepositsGuestPage />} />
                                 <Route path="/claim" element={<Claim />} />
                                 <Route
                                   path="/dashboard"
@@ -158,9 +161,9 @@ const App = () => {
                                 <Route
                                   path="/dashboard/deposits"
                                   element={
-                                    <ProtectedRoute>
+                                    <GuestAccessibleRoute>
                                         <DepositsPage />
-                                    </ProtectedRoute>
+                                    </GuestAccessibleRoute>
                                   }
                                 />
                                 <Route
@@ -174,25 +177,25 @@ const App = () => {
                                 <Route
                                   path="/dashboard/borrow"
                                   element={
-                                    <ProtectedRoute>
+                                    <GuestAccessibleRoute>
                                         <Borrow />
-                                    </ProtectedRoute>
+                                    </GuestAccessibleRoute>
                                   }
                                 />
                                 <Route
-                                      path="/dashboard/advanced"
+                                  path="/dashboard/advanced"
                                   element={
-                                    <ProtectedRoute>
-                                          <Advanced />
-                                    </ProtectedRoute>
+                                    <GuestAccessibleRoute>
+                                      <Advanced />
+                                    </GuestAccessibleRoute>
                                   }
                                 />
                                 <Route
                                   path="/dashboard/activity"
                                   element={
-                                    <ProtectedRoute>
+                                    <GuestAccessibleRoute>
                                         <ActivityFeed />
-                                    </ProtectedRoute>
+                                    </GuestAccessibleRoute>
                                   }
                                 />
                                 <Route
@@ -226,11 +229,11 @@ const App = () => {
                                 <Route
                                   path="/dashboard/stats"
                                   element={
-                                    <ProtectedRoute>
+                                    <GuestAccessibleRoute>
                                         <StratoStats />
-                                        </ProtectedRoute>
-                                      }
-                                    />
+                                    </GuestAccessibleRoute>
+                                  }
+                                />
 
                                     <Route
                                       path="/dashboard/withdrawals"
@@ -244,9 +247,9 @@ const App = () => {
                                 <Route
                                   path="/dashboard/rewards"
                                   element={
-                                    <ProtectedRoute>
+                                    <GuestAccessibleRoute>
                                       <Rewards />
-                                    </ProtectedRoute>
+                                    </GuestAccessibleRoute>
                                   }
                                 />
 
@@ -262,9 +265,9 @@ const App = () => {
                                 <Route
                                   path="/dashboard/referrals"
                                   element={
-                                    <ProtectedRoute>
+                                    <GuestAccessibleRoute>
                                       <ReferralsManagement />
-                                    </ProtectedRoute>
+                                    </GuestAccessibleRoute>
                                   }
                                 />
 

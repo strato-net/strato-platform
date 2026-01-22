@@ -11,8 +11,7 @@ import { useTokenContext } from "@/context/TokenContext";
 import { formatWeiToDecimalHP, formatNumber } from "@/utils/numberUtils";
 
 interface LiquidationsViewProps {
-  // Props can be added here if needed in the future
-  children?: never; // Placeholder to make interface non-empty
+  guestMode?: boolean;
 }
 
 // Format percentage with reasonable precision
@@ -21,7 +20,7 @@ const formatPercentage = (num: number, decimals: number = 2): string => {
   return num.toFixed(decimals) + '%';
 };
 
-const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
+const LiquidationsView: React.FC<LiquidationsViewProps> = ({ guestMode = false }) => {
   const [liquidatableVaults, setLiquidatableVaults] = useState<VaultData[]>([]);
   const [assetConfigs, setAssetConfigs] = useState<Record<string, AssetConfig>>({});
   const [loading, setLoading] = useState(true);
@@ -93,13 +92,15 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
         });
         setLiquidatableVaults(filteredLiquidatable);
 
-        // Fetch USDST balance once for the entire component
-        await fetchUsdstBalance();
-        const availableUsdstWei = BigInt(usdstBalance || "0");
-        const availableUsdstDecimal = parseFloat(
-          formatWeiToDecimalHP(availableUsdstWei.toString(), 18)
-        );
-        setAvailableUsdstBalance(availableUsdstDecimal);
+        // Fetch USDST balance only for logged-in users
+        if (!guestMode) {
+          await fetchUsdstBalance();
+          const availableUsdstWei = BigInt(usdstBalance || "0");
+          const availableUsdstDecimal = parseFloat(
+            formatWeiToDecimalHP(availableUsdstWei.toString(), 18)
+          );
+          setAvailableUsdstBalance(availableUsdstDecimal);
+        }
       } catch (error) {
         console.error("Error fetching data:", error);
         toast({
@@ -113,7 +114,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
     };
 
     fetchData();
-  }, [toast, userAddress, fetchUsdstBalance, usdstBalance]);
+  }, [toast, userAddress, fetchUsdstBalance, usdstBalance, guestMode]);
 
   const toggleExpanded = async (vaultKey: string) => {
     const isCurrentlyExpanded = expandedVaults[vaultKey];
@@ -124,7 +125,8 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
     }));
     
     // If expanding the vault and we don't have max value yet, fetch it
-    if (!isCurrentlyExpanded && !maxValues[vaultKey]) {
+    // Skip for guests since they can't perform liquidations anyway
+    if (!guestMode && !isCurrentlyExpanded && !maxValues[vaultKey]) {
       const vaultIndex = parseInt(vaultKey.split('-').pop() || '0');
       const vault = liquidatableVaults[vaultIndex];
       
@@ -183,6 +185,9 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
 
   // Handle MAX button click
   const handleMaxClick = async (vault: VaultData, vaultKey: string) => {
+    // Skip for guests
+    if (guestMode) return;
+    
     const isCurrentlyMax = maxStates[vaultKey];
     if (isCurrentlyMax) {
       // Clear max state and amount
@@ -477,7 +482,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
                                 size="sm" 
                                 className={`flex-1 md:flex-none min-w-[50px] ${maxStates[vaultKey] ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}`}
                                 onClick={() => handleMaxClick(vault, vaultKey)}
-                                disabled={isUsdstBalanceInsufficient()}
+                                disabled={guestMode || isUsdstBalanceInsufficient()}
                               >
                                 MAX
                               </Button>
@@ -485,15 +490,24 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
                                 className="flex-1 md:flex-none bg-red-600 hover:bg-red-700 text-white text-sm"
                                 size="sm"
                                 onClick={() => handleLiquidate(vault, vaultKey)}
-                                disabled={isLiquidating || !liquidationAmount || isAmountExceedsMax(vaultKey) || isUsdstBalanceInsufficient()}
+                                disabled={guestMode || isLiquidating || !liquidationAmount || isAmountExceedsMax(vaultKey) || isUsdstBalanceInsufficient()}
                               >
                                 {isLiquidating ? "Liquidating..." : "Liquidate"}
                               </Button>
                             </div>
                           </div>
                           
+                          {/* Guest mode message */}
+                          {guestMode && (
+                            <div className="text-center">
+                              <p className="text-xs text-muted-foreground">
+                                Sign in to perform liquidations
+                              </p>
+                            </div>
+                          )}
+                          
                           {/* Error message when amount exceeds max */}
-                          {isAmountExceedsMax(vaultKey) && (
+                          {!guestMode && isAmountExceedsMax(vaultKey) && (
                             <div className="text-center">
                               <p className="text-xs text-red-500">
                                 Maximum liquidation amount reached
@@ -502,7 +516,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
                           )}
                           
                           {/* Error message when USDST balance is insufficient */}
-                          {isUsdstBalanceInsufficient() && (
+                          {!guestMode && isUsdstBalanceInsufficient() && (
                             <div className="text-center">
                               <p className="text-xs text-red-500">
                                 Insufficient USDST Balance
