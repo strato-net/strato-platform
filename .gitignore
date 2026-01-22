@@ -1,3 +1,4 @@
+.DS_Store
 .idea
 .basil-work
 .docker-work
@@ -58,6 +59,7 @@ docker-compose.oracle.yml
 
 /app
 /mynode/
+.aider*
 
 # Documentation working files (summaries, verification reports, commit messages)
 /*_SUMMARY.md

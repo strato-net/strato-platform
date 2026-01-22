@@ -1,5 +1,5 @@
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
-import { logError } from './logger';
+import { logError, logInfo } from './logger';
 import { RetryConfig } from '../types';
 import { healthMonitor } from './healthMonitor';
 import { DEFAULT_RETRY_CONFIG } from './constants';
@@ -45,17 +45,21 @@ async function withRetry<T>(
     operation: () => Promise<T>,
     config: RetryConfig = DEFAULT_RETRY_CONFIG
 ): Promise<T> {
+    const apiContext = config.apiUrl ? ` ${config.method || 'REQUEST'} ${config.apiUrl}` : '';
+
     for (let attempt = 1; attempt <= config.maxAttempts; attempt++) {
         try {
             return await operation();
         } catch (error: any) {
             const errorMessage = extractErrorMessage(error);
-            
+
+            logInfo(config.logPrefix, `Attempt ${attempt} failed${apiContext}: ${errorMessage}`);
+
+            // Failed final attempt
             if (attempt === config.maxAttempts) {
-                logError(config.logPrefix, new Error(`All ${config.maxAttempts} attempts failed. Last error: ${errorMessage}`));
+                logError(config.logPrefix, new Error(`All ${config.maxAttempts} attempts failed${apiContext}. Last error: ${errorMessage}`));
                 throw new Error(errorMessage);
             }
-            logError(config.logPrefix, new Error(`Attempt ${attempt} failed: ${errorMessage}`));
         }
     }
     throw new Error('Unexpected retry loop exit');
@@ -70,7 +74,7 @@ export async function apiGet<T = any>(
         async () => {
             return await axios.get(url, config);
         },
-        { ...DEFAULT_RETRY_CONFIG, ...retryConfig }
+        { ...DEFAULT_RETRY_CONFIG, apiUrl: url, method: 'GET', ...retryConfig }
     );
 }
 
@@ -84,7 +88,7 @@ export async function apiPost<T = any>(
         async () => {
             return await axios.post(url, data, config);
         },
-        { ...DEFAULT_RETRY_CONFIG, ...retryConfig }
+        { ...DEFAULT_RETRY_CONFIG, apiUrl: url, method: 'POST', ...retryConfig }
     );
 }
 
@@ -96,6 +100,11 @@ export async function apiRequest<T = any>(
         async () => {
             return await axios(requestConfig);
         },
-        { ...DEFAULT_RETRY_CONFIG, ...retryConfig }
+        {
+            ...DEFAULT_RETRY_CONFIG,
+            apiUrl: requestConfig.url,
+            method: requestConfig.method?.toUpperCase() || 'REQUEST',
+            ...retryConfig
+        }
     );
 }

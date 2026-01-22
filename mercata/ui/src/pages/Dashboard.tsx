@@ -1,12 +1,12 @@
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
-import MobileSidebar from "../components/dashboard/MobileSidebar";
+import MobileBottomNav from "../components/dashboard/MobileBottomNav";
 import AssetSummary from "../components/dashboard/AssetSummary";
 import AssetsList from "../components/dashboard/AssetsList";
 import DashboardFAQ from "../components/dashboard/DashboardFAQ";
 import BorrowingSection from "../components/dashboard/BorrowingSection";
-import { Wallet, Coins, Shield, Banknote, Loader2, Trophy } from "lucide-react";
+import { Wallet, Coins, Shield, Banknote, Loader2, Trophy, UserPlus, Send, Book, ArrowRightLeft } from "lucide-react";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
 import { usePendingRewards } from "@/hooks/usePendingRewards";
@@ -33,7 +33,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-  const { userAddress } = useUser();
+  const { userAddress, isLoggedIn } = useUser();
   const {
     earningAssets,
     getEarningAssets,
@@ -62,7 +62,6 @@ const Dashboard = () => {
   });
   const { loans, refreshLoans } = useLendingContext();
   const { totalCDPDebt, refreshVaults } = useCDP();
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [selectedTimeRange, setSelectedTimeRange] = useState<TimeRange>(() => {
     const stored = localStorage.getItem('dashboard-timeRange');
     if (stored && TIME_RANGES.includes(stored as TimeRange)) {
@@ -132,6 +131,14 @@ const Dashboard = () => {
   useEffect(() => {
     document.title = "Dashboard | STRATO";
     
+    // Check if user just logged in and needs to be redirected back to claim page
+    const claimReturnUrl = localStorage.getItem("claimReturnUrl");
+    if (claimReturnUrl && isLoggedIn) {
+      localStorage.removeItem("claimReturnUrl");
+      navigate(claimReturnUrl, { replace: true });
+      return;
+    }
+    
     const hasExistingEarningAssets = earningAssets.length > 0;
     const hasExistingInactiveTokens = inactiveTokens.length > 0;
     
@@ -139,7 +146,7 @@ const Dashboard = () => {
     getInactiveTokens(!hasExistingInactiveTokens);
     refreshLoans();
     refreshVaults();
-  }, [location.pathname, userAddress, getEarningAssets, getInactiveTokens, refreshLoans, refreshVaults]);
+  }, [location.pathname, userAddress, getEarningAssets, getInactiveTokens, refreshLoans, refreshVaults, isLoggedIn, navigate]);
 
   useEffect(() => {
     localStorage.setItem('dashboard-activeTab', activeTab);
@@ -294,19 +301,12 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-background">
       <DashboardSidebar />
-      <MobileSidebar 
-        isOpen={isMobileSidebarOpen} 
-        onClose={() => setIsMobileSidebarOpen(false)} 
-      />
 
-      <div className="transition-all duration-300 md:pl-64" style={{ paddingLeft: 'var(--sidebar-width, 0rem)' }}>
-        <DashboardHeader 
-          title="Overview" 
-          onMenuClick={() => setIsMobileSidebarOpen(true)}
-        />
+      <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
+        <DashboardHeader title="Portfolio" />
 
-        <main className="p-6">
-          <div className={`grid grid-cols-1 ${rewardsEnabled ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-6 mb-8`}>
+        <main className="p-4 md:p-6 pb-24 md:pb-6">
+          <div className={`grid grid-cols-1 ${rewardsEnabled ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-3 md:gap-6 mb-4 md:mb-8`}>
             <AssetSummary
               title="Net Balance"
               value={`$${totalBalance.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`}
@@ -318,7 +318,7 @@ const Dashboard = () => {
             />
 
             <AssetSummary
-              title="Rewards (All Time)"
+              title="Rewards (Season)"
               value={(() => {
                 if (rankLoading) return "Loading...";
                 if (!totalEarned) return "0 Reward Points";
@@ -380,8 +380,34 @@ const Dashboard = () => {
             />
           </div>
 
-          {/* Portfolio Value Chart */}
-          <div className="mb-8">
+          {/* Refer a Friend Section */}
+          <div className="mb-4 md:mb-8">
+            <div className="bg-card shadow-sm rounded-xl p-4 md:p-6 border border-border">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 md:p-3 bg-blue-500 rounded-lg shrink-0">
+                    <UserPlus className="text-white" size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-base md:text-lg font-semibold">Refer a Friend</h3>
+                    <p className="text-xs md:text-sm text-muted-foreground">
+                      Send tokens to friends who haven't signed up yet
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  onClick={() => navigate("/dashboard/refer")}
+                  className="w-full md:w-auto flex items-center justify-center gap-2"
+                >
+                  <UserPlus className="h-4 w-4" />
+                  Get Started
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Portfolio Value Chart - hidden on mobile */}
+          <div className="mb-8 hidden md:block">
             <PortfolioValueChart 
               data={chartConfig[activeTab].data || []}
               onTimeRangeChange={onTimeRangeChange}
@@ -392,6 +418,38 @@ const Dashboard = () => {
               subtitle={chartConfig[activeTab].subtitle}
               currentValue={chartConfig[activeTab].currentValue}
             />
+          </div>
+
+          {/* Quick Action Buttons */}
+          <div className="mb-8 grid grid-cols-4 gap-2 md:gap-4">
+            <Button
+              onClick={() => navigate("/dashboard/deposits")}
+              className="h-auto py-3 md:h-12 md:py-0 bg-primary hover:bg-primary/90 text-primary-foreground font-medium flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2"
+            >
+              <Wallet size={18} />
+              <span className="text-xs md:text-sm">Deposit</span>
+            </Button>
+            <Button
+              onClick={() => navigate("/dashboard/transfer")}
+              className="h-auto py-3 md:h-12 md:py-0 bg-primary hover:bg-primary/90 text-primary-foreground font-medium flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2"
+            >
+              <Send size={18} />
+              <span className="text-xs md:text-sm">Transfer</span>
+            </Button>
+            <Button
+              onClick={() => navigate("/dashboard/borrow")}
+              className="h-auto py-3 md:h-12 md:py-0 bg-primary hover:bg-primary/90 text-primary-foreground font-medium flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2"
+            >
+              <Book size={18} />
+              <span className="text-xs md:text-sm">Borrow</span>
+            </Button>
+            <Button
+              onClick={() => navigate("/dashboard/swap")}
+              className="h-auto py-3 md:h-12 md:py-0 bg-primary hover:bg-primary/90 text-primary-foreground font-medium flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2"
+            >
+              <ArrowRightLeft size={18} />
+              <span className="text-xs md:text-sm">Swap</span>
+            </Button>
           </div>
 
           <div className="mb-8">
@@ -420,6 +478,8 @@ const Dashboard = () => {
           </div>
         </main>
       </div>
+
+      <MobileBottomNav />
     </div>
   );
 };

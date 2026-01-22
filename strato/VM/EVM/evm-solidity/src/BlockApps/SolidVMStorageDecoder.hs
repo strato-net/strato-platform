@@ -36,8 +36,8 @@ import SolidVM.Model.Storable
 import Text.Printf
 import Text.Read
 
-decodeSolidVMValues :: [(StoragePath, BasicValue)] -> [(T.Text, SolidityValue)]
-decodeSolidVMValues pathValues = either (error . printf "decodeSolidVMValues: %s" . show) id $ do
+decodeSolidVMValues :: [(StoragePath, BasicValue)] -> Either T.Text [(T.Text, SolidityValue)]
+decodeSolidVMValues pathValues = bimap (T.pack . printf "decodeSolidVMValues: %s" . show) id $ do
   totalStorage <- bimap show HM.toList $ synthesize pathValues
   mapMaybeM (bimapValue bsToText) totalStorage
 
@@ -47,19 +47,19 @@ bimapValue f (name', value') = do
   mValue <- valueToSolidityValue value'
   return $ fmap (name,) mValue
 
-decodeCacheValuesWith :: (StoragePath -> BasicValue -> Bool) -> M.Map StoragePath BasicValue -> [(T.Text, Value)]
-decodeCacheValuesWith f hxs = either (error . (++ ": " ++ show hxs) . printf "SVM.decodeCacheValuesWith: %s" . show) id $ do
+decodeCacheValuesWith :: (StoragePath -> BasicValue -> Bool) -> M.Map StoragePath BasicValue -> Either T.Text [(T.Text, Value)]
+decodeCacheValuesWith f hxs = bimap (T.pack . (++ ": " ++ show hxs) . printf "SVM.decodeCacheValuesWith: %s" . show) id $ do
   let pathValues' = filter (uncurry f) $ M.toList hxs
   finalState <- bimap show HM.toList $ synthesize pathValues'
   mapM (bimapM bsToText return) finalState
 
-decodeCacheValues :: M.Map StoragePath BasicValue -> [(T.Text, Value)]
+decodeCacheValues :: M.Map StoragePath BasicValue -> Either T.Text [(T.Text, Value)]
 decodeCacheValues = decodeCacheValuesWith (const . isBasic)
   where isBasic (StoragePath ([Field _])) = True
         isBasic (StoragePath [Field _, Field fieldBS]) = C8.unpack fieldBS /= "length"
         isBasic _ = False
 
-decodeCacheValuesForCollections :: M.Map StoragePath BasicValue -> [(T.Text, Value)]
+decodeCacheValuesForCollections :: M.Map StoragePath BasicValue -> Either T.Text [(T.Text, Value)]
 decodeCacheValuesForCollections = decodeCacheValuesWith (\_ _ -> True)
 
 bsToText :: B.ByteString -> Either String T.Text

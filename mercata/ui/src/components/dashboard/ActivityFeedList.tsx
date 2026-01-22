@@ -342,7 +342,7 @@ const ActivityFeedList = () => {
 
   // Memoized event card renderer to prevent unnecessary re-renders
   const renderEventCard = useCallback((event: Event) => (
-    <Card key={event.id} className="mb-3 sm:mb-4 hover:shadow-md transition-shadow">
+    <Card key={event.id} className="mb-3 sm:mb-4 hover:shadow-md transition-shadow overflow-hidden">
       <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-2 sm:gap-3">
@@ -405,13 +405,13 @@ const ActivityFeedList = () => {
             </div>
           </div>
           
-          <div className="space-y-2">
+          <div className="space-y-2 overflow-hidden">
             <div className="text-xs sm:text-sm font-medium text-foreground">Event Attributes:</div>
             <div className="space-y-1">
               {Object.entries(event?.attributes).map(([key, value]) => (
-                <div key={key} className="flex justify-between text-xs sm:text-sm">
-                  <span className="text-muted-foreground capitalize">{key}:</span>
-                  <span className="font-mono text-xs">
+                <div key={key} className="flex justify-between gap-2 text-xs sm:text-sm">
+                  <span className="text-muted-foreground capitalize shrink-0">{key}:</span>
+                  <span className="font-mono text-xs truncate">
                     {key.toLowerCase().includes('value') 
                       ? formatValue(value)
                       : key.toLowerCase().includes('address') || key.toLowerCase().includes('from') || key.toLowerCase().includes('to')
@@ -442,7 +442,7 @@ const ActivityFeedList = () => {
   ), [formatAddress, formatTimestamp, getEventIcon, getEventColor, formatValue]);
 
   return (
-    <div>
+    <div className="overflow-x-hidden">
       <ActivityFeedFilters 
         filters={filters}
         onFiltersChange={handleFiltersChange}
@@ -512,7 +512,7 @@ const ActivityFeedList = () => {
       </div>
 
       {totalPages > 1 && (
-        <div className="mt-6 sm:mt-8 pb-12 sm:pb-0">
+        <div className="mt-6 sm:mt-8">
           <Pagination>
             <PaginationContent className="flex flex-wrap sm:flex-nowrap justify-center gap-0 sm:gap-1">
               <PaginationItem>

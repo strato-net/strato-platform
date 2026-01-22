@@ -66,7 +66,10 @@ export const getPools = async (
     })
   ]);
 
-  const validatedPools = poolData as RawGetPool[];
+  // Filter out hidden pools
+  const validatedPools = (poolData as RawGetPool[]).filter(
+    pool => !config.hiddenSwapPools.has(pool.address)
+  );
   const validatedFactory = factoryData[0] as RawPoolFactory;
   const tokenAddresses = extractTokenAddresses(validatedPools);
   const priceMap = await getOraclePrices(accessToken, {
@@ -117,13 +120,16 @@ export const getSwapableTokens = async (
   const { data: poolData } = await cirrus.get(accessToken, `/${Pool}`, {
     params: {
       poolFactory: "eq." + constants.poolFactory,
-      select: `tokenA:tokenA_fkey(${swapTokenSelectFields.join(',')}),tokenB:tokenB_fkey(${swapTokenSelectFields.join(',')}),tokenABalance::text,tokenBBalance::text`,
+      select: `address,tokenA:tokenA_fkey(${swapTokenSelectFields.join(',')}),tokenB:tokenB_fkey(${swapTokenSelectFields.join(',')}),tokenABalance::text,tokenBBalance::text`,
       "tokenA.balances.key": `eq.${userAddress}`,
       "tokenB.balances.key": `eq.${userAddress}`,
     }
   });
 
-  const validatedPools = poolData as PoolWithTokens[];
+  // Filter out hidden pools
+  const validatedPools = (poolData as (PoolWithTokens & { address: string })[]).filter(
+    pool => !config.hiddenSwapPools.has(pool.address)
+  ) as PoolWithTokens[];
   const tokenAddresses = extractTokenAddresses(validatedPools);
   const priceMap = await getOraclePrices(accessToken, {
     select: "asset:key,price:value::text",
@@ -156,7 +162,7 @@ export const getSwapableTokenPairs = async (
     cirrus.get(accessToken, `/${Pool}`, {
       params: {
         poolFactory: "eq." + constants.poolFactory,
-        select: `tokenB:tokenB_fkey(${swapTokenSelectFields.join(',')}),tokenBBalance::text`,
+        select: `address,tokenB:tokenB_fkey(${swapTokenSelectFields.join(',')}),tokenBBalance::text`,
         tokenA: "eq." + tokenAddress,
         "tokenB.balances.key": `eq.${userAddress}`,
       }
@@ -164,15 +170,20 @@ export const getSwapableTokenPairs = async (
     cirrus.get(accessToken, `/${Pool}`, {
       params: {
         poolFactory: "eq." + constants.poolFactory,
-        select: `tokenA:tokenA_fkey(${swapTokenSelectFields.join(',')}),tokenABalance::text`,
+        select: `address,tokenA:tokenA_fkey(${swapTokenSelectFields.join(',')}),tokenABalance::text`,
         tokenB: "eq." + tokenAddress,
         "tokenA.balances.key": `eq.${userAddress}`,
       }
     })
   ]);
 
-  const validatedPoolsA = poolDataA as PoolWithTokenB[];
-  const validatedPoolsB = poolDataB as PoolWithTokenA[];
+  // Filter out hidden pools
+  const validatedPoolsA = (poolDataA as (PoolWithTokenB & { address: string })[]).filter(
+    pool => !config.hiddenSwapPools.has(pool.address)
+  ) as PoolWithTokenB[];
+  const validatedPoolsB = (poolDataB as (PoolWithTokenA & { address: string })[]).filter(
+    pool => !config.hiddenSwapPools.has(pool.address)
+  ) as PoolWithTokenA[];
 
   const allTokens: Array<{token: RawToken, poolBalance: string}> = [
     ...validatedPoolsA.map(pool => ({ token: pool.tokenB, poolBalance: pool.tokenBBalance })),
@@ -203,7 +214,8 @@ export const getSwapHistory = async (
   accessToken: string,
   poolAddress: string,
   page: number = 1,
-  limit: number = 10
+  limit: number = 10,
+  senderAddress?: string
 ): Promise<SwapHistoryResponse> => {
   const offset = (page - 1) * limit;
 
@@ -211,6 +223,7 @@ export const getSwapHistory = async (
     cirrus.get(accessToken, `/${PoolSwap}`, {
       params: {
         address: `eq.${poolAddress}`,
+        ...(senderAddress ? { sender: `eq.${senderAddress}` } : {}),
         select: swapHistorySelectFields.join(','),
         order: 'block_timestamp.desc',
         limit: limit.toString(),
@@ -220,6 +233,7 @@ export const getSwapHistory = async (
     cirrus.get(accessToken, `/${PoolSwap}`, {
       params: {
         address: `eq.${poolAddress}`,
+        ...(senderAddress ? { sender: `eq.${senderAddress}` } : {}),
         select: "count()",
       }
     })
@@ -233,7 +247,7 @@ export const getSwapHistory = async (
   }
 
   const swapHistory: SwapHistoryEntry[] = (swapEvents as RawSwapEvent[]).map(event => {
-    const { tokenA, tokenB } = event.pool;
+    const { tokenA, tokenB, isStable } = event.pool;
     const isAToB = event.tokenIn === tokenA.address;
 
     return {
@@ -243,7 +257,7 @@ export const getSwapHistory = async (
       tokenOut: isAToB ? tokenB.symbol : tokenA.symbol,
       amountIn: event.amountIn,
       amountOut: event.amountOut,
-      impliedPrice: calculateImpliedPrice(event.amountIn, event.amountOut, isAToB),
+      impliedPrice: calculateImpliedPrice(event.amountIn, event.amountOut, isAToB, isStable),
       sender: event.sender
     };
   });
@@ -260,11 +274,12 @@ export const createPool = async (
   body: CreatePoolParams,
   userAddress: string
 ): Promise<TransactionResponse> => {
+  const { isStable, ...restBody } = body;
   const tx = await buildFunctionTx({
     contractName: extractContractName(PoolFactory),
     contractAddress: constants.poolFactory,
-    method: "createPool",
-    args: body,
+    method: isStable ? "createStablePool" : "createPool",
+    args: restBody,
   }, userAddress, accessToken);
 
   return executeTransaction(accessToken, tx);

@@ -23,8 +23,11 @@ import AssetDetail from "./pages/AssetDetail";
 import Advanced from "./pages/Advanced";
 import ActivityFeed from "./pages/ActivityFeed";
 import NotFound from "./pages/NotFound";
-import MercataStats from "./pages/MercataStats";
+import StratoStats from "./pages/StratoStats";
 import Rewards from "./pages/Rewards";
+import ReferFriend from "./pages/ReferFriend";
+import Claim from "./pages/Claim";
+import ReferralsManagement from "./pages/ReferralsManagement";
 
 // Import dashboard components
 
@@ -45,6 +48,7 @@ import { SafetyProvider } from "./context/SafetyContext";
 import { LendingProvider } from "@/context/LendingContext";
 import { CDPProvider } from "@/context/CDPContext";
 import { SwapProvider } from "@/context/SwapContext";
+import { NetworkProvider } from "@/context/NetworkContext";
 import Borrow from "./pages/Borrow";
 import { getConfig } from "./lib/config";
 import { useState, useEffect } from "react";
@@ -114,6 +118,7 @@ const App = () => {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <NetworkProvider>
       <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
       <WagmiProvider config={wagmiConfig}>
       <RainbowKitProvider>
@@ -133,6 +138,7 @@ const App = () => {
                               <UsdstBalanceBox />
                               <Routes>
                                 <Route path="/" element={<Index />} />
+                                <Route path="/claim" element={<Claim />} />
                                 <Route
                                   path="/dashboard"
                                   element={
@@ -221,7 +227,7 @@ const App = () => {
                                   path="/dashboard/stats"
                                   element={
                                     <ProtectedRoute>
-                                        <MercataStats />
+                                        <StratoStats />
                                         </ProtectedRoute>
                                       }
                                     />
@@ -244,6 +250,24 @@ const App = () => {
                                   }
                                 />
 
+                                <Route
+                                  path="/dashboard/refer"
+                                  element={
+                                    <ProtectedRoute>
+                                      <ReferFriend />
+                                    </ProtectedRoute>
+                                  }
+                                />
+
+                                <Route
+                                  path="/dashboard/referrals"
+                                  element={
+                                    <ProtectedRoute>
+                                      <ReferralsManagement />
+                                    </ProtectedRoute>
+                                  }
+                                />
+
                                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                                 <Route path="*" element={<NotFound />} />
                               </Routes>
@@ -262,6 +286,7 @@ const App = () => {
       </RainbowKitProvider>
       </WagmiProvider>
       </ThemeProvider>
+    </NetworkProvider>
     </QueryClientProvider>
   );
 };

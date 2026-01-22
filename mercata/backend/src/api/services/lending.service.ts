@@ -522,11 +522,12 @@ export const collateralAndBalance = async (
       const liquidationThreshold = assetConfig?.liquidationThreshold || 0;
 
       // Calculate metrics using the helper function
-      const {userBalanceValue, collateralizedAmountValue, maxBorrowingPower} = calculateCollateralMetrics(
+      const {userBalanceValue, collateralizedAmountValue, maxBorrowingPower, unsuppliedBorrowingPower, unsuppliedLTCollateralValue} = calculateCollateralMetrics(
         userBalance,
         collateralizedAmount,
         assetPrice,
-        ltv
+        ltv,
+        liquidationThreshold
       );
 
       return {
@@ -539,6 +540,8 @@ export const collateralAndBalance = async (
         isCollateralized: collateral?.amount > 0,
         canSupply: BigInt(userBalance) > 0n,
         maxBorrowingPower,
+        unsuppliedBorrowingPower,
+        unsuppliedLTCollateralValue,
         assetPrice,
         ltv,
         liquidationThreshold,
@@ -658,13 +661,11 @@ export const liquidityAndBalance = async (
   const supplyAPY = apyData.supplyAPY * (utilizationRate / 100);
 
   // Total collateral value across all users (USD 1e18)
-  const totalCollateralValue = await Promise.resolve(
-    calculateTotalCollateralValue(
-      registry.lendingPool?.assetConfigs || [],
-      allCollaterals,
-      priceMap,
-      borrowableAsset
-    )
+  const totalCollateralValue = calculateTotalCollateralValue(
+    registry.lendingPool?.assetConfigs || [],
+    allCollaterals,
+    priceMap,
+    borrowableAsset
   );
 
   // Get user's staked balance from RewardsChef
@@ -1318,30 +1319,40 @@ export const listLoansForLiquidation = async (
  * Get interest accrued for lending pool
  * Uses compound interest formula matching contract's _accrue() function
  */
+/**
+ * Get estimated protocol revenue from lending pool interest.
+ * 
+ * Revenue calculation:
+ * - Total interest accrues on borrowed debt
+ * - Only `reserveFactor` portion of interest goes to `reservesAccrued`
+ * - Of `reservesAccrued`, only `(10000 - safetyShareBps)` portion goes to FeeCollector as revenue
+ * 
+ * Formula: revenue = interest × (reserveFactor / 10000) × ((10000 - safetyShareBps) / 10000)
+ */
 export const getLendingInterestAccrued = async (
   accessToken: string,
 ): Promise<{
-  totalDailyInterestUSD: string;
-  totalWeeklyInterestUSD: string;
-  totalMonthlyInterestUSD: string;
-  totalYtdInterestUSD: string;
-  totalAllTimeInterestUSD: string;
+  totalDailyRevenueUSD: string;
+  totalWeeklyRevenueUSD: string;
+  totalMonthlyRevenueUSD: string;
+  totalYtdRevenueUSD: string;
+  totalAllTimeRevenueUSD: string;
   borrowableAsset: {
     asset: string;
     symbol: string;
     totalDebtUSD: string;
     annualRatePercent: number;
-    dailyInterestUSD: string;
-    weeklyInterestUSD: string;
-    monthlyInterestUSD: string;
-    ytdInterestUSD: string;
-    allTimeInterestUSD: string;
+    dailyRevenueUSD: string;
+    weeklyRevenueUSD: string;
+    monthlyRevenueUSD: string;
+    ytdRevenueUSD: string;
+    allTimeRevenueUSD: string;
   };
 }> => {
   const registry = await getPool(accessToken, {
     select:
       `lendingPool:lendingPool_fkey(` +
-        `address,borrowableAsset,` +
+        `address,borrowableAsset,safetyShareBps,` +
         `borrowIndex::text,totalScaledDebt::text,` +
         `assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value)` +
       `)`
@@ -1351,9 +1362,10 @@ export const getLendingInterestAccrued = async (
     throw new Error("Lending pool or borrowable asset not found");
   }
 
-  const { borrowableAsset, borrowIndex: borrowIndexStr, totalScaledDebt: totalScaledDebtStr } = registry.lendingPool;
+  const { borrowableAsset, borrowIndex: borrowIndexStr, totalScaledDebt: totalScaledDebtStr, safetyShareBps: safetyShareBpsNum } = registry.lendingPool;
   const totalScaledDebt = BigInt(totalScaledDebtStr || "0");
   const borrowIndex = BigInt(borrowIndexStr || RAY.toString());
+  const safetyShareBps = BigInt(safetyShareBpsNum || 0);
 
   // Get asset config
   const borrowableAssetConfig = registry.lendingPool.assetConfigs
@@ -1368,6 +1380,8 @@ export const getLendingInterestAccrued = async (
   if (perSecondFactorRAY === 0n || perSecondFactorRAY === RAY) {
     throw new Error("perSecondFactorRAY not set or invalid");
   }
+
+  const reserveFactorBps = BigInt(borrowableAssetConfig.reserveFactor || 0);
 
   // Get token symbol
   const tokenRows = await getTokens(accessToken, {
@@ -1388,6 +1402,15 @@ export const getLendingInterestAccrued = async (
     return (totalScaledDebt * (idx1 - borrowIndex)) / RAY;
   };
 
+  // Helper: Convert interest to protocol revenue (FeeCollector portion)
+  // revenue = interest × (reserveFactor / 10000) × ((10000 - safetyShareBps) / 10000)
+  const interestToRevenue = (interest: bigint): bigint => {
+    if (interest === 0n) return 0n;
+    const treasuryShareBps = 10000n - safetyShareBps;
+    // revenue = interest * reserveFactorBps * treasuryShareBps / 100_000_000
+    return (interest * reserveFactorBps * treasuryShareBps) / 100_000_000n;
+  };
+
   // Calculate time periods
   const secondsPerDay = 86400n;
   const secondsPerWeek = 604800n;
@@ -1396,13 +1419,13 @@ export const getLendingInterestAccrued = async (
   const startOfYearTimestamp = Math.floor(new Date(new Date().getFullYear(), 0, 1).getTime() / 1000);
   const secondsElapsedYTD = BigInt(now - startOfYearTimestamp);
 
-  // Calculate interest for each period
-  const dailyInterestUSD = calculateCompoundInterest(secondsPerDay);
-  const weeklyInterestUSD = calculateCompoundInterest(secondsPerWeek);
-  const monthlyInterestUSD = calculateCompoundInterest(secondsPerMonth);
+  // Calculate interest for each period, then convert to revenue
+  const dailyInterest = calculateCompoundInterest(secondsPerDay);
+  const weeklyInterest = calculateCompoundInterest(secondsPerWeek);
+  const monthlyInterest = calculateCompoundInterest(secondsPerMonth);
   
   // YTD: Work backwards to find borrowIndex at start of year
-  const ytdInterestUSD = totalScaledDebt > 0n && secondsElapsedYTD > 0n
+  const ytdInterest = totalScaledDebt > 0n && secondsElapsedYTD > 0n
     ? (() => {
         const rpowResult = rpow(perSecondFactorRAY, secondsElapsedYTD, RAY);
         const borrowIndexAtStartOfYear = (borrowIndex * RAY) / rpowResult;
@@ -1411,29 +1434,36 @@ export const getLendingInterestAccrued = async (
     : 0n;
 
   // All-time interest (actual accrued)
-  const allTimeInterestUSD = totalScaledDebt > 0n 
+  const allTimeInterest = totalScaledDebt > 0n 
     ? (totalScaledDebt * (borrowIndex - RAY)) / RAY
     : 0n;
+
+  // Convert interest to revenue
+  const dailyRevenueUSD = interestToRevenue(dailyInterest);
+  const weeklyRevenueUSD = interestToRevenue(weeklyInterest);
+  const monthlyRevenueUSD = interestToRevenue(monthlyInterest);
+  const ytdRevenueUSD = interestToRevenue(ytdInterest);
+  const allTimeRevenueUSD = interestToRevenue(allTimeInterest);
 
   // Format values as strings
   const formatValue = (val: bigint) => val.toString();
 
   return {
-    totalDailyInterestUSD: formatValue(dailyInterestUSD),
-    totalWeeklyInterestUSD: formatValue(weeklyInterestUSD),
-    totalMonthlyInterestUSD: formatValue(monthlyInterestUSD),
-    totalYtdInterestUSD: formatValue(ytdInterestUSD),
-    totalAllTimeInterestUSD: formatValue(allTimeInterestUSD),
+    totalDailyRevenueUSD: formatValue(dailyRevenueUSD),
+    totalWeeklyRevenueUSD: formatValue(weeklyRevenueUSD),
+    totalMonthlyRevenueUSD: formatValue(monthlyRevenueUSD),
+    totalYtdRevenueUSD: formatValue(ytdRevenueUSD),
+    totalAllTimeRevenueUSD: formatValue(allTimeRevenueUSD),
     borrowableAsset: {
       asset: borrowableAsset,
       symbol,
       totalDebtUSD: formatValue(actualDebtUSD),
       annualRatePercent,
-      dailyInterestUSD: formatValue(dailyInterestUSD),
-      weeklyInterestUSD: formatValue(weeklyInterestUSD),
-      monthlyInterestUSD: formatValue(monthlyInterestUSD),
-      ytdInterestUSD: formatValue(ytdInterestUSD),
-      allTimeInterestUSD: formatValue(allTimeInterestUSD)
+      dailyRevenueUSD: formatValue(dailyRevenueUSD),
+      weeklyRevenueUSD: formatValue(weeklyRevenueUSD),
+      monthlyRevenueUSD: formatValue(monthlyRevenueUSD),
+      ytdRevenueUSD: formatValue(ytdRevenueUSD),
+      allTimeRevenueUSD: formatValue(allTimeRevenueUSD)
     }
   };
 };

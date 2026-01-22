@@ -10,9 +10,10 @@ import { txMetricsService } from './txMetricsService';
 async function callListAndWait(callListArgs: CallListArg[]): Promise<TransactionResult> {
     const accessToken = await oauthClient().getAccessToken();
     const submitTime = Date.now();
-    
+
+    const submitEndpoint = `${process.env.STRATO_NODE_URL}/bloc/v2.2/transaction/parallel?resolve=true`;
     const response = await apiPost(
-        `${process.env.STRATO_NODE_URL}/bloc/v2.2/transaction/parallel`,
+        submitEndpoint,
         {
             txs: callListArgs.map(callArg => ({
                 type: "FUNCTION",
@@ -32,11 +33,38 @@ async function callListAndWait(callListArgs: CallListArg[]): Promise<Transaction
             },
             timeout: TIMEOUTS.SUBMIT
         },
-        { logPrefix: 'OraclePusher' }
+        {
+            logPrefix: 'OraclePusher',
+            apiUrl: submitEndpoint,
+            method: 'POST'
+        }
     );
 
     const txHash = extractTransactionHash(response.data);
-    const result = await waitForTransaction(txHash);
+
+    // Evaluate immediate status from resolve=true; fallback to polling on Pending or undefined
+    const getImmediateResult = (data: unknown): TransactionResult | undefined => {
+        const first: any = Array.isArray(data) ? (data as any[])[0] : data;
+        const status: string | undefined = first?.status;
+
+        switch (status) {
+            case 'Success':
+                return { status: 'Success', hash: txHash, timestamp: Date.now().toString() };
+            case 'Failed':
+            case 'Failure': {
+                const errorMessage = first?.txResult?.message ?? first?.error ?? 'Unknown error';
+                throw new Error(`Transaction failed: ${errorMessage}`);
+            }
+            case 'Pending':
+            case undefined:
+            default:
+                // Pending, undefined, or any unknown status: fall back to polling
+                return undefined;
+        }
+    };
+
+    const immediate = getImmediateResult(response.data);
+    const result = immediate ?? await waitForTransaction(txHash);
     
     // Record metrics (errors are handled inside txMetricsService)
     await txMetricsService.recordTxMetric({
@@ -82,13 +110,14 @@ export async function pushAssetPrices(assets: string[], prices: number[]): Promi
 
 async function waitForTransaction(txHash: string): Promise<TransactionResult> {
     const startTime = Date.now();
-    
+
+    const statusEndpoint = `${process.env.STRATO_NODE_URL}/bloc/v2.2/transactions/results`;
     while (Date.now() - startTime < TIMEOUTS.WAIT) {
         try {
             const accessToken = await oauthClient().getAccessToken();
-            
+
             const response = await apiPost(
-                `${process.env.STRATO_NODE_URL}/bloc/v2.2/transactions/results`,
+                statusEndpoint,
                 [txHash],
                 {
                     headers: {
@@ -97,7 +126,11 @@ async function waitForTransaction(txHash: string): Promise<TransactionResult> {
                     },
                     timeout: TIMEOUTS.STATUS
                 },
-                { logPrefix: 'OraclePusher' }
+                {
+                    logPrefix: 'OraclePusher',
+                    apiUrl: statusEndpoint,
+                    method: 'POST'
+                }
             );
 
             const txData = response.data[0];

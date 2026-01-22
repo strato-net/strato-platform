@@ -120,14 +120,11 @@ const CollateralModal = ({
         // If user selected at least the max, invoke on-chain max-withdraw to avoid drift issues
         if (amtWei >= maxDisplayAmount && maxDisplayAmount > 0n) {
           onAction('ALL');
-          setAmount("");
           return;
         }
       }
     } catch {}
     onAction(amount);
-    setAmount("");
-    setAmountError("");
   };
 
   // Clear input when modal closes

@@ -1,157 +1,145 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTheme } from 'next-themes';
-import { LayoutDashboard, Wallet, ArrowLeft, ArrowRight, Book, ArrowRightLeft, Send, Shield, Activity, BarChart3, Coins ,Droplets, Download} from 'lucide-react';
+import { 
+  LayoutDashboard, 
+  ArrowUpDown, 
+  Send, 
+  Landmark, 
+  ArrowLeftRight, 
+  Gift, 
+  Activity, 
+  Download, 
+  BarChart3, 
+  Droplets, 
+  Shield,
+  UserPlus,
+  ChevronUp,
+  ChevronDown,
+  LucideIcon
+} from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import STRATOLOGO from '@/assets/strato.png';
 import STRATOLOGODARK from '@/assets/strato-dark.png';
-import MERCATAICON from '@/assets/icon.png';
-import MERCATAICONDARK from '@/assets/dark-theme-strato-compressed-logo.png';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+
+interface NavItem {
+  icon: LucideIcon;
+  label: string;
+  path: string;
+  adminOnly?: boolean;
+}
+
+const PRIMARY_NAV_ITEMS: NavItem[] = [
+  { icon: LayoutDashboard, label: 'Portfolio', path: '/dashboard' },
+  { icon: ArrowUpDown, label: 'Deposit', path: '/dashboard/deposits' },
+  { icon: Send, label: 'Transfer', path: '/dashboard/transfer' },
+  { icon: Landmark, label: 'Borrow', path: '/dashboard/borrow' },
+  { icon: ArrowLeftRight, label: 'Swap', path: '/dashboard/swap' },
+  { icon: Gift, label: 'Rewards', path: '/dashboard/rewards' },
+];
+
+const MORE_NAV_ITEMS: NavItem[] = [
+  { icon: Activity, label: 'Activity Feed', path: '/dashboard/activity' },
+  { icon: Download, label: 'Withdrawals', path: '/dashboard/withdrawals' },
+  { icon: BarChart3, label: 'STRATO Stats', path: '/dashboard/stats' },
+  { icon: Droplets, label: 'Advanced', path: '/dashboard/advanced' },
+  { icon: UserPlus, label: 'My Referrals', path: '/dashboard/referrals' },
+  { icon: Shield, label: 'Admin', path: '/dashboard/admin', adminOnly: true },
+];
 
 const DashboardSidebar = () => {
-  const [collapsed, setCollapsed] = useState(false);
-  const { logout, isAdmin } = useUser();
-  const location = useLocation();
+  const { isAdmin } = useUser();
+  const { pathname } = useLocation();
   const { resolvedTheme } = useTheme();
-  const logo = resolvedTheme === 'dark' ? STRATOLOGODARK : STRATOLOGO;
-  const icon = resolvedTheme === 'dark' ? MERCATAICONDARK : MERCATAICON;
+  const [isMoreOpen, setIsMoreOpen] = useState(false);
 
   useEffect(() => {
-    // Update CSS variable when collapsed state changes - only on desktop
-    const updateSidebarWidth = () => {
-      if (window.innerWidth >= 768) { // md breakpoint
-        document.documentElement.style.setProperty(
-          '--sidebar-width',
-          collapsed ? '4rem' : '16rem'
-        );
-      } else {
-        document.documentElement.style.setProperty('--sidebar-width', '0rem');
-      }
+    const updateWidth = () => {
+      document.documentElement.style.setProperty(
+        '--sidebar-width',
+        window.innerWidth >= 768 ? '250px' : '0px'
+      );
     };
+    updateWidth();
+    window.addEventListener('resize', updateWidth);
+    return () => window.removeEventListener('resize', updateWidth);
+  }, []);
 
-    updateSidebarWidth();
-    window.addEventListener('resize', updateSidebarWidth);
-
-    return () => window.removeEventListener('resize', updateSidebarWidth);
-  }, [collapsed]);
-
-  const allNavItems = [
-    { icon: <LayoutDashboard size={20} />, label: 'Overview', path: '/dashboard' },
-    { icon: <Wallet size={20} />, label: 'Deposits', path: '/dashboard/deposits' },
-    { icon: <Send size={20} />, label: 'Transfer', path: '/dashboard/transfer' },
-    { icon: <Book size={20} />, label: 'Borrow', path: '/dashboard/borrow' },
-    { icon: <ArrowRightLeft size={20} />, label: 'Swap', path: '/dashboard/swap' },
-    { icon: <Droplets size={20} />, label: 'Advanced', path: '/dashboard/advanced' },
-    { icon: <Coins size={20} />, label: 'Rewards', path: '/dashboard/rewards' },
-    { icon: <BarChart3 size={20} />, label: 'Mercata Stats', path: '/dashboard/stats' },
-    { icon: <Download size={20} />, label: 'Withdrawals', path: '/dashboard/withdrawals' },
-    { icon: <Activity size={20} />, label: 'Activity Feed', path: '/dashboard/activity' },
-    { icon: <Shield size={20} />, label: 'Admin', path: '/dashboard/admin' },
-  ];
-
-  const navItems = allNavItems.filter(item => item.label !== 'Admin' || isAdmin);
-
-  const isActive = (itemPath: string) => {
-    if (itemPath === '/dashboard') {
-      return location.pathname === '/dashboard';
+  // Auto-expand "More" if any of its items is active
+  useEffect(() => {
+    const isMoreItemActive = MORE_NAV_ITEMS
+      .filter(item => !item.adminOnly || isAdmin)
+      .some(item => 
+        item.path === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(item.path)
+      );
+    if (isMoreItemActive) {
+      setIsMoreOpen(true);
     }
-    return location.pathname.startsWith(itemPath);
+  }, [pathname, isAdmin]);
+
+  const isActive = (path: string) => 
+    path === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(path);
+
+  const renderNavItem = ({ icon: Icon, label, path }: NavItem) => {
+    const active = isActive(path);
+    return (
+      <li key={path}>
+        <Link
+          to={path}
+          className={`relative flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${
+            active
+              ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium'
+              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/50'
+          }`}
+        >
+          {/* Left border accent for active state */}
+          {active && (
+            <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-blue-500 rounded-r-full" />
+          )}
+          <Icon size={20} />
+          <span className="text-sm">{label}</span>
+        </Link>
+      </li>
+    );
   };
 
-  const baseLinkClasses = "flex items-center px-4 py-2.5 rounded-md mx-2 transition-colors duration-200";
-  const activeLinkClasses = "bg-muted text-primary font-semibold border-l-4 border-primary";
-  const inactiveLinkClasses = "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground";
-
-  const NavIcon = ({ icon, active }: { icon: React.ReactNode; active: boolean }) => (
-    <span className={`flex-shrink-0 ${active ? 'text-primary' : ''}`}>
-      {icon}
-    </span>
-  );
-
   return (
-    <div
-      className={`h-screen flex-col bg-sidebar-background text-sidebar-foreground fixed left-0 top-0 z-40 transition-all duration-300 border-r border-sidebar-border hidden md:flex ${
-        collapsed ? 'w-16' : 'w-64'
-        }`}
-    >
-      <div className="border-b border-sidebar-border">
-        {!collapsed && (
-          <div className="p-4 flex items-center justify-between">
-            <img
-              src={logo}
-              alt="STRATO"
-              className="h-12"
-            />
-            <button
-              onClick={() => setCollapsed(!collapsed)}
-              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-              className="rounded-md p-1 hover:bg-sidebar-accent text-sidebar-foreground"
-            >
-              <ArrowLeft size={16} />
-            </button>
-          </div>
-        )}
-        {collapsed && (
-          <div className="p-4 flex flex-col items-center space-y-2">
-            <button
-              onClick={() => setCollapsed(!collapsed)}
-              className="rounded-md p-1 hover:bg-sidebar-accent text-sidebar-foreground"
-            >
-              <ArrowRight size={16} />
-            </button>
-            <img
-              src={icon}
-              alt="STRATO"
-              className="h-8"
-            />
-          </div>
-        )}
+    <aside className="hidden md:flex flex-col fixed left-0 top-0 h-screen w-[250px] bg-sidebar-background border-r border-sidebar-border z-40">
+      {/* Logo */}
+      <div className="p-5 border-b border-sidebar-border">
+        <img src={resolvedTheme === 'dark' ? STRATOLOGODARK : STRATOLOGO} alt="STRATO" className="h-10" />
       </div>
 
-      <div className="flex flex-col flex-1 overflow-y-auto py-4">
-        <nav className="flex-1" role="navigation" aria-label="Sidebar">
-          <ul className="space-y-1">
-            {navItems.map((item, index) => {
-              const active = isActive(item.path);
-              return (
-                <li key={index}>
-                  {collapsed ? (
-                    <TooltipProvider delayDuration={300}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Link
-                            to={item.path}
-                            className={`${baseLinkClasses} ${active ? activeLinkClasses : inactiveLinkClasses}`}
-                          >
-                            <NavIcon icon={item.icon} active={active} />
-                          </Link>
-                        </TooltipTrigger>
-                        <TooltipContent side="right" className="bg-muted text-sm rounded-md">
-                          {item.label}
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  ) : (
-                    <Link
-                      to={item.path}
-                      className={`${baseLinkClasses} ${active ? activeLinkClasses : inactiveLinkClasses}`}
-                    >
-                      <NavIcon icon={item.icon} active={active} />
-                      <span className={`ml-3 ${active ? 'font-semibold' : ''}`}>{item.label}</span>
-                    </Link>
-                  )}
-                </li>
-              )})}
-          </ul>
-        </nav>
-      </div>
-    </div>
+      <nav className="flex-1 py-4 px-3 overflow-y-auto">
+        {/* Primary Navigation */}
+        <ul className="space-y-1">
+          {PRIMARY_NAV_ITEMS.map(renderNavItem)}
+        </ul>
+
+        {/* More Section */}
+        <div className="mt-4">
+          <button
+            onClick={() => setIsMoreOpen(!isMoreOpen)}
+            className="flex items-center justify-between w-full px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-lg transition-colors"
+          >
+            <span>More</span>
+            {isMoreOpen ? (
+              <ChevronUp size={18} className="text-gray-400" />
+            ) : (
+              <ChevronDown size={18} className="text-gray-400" />
+            )}
+          </button>
+          
+          {isMoreOpen && (
+            <ul className="mt-1 space-y-1">
+              {MORE_NAV_ITEMS
+                .filter(item => !item.adminOnly || isAdmin)
+                .map(renderNavItem)}
+            </ul>
+          )}
+        </div>
+      </nav>
+    </aside>
   );
 };
 

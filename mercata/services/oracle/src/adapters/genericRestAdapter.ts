@@ -39,15 +39,19 @@ export async function fetchBatchPrices(assets: Asset[], sourceConfig: SourceConf
     const apiKey = getApiKey(sourceConfig);
     const url = buildBatchUrl(sourceConfig, assets, apiKey);
     const requestOptions = buildBatchRequestOptions(sourceConfig, url, apiKey, assets);
-    
-    const response = await apiRequest(requestOptions, { logPrefix: 'GenericRestAdapter' });
-    
+
+    const response = await apiRequest(requestOptions, {
+        logPrefix: 'GenericRestAdapter',
+        apiUrl: url,
+        method: requestOptions.method || 'GET'
+    });
+
     // Check for API error responses that don't throw HTTP errors
     if (response.data && response.data.success === false) {
         const errorMessage = response.data.error?.message || response.data.error || 'API returned error response';
         throw new Error(`${sourceConfig.url}: ${errorMessage}`);
     }
-    
+
     return parseBatchResponse(response.data, sourceConfig, assets);
 }
 
@@ -65,32 +69,29 @@ function buildBatchUrl(sourceConfig: SourceConfig, assets: Asset[], apiKey: stri
         const queryParams = new URLSearchParams();
         
         params.forEach(param => {
-            if (param === 'api_key' && apiKey) {
-                queryParams.append('api_key', apiKey);
-            } else if (param === 'access_key' && apiKey) {
-                queryParams.append('access_key', apiKey);
-            } else if (param === 'symbol') {
+            // API key params
+            if ((param === 'api_key' || param === 'access_key' || param === 'x_cg_pro_api_key') && apiKey) {
+                queryParams.append(param, apiKey);
+            // Dynamic asset-based params
+            } else if (param === 'ids') {
+                const ids = assets.map(asset => {
+                    const symbol = asset.name.split('-')[0];
+                    return sourceConfig.symbolMapping?.[symbol] || symbol.toLowerCase();
+                }).join(',');
+                queryParams.append('ids', ids);
+            } else if (param === 'symbol' || param === 'symbols') {
                 const symbols = assets.map(asset => asset.name.split('-')[0]).join(',');
-                queryParams.append('symbol', symbols);
-            } else if (param === 'symbols') {
-                const symbols = assets.map(asset => asset.name.split('-')[0]).join(',');
-                queryParams.append('symbols', symbols);
+                queryParams.append(param, symbols);
             } else if (param === 'metals') {
                 const metals = assets.map(asset => {
                     const symbol = asset.name.split('-')[0];
                     return sourceConfig.symbolMapping?.[symbol] || symbol;
                 }).join(',');
                 queryParams.append('metals', metals);
-            } else if (param.startsWith('currency=')) {
-                queryParams.append('currency', param.split('=')[1]);
-            } else if (param.startsWith('convert=')) {
-                queryParams.append('convert', param.split('=')[1]);
-            } else if (param.startsWith('base=')) {
-                queryParams.append('base', param.split('=')[1]);
-            } else if (param.startsWith('currencies=')) {
-                queryParams.append('currencies', param.split('=')[1]);
-            } else if (param.startsWith('unit=')) {
-                queryParams.append('unit', param.split('=')[1]);
+            // Static key=value params
+            } else if (param.includes('=')) {
+                const [key, value] = param.split('=');
+                queryParams.append(key, value);
             }
         });
         
@@ -163,9 +164,11 @@ function parseBatchResponse(
             const asset = assets[index];
             if (item.prices && item.prices.length > 0) {
                 const priceUSD = parseFloat(item.prices[0].value);
-                const price = Math.floor(priceUSD * 1e18);
-                const feedTimestamp = item.prices[0].lastUpdatedAt || new Date().toISOString();
-                result[asset.name] = { price, feedTimestamp };
+                if (priceUSD > 0) {
+                    const price = Math.floor(priceUSD * 1e18);
+                    const feedTimestamp = item.prices[0].lastUpdatedAt || new Date().toISOString();
+                    result[asset.name] = { price, feedTimestamp };
+                }
             }
         });
         
@@ -176,9 +179,30 @@ function parseBatchResponse(
             const symbolData = data.data[symbol];
             if (symbolData && symbolData[0] && symbolData[0].quote && symbolData[0].quote.USD) {
                 const priceUSD = parseFloat(symbolData[0].quote.USD.price);
-                const price = Math.floor(priceUSD * 1e18);
-                const feedTimestamp = symbolData[0].quote.USD.last_updated || new Date().toISOString();
-                result[asset.name] = { price, feedTimestamp };
+                if (priceUSD > 0) {
+                    const price = Math.floor(priceUSD * 1e18);
+                    const feedTimestamp = symbolData[0].quote.USD.last_updated || new Date().toISOString();
+                    result[asset.name] = { price, feedTimestamp };
+                }
+            }
+        });
+        
+    // Handle CoinGecko response structures
+    } else if (parsePattern === '{id}.usd') {
+        assets.forEach(asset => {
+            const symbol = asset.name.split('-')[0];
+            const id = sourceConfig.symbolMapping?.[symbol] || symbol.toLowerCase();
+            const priceData = data[id];
+            
+            if (priceData && priceData.usd) {
+                const priceUSD = parseFloat(priceData.usd);
+                if (priceUSD > 0) {
+                    const price = Math.floor(priceUSD * 1e18);
+                    const feedTimestamp = priceData.last_updated_at 
+                        ? new Date(priceData.last_updated_at * 1000).toISOString()
+                        : new Date().toISOString();
+                    result[asset.name] = { price, feedTimestamp };
+                }
             }
         });
         
@@ -202,7 +226,7 @@ function parseBatchResponse(
                 feedTimestamp = data.timestamp ? new Date(data.timestamp * 1000).toISOString() : new Date().toISOString();
             }
             
-            if (!isNaN(priceUSD)) {
+            if (!isNaN(priceUSD) && priceUSD > 0) {
                 const price = Math.floor(priceUSD * 1e18);
                 result[asset.name] = { price, feedTimestamp };
             }
@@ -216,12 +240,15 @@ function parseBatchResponse(
                 const assetParsePath = parsePattern.replace(/\{symbol\}/g, symbol);
                 const priceUSD = extractNestedProperty(data, assetParsePath);
                 
-                if (priceUSD && !isNaN(parseFloat(priceUSD))) {
-                    const price = Math.floor(parseFloat(priceUSD) * 1e18);
-                    const feedTimestamp = timestampPattern 
-                        ? extractNestedProperty(data, timestampPattern) || new Date().toISOString()
-                        : new Date().toISOString();
-                    result[asset.name] = { price, feedTimestamp };
+                if (priceUSD) {
+                    const parsedPrice = parseFloat(priceUSD);
+                    if (!isNaN(parsedPrice) && parsedPrice > 0) {
+                        const price = Math.floor(parsedPrice * 1e18);
+                        const feedTimestamp = timestampPattern 
+                            ? extractNestedProperty(data, timestampPattern) || new Date().toISOString()
+                            : new Date().toISOString();
+                        result[asset.name] = { price, feedTimestamp };
+                    }
                 }
             } catch (error) {
                 logError('GenericRestAdapter', new Error(`Failed to parse price for ${asset.name}: ${error}`));

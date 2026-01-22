@@ -1,13 +1,20 @@
 {
   "0000000000000000000000000000000000001004": {
     "Deposited": {
-      "amount": "mTokenMinted"
+      "amount": "mTokenMinted",
+      "user": "user"
     },
     "Withdrawn": {
       "amount": "mTokenBurned"
     },
     "Borrowed": {
       "amount": "amount"
+    }
+  },
+  "0000000000000000000000000000000000001008": {
+    "DepositCompleted": {
+      "amount": "stratoTokenAmount",
+      "user": "stratoRecipient"
     }
   },
   "0000000000000000000000000000000000001011": {

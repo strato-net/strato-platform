@@ -12,7 +12,8 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     // Only redirect if not loading and not authenticated
     if (!loading && !isLoggedIn) {
       // Redirect to login page if not authenticated
-      window.location.href = '/login';
+      const theme = localStorage.getItem('theme') || 'light';
+      window.location.href = `/login?theme=${theme}`;
     }
   }, [isLoggedIn, loading]);
 

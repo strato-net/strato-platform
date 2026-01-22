@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
-import MobileSidebar from '../components/dashboard/MobileSidebar';
+import MobileBottomNav from '../components/dashboard/MobileBottomNav';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -95,21 +95,21 @@ interface InterestAccruedResponse {
 }
 
 interface LendingInterestAccruedResponse {
-  totalDailyInterestUSD: string;
-  totalWeeklyInterestUSD: string;
-  totalMonthlyInterestUSD: string;
-  totalYtdInterestUSD: string;
-  totalAllTimeInterestUSD: string;
+  totalDailyRevenueUSD: string;
+  totalWeeklyRevenueUSD: string;
+  totalMonthlyRevenueUSD: string;
+  totalYtdRevenueUSD: string;
+  totalAllTimeRevenueUSD: string;
   borrowableAsset: {
     asset: string;
     symbol: string;
     totalDebtUSD: string;
     annualRatePercent: number;
-    dailyInterestUSD: string;
-    weeklyInterestUSD: string;
-    monthlyInterestUSD: string;
-    ytdInterestUSD: string;
-    allTimeInterestUSD: string;
+    dailyRevenueUSD: string;
+    weeklyRevenueUSD: string;
+    monthlyRevenueUSD: string;
+    ytdRevenueUSD: string;
+    allTimeRevenueUSD: string;
   };
 }
 
@@ -121,13 +121,12 @@ const createEmptyRevenuePeriod = (): RevenuePeriod => ({
   allTime: { total: '0', byAsset: [] }
 });
 
-const MercataStats = () => {
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+const StratoStats = () => {
   const [tokens, setTokens] = useState<TokenWithStats[]>([]);
   const [totalMarketCap, setTotalMarketCap] = useState<string>('0');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // CDP Stats state
   const [cdpAssets, setCdpAssets] = useState<CDPAssetStats[]>([]);
   const [totalCollateralValueUSD, setTotalCollateralValueUSD] = useState<string>('0');
@@ -139,18 +138,18 @@ const MercataStats = () => {
   // Protocol Revenue state
   const [cdpTotalRevenue, setCdpTotalRevenue] = useState<string>('0');
   const [cdpRevenueByPeriod, setCdpRevenueByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
-  
+
   const [swapTotalRevenue, setSwapTotalRevenue] = useState<string>('0');
   const [swapRevenueByPeriod, setSwapRevenueByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
-  
+
   const [lendingTotalRevenue, setLendingTotalRevenue] = useState<string>('0');
   const [lendingRevenueByPeriod, setLendingRevenueByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
-  
+
   const [gasTotalRevenue, setGasTotalRevenue] = useState<string>('0');
   const [gasRevenueByPeriod, setGasRevenueByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
-  
+
   const [aggregatedRevenueByPeriod, setAggregatedRevenueByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
-  
+
   const [selectedPeriod, setSelectedPeriod] = useState<keyof RevenuePeriod>('allTime');
   const [revenueLoading, setRevenueLoading] = useState(true);
   const [revenueError, setRevenueError] = useState<string | null>(null);
@@ -175,7 +174,7 @@ const MercataStats = () => {
     try {
       setLoading(true);
       const response = await api.get<TokenStatsResponse>('/tokens/stats');
-      
+
       // Tokens are already sorted by market cap in backend
       setTokens(response.data.tokens);
       setTotalMarketCap(response.data.totalMarketCap);
@@ -191,7 +190,7 @@ const MercataStats = () => {
     try {
       setCdpLoading(true);
       const response = await api.get<CDPStatsResponse>('/cdp/stats');
-      
+
       setCdpAssets(response.data.assets);
       setTotalCollateralValueUSD(response.data.totalCollateralValueUSD);
       setTotalDebtUSD(response.data.totalDebtUSD);
@@ -207,22 +206,22 @@ const MercataStats = () => {
   const fetchProtocolRevenue = async () => {
     try {
       setRevenueLoading(true);
-      
+
       // Fetch aggregated protocol revenue from the new centralized endpoint
       const response = await api.get<AggregatedRevenueResponse>('/protocol-fees/revenue');
-      
+
       // Extract data for each protocol from the aggregated response
       setAggregatedRevenueByPeriod(response.data.aggregated);
-      
+
       setCdpTotalRevenue(response.data.byProtocol.cdp.totalRevenue);
       setCdpRevenueByPeriod(response.data.byProtocol.cdp.revenueByPeriod);
-      
+
       setSwapTotalRevenue(response.data.byProtocol.swap.totalRevenue);
       setSwapRevenueByPeriod(response.data.byProtocol.swap.revenueByPeriod);
-      
+
       setLendingTotalRevenue(response.data.byProtocol.lending.totalRevenue);
       setLendingRevenueByPeriod(response.data.byProtocol.lending.revenueByPeriod);
-      
+
       setGasTotalRevenue(response.data.byProtocol.gas.totalRevenue);
       setGasRevenueByPeriod(response.data.byProtocol.gas.revenueByPeriod);
     } catch (err) {
@@ -275,19 +274,19 @@ const MercataStats = () => {
     }
   };
 
-  const getLendingEstimatedInterestForPeriod = (period: keyof RevenuePeriod): string => {
+  const getLendingEstimatedRevenueForPeriod = (period: keyof RevenuePeriod): string => {
     if (!lendingInterestAccrued) return '0';
     switch (period) {
       case 'daily':
-        return lendingInterestAccrued.totalDailyInterestUSD;
+        return lendingInterestAccrued.totalDailyRevenueUSD;
       case 'weekly':
-        return lendingInterestAccrued.totalWeeklyInterestUSD;
+        return lendingInterestAccrued.totalWeeklyRevenueUSD;
       case 'monthly':
-        return lendingInterestAccrued.totalMonthlyInterestUSD;
+        return lendingInterestAccrued.totalMonthlyRevenueUSD;
       case 'ytd':
-        return lendingInterestAccrued.totalYtdInterestUSD;
+        return lendingInterestAccrued.totalYtdRevenueUSD;
       case 'allTime':
-        return lendingInterestAccrued.totalAllTimeInterestUSD;
+        return lendingInterestAccrued.totalAllTimeRevenueUSD;
       default:
         return '0';
     }
@@ -318,31 +317,27 @@ const MercataStats = () => {
     }
     return `${cr.toFixed(2)}%`;
   };
-  
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-16 md:pb-0">
       <DashboardSidebar />
-      <MobileSidebar 
-        isOpen={isMobileSidebarOpen} 
-        onClose={() => setIsMobileSidebarOpen(false)} 
-      />
-      <div className="transition-all duration-300 md:pl-64" style={{ paddingLeft: 'var(--sidebar-width, 0rem)' }}>
-        <DashboardHeader title="Mercata Stats" onMenuClick={() => setIsMobileSidebarOpen(true)} />
-        
-        <main className="p-6">
+
+      <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
+        <DashboardHeader title="STRATO Stats" />
+        <main className="p-4 md:p-6">
           <div className="max-w-7xl mx-auto">
             <Tabs defaultValue="tokens" className="w-full">
-                <TabsList className="grid w-full grid-cols-3 mb-6">
-                  <TabsTrigger value="tokens">
-                    Token Stats
-                  </TabsTrigger>
-                  <TabsTrigger value="cdp">
-                    CDP Stats
-                  </TabsTrigger>
-                  <TabsTrigger value="revenue">
-                    Protocol Revenue
-                  </TabsTrigger>
-                </TabsList>
+              <TabsList className="grid w-full grid-cols-3 mb-6 h-auto">
+                <TabsTrigger value="tokens" className="text-xs md:text-sm py-2 px-1 md:px-3">
+                  Token Stats
+                </TabsTrigger>
+                <TabsTrigger value="cdp" className="text-xs md:text-sm py-2 px-1 md:px-3">
+                  CDP Stats
+                </TabsTrigger>
+                <TabsTrigger value="revenue" className="text-xs md:text-sm py-2 px-1 md:px-3 whitespace-nowrap">
+                  Protocol Revenue
+                </TabsTrigger>
+              </TabsList>
 
               <TabsContent value="tokens">
                 {/* Summary Cards */}
@@ -478,30 +473,30 @@ const MercataStats = () => {
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead>Asset</TableHead>
-                              <TableHead className="text-right">Number of Vaults</TableHead>
-                              <TableHead className="text-right">Total Collateral Value</TableHead>
-                              <TableHead className="text-right">Total Debt (USDST)</TableHead>
-                              <TableHead className="text-right">CR</TableHead>
+                              <TableHead className="text-xs md:text-sm pl-2 md:pl-4">Asset</TableHead>
+                              <TableHead className="text-center text-xs md:text-sm px-1 md:px-4">Number of Vaults</TableHead>
+                              <TableHead className="text-center text-xs md:text-sm px-1 md:px-4">Total Collateral Value</TableHead>
+                              <TableHead className="text-center text-xs md:text-sm px-1 md:px-4">Total Debt (USDST)</TableHead>
+                              <TableHead className="text-right text-xs md:text-sm pr-2 md:pr-4">CR</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {cdpAssets.map((asset) => (
                               <TableRow key={asset.asset}>
-                                <TableCell>
+                                <TableCell className="text-xs md:text-sm pl-2 md:pl-4">
                                   <div>
                                     <div>{asset.symbol}</div>
-                                    <div className="text-sm text-muted-foreground">{asset.asset.slice(0, 6)}...{asset.asset.slice(-4)}</div>
+                                    <div className="text-xs text-muted-foreground">{asset.asset.slice(0, 6)}...{asset.asset.slice(-4)}</div>
                                   </div>
                                 </TableCell>
-                                <TableCell className="text-right">{asset.numberOfVaults}</TableCell>
-                                <TableCell className="text-right font-semibold">
+                                <TableCell className="text-center text-xs md:text-sm px-1 md:px-4">{asset.numberOfVaults}</TableCell>
+                                <TableCell className="text-center text-xs md:text-sm px-1 md:px-4 font-semibold">
                                   ${formatLargeNumber(parseFloat(formatUnits(BigInt(asset.collateralValueUSD || '0'), 18)))}
                                 </TableCell>
-                                <TableCell className="text-right font-semibold">
+                                <TableCell className="text-center text-xs md:text-sm px-1 md:px-4 font-semibold">
                                   ${formatLargeNumber(parseFloat(formatUnits(BigInt(asset.totalDebtUSD || '0'), 18)))}
                                 </TableCell>
-                                <TableCell className="text-right">
+                                <TableCell className="text-right text-xs md:text-sm pr-2 md:pr-4">
                                   {formatCR(asset.collateralizationRatio)}
                                 </TableCell>
                               </TableRow>
@@ -517,57 +512,52 @@ const MercataStats = () => {
               <TabsContent value="revenue">
                 {/* Time Period Selector */}
                 <div className="flex flex-wrap gap-2 mb-6">
-                    <button
-                      onClick={() => setSelectedPeriod('daily')}
-                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                        selectedPeriod === 'daily' 
-                          ? 'bg-blue-600 text-white dark:bg-blue-700' 
-                          : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                  <button
+                    onClick={() => setSelectedPeriod('daily')}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedPeriod === 'daily'
+                      ? 'bg-blue-600 text-white dark:bg-blue-700'
+                      : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
                       }`}
-                    >
-                      Daily
-                    </button>
-                    <button
-                      onClick={() => setSelectedPeriod('weekly')}
-                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                        selectedPeriod === 'weekly' 
-                          ? 'bg-blue-600 text-white dark:bg-blue-700' 
-                          : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                  >
+                    Daily
+                  </button>
+                  <button
+                    onClick={() => setSelectedPeriod('weekly')}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedPeriod === 'weekly'
+                      ? 'bg-blue-600 text-white dark:bg-blue-700'
+                      : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
                       }`}
-                    >
-                      Weekly
-                    </button>
-                    <button
-                      onClick={() => setSelectedPeriod('monthly')}
-                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                        selectedPeriod === 'monthly' 
-                          ? 'bg-blue-600 text-white dark:bg-blue-700' 
-                          : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                  >
+                    Weekly
+                  </button>
+                  <button
+                    onClick={() => setSelectedPeriod('monthly')}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedPeriod === 'monthly'
+                      ? 'bg-blue-600 text-white dark:bg-blue-700'
+                      : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
                       }`}
-                    >
-                      Monthly
-                    </button>
-                    <button
-                      onClick={() => setSelectedPeriod('ytd')}
-                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                        selectedPeriod === 'ytd' 
-                          ? 'bg-blue-600 text-white dark:bg-blue-700' 
-                          : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                  >
+                    Monthly
+                  </button>
+                  <button
+                    onClick={() => setSelectedPeriod('ytd')}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedPeriod === 'ytd'
+                      ? 'bg-blue-600 text-white dark:bg-blue-700'
+                      : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
                       }`}
-                    >
-                      YTD
-                    </button>
-                    <button
-                      onClick={() => setSelectedPeriod('allTime')}
-                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                        selectedPeriod === 'allTime' 
-                          ? 'bg-blue-600 text-white dark:bg-blue-700' 
-                          : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                  >
+                    YTD
+                  </button>
+                  <button
+                    onClick={() => setSelectedPeriod('allTime')}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedPeriod === 'allTime'
+                      ? 'bg-blue-600 text-white dark:bg-blue-700'
+                      : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
                       }`}
-                    >
-                      All Time
-                    </button>
-                  </div>
+                  >
+                    All Time
+                  </button>
+                </div>
 
                 {/* Revenue Summary Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-6">
@@ -595,14 +585,14 @@ const MercataStats = () => {
                           )}
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          {selectedPeriod === 'allTime' 
-                            ? 'Actual accrued interest' 
+                          {selectedPeriod === 'allTime'
+                            ? 'Actual accrued interest'
                             : `Est. ${selectedPeriod} accrued interest`}
                         </p>
                       </div>
                     </CardContent>
                   </Card>
-                  
+
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium">Lending Revenue</CardTitle>
@@ -623,18 +613,18 @@ const MercataStats = () => {
                           {lendingInterestLoading ? (
                             <Skeleton className="h-6 w-20" />
                           ) : (
-                            `$${formatLargeNumber(parseFloat(formatUnits(BigInt(getLendingEstimatedInterestForPeriod(selectedPeriod) || '0'), 18)))}`
+                            `$${formatLargeNumber(parseFloat(formatUnits(BigInt(getLendingEstimatedRevenueForPeriod(selectedPeriod) || '0'), 18)))}`
                           )}
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          {selectedPeriod === 'allTime' 
-                            ? 'Actual accrued interest' 
+                          {selectedPeriod === 'allTime'
+                            ? 'Actual accrued interest'
                             : `Est. ${selectedPeriod} accrued interest`}
                         </p>
                       </div>
                     </CardContent>
                   </Card>
-                  
+
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium">Swap Pool Revenue</CardTitle>
@@ -670,7 +660,7 @@ const MercataStats = () => {
                       </p>
                     </CardContent>
                   </Card>
-                  
+
                   <Card className="border-2 border-green-500 dark:border-green-700">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium">Combined Revenue</CardTitle>
@@ -696,9 +686,9 @@ const MercataStats = () => {
 
                 {/* Revenue by Asset Table */}
                 <Card>
-                  <CardHeader>
-                    <CardTitle>Combined Revenue by Asset</CardTitle>
-                    <CardDescription>
+                  <CardHeader className="px-4 md:px-6">
+                    <CardTitle className="text-base md:text-xl whitespace-nowrap">Combined Revenue by Asset</CardTitle>
+                    <CardDescription className="text-xs md:text-sm">
                       Total protocol revenue across all sources by asset
                     </CardDescription>
                   </CardHeader>
@@ -749,8 +739,10 @@ const MercataStats = () => {
           </div>
         </main>
       </div>
+
+      <MobileBottomNav />
     </div>
   );
 };
 
-export default MercataStats;
+export default StratoStats;

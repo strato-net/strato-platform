@@ -16,8 +16,6 @@ export interface FeedConfig {
     name: string;
     sources: string[];
     assets: string[]; // Array of asset keys
-    minPrice?: number;
-    maxPrice?: number;
 }
 
 export interface SourceConfig {
@@ -52,6 +50,8 @@ export interface CallListArg {
 export interface RetryConfig {
     maxAttempts: number;
     logPrefix: string;
+    apiUrl?: string;
+    method?: string;
 } 
 
 export interface TxMetric {

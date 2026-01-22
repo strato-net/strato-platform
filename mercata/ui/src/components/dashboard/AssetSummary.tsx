@@ -30,9 +30,9 @@ const AssetSummary = ({
 }: AssetSummaryProps) => {
   return (
     <div 
-      className={`bg-card rounded-xl border-2 p-5 shadow-sm transition-all w-full h-full flex flex-col justify-center ${
-        isActive ? 'border-blue-500 shadow-md' : 'border-border hover:shadow-md'
-      } ${onClick ? 'cursor-pointer' : ''}`}
+      className={`bg-card rounded-xl border-2 p-4 md:p-5 shadow-sm transition-all w-full h-full flex flex-col justify-center ${
+        isActive ? 'border-border md:border-blue-500 md:shadow-md' : 'border-border hover:shadow-md'
+      } ${onClick ? 'md:cursor-pointer' : ''}`}
       onClick={onClick}
     >
       <div className="flex justify-between items-start">
@@ -56,7 +56,7 @@ const AssetSummary = ({
               <span className="text-muted-foreground text-sm">Loading...</span>
             </div>
           ) : (
-            <h3 className="text-2xl font-bold mt-1 whitespace-nowrap">{value}</h3>
+            <h3 className="text-lg md:text-2xl font-bold mt-1">{value}</h3>
           )}
           {additionalContent && (
             <div className="mt-2" onClick={(e) => e.stopPropagation()}>

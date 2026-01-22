@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
-import MobileSidebar from "../components/dashboard/MobileSidebar";
+import MobileBottomNav from "../components/dashboard/MobileBottomNav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs as AntdTabs } from "antd";
 import BridgeOut from "@/components/bridge/BridgeOut";
@@ -12,7 +12,6 @@ import { Loader2, ArrowRight } from "lucide-react";
 import { formatBalance } from "@/utils/numberUtils";
 
 const WithdrawalsPage = () => {
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"from-savings" | "bridge-out">(
     "from-savings"
   );
@@ -24,8 +23,8 @@ const WithdrawalsPage = () => {
 
   useEffect(() => {
     const tabParam = searchParams.get("tab");
-    if (tabParam === "bridge-out") {
-      setActiveTab("bridge-out");
+    if (tabParam && ['from-savings', 'bridge-out'].includes(tabParam)) {
+      setActiveTab(tabParam as "from-savings" | "bridge-out");
     }
   }, [searchParams]);
 
@@ -53,7 +52,7 @@ const WithdrawalsPage = () => {
   }, [fetchWithdrawalSummary]);
 
   return (
-    <div className="h-screen bg-background overflow-hidden">
+    <div className="h-screen bg-background overflow-hidden pb-16 md:pb-0">
       <style>{`
         .custom-tabs .ant-tabs-tab {
           justify-content: center !important;
@@ -75,33 +74,25 @@ const WithdrawalsPage = () => {
 
       <DashboardSidebar />
 
-      <MobileSidebar
-        isOpen={isMobileSidebarOpen}
-        onClose={() => setIsMobileSidebarOpen(false)}
-      />
-
       <div
-        className="h-screen flex flex-col transition-all duration-300 md:pl-64"
-        style={{ paddingLeft: "var(--sidebar-width, 0rem)" }}
+        className="h-screen flex flex-col transition-all duration-300"
+        style={{ paddingLeft: "var(--sidebar-width, 0px)" }}
       >
-        <DashboardHeader
-          title="Withdrawals"
-          onMenuClick={() => setIsMobileSidebarOpen(true)}
-        />
+        <DashboardHeader title="Withdrawals" />
 
-        <main className="flex-1 p-6 overflow-y-auto">
+        <main className="flex-1 p-4 md:p-6 pb-10 md:pb-6 overflow-y-auto">
           <div className="mb-8 flex flex-col lg:flex-row gap-6 items-stretch">
             <div className="w-full lg:w-[50%] flex">
               <Card className="shadow-sm flex-1 flex flex-col">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle>Withdraw Assets</CardTitle>
+                <CardHeader className="pb-2 md:pb-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <CardTitle className="text-base md:text-xl">Withdraw Assets</CardTitle>
                     <Link
-                      to="/bridge-transactions"
+                      to="/bridge-transactions?from=withdrawals"
                       onClick={() => setTargetTransactionTab('WithdrawalInitiated')}
-                      className="flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors"
+                      className="flex items-center gap-1 text-xs md:text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors whitespace-nowrap"
                     >
-                      <ArrowRight size={16} />
+                      <ArrowRight size={14} className="md:w-4 md:h-4" />
                       View Transactions
                     </Link>
                   </div>
@@ -201,7 +192,8 @@ const WithdrawalsPage = () => {
             </div>
           </div>
 
-          <Card className="shadow-sm">
+          {/* Withdrawal History - hidden on mobile to avoid horizontal scroll */}
+          <Card className="shadow-sm hidden md:block">
             <CardHeader>
               <CardTitle>Withdrawal History</CardTitle>
             </CardHeader>
@@ -211,6 +203,8 @@ const WithdrawalsPage = () => {
           </Card>
         </main>
       </div>
+
+      <MobileBottomNav />
     </div>
   );
 };

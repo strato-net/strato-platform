@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
-import MobileSidebar from "../components/dashboard/MobileSidebar";
+import MobileBottomNav from "../components/dashboard/MobileBottomNav";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RewardsOverview } from "@/components/rewards/RewardsOverview";
 import { ActivitiesTable } from "@/components/rewards/ActivitiesTable";
@@ -16,7 +16,6 @@ import { useSearchParams } from "react-router-dom";
 
 const Rewards = () => {
   const [searchParams] = useSearchParams();
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"activities" | "my-rewards" | "leaderboard">(() => {
     const tabParam = searchParams.get("tab");
     if (tabParam === "leaderboard" || tabParam === "activities" || tabParam === "my-rewards") {
@@ -54,6 +53,7 @@ const Rewards = () => {
     refetchState();
     refetchActivities();
     refetchUserRewards();
+    getInactiveTokens(false); // Refresh CATA balance (Total Earned)
     refetchLeaderboard();
   };
 
@@ -69,16 +69,13 @@ const Rewards = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-16 md:pb-0">
       <DashboardSidebar />
-      <MobileSidebar
-        isOpen={isMobileSidebarOpen}
-        onClose={() => setIsMobileSidebarOpen(false)}
-      />
-      <div className="transition-all duration-300 md:pl-64" style={{ paddingLeft: 'var(--sidebar-width, 0rem)' }}>
-        <DashboardHeader title="Rewards" onMenuClick={() => setIsMobileSidebarOpen(true)} />
 
-        <main className="p-6">
+      <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
+        <DashboardHeader title="Rewards" />
+
+        <main className="p-4 md:p-6">
           {/* Global Overview */}
           <div className="mb-6">
             <RewardsOverview state={state} loading={stateLoading} onRefresh={handleRefresh} />
@@ -123,6 +120,8 @@ const Rewards = () => {
           </Tabs>
         </main>
       </div>
+
+      <MobileBottomNav />
     </div>
   );
 };

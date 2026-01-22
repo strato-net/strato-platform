@@ -7,7 +7,7 @@ import { useUser } from "@/context/UserContext";
 import { useTokenContext } from "@/context/TokenContext";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
-import MobileSidebar from "../components/dashboard/MobileSidebar";
+import MobileBottomNav from "../components/dashboard/MobileBottomNav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CollateralData } from "@/interface";
@@ -30,7 +30,6 @@ const Borrow = () => {
     type: "supply" | "withdraw" | null;
   }>({ isOpen: false, type: null });
   const [modalLoading, setModalLoading] = useState(false);
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [repayLoading, setRepayLoading] = useState(false);
   const [eligibleCollateral, setEligibleCollateral] = useState<CollateralData[]>([]);
   const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
@@ -190,6 +189,7 @@ const Borrow = () => {
       ]);
     } catch (error) {
       setBorrowLoading(false);
+      throw error;
     }
   };
 
@@ -226,16 +226,13 @@ const Borrow = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-16 md:pb-0">
       <DashboardSidebar />
-      <MobileSidebar 
-        isOpen={isMobileSidebarOpen} 
-        onClose={() => setIsMobileSidebarOpen(false)} 
-      />
-      <div className="transition-all duration-300 md:pl-64" style={{ paddingLeft: 'var(--sidebar-width, 0rem)' }}>
-        <DashboardHeader title="Borrow" onMenuClick={() => setIsMobileSidebarOpen(true)} />
 
-        <main className="p-6">
+      <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
+        <DashboardHeader title="Borrow" />
+
+        <main className="p-4 md:p-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
             {/* Left Column - Borrow/Repay Tabbed Card */}
             <Card>
@@ -277,18 +274,18 @@ const Borrow = () => {
               </CardContent>
             </Card>
 
-            {/* Right Column - Your Position */}
-            <div>
+            {/* Right Column - Your Position and Collateral Management */}
+            <div className="space-y-6">
               <PositionSection loanData={loans} userCollaterals={collateralInfo} />
+              <CollateralManagementTable
+                collateralInfo={collateralInfo}
+                loadingCollateral={loadingCollateral}
+                loans={loans}
+                onSupply={handleSupply}
+                onWithdraw={handleWithdraw}
+              />
             </div>
           </div>
-          <CollateralManagementTable
-            collateralInfo={collateralInfo}
-            loadingCollateral={loadingCollateral}
-            loans={loans}
-            onSupply={handleSupply}
-            onWithdraw={handleWithdraw}
-          />
         </main>
       </div>
 
@@ -314,6 +311,7 @@ const Borrow = () => {
         />
       )}
 
+      <MobileBottomNav />
     </div>
   );
 };
