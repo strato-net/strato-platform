@@ -18,7 +18,7 @@ import CastVoteModal from './CastVoteModal';
 import AddAdminModal from './AddAdminModal';
 import RemoveAdminModal from './RemoveAdminModal';
 import { parseJsonBigInt } from '@/utils/numberUtils';
-import { ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE } from '@/lib/constants';
+import { ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE, ADMIN_VOTE_OPEN_ISSUES_PER_PAGE } from '@/lib/constants';
 
 const VoteTab = () => {
   const { userAddress, openIssuesLoading, openIssues, getOpenIssues, executedIssues, executedIssuesLoading, getExecutedIssues, castVoteOnIssue, castVoteOnIssueById, dismissIssue, addAdmin, removeAdmin } = useUser();
@@ -27,6 +27,7 @@ const VoteTab = () => {
   const [addAdminOpen, setAddAdminOpen] = useState(false);
   const [removeAdminOpen, setRemoveAdminOpen] = useState(false);
   const [executedPage, setExecutedPage] = useState(1);
+  const [openIssuesPage, setOpenIssuesPage] = useState(1);
   const [selectedIssue, setSelectedIssue] = useState<{
     issueId: string;
     target: string;
@@ -98,13 +99,19 @@ const VoteTab = () => {
   }
 
   const admins: any[] = (openIssues && openIssues['admins']) || [];
-  const issues: any[] = (openIssues && openIssues['issues']) || [];
+  const allIssues: any[] = (openIssues && openIssues['issues']) || [];
   const votes: any[] = (openIssues && openIssues['votes']) || [];
   const thresholds: any[] = (openIssues && openIssues['thresholds']) || [];
   const globalThreshold: number = (openIssues && openIssues['globalThreshold']) || 6000;
   const executed: object[] = (executedIssues && executedIssues['executed']) || [];
   const executedTotal: number = (executedIssues && executedIssues['executedTotal']) || 0;
   const executedTotalPages = Math.ceil(executedTotal / ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE);
+  
+  // Paginate open issues client-side
+  const openIssuesTotalPages = Math.ceil(allIssues.length / ADMIN_VOTE_OPEN_ISSUES_PER_PAGE);
+  const openIssuesStartIndex = (openIssuesPage - 1) * ADMIN_VOTE_OPEN_ISSUES_PER_PAGE;
+  const openIssuesEndIndex = openIssuesStartIndex + ADMIN_VOTE_OPEN_ISSUES_PER_PAGE;
+  const issues = allIssues.slice(openIssuesStartIndex, openIssuesEndIndex);
 
   return (
     <div className="space-y-6">
@@ -194,7 +201,13 @@ const VoteTab = () => {
         <CardContent className="px-4 md:px-6">
           <div className="mb-3 md:mb-4">
             <span className="text-xs md:text-sm text-muted-foreground">
-              Showing {issues.length} open issues
+              {allIssues.length > 0 ? (
+                <>
+                  Showing {openIssuesStartIndex + 1}-{Math.min(openIssuesEndIndex, allIssues.length)} of {allIssues.length} open issues
+                </>
+              ) : (
+                <>No open issues</>
+              )}
             </span>
           </div>
           
@@ -203,20 +216,21 @@ const VoteTab = () => {
               <p className="text-muted-foreground text-sm">No open issues found</p>
             </div>
           ) : (
-            <div className="overflow-x-auto -mx-4 md:mx-0">
-              <Table>
-                <TableHeader>
-                  <TableRow className="dark:border-border dark:hover:bg-transparent">
-                    <TableHead className="text-xs md:text-sm pl-4 md:pl-4 dark:text-muted-foreground whitespace-nowrap">Issue ID</TableHead>
-                    <TableHead className="text-xs md:text-sm dark:text-muted-foreground hidden md:table-cell">Contract</TableHead>
-                    <TableHead className="text-xs md:text-sm dark:text-muted-foreground hidden md:table-cell">Function</TableHead>
-                    <TableHead className="text-xs md:text-sm dark:text-muted-foreground whitespace-nowrap">Votes Needed</TableHead>
-                    <TableHead className="text-xs md:text-sm dark:text-muted-foreground whitespace-nowrap">Voting Threshold</TableHead>
-                    <TableHead className="text-xs md:text-sm pr-4 md:pr-4 dark:text-muted-foreground">Vote</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {issues.map((issue: any, index) => {
+            <>
+              <div className="overflow-x-auto -mx-4 md:mx-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="dark:border-border dark:hover:bg-transparent">
+                      <TableHead className="text-xs md:text-sm pl-4 md:pl-4 dark:text-muted-foreground whitespace-nowrap">Issue ID</TableHead>
+                      <TableHead className="text-xs md:text-sm dark:text-muted-foreground hidden md:table-cell">Contract</TableHead>
+                      <TableHead className="text-xs md:text-sm dark:text-muted-foreground hidden md:table-cell">Function</TableHead>
+                      <TableHead className="text-xs md:text-sm dark:text-muted-foreground whitespace-nowrap">Votes Needed</TableHead>
+                      <TableHead className="text-xs md:text-sm dark:text-muted-foreground whitespace-nowrap">Voting Threshold</TableHead>
+                      <TableHead className="text-xs md:text-sm pr-4 md:pr-4 dark:text-muted-foreground">Vote</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {issues.map((issue: any, index) => {
                     const issueId = issue.issueId;
                     const address = issue.target;
                     const issueArgs = parseJsonBigInt(typeof issue.args === 'string' ? issue.args : JSON.stringify(issue.args), { fallback: [] }) as any[];
@@ -289,9 +303,57 @@ const VoteTab = () => {
                       </TableRow>
                     );
                   })}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableBody>
+                </Table>
+              </div>
+              {openIssuesTotalPages > 1 && (
+                <div className="mt-4 flex items-center justify-center">
+                  <Pagination>
+                    <PaginationContent>
+                      {openIssuesPage > 2 && (
+                        <PaginationItem>
+                          <PaginationLink
+                            onClick={() => setOpenIssuesPage(1)}
+                            className={openIssuesLoading ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                          >
+                            <ChevronsLeft className="h-4 w-4" />
+                            <span className="sr-only">Go to first page</span>
+                          </PaginationLink>
+                        </PaginationItem>
+                      )}
+                      <PaginationItem>
+                        <PaginationPrevious 
+                          onClick={() => setOpenIssuesPage(prev => Math.max(1, prev - 1))}
+                          className={openIssuesPage === 1 || openIssuesLoading ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                        />
+                      </PaginationItem>
+                      <PaginationItem>
+                        <span className="text-sm text-muted-foreground px-4">
+                          Page {openIssuesPage} of {openIssuesTotalPages}
+                        </span>
+                      </PaginationItem>
+                      <PaginationItem>
+                        <PaginationNext 
+                          onClick={() => setOpenIssuesPage(prev => Math.min(openIssuesTotalPages, prev + 1))}
+                          className={openIssuesPage === openIssuesTotalPages || openIssuesLoading ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                        />
+                      </PaginationItem>
+                      {openIssuesPage < openIssuesTotalPages - 1 && (
+                        <PaginationItem>
+                          <PaginationLink
+                            onClick={() => setOpenIssuesPage(openIssuesTotalPages)}
+                            className={openIssuesLoading ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                          >
+                            <ChevronsRight className="h-4 w-4" />
+                            <span className="sr-only">Go to last page</span>
+                          </PaginationLink>
+                        </PaginationItem>
+                      )}
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

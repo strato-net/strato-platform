@@ -59,3 +59,4 @@ export const MIN_USDST_WITHDRAWAL = "10.0"; // Minimum USDST withdrawal amount
 // ============================================
 
 export const ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE = 10; // # of executed issues/page to display on the vote tab
+export const ADMIN_VOTE_OPEN_ISSUES_PER_PAGE = 3; // # of open issues/page to display on the vote tab
