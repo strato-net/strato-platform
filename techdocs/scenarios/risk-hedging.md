@@ -75,7 +75,7 @@ Use stablecoins and diversification to hedge against collateral price drops whil
 **Target:**
 
 - 6 ETHST ($18,000) = 60% volatile
-- 12,000 USDCST ($12,000) = 40% stable
+- 12,000 USDST ($12,000) = 40% stable
 
 **Steps:**
 
@@ -86,18 +86,18 @@ Use stablecoins and diversification to hedge against collateral price drops whil
 
 2. **Swap to stablecoins:**
 
-   - Swap 6,000 USDST → USDCST
+   - Swap 6,000 USDST → USDST
    - Cost: ~$18 (0.3% fee)
 
-3. **Supply USDCST as collateral:**
+3. **Supply USDST as collateral:**
 
-   - Add 6,000 USDCST to collateral
+   - Add 6,000 USDST to collateral
    - Now have mixed collateral
 
 4. **Optional - Remove some ETH:**
 
    - Withdraw 2 ETHST    - Sell or hold separately
-   - Keep 8 ETHST + 6,000 USDCST collateral
+   - Keep 8 ETHST + 6,000 USDST collateral
 
 **Result:**
 ```
@@ -110,7 +110,7 @@ Before:
 
 After:
 
-- 8 ETHST + 6,000 USDCST collateral
+- 8 ETHST + 6,000 USDST collateral
 - 22,000 USDST debt (16k original + 6k new)
 - HF: 1.09
 - Risk: Lower (60% ETHST, 40% stable)
@@ -128,7 +128,7 @@ After:
 
 **With hedge:**
 
-- Collateral: $24,000 (8 ETHST @ $2,250 + 6k USDCST)
+- Collateral: $24,000 (8 ETHST @ $2,250 + 6k USDST)
 - Debt: 22,000
 - HF: 0.87 (liquidated!)
 
@@ -152,7 +152,7 @@ After:
 
 2. **Swap to stablecoins:**
 
-   - Swap to 7,000 USDCST    - Hold in wallet (NOT as collateral)
+   - Swap to 7,000 USDST    - Hold in wallet (NOT as collateral)
 
 3. **Keep borrowing position:**
 
@@ -165,7 +165,7 @@ After:
 Collateral: 10 ETHST ($30,000)
 Debt: 23,000 USDST
 HF: 1.04
-Safety buffer: 7,000 USDCST in wallet
+Safety buffer: 7,000 USDST in wallet
 ```
 
 ### Using the Safety Buffer
@@ -180,7 +180,7 @@ Safety buffer: 7,000 USDCST in wallet
 
 2. **With buffer:**
 
-   - Use 7,000 USDCST from wallet
+   - Use 7,000 USDST from wallet
    - Swap → 3.11 ETHST (at $2,250)
    - Supply as collateral
    - New collateral: 13.11 ETHST ($29,498)
@@ -335,7 +335,7 @@ Risk: Very low
 
 **Bob's action:** Implemented Safety Buffer
 - Minted 5,000 USDST via CDP
-- Swapped to USDCST - Held as emergency fund
+- Swapped to USDST - Held as emergency fund
 
 **November 2022:**
 
@@ -346,7 +346,7 @@ Risk: Very low
 
 **Bob's response:**
 
-- Used 5,000 USDCST buffer
+- Used 5,000 USDST buffer
 - Bought 4.16 ETHST @ $1,200
 - Added to collateral
 - New collateral: 14.16 ETHST @ $1,200 = $17k

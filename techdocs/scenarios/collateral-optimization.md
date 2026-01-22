@@ -29,7 +29,7 @@ Actively manage collateral composition to:
 
 **After optimization:**
 
-- Collateral: 3 ETHST + 0.18 WBTCST + 12,000 USDCST ($30,000)
+- Collateral: 3 ETHST + 0.18 WBTCST + 12,000 USDST ($30,000)
 - Borrowed: 18,000 USDST
 - LTV: 60%
 - Health Factor: 1.37
@@ -51,8 +51,8 @@ Actively manage collateral composition to:
 |-------|-----|----------------|------------|-------------------|
 | **ETHST** | 75% | 80% | High (70%) | 1.0 (perfect) |
 | **WBTCST** | 75% | 80% | High (65%) | 0.85 (high) |
-| **USDCST** | 80% | 85% | None (0%) | 0.0 (none) |
-| **USDTST** | 80% | 85% | None (0%) | 0.0 (none) |
+| **USDST** | 80% | 85% | None (0%) | 0.0 (none) |
+| **USDST** | 80% | 85% | None (0%) | 0.0 (none) |
 | **GOLDST** | 70% | 75% | Moderate (40%) | 0.3 (low) |
 
 **Key insights:**
@@ -125,7 +125,7 @@ Target: Increase this ratio
   - $9k ETHST (3 ETHST)
   - $9k WBTCST (0.18 BTC)
 - $12k stables (40%)
-  - $12k USDCST
+  - $12k USDST
 
 **From current (10 ETHST):**
 
@@ -133,7 +133,7 @@ Target: Increase this ratio
    - Temporarily reduces HF
    - Will fix by adding others
 
-2. **Swap 4 ETHST → $12k USDCST**
+2. **Swap 4 ETHST → $12k USDST**
    - Keep as stables
 
 3. **Swap 3 ETHST → 0.18 WBTCST**
@@ -143,11 +143,11 @@ Target: Increase this ratio
 
    - 3 ETHST
    - 0.18 WBTCST
-   - 12,000 USDCST
+   - 12,000 USDST
 
 **Result:**
 ```
-New collateral: 3 ETHST + 0.18 WBTCST + 12k USDCST
+New collateral: 3 ETHST + 0.18 WBTCST + 12k USDST
 Value: $30,000 (unchanged)
 Max borrow: $23,100 (vs $22,500)
 Volatility: ~45% (vs 70%)
@@ -191,7 +191,7 @@ Example:
 
 - 3 ETHST ($9k) × 75% = $6,750
 - 0.18 WBTCST ($9k) × 75% = $6,750
-- 12k USDCST × 80% = $9,600
+- 12k USDST × 80% = $9,600
 Total: $23,100 / $30k = 77% effective LTV
 
 vs pure ETHST: 75% LTV
@@ -216,7 +216,7 @@ vs pure ETHST: 75% LTV
 
 - 30% ETHST
 - 30% GOLDST
-- 40% USDCST
+- 40% USDST
 - Correlations: 0.85, 0.0
 - Better protected in crashes
 

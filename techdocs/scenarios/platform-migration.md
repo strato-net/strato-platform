@@ -91,7 +91,7 @@ Move your positions from Aave, Compound, MakerDAO, or other platforms to STRATO.
 
 **Options to get USDC:**
 
-- A) Use USDCST you already have
+- A) Use USDST you already have
 - B) Bridge USDC from another chain
 - C) Sell some ETHST collateral first
 - D) Add new funds
@@ -107,7 +107,7 @@ Move your positions from Aave, Compound, MakerDAO, or other platforms to STRATO.
 
 **Result:**
 ```
-✅ Repaid: 15,000 USDCST ✅ Health Factor: N/A (no debt)
+✅ Repaid: 15,000 USDST ✅ Health Factor: N/A (no debt)
 ✅ Ethereum gas paid: ~$30
 ```
 
@@ -190,9 +190,9 @@ If you want to recreate borrowing position:
 
 **Step 3: Optional - Swap to USDC**
 
-If you need USDCST instead of USDST:
+If you need USDST instead of USDST:
 
-1. Swap 15,000 USDST → USDCST (~0.3% fee)
+1. Swap 15,000 USDST → USDST (~0.3% fee)
 2. Now you have same asset as before
 
 ---
@@ -204,7 +204,7 @@ If you need USDCST instead of USDST:
 | Metric | Aave (Ethereum) | STRATO |
 |--------|-----------------|---------|
 | **Collateral** | 10 ETHST | 10 ETHST |
-| **Borrowed** | 15,000 USDCST | 15,000 USDST |
+| **Borrowed** | 15,000 USDST | 15,000 USDST |
 | **Health Factor** | 1.5 | 1.5 |
 | **Interest Rate** | ~8% | ~5% |
 | **Annual Interest** | $1,200 | $750 |
@@ -434,7 +434,7 @@ Break-even: 1 month
 **Starting Position (Aave):**
 
 - 5 ETHST collateral
-- 7,500 USDCST borrowed
+- 7,500 USDST borrowed
 - 8% interest = $600/year
 - Monthly Ethereum gas: ~$50
 

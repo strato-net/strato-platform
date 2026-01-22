@@ -247,8 +247,8 @@ If you want to withdraw collateral, you'll need to close positions first. Here's
 
 ### About Asset Conversions
 
-- **USDST → USDCST/USDT:** 1:1 conversion (no slippage)
-- **ETHST → ETHST:** 1:1 conversion (no slippage)
+- **USDST → USDC/USDT:** 1:1 conversion (no slippage)
+- **ETHST → ETH:** 1:1 conversion (no slippage)
 - **Wrapped tokens:** Always convert back to original Ethereum asset
 
 ---

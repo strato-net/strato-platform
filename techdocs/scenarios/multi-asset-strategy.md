@@ -25,7 +25,7 @@ Combine different assets, both systems (Lending + CDP), and multiple income stre
 
 - 5 ETHST ($15,000)
 - 0.5 WBTCST ($25,000)
-- 10,000 USDCST ($10,000)
+- 10,000 USDST ($10,000)
 - **Total:** $50,000
 
 **Your goal:**
@@ -59,9 +59,9 @@ Combine different assets, both systems (Lending + CDP), and multiple income stre
    - In table, find WBTCST → Click **"Supply"**
    - Enter: 0.5, Click **"Supply"** (~$0.10 gas)
 
-3. **Supply 10,000 USDCST:**
+3. **Supply 10,000 USDST:**
 
-   - In table, find USDCST → Click **"Supply"**
+   - In table, find USDST → Click **"Supply"**
    - Enter: 10,000, Click **"Supply"** (~$0.10 gas)
 
 **Result:**
@@ -69,7 +69,7 @@ Combine different assets, both systems (Lending + CDP), and multiple income stre
 ✅ Total collateral: $50,000
 - ETHST: $15,000 (30%)
 - WBTCST: $25,000 (50%)
-- USDCST: $10,000 (20%)
+- USDST: $10,000 (20%)
 
 ✅ Can borrow: Up to $37,500 (75% LTV)
 ```
@@ -118,16 +118,16 @@ Combine different assets, both systems (Lending + CDP), and multiple income stre
 
 **Strategy A: Liquidity Provision (60% of capital)**
 
-1. **USDST-USDCST Pool ($12,000):**
+1. **USDST-USDST Pool ($12,000):**
 
-   - Provide 6,000 USDST + 6,000 USDCST
+   - Provide 6,000 USDST + 6,000 USDST
    - Expected APR: 10% = $1,200/year
    - Low risk (stable-stable pair)
 
-2. **ETHST-USDTST Pool ($6,000):**
+2. **ETHST-USDST Pool ($6,000):**
 
    - Swap 2,000 USDST → 0.67 ETHST
-   - Provide 0.67 ETHST + 2,000 USDTST
+   - Provide 0.67 ETHST + 2,000 USDST
    - Expected APR: 15% = $900/year
    - Moderate risk (IL possible)
 
@@ -151,8 +151,8 @@ Combine different assets, both systems (Lending + CDP), and multiple income stre
 ```
 ✅ Deployed capital:
 
-- LP (USDST-USDCST): $12,000
-- LP (ETHST-USDTST): $6,000
+- LP (USDST-USDST): $12,000
+- LP (ETHST-USDST): $6,000
 - Supplied USDST: $5,000
 - Safety buffer: $5,000
 Total: $28,000 deployed
@@ -168,7 +168,7 @@ Total: $28,000 deployed
 ```
 5 ETHST: $15,000 (30%)
 0.5 WBTCST: $25,000 (50%)
-10,000 USDCST: $10,000 (20%)
+10,000 USDST: $10,000 (20%)
 Total: $50,000
 ```
 
@@ -181,8 +181,8 @@ Total: 23,000 USDST
 
 **Deployed:**
 ```
-USDST-USDCST LP: $12,000 (10% APR)
-ETHST-USDTST LP: $6,000 (15% APR)
+USDST-USDST LP: $12,000 (10% APR)
+ETHST-USDST LP: $6,000 (15% APR)
 Supplied USDST: $5,000 (3% APR)
 Safety buffer: $5,000
 ```
@@ -195,8 +195,8 @@ Safety buffer: $5,000
 
 | Source | Amount | APR | Annual Income |
 |--------|--------|-----|---------------|
-| USDST-USDCST LP fees | $12,000 | 10% | $1,200 |
-| ETHST-USDTST LP fees | $6,000 | 15% | $900 |
+| USDST-USDST LP fees | $12,000 | 10% | $1,200 |
+| ETHST-USDST LP fees | $6,000 | 15% | $900 |
 | Supply APY | $5,000 | 3% | $150 |
 | Reward Points | All activities | Est | $800 |
 | **Total Income** | | | **$3,050** |
@@ -231,7 +231,7 @@ Return on capital: 4.6% on $50k
 **Collateral:**
 
 - 3 different assets
-- Mix of volatile (ETHST, WBTCST) and stable (USDCST)
+- Mix of volatile (ETHST, WBTCST) and stable (USDST)
 - Correlation: Partially hedged
 
 **Income:**
@@ -251,7 +251,7 @@ Return on capital: 4.6% on $50k
 **Safe price drops:**
 
 - ETHST/WBTCST can drop ~20-25%
-- USDCST stable
+- USDST stable
 - Before liquidation risk
 
 **Mitigation:**
@@ -315,12 +315,12 @@ Return on capital: 4.6% on $50k
 
 **Switch LP positions based on APRs:**
 
-**Current:** USDST-USDCST at 10% APR
+**Current:** USDST-USDST at 10% APR
 
-**If USDST-USDTST pool offers 15%:**
+**If USDST-USDST pool offers 15%:**
 
-1. Remove from USDST-USDCST
-2. Swap to USDST-USDTST
+1. Remove from USDST-USDST
+2. Swap to USDST-USDST
 3. Provide liquidity there
 4. Extra $600/year
 
@@ -344,7 +344,7 @@ Return on capital: 4.6% on $50k
 **Strategy:**
 
 1. Withdraw WBTCST collateral
-2. Sell for USDCST (realize loss)
+2. Sell for USDST (realize loss)
 3. Buy back WBTCST after 30 days (avoid wash sale)
 4. Offset ETHST gains with WBTCST loss
 
@@ -418,7 +418,7 @@ Return on capital: 4.6% on $50k
 **Background:**
 
 - $75k portfolio
-- 8 ETHST + 1 WBTCST + $15k USDCST
+- 8 ETHST + 1 WBTCST + $15k USDST
 - Ran for 6 months
 
 **His strategy:**

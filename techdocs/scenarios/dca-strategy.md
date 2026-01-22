@@ -54,15 +54,15 @@ Regularly deposit and invest fixed amounts into STRATO, regardless of price.
 **Actions:**
 
 1. Bridge $1,000 USDC to STRATO ($20-30 Ethereum L1 gas, one-time per bridge)
-2. Swap $500 USDCST → ETHST (~0.167 ETHST @ $3,000)
+2. Swap $500 USDST → ETHST (~0.167 ETHST @ $3,000)
 3. Supply 0.167 ETHST as collateral
-4. Swap $500 USDCST → USDST
-5. Provide $500 USDST liquidity in USDST-USDCST pool
+4. Swap $500 USDST → USDST
+5. Provide $500 USDST liquidity in USDST-USDST pool
 
 **Result:**
 ```
 Collateral: 0.167 ETHST ($500)
-Liquidity: $500 USDST-USDCST
+Liquidity: $500 USDST-USDST
 Total value: $1,000
 Earning: LP fees + Reward Points
 ```
@@ -86,7 +86,7 @@ Earning: LP fees + Reward Points
 - Increase collateral base
 
 **4. Add to liquidity**
-- Increase USDST-USDCST LP position
+- Increase USDST-USDST LP position
 - Compound previous rewards
 
 ---

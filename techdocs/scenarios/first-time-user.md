@@ -113,7 +113,7 @@ Get your crypto onto STRATO and borrow USDST to start using DeFi.
 - Request USDST from faucet (if testnet)
 - OR get from a friend
 - OR use the app's "Get Gas" feature if available
-- OR bridge in USDC first, swap USDCST for USDST
+- OR bridge in USDC first, swap USDST for USDST
 
 **For this guide, assume you got 10 USDST for fees.**
 
