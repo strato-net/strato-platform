@@ -308,22 +308,29 @@ const VoteTab = () => {
         <CardContent className="px-4 md:px-6">
           <div className="mb-3 md:mb-4">
             <span className="text-xs md:text-sm text-muted-foreground">
-              Showing {executed.length} of {executedTotal} executed issues
+              {executedTotal > 0 ? (
+                <>
+                  Showing {((executedPage - 1) * ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE) + 1}-{Math.min(executedPage * ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE, executedTotal)} of {executedTotal} executed issues
+                </>
+              ) : (
+                <>No executed issues</>
+              )}
             </span>
           </div>
           
-          {executedIssuesLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin" />
-              <span className="ml-2 text-sm text-muted-foreground">Loading executed issues...</span>
-            </div>
-          ) : executed.length === 0 ? (
+          {executed.length === 0 && !executedIssuesLoading ? (
             <div className="text-center py-8">
               <p className="text-muted-foreground text-sm">No executed issues found</p>
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto -mx-4 md:mx-0">
+              <div className="overflow-x-auto -mx-4 md:mx-0 relative">
+                {executedIssuesLoading && (
+                  <div className="absolute inset-0 bg-background/50 backdrop-blur-sm z-10 flex items-center justify-center">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                    <span className="ml-2 text-sm text-muted-foreground">Loading...</span>
+                  </div>
+                )}
                 <Table>
                   <TableHeader>
                     <TableRow className="dark:border-border dark:hover:bg-transparent">
@@ -334,7 +341,7 @@ const VoteTab = () => {
                       <TableHead className="text-sm pr-4 dark:text-muted-foreground whitespace-nowrap">Executor</TableHead>
                     </TableRow>
                   </TableHeader>
-                  <TableBody>
+                  <TableBody className={executedIssuesLoading ? "opacity-50 pointer-events-none" : ""}>
                     {executed.map((issue: any, index) => {
                       const issueId = issue.issueId;
                       const address = issue.target;
@@ -405,7 +412,6 @@ const VoteTab = () => {
                       <PaginationItem>
                         <span className="text-sm text-muted-foreground px-4">
                           Page {executedPage} of {executedTotalPages}
-                          {executedIssuesLoading && <span className="ml-2 text-blue-500">Loading...</span>}
                         </span>
                       </PaginationItem>
                       <PaginationItem>
