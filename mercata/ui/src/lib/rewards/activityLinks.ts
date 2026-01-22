@@ -13,6 +13,11 @@ export const getActivityLink = (activityName: string): string | null => {
 
   const lowerName = activityName.toLowerCase();
 
+  // Direct mint activities - on testnet, goes by "Bridge Deposit"
+  if (lowerName.includes('direct mint') || lowerName.includes('bridge deposit')) {
+    return '/dashboard/deposits?tab=easy-savings';
+  }
+
   // CDP-related activities - goes to the Advanced page, Mint tab, Vaults sub-tab
   if (lowerName.includes('cdp')) {
     return '/dashboard/advanced?tab=mint&subtab=vaults';
