@@ -19,6 +19,7 @@ import {
   calculateMaxMintUnitsForVault,
   truncateForDisplay,
   getHFColorClass,
+  WAD_UNIT,
 } from '@/components/cdp/v2/cdpUtils';
 import { useTokenContext } from '@/context/TokenContext';
 import { parseUnitsWithTruncation } from '@/utils/numberUtils';
@@ -173,6 +174,50 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
     
     return formatUnits(amountUnits, decimals);
   }, [vaultCandidates, getPrice]);
+
+  /**
+   * Check if a vault's CR is below minCR using exact BigInt math
+   * Matches on-chain validation: require(crAfter >= minCR)
+   * 
+   * @param candidate - The vault candidate to check
+   * @param skipIfMaxMode - If true, returns false when both deposit and mint are at max
+   * @returns true if CR < minCR (insufficient collateralization)
+   */
+  const checkVaultHasLowCR = useCallback((
+    candidate: VaultCandidate,
+    skipIfMaxMode: boolean = true
+  ): boolean => {
+    if (autoAllocate || !candidate.allocation) return false;
+    
+    // Skip if both inputs are in max mode (by definition, max values are valid)
+    if (skipIfMaxMode) {
+      const isInMaxMode = depositMaxVaults.has(candidate.vaultConfig.assetAddress) && 
+                         mintMaxVaults.has(candidate.vaultConfig.assetAddress);
+      if (isInMaxMode) return false;
+    }
+    
+    const depositUnits: UNITS = candidate.allocation.depositAmount;
+    const mintUnits: WEI = candidate.allocation.mintAmount;
+    
+    // Skip if no debt (infinite CR)
+    if (mintUnits === 0n) return false;
+    
+    // Calculate total collateral and debt using exact BigInt math
+    const totalCollateral: UNITS = candidate.currentCollateral + depositUnits;
+    const totalDebt: WEI = candidate.currentDebt + mintUnits;
+    
+    if (totalDebt === 0n) return false;
+    
+    // Calculate collateral value in USD: (collateral * price) / unitScale
+    const collateralValueUSD: WEI = (totalCollateral * candidate.oraclePrice) / candidate.vaultConfig.unitScale;
+    
+    // Calculate CR in WAD format: (collateralValueUSD * WAD) / totalDebt
+    const actualCR: bigint = (collateralValueUSD * WAD_UNIT) / totalDebt;
+    const minCR: bigint = candidate.vaultConfig.minCR;
+    
+    // Return true if CR at or below minimum (on-chain mint requires: actualCR > minCR, strict)
+    return actualCR <= minCR;
+  }, [autoAllocate, depositMaxVaults, mintMaxVaults]);
 
 
 
@@ -636,7 +681,8 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
   // Effects - Validation
   // ============================================================================
 
-  // Validate Health Factor - Checks if any vault has health factor below minimum
+  // Validate Collateralization Ratio - Checks if any vault has CR at or below minCR
+  // Uses exact BigInt math to match on-chain validation (CDPEngine line 306: requires CR > minCR, strict)
   useEffect(() => {
     if (!onHFValidationChange || autoAllocate) return;
 
@@ -644,8 +690,8 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
     const failingVaults: Array<{
       symbol: string;
       assetAddress: ADDRESS;
-      healthFactor: number;
-      minimumHF: number;
+      actualCR: string;
+      minCR: string;
       depositAmount: string;
       mintAmount: string;
     }> = [];
@@ -653,51 +699,56 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
     for (const candidate of vaultCandidates) {
       if (!candidate.allocation) continue;
       
-      const decimals = candidate.vaultConfig.unitScale.toString().length - 1;
-      const depositAmt = parseFloat(formatUnits(candidate.allocation.depositAmount, decimals));
-      const mintAmt = parseFloat(formatUnits(candidate.allocation.mintAmount, 18));
-      
-      if (mintAmt === 0) continue;
-      
-      // Check if both inputs are in max mode (deposit and mint both at max)
-      const isInMaxMode = depositMaxVaults.has(candidate.vaultConfig.assetAddress) && 
-                         mintMaxVaults.has(candidate.vaultConfig.assetAddress);
-      
-      // Skip HF validation if both inputs are at max (by definition, max values are calculated to be valid)
-      if (isInMaxMode) continue;
-      
-      const hfRaw = calculateVaultHFRaw(candidate, depositAmt, mintAmt);
-      const vaultMinHFRaw = calculateVaultMinHFRaw(candidate);
-      
-      if (hfRaw !== null && hfRaw < vaultMinHFRaw) {
+      // Use helper function to check if CR is below minimum
+      if (checkVaultHasLowCR(candidate, true)) {
         hasLowHF = true;
+        
+        const depositUnits: UNITS = candidate.allocation.depositAmount;
+        const mintUnits: WEI = candidate.allocation.mintAmount;
+        const decimals = candidate.vaultConfig.unitScale.toString().length - 1;
+        
+        // Format amounts for error reporting
+        const depositAmtFormatted = parseFloat(formatUnits(depositUnits, decimals)).toLocaleString('en-US', { maximumFractionDigits: 6 });
+        const mintAmtFormatted = parseFloat(formatUnits(mintUnits, 18)).toLocaleString('en-US', { maximumFractionDigits: 2 });
+        
+        // Calculate CR values for error reporting
+        const totalCollateral: UNITS = candidate.currentCollateral + depositUnits;
+        const totalDebt: WEI = candidate.currentDebt + mintUnits;
+        const collateralValueUSD: WEI = (totalCollateral * candidate.oraclePrice) / candidate.vaultConfig.unitScale;
+        const actualCR: bigint = (collateralValueUSD * WAD_UNIT) / totalDebt;
+        const minCR: bigint = candidate.vaultConfig.minCR;
+        
+        // Convert CR from WAD to percentage for display (e.g., 1.5e18 → 150%)
+        const actualCRPercent = parseFloat(formatUnits(actualCR, 18)) * 100;
+        const minCRPercent = parseFloat(formatUnits(minCR, 18)) * 100;
+        
         failingVaults.push({
           symbol: candidate.vaultConfig.symbol,
           assetAddress: candidate.vaultConfig.assetAddress,
-          healthFactor: hfRaw,
-          minimumHF: vaultMinHFRaw,
-          depositAmount: depositAmt.toLocaleString('en-US', { maximumFractionDigits: 6 }),
-          mintAmount: mintAmt.toLocaleString('en-US', { maximumFractionDigits: 2 }),
+          actualCR: actualCRPercent.toFixed(2) + '%',
+          minCR: minCRPercent.toFixed(2) + '%',
+          depositAmount: depositAmtFormatted,
+          mintAmount: mintAmtFormatted,
         });
       }
     }
     
     if (hasLowHF && failingVaults.length > 0) {
-      console.error('[VaultBreakdown] ❌ HEALTH FACTOR BELOW MINIMUM WARNING:', {
-        failingCondition: 'healthFactor < minimumHF',
+      console.error('[VaultBreakdown] ❌ COLLATERALIZATION RATIO BELOW MINIMUM WARNING:', {
+        failingCondition: 'actualCR <= minCR (on-chain mint requires: actualCR > minCR, strict)',
         failingVaults: failingVaults.map(v => ({
           symbol: v.symbol,
           assetAddress: v.assetAddress,
-          expected: `≥ ${v.minimumHF.toLocaleString('en-US', { maximumFractionDigits: 4 })}`,
-          actual: `${v.healthFactor.toLocaleString('en-US', { maximumFractionDigits: 4 })}`,
+          expected: `> ${v.minCR}`,
+          actual: v.actualCR,
           depositAmount: `${v.depositAmount} ${v.symbol}`,
-          mintAmount: `${v.mintAmount} USD`,
+          mintAmount: `${v.mintAmount} USDST`,
         })),
       });
     }
     
     onHFValidationChange(hasLowHF);
-  }, [vaultCandidates, autoAllocate, depositMaxVaults, mintMaxVaults, onHFValidationChange]);
+  }, [vaultCandidates, autoAllocate, checkVaultHasLowCR, onHFValidationChange]);
 
   // Validate Balance - Checks if any deposit amount exceeds available user balance
   useEffect(() => {
@@ -1138,9 +1189,9 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
 
             {hasLowHF && !autoAllocate && (
               <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-                <p className="text-sm font-semibold text-red-800 dark:text-red-200 mb-2">Health Factor Below Minimum</p>
+                <p className="text-sm font-semibold text-red-800 dark:text-red-200 mb-2">Insufficient Collateralization</p>
                 <p className="text-xs text-red-700 dark:text-red-300">
-                  One or more vaults have a health factor below the required minimum.
+                  One or more vaults have insufficient collateral for the mint amount. Increase deposit or decrease mint amount.
                 </p>
               </div>
             )}
@@ -1189,19 +1240,8 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
                 const hfNum = parseFloat(hf);
                 const hfColor = getHFColorClass(hf, hfNum);
                 
-                // Use RAW (unrounded) HF and minHF for validation to catch small changes
-                const hfRaw = calculateVaultHFRaw(candidate, depositAmt, mintAmt);
-                const vaultMinHFRaw = calculateVaultMinHFRaw(candidate);
-                
-                // Check if both inputs are in max mode (deposit and mint both at max)
-                const isInMaxMode = depositMaxVaults.has(candidate.vaultConfig.assetAddress) && 
-                                   mintMaxVaults.has(candidate.vaultConfig.assetAddress);
-                
-                // Skip HF validation if both inputs are at max (by definition, max values are calculated to be valid)
-                const vaultHasLowHF = !autoAllocate && 
-                  !isInMaxMode &&  // Exception: don't validate when both at max
-                  mintAmt > 0 &&
-                  hfRaw !== null && hfRaw < vaultMinHFRaw;
+                // Validate CR using exact BigInt math (matches on-chain validation)
+                const vaultHasLowHF = checkVaultHasLowCR(candidate, true);
 
                 // Get display values from vaultInputs
                 const inputs = vaultInputs[candidate.vaultConfig.assetAddress] || { depositAmount: '', mintAmount: '' };
