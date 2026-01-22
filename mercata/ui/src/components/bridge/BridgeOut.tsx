@@ -13,7 +13,7 @@ import BridgeWalletStatus from "./BridgeWalletStatus";
 import NetworkSelector from "./NetworkSelector";
 import TokenSelector from "./TokenSelector";
 import TransactionSummary from "./TransactionSummary";
-import { BRIDGE_OUT_FEE, usdstAddress, DECIMAL } from "@/lib/constants";
+import { BRIDGE_OUT_FEE, usdstAddress, DECIMAL, MIN_USDST_WITHDRAWAL } from "@/lib/constants";
 import {
   handleAmountInputChange,
   computeMaxTransferable,
@@ -212,8 +212,17 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false }) => {
         maxAmount,
         DECIMAL
       );
+
+      // Additional minimum validation for "From Savings" (USDST withdrawal)
+      if (isSaving && value) {
+        const numValue = parseFloat(value.replace(/,/g, ""));
+        const minAmount = parseFloat(MIN_USDST_WITHDRAWAL);
+        if (!isNaN(numValue) && numValue > 0 && numValue < minAmount) {
+          setAmountError(`Amount must be at least ${MIN_USDST_WITHDRAWAL} USDST`);
+        }
+      }
     },
-    [maxAmount]
+    [maxAmount, isSaving]
   );
 
   const showConfirmModal = () => {

@@ -184,6 +184,7 @@ const WithdrawalsPage = () => {
                 </CardHeader>
                 <CardContent>
                   <ul className="space-y-2 text-sm text-muted-foreground list-disc pl-5">
+                    <li>Minimum withdrawal amount is 10 USDST</li>
                     <li>Withdrawals are processed within 1-3 business days</li>
                     <li>Double-check withdrawal address before confirming</li>
                   </ul>
