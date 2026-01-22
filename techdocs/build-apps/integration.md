@@ -13,7 +13,7 @@ Complete walkthrough for integrating with STRATO using REST APIs.
     **For production, use public endpoints:**
     
     - **Mainnet:** `https://app.strato.nexus`
-    - **Testnet:** `https://buildtest.mercata-testnet.blockapps.net`
+    - **Testnet:** `https://app.testnet.strato.nexus`
     
     **Optional local setup:** [Setup Guide](../contribute/setup.md)
 
@@ -39,7 +39,7 @@ const BASE_URL = 'http://localhost:8080';
 
 // For production (replace with):
 // const BASE_URL = 'https://app.strato.nexus';  // mainnet
-// const BASE_URL = 'https://buildtest.mercata-testnet.blockapps.net';  // testnet
+// const BASE_URL = 'https://app.testnet.strato.nexus';  // testnet
 
 const STRATO_API = `${BASE_URL}/strato/v2.3`;  // transactions, keys
 const CIRRUS = `${BASE_URL}/cirrus/search`;     // indexed queries

@@ -14,7 +14,7 @@ https://app.strato.nexus/api
 
 **Testnet:**
 ```
-https://buildtest.mercata-testnet.blockapps.net/api
+https://app.testnet.strato.nexus/api
 ```
 
 !!! info "Alternative: Core Platform API"
@@ -570,7 +570,7 @@ GET /tokens/v2?order=balance.desc
 For real-time position updates:
 
 ```javascript
-const ws = new WebSocket('wss://buildtest.mercata-testnet.blockapps.net/ws');
+const ws = new WebSocket('wss://app.testnet.strato.nexus/ws');
 
 ws.send(JSON.stringify({
   type: 'subscribe',
@@ -602,7 +602,7 @@ npm install @strato/sdk
 import { StratoClient } from '@strato/sdk';
 
 const client = new StratoClient({
-  baseUrl: 'https://buildtest.mercata-testnet.blockapps.net/api',
+  baseUrl: 'https://app.testnet.strato.nexus/api',
   accessToken: 'eyJhbGc...'
 });
 
@@ -684,7 +684,7 @@ async function fetchAll(endpoint) {
 
 Use testnet for development:
 ```
-https://buildtest.mercata-testnet.blockapps.net/api
+https://app.testnet.strato.nexus/api
 ```
 
 - No real value at risk

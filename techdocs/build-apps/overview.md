@@ -37,7 +37,7 @@ Welcome! This guide helps you build external applications that integrate with yo
 Connect to the public STRATO network via REST APIs:
 
 - **Mainnet**: `https://app.strato.nexus/api`
-- **Testnet**: `https://buildtest.mercata-testnet.blockapps.net/api`
+- **Testnet**: `https://app.testnet.strato.nexus/api`
 
 **Option 2: Deploy Your Own Node (Optional)**
 
@@ -83,7 +83,7 @@ You need access to a STRATO endpoint to build apps.
 **Option 1: Use Public Endpoints (Recommended)**
 
 - **Mainnet**: `https://app.strato.nexus`
-- **Testnet**: `https://buildtest.mercata-testnet.blockapps.net`
+- **Testnet**: `https://app.testnet.strato.nexus`
 
 No setup required - just start building!
 

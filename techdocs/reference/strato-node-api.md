@@ -36,7 +36,7 @@ https://app.strato.nexus/strato-api
 
 **Testnet:**
 ```
-https://buildtest.mercata-testnet.blockapps.net/strato-api
+https://app.testnet.strato.nexus/strato-api
 ```
 
 ## Authentication
@@ -249,7 +249,7 @@ GET /strato-api/eth/v1.2/logs?address={contractAddress}&fromBlock={start}&toBloc
 #### Subscribe to Events (WebSocket)
 
 ```javascript
-const ws = new WebSocket('wss://buildtest.mercata-testnet.blockapps.net/strato-api/ws');
+const ws = new WebSocket('wss://app.testnet.strato.nexus/strato-api/ws');
 
 ws.send(JSON.stringify({
   type: 'subscribe',

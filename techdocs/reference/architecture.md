@@ -345,7 +345,7 @@ Allows Pool to call `mint()` on LP Token.
 - Local Cirrus instance
 - Frontend dev server (Vite)
 
-**Testnet (buildtest):**
+**Testnet:**
 
 - Hosted STRATO node
 - Hosted Cirrus + PostgreSQL

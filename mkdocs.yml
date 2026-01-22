@@ -2,7 +2,7 @@ site_name: STRATO Technical Docs
 site_description: STRATO platform technical documentation (use-case first, end-user + developer)
 site_url: https://docs.strato.nexus
 site_author: BlockApps
-copyright: Copyright &copy; 2025 BlockApps - STRATO Platform
+copyright: Copyright &copy; 2026 BlockApps - STRATO Platform
 
 theme:
   name: material
