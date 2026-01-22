@@ -274,7 +274,7 @@ https://app.strato.nexus/strato-api/eth/v1.2
 
 **Testnet**:
 ```
-https://buildtest.mercata-testnet.blockapps.net/strato-api/eth/v1.2
+https://app.testnet.strato.nexus/strato-api/eth/v1.2
 ```
 
 ### Where can I find smart contract addresses?

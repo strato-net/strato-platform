@@ -12,7 +12,7 @@ High-level API for DeFi operations: lending, CDP, swaps, liquidity, bridge, rewa
     [https://app.strato.nexus/api/docs](https://app.strato.nexus/api/docs)
 
 !!! example "App API - Testnet"
-    [https://buildtest.mercata-testnet.blockapps.net/api/docs](https://buildtest.mercata-testnet.blockapps.net/api/docs)
+    [https://app.testnet.strato.nexus/api/docs](https://app.testnet.strato.nexus/api/docs)
 
 ---
 
@@ -24,7 +24,7 @@ Low-level blockchain API: users, transactions, contracts, blocks.
     [https://app.strato.nexus/docs](https://app.strato.nexus/docs)
 
 !!! info "Core API - Testnet"
-    [https://buildtest.mercata-testnet.blockapps.net/docs](https://buildtest.mercata-testnet.blockapps.net/docs)
+    [https://app.testnet.strato.nexus/docs](https://app.testnet.strato.nexus/docs)
 
 ---
 
@@ -73,7 +73,7 @@ All API requests require authentication via **OAuth 2.0 Bearer token**.
 **Base URLs:**
 
 - **Mainnet**: `https://app.strato.nexus`
-- **Testnet**: `https://buildtest.mercata-testnet.blockapps.net`
+- **Testnet**: `https://app.testnet.strato.nexus`
 
 ---
 

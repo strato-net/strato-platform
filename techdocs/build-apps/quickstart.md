@@ -12,7 +12,7 @@ Build your first app on STRATO in 10 minutes using STRATO's REST APIs.
     
     - **Option 1 (Recommended):** Use public endpoints
         - Mainnet: `https://app.strato.nexus/api`
-        - Testnet: `https://buildtest.mercata-testnet.blockapps.net/api`
+        - Testnet: `https://app.testnet.strato.nexus/api`
     - **Option 2 (Optional):** Deploy locally for development
         - See [Setup Guide](../contribute/setup.md) to install
         - Run `./start my_node_name`
@@ -49,7 +49,7 @@ NODE_URL=http://localhost:8080
 
 # For production, use public endpoints:
 # NODE_URL=https://app.strato.nexus  (mainnet)
-# NODE_URL=https://buildtest.mercata-testnet.blockapps.net  (testnet)
+# NODE_URL=https://app.testnet.strato.nexus  (testnet)
 
 # OAuth credentials (required for authentication)
 OAUTH_CLIENT_ID=your_client_id_here
@@ -61,7 +61,7 @@ OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata
     - **Local dev:** Use `http://localhost:8080` (requires [local STRATO setup](../contribute/setup.md))
     - **Production:** Use public endpoints (no local deployment needed)
         - Mainnet: `https://app.strato.nexus`
-        - Testnet: `https://buildtest.mercata-testnet.blockapps.net`
+        - Testnet: `https://app.testnet.strato.nexus`
 
 ### TypeScript Configuration
 
@@ -92,7 +92,7 @@ Create `tsconfig.json`:
     All code examples use `localhost` for local development. For production:
     
     - Replace `http://localhost:8080` with `https://app.strato.nexus` (mainnet)
-    - Or use `https://buildtest.mercata-testnet.blockapps.net` (testnet)
+    - Or use `https://app.testnet.strato.nexus` (testnet)
 
 Create `src/config.ts`:
 

@@ -13,7 +13,7 @@ Complete workflow examples for building on STRATO using REST APIs.
     For production, use public endpoints:
     
     - **Mainnet:** `https://app.strato.nexus`
-    - **Testnet:** `https://buildtest.mercata-testnet.blockapps.net`
+    - **Testnet:** `https://app.testnet.strato.nexus`
     
     **In your code:**
     
@@ -23,7 +23,7 @@ Complete workflow examples for building on STRATO using REST APIs.
     
     // For production (replace localhost with):
     // const NODE_URL = 'https://app.strato.nexus';  // mainnet
-    // const NODE_URL = 'https://buildtest.mercata-testnet.blockapps.net';  // testnet
+    // const NODE_URL = 'https://app.testnet.strato.nexus';  // testnet
     
     const strato = createApiClient(`${NODE_URL}/strato/v2.3`);
     const cirrus = createApiClient(`${NODE_URL}/cirrus/search`);

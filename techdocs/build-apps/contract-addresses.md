@@ -7,7 +7,7 @@ Find deployed contracts and addresses for your STRATO deployment.
     
     **For production, use public endpoints:**
     - Mainnet: `https://app.strato.nexus`
-    - Testnet: `https://buildtest.mercata-testnet.blockapps.net`
+    - Testnet: `https://app.testnet.strato.nexus`
     
     **Contract addresses are the same across all deployments** (query from registries)
 
@@ -157,7 +157,7 @@ http://localhost:8080/smd/
 
 # Production
 https://app.strato.nexus/smd/  (mainnet)
-https://buildtest.mercata-testnet.blockapps.net/smd/  (testnet)
+https://app.testnet.strato.nexus/smd/  (testnet)
 
 # View specific contract
 http://localhost:8080/smd/address/0x.../contracts
@@ -347,7 +347,7 @@ async function getUserCollateral(
 - ✅ Block explorer (SMD): 
   - Local: `http://localhost:8080/smd/`
   - Mainnet: `https://app.strato.nexus/smd/`
-  - Testnet: `https://buildtest.mercata-testnet.blockapps.net/smd/`
+  - Testnet: `https://app.testnet.strato.nexus/smd/`
 - ✅ Query Cirrus for contract code
 - ✅ Check contract name matches expected
 
