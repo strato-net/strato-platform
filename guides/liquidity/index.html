@@ -1,0 +1,3771 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="STRATO platform technical documentation (use-case first, end-user + developer)">
+      
+      
+        <meta name="author" content="BlockApps">
+      
+      
+        <link rel="canonical" href="https://docs.strato.nexus/guides/liquidity/">
+      
+      
+        <link rel="prev" href="../swap/">
+      
+      
+        <link rel="next" href="../bridge/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Provide Liquidity - STRATO Technical Docs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../css/timeago.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#provide-liquidity" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="STRATO Technical Docs" class="md-header__button md-logo" aria-label="STRATO Technical Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            STRATO Technical Docs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Provide Liquidity
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="STRATO Technical Docs" class="md-nav__button md-logo" aria-label="STRATO Technical Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    STRATO Technical Docs
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../quick-start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Concepts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scenarios/first-time-user/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    First-Time User
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../borrow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Borrow USDST
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mint-cdp/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mint USDST (CDP)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../swap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Swap Tokens
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Provide Liquidity
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Provide Liquidity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#complete-example-provide-6000-ethst-usdst-liquidity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Complete Example: Provide $6,000 ETHST-USDST Liquidity
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Complete Example: Provide $6,000 ETHST-USDST Liquidity">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#quick-walkthrough" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Walkthrough
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prerequisites
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-liquidity-pools-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How Liquidity Pools Work
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How Liquidity Pools Work">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#automated-market-maker-amm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Automated Market Maker (AMM)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pool-math" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pool Math
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#your-share" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Your Share
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-by-step-add-liquidity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step-by-Step: Add Liquidity
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step-by-Step: Add Liquidity">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-1-choose-a-pool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1: Choose a Pool
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-enter-amounts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2: Enter Amounts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-3-review-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3: Review Details
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-4-add-liquidity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 4: Add Liquidity
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#earning-from-liquidity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Earning from Liquidity
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Earning from Liquidity">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#trading-fees" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trading Fees
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reward-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reward Points
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tracking-earnings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tracking Earnings
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#removing-liquidity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Removing Liquidity
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Removing Liquidity">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-1-go-to-your-positions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1: Go to Your Positions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-choose-amount" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2: Choose Amount
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-3-confirm-withdrawal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3: Confirm Withdrawal
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#understanding-impermanent-loss" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Understanding Impermanent Loss
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Understanding Impermanent Loss">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-is-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What Is It?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-is-it-a-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When Is It a Problem?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mitigating-il" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mitigating IL
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#best-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Best Practices
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Best Practices">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#choosing-pools" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choosing Pools
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#managing-il-risk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Managing IL Risk
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#position-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Position Management
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pool-stats-explained" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pool Stats Explained
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Pool Stats Explained">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tvl-total-value-locked" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TVL (Total Value Locked)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#volume-24h" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Volume 24h
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#apr-annual-percentage-rate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        APR (Annual Percentage Rate)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#your-pool-share" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Your Pool Share
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#advanced-strategies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Advanced Strategies
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Advanced Strategies">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#liquidity-farming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Liquidity Farming
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#range-orders-concentrated-liquidity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Range Orders (Concentrated Liquidity)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#arbitrage-protection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Arbitrage Protection
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#common-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common Issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Common Issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#insufficient-balance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Insufficient Balance"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#price-updated-warning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Price Updated" Warning
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#slippage-tolerance-exceeded" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Slippage Tolerance Exceeded"
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#risk-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Risk Management
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Risk Management">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#diversification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Diversification
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#start-small" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Start Small
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#monitor-regularly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Monitor Regularly
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#emergency-exit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Emergency Exit
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#whats-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What's Next?
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What&#39;s Next?">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#claim-your-rewards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Claim Your Rewards
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#optimize-your-portfolio" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optimize Your Portfolio
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#need-help" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Need Help?
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bridge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bridge Assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rewards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manage Rewards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Scenarios
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Scenarios
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scenarios/grow-position/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Grow Your Position
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scenarios/maximize-yield/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Maximize Yield
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scenarios/dca-strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DCA Strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scenarios/platform-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scenarios/portfolio-rebalancing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Portfolio Rebalancing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scenarios/risk-hedging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Risk Management & Hedging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scenarios/leverage-long/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Leverage Long Position
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scenarios/multi-asset-strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Asset Strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scenarios/collateral-optimization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Collateral Optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scenarios/arbitrage-market-making/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Arbitrage & Market Making
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scenarios/withdrawals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Withdrawals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing to STRATO
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Contributing to STRATO
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contribute/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contribute/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contribute/contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing Guidelines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building Apps on STRATO
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Building Apps on STRATO
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_1" id="__nav_8_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../build-apps/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    System Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../build-apps/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start (5 min)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_2" id="__nav_8_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Building
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../build-apps/integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../build-apps/e2e/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    E2E Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_3" id="__nav_8_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../build-apps/contract-addresses/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../build-apps/quick-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Cheat Sheet
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    App API (Getting Started)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/interactive-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Interactive Reference (Swagger)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/strato-node-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Platform API (Advanced)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../safety/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Safety & Risk
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#complete-example-provide-6000-ethst-usdst-liquidity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Complete Example: Provide $6,000 ETHST-USDST Liquidity
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Complete Example: Provide $6,000 ETHST-USDST Liquidity">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#quick-walkthrough" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Walkthrough
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prerequisites
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-liquidity-pools-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How Liquidity Pools Work
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How Liquidity Pools Work">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#automated-market-maker-amm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Automated Market Maker (AMM)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pool-math" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pool Math
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#your-share" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Your Share
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-by-step-add-liquidity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step-by-Step: Add Liquidity
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step-by-Step: Add Liquidity">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-1-choose-a-pool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1: Choose a Pool
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-enter-amounts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2: Enter Amounts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-3-review-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3: Review Details
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-4-add-liquidity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 4: Add Liquidity
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#earning-from-liquidity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Earning from Liquidity
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Earning from Liquidity">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#trading-fees" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trading Fees
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reward-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reward Points
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tracking-earnings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tracking Earnings
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#removing-liquidity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Removing Liquidity
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Removing Liquidity">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-1-go-to-your-positions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1: Go to Your Positions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-choose-amount" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2: Choose Amount
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-3-confirm-withdrawal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3: Confirm Withdrawal
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#understanding-impermanent-loss" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Understanding Impermanent Loss
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Understanding Impermanent Loss">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-is-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What Is It?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-is-it-a-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When Is It a Problem?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mitigating-il" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mitigating IL
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#best-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Best Practices
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Best Practices">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#choosing-pools" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choosing Pools
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#managing-il-risk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Managing IL Risk
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#position-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Position Management
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pool-stats-explained" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pool Stats Explained
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Pool Stats Explained">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tvl-total-value-locked" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TVL (Total Value Locked)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#volume-24h" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Volume 24h
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#apr-annual-percentage-rate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        APR (Annual Percentage Rate)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#your-pool-share" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Your Pool Share
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#advanced-strategies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Advanced Strategies
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Advanced Strategies">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#liquidity-farming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Liquidity Farming
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#range-orders-concentrated-liquidity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Range Orders (Concentrated Liquidity)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#arbitrage-protection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Arbitrage Protection
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#common-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common Issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Common Issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#insufficient-balance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Insufficient Balance"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#price-updated-warning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Price Updated" Warning
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#slippage-tolerance-exceeded" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Slippage Tolerance Exceeded"
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#risk-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Risk Management
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Risk Management">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#diversification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Diversification
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#start-small" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Start Small
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#monitor-regularly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Monitor Regularly
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#emergency-exit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Emergency Exit
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#whats-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What's Next?
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What&#39;s Next?">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#claim-your-rewards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Claim Your Rewards
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#optimize-your-portfolio" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optimize Your Portfolio
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#need-help" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Need Help?
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="provide-liquidity">Provide Liquidity<a class="headerlink" href="#provide-liquidity" title="Permanent link">&para;</a></h1>
+<p>Earn fees by providing liquidity to STRATO's decentralized exchange pools.</p>
+<div class="admonition note">
+<p class="admonition-title">Variable Returns &amp; Risks</p>
+<p>APR estimates, gas costs, and trading fees shown are based on historical data and typical conditions. Actual returns may vary significantly based on trading volume, pool size, and market conditions. You may also experience impermanent loss. Always research pool performance before providing liquidity.</p>
+</div>
+<hr />
+<h2 id="complete-example-provide-6000-ethst-usdst-liquidity">Complete Example: Provide $6,000 ETHST-USDST Liquidity<a class="headerlink" href="#complete-example-provide-6000-ethst-usdst-liquidity" title="Permanent link">&para;</a></h2>
+<p><strong>Your situation:</strong></p>
+<ul>
+<li>You have: 1 ETHST ($3,000) + 3,000 USDST</li>
+<li>You want: Earn trading fees passively</li>
+</ul>
+<p><strong>What you'll do:</strong></p>
+<ol>
+<li>Choose ETHST-USDST pool</li>
+<li>Add liquidity</li>
+<li>Earn fees automatically</li>
+<li>Remove liquidity (anytime)</li>
+</ol>
+<p><strong>Time needed:</strong> 5 minutes<br />
+<strong>Potential earnings:</strong> ~8-15% APR (fees + Reward Points)<br />
+<strong>Total gas cost:</strong> ~$0.30</p>
+<hr />
+<h3 id="quick-walkthrough">Quick Walkthrough<a class="headerlink" href="#quick-walkthrough" title="Permanent link">&para;</a></h3>
+<p><strong>Step 1: Choose Pool</strong>
+- Go to <strong>Pools</strong> page
+- Select <strong>ETHST-USDST pool</strong>
+- Check: 24h volume $500k, APR 12%</p>
+<p><strong>Step 2: Enter Amounts</strong>
+- Enter: <strong>1 ETHST</strong>
+- Auto-fills: <strong>3,000 USDST</strong> (to match ratio)
+- Your share: 0.5% of pool</p>
+<p><strong>Step 3: Add Liquidity</strong>
+- Click <strong>"Add Liquidity"</strong> (~$0.10 gas)
+- Confirm in wallet
+  - Approvals + add liquidity happen automatically in one transaction
+- Wait 1-2 seconds</p>
+<p><strong>Result:</strong>
+<div class="highlight"><pre><span></span><code>✅ Added: 1 ETHST + 3,000 USDST to pool
+✅ Received: LP tokens (representing your 0.5% share)
+✅ Earning: ~$2/day in fees (12% APR)
+✅ Plus: Reward Points
+</code></pre></div></p>
+<p><strong>Your position:</strong></p>
+<ul>
+<li>Pool share: 0.5%</li>
+<li>Value: $6,000</li>
+<li>Daily earnings: ~$2 in fees</li>
+<li>Monthly: ~$60 (if volume stays constant)</li>
+</ul>
+<hr />
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<p><strong>What is liquidity providing?</strong>
+- Deposit token pairs into liquidity pools (e.g., ETHST + USDC)
+- Earn trading fees from every swap that uses your pool
+- Receive LP (Liquidity Provider) tokens representing your share
+- Plus earn Reward Points</p>
+<p><strong>Why provide liquidity?</strong>
+- <strong>Passive income</strong>: Earn from trading fees (typically 0.3% per trade)
+- <strong>Reward Points</strong>: Bonus rewards for liquidity providers
+- <strong>Support ecosystem</strong>: Enable trading for others
+- <strong>Capital efficiency</strong>: Put idle assets to work</p>
+<hr />
+<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
+<p>Before providing liquidity:</p>
+<ul>
+<li>[ ] STRATO account set up (<a href="../../quick-start/">Quick Start Guide</a>)</li>
+<li>[ ] Wallet connected to STRATO network</li>
+<li>[ ] Both tokens of a pair in your wallet (e.g., ETHST + USDC)</li>
+<li>[ ] Small amount of USDST for gas fees</li>
+<li>[ ] Understanding of impermanent loss (<a href="../../concepts/#impermanent-loss-liquidity-provision">Core Concepts</a>)</li>
+</ul>
+<hr />
+<h2 id="how-liquidity-pools-work">How Liquidity Pools Work<a class="headerlink" href="#how-liquidity-pools-work" title="Permanent link">&para;</a></h2>
+<h3 id="automated-market-maker-amm">Automated Market Maker (AMM)<a class="headerlink" href="#automated-market-maker-amm" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>You deposit</strong> equal value of two tokens (e.g., $1,000 ETHST + $1,000 USDC)</li>
+<li><strong>Traders swap</strong> between these tokens, paying fees</li>
+<li><strong>You earn</strong> a share of fees proportional to your pool share</li>
+<li><strong>You can withdraw</strong> anytime (subject to available liquidity)</li>
+</ol>
+<h3 id="pool-math">Pool Math<a class="headerlink" href="#pool-math" title="Permanent link">&para;</a></h3>
+<p>Pools maintain a constant product:</p>
+<div class="highlight"><pre><span></span><code>x × y = k (constant)
+
+Where:
+x = Token A reserves
+y = Token B reserves  
+k = constant product
+</code></pre></div>
+<p>This formula automatically sets prices based on supply and demand.</p>
+<h3 id="your-share">Your Share<a class="headerlink" href="#your-share" title="Permanent link">&para;</a></h3>
+<p>You receive <strong>LP tokens</strong> representing your ownership:</p>
+<div class="highlight"><pre><span></span><code>Your LP tokens / Total LP tokens = Your % of pool
+</code></pre></div>
+<p><strong>Example</strong>: You own 1,000 LP tokens, total is 100,000 LP tokens
+- Your share: 1%
+- You earn: 1% of all trading fees</p>
+<hr />
+<h2 id="step-by-step-add-liquidity">Step-by-Step: Add Liquidity<a class="headerlink" href="#step-by-step-add-liquidity" title="Permanent link">&para;</a></h2>
+<h3 id="step-1-choose-a-pool">Step 1: Choose a Pool<a class="headerlink" href="#step-1-choose-a-pool" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Navigate to <strong>Pools</strong> section in STRATO app</li>
+<li>Browse available pools or search for specific pair</li>
+<li>
+<p>Check pool stats:</p>
+</li>
+<li>
+<p><strong>TVL (Total Value Locked)</strong>: Pool size</p>
+</li>
+<li><strong>Volume 24h</strong>: Trading activity</li>
+<li><strong>APR</strong>: Estimated annual returns (fees + rewards)</li>
+</ol>
+<p><strong>Popular pools</strong>:</p>
+<ul>
+<li>ETHST / USDST - High volume, stable</li>
+<li>WBTC / ETHST - Dual crypto exposure</li>
+<li>USDST / USDST - Minimal impermanent loss</li>
+</ul>
+<h3 id="step-2-enter-amounts">Step 2: Enter Amounts<a class="headerlink" href="#step-2-enter-amounts" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Click <strong>Add Liquidity</strong> on chosen pool</li>
+<li>Enter amount for one token</li>
+<li>Second token amount auto-fills to maintain pool ratio</li>
+</ol>
+<p><strong>Example</strong>:</p>
+<ul>
+<li>Pool is 50% ETHST, 50% USDST</li>
+<li>You enter: 1 ETHST ($3,000)</li>
+<li>Auto-fills: 3,000 USDST (to match value)</li>
+</ul>
+<div class="admonition tip">
+<p class="admonition-title">Start Small</p>
+<p>Test with ~$100-500 first to understand the process before committing large amounts.</p>
+</div>
+<h3 id="step-3-review-details">Step 3: Review Details<a class="headerlink" href="#step-3-review-details" title="Permanent link">&para;</a></h3>
+<p>Check:</p>
+<ul>
+<li><strong>Token amounts</strong>: Both tokens and their USD values</li>
+<li><strong>Pool share</strong>: Your % of total pool</li>
+<li><strong>Exchange rate</strong>: Current price in pool</li>
+<li><strong>Estimated APR</strong>: Expected annual returns</li>
+<li><strong>Fees</strong>: Gas cost (&lt; $0.10 in USDST)</li>
+</ul>
+<h3 id="step-4-add-liquidity">Step 4: Add Liquidity<a class="headerlink" href="#step-4-add-liquidity" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Click <strong>Add Liquidity</strong></li>
+<li>Review transaction in wallet popup</li>
+<li>Confirm transaction</li>
+<li>Wait for confirmation (~1-2 seconds)</li>
+</ol>
+<p>✅ <strong>Done!</strong> You now have LP tokens in your wallet.</p>
+<hr />
+<h2 id="earning-from-liquidity">Earning from Liquidity<a class="headerlink" href="#earning-from-liquidity" title="Permanent link">&para;</a></h2>
+<h3 id="trading-fees">Trading Fees<a class="headerlink" href="#trading-fees" title="Permanent link">&para;</a></h3>
+<p><strong>How you earn</strong>:</p>
+<ul>
+<li>Every swap pays 0.3% fee (typical)</li>
+<li>Fees distributed proportionally to all LP holders</li>
+<li>Automatically added to pool (compounds)</li>
+</ul>
+<p><strong>Example</strong>:</p>
+<ul>
+<li>You own 1% of ETH-USDC pool</li>
+<li>Pool does $1,000,000 daily volume</li>
+<li>Daily fees: $1,000,000 × 0.3% = $3,000</li>
+<li>Your share: $3,000 × 1% = $30/day</li>
+</ul>
+<h3 id="reward-points">Reward Points<a class="headerlink" href="#reward-points" title="Permanent link">&para;</a></h3>
+<p>Additional rewards in Reward Points:</p>
+<ul>
+<li>Distributed to select pools</li>
+<li>Varies by pool and season</li>
+<li>Claim anytime in Rewards section</li>
+</ul>
+<h3 id="tracking-earnings">Tracking Earnings<a class="headerlink" href="#tracking-earnings" title="Permanent link">&para;</a></h3>
+<p>Monitor your position:</p>
+<ol>
+<li>Go to <strong>Advanced</strong> (in sidebar) → <strong>Swap Pools</strong> tab</li>
+<li>See your LP positions</li>
+<li>View accumulated fees</li>
+<li>Check current value vs. initial deposit</li>
+</ol>
+<hr />
+<h2 id="removing-liquidity">Removing Liquidity<a class="headerlink" href="#removing-liquidity" title="Permanent link">&para;</a></h2>
+<h3 id="step-1-go-to-your-positions">Step 1: Go to Your Positions<a class="headerlink" href="#step-1-go-to-your-positions" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Navigate to <strong>Portfolio</strong> → <strong>Liquidity</strong></li>
+<li>Select pool to withdraw from</li>
+</ol>
+<h3 id="step-2-choose-amount">Step 2: Choose Amount<a class="headerlink" href="#step-2-choose-amount" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Remove All</strong>: Withdraw 100% of position</li>
+<li><strong>Partial</strong>: Enter % or amount to withdraw</li>
+<li>Receive both tokens proportionally</li>
+</ul>
+<h3 id="step-3-confirm-withdrawal">Step 3: Confirm Withdrawal<a class="headerlink" href="#step-3-confirm-withdrawal" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Click <strong>Remove Liquidity</strong></li>
+<li>Review amounts you'll receive</li>
+<li>Confirm transaction in wallet</li>
+<li>Wait for confirmation</li>
+</ol>
+<p>Tokens (including earned fees) return to your wallet.</p>
+<hr />
+<h2 id="understanding-impermanent-loss">Understanding Impermanent Loss<a class="headerlink" href="#understanding-impermanent-loss" title="Permanent link">&para;</a></h2>
+<h3 id="what-is-it">What Is It?<a class="headerlink" href="#what-is-it" title="Permanent link">&para;</a></h3>
+<p><strong>Impermanent Loss (IL)</strong>: Loss vs. simply holding the tokens when prices diverge.</p>
+<h3 id="example">Example<a class="headerlink" href="#example" title="Permanent link">&para;</a></h3>
+<p><strong>Initial deposit</strong>:</p>
+<ul>
+<li>1 ETHST ($3,000) + 3,000 USDST = $6,000 total</li>
+</ul>
+<p><strong>ETH doubles to $6,000</strong>:</p>
+<ul>
+<li>Pool rebalances: 0.707 ETHST + 4,242 USDST - Pool value: $8,485</li>
+<li>If you just held: 1 ETHST ($6,000) + 3,000 USDST = $9,000</li>
+<li><strong>Impermanent loss: $515 (5.7%)</strong></li>
+</ul>
+<h3 id="when-is-it-a-problem">When Is It a Problem?<a class="headerlink" href="#when-is-it-a-problem" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>High IL</strong>: When token prices diverge significantly</li>
+<li><strong>Low IL</strong>: Stablecoin pairs (USDC-USDST) or correlated assets</li>
+</ul>
+<h3 id="mitigating-il">Mitigating IL<a class="headerlink" href="#mitigating-il" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Choose stable pairs</strong>: USDC-USDST has minimal IL</li>
+<li><strong>Earn fees to offset</strong>: High-volume pools compensate with fees</li>
+<li><strong>Long-term provide</strong>: Price often reverts, making loss "impermanent"</li>
+<li><strong>Reward Points</strong>: Additional rewards can exceed IL</li>
+</ol>
+<div class="admonition note">
+<p class="admonition-title">IL is Impermanent</p>
+<p>Loss only realizes if you withdraw. If prices revert, the "loss" disappears. Plus trading fees and rewards often exceed IL.</p>
+</div>
+<hr />
+<h2 id="best-practices">Best Practices<a class="headerlink" href="#best-practices" title="Permanent link">&para;</a></h2>
+<h3 id="choosing-pools">Choosing Pools<a class="headerlink" href="#choosing-pools" title="Permanent link">&para;</a></h3>
+<p><strong>Good pools have</strong>:</p>
+<ul>
+<li>✅ High trading volume (more fees earned)</li>
+<li>✅ Deep liquidity (lower IL from your deposits)</li>
+<li>✅ Verified tokens (avoid scams)</li>
+<li>✅ Reward Points incentives</li>
+</ul>
+<p><strong>Avoid pools with</strong>:</p>
+<ul>
+<li>❌ Unknown/unverified tokens</li>
+<li>❌ Extremely low liquidity</li>
+<li>❌ Suspicious APR (too good to be true)</li>
+</ul>
+<h3 id="managing-il-risk">Managing IL Risk<a class="headerlink" href="#managing-il-risk" title="Permanent link">&para;</a></h3>
+<p><strong>Low IL strategies</strong>:</p>
+<ul>
+<li>Stablecoin pairs (USDC-USDST, USDC-DAI)</li>
+<li>Correlated assets (WBTC-ETH move together)</li>
+<li>Short time horizons in stable markets</li>
+</ul>
+<p><strong>Higher IL but profitable</strong>:</p>
+<ul>
+<li>High-volume pairs (fees offset IL)</li>
+<li>Pools with Reward Points</li>
+<li>Long-term positions (price reverts)</li>
+</ul>
+<h3 id="position-management">Position Management<a class="headerlink" href="#position-management" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] Monitor positions weekly</li>
+<li>[ ] Check if fees exceed IL</li>
+<li>[ ] Rebalance between pools based on APR</li>
+<li>[ ] Claim Reward Points regularly</li>
+<li>[ ] Withdraw if IL becomes too large</li>
+</ul>
+<hr />
+<h2 id="pool-stats-explained">Pool Stats Explained<a class="headerlink" href="#pool-stats-explained" title="Permanent link">&para;</a></h2>
+<h3 id="tvl-total-value-locked">TVL (Total Value Locked)<a class="headerlink" href="#tvl-total-value-locked" title="Permanent link">&para;</a></h3>
+<p>Total $ value in the pool. Higher = more stable prices, lower price impact.</p>
+<h3 id="volume-24h">Volume 24h<a class="headerlink" href="#volume-24h" title="Permanent link">&para;</a></h3>
+<p>Total trading volume in last 24 hours. Higher = more fees earned.</p>
+<h3 id="apr-annual-percentage-rate">APR (Annual Percentage Rate)<a class="headerlink" href="#apr-annual-percentage-rate" title="Permanent link">&para;</a></h3>
+<p>Estimated yearly returns from:</p>
+<ul>
+<li>Trading fees</li>
+<li>Reward Points</li>
+</ul>
+<p><strong>Example</strong>: 25% APR on $10,000 = ~$2,500/year</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>APR is estimated based on recent activity. Actual returns vary with volume and prices.</p>
+</div>
+<h3 id="your-pool-share">Your Pool Share<a class="headerlink" href="#your-pool-share" title="Permanent link">&para;</a></h3>
+<p>Your % of total pool. Determines your fee earnings:</p>
+<div class="highlight"><pre><span></span><code>Your fees = Total pool fees × Your share %
+</code></pre></div>
+<hr />
+<h2 id="advanced-strategies">Advanced Strategies<a class="headerlink" href="#advanced-strategies" title="Permanent link">&para;</a></h2>
+<h3 id="liquidity-farming">Liquidity Farming<a class="headerlink" href="#liquidity-farming" title="Permanent link">&para;</a></h3>
+<p>Maximize returns by:</p>
+<ol>
+<li>Choose highest APR pools</li>
+<li>Reinvest earned fees (compound)</li>
+<li>Claim and reinvest Reward Points</li>
+<li>Rotate to best-performing pools</li>
+</ol>
+<h3 id="range-orders-concentrated-liquidity">Range Orders (Concentrated Liquidity)<a class="headerlink" href="#range-orders-concentrated-liquidity" title="Permanent link">&para;</a></h3>
+<p>Some pools support concentrated liquidity:</p>
+<ul>
+<li>Provide liquidity in specific price ranges</li>
+<li>Earn more fees per capital</li>
+<li>Higher risk if price exits range</li>
+</ul>
+<p><strong>Not yet available on all STRATO pools</strong> - check pool type.</p>
+<h3 id="arbitrage-protection">Arbitrage Protection<a class="headerlink" href="#arbitrage-protection" title="Permanent link">&para;</a></h3>
+<p>Be aware of:</p>
+<ul>
+<li>Price discrepancies between exchanges</li>
+<li>Arbitrageurs quickly correct, earning fees from your pool</li>
+<li>You still earn fees, but IL can occur rapidly</li>
+</ul>
+<hr />
+<h2 id="common-issues">Common Issues<a class="headerlink" href="#common-issues" title="Permanent link">&para;</a></h2>
+<h3 id="insufficient-balance">"Insufficient Balance"<a class="headerlink" href="#insufficient-balance" title="Permanent link">&para;</a></h3>
+<p><strong>Cause</strong>: Not enough of one or both tokens</p>
+<p><strong>Fix</strong>:</p>
+<ul>
+<li>Check you have both tokens</li>
+<li>Verify balances cover amounts + gas</li>
+<li>Swap to get missing token</li>
+</ul>
+<h3 id="price-updated-warning">"Price Updated" Warning<a class="headerlink" href="#price-updated-warning" title="Permanent link">&para;</a></h3>
+<p><strong>Cause</strong>: Pool ratio changed since you started</p>
+<p><strong>Fix</strong>:</p>
+<ul>
+<li>Accept new price</li>
+<li>Or cancel and try again with updated amounts</li>
+</ul>
+<h3 id="slippage-tolerance-exceeded">"Slippage Tolerance Exceeded"<a class="headerlink" href="#slippage-tolerance-exceeded" title="Permanent link">&para;</a></h3>
+<p><strong>Cause</strong>: Pool price moved beyond tolerance</p>
+<p><strong>Fix</strong>:</p>
+<ul>
+<li>Increase slippage in settings</li>
+<li>Try again with updated amounts</li>
+</ul>
+<hr />
+<h2 id="risk-management">Risk Management<a class="headerlink" href="#risk-management" title="Permanent link">&para;</a></h2>
+<h3 id="diversification">Diversification<a class="headerlink" href="#diversification" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Don't put all capital in one pool</li>
+<li>Split across 3-5 pools</li>
+<li>Mix stable and volatile pairs</li>
+</ul>
+<h3 id="start-small">Start Small<a class="headerlink" href="#start-small" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Test with $100-500 first</li>
+<li>Learn the mechanics</li>
+<li>Scale up gradually</li>
+</ul>
+<h3 id="monitor-regularly">Monitor Regularly<a class="headerlink" href="#monitor-regularly" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Check positions weekly</li>
+<li>Compare returns vs. holding</li>
+<li>Exit if IL exceeds comfort level</li>
+</ul>
+<h3 id="emergency-exit">Emergency Exit<a class="headerlink" href="#emergency-exit" title="Permanent link">&para;</a></h3>
+<p>If you need to exit quickly:</p>
+<ul>
+<li>Remove liquidity anytime</li>
+<li>Receive both tokens back</li>
+<li>May realize impermanent loss</li>
+<li>But you keep all earned fees</li>
+</ul>
+<hr />
+<h2 id="whats-next">What's Next?<a class="headerlink" href="#whats-next" title="Permanent link">&para;</a></h2>
+<h3 id="claim-your-rewards">Claim Your Rewards<a class="headerlink" href="#claim-your-rewards" title="Permanent link">&para;</a></h3>
+<p>Maximize earnings:</p>
+<p>→ <strong><a href="../rewards/">Rewards Guide</a></strong> - Learn to claim Reward Points</p>
+<h3 id="optimize-your-portfolio">Optimize Your Portfolio<a class="headerlink" href="#optimize-your-portfolio" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong><a href="../swap/">Swap Guide</a></strong> - Rebalance between pools</li>
+<li><strong><a href="../borrow/">Borrow USDST</a></strong> - Leverage your LP positions</li>
+<li><strong><a href="../../concepts/">Core Concepts</a></strong> - Deepen your understanding</li>
+</ul>
+<hr />
+<h2 id="need-help">Need Help?<a class="headerlink" href="#need-help" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>FAQ</strong>: <a href="../../faq/#swaps-liquidity">Common Questions</a></li>
+<li><strong>Support</strong>: <a href="https://support.blockapps.net">support.blockapps.net</a></li>
+<li><strong>API Reference</strong>: <a href="../../reference/interactive-api/">Interactive API (Swagger)</a></li>
+<li><strong>Telegram</strong>: <a href="https://t.me/strato_net">t.me/strato_net</a></li>
+</ul>
+
+
+
+
+
+
+
+  
+    
+  
+  
+    
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Last update">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="January 22, 2026 09:54:44 UTC"><span class="timeago" datetime="2026-01-22T09:54:44+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="January 22, 2026 09:54:44 UTC">2026-01-22</span>
+  </span>
+
+    
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Created">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="January 5, 2026 17:52:18 UTC"><span class="timeago" datetime="2026-01-05T17:52:18+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="January 5, 2026 17:52:18 UTC">2026-01-05</span>
+  </span>
+
+    
+    
+    
+  </aside>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2025 BlockApps - STRATO Platform
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+    <a href="https://t.me/strato_net" target="_blank" rel="noopener" title="Telegram Community" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M256 8a248 248 0 1 0 0 496 248 248 0 1 0 0-496m115 168.7c-3.7 39.2-19.9 134.4-28.1 178.3-3.5 18.6-10.3 24.8-16.9 25.4-14.4 1.3-25.3-9.5-39.3-18.7-21.8-14.3-34.2-23.2-55.3-37.2-24.5-16.1-8.6-25 5.3-39.5 3.7-3.8 67.1-61.5 68.3-66.7.2-.7.3-3.1-1.2-4.4s-3.6-.8-5.1-.5c-2.2.5-37.1 23.5-104.6 69.1-9.9 6.8-18.9 10.1-26.9 9.9-8.9-.2-25.9-5-38.6-9.1-15.5-5-27.9-7.7-26.8-16.3.6-4.5 6.7-9 18.4-13.7 72.3-31.5 120.5-52.3 144.6-62.3 68.9-28.6 83.2-33.6 92.5-33.8 2.1 0 6.6.5 9.6 2.9 2 1.7 3.2 4.1 3.5 6.7.5 3.2.6 6.5.4 9.8z"/></svg>
+    </a>
+  
+    
+    
+    
+    
+    <a href="https://support.blockapps.net" target="_blank" rel="noopener" title="Support Portal" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M256 512a256 256 0 1 0 0-512 256 256 0 1 0 0 512m0-336c-17.7 0-32 14.3-32 32 0 13.3-10.7 24-24 24s-24-10.7-24-24c0-44.2 35.8-80 80-80s80 35.8 80 80c0 47.2-36 67.2-56 74.5v3.8c0 13.3-10.7 24-24 24s-24-10.7-24-24v-8.1c0-20.5 14.8-35.2 30.1-40.2 6.4-2.1 13.2-5.5 18.2-10.3 4.3-4.2 7.7-10 7.7-19.6 0-17.7-14.3-32-32-32zm-32 192a32 32 0 1 1 64 0 32 32 0 1 1-64 0"/></svg>
+    </a>
+  
+    
+    
+    
+    
+    <a href="https://docs.strato.nexus" target="_blank" rel="noopener" title="Documentation" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M384 512H96c-53 0-96-43-96-96V96C0 43 43 0 96 0h304c26.5 0 48 21.5 48 48v288c0 20.9-13.4 38.7-32 45.3V448c17.7 0 32 14.3 32 32s-14.3 32-32 32zM96 384c-17.7 0-32 14.3-32 32s14.3 32 32 32h256v-64zm32-232c0 13.3 10.7 24 24 24h176c13.3 0 24-10.7 24-24s-10.7-24-24-24H152c-13.3 0-24 10.7-24 24m24 72c-13.3 0-24 10.7-24 24s10.7 24 24 24h176c13.3 0 24-10.7 24-24s-10.7-24-24-24z"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.indexes", "navigation.instant", "navigation.tracking", "navigation.top", "navigation.expand", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit", "content.action.view"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../js/timeago.min.js"></script>
+      
+        <script src="../../js/timeago_mkdocs_material.js"></script>
+      
+    
+  </body>
+</html>
