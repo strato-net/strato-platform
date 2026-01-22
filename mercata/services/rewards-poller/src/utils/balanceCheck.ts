@@ -7,6 +7,7 @@ const fetchVoucherBalance = async (): Promise<bigint> => {
   const userAddress = await getBAUserAddress();
   const response = await cirrus.get("/BlockApps-Voucher-_balances", {
     params: {
+      address: `eq.${config.voucher.address}`,
       key: `eq.${userAddress}`,
       select: "balance:value::text",
     },
@@ -41,7 +42,7 @@ export const checkBalances = async (): Promise<void> => {
   const voucherBalanceUSD = Number(voucherBalance) / 1e18;
   const usdstBalanceUSD = Number(usdstBalance) / 1e18;
 
-  if (totalTransactions < config.balance.minTransactionsThreshold) {
+  if (totalTransactions <= config.balance.minTransactionsThreshold) {
     throw new Error(
       `Total possible transactions (${totalTransactions}) below minimum threshold (${config.balance.minTransactionsThreshold}). Voucher: ${voucherBalanceUSD} (${voucherTransactions} txs), USDST: ${usdstBalanceUSD} (${usdstTransactions} txs)`
     );
