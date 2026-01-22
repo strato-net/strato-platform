@@ -43,8 +43,7 @@ Get your crypto onto STRATO and borrow USDST to start using DeFi.
 4. Review costs:
 
    - Ethereum gas: ~$20 (varies with congestion)
-   - Bridge fee: ~$1
-   - Total: ~$21
+   - Total: ~$20
 
 **Step 3: Confirm & Wait**
 
@@ -198,9 +197,8 @@ Get your crypto onto STRATO and borrow USDST to start using DeFi.
 **Total costs:**
 
 - Ethereum gas: ~$20
-- Bridge fee: ~$1
 - STRATO gas: ~$0.30
-- **Total: ~$21.30**
+- **Total: ~$20.30**
 
 **What you can do now:**
 

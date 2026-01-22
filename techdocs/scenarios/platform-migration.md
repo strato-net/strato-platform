@@ -139,14 +139,13 @@ Move your positions from Aave, Compound, MakerDAO, or other platforms to STRATO.
 5. Review costs:
 
    - Ethereum gas: ~$15-25
-   - Bridge fee: ~$1
 6. Confirm and pay
 7. Wait 10-15 minutes
 
 **Result:**
 ```
 ✅ Bridged: 10 ETH to STRATO
-✅ Total bridge cost: ~$16-26
+✅ Total bridge cost: ~$15-25
 ```
 
 **Optional: Bridge USDC for Repayment Later**
@@ -240,7 +239,7 @@ If you need USDST instead of USDST:
 |--------|------|
 | Repay Aave debt | ~$30 (ETH gas) |
 | Withdraw from Aave | ~$20 (ETH gas) |
-| Bridge to STRATO | ~$20 (ETH gas + bridge fee) |
+| Bridge to STRATO | ~$20 (ETH gas) |
 | Supply on STRATO | ~$0.10 (USDST gas) |
 | Borrow on STRATO | ~$0.10 (USDST gas) |
 | **Total migration cost** | **~$70-80** |
