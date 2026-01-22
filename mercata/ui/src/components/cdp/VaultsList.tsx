@@ -6,13 +6,13 @@ import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { MoreVertical, Loader2 } from "lucide-react";
-import { cdpService, VaultData, TransactionResponse } from "@/services/cdpService";
+import { cdpService, Vault, TransactionResponse } from "@/services/cdpService";
 import { useToast } from "@/hooks/use-toast";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { useOracleContext } from "@/context/OracleContext";
 import { formatWeiToDecimalHP, formatNumber, formatDecimalToWeiHP, formatNumberWithCommas, parseCommaNumber } from "@/utils/numberUtils";
-import { getAssetColor } from "@/utils/loanUtils";
+import { getAssetColor } from "@/components/cdp/v2/cdpUtils";
 import { usdstAddress } from "@/lib/constants";
 
 // Calculate Health Factor: CR / LT (Liquidation Threshold)
@@ -44,7 +44,7 @@ interface VaultsListProps {
  * Connected to backend API for real-time data
  */
 const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSuccess }) => {
-  const [positions, setPositions] = useState<VaultData[]>([]);
+  const [positions, setPositions] = useState<Vault[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const { activeTokens, fetchTokens } = useUserTokens();
@@ -229,7 +229,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
   };
 
   // Calculate maximum allowed value for each action
-  const calculateMaxValue = async (position: VaultData, action: 'deposit' | 'withdraw' | 'mint' | 'repay'): Promise<string> => {
+  const calculateMaxValue = async (position: Vault, action: 'deposit' | 'withdraw' | 'mint' | 'repay'): Promise<string> => {
     switch (action) {
       case 'deposit': {
         // Find the user's balance for this token
@@ -321,7 +321,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
   };
 
   // Calculate preview values based on input
-  const calculatePreviewValues = (position: VaultData, action: 'deposit' | 'withdraw' | 'mint' | 'repay', inputAmount: string) => {
+  const calculatePreviewValues = (position: Vault, action: 'deposit' | 'withdraw' | 'mint' | 'repay', inputAmount: string) => {
     const parsed = parseCommaNumber(inputAmount);
     const amount = parseFloat(parsed);
     if (isNaN(amount) || amount <= 0) return null;

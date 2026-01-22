@@ -10,6 +10,7 @@ interface MintAmountInputProps {
   onMaxClick: () => void;
   isMaxMode: boolean;
   exceedsMax?: boolean; // Whether value exceeds maximum available
+  maxAvailable?: string; // Maximum available amount for error message
   label?: string;
   placeholder?: string;
   unit?: string;
@@ -23,6 +24,7 @@ const MintAmountInput: React.FC<MintAmountInputProps> = ({
   onMaxClick,
   isMaxMode,
   exceedsMax = false,
+  maxAvailable,
   label = 'Mint Amount',
   placeholder = '0',
   unit = 'USDST',
@@ -75,6 +77,11 @@ const MintAmountInput: React.FC<MintAmountInputProps> = ({
           </Button>
         </div>
       </div>
+      {exceedsMax && (
+        <p className="text-xs text-red-600 dark:text-red-400">
+          Insufficient collateral. Maximum available: {maxAvailable ? `${maxAvailable} ${unit}` : `${unit}`}. Try decreasing the mint amount or moving the Risk Slider to the right.
+        </p>
+      )}
     </div>
   );
 };

@@ -9,8 +9,8 @@ import { Slider } from "@/components/ui/slider";
 import { ChevronDown, ChevronLeft, ChevronRight, Info } from "lucide-react";
 import { useOracleContext } from "@/context/OracleContext";
 import { cdpService } from "@/services/cdpService";
-import { getOptimalAllocations, computeTotalHeadroom, getMaxAllocations, type VaultCandidate } from "@/services/MintService";
-import type { PlanItem } from "@/services/cdpTypes";
+import { getOptimalAllocations, computeTotalHeadroom, getMaxAllocations } from "@/components/cdp/v2/MintService";
+import type { VaultCandidate, Allocation } from "@/components/cdp/v2/cdpTypes";
 import {
   SECONDS_PER_DAY,
   SECONDS_PER_WEEK,
@@ -63,53 +63,38 @@ const parseInputToWei = (input: string): bigint => {
   }
 };
 
-function allocationToPlanItem(
-  allocation: { assetAddress: string; depositAmount: bigint; mintAmount: bigint },
-  candidate: VaultCandidate
-): PlanItem {
-  const decimals = candidate.assetScale.toString().length - 1;
-  const depositAmountUSDWei = (allocation.depositAmount * candidate.oraclePrice) / candidate.assetScale;
-  const existingCollateralUSDWei = (candidate.currentCollateral * candidate.oraclePrice) / candidate.assetScale;
-  const userBalanceUSDWei = (candidate.potentialCollateral * candidate.oraclePrice) / candidate.assetScale;
-  
-  return {
-    assetAddress: allocation.assetAddress,
-    symbol: candidate.symbol,
-    depositAmount: formatUnits(allocation.depositAmount, decimals),
-    depositAmountUSD: formatUnits(depositAmountUSDWei, 18),
-    mintAmount: formatUnits(allocation.mintAmount, 18),
-    stabilityFeeRate: convertStabilityFeeRateToAnnualPercentage(candidate.stabilityFeeRate),
-    existingCollateralUSD: formatUnits(existingCollateralUSDWei, 18),
-    userBalance: formatUnits(candidate.potentialCollateral, decimals),
-    userBalanceUSD: formatUnits(userBalanceUSDWei, 18),
-  };
-}
-
-function convertAllocationsToPlanItems(
-  allocations: { assetAddress: string; depositAmount: bigint; mintAmount: bigint }[],
+function addAllocationsToVaultCandidates(
+  allocations: Allocation[],
   candidates: VaultCandidate[]
-): PlanItem[] {
-  return allocations
+): VaultCandidate[] {
+  const result = allocations
     .map(allocation => {
       const candidate = candidates.find(c => c.assetAddress === allocation.assetAddress);
-      return candidate ? allocationToPlanItem(allocation, candidate) : null;
+      return candidate ? { ...candidate, allocation } : null;
     })
-    .filter((item): item is PlanItem => item !== null)
-    .sort((a, b) => a.stabilityFeeRate - b.stabilityFeeRate);
+    .filter((item) => item !== null) as VaultCandidate[];
+  
+  return result.sort((a, b) => {
+    const aRate = parseFloat(formatUnits(a.stabilityFeeRate, 18));
+    const bRate = parseFloat(formatUnits(b.stabilityFeeRate, 18));
+    return aRate - bRate;
+  });
 }
 
 // VaultBreakdown Component
 const VaultBreakdown: React.FC<{
-  allocations: PlanItem[];
+  vaultCandidates: VaultCandidate[];  // VaultCandidates with allocation field
   open: boolean;
   onOpenChange: (open: boolean) => void;
-}> = ({ allocations, open, onOpenChange }) => {
-  const totalMintAmount = allocations.reduce((sum, a) => sum + parseFloat(a.mintAmount || "0"), 0);
+}> = ({ vaultCandidates, open, onOpenChange }) => {
+  const totalMintAmount = vaultCandidates.reduce((sum, v) => {
+    return sum + (v.allocation ? parseFloat(formatUnits(v.allocation.mintAmount, 18)) : 0);
+  }, 0);
   
-  const { transactionCount, totalFees } = allocations.reduce(
-    (acc, a) => {
-      const hasDeposit = parseFloat(a.depositAmount || "0") > 0;
-      const hasMint = parseFloat(a.mintAmount || "0") > 0;
+  const { transactionCount, totalFees } = vaultCandidates.reduce(
+    (acc, v) => {
+      const hasDeposit = v.allocation && v.allocation.depositAmount > 0n;
+      const hasMint = v.allocation && v.allocation.mintAmount > 0n;
       return {
         transactionCount: acc.transactionCount + (hasDeposit ? 1 : 0) + (hasMint ? 1 : 0),
         totalFees: acc.totalFees + (hasDeposit ? DEPOSIT_FEE_USDST : 0) + (hasMint ? MINT_FEE_USDST : 0),
@@ -128,29 +113,42 @@ const VaultBreakdown: React.FC<{
       </CollapsibleTrigger>
       <CollapsibleContent>
         <div className="space-y-2 pt-2">
-          {allocations.map((allocation) => {
-            const depositAmount = parseFloat(allocation.depositAmount);
-            const existingCollateralUSD = parseFloat(allocation.existingCollateralUSD);
+          {vaultCandidates.map((candidate) => {
+            if (!candidate.allocation) return null;
+            
+            const decimals = candidate.unitScale.toString().length - 1;
+            
+            // Calculate amounts from wei
+            const depositAmount = parseFloat(formatUnits(candidate.allocation.depositAmount, decimals));
+            const userBalance = parseFloat(formatUnits(candidate.potentialCollateral, decimals));
+            const mintAmount = parseFloat(formatUnits(candidate.allocation.mintAmount, 18));
+            
+            // Calculate USD values on-the-fly
+            const depositAmountUSD = parseFloat(formatUnits((candidate.allocation.depositAmount * candidate.oraclePrice) / candidate.unitScale, 18));
+            const userBalanceUSD = parseFloat(formatUnits((candidate.potentialCollateral * candidate.oraclePrice) / candidate.unitScale, 18));
+            const existingCollateralUSD = parseFloat(formatUnits((candidate.currentCollateral * candidate.oraclePrice) / candidate.unitScale, 18));
+            
+            const stabilityFeeRate = parseFloat(formatUnits(candidate.stabilityFeeRate, 18)) * 100;
 
             return (
-              <div key={allocation.assetAddress} className="p-3 rounded-md border border-border bg-card">
+              <div key={candidate.assetAddress} className="p-3 rounded-md border border-border bg-card">
                 <div className="flex items-center justify-between mb-2">
-                  <p className="font-semibold text-foreground">{allocation.symbol}</p>
-                  <Badge variant="outline">{formatPercentage(allocation.stabilityFeeRate)}</Badge>
+                  <p className="font-semibold text-foreground">{candidate.symbol}</p>
+                  <Badge variant="outline">{formatPercentage(stabilityFeeRate)}</Badge>
                 </div>
                 <div className="space-y-1 text-sm text-muted-foreground">
-                  <p>• Balance: {formatUSD(parseFloat(allocation.userBalance), 4)} {allocation.symbol} (${formatUSD(parseFloat(allocation.userBalanceUSD), 2)})</p>
+                  <p>• Balance: {formatUSD(userBalance, 4)} {candidate.symbol} (${formatUSD(userBalanceUSD, 2)})</p>
                   {depositAmount > 0 ? (
-                    <p>• Add collateral: {formatUSD(depositAmount, 4)} {allocation.symbol} (${formatUSD(parseFloat(allocation.depositAmountUSD))})</p>
+                    <p>• Add collateral: {formatUSD(depositAmount, 4)} {candidate.symbol} (${formatUSD(depositAmountUSD)})</p>
                   ) : existingCollateralUSD > 0 ? (
                     <p>• Use existing collateral: ${formatUSD(existingCollateralUSD)}</p>
                   ) : null}
-                  <p className="font-semibold text-foreground">• Mint: {formatUSD(parseFloat(allocation.mintAmount), 2)} USDST</p>
+                  <p className="font-semibold text-foreground">• Mint: {formatUSD(mintAmount, 2)} USDST</p>
                 </div>
               </div>
             );
           })}
-          {allocations.length > 0 && (
+          {vaultCandidates.length > 0 && (
             <div className="pt-2 mt-2 border-t border-border space-y-2">
               <div className="flex items-center justify-between p-3 rounded-md bg-muted/50">
                 <p className="text-sm font-semibold text-foreground">Total Mint Amount</p>
@@ -238,11 +236,11 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
 
   const mintAmountWei = useMemo(() => parseInputToWei(mintAmountInput), [mintAmountInput]);
 
-  const maxAllocations = useMemo<PlanItem[]>(() => {
+  const maxAllocations = useMemo<VaultCandidate[]>(() => {
     if (vaultCandidates.length === 0) return [];
     try {
       const result = getMaxAllocations(vaultCandidates, riskBuffer);
-      return convertAllocationsToPlanItems(result, vaultCandidates);
+      return addAllocationsToVaultCandidates(result, vaultCandidates);
     } catch {
       return [];
     }
@@ -255,7 +253,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
     try {
       const result = getOptimalAllocations(mintAmountWei, riskBuffer, vaultCandidates);
       return {
-        optimalAllocations: convertAllocationsToPlanItems(result.allocations, vaultCandidates),
+        optimalAllocations: addAllocationsToVaultCandidates(result.allocations, vaultCandidates),
         debtFloorHit: result.debtFloorHit,
         debtCeilingHit: result.debtCeilingHit,
       };
@@ -269,7 +267,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
   [riskBuffer, vaultCandidates]);
 
   const totalMaxMintWei = useMemo(() => 
-    maxAllocations.reduce((sum, a) => sum + parseUnits(a.mintAmount, 18), 0n),
+    maxAllocations.reduce((sum, v) => sum + (v.allocation?.mintAmount || 0n), 0n),
   [maxAllocations]);
 
   const shouldLockInput = maxAllocations.length === 0 || totalMaxMintWei === 0n;
@@ -342,7 +340,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
   // Computed display values
   const supportedAssetsWithBalances = useMemo(() => {
     return vaultCandidates.map((c) => {
-      const decimals = c.assetScale.toString().length - 1;
+      const decimals = c.unitScale.toString().length - 1;
       const priceUSD = parseFloat(formatUnits(c.oraclePrice, 18));
       const depositedAmount = parseFloat(formatUnits(c.currentCollateral, decimals));
       const walletAmount = parseFloat(formatUnits(c.potentialCollateral, decimals));
@@ -364,11 +362,13 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
     if (optimalAllocations.length === 0) return 0;
     let totalMint = 0, weightedSum = 0;
     
-    for (const a of optimalAllocations) {
-      const mint = parseFloat(a.mintAmount);
-      if (isFinite(mint) && isFinite(a.stabilityFeeRate) && mint > 0 && a.stabilityFeeRate >= 0) {
+    for (const v of optimalAllocations) {
+      if (!v.allocation) continue;
+      const mint = parseFloat(formatUnits(v.allocation.mintAmount, 18));
+      const feeRate = parseFloat(formatUnits(v.stabilityFeeRate, 18)) * 100; // Convert to percentage
+      if (isFinite(mint) && isFinite(feeRate) && mint > 0 && feeRate >= 0) {
         totalMint += mint;
-        weightedSum += mint * a.stabilityFeeRate;
+        weightedSum += mint * feeRate;
       }
     }
     
@@ -401,23 +401,28 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
       const { existingVaults, potentialVaults } = await cdpService.getVaultCandidates();
       const freshCandidates = [...existingVaults, ...potentialVaults];
       
-      let freshAllocations: PlanItem[];
+      let freshAllocations: VaultCandidate[];
       if (isMaxMode) {
         const maxResult = getMaxAllocations(freshCandidates, riskBuffer);
-        freshAllocations = convertAllocationsToPlanItems(maxResult, freshCandidates);
+        freshAllocations = addAllocationsToVaultCandidates(maxResult, freshCandidates);
       } else {
         const freshTargetMintUSD = parseUnits(mintAmount.toFixed(18), 18);
         const result = getOptimalAllocations(freshTargetMintUSD, riskBuffer, freshCandidates);
-        freshAllocations = convertAllocationsToPlanItems(result.allocations, freshCandidates);
+        freshAllocations = addAllocationsToVaultCandidates(result.allocations, freshCandidates);
       }
 
       const transactions: Array<{ type: "deposit" | "mint"; asset: string; amount: string; symbol: string }> = [];
-      for (const allocation of freshAllocations) {
-        if (parseFloat(allocation.depositAmount || "0") > 0) {
-          transactions.push({ type: "deposit", asset: allocation.assetAddress, amount: allocation.depositAmount, symbol: allocation.symbol });
+      for (const candidate of freshAllocations) {
+        if (!candidate.allocation) continue;
+        
+        if (candidate.allocation.depositAmount > 0n) {
+          const decimals = candidate.unitScale.toString().length - 1;
+          const depositDecimal = formatUnits(candidate.allocation.depositAmount, decimals);
+          transactions.push({ type: "deposit", asset: candidate.assetAddress, amount: depositDecimal, symbol: candidate.symbol });
         }
-        if (parseFloat(allocation.mintAmount || "0") > 0) {
-          transactions.push({ type: "mint", asset: allocation.assetAddress, amount: allocation.mintAmount, symbol: allocation.symbol });
+        if (candidate.allocation.mintAmount > 0n) {
+          const mintDecimal = formatUnits(candidate.allocation.mintAmount, 18);
+          transactions.push({ type: "mint", asset: candidate.assetAddress, amount: mintDecimal, symbol: candidate.symbol });
         }
       }
 
@@ -680,7 +685,7 @@ const MintPlanner: React.FC<{ title?: string; onSuccess?: () => void; refreshTri
                 </div>
               ) : exceedsMaxCollateral ? null : optimalAllocations.length > 0 ? (
                 <>
-                  <VaultBreakdown allocations={optimalAllocations} open={showVaultBreakdown} onOpenChange={setShowVaultBreakdown} />
+                  <VaultBreakdown vaultCandidates={optimalAllocations} open={showVaultBreakdown} onOpenChange={setShowVaultBreakdown} />
                   {(debtFloorHit || debtCeilingHit) && (
                     <div className="p-3 rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
                       <p className="text-xs text-amber-800 dark:text-amber-200">

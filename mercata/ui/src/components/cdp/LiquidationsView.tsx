@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { cdpService, VaultData, AssetConfig, TransactionResponse } from "@/services/cdpService";
+import { cdpService, Vault, AssetConfig, TransactionResponse } from "@/services/cdpService";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
@@ -22,7 +22,7 @@ const formatPercentage = (num: number, decimals: number = 2): string => {
 };
 
 const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
-  const [liquidatableVaults, setLiquidatableVaults] = useState<VaultData[]>([]);
+  const [liquidatableVaults, setLiquidatableVaults] = useState<Vault[]>([]);
   const [assetConfigs, setAssetConfigs] = useState<Record<string, AssetConfig>>({});
   const [loading, setLoading] = useState(true);
   const [expandedVaults, setExpandedVaults] = useState<Record<string, boolean>>({});
@@ -182,7 +182,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
   };
 
   // Handle MAX button click
-  const handleMaxClick = async (vault: VaultData, vaultKey: string) => {
+  const handleMaxClick = async (vault: Vault, vaultKey: string) => {
     const isCurrentlyMax = maxStates[vaultKey];
     if (isCurrentlyMax) {
       // Clear max state and amount
@@ -248,7 +248,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
     }
   };
 
-  const calculateExpectedProfit = (vault: VaultData, liquidationAmount: string): string => {
+  const calculateExpectedProfit = (vault: Vault, liquidationAmount: string): string => {
     const vaultKey = `${vault.borrower || 'unknown'}-${vault.asset}-${liquidatableVaults.findIndex(v => v.borrower === vault.borrower && v.asset === vault.asset)}`;
     const amount = parseFloat(liquidationAmount);
     
@@ -280,7 +280,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
     return `$${formatNumber(profit)}`;
   };
 
-  const handleLiquidate = async (vault: VaultData, vaultKey: string) => {
+  const handleLiquidate = async (vault: Vault, vaultKey: string) => {
     const liquidationAmount = liquidationAmounts[vaultKey];
     
     if (!liquidationAmount || parseFloat(liquidationAmount) <= 0) {
