@@ -365,7 +365,6 @@ Break-even: 1 month
 - [ ] Have assets ready for repayment
 - [ ] Check Ethereum gas prices (migrate when low)
 - [ ] Ensure enough USDST for STRATO gas
-- [ ] Add STRATO network to MetaMask
 - [ ] Read STRATO docs
 
 ### During Migration

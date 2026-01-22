@@ -65,34 +65,11 @@ Get your crypto onto STRATO and borrow USDST to start using DeFi.
 
 **While waiting:**
 
-- Add STRATO network to MetaMask (bridge page will prompt)
-- Switch to STRATO network in wallet
 - Read [Core Concepts](../concepts.md) to understand health factor
 
 ---
 
-### Part 2: Add STRATO Network to MetaMask
-
-**The bridge page should auto-prompt, but if not:**
-
-1. Open MetaMask → Networks → **Add Network**
-2. Enter details:
-
-   - Network Name: **STRATO**
-   - RPC URL: `https://app.strato.nexus/strato-api/eth/v1.2`
-   - Chain ID: (auto-detected)
-   - Currency: **ETH**
-3. Click **Save**
-4. Switch to STRATO network
-
-**Verify:**
-
-- You should see **1 ETHST** in your wallet
-- Network shows "STRATO" at top of MetaMask
-
----
-
-### Part 3: Get USDST for Fees (5 minutes)
+### Part 2: Get USDST for Fees (5 minutes)
 
 **Problem:** You need USDST to pay gas fees on STRATO
 
@@ -118,7 +95,7 @@ Get your crypto onto STRATO and borrow USDST to start using DeFi.
 
 ---
 
-### Part 4: Supply Collateral (2 minutes)
+### Part 3: Supply Collateral (2 minutes)
 
 **Now you have gas, let's continue:**
 
@@ -150,7 +127,7 @@ Get your crypto onto STRATO and borrow USDST to start using DeFi.
 
 ---
 
-### Part 5: Borrow USDST (2 minutes)
+### Part 4: Borrow USDST (2 minutes)
 
 **Step 1: Borrow**
 
