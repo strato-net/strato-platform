@@ -389,29 +389,30 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
         // Pre-calculate BOTH representations for deposit
         let depositAmountDisplay = '';
         let depositValueDisplay = '';
-        if (depositBigInt > 0n) {
-          // Check if deposit equals potentialCollateral (max mode)
-          const shouldAddToDepositMax = depositBigInt === c.potentialCollateral && c.potentialCollateral > 0n;
-          
-          if (shouldAddToDepositMax) {
-            // Use memoized formatted display values for max mode to avoid precision issues
-            const computed = vaultComputedValues[c.vaultConfig.assetAddress];
-            if (computed) {
-              depositAmountDisplay = computed.depositMaxAmount;
-              depositValueDisplay = computed.depositMaxValue;
-            } else {
-              // Fallback if computed not available
-              const tokenAmount = formatUnits(depositBigInt, decimals);
-              depositAmountDisplay = tokenAmount;
-              depositValueDisplay = amountToValue(tokenAmount, c.vaultConfig.assetAddress, false);
-            }
-            newDepositMaxVaults.add(c.vaultConfig.assetAddress);
-          } else {
-            // For non-max values, use standard conversion
+        
+        // Check if deposit equals potentialCollateral (max mode)
+        // Note: If potentialCollateral = 0 and depositBigInt = 0, that's also "at max" (nothing to deposit)
+        const isDepositAtMax = depositBigInt === c.potentialCollateral;
+        
+        if (isDepositAtMax) {
+          // Use memoized formatted display values for max mode to avoid precision issues
+          const computed = vaultComputedValues[c.vaultConfig.assetAddress];
+          if (computed && c.potentialCollateral > 0n) {
+            depositAmountDisplay = computed.depositMaxAmount;
+            depositValueDisplay = computed.depositMaxValue;
+          } else if (depositBigInt > 0n) {
+            // Fallback if computed not available but there is a deposit
             const tokenAmount = formatUnits(depositBigInt, decimals);
             depositAmountDisplay = tokenAmount;
             depositValueDisplay = amountToValue(tokenAmount, c.vaultConfig.assetAddress, false);
           }
+          // else: depositBigInt = 0 and potentialCollateral = 0, display stays empty
+          newDepositMaxVaults.add(c.vaultConfig.assetAddress);
+        } else if (depositBigInt > 0n) {
+          // For non-max values, use standard conversion
+          const tokenAmount = formatUnits(depositBigInt, decimals);
+          depositAmountDisplay = tokenAmount;
+          depositValueDisplay = amountToValue(tokenAmount, c.vaultConfig.assetAddress, false);
         }
 
         // Pre-calculate BOTH representations for mint
@@ -424,18 +425,23 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
           const shouldAddToMintMax = mintBigInt === maxMintUnits && maxMintUnits > 0n;
           
           if (shouldAddToMintMax) {
-            // Use memoized formatted display values for max mode to avoid precision issues
+            newMintMaxVaults.add(c.vaultConfig.assetAddress);
+            
+            // Only use pre-computed values if deposit is ALSO at max
+            // (computed mint max is calculated for full potentialCollateral deposit)
+            // Note: isDepositAtMax includes the case where potentialCollateral = 0
             const computed = vaultComputedValues[c.vaultConfig.assetAddress];
-            if (computed) {
+            
+            if (isDepositAtMax && computed && c.potentialCollateral > 0n) {
+              // Safe to use pre-computed mint max (calculated for full deposit)
               mintAmountDisplay = computed.mintMaxAmount;
               mintValueDisplay = computed.mintMaxValue;
             } else {
-              // Fallback if computed not available
+              // Deposit not at max OR potentialCollateral is 0, format mint from actual BigInt
               const mintDecimal = formatUnits(mintBigInt, 18);
               mintAmountDisplay = mintDecimal;
               mintValueDisplay = parseFloat(mintDecimal).toFixed(2);
             }
-            newMintMaxVaults.add(c.vaultConfig.assetAddress);
           } else {
             // For non-max values, use standard conversion
             const mintDecimal = formatUnits(mintBigInt, 18);
