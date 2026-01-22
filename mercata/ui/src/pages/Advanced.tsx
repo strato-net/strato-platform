@@ -14,8 +14,8 @@ import LiquidationsView from '@/components/cdp/LiquidationsView';
 import BadDebtView from '@/components/cdp/BadDebtView';
 import GuestVaultsView from '@/components/cdp/GuestVaultsView';
 // New v2 components
-import Mint from '@/components/cdp/v2/Mint';
-import DebtPosition from '@/components/cdp/v2/DebtPosition';
+import Mint from '@/components/cdp/v2/components/Mint/Mint';
+import DebtPosition from '@/components/cdp/v2/components/DebtPosition';
 import { useCDP } from '@/context/CDPContext';
 import { useUser } from '@/context/UserContext';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';

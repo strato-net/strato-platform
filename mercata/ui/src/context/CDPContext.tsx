@@ -1,10 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { cdpService, VaultData, AssetConfig } from '@/services/cdpService';
+import { cdpService, Vault,AssetConfig } from '@/services/cdpService';
 import { useUser } from '@/context/UserContext';
 import { api } from '@/lib/axios';
 
 type CDPContextType = {
-  vaults: VaultData[];
+  vaults: Vault[];
   loading: boolean;
   refreshVaults: () => Promise<void>;
   totalCDPDebt: string | undefined;
@@ -15,7 +15,7 @@ type CDPContextType = {
 const CDPContext = createContext<CDPContextType | undefined>(undefined);
 
 export const CDPProvider = ({ children }: { children: React.ReactNode }) => {
-  const [vaults, setVaults] = useState<VaultData[]>([]);
+  const [vaults, setVaults] = useState<Vault[]>([]);
   const [loading, setLoading] = useState(false); // Start with false, will be set to true when fetching
   const [cdpAssets, setCdpAssets] = useState<AssetConfig[]>([]);
   const [loadingAssets, setLoadingAssets] = useState(false);
@@ -46,7 +46,7 @@ export const CDPProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     try {
-      const response = await api.get<VaultData[]>("/cdp/vaults", {
+      const response = await api.get<Vault[]>("/cdp/vaults", {
         signal: vaultsAbortControllerRef.current.signal
       });
       
