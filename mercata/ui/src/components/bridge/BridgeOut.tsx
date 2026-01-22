@@ -331,15 +331,20 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false }) => {
             </div>
           ) : (
             maxAmount && (
-              <p className="text-xs md:text-sm text-muted-foreground truncate max-w-[200px] md:max-w-none">
-                Max: {formatBalance(
-                  maxAmount,
-                  undefined,
-                  DECIMAL,
-                  2,
-                  6
-                )}
-              </p>
+              <div className="flex items-center gap-3">
+                <p className="text-xs md:text-sm text-muted-foreground">
+                  Max: {formatBalance(
+                    maxAmount,
+                    undefined,
+                    DECIMAL,
+                    2,
+                    6
+                  )}
+                </p>
+                <p className="text-xs md:text-sm text-muted-foreground">
+                  Min: {isSaving ? MIN_USDST_WITHDRAWAL : "0"}
+                </p>
+              </div>
             )
           )}
         </div>
