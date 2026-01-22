@@ -28,6 +28,7 @@ import Rewards from "./pages/Rewards";
 import ReferFriend from "./pages/ReferFriend";
 import Claim from "./pages/Claim";
 import ReferralsManagement from "./pages/ReferralsManagement";
+import PriceTracking from "./pages/PriceTracking";
 
 // Import dashboard components
 
@@ -264,6 +265,15 @@ const App = () => {
                                   element={
                                     <ProtectedRoute>
                                       <ReferralsManagement />
+                                    </ProtectedRoute>
+                                  }
+                                />
+
+                                <Route
+                                  path="/dashboard/trading-desk"
+                                  element={
+                                    <ProtectedRoute>
+                                      <PriceTracking />
                                     </ProtectedRoute>
                                   }
                                 />

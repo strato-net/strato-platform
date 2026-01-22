@@ -6,6 +6,7 @@ import { extractContractName } from "../../utils/utils";
 import { getPool } from "./lending.service";
 import { PriceHistoryEntry, PriceHistoryResponse, OraclePriceEntry, OraclePriceMap } from "@mercata/shared-types";
 import { toUTCTime } from "../helpers/cirrusHelpers";
+import { getHistoryParams } from "../helpers/history.helper";
 
 const {
   PriceOracle,
@@ -99,13 +100,14 @@ export const getPriceHistory = async (
 
     const oracleAddress = registry.priceOracle.address || registry.priceOracle;
 
-    // Calculate time range for the last month
-    const oneMonthAgo = new Date();
-    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+    // Use duration parameter if provided, otherwise default to 1 month
+    const duration = rawParams.duration || '1m';
+    const historyParams = getHistoryParams(duration, rawParams.end);
+    const startTime = new Date(historyParams.endTimestamp - (historyParams.interval * historyParams.numTicks));
 
     const params = {
       address: `eq.${oracleAddress}`,
-      block_timestamp: `gte.${toUTCTime(oneMonthAgo)}`,
+      block_timestamp: `gte.${toUTCTime(startTime)}`,
       order: rawParams.order || "block_timestamp.asc",
     };
 
@@ -165,68 +167,67 @@ export const getPriceHistory = async (
       return { data: [], totalCount: 0 };
     }
 
-    // Process events and create hourly data points
-    const hourlyPrices = new Map<string, PriceHistoryEntry>();
+    // Process events and create interval-based data points based on duration
+    const intervalMs = historyParams.interval;
+    const intervalPrices = new Map<number, PriceHistoryEntry>();
 
     priceEvents.forEach((event: any) => {
       const blockTimestamp = event.blockTimestamp;
+      // Round down to the nearest interval
+      const intervalTimestamp = Math.floor(blockTimestamp.getTime() / intervalMs) * intervalMs;
+      const intervalKey = intervalTimestamp;
 
-      // Create hourly bucket (round down to the hour)
-      const hourBucket = new Date(blockTimestamp);
-      hourBucket.setMinutes(0, 0, 0);
-      const hourKey = hourBucket.toISOString();
-
-      // Keep the latest price for each hour
-      if (!hourlyPrices.has(hourKey) || blockTimestamp > hourlyPrices.get(hourKey)!.blockTimestamp) {
-        hourlyPrices.set(hourKey, event);
+      // Keep the latest price for each interval
+      if (!intervalPrices.has(intervalKey) || blockTimestamp > intervalPrices.get(intervalKey)!.blockTimestamp) {
+        intervalPrices.set(intervalKey, event);
       }
     });
 
     // If no historical data, return empty
-    if (hourlyPrices.size === 0) {
+    if (intervalPrices.size === 0) {
       console.log(`[getPriceHistory] No historical oracle data found for ${assetAddress}`);
       return { data: [], totalCount: 0 };
     }
 
     // Find the earliest and latest actual data points
-    const sortedEvents = Array.from(hourlyPrices.values()).sort(
+    const sortedEvents = Array.from(intervalPrices.values()).sort(
       (a, b) => a.blockTimestamp.getTime() - b.blockTimestamp.getTime()
     );
 
     const earliestDataPoint = sortedEvents[0];
     const latestDataPoint = sortedEvents[sortedEvents.length - 1];
 
-    // Start from the earliest actual data point (rounded to hour)
-    const startTime = new Date(earliestDataPoint.blockTimestamp);
-    startTime.setMinutes(0, 0, 0);
+    // Start from the earliest actual data point (rounded to interval)
+    const earliestInterval = Math.floor(earliestDataPoint.blockTimestamp.getTime() / intervalMs) * intervalMs;
+    const earliestStartTime = new Date(earliestInterval);
 
     // End at current time (or latest data point if it's more recent)
     const now = new Date();
     const endTime = latestDataPoint.blockTimestamp > now ? latestDataPoint.blockTimestamp : now;
+    const endInterval = Math.ceil(endTime.getTime() / intervalMs) * intervalMs;
 
     const filledPriceHistory: PriceHistoryEntry[] = [];
     let currentPrice = earliestDataPoint.price;
 
-    // Generate hourly timestamps from first data point to now
-    for (let currentHour = new Date(startTime); currentHour <= endTime; currentHour.setHours(currentHour.getHours() + 1)) {
-      const hourKey = currentHour.toISOString();
+    // Generate interval-based timestamps from first data point to now
+    for (let currentInterval = earliestStartTime.getTime(); currentInterval <= endInterval; currentInterval += intervalMs) {
+      const intervalKey = currentInterval;
 
-      if (hourlyPrices.has(hourKey)) {
-        // We have actual data for this hour
-        const actualData = hourlyPrices.get(hourKey)!;
+      if (intervalPrices.has(intervalKey)) {
+        // We have actual data for this interval
+        const actualData = intervalPrices.get(intervalKey)!;
         currentPrice = actualData.price;
         filledPriceHistory.push(actualData);
       } else {
         // Fill gap with last known price
         filledPriceHistory.push({
-          id: `filled-${currentHour.getTime()}`,
-          timestamp: new Date(currentHour),
+          id: `filled-${currentInterval}`,
+          timestamp: new Date(currentInterval),
           asset: assetAddress,
           price: currentPrice.toString(),
-          blockTimestamp: new Date(currentHour)
+          blockTimestamp: new Date(currentInterval)
         });
       }
-      
     }
 
 
