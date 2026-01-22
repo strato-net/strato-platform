@@ -167,7 +167,9 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
       then do
         $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"
         newBlock <- Bagger.makeNewBlock mineTransactions mSelfAddress
-        pure $ Just newBlock
+        if not . null $ obReceiptTransactions newBlock
+          then pure $ Just newBlock
+          else pure Nothing
       else pure Nothing
 
   for_ mNewBlock $ yield . OutBlock

@@ -38,6 +38,7 @@ import Blockchain.Blockstanbul
 import Blockchain.Constants
 import Blockchain.Model.SyncState
 import Blockchain.Data.Block
+import Blockchain.Data.BlockHeader
 import Blockchain.EthConf
 import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.CablePackage
@@ -266,23 +267,22 @@ createNewTimer rn = do
   next <- addUTCTime dt <$> liftIO getCurrentTime
   liftIO $ setAlarm alarm next
 
-createNewViewTimer ::
-  MonadBlockstanbul m => m ()
-createNewViewTimer = do
+createNewViewTimer :: MonadBlockstanbul m => Block -> m ()
+createNewViewTimer b = do
   updateViewTimer
   vpref <- Mod.access (Mod.Proxy @(IORef (View, Maybe Block)))
-  v <- fst <$> liftIO (readIORef vpref)
+  vCur <- fst <$> liftIO (readIORef vpref)
+  let v = vCur{ _sequence = max 1 $ fromIntegral (number $ blockBlockData b) - 1 }
   ch <- Mod.access (Mod.Proxy @(TMChan RoundNumber))
   let act :: AlarmClock UTCTime -> IO ()
       act this' = do
         (v', p) <- readIORef vpref
-        when (v == v' && isNothing p) $ do
-          putStrLn $ "VALIDATOR DOWN! " ++ show v
+        when (v >= v' && isNothing p) $ do
           atomically . writeTMChan ch $ _round v'
-          next <- addUTCTime 5000000 <$> getCurrentTime
+          next <- addUTCTime 5 <$> getCurrentTime
           setAlarm this' next
   alarm <- liftIO $ newAlarmClock act
-  next <- addUTCTime 2000000 <$> liftIO getCurrentTime
+  next <- addUTCTime 2 <$> liftIO getCurrentTime
   liftIO $ setAlarm alarm next
 
 updateViewTimer :: MonadBlockstanbul m => m ()

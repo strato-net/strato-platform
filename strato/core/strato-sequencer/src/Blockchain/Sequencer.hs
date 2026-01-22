@@ -226,7 +226,7 @@ blockstanbulSend' ::
 blockstanbulSend' msg = do
   (p2pevs, vmevs) <- lift $ do
     case msg of
-      UnannouncedBlock{} -> createNewViewTimer
+      UnannouncedBlock blk -> createNewViewTimer blk
       _ -> pure ()
     resp <- sendAllMessages [msg]
     let blocks = [b | ToCommit b <- resp]
