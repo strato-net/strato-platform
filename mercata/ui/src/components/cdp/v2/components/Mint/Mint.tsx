@@ -103,6 +103,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
 
   const [totalManualMint, setTotalManualMint] = useState('0');
   const [mintMaxVaults, setMintMaxVaults] = useState<Set<ADDRESS>>(new Set());
+  const [manualDirty, setManualDirty] = useState(false);
 
 
 
@@ -111,6 +112,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   // ============================================================================
 
   const prevAutoSupplyRef = useRef<boolean>(autoAllocate);
+  const optimalAllocationsRef = useRef<VaultCandidate[]>(optimalAllocations);
 
 
 
@@ -332,11 +334,18 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   }, [mintAmountUSDST, targetHF, vaultCandidates, isMaxMode, maxAllocationsForTargetHF, autoAllocate]);
 
   useEffect(() => {
-    if (prevAutoSupplyRef.current === true && autoAllocate === false && optimalAllocations.length > 0) {
-      setManualAllocations(optimalAllocations);
-    }
     prevAutoSupplyRef.current = autoAllocate;
-  }, [autoAllocate, optimalAllocations]);
+  }, [autoAllocate]);
+
+  useEffect(() => {
+    optimalAllocationsRef.current = optimalAllocations;
+  }, [optimalAllocations]);
+
+  useEffect(() => {
+    if (autoAllocate || manualDirty) return;
+    if (optimalAllocations.length === 0) return;
+    setManualAllocations(optimalAllocations);
+  }, [autoAllocate, manualDirty, optimalAllocations]);
 
   // ============================================================================
   // Effects - Max Mode Sync
@@ -423,6 +432,15 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     }
   }, [totalMaxMint, isMaxMode]);
 
+  const handleAutoAllocateChange = useCallback((checked: boolean) => {
+    // When switching to manual mode, snapshot current optimal allocations
+    if (!checked && optimalAllocationsRef.current.length > 0) {
+      setManualDirty(false);
+      setManualAllocations(optimalAllocationsRef.current);
+    }
+    setAutoAllocate(checked);
+  }, []);
+
   // ============================================================================
   // Callbacks - Allocation Handlers
   // ============================================================================
@@ -431,6 +449,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     const candidate = vaultCandidates.find(c => c.vaultConfig.assetAddress === assetAddress);
     if (!candidate) return;
     
+    setManualDirty(true);
     setManualAllocations(prev => {
       const existing = prev.find(v => v.vaultConfig.assetAddress === assetAddress);
       return existing
@@ -460,6 +479,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     const candidate = vaultCandidates.find(c => c.vaultConfig.assetAddress === assetAddress);
     if (!candidate) return;
     
+    setManualDirty(true);
     setManualAllocations(prev => {
       const existing = prev.find(v => v.vaultConfig.assetAddress === assetAddress);
       return existing
@@ -725,7 +745,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
             <Checkbox
               id="auto-supply"
               checked={autoAllocate}
-              onCheckedChange={(checked) => setAutoAllocate(checked === true)}
+              onCheckedChange={(checked) => handleAutoAllocateChange(checked === true)}
             />
             <Label htmlFor="auto-supply" className="text-sm cursor-pointer">
               Automatically allocate across vaults
