@@ -280,31 +280,6 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
     }
   }, [mintMaxVaults, onMintMaxVaultsChange]);
 
-  // Log mintMaxVaults whenever it changes
-  useEffect(() => {
-    const vaultSymbols = Array.from(mintMaxVaults).map(address => {
-      const candidate = vaultCandidates.find(c => c.vaultConfig.assetAddress === address);
-      return candidate ? candidate.vaultConfig.symbol : address;
-    });
-    console.log('[VaultBreakdown] 🔵 mintMaxVaults changed:', {
-      addresses: Array.from(mintMaxVaults),
-      symbols: vaultSymbols,
-      count: mintMaxVaults.size,
-    });
-  }, [mintMaxVaults, vaultCandidates]);
-
-  // Log depositMaxVaults whenever they change
-  useEffect(() => {
-    const vaultSymbols = Array.from(depositMaxVaults).map(address => {
-      const candidate = vaultCandidates.find(c => c.vaultConfig.assetAddress === address);
-      return candidate ? candidate.vaultConfig.symbol : address;
-    });
-    console.log('[VaultBreakdown] 🔵 depositMaxVaults changed:', {
-      addresses: Array.from(depositMaxVaults),
-      symbols: vaultSymbols,
-      count: depositMaxVaults.size,
-    });
-  }, [depositMaxVaults, vaultCandidates]);
 
   // No longer needed - projectedVaultHealth is passed as prop
 
