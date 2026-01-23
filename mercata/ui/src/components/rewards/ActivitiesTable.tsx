@@ -8,6 +8,8 @@ import { formatEmissionRatePerDay, formatEmissionRatePerWeek, roundByMagnitude, 
 import { formatDistanceToNow } from "date-fns";
 import { Info } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Link } from "react-router-dom";
+import { getActivityLink } from "@/lib/rewards/activityLinks";
 
 interface ActivitiesTableProps {
   activities: Activity[];
@@ -23,12 +25,12 @@ export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) =
   if (loading) {
     return (
       <Card>
-        <CardHeader>
+        <CardHeader className="px-3 md:px-6">
           <CardTitle>Activities</CardTitle>
           <CardDescription>All reward activities</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
+        <CardContent className="px-0 md:px-6">
+          <div className="space-y-2 px-3 md:px-0">
             <Skeleton className="h-12 w-full" />
             <Skeleton className="h-12 w-full" />
             <Skeleton className="h-12 w-full" />
@@ -41,11 +43,11 @@ export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) =
   if (activities.length === 0) {
     return (
       <Card>
-        <CardHeader>
+        <CardHeader className="px-3 md:px-6">
           <CardTitle>Activities</CardTitle>
           <CardDescription>All reward activities</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-3 md:px-6">
           <p className="text-muted-foreground text-center py-8">No activities found</p>
         </CardContent>
       </Card>
@@ -54,12 +56,12 @@ export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) =
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="px-3 md:px-6">
         <CardTitle>Activities</CardTitle>
         <CardDescription>All reward activities</CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className="rounded-md border">
+      <CardContent className="px-0 md:px-6">
+        <div className="rounded-none md:rounded-md border-x-0 md:border-x border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -111,6 +113,7 @@ export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) =
                 const lastUpdateTimeStr = activity?.lastUpdateTime || null;
                 const lastUpdate = lastUpdateTimeStr ? new Date(Number(lastUpdateTimeStr) * 1000) : null;
                 const timeAgo = lastUpdate ? formatDistanceToNow(lastUpdate, { addSuffix: true }) : "?";
+                const activityLink = activity?.name ? getActivityLink(activity.name) : null;
 
                 return (
                   <TableRow
@@ -120,7 +123,18 @@ export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) =
                       {activity?.activityId !== undefined && activity?.activityId !== null ? activity.activityId : "?"}
                     </TableCell>
                     <TableCell className="font-medium">
-                      {activity?.name ? truncateActivityName(activity.name) : "?"}
+                      {activity?.name ? (
+                        activityLink ? (
+                          <Link
+                            to={activityLink}
+                            className="flex items-center gap-1 text-primary hover:underline"
+                          >
+                            {truncateActivityName(activity.name)}
+                          </Link>
+                        ) : (
+                          truncateActivityName(activity.name)
+                        )
+                      ) : "?"}
                     </TableCell>
                     <TableCell>
                       <Badge variant="secondary">

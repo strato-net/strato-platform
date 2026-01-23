@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowLeftRight } from 'lucide-react';
 import { Tabs } from 'antd';
 import 'antd/dist/reset.css';
 import './BridgeTransactionsPage.css';
@@ -56,29 +55,25 @@ const BridgeTransactionsPage = ({ isAdmin = false }: { isAdmin?: boolean }) => {
           background: hsl(var(--primary)) !important;
         }
       `}</style>
-      <div className="container mx-auto max-w-full py-2 px-0">
-        <div className="w-full overflow-x-hidden">
-          <div className="bg-card rounded-2xl shadow-lg p-4 border border-border">
-            <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
-                <div className="flex items-center gap-2">
-                  <ArrowLeftRight className="h-6 w-6 text-blue-600" />
-                  <h1 className="text-2xl font-semibold text-foreground">Bridge Transactions</h1>
-                </div>
-                <div className="w-full sm:w-[400px] bg-muted/50 p-1.5 rounded-xl border border-border shadow-sm">
-                  <Tabs
-                    activeKey={transactionType}
-                    items={mainItems}
-                    onChange={(value) => setTransactionType(value as BridgeTransactionTab)}
-                    className="custom-tabs"
-                    style={{
-                      '--ant-primary-color': 'hsl(var(--primary))',
-                      '--ant-primary-color-hover': 'hsl(var(--primary))',
-                    } as React.CSSProperties}
-                  />
-                </div>
-              </div>
+      <div className="w-full">
+        <div className="bg-card rounded-xl shadow-sm p-3 md:p-4 border border-border">
+          <div className="space-y-4">
+            {/* Tabs */}
+            <div className="w-full bg-muted/50 p-1 md:p-1.5 rounded-lg md:rounded-xl border border-border">
+              <Tabs
+                activeKey={transactionType}
+                items={mainItems}
+                onChange={(value) => setTransactionType(value as BridgeTransactionTab)}
+                className="custom-tabs"
+                style={{
+                  '--ant-primary-color': 'hsl(var(--primary))',
+                  '--ant-primary-color-hover': 'hsl(var(--primary))',
+                } as React.CSSProperties}
+              />
+            </div>
 
+            {/* Transaction Details */}
+            <div className="overflow-x-auto">
               {transactionType === 'DepositRecorded' ? (
                 <DepositTransactionDetails key="deposit" context={isAdmin ? 'admin' : undefined} />
               ) : (

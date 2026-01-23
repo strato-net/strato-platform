@@ -690,7 +690,7 @@ insertIndexTable cs =
                   ValueInt False Nothing . E.blockNumber
                 ]
               baseRowVals = map (Just . SimpleValue . ($ contract)) baseVals
-              dataVals = [Just . ValueMapping $ Map.mapKeys ValueString $ Map.fromList $ SolidVM.decodeCacheValues list]
+              dataVals = either (const []) ((:[]) . Just . ValueMapping . Map.mapKeys ValueString . Map.fromList) $ SolidVM.decodeCacheValues list
               valsForSQL = baseRowVals ++ dataVals
               conflictUpdateCols = ["address", "block_hash", "block_timestamp", "block_number"]
               tblText = tableNameToDoubleQuoteText storageTableName

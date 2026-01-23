@@ -158,15 +158,15 @@ const TokenAvatar = ({ token, size = "w-4 h-4" }: TokenAvatarProps) => {
 const TokenSelectorComponent = ({ asset, onSelect, tokens, isOpen, onOpenChange }: TokenSelectorProps) => (
   <Popover open={isOpen} onOpenChange={onOpenChange}>
     <PopoverTrigger asChild>
-      <Button variant="outline" className="flex items-center gap-2 justify-between text-sm px-3 py-2">
-        <div className="flex items-center gap-2">
-          {asset ? <TokenAvatar token={asset} /> : null}
-          <span className="whitespace-nowrap">{asset?._symbol || "Select Token"}</span>
+      <Button variant="outline" className="flex items-center gap-1 md:gap-2 justify-between text-xs md:text-sm px-1.5 md:px-3 py-1.5 md:py-2 h-8 md:h-10">
+        <div className="flex items-center gap-1 md:gap-2">
+          {asset ? <TokenAvatar token={asset} size="w-3.5 h-3.5 md:w-4 md:h-4" /> : null}
+          <span className="whitespace-nowrap text-[11px] md:text-sm">{asset?._symbol || "Select"}</span>
         </div>
-        <ChevronDown className="h-4 w-4 flex-shrink-0" />
+        <ChevronDown className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0" />
       </Button>
     </PopoverTrigger>
-    <PopoverContent className="w-56 max-w-[calc(100vw-2rem)] p-0" align="end">
+    <PopoverContent className="w-56 max-w-[calc(100vw-2rem)] p-0 z-50" align="end" sideOffset={5}>
       <div className="flex flex-col">
         {tokens.length > 0 ? (
           tokens.map((token) => (
@@ -237,12 +237,12 @@ const TokenInput = ({
   loading,
 }: TokenInputProps) => {      
   return (
-    <div className="bg-muted/50 p-4 rounded-lg border border-border">
+    <div className="bg-muted/50 p-3 md:p-4 rounded-lg border border-border">
       <div className="flex flex-col sm:flex-row sm:justify-between mb-2">
         <label className="text-sm text-muted-foreground font-semibold">{label}</label>
       </div>
       <div className="flex items-center gap-2">
-        <div className="flex-1 min-w-0 flex flex-col">
+        <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
           <input
             type="text"
             value={amount}
@@ -251,12 +251,12 @@ const TokenInput = ({
             placeholder="0.00"
             inputMode="decimal"
             disabled={toWei(maxAmountWei) === 0n && isFromInput}
-            className={`p-2 bg-transparent border-none text-lg font-medium focus:outline-none text-foreground placeholder:text-muted-foreground ${
+            className={`p-1 md:p-2 bg-transparent border-none text-sm md:text-lg font-medium focus:outline-none text-foreground placeholder:text-muted-foreground w-full ${
               amountError ? " border border-red-500 rounded-md" : ""
               } ${(toWei(maxAmountWei) === 0n && isFromInput) ? "opacity-50 cursor-not-allowed" : ""}`}
           />
           {amountError && (
-            <p className="text-red-600 text-sm mt-1">{amountError}</p>
+            <p className="text-red-600 text-xs md:text-sm mt-1">{amountError}</p>
           )}
         </div>
         <div className="flex-shrink-0">
@@ -270,18 +270,21 @@ const TokenInput = ({
         </div>
       </div>
       {asset && (
-        <div className="mt-2 flex justify-between">
+        <div className="mt-2 flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-2">
           {isFromInput ? (
-            <span className={`text-sm flex items-center gap-1 ${
+            <span className={`text-xs md:text-sm flex flex-wrap items-center gap-1 ${
               toWei(maxAmountWei) === 0n ? "text-red-600" : "text-muted-foreground"
             }`}>
-              Your Balance: <AnimatedNumber 
-                value={maxAmountWei !== "0" ? formatBalance(maxAmountWei, asset._symbol || "", undefined, 2, 6) : "0"} 
-                isLoading={loading} 
-              />
+              <span className="whitespace-nowrap">Your Balance:</span>
+              <span className="whitespace-nowrap">
+                <AnimatedNumber 
+                  value={maxAmountWei !== "0" ? formatBalance(maxAmountWei, asset._symbol || "", undefined, 2, 6) : "0"} 
+                  isLoading={loading} 
+                />
+              </span>
               <button
                 type="button"
-                className={`text-blue-600 text-xs ml-2 underline ${toWei(maxAmountWei) === 0n ? "opacity-50 cursor-not-allowed" : ""}`}
+                className={`text-blue-600 text-xs underline ${toWei(maxAmountWei) === 0n ? "opacity-50 cursor-not-allowed" : ""}`}
                 onClick={onMaxClick}
                 disabled={toWei(maxAmountWei) === 0n}
               >
@@ -289,18 +292,24 @@ const TokenInput = ({
               </button>
             </span>
           ) : (
-            <span className="text-sm text-muted-foreground">
-              Your Balance: <AnimatedNumber 
-                value={userBalanceWei !== "0" ? formatBalance(userBalanceWei, asset._symbol || "", undefined, 2, 6) : "0"} 
+            <span className="text-xs md:text-sm text-muted-foreground flex flex-wrap items-center gap-1">
+              <span className="whitespace-nowrap">Your Balance:</span>
+              <span className="whitespace-nowrap">
+                <AnimatedNumber 
+                  value={userBalanceWei !== "0" ? formatBalance(userBalanceWei, asset._symbol || "", undefined, 2, 6) : "0"} 
+                  isLoading={loading} 
+                />
+              </span>
+            </span>
+          )}
+          <span className="text-xs md:text-sm text-muted-foreground flex flex-wrap items-center gap-1">
+            <span className="whitespace-nowrap">Pool Balance:</span>
+            <span className="whitespace-nowrap">
+              <AnimatedNumber 
+                value={poolBalanceWei !== "0" ? formatBalance(poolBalanceWei, asset._symbol || "", undefined, 2, 6) : "0"} 
                 isLoading={loading} 
               />
             </span>
-          )}
-          <span className="text-sm text-muted-foreground">
-            Pool Balance: <AnimatedNumber 
-              value={poolBalanceWei !== "0" ? formatBalance(poolBalanceWei, asset._symbol || "", undefined, 2, 6) : "0"} 
-              isLoading={loading} 
-            />
           </span>
         </div>
       )}
@@ -415,11 +424,11 @@ const SlippageControl = ({ slippage, autoSlippage, onSlippageChange, onAutoToggl
 
   return (
     <div className="flex flex-col gap-1 mt-2">
-      <div className="flex items-center justify-between text-sm mb-1">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 text-sm mb-1">
         <span className="text-muted-foreground">Max slippage</span>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 md:gap-2">
           <button
-            className={`px-3 py-1 rounded-full text-xs font-medium border ${
+            className={`px-2 md:px-3 py-1 rounded-full text-xs font-medium border ${
               autoSlippage ? 'bg-muted text-foreground' : 'bg-transparent text-muted-foreground'
               } border-border`}
             onClick={() => {
@@ -430,14 +439,14 @@ const SlippageControl = ({ slippage, autoSlippage, onSlippageChange, onAutoToggl
             Auto
           </button>
           <button
-            className={`px-3 py-1 rounded-full text-xs font-medium border ${
+            className={`px-2 md:px-3 py-1 rounded-full text-xs font-medium border ${
               !autoSlippage ? 'bg-muted text-foreground' : 'bg-transparent text-muted-foreground'
               } border-border`}
             onClick={() => onAutoToggle(false)}
           >
             Manual
           </button>
-          <span className={`ml-2 px-3 py-1 rounded-full border text-xs font-semibold ${slippageClass}`}>
+          <span className={`ml-1 md:ml-2 px-2 md:px-3 py-1 rounded-full border text-xs font-semibold ${slippageClass}`}>
             {slippage}%
           </span>
         </div>
@@ -914,38 +923,41 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
         );
       })()}
 
-      <div className="flex flex-col gap-2 bg-muted/50 p-4 rounded-lg border border-border">
+      <div className="flex flex-col gap-3 bg-muted/50 p-3 md:p-4 rounded-lg border border-border">
+        {/* Exchange Rate */}
         <div className="flex flex-col gap-1 text-sm">
-          <div className="flex justify-between">
+          <div className="flex flex-col md:flex-row md:justify-between gap-1">
             <span className="text-muted-foreground">Exchange Rate</span>
             {!exchangeRate ? (
               <LoadingSpinner />
             ) : (
-              <span className="font-medium text-foreground">
+              <span className="font-medium text-foreground text-xs md:text-sm">
                 1 {fromAsset?._symbol || ""} ≈ {exchangeRate} ({oracleExchangeRate}*) {toAsset?._symbol || ""}
               </span>
             )}
           </div>
           {exchangeRate && (
             <>
-              <div className="flex justify-end">
-                <span className="text-muted-foreground/70">
+              <div className="md:text-right">
+                <span className="text-muted-foreground/70 text-xs md:text-sm">
                   1 {toAsset?._symbol || ""} ≈ {invertedExchangeRate} ({invertedOracleExchangeRate}*) {fromAsset?._symbol || ""}
                 </span>
               </div>
-              <div className="flex justify-end">
+              <div className="md:text-right">
                 <span className="text-xs text-muted-foreground/70">* spot price</span>
               </div>
             </>
           )}
         </div>
-        <div className="my-1"></div>
-        <div className="flex justify-between text-sm">
+
+        {/* Transaction Fee */}
+        <div className="flex flex-col md:flex-row md:justify-between gap-1 text-sm">
           <span className="text-muted-foreground">Transaction Fee</span>
-          <span className="font-medium">{SWAP_FEE} USDST ({parseFloat(SWAP_FEE) * 100} voucher)</span>
+          <span className="font-medium text-xs md:text-sm">{SWAP_FEE} USDST ({parseFloat(SWAP_FEE) * 100} voucher)</span>
         </div>
-        
-        <div className="flex justify-between text-sm items-center">
+
+        {/* Price Impact */}
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-1 text-sm">
           <div className="flex items-center gap-1">
             <span className="text-muted-foreground">Price Impact</span>
             <Tooltip>
@@ -957,7 +969,7 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
               </TooltipContent>
             </Tooltip>
           </div>
-          <span className={`font-medium ${
+          <span className={`font-medium text-xs md:text-sm ${
             priceImpact === null ? 'text-muted-foreground' :
             priceImpact < 1 ? 'text-foreground' :
             priceImpact < 5 ? 'text-yellow-600' :

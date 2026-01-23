@@ -124,29 +124,29 @@ const TokenStatusTable = () => {
   }
 
   return (
-    <Card className="dark:bg-card">
-      <CardHeader>
-        <CardTitle className="dark:text-foreground">Token Status</CardTitle>
-        <CardDescription className="dark:text-muted-foreground">
+    <Card className="dark:bg-card overflow-hidden">
+      <CardHeader className="px-4 md:px-6">
+        <CardTitle className="text-base md:text-xl dark:text-foreground">Token Status</CardTitle>
+        <CardDescription className="text-xs md:text-sm dark:text-muted-foreground">
           Manage token status and configurations for all tokens
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className="mb-6 space-y-4">
-          <div className="flex items-center gap-4">
-            <div className="relative flex-1 max-w-sm">
+      <CardContent className="px-4 md:px-6">
+        <div className="mb-4 md:mb-6 space-y-3 md:space-y-4">
+          <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
+            <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search by name, symbol, or address..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 dark:bg-background dark:text-foreground dark:border-input"
+                className="pl-10 text-sm dark:bg-background dark:text-foreground dark:border-input"
               />
             </div>
             <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 dark:text-muted-foreground" />
+              <Filter className="h-4 w-4 dark:text-muted-foreground shrink-0" />
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[180px] dark:bg-background dark:text-foreground dark:border-input">
+                <SelectTrigger className="w-full md:w-[180px] text-sm dark:bg-background dark:text-foreground dark:border-input">
                   <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
                 <SelectContent className="dark:bg-card dark:border-border">
@@ -157,13 +157,12 @@ const TokenStatusTable = () => {
                   <SelectItem value="unknown" className="dark:text-foreground dark:focus:bg-accent">UNKNOWN</SelectItem>
                 </SelectContent>
               </Select>
+              <Button variant="outline" size="icon" onClick={refreshAllData} className="shrink-0 dark:border-border dark:text-foreground dark:hover:bg-accent">
+                <RefreshCw className="h-4 w-4" />
+              </Button>
             </div>
-            <Button variant="outline" onClick={refreshAllData} className="dark:border-border dark:text-foreground dark:hover:bg-accent">
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
-            </Button>
           </div>
-          <div className="text-sm text-muted-foreground">
+          <div className="text-xs md:text-sm text-muted-foreground">
             Showing {filteredTokens.length} of {tokens.length} tokens
             {searchQuery && ` matching "${searchQuery}"`}
             {statusFilter !== 'all' && ` with ${getStatusLabel(statusFilter).label} status`}
@@ -194,15 +193,15 @@ const TokenStatusTable = () => {
             )}
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto -mx-4 md:mx-0">
             <Table>
               <TableHeader>
                 <TableRow className="dark:border-border dark:hover:bg-transparent">
-                  <TableHead className="w-[100px] dark:text-muted-foreground">Symbol</TableHead>
-                  <TableHead className="w-[200px] dark:text-muted-foreground">Name</TableHead>
-                  <TableHead className="w-[140px] dark:text-muted-foreground">Address</TableHead>
-                  <TableHead className="w-[80px] dark:text-muted-foreground">Status</TableHead>
-                  <TableHead className="w-[60px] dark:text-muted-foreground">Actions</TableHead>
+                  <TableHead className="text-xs md:text-sm pl-4 md:pl-4 dark:text-muted-foreground">Symbol</TableHead>
+                  <TableHead className="text-xs md:text-sm dark:text-muted-foreground">Name</TableHead>
+                  <TableHead className="text-xs md:text-sm hidden md:table-cell dark:text-muted-foreground">Address</TableHead>
+                  <TableHead className="text-xs md:text-sm hidden md:table-cell dark:text-muted-foreground">Status</TableHead>
+                  <TableHead className="text-xs md:text-sm pr-4 md:pr-4 dark:text-muted-foreground">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -215,9 +214,9 @@ const TokenStatusTable = () => {
 
                   return (
                     <TableRow key={`${address}-${index}`} className="dark:border-border dark:hover:bg-muted/50">
-                      <TableCell className="font-medium text-sm max-w-[100px] truncate dark:text-foreground">{symbol}</TableCell>
-                      <TableCell className="text-sm max-w-[200px] truncate dark:text-foreground" title={name}>{name}</TableCell>
-                      <TableCell className="font-mono text-xs max-w-[140px] dark:text-foreground">
+                      <TableCell className="font-medium text-xs md:text-sm pl-4 md:pl-4 truncate dark:text-foreground">{symbol}</TableCell>
+                      <TableCell className="text-xs md:text-sm max-w-[120px] md:max-w-[200px] truncate dark:text-foreground" title={name}>{name}</TableCell>
+                      <TableCell className="font-mono text-xs hidden md:table-cell dark:text-foreground">
                         <div className="flex items-center space-x-2">
                           <span>
                             {address && address !== 'Unknown' 
@@ -230,18 +229,18 @@ const TokenStatusTable = () => {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="max-w-[80px]">
+                      <TableCell className="hidden md:table-cell">
                         <Badge variant={status.variant} className="text-xs">
                           {status.label}
                         </Badge>
                       </TableCell>
-                      <TableCell className="max-w-[60px]">
+                      <TableCell className="pr-4 md:pr-4">
                         <Button 
                           size="sm" 
                           onClick={() => handleSetTokenStatus({address, symbol, name})}
-                          className="bg-strato-blue hover:bg-strato-blue/90 text-xs dark:text-white"
+                          className="bg-strato-blue hover:bg-strato-blue/90 text-[10px] md:text-xs px-2 md:px-3 dark:text-white"
                         >
-                          Set Status
+                          Set
                         </Button>
                       </TableCell>
                     </TableRow>

@@ -97,13 +97,13 @@ const HFSlider: React.FC<HFSliderProps> = ({
       `}</style>
       <div className="space-y-2">
         {/* Header: Label with Tooltip and Value/Risk Level */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <Tooltip>
             <TooltipTrigger asChild>
-              <div className="flex items-center gap-2 cursor-help">
-                <span className="text-base font-bold">Health Factor</span>
-                <HelpCircle className="w-4 h-4 text-muted-foreground" />
-              </div>
+              <button type="button" className="flex items-center gap-1.5 md:gap-2 cursor-help touch-manipulation p-1 -m-1">
+                <span className="text-sm md:text-base font-bold whitespace-nowrap">Health Factor</span>
+                <HelpCircle className="w-5 h-5 md:w-4 md:h-4 text-muted-foreground shrink-0" />
+              </button>
             </TooltipTrigger>
             <TooltipContent>
               <div className="whitespace-pre-line text-center">
@@ -113,9 +113,9 @@ const HFSlider: React.FC<HFSliderProps> = ({
           </Tooltip>
           
           {/* Risk Level and Value */}
-          <div className="flex items-baseline gap-3">
-            <span className={`text-lg font-medium ${disabled ? 'text-muted-foreground' : riskLevel.color}`}>{riskLevel.label}</span>
-            <span className={`text-2xl font-bold tabular-nums ${disabled ? 'text-muted-foreground' : ''}`}>{formatNumber(clampedValue, 2)}</span>
+          <div className="flex items-center gap-2 md:gap-3">
+            <span className={`text-base md:text-lg font-medium whitespace-nowrap ${disabled ? 'text-muted-foreground' : riskLevel.color}`}>{riskLevel.label}</span>
+            <span className={`text-xl md:text-2xl font-bold tabular-nums ${disabled ? 'text-muted-foreground' : ''}`}>{formatNumber(clampedValue, 2)}</span>
           </div>
         </div>
       

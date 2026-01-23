@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
-import MobileSidebar from "../components/dashboard/MobileSidebar";
+import MobileBottomNav from "../components/dashboard/MobileBottomNav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -28,7 +28,6 @@ const ReferralsManagement = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { getTransferableTokens } = useTokenContext();
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [referrals, setReferrals] = useState<UserReferral[]>([]);
   const [loading, setLoading] = useState(true);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
@@ -137,18 +136,12 @@ const ReferralsManagement = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-16 md:pb-0">
       <DashboardSidebar />
-      <MobileSidebar 
-        isOpen={isMobileSidebarOpen} 
-        onClose={() => setIsMobileSidebarOpen(false)} 
-      />
-      <div className="transition-all duration-300 md:pl-64" style={{ paddingLeft: 'var(--sidebar-width, 0rem)' }}>
-        <DashboardHeader 
-          title="My Referrals" 
-          onMenuClick={() => setIsMobileSidebarOpen(true)}
-        />
-        <main className="p-6">
+
+      <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
+        <DashboardHeader title="My Referrals" />
+        <main className="p-4 md:p-6">
           <div className="max-w-6xl mx-auto space-y-6">
             <div className="flex items-center justify-between">
               <div>
@@ -303,13 +296,13 @@ const ReferralsManagement = () => {
 
             {/* Referral History */}
             <Card>
-              <CardHeader>
-                <CardTitle>Referral History</CardTitle>
-                <CardDescription>
+              <CardHeader className="px-4 md:px-6 pb-2 md:pb-4">
+                <CardTitle className="text-base md:text-xl">Referral History</CardTitle>
+                <CardDescription className="text-xs md:text-sm">
                   View your completed and cancelled referrals
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="px-2 md:px-6">
                 <ReferralHistoryTable 
                   userAddress={userAddress}
                   getTokenInfo={getTokenInfo}
@@ -319,6 +312,8 @@ const ReferralsManagement = () => {
           </div>
         </main>
       </div>
+
+      <MobileBottomNav />
     </div>
   );
 };
@@ -384,14 +379,17 @@ const ReferralHistoryTable = ({ userAddress, getTokenInfo }: ReferralHistoryTabl
   };
 
   const formatTimestamp = (timestamp: Date) => {
-    return timestamp.toLocaleDateString([], {
+    const date = timestamp.toLocaleDateString([], {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
+    });
+    const time = timestamp.toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit',
       hour12: false
     });
+    return { date, time };
   };
 
   if (loading) {
@@ -415,43 +413,45 @@ const ReferralHistoryTable = ({ userAddress, getTokenInfo }: ReferralHistoryTabl
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Time</TableHead>
-            <TableHead>Event</TableHead>
-            <TableHead>Ephemeral Address</TableHead>
-            <TableHead>Tokens</TableHead>
-            <TableHead>Quantity</TableHead>
-            <TableHead>Recipient</TableHead>
+            <TableHead className="text-xs md:text-sm whitespace-nowrap">Time</TableHead>
+            <TableHead className="text-xs md:text-sm">Event</TableHead>
+            <TableHead className="text-xs md:text-sm whitespace-nowrap">Ephemeral Address</TableHead>
+            <TableHead className="text-xs md:text-sm">Tokens</TableHead>
+            <TableHead className="text-xs md:text-sm">Qty</TableHead>
+            <TableHead className="text-xs md:text-sm">Recipient</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {history.map((entry) => {
             const fieldId = `ephemeral-${entry.id}`;
+            const timestamp = formatTimestamp(
+              entry.blockTimestamp instanceof Date 
+                ? entry.blockTimestamp 
+                : new Date(entry.blockTimestamp)
+            );
             return (
               <TableRow key={entry.id}>
-                <TableCell className="text-sm">
-                  {formatTimestamp(
-                    entry.blockTimestamp instanceof Date 
-                      ? entry.blockTimestamp 
-                      : new Date(entry.blockTimestamp)
-                  )}
+                <TableCell className="text-xs md:text-sm">
+                  <div className="whitespace-nowrap">{timestamp.date}</div>
+                  <div className="text-muted-foreground whitespace-nowrap">{timestamp.time}</div>
                 </TableCell>
                 <TableCell>
                   <Badge 
                     variant={entry.eventName === "Redeemed" ? "default" : "destructive"}
-                    className={entry.eventName === "Redeemed" ? "bg-green-500" : ""}
+                    className={`text-[10px] md:text-xs ${entry.eventName === "Redeemed" ? "bg-green-500" : ""}`}
                   >
                     {entry.eventName}
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  <div className="flex items-center gap-2">
-                    <code className="text-xs font-mono">
-                      {entry.ephemeralAddress?.slice(0, 8)}...{entry.ephemeralAddress?.slice(-6)}
+                  <div className="flex items-center gap-1">
+                    <code className="text-[10px] md:text-xs font-mono">
+                      {entry.ephemeralAddress?.slice(0, 6)}...{entry.ephemeralAddress?.slice(-4)}
                     </code>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6"
+                      className="h-5 w-5 shrink-0"
                       onClick={() => copyToClipboard(entry.ephemeralAddress, fieldId)}
                     >
                       {copiedField === fieldId ? (
@@ -463,32 +463,32 @@ const ReferralHistoryTable = ({ userAddress, getTokenInfo }: ReferralHistoryTabl
                   </div>
                 </TableCell>
                 <TableCell>
-                  <div className="space-y-1">
+                  <div className="space-y-0.5">
                     {entry.tokens?.map((tokenAddress: string, index: number) => {
                       const tokenInfo = getTokenInfo(tokenAddress);
                       const amount = formatUnits(entry.amounts?.[index] || "0", 18);
                       return (
-                        <div key={index} className="text-sm">
-                          <span className="font-medium">{amount}</span>{" "}
+                        <div key={index} className="text-[10px] md:text-xs whitespace-nowrap">
+                          <span className="font-medium">{parseFloat(amount).toFixed(2)}</span>{" "}
                           <span className="text-muted-foreground">{tokenInfo.symbol}</span>
                         </div>
                       );
                     })}
                   </div>
                 </TableCell>
-                <TableCell>
-                  <span className="text-sm font-medium">{entry.quantity || 1}</span>
+                <TableCell className="text-xs md:text-sm">
+                  <span className="font-medium">{entry.quantity || 1}</span>
                 </TableCell>
                 <TableCell>
                   {entry.recipient ? (
-                    <div className="flex items-center gap-2">
-                      <code className="text-xs font-mono">
-                        {entry.recipient.slice(0, 8)}...{entry.recipient.slice(-6)}
+                    <div className="flex items-center gap-1">
+                      <code className="text-[10px] md:text-xs font-mono">
+                        {entry.recipient.slice(0, 4)}...{entry.recipient.slice(-4)}
                       </code>
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-6 w-6"
+                        className="h-5 w-5 shrink-0"
                         onClick={() => copyToClipboard(entry.recipient, `recipient-${entry.id}`)}
                       >
                         {copiedField === `recipient-${entry.id}` ? (
@@ -499,7 +499,7 @@ const ReferralHistoryTable = ({ userAddress, getTokenInfo }: ReferralHistoryTabl
                       </Button>
                     </div>
                   ) : (
-                    <span className="text-sm text-muted-foreground">—</span>
+                    <span className="text-xs text-muted-foreground">—</span>
                   )}
                 </TableCell>
               </TableRow>

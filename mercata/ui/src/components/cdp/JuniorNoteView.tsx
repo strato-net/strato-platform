@@ -33,21 +33,21 @@ const JuniorNoteView: React.FC<JuniorNoteViewProps> = ({ badDebtData, onBadDebtU
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Overview Section */}
       <Card>
-        <CardHeader>
-          <CardTitle>Junior Notes - Bad Debt Recovery</CardTitle>
+        <CardHeader className="px-4 md:px-6 pb-2 md:pb-4">
+          <CardTitle className="text-base md:text-xl">Junior Notes - Bad Debt Recovery</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="text-sm text-muted-foreground space-y-2">
+        <CardContent className="px-4 md:px-6">
+          <div className="text-xs md:text-sm text-muted-foreground space-y-2">
             <p>
               <strong className="text-foreground">Junior Notes</strong> allow you to participate in bad debt recovery by burning USDST 
               for a premium return when the system recovers funds.
             </p>
-            <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 rounded-lg p-3 mt-3">
-              <h4 className="font-medium text-blue-900 dark:text-blue-300 mb-2">How it works:</h4>
-              <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
+            <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 rounded-lg p-2.5 md:p-3 mt-3">
+              <h4 className="font-medium text-blue-900 dark:text-blue-300 mb-2 text-xs md:text-sm">How it works:</h4>
+              <ul className="text-xs md:text-sm text-blue-800 dark:text-blue-200 space-y-1">
                 <li>• <strong className="text-blue-900 dark:text-blue-300">Burn USDST:</strong> Burn your USDST to open a junior note with a 10% premium cap</li>
                 <li>• <strong className="text-blue-900 dark:text-blue-300">Earn Rewards:</strong> Receive proportional share of recovered bad debt funds</li>
                 <li>• <strong className="text-blue-900 dark:text-blue-300">Claim Anytime:</strong> Claim your accumulated rewards as funds flow into the reserve</li>
@@ -60,9 +60,9 @@ const JuniorNoteView: React.FC<JuniorNoteViewProps> = ({ badDebtData, onBadDebtU
 
       {/* Action Tabs */}
       <Tabs defaultValue="claim" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="claim">My Junior Note</TabsTrigger>
-          <TabsTrigger value="open">Cover Bad Debt</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 h-auto">
+          <TabsTrigger value="claim" className="text-xs md:text-sm py-2">My Junior Note</TabsTrigger>
+          <TabsTrigger value="open" className="text-xs md:text-sm py-2">Cover Bad Debt</TabsTrigger>
         </TabsList>
         
         <TabsContent value="claim" className="space-y-4">
@@ -83,12 +83,12 @@ const JuniorNoteView: React.FC<JuniorNoteViewProps> = ({ badDebtData, onBadDebtU
 
       {/* Additional Information */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Important Information</CardTitle>
+        <CardHeader className="px-4 md:px-6 pb-2 md:pb-4">
+          <CardTitle className="text-base md:text-lg">Important Information</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-            <div className="space-y-3">
+        <CardContent className="px-4 md:px-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 text-xs md:text-sm">
+            <div className="space-y-2 md:space-y-3">
               <div>
                 <h4 className="font-medium text-foreground mb-1">Premium Structure</h4>
                 <p className="text-muted-foreground">
@@ -102,7 +102,7 @@ const JuniorNoteView: React.FC<JuniorNoteViewProps> = ({ badDebtData, onBadDebtU
                 </p>
               </div>
             </div>
-            <div className="space-y-3">
+            <div className="space-y-2 md:space-y-3">
               <div>
                 <h4 className="font-medium text-foreground mb-1">Risk Factors</h4>
                 <p className="text-muted-foreground">
@@ -118,12 +118,12 @@ const JuniorNoteView: React.FC<JuniorNoteViewProps> = ({ badDebtData, onBadDebtU
             </div>
           </div>
           
-          <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-900 rounded-lg">
+          <div className="mt-3 md:mt-4 p-2.5 md:p-3 bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-900 rounded-lg">
             <div className="flex items-start space-x-2">
-              <div className="w-4 h-4 bg-yellow-500 dark:bg-yellow-600 rounded-full flex items-center justify-center mt-0.5">
+              <div className="w-4 h-4 bg-yellow-500 dark:bg-yellow-600 rounded-full flex items-center justify-center mt-0.5 shrink-0">
                 <span className="text-white text-xs font-bold">!</span>
               </div>
-              <div className="text-sm">
+              <div className="text-xs md:text-sm">
                 <p className="font-medium text-yellow-900 dark:text-yellow-400">Risk Warning</p>
                 <p className="text-yellow-800 dark:text-yellow-300">
                   Junior notes are higher-risk investments. Only participate with funds you can afford to lose. 

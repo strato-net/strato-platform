@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import MintAmountInput from './MintAmountInput';
 import HFSlider from './HFSlider';
-import { formatPercentage } from '@/utils/loanUtils';
+import { formatPercentage } from '@/components/cdp/v2/cdpUtils';
 
 interface LoanFormProps {
   // Label configuration
@@ -22,8 +22,8 @@ interface LoanFormProps {
   exceedsMaxMint?: boolean; // Whether input exceeds max available to mint
   
   // Health factor state
-  riskBuffer: number;
-  onRiskBufferChange: (value: number) => void;
+  targetHF: number;
+  onTargetHFChange: (value: number) => void;
   minHF?: number; // Minimum health factor for slider bounds
   currentHF?: number; // Current position health factor
   sliderRangeColor?: string; // Custom color for slider range bar
@@ -50,8 +50,8 @@ const LoanForm: React.FC<LoanFormProps> = ({
   onMaxClick,
   isMaxMode,
   exceedsMaxMint = false,
-  riskBuffer,
-  onRiskBufferChange,
+  targetHF,
+  onTargetHFChange,
   minHF,
   currentHF,
   sliderRangeColor,
@@ -87,6 +87,7 @@ const LoanForm: React.FC<LoanFormProps> = ({
             onMaxClick={onMaxClick}
             isMaxMode={isMaxMode}
             exceedsMax={exceedsMaxMint}
+            maxAvailable={availableAmount}
             label="Mint Amount"
             placeholder="0"
             unit="USDST"
@@ -96,8 +97,8 @@ const LoanForm: React.FC<LoanFormProps> = ({
 
           {/* Health Factor Slider */}
           <HFSlider
-            value={riskBuffer}
-            onChange={onRiskBufferChange}
+            value={targetHF}
+            onChange={onTargetHFChange}
             minHF={minHF}
             currentHF={currentHF}
             averageVaultHealth={averageVaultHealth}

@@ -452,6 +452,15 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
     return safeParseUnits(borrowAmount || "0", 18) > BigInt(maxAmount);
   }, [borrowAmount, maxAmount]);
 
+  // We handle borrowAmountExceedsMax separately, since it updates on HF slider
+  const setBorrowAmountErrorIgnoringMax = (value: string) => {
+    if (value === "Maximum amount exceeded") {
+      setBorrowAmountError("");
+      return;
+    }
+    setBorrowAmountError(value);
+  };
+
   return (
     <div className="space-y-4 pt-4">
       {/* Header: Borrow USDST */}
@@ -478,7 +487,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
               value={addCommasToInput(borrowAmount)}
               onChange={(e) => {
                 const value = e.target.value;
-                handleAmountInputChange(value, setBorrowAmount, setBorrowAmountError, maxAmount);
+                handleAmountInputChange(value, setBorrowAmount, setBorrowAmountErrorIgnoringMax, maxAmount);
                 handlePollingUpdate(value);
               }}
             />
@@ -499,6 +508,9 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
             MAX
           </Button>
         </div>
+        {borrowAmountError && (
+          <p className="text-red-600 text-sm">{borrowAmountError}</p>
+        )}
       </div>
 
       {/* Health Factor Slider */}

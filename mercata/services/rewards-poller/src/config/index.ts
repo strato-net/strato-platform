@@ -18,6 +18,9 @@ const config = {
   usdst: {
     address: process.env.USDST_ADDRESS || '937efa7e3a77e20bbdbd7c0d32b6514f368c1010',
   },
+  voucher: {
+    address: process.env.VOUCHER_ADDRESS || '000000000000000000000000000000000000100e',
+  },
   polling: {
     interval: Number(process.env.POLLING_INTERVAL) || 10 * 60 * 1000,
     maxBatchSize: Number(process.env.MAX_BATCH_SIZE) || 50,
