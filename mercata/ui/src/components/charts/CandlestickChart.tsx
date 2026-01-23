@@ -165,6 +165,27 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({
     return chartMargin.top + ((max - currentPrice) / range) * innerHeight;
   }, [currentPrice, yAxisDomain, chartHeightPx, chartMargin.top, chartMargin.bottom]);
 
+  // Calculate position of the latest data point for the pulsating dot
+  const latestPointPosition = useMemo(() => {
+    if (chartData.length === 0 || !chartContainerRef.current) return null;
+    const latest = chartData[chartData.length - 1];
+    const [min, max] = yAxisDomain;
+    let range = max - min;
+    if (range <= 0) range = 0;
+    const innerHeight = chartHeightPx - chartMargin.top - chartMargin.bottom - 32;
+    const containerWidth = chartContainerRef.current.offsetWidth;
+    const innerWidth = containerWidth - chartMargin.left - chartMargin.right;
+
+    // Calculate Y position (same logic as currentPriceYPx)
+    const yPx = chartMargin.top + ((max - latest.close) / range) * innerHeight;
+
+    // Calculate X position - last point is at the right edge of the plot area
+    // Recharts positions data points evenly, so the last point is at the right margin
+    const xPx = chartMargin.left + innerWidth;
+
+    return { x: xPx, y: yPx, price: latest.close };
+  }, [chartData, chartContainerRef, yAxisDomain, chartHeightPx, chartMargin]);
+
   const yPxToValue = useCallback((yPx: number): number | null => {
     const [min, max] = yAxisDomain;
     const range = max - min;
@@ -452,6 +473,57 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({
               {hoverLabelRef.current}
             </div>
           </div>
+        )}
+        {/* Pulsating dot at the latest price point */}
+        {latestPointPosition && (
+          <>
+            <div
+              className="absolute pointer-events-none z-20"
+              style={{
+                left: `${latestPointPosition.x}px`,
+                top: `${latestPointPosition.y}px`,
+                transform: 'translate(-50%, -50%)',
+              }}
+            >
+              {/* Outer pulsing ring */}
+              <div
+                className="absolute rounded-full"
+                style={{
+                  width: '12px',
+                  height: '12px',
+                  backgroundColor: trendColor,
+                  opacity: 0.3,
+                  animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                }}
+              />
+              {/* Inner solid dot */}
+              <div
+                className="absolute rounded-full"
+                style={{
+                  left: '50%',
+                  top: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  width: '6px',
+                  height: '6px',
+                  backgroundColor: trendColor,
+                  border: '2px solid white',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.25)',
+                }}
+              />
+            </div>
+            <style>{`
+              @keyframes pulse {
+                0%, 100% {
+                  opacity: 0.3;
+                  transform: translate(-50%, -50%) scale(1);
+                }
+                50% {
+                  opacity: 0.1;
+                  transform: translate(-50%, -50%) scale(1.5);
+                }
+              }
+            `}</style>
+          </>
         )}
       </div>
       {showVolume && (

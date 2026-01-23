@@ -576,7 +576,7 @@ const PriceTracking = () => {
   );
 
   // Get interval in milliseconds
-  const getIntervalMs = (interval: Interval): number => {
+  const getIntervalMs = useCallback((interval: Interval): number => {
     switch (interval) {
       case '10s':
         return 10 * 1000;
@@ -593,10 +593,79 @@ const PriceTracking = () => {
       default:
         return 5 * 60 * 1000;
     }
-  };
+  }, []);
+
+  // Fetch current price for a single asset (for polling)
+  const fetchCurrentPrice = useCallback(async (widget: WidgetConfig): Promise<number | null> => {
+    if (!widget.assetAddress) return null;
+
+    const asset = filteredAssets.find((a) => a.address === widget.assetAddress);
+    if (!asset) return null;
+
+    const isPool = (asset as any).isPool === true;
+
+    try {
+      if (isPool) {
+        // For pools, try bToARatio first, then calculate from balances
+        const response = await api.get(`/swap-pools/${widget.assetAddress}`);
+        const pool = response.data;
+
+        // Try bToARatio first (could be string or number)
+        const aToBRatioStr = pool.aToBRatio?.toString() || '0';
+        const aToBRatio = parseFloat(aToBRatioStr);
+        if (aToBRatio > 0 && !isNaN(aToBRatio)) {
+          return aToBRatio;
+        }
+
+        // Fallback to calculating from balances (same logic as initial pool loading)
+        // Try multiple possible locations for balances
+        const tokenABalance = parseFloat(
+          pool.tokenA?.balance ||
+          pool.tokenABalance ||
+          pool.tokenA?.tokenABalance ||
+          '0'
+        );
+        const tokenBBalance = parseFloat(
+          pool.tokenB?.balance ||
+          pool.tokenBBalance ||
+          pool.tokenB?.tokenBBalance ||
+          '0'
+        );
+
+        if (tokenABalance > 0 && !isNaN(tokenABalance) && !isNaN(tokenBBalance)) {
+          const calculatedPrice = tokenBBalance / tokenABalance;
+          if (calculatedPrice > 0 && !isNaN(calculatedPrice)) {
+            return calculatedPrice;
+          }
+        }
+
+        console.warn(`Failed to get pool price for ${widget.assetAddress}:`, {
+          bToARatio: pool.bToARatio,
+          tokenABalance: pool.tokenA?.balance || pool.tokenABalance,
+          tokenBBalance: pool.tokenB?.balance || pool.tokenBBalance,
+          pool: pool
+        });
+        return null;
+      } else {
+        // For tokens, fetch from oracle price endpoint
+        const response = await api.get('/oracle/price', {
+          params: { asset: widget.assetAddress },
+        });
+        const priceEntry = response.data;
+        if (priceEntry && priceEntry.price) {
+          const price = parseFloat(priceEntry.price);
+          return price > 1e10 ? price / 1e18 : price;
+        }
+        return null;
+      }
+    } catch (error) {
+      console.error(`Failed to fetch current price for ${widget.assetAddress}:`, error);
+      return null;
+    }
+  }, [filteredAssets]);
 
   // Fetch data for a single widget
-  const fetchWidgetData = useCallback(async (widget: WidgetConfig) => {
+  const fetchWidgetData = useCallback(async (widget: WidgetConfig, appendNewPrice = false) => {
     if (!widget.assetAddress) return;
 
         const asset = filteredAssets.find((a) => a.address === widget.assetAddress);
@@ -607,34 +676,68 @@ const PriceTracking = () => {
     // Include timeRange and interval in dataKey so different configs are cached separately
     const dataKey = `${widget.id}-${widget.assetAddress}-${widget.timeRange}-${widget.interval}`;
 
-    // Set loading state
-    setAssetData((prev) => {
-      const updated = new Map(prev);
-      updated.set(dataKey, {
-        asset,
-        data: [],
-        loading: true,
-        currentPrice: (() => {
-          const price = parseFloat(asset.price || '0');
-          return price > 1e10 ? price / 1e18 : price;
-        })(),
-        change24h: 0,
-        changePercent24h: 0,
+    // If appending new price, don't set loading state
+    if (!appendNewPrice) {
+      // Set loading state
+      setAssetData((prev) => {
+        const updated = new Map(prev);
+        const existing = prev.get(dataKey);
+        updated.set(dataKey, {
+          asset,
+          data: existing?.data || [],
+          loading: true,
+          currentPrice: existing?.currentPrice || (() => {
+            const price = parseFloat(asset.price || '0');
+            return price > 1e10 ? price / 1e18 : price;
+          })(),
+          change24h: existing?.change24h || 0,
+          changePercent24h: existing?.changePercent24h || 0,
+        });
+        return updated;
       });
-      return updated;
-    });
+    }
 
     try {
       const ohlcData = isPool
         ? await fetchPoolPriceHistory(widget.assetAddress, widget.timeRange, widget.interval)
         : await fetchTokenPriceHistory(widget.assetAddress, widget.timeRange, widget.interval);
 
+      // If appending, merge with existing data
+      let finalData = ohlcData;
+      if (appendNewPrice) {
+        setAssetData((prev) => {
+          const existing = prev.get(dataKey);
+          if (existing && existing.data.length > 0) {
+            // Get the last existing data point
+            const lastExisting = existing.data[existing.data.length - 1];
+            // Get the first new data point
+            const firstNew = ohlcData[0];
+
+            // If new data overlaps with existing, replace overlapping points
+            // Otherwise, append new points that are after the last existing point
+            const existingLastTimestamp = lastExisting.timestamp;
+            const newDataAfterExisting = ohlcData.filter(d => d.timestamp > existingLastTimestamp);
+
+            // Keep existing data up to the first new point, then add new data
+            const existingDataBeforeNew = existing.data.filter(d => {
+              if (newDataAfterExisting.length === 0) return true;
+              return d.timestamp < newDataAfterExisting[0].timestamp;
+            });
+
+            finalData = [...existingDataBeforeNew, ...newDataAfterExisting];
+          } else {
+            finalData = ohlcData;
+          }
+          return prev;
+        });
+      }
+
       // Calculate change
       let change24h = 0;
       let changePercent24h = 0;
-      if (ohlcData.length >= 2) {
-        const current = ohlcData[ohlcData.length - 1];
-        const previous = ohlcData[0];
+      if (finalData.length >= 2) {
+        const current = finalData[finalData.length - 1];
+        const previous = finalData[0];
         change24h = current.close - previous.close;
         changePercent24h = previous.close > 0 ? (change24h / previous.close) * 100 : 0;
       }
@@ -643,31 +746,33 @@ const PriceTracking = () => {
         const updated = new Map(prev);
         updated.set(dataKey, {
           asset,
-          data: ohlcData,
+          data: finalData,
           loading: false,
-          currentPrice: ohlcData.length > 0 ? ohlcData[ohlcData.length - 1].close : parseFloat(asset.price || '0') / 1e18,
+          currentPrice: finalData.length > 0 ? finalData[finalData.length - 1].close : parseFloat(asset.price || '0') / 1e18,
           change24h,
           changePercent24h,
         });
         return updated;
       });
     } catch (error) {
-      setAssetData((prev) => {
-        const updated = new Map(prev);
-        updated.set(dataKey, {
-          asset,
-          data: [],
-          loading: false,
-          error: 'Failed to load data',
-          currentPrice: (() => {
-            const price = parseFloat(asset.price || '0');
-            return price > 1e10 ? price / 1e18 : price;
-          })(),
-          change24h: 0,
-          changePercent24h: 0,
+      if (!appendNewPrice) {
+        setAssetData((prev) => {
+          const updated = new Map(prev);
+          updated.set(dataKey, {
+            asset,
+            data: [],
+            loading: false,
+            error: 'Failed to load data',
+            currentPrice: (() => {
+              const price = parseFloat(asset.price || '0');
+              return price > 1e10 ? price / 1e18 : price;
+            })(),
+            change24h: 0,
+            changePercent24h: 0,
+          });
+          return updated;
         });
-        return updated;
-      });
+      }
     }
   }, [filteredAssets, fetchTokenPriceHistory, fetchPoolPriceHistory]);
 
@@ -696,6 +801,73 @@ const PriceTracking = () => {
     prevWidgetsRef.current = currentWidgetKeys;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [widgets, filteredAssets.length]);
+
+  // Poll for current prices every 5 seconds
+  useEffect(() => {
+    if (filteredAssets.length === 0) return;
+
+    const pollInterval = setInterval(async () => {
+      // Poll each widget that has an asset
+      for (const widget of widgets) {
+        if (!widget.assetAddress) continue;
+
+        const currentPrice = await fetchCurrentPrice(widget);
+        if (currentPrice === null) continue;
+
+        const dataKey = `${widget.id}-${widget.assetAddress}-${widget.timeRange}-${widget.interval}`;
+        setAssetData((prev) => {
+          const existing = prev.get(dataKey);
+          if (!existing || existing.data.length === 0) return prev;
+
+          const now = Date.now();
+          const lastDataPoint = existing.data[existing.data.length - 1];
+
+          // Only append if the new price is different or enough time has passed
+          // Use the interval to determine if we should add a new point
+          const intervalMs = getIntervalMs(widget.interval);
+          const timeSinceLastPoint = now - lastDataPoint.timestamp;
+
+          // If enough time has passed or price changed significantly, append new point
+          if (timeSinceLastPoint >= intervalMs || Math.abs(currentPrice - lastDataPoint.close) / lastDataPoint.close > 0.001) {
+            const updated = new Map(prev);
+            const newDataPoint: OHLCData = {
+              timestamp: now,
+              open: lastDataPoint.close,
+              high: Math.max(lastDataPoint.close, currentPrice),
+              low: Math.min(lastDataPoint.close, currentPrice),
+              close: currentPrice,
+            };
+
+            // Append new point
+            const updatedData = [...existing.data, newDataPoint];
+
+            // Calculate change from first point
+            let change24h = 0;
+            let changePercent24h = 0;
+            if (updatedData.length >= 2) {
+              const current = updatedData[updatedData.length - 1];
+              const previous = updatedData[0];
+              change24h = current.close - previous.close;
+              changePercent24h = previous.close > 0 ? (change24h / previous.close) * 100 : 0;
+            }
+
+            updated.set(dataKey, {
+              ...existing,
+              data: updatedData,
+              currentPrice,
+              change24h,
+              changePercent24h,
+            });
+            return updated;
+          }
+
+          return prev;
+        });
+      }
+    }, 5000); // Poll every 5 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [widgets, filteredAssets.length, fetchCurrentPrice, getIntervalMs]);
 
   // Update widget configuration and save to localStorage
   const updateWidget = (widgetId: string, updates: Partial<WidgetConfig>) => {
