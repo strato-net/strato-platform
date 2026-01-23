@@ -1,0 +1,3229 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="STRATO platform technical documentation (use-case first, end-user + developer)">
+      
+      
+        <meta name="author" content="BlockApps">
+      
+      
+        <link rel="canonical" href="https://docs.strato.nexus/contribute/architecture/">
+      
+      
+        <link rel="prev" href="../setup/">
+      
+      
+        <link rel="next" href="../contributing/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Architecture - STRATO Technical Docs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../css/timeago.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#architecture-strato-platform" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="STRATO Technical Docs" class="md-header__button md-logo" aria-label="STRATO Technical Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            STRATO Technical Docs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Architecture
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="STRATO Technical Docs" class="md-nav__button md-logo" aria-label="STRATO Technical Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    STRATO Technical Docs
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../quick-start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Concepts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scenarios/first-time-user/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    First-Time User
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/borrow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Borrow USDST
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/mint-cdp/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mint USDST (CDP)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/swap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Swap Tokens
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/liquidity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Provide Liquidity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/bridge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bridge Assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/rewards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manage Rewards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Scenarios
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Scenarios
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scenarios/grow-position/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Grow Your Position
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scenarios/maximize-yield/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Maximize Yield
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scenarios/dca-strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DCA Strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scenarios/platform-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scenarios/portfolio-rebalancing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Portfolio Rebalancing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scenarios/risk-hedging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Risk Management & Hedging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scenarios/leverage-long/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Leverage Long Position
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scenarios/multi-asset-strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Asset Strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scenarios/collateral-optimization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Collateral Optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scenarios/arbitrage-market-making/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Arbitrage & Market Making
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scenarios/withdrawals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Withdrawals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing to STRATO
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Contributing to STRATO
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#monorepo-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Monorepo Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#layer-1-blockchain-core-strato" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layer 1: Blockchain Core (strato/)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Layer 1: Blockchain Core (strato/)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#purpose" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Purpose
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Components
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-flow-layer-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Flow (Layer 1)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#layer-2-defi-application-mercata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layer 2: DeFi Application (mercata/)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Layer 2: DeFi Application (mercata/)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#purpose_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Purpose
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-components_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Components
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-flow-layer-2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Flow (Layer 2)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#supporting-infrastructure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supporting Infrastructure
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Supporting Infrastructure">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bootstrap-docker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        bootstrap-docker
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nginx-packager" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        nginx-packager
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#build-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Build System
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Build System">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#makefiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Makefiles
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stack-haskell" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stack (Haskell)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#npm-nodejs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        npm (Node.js)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#technology-stack-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Technology Stack Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#component-communication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Component Communication
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Component Communication">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#internal-communication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Internal Communication
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#external-communication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        External Communication
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#development-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Development Workflow
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Development Workflow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#choose-your-focus-area" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose Your Focus Area
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#general-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        General Workflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Next Steps
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#need-help" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Need Help?
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing Guidelines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building Apps on STRATO
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Building Apps on STRATO
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_1" id="__nav_8_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../build-apps/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    System Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../build-apps/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start (5 min)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_2" id="__nav_8_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Building
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../build-apps/integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../build-apps/e2e/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    E2E Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_3" id="__nav_8_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../build-apps/contract-addresses/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../build-apps/quick-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Cheat Sheet
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    App API (Getting Started)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/interactive-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Interactive Reference (Swagger)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/strato-node-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Platform API (Advanced)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../safety/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Safety & Risk
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#monorepo-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Monorepo Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#layer-1-blockchain-core-strato" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layer 1: Blockchain Core (strato/)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Layer 1: Blockchain Core (strato/)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#purpose" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Purpose
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Components
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-flow-layer-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Flow (Layer 1)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#layer-2-defi-application-mercata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layer 2: DeFi Application (mercata/)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Layer 2: DeFi Application (mercata/)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#purpose_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Purpose
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-components_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Components
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-flow-layer-2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Flow (Layer 2)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#supporting-infrastructure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supporting Infrastructure
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Supporting Infrastructure">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bootstrap-docker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        bootstrap-docker
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nginx-packager" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        nginx-packager
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#build-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Build System
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Build System">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#makefiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Makefiles
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stack-haskell" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stack (Haskell)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#npm-nodejs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        npm (Node.js)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#technology-stack-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Technology Stack Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#component-communication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Component Communication
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Component Communication">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#internal-communication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Internal Communication
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#external-communication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        External Communication
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#development-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Development Workflow
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Development Workflow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#choose-your-focus-area" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose Your Focus Area
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#general-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        General Workflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Next Steps
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#need-help" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Need Help?
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="architecture-strato-platform">Architecture - STRATO Platform<a class="headerlink" href="#architecture-strato-platform" title="Permanent link">&para;</a></h1>
+<p>Understanding the STRATO platform monorepo structure and how components work together.</p>
+<hr />
+<h2 id="monorepo-overview">Monorepo Overview<a class="headerlink" href="#monorepo-overview" title="Permanent link">&para;</a></h2>
+<p>The STRATO platform is a <strong>monorepo</strong> containing:</p>
+<ol>
+<li><strong>Layer 1: Blockchain</strong> (<code>strato/</code>) - Core blockchain (Haskell)</li>
+<li><strong>Layer 2: DeFi Application</strong> (<code>mercata/</code>) - Application layer (Solidity, TypeScript, React)</li>
+<li><strong>Supporting Infrastructure</strong> - Deployment, proxies, documentation</li>
+</ol>
+<div class="highlight"><pre><span></span><code>strato-platform/
+├── strato/              # Blockchain core (Haskell)
+├── mercata/             # DeFi application (TypeScript, Solidity, React)
+├── bootstrap-docker/    # Production deployment scripts
+├── nginx-packager/      # Reverse proxy &amp; Swagger docs
+├── docs/                # Additional documentation
+└── techdocs/            # User &amp; developer documentation (this site!)
+</code></pre></div>
+<hr />
+<h2 id="layer-1-blockchain-core-strato">Layer 1: Blockchain Core (<code>strato/</code>)<a class="headerlink" href="#layer-1-blockchain-core-strato" title="Permanent link">&para;</a></h2>
+<h3 id="purpose">Purpose<a class="headerlink" href="#purpose" title="Permanent link">&para;</a></h3>
+<p>Custom EVM-compatible blockchain built on Haskell for security and performance.</p>
+<h3 id="key-components">Key Components<a class="headerlink" href="#key-components" title="Permanent link">&para;</a></h3>
+<h4 id="strato-core">strato-core<a class="headerlink" href="#strato-core" title="Permanent link">&para;</a></h4>
+<p><strong>What:</strong> Main blockchain node (consensus, state, networking)</p>
+<p><strong>Language:</strong> Haskell</p>
+<p><strong>Location:</strong> <code>strato/core/</code></p>
+<p><strong>Responsibilities:</strong></p>
+<ul>
+<li>Block production and validation</li>
+<li>Consensus mechanism</li>
+<li>P2P networking</li>
+<li>State management</li>
+<li>Transaction pool</li>
+</ul>
+<p><strong>Key modules:</strong></p>
+<ul>
+<li><code>BlockApps.Blockchain</code> - Block processing</li>
+<li><code>BlockApps.Network</code> - P2P networking</li>
+<li><code>BlockApps.VM</code> - VM interface</li>
+<li><code>BlockApps.State</code> - World state management</li>
+</ul>
+<h4 id="vm-runner">vm-runner<a class="headerlink" href="#vm-runner" title="Permanent link">&para;</a></h4>
+<p><strong>What:</strong> EVM (Ethereum Virtual Machine) executor</p>
+<p><strong>Language:</strong> Haskell</p>
+<p><strong>Location:</strong> <code>strato/vm-runner/</code></p>
+<p><strong>Responsibilities:</strong></p>
+<ul>
+<li>Execute smart contract bytecode</li>
+<li>Gas metering</li>
+<li>State transitions</li>
+<li>Opcode implementations</li>
+</ul>
+<h4 id="strato-api">strato-api<a class="headerlink" href="#strato-api" title="Permanent link">&para;</a></h4>
+<p><strong>What:</strong> JSON-RPC API server (Ethereum-compatible)</p>
+<p><strong>Language:</strong> Haskell</p>
+<p><strong>Location:</strong> <code>strato/api/</code></p>
+<p><strong>Responsibilities:</strong></p>
+<ul>
+<li>HTTP/WebSocket API endpoints</li>
+<li>Ethereum JSON-RPC compatibility</li>
+<li>Transaction submission</li>
+<li>Query interface</li>
+</ul>
+<p><strong>API endpoints:</strong></p>
+<ul>
+<li><code>/strato-api/eth/v1.2/account</code> - Account management</li>
+<li><code>/strato-api/eth/v1.2/transaction</code> - Transaction submission</li>
+<li><code>/strato-api/eth/v1.2/block</code> - Block queries</li>
+<li><code>/strato-api/eth/v1.2/contract</code> - Contract interactions</li>
+</ul>
+<h4 id="cirrus">cirrus<a class="headerlink" href="#cirrus" title="Permanent link">&para;</a></h4>
+<p><strong>What:</strong> Blockchain indexer (PostgreSQL-based)</p>
+<p><strong>Language:</strong> Haskell</p>
+<p><strong>Location:</strong> <code>strato/cirrus/</code></p>
+<p><strong>Responsibilities:</strong></p>
+<ul>
+<li>Index blockchain data into PostgreSQL</li>
+<li>Fast queries for transactions, events, balances</li>
+<li>Block explorer data</li>
+<li>Historical data access</li>
+</ul>
+<p><strong>Database schema:</strong></p>
+<ul>
+<li><code>blocks</code> - Block data</li>
+<li><code>transactions</code> - Transaction data</li>
+<li><code>events</code> - Smart contract events</li>
+<li><code>accounts</code> - Account balances</li>
+</ul>
+<h3 id="data-flow-layer-1">Data Flow (Layer 1)<a class="headerlink" href="#data-flow-layer-1" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code>User → JSON-RPC API → strato-core → vm-runner → State
+                           ↓
+                        cirrus → PostgreSQL
+</code></pre></div>
+<ol>
+<li>User submits transaction via JSON-RPC</li>
+<li><code>strato-core</code> validates and adds to mempool</li>
+<li>Block produced, transactions executed in <code>vm-runner</code></li>
+<li>State updated</li>
+<li><code>cirrus</code> indexes results to PostgreSQL</li>
+</ol>
+<hr />
+<h2 id="layer-2-defi-application-mercata">Layer 2: DeFi Application (<code>mercata/</code>)<a class="headerlink" href="#layer-2-defi-application-mercata" title="Permanent link">&para;</a></h2>
+<h3 id="purpose_1">Purpose<a class="headerlink" href="#purpose_1" title="Permanent link">&para;</a></h3>
+<p>Full-stack DeFi application built on top of STRATO blockchain.</p>
+<h3 id="key-components_1">Key Components<a class="headerlink" href="#key-components_1" title="Permanent link">&para;</a></h3>
+<h4 id="smart-contracts-mercatacontracts">Smart Contracts (<code>mercata/contracts/</code>)<a class="headerlink" href="#smart-contracts-mercatacontracts" title="Permanent link">&para;</a></h4>
+<p><strong>What:</strong> Solidity smart contracts for DeFi protocols</p>
+<p><strong>Language:</strong> Solidity 0.8.22</p>
+<p><strong>Location:</strong> <code>mercata/contracts/concrete/</code></p>
+<p><strong>Core Protocols:</strong></p>
+<ol>
+<li><strong>Lending</strong> (<code>Lending/</code>)</li>
+<li><code>LendingPool.sol</code> - Main lending logic</li>
+<li><code>CollateralVault.sol</code> - Collateral storage</li>
+<li>
+<p>Health factor calculations, liquidations</p>
+</li>
+<li>
+<p><strong>CDP (Collateralized Debt Position)</strong> (<code>CDP/</code>)</p>
+</li>
+<li><code>CDPEngine.sol</code> - Mint USDST stablecoin</li>
+<li><code>CDPVault.sol</code> - Collateral storage</li>
+<li>
+<p>Stability fees, liquidation ratios</p>
+</li>
+<li>
+<p><strong>AMM Pools</strong> (<code>Pools/</code>)</p>
+</li>
+<li><code>Pool.sol</code> - Automated market maker</li>
+<li><code>PoolFactory.sol</code> - Pool creation</li>
+<li>
+<p>Swap, add/remove liquidity</p>
+</li>
+<li>
+<p><strong>Bridge</strong> (<code>Bridge/</code>)</p>
+</li>
+<li><code>MercataBridge.sol</code> - Cross-chain transfers</li>
+<li>
+<p>Deposit/withdrawal workflows</p>
+</li>
+<li>
+<p><strong>Rewards</strong> (<code>Rewards/</code>)</p>
+</li>
+<li><code>Rewards.sol</code> - Incentives controller for distributing Reward Points</li>
+<li>Tracks user activities (borrowing, liquidity, swaps, etc.)</li>
+<li>Calculates and distributes rewards based on emission rates</li>
+<li>
+<p>Activity-based incentive system</p>
+</li>
+<li>
+<p><strong>Tokens</strong> (<code>Tokens/</code>)</p>
+</li>
+<li><code>Token.sol</code> - Base token implementation</li>
+<li><code>TokenFactory.sol</code> - Token creation (USDST, Reward Points, wrapped assets)</li>
+<li><code>TokenMetadata.sol</code> - Token metadata management</li>
+</ol>
+<p><strong>Build:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>mercata/contracts
+npm<span class="w"> </span>install
+npm<span class="w"> </span>run<span class="w"> </span>compile
+npm<span class="w"> </span><span class="nb">test</span>
+</code></pre></div>
+<p><strong>Test:</strong></p>
+<div class="highlight"><pre><span></span><code>npm<span class="w"> </span><span class="nb">test</span><span class="w">                    </span><span class="c1"># All tests</span>
+npm<span class="w"> </span>run<span class="w"> </span>test:coverage<span class="w">       </span><span class="c1"># With coverage</span>
+</code></pre></div>
+<h4 id="backend-api-mercatabackend">Backend API (<code>mercata/backend/</code>)<a class="headerlink" href="#backend-api-mercatabackend" title="Permanent link">&para;</a></h4>
+<p><strong>What:</strong> Node.js REST API for DeFi operations</p>
+<p><strong>Language:</strong> TypeScript (Node.js + Express)</p>
+<p><strong>Location:</strong> <code>mercata/backend/src/</code></p>
+<p><strong>Responsibilities:</strong></p>
+<ul>
+<li>High-level DeFi API endpoints</li>
+<li>User authentication (OAuth 2.0)</li>
+<li>Transaction bundling (e.g., approve + supply)</li>
+<li>Event monitoring</li>
+<li>Database queries (Cirrus)</li>
+</ul>
+<p><strong>Key modules:</strong></p>
+<ul>
+<li><code>api/routes/</code> - Express routes</li>
+<li><code>api/services/</code> - Business logic</li>
+<li><code>lending.service.ts</code> - Lending operations</li>
+<li><code>cdp.service.ts</code> - CDP operations</li>
+<li><code>swapping.service.ts</code> - Swap/liquidity</li>
+<li><code>bridge.service.ts</code> - Bridge operations</li>
+<li><code>api/middleware/</code> - Auth, validation</li>
+<li><code>db/</code> - Database client (PostgreSQL via Cirrus)</li>
+</ul>
+<p><strong>API endpoints:</strong> (Available at <code>/api/docs</code>)</p>
+<ul>
+<li><code>POST /api/lending/supply</code> - Supply collateral</li>
+<li><code>POST /api/lending/borrow</code> - Borrow USDST</li>
+<li><code>POST /api/cdp/deposit</code> - Deposit for CDP</li>
+<li><code>POST /api/cdp/mint</code> - Mint USDST</li>
+<li><code>POST /api/swap/execute</code> - Swap tokens</li>
+<li><code>POST /api/pool/add-liquidity</code> - Add liquidity</li>
+</ul>
+<p><strong>Run:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>mercata/backend
+npm<span class="w"> </span>install
+npm<span class="w"> </span>run<span class="w"> </span>dev<span class="w">              </span><span class="c1"># Development mode</span>
+npm<span class="w"> </span>run<span class="w"> </span>build<span class="w">            </span><span class="c1"># Production build</span>
+npm<span class="w"> </span>start<span class="w">                </span><span class="c1"># Start production server</span>
+</code></pre></div>
+<p><strong>Test:</strong></p>
+<div class="highlight"><pre><span></span><code>npm<span class="w"> </span><span class="nb">test</span><span class="w">                 </span><span class="c1"># Unit tests</span>
+npm<span class="w"> </span>run<span class="w"> </span>test:integration<span class="w"> </span><span class="c1"># Integration tests</span>
+npm<span class="w"> </span>run<span class="w"> </span>test:e2e<span class="w">         </span><span class="c1"># E2E tests</span>
+</code></pre></div>
+<h4 id="frontend-ui-mercataui">Frontend UI (<code>mercata/ui/</code>)<a class="headerlink" href="#frontend-ui-mercataui" title="Permanent link">&para;</a></h4>
+<p><strong>What:</strong> React web application for DeFi interactions</p>
+<p><strong>Language:</strong> TypeScript (React + Vite)</p>
+<p><strong>Location:</strong> <code>mercata/ui/src/</code></p>
+<p><strong>Responsibilities:</strong></p>
+<ul>
+<li>User interface for DeFi operations</li>
+<li>Wallet connection (MetaMask, WalletConnect)</li>
+<li>Transaction submission</li>
+<li>Real-time updates</li>
+<li>Data visualization</li>
+</ul>
+<p><strong>Key modules:</strong></p>
+<ul>
+<li><code>pages/</code> - Main pages</li>
+<li><code>Borrow.tsx</code> - Lending interface</li>
+<li><code>Advanced.tsx</code> - CDP minting, pools</li>
+<li><code>SwapAsset.tsx</code> - Token swaps</li>
+<li><code>DepositsPage.tsx</code> - Bridge in</li>
+<li><code>WithdrawalsPage.tsx</code> - Bridge out</li>
+<li><code>Rewards.tsx</code> - Rewards management</li>
+<li><code>components/</code> - Reusable components</li>
+<li><code>hooks/</code> - React hooks (API calls, wallet)</li>
+<li><code>contexts/</code> - State management</li>
+<li><code>utils/</code> - Helpers, formatters</li>
+</ul>
+<p><strong>Tech stack:</strong></p>
+<ul>
+<li>React 18</li>
+<li>TypeScript</li>
+<li>Vite (build tool)</li>
+<li>ethers.js (Web3 library)</li>
+<li>Material-UI (components)</li>
+</ul>
+<p><strong>Run:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>mercata/ui
+npm<span class="w"> </span>install
+npm<span class="w"> </span>run<span class="w"> </span>dev<span class="w">              </span><span class="c1"># Development server (port 3001)</span>
+npm<span class="w"> </span>run<span class="w"> </span>build<span class="w">            </span><span class="c1"># Production build</span>
+npm<span class="w"> </span>run<span class="w"> </span>preview<span class="w">          </span><span class="c1"># Preview production build</span>
+</code></pre></div>
+<p><strong>Test:</strong></p>
+<div class="highlight"><pre><span></span><code>npm<span class="w"> </span><span class="nb">test</span><span class="w">                 </span><span class="c1"># Component tests</span>
+npm<span class="w"> </span>run<span class="w"> </span>test:e2e<span class="w">         </span><span class="c1"># E2E tests (Playwright)</span>
+</code></pre></div>
+<h4 id="background-services-mercataservices">Background Services (<code>mercata/services/</code>)<a class="headerlink" href="#background-services-mercataservices" title="Permanent link">&para;</a></h4>
+<p><strong>What:</strong> Long-running services for async operations</p>
+<p><strong>Language:</strong> TypeScript (Node.js)</p>
+<p><strong>Key services:</strong></p>
+<ol>
+<li><strong>Bridge Service</strong> (<code>bridge/</code>)</li>
+<li>Monitors Ethereum for deposits</li>
+<li>Processes withdrawals</li>
+<li>Mints wrapped assets</li>
+<li>
+<p>Issues transaction vouchers (10 per bridge-in)</p>
+</li>
+<li>
+<p><strong>Oracle Service</strong> (<code>oracle/</code>)</p>
+</li>
+<li>Fetches external price feeds</li>
+<li>Updates on-chain prices</li>
+<li>
+<p>Data sources (Chainlink, CoinGecko, etc.)</p>
+</li>
+<li>
+<p><strong>Voucher Service</strong> (<code>voucher/</code>)</p>
+</li>
+<li>Manages transaction vouchers</li>
+<li>Mints vouchers on bridge-in</li>
+<li>Tracks voucher usage</li>
+</ol>
+<p><strong>Run:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>mercata/services/bridge
+npm<span class="w"> </span>install
+npm<span class="w"> </span>run<span class="w"> </span>dev
+</code></pre></div>
+<h3 id="data-flow-layer-2">Data Flow (Layer 2)<a class="headerlink" href="#data-flow-layer-2" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code>User (Browser)
+    ↓
+Frontend UI (React) → Wallet (MetaMask)
+    ↓                       ↓
+Backend API (Node.js) ← Blockchain (via ethers.js)
+    ↓
+Smart Contracts (Solidity)
+    ↓
+STRATO Blockchain (Layer 1)
+</code></pre></div>
+<p><strong>Example: Borrow USDST</strong></p>
+<ol>
+<li>User clicks "Borrow" in UI</li>
+<li>Frontend calls <code>POST /api/lending/borrow</code></li>
+<li>Backend bundles transactions:</li>
+<li>Approve token spending</li>
+<li>Call <code>LendingPool.borrow()</code></li>
+<li>Backend submits to STRATO blockchain</li>
+<li><code>vm-runner</code> executes contract</li>
+<li>State updated, event emitted</li>
+<li><code>cirrus</code> indexes transaction</li>
+<li>Backend returns result to frontend</li>
+<li>UI updates with new balance</li>
+</ol>
+<hr />
+<h2 id="supporting-infrastructure">Supporting Infrastructure<a class="headerlink" href="#supporting-infrastructure" title="Permanent link">&para;</a></h2>
+<h3 id="bootstrap-docker">bootstrap-docker<a class="headerlink" href="#bootstrap-docker" title="Permanent link">&para;</a></h3>
+<p><strong>What:</strong> Production deployment scripts</p>
+<p><strong>Location:</strong> <code>bootstrap-docker/</code></p>
+<p><strong>Contains:</strong></p>
+<ul>
+<li><code>strato-run.sh</code> - Main deployment script</li>
+<li><code>docker-compose.yml</code> - Service definitions</li>
+<li><code>strato</code> - CLI wrapper</li>
+</ul>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>bootstrap-docker
+sudo<span class="w"> </span>./strato-run.sh
+</code></pre></div>
+<h3 id="nginx-packager">nginx-packager<a class="headerlink" href="#nginx-packager" title="Permanent link">&para;</a></h3>
+<p><strong>What:</strong> Reverse proxy and API gateway</p>
+<p><strong>Location:</strong> <code>nginx-packager/</code></p>
+<p><strong>Responsibilities:</strong></p>
+<ul>
+<li>Route <code>/strato-api/*</code> → strato-api (Layer 1)</li>
+<li>Route <code>/api/*</code> → mercata-backend (Layer 2)</li>
+<li>Route <code>/</code> → mercata-ui (frontend)</li>
+<li>Serve Swagger UI at <code>/docs</code> and <code>/api/docs</code></li>
+</ul>
+<p><strong>Configuration:</strong></p>
+<ul>
+<li><code>nginx.conf</code> - Main config</li>
+<li><code>swagger/swagger.yaml</code> - API specification</li>
+</ul>
+<hr />
+<h2 id="build-system">Build System<a class="headerlink" href="#build-system" title="Permanent link">&para;</a></h2>
+<h3 id="makefiles">Makefiles<a class="headerlink" href="#makefiles" title="Permanent link">&para;</a></h3>
+<p><strong>Root Makefile:</strong> <code>Makefile</code></p>
+<p><strong>Targets:</strong></p>
+<div class="highlight"><pre><span></span><code>make<span class="w">                     </span><span class="c1"># Build everything</span>
+make<span class="w"> </span>strato-core<span class="w">         </span><span class="c1"># Build blockchain core</span>
+make<span class="w"> </span>mercata-contracts<span class="w">   </span><span class="c1"># Build smart contracts</span>
+make<span class="w"> </span>mercata-backend<span class="w">     </span><span class="c1"># Build backend API</span>
+make<span class="w"> </span>mercata-ui<span class="w">          </span><span class="c1"># Build frontend UI</span>
+make<span class="w"> </span>docker-compose<span class="w">      </span><span class="c1"># Generate docker-compose files</span>
+make<span class="w"> </span><span class="nb">test</span><span class="w">                </span><span class="c1"># Run all tests</span>
+</code></pre></div>
+<h3 id="stack-haskell">Stack (Haskell)<a class="headerlink" href="#stack-haskell" title="Permanent link">&para;</a></h3>
+<p><strong>What:</strong> Build tool for Haskell components</p>
+<p><strong>Configuration:</strong> <code>stack.yaml</code></p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>stack<span class="w"> </span>build<span class="w">              </span><span class="c1"># Build Haskell code</span>
+stack<span class="w"> </span><span class="nb">test</span><span class="w">               </span><span class="c1"># Run Haskell tests</span>
+stack<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>strato-core<span class="w">   </span><span class="c1"># Run compiled binary</span>
+</code></pre></div>
+<h3 id="npm-nodejs">npm (Node.js)<a class="headerlink" href="#npm-nodejs" title="Permanent link">&para;</a></h3>
+<p><strong>What:</strong> Package manager for JavaScript/TypeScript</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>mercata/backend
+npm<span class="w"> </span>install<span class="w">              </span><span class="c1"># Install dependencies</span>
+npm<span class="w"> </span>run<span class="w"> </span>build<span class="w">            </span><span class="c1"># Compile TypeScript</span>
+npm<span class="w"> </span><span class="nb">test</span><span class="w">                 </span><span class="c1"># Run tests</span>
+
+<span class="nb">cd</span><span class="w"> </span>mercata/ui
+npm<span class="w"> </span>install
+npm<span class="w"> </span>run<span class="w"> </span>dev<span class="w">              </span><span class="c1"># Start dev server</span>
+</code></pre></div>
+<hr />
+<h2 id="technology-stack-summary">Technology Stack Summary<a class="headerlink" href="#technology-stack-summary" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Language</th>
+<th>Framework</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>strato-core</td>
+<td>Haskell</td>
+<td>Stack</td>
+<td>Blockchain core</td>
+</tr>
+<tr>
+<td>vm-runner</td>
+<td>Haskell</td>
+<td>Stack</td>
+<td>EVM executor</td>
+</tr>
+<tr>
+<td>cirrus</td>
+<td>Haskell</td>
+<td>Stack + PostgreSQL</td>
+<td>Indexer</td>
+</tr>
+<tr>
+<td>Smart Contracts</td>
+<td>Solidity 0.8.22</td>
+<td>Hardhat</td>
+<td>DeFi protocols</td>
+</tr>
+<tr>
+<td>Backend API</td>
+<td>TypeScript</td>
+<td>Node.js + Express</td>
+<td>REST API</td>
+</tr>
+<tr>
+<td>Frontend UI</td>
+<td>TypeScript</td>
+<td>React + Vite</td>
+<td>Web app</td>
+</tr>
+<tr>
+<td>Services</td>
+<td>TypeScript</td>
+<td>Node.js</td>
+<td>Background tasks</td>
+</tr>
+<tr>
+<td>Deployment</td>
+<td>Bash + Docker</td>
+<td>Docker Compose</td>
+<td>Infrastructure</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="component-communication">Component Communication<a class="headerlink" href="#component-communication" title="Permanent link">&para;</a></h2>
+<h3 id="internal-communication">Internal Communication<a class="headerlink" href="#internal-communication" title="Permanent link">&para;</a></h3>
+<p><strong>Blockchain → API:</strong></p>
+<ul>
+<li>Direct function calls (Haskell)</li>
+</ul>
+<p><strong>Blockchain → Cirrus:</strong></p>
+<ul>
+<li>Database writes (PostgreSQL)</li>
+</ul>
+<p><strong>Backend → Blockchain:</strong></p>
+<ul>
+<li>HTTP (JSON-RPC API)</li>
+<li>Port: 8080</li>
+</ul>
+<p><strong>Frontend → Backend:</strong></p>
+<ul>
+<li>HTTP (REST API)</li>
+<li>Port: 3000</li>
+</ul>
+<p><strong>Frontend → Blockchain:</strong></p>
+<ul>
+<li>Direct via ethers.js (JSON-RPC)</li>
+<li>For read operations, gas estimation</li>
+</ul>
+<h3 id="external-communication">External Communication<a class="headerlink" href="#external-communication" title="Permanent link">&para;</a></h3>
+<p><strong>User → Frontend:</strong></p>
+<ul>
+<li>HTTPS (web browser)</li>
+<li>Port: 443 (production) or 3001 (dev)</li>
+</ul>
+<p><strong>Bridge Service → Ethereum L1:</strong></p>
+<ul>
+<li>JSON-RPC (Infura, Alchemy)</li>
+<li>Monitors events, submits transactions</li>
+</ul>
+<p><strong>Oracle Service → Price Feeds:</strong></p>
+<ul>
+<li>HTTPS (Chainlink, CoinGecko APIs)</li>
+</ul>
+<hr />
+<h2 id="development-workflow">Development Workflow<a class="headerlink" href="#development-workflow" title="Permanent link">&para;</a></h2>
+<h3 id="choose-your-focus-area">Choose Your Focus Area<a class="headerlink" href="#choose-your-focus-area" title="Permanent link">&para;</a></h3>
+<p>Detailed component-specific guides are coming soon. For now, see:</p>
+<ol>
+<li><strong>Blockchain Core</strong> - Haskell codebase (<code>strato/core/</code>, <code>strato/api/</code>)</li>
+<li><strong>Smart Contracts</strong> - Solidity contracts (<code>mercata/contracts/</code>)</li>
+<li><strong>Backend API</strong> - Node.js/TypeScript (<code>mercata/backend/</code>)</li>
+<li><strong>Frontend UI</strong> - React/TypeScript (<code>mercata/ui/</code>)</li>
+<li><strong>Services</strong> - Background services (<code>mercata/services/</code>)</li>
+</ol>
+<h3 id="general-workflow">General Workflow<a class="headerlink" href="#general-workflow" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Make changes</strong> in your area</li>
+<li><strong>Build</strong> your component</li>
+<li><strong>Run tests</strong> (unit, integration)</li>
+<li><strong>Test locally</strong> (full stack)</li>
+<li><strong>Submit PR</strong> (see <a href="../contributing/">Contributing</a>)</li>
+</ol>
+<hr />
+<h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
+<p>Now that you understand the architecture:</p>
+<ol>
+<li><strong>Choose your area of interest</strong> (blockchain, contracts, backend, frontend, services)</li>
+<li><strong>Read the component-specific guide</strong></li>
+<li><strong>Set up your development environment</strong> (see <a href="../setup/">Setup</a>)</li>
+<li><strong>Make your first contribution</strong> (see <a href="../contributing/">Contributing</a>)</li>
+</ol>
+<hr />
+<h2 id="need-help">Need Help?<a class="headerlink" href="#need-help" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Documentation:</strong> <a href="https://docs.strato.nexus">docs.strato.nexus</a></li>
+<li><strong>Support:</strong> <a href="https://support.blockapps.net">support.blockapps.net</a></li>
+<li><strong>Telegram:</strong> <a href="https://t.me/strato_net">t.me/strato_net</a></li>
+</ul>
+
+
+
+
+
+
+
+  
+    
+  
+  
+    
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Last update">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="January 22, 2026 16:13:05 UTC"><span class="timeago" datetime="2026-01-22T16:13:05+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="January 22, 2026 16:13:05 UTC">2026-01-22</span>
+  </span>
+
+    
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Created">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="January 5, 2026 17:52:18 UTC"><span class="timeago" datetime="2026-01-05T17:52:18+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="January 5, 2026 17:52:18 UTC">2026-01-05</span>
+  </span>
+
+    
+    
+    
+  </aside>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 BlockApps - STRATO Platform
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+    <a href="https://t.me/strato_net" target="_blank" rel="noopener" title="Telegram Community" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M256 8a248 248 0 1 0 0 496 248 248 0 1 0 0-496m115 168.7c-3.7 39.2-19.9 134.4-28.1 178.3-3.5 18.6-10.3 24.8-16.9 25.4-14.4 1.3-25.3-9.5-39.3-18.7-21.8-14.3-34.2-23.2-55.3-37.2-24.5-16.1-8.6-25 5.3-39.5 3.7-3.8 67.1-61.5 68.3-66.7.2-.7.3-3.1-1.2-4.4s-3.6-.8-5.1-.5c-2.2.5-37.1 23.5-104.6 69.1-9.9 6.8-18.9 10.1-26.9 9.9-8.9-.2-25.9-5-38.6-9.1-15.5-5-27.9-7.7-26.8-16.3.6-4.5 6.7-9 18.4-13.7 72.3-31.5 120.5-52.3 144.6-62.3 68.9-28.6 83.2-33.6 92.5-33.8 2.1 0 6.6.5 9.6 2.9 2 1.7 3.2 4.1 3.5 6.7.5 3.2.6 6.5.4 9.8z"/></svg>
+    </a>
+  
+    
+    
+    
+    
+    <a href="https://support.blockapps.net" target="_blank" rel="noopener" title="Support Portal" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M256 512a256 256 0 1 0 0-512 256 256 0 1 0 0 512m0-336c-17.7 0-32 14.3-32 32 0 13.3-10.7 24-24 24s-24-10.7-24-24c0-44.2 35.8-80 80-80s80 35.8 80 80c0 47.2-36 67.2-56 74.5v3.8c0 13.3-10.7 24-24 24s-24-10.7-24-24v-8.1c0-20.5 14.8-35.2 30.1-40.2 6.4-2.1 13.2-5.5 18.2-10.3 4.3-4.2 7.7-10 7.7-19.6 0-17.7-14.3-32-32-32zm-32 192a32 32 0 1 1 64 0 32 32 0 1 1-64 0"/></svg>
+    </a>
+  
+    
+    
+    
+    
+    <a href="https://docs.strato.nexus" target="_blank" rel="noopener" title="Documentation" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M384 512H96c-53 0-96-43-96-96V96C0 43 43 0 96 0h304c26.5 0 48 21.5 48 48v288c0 20.9-13.4 38.7-32 45.3V448c17.7 0 32 14.3 32 32s-14.3 32-32 32zM96 384c-17.7 0-32 14.3-32 32s14.3 32 32 32h256v-64zm32-232c0 13.3 10.7 24 24 24h176c13.3 0 24-10.7 24-24s-10.7-24-24-24H152c-13.3 0-24 10.7-24 24m24 72c-13.3 0-24 10.7-24 24s10.7 24 24 24h176c13.3 0 24-10.7 24-24s-10.7-24-24-24z"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.indexes", "navigation.instant", "navigation.tracking", "navigation.top", "navigation.expand", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit", "content.action.view"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../js/timeago.min.js"></script>
+      
+        <script src="../../js/timeago_mkdocs_material.js"></script>
+      
+    
+  </body>
+</html>

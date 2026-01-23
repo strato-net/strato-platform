@@ -1,0 +1,3649 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="STRATO platform technical documentation (use-case first, end-user + developer)">
+      
+      
+        <meta name="author" content="BlockApps">
+      
+      
+        <link rel="canonical" href="https://docs.strato.nexus/scenarios/collateral-optimization/">
+      
+      
+        <link rel="prev" href="../multi-asset-strategy/">
+      
+      
+        <link rel="next" href="../arbitrage-market-making/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Collateral Optimization - STRATO Technical Docs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../css/timeago.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#dynamic-collateral-optimization" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="STRATO Technical Docs" class="md-header__button md-logo" aria-label="STRATO Technical Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            STRATO Technical Docs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Collateral Optimization
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="STRATO Technical Docs" class="md-nav__button md-logo" aria-label="STRATO Technical Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    STRATO Technical Docs
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../quick-start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Concepts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../first-time-user/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    First-Time User
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/borrow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Borrow USDST
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/mint-cdp/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mint USDST (CDP)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/swap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Swap Tokens
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/liquidity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Provide Liquidity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/bridge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bridge Assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/rewards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manage Rewards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Scenarios
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Scenarios
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../grow-position/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Grow Your Position
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../maximize-yield/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Maximize Yield
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dca-strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DCA Strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platform-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../portfolio-rebalancing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Portfolio Rebalancing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../risk-hedging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Risk Management & Hedging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../leverage-long/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Leverage Long Position
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../multi-asset-strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Asset Strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Collateral Optimization
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Collateral Optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Strategy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#complete-example-optimize-10-ethst-position" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Complete Example: Optimize 10 ETHST Position
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#understanding-collateral-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Understanding Collateral Types
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Understanding Collateral Types">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#collateral-parameters-on-strato" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Collateral Parameters on STRATO
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#optimization-framework" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optimization Framework
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Optimization Framework">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-1-calculate-current-efficiency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1: Calculate Current Efficiency
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-identify-optimal-mix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2: Identify Optimal Mix
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-3-execute-rebalancing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3: Execute Rebalancing
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dynamic-optimization-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dynamic Optimization Rules
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Dynamic Optimization Rules">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rule-1-volatility-targeting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rule 1: Volatility Targeting
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rule-2-ltv-maximization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rule 2: LTV Maximization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rule-3-correlation-reduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rule 3: Correlation Reduction
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#market-condition-strategies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Market Condition Strategies
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Market Condition Strategies">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bull-market-prices-rising" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bull Market (Prices Rising)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bear-market-prices-falling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bear Market (Prices Falling)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sideways-market-ranging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sideways Market (Ranging)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#advanced-automated-rebalancing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Advanced: Automated Rebalancing
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Advanced: Automated Rebalancing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#set-rebalancing-triggers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Set Rebalancing Triggers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cost-benefit-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cost-Benefit Analysis
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Cost-Benefit Analysis">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rebalancing-costs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rebalancing Costs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-rebalancing-pays-off" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When Rebalancing Pays Off
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#real-example-portfolio-over-1-year" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Real Example: Portfolio Over 1 Year
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#optimization-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optimization Checklist
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Optimization Checklist">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#monthly-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Monthly Review
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#quarterly-deep-dive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quarterly Deep Dive
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tools-resources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tools &amp; Resources
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tools &amp; Resources">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#portfolio-tracking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Portfolio Tracking
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#volatility-calculation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Volatility Calculation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-not-to-optimize" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When NOT to Optimize
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="When NOT to Optimize">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#skip-rebalancing-if" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Skip Rebalancing If:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#common-mistakes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common Mistakes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Common Mistakes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rebalancing-too-often" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ❌ Rebalancing Too Often
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chasing-past-performance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ❌ Chasing Past Performance
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ignoring-correlations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ❌ Ignoring Correlations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Next Steps
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Next Steps">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#related-strategies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related Strategies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#learn-more" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Learn More
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#need-help" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Need Help?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../arbitrage-market-making/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Arbitrage & Market Making
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../withdrawals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Withdrawals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing to STRATO
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Contributing to STRATO
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contribute/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contribute/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contribute/contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing Guidelines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building Apps on STRATO
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Building Apps on STRATO
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_1" id="__nav_8_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../build-apps/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    System Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../build-apps/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start (5 min)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_2" id="__nav_8_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Building
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../build-apps/integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../build-apps/e2e/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    E2E Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_3" id="__nav_8_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../build-apps/contract-addresses/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../build-apps/quick-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Cheat Sheet
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    App API (Getting Started)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/interactive-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Interactive Reference (Swagger)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/strato-node-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Platform API (Advanced)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../safety/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Safety & Risk
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Strategy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#complete-example-optimize-10-ethst-position" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Complete Example: Optimize 10 ETHST Position
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#understanding-collateral-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Understanding Collateral Types
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Understanding Collateral Types">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#collateral-parameters-on-strato" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Collateral Parameters on STRATO
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#optimization-framework" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optimization Framework
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Optimization Framework">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-1-calculate-current-efficiency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1: Calculate Current Efficiency
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-identify-optimal-mix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2: Identify Optimal Mix
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-3-execute-rebalancing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3: Execute Rebalancing
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dynamic-optimization-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dynamic Optimization Rules
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Dynamic Optimization Rules">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rule-1-volatility-targeting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rule 1: Volatility Targeting
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rule-2-ltv-maximization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rule 2: LTV Maximization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rule-3-correlation-reduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rule 3: Correlation Reduction
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#market-condition-strategies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Market Condition Strategies
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Market Condition Strategies">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bull-market-prices-rising" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bull Market (Prices Rising)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bear-market-prices-falling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bear Market (Prices Falling)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sideways-market-ranging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sideways Market (Ranging)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#advanced-automated-rebalancing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Advanced: Automated Rebalancing
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Advanced: Automated Rebalancing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#set-rebalancing-triggers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Set Rebalancing Triggers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cost-benefit-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cost-Benefit Analysis
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Cost-Benefit Analysis">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rebalancing-costs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rebalancing Costs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-rebalancing-pays-off" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When Rebalancing Pays Off
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#real-example-portfolio-over-1-year" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Real Example: Portfolio Over 1 Year
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#optimization-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optimization Checklist
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Optimization Checklist">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#monthly-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Monthly Review
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#quarterly-deep-dive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quarterly Deep Dive
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tools-resources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tools &amp; Resources
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tools &amp; Resources">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#portfolio-tracking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Portfolio Tracking
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#volatility-calculation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Volatility Calculation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-not-to-optimize" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When NOT to Optimize
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="When NOT to Optimize">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#skip-rebalancing-if" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Skip Rebalancing If:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#common-mistakes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common Mistakes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Common Mistakes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rebalancing-too-often" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ❌ Rebalancing Too Often
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chasing-past-performance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ❌ Chasing Past Performance
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ignoring-correlations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ❌ Ignoring Correlations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Next Steps
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Next Steps">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#related-strategies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related Strategies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#learn-more" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Learn More
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#need-help" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Need Help?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="dynamic-collateral-optimization">Dynamic Collateral Optimization<a class="headerlink" href="#dynamic-collateral-optimization" title="Permanent link">&para;</a></h1>
+<p>Continuously optimize your collateral mix based on market conditions for best risk/reward.</p>
+<hr />
+<h2 id="the-strategy">The Strategy<a class="headerlink" href="#the-strategy" title="Permanent link">&para;</a></h2>
+<p>Actively manage collateral composition to:</p>
+<ul>
+<li>Maximize borrowing capacity</li>
+<li>Minimize liquidation risk</li>
+<li>Optimize for fee generation</li>
+<li>Adapt to market conditions</li>
+</ul>
+<p><strong>Key insight:</strong> Not all collateral is created equal - different LTVs, volatilities, and correlations.</p>
+<hr />
+<h2 id="complete-example-optimize-10-ethst-position">Complete Example: Optimize 10 ETHST Position<a class="headerlink" href="#complete-example-optimize-10-ethst-position" title="Permanent link">&para;</a></h2>
+<p><strong>Your starting position:</strong></p>
+<ul>
+<li>Collateral: 10 ETHST ($30,000)</li>
+<li>Borrowed: 15,000 USDST</li>
+<li>LTV: 50%</li>
+<li>Health Factor: 1.6</li>
+<li>Risk: High (single asset)</li>
+</ul>
+<p><strong>After optimization:</strong></p>
+<ul>
+<li>Collateral: 3 ETHST + 0.18 WBTCST + 12,000 USDST ($30,000)</li>
+<li>Borrowed: 18,000 USDST</li>
+<li>LTV: 60%</li>
+<li>Health Factor: 1.37</li>
+<li>Risk: Medium (diversified)</li>
+</ul>
+<p><strong>Improvement:</strong> </p>
+<ul>
+<li>✅ Borrow $3k more (trade-off: slightly lower HF)</li>
+<li>✅ Lower volatility portfolio (70% → 45%)</li>
+<li>✅ Better risk-adjusted returns</li>
+</ul>
+<hr />
+<h2 id="understanding-collateral-types">Understanding Collateral Types<a class="headerlink" href="#understanding-collateral-types" title="Permanent link">&para;</a></h2>
+<h3 id="collateral-parameters-on-strato">Collateral Parameters on STRATO<a class="headerlink" href="#collateral-parameters-on-strato" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Asset</th>
+<th>LTV</th>
+<th>Liq. Threshold</th>
+<th>Volatility</th>
+<th>Correlation to ETHST</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>ETHST</strong></td>
+<td>75%</td>
+<td>80%</td>
+<td>High (70%)</td>
+<td>1.0 (perfect)</td>
+</tr>
+<tr>
+<td><strong>WBTCST</strong></td>
+<td>75%</td>
+<td>80%</td>
+<td>High (65%)</td>
+<td>0.85 (high)</td>
+</tr>
+<tr>
+<td><strong>USDST</strong></td>
+<td>80%</td>
+<td>85%</td>
+<td>None (0%)</td>
+<td>0.0 (none)</td>
+</tr>
+<tr>
+<td><strong>USDST</strong></td>
+<td>80%</td>
+<td>85%</td>
+<td>None (0%)</td>
+<td>0.0 (none)</td>
+</tr>
+<tr>
+<td><strong>GOLDST</strong></td>
+<td>70%</td>
+<td>75%</td>
+<td>Moderate (40%)</td>
+<td>0.3 (low)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Key insights:</strong></p>
+<ol>
+<li>Stablecoins have higher LTV (can borrow more)</li>
+<li>But provide no price appreciation</li>
+<li>Volatile assets have upside but more risk</li>
+<li>Correlation matters for diversification</li>
+</ol>
+<hr />
+<h2 id="optimization-framework">Optimization Framework<a class="headerlink" href="#optimization-framework" title="Permanent link">&para;</a></h2>
+<h3 id="step-1-calculate-current-efficiency">Step 1: Calculate Current Efficiency<a class="headerlink" href="#step-1-calculate-current-efficiency" title="Permanent link">&para;</a></h3>
+<p><strong>Metric: Risk-Adjusted Borrowing Capacity</strong></p>
+<div class="highlight"><pre><span></span><code>Current position:
+
+- Collateral: 10 ETHST ($30k)
+- Max borrow: $22,500 (75% LTV)
+- Volatility: 70% (high)
+- Sharpe-like ratio: $22,500 / 70% = 321
+
+Target: Increase this ratio
+</code></pre></div>
+<hr />
+<h3 id="step-2-identify-optimal-mix">Step 2: Identify Optimal Mix<a class="headerlink" href="#step-2-identify-optimal-mix" title="Permanent link">&para;</a></h3>
+<p><strong>Goal:</strong> Maximize borrowing capacity per unit of risk</p>
+<p><strong>Theory:</strong> </p>
+<ul>
+<li>More stables = higher LTV, lower vol</li>
+<li>Some volatile assets = upside exposure</li>
+<li>Uncorrelated assets = better diversification</li>
+</ul>
+<p><strong>Optimal mix (depends on goals):</strong></p>
+<p><strong>Conservative:</strong></p>
+<ul>
+<li>40% volatile (ETHST+WBTCST)</li>
+<li>60% stables</li>
+<li>Lower risk, less upside</li>
+</ul>
+<p><strong>Moderate (recommended):</strong></p>
+<ul>
+<li>60% volatile</li>
+<li>40% stables</li>
+<li>Balanced risk/reward</li>
+</ul>
+<p><strong>Aggressive:</strong></p>
+<ul>
+<li>80% volatile</li>
+<li>20% stables</li>
+<li>Higher upside, more risk</li>
+</ul>
+<hr />
+<h3 id="step-3-execute-rebalancing">Step 3: Execute Rebalancing<a class="headerlink" href="#step-3-execute-rebalancing" title="Permanent link">&para;</a></h3>
+<p><strong>For moderate allocation on $30k portfolio:</strong></p>
+<p><strong>Target:</strong></p>
+<ul>
+<li>$18k volatile (60%)</li>
+<li>$9k ETHST (3 ETHST)</li>
+<li>$9k WBTCST (0.18 BTC)</li>
+<li>$12k stables (40%)</li>
+<li>$12k USDST</li>
+</ul>
+<p><strong>From current (10 ETHST):</strong></p>
+<ol>
+<li><strong>Remove 7 ETHST from collateral</strong></li>
+<li>Temporarily reduces HF</li>
+<li>
+<p>Will fix by adding others</p>
+</li>
+<li>
+<p><strong>Swap 4 ETHST → $12k USDST</strong></p>
+</li>
+<li>
+<p>Keep as stables</p>
+</li>
+<li>
+<p><strong>Swap 3 ETHST → 0.18 WBTCST</strong></p>
+</li>
+<li>
+<p>Diversify volatile holdings</p>
+</li>
+<li>
+<p><strong>Supply new collateral:</strong></p>
+</li>
+<li>
+<p>3 ETHST</p>
+</li>
+<li>0.18 WBTCST</li>
+<li>12,000 USDST</li>
+</ol>
+<p><strong>Result:</strong>
+<div class="highlight"><pre><span></span><code>New collateral: 3 ETHST + 0.18 WBTCST + 12k USDST
+Value: $30,000 (unchanged)
+Max borrow: $23,100 (vs $22,500)
+Volatility: ~45% (vs 70%)
+Sharpe ratio: 513 (vs 321) ✅
+</code></pre></div></p>
+<p><strong>Can now borrow $600 more with lower risk!</strong></p>
+<hr />
+<h2 id="dynamic-optimization-rules">Dynamic Optimization Rules<a class="headerlink" href="#dynamic-optimization-rules" title="Permanent link">&para;</a></h2>
+<h3 id="rule-1-volatility-targeting">Rule 1: Volatility Targeting<a class="headerlink" href="#rule-1-volatility-targeting" title="Permanent link">&para;</a></h3>
+<p><strong>Set target portfolio volatility (e.g., 50%):</strong></p>
+<p><strong>If volatility exceeds target:</strong></p>
+<ol>
+<li>Measure current vol (use price history)</li>
+<li>Calculate over-exposure to volatile assets</li>
+<li>Swap excess to stablecoins</li>
+<li>Rebalance to hit target</li>
+</ol>
+<p><strong>When to use:</strong></p>
+<ul>
+<li>During high market volatility</li>
+<li>When nervous about positions</li>
+<li>Before major events (Fed meetings, etc.)</li>
+</ul>
+<hr />
+<h3 id="rule-2-ltv-maximization">Rule 2: LTV Maximization<a class="headerlink" href="#rule-2-ltv-maximization" title="Permanent link">&para;</a></h3>
+<p><strong>Goal: Borrow maximum while staying safe</strong></p>
+<p><strong>Calculate weighted LTV:</strong>
+<div class="highlight"><pre><span></span><code>Weighted LTV = Σ(Asset_Value × Asset_LTV) / Total_Value
+
+Example:
+
+- 3 ETHST ($9k) × 75% = $6,750
+- 0.18 WBTCST ($9k) × 75% = $6,750
+- 12k USDST × 80% = $9,600
+Total: $23,100 / $30k = 77% effective LTV
+
+vs pure ETHST: 75% LTV
+</code></pre></div></p>
+<p><strong>Improvement: +2% borrowing capacity</strong></p>
+<hr />
+<h3 id="rule-3-correlation-reduction">Rule 3: Correlation Reduction<a class="headerlink" href="#rule-3-correlation-reduction" title="Permanent link">&para;</a></h3>
+<p><strong>Minimize correlated assets:</strong></p>
+<p><strong>Bad diversification:</strong></p>
+<ul>
+<li>50% ETHST</li>
+<li>50% WBTCST</li>
+<li>Correlation: 0.85 (move together)</li>
+<li>Crash together in bear market</li>
+</ul>
+<p><strong>Good diversification:</strong></p>
+<ul>
+<li>30% ETHST</li>
+<li>30% GOLDST</li>
+<li>40% USDST</li>
+<li>Correlations: 0.85, 0.0</li>
+<li>Better protected in crashes</li>
+</ul>
+<p><strong>Formula:</strong>
+<div class="highlight"><pre><span></span><code>Portfolio_Variance = Σ(w_i² × σ_i²) + Σ(w_i × w_j × ρ_ij × σ_i × σ_j)
+
+Minimize this by choosing low-correlation assets
+</code></pre></div></p>
+<hr />
+<h2 id="market-condition-strategies">Market Condition Strategies<a class="headerlink" href="#market-condition-strategies" title="Permanent link">&para;</a></h2>
+<h3 id="bull-market-prices-rising">Bull Market (Prices Rising)<a class="headerlink" href="#bull-market-prices-rising" title="Permanent link">&para;</a></h3>
+<p><strong>Optimize for:</strong></p>
+<ul>
+<li>Maximum upside exposure</li>
+<li>Higher volatile allocation</li>
+<li>Leverage if confident</li>
+</ul>
+<p><strong>Target mix:</strong></p>
+<ul>
+<li>80% ETHST + WBTCST - 20% stables (for stability)</li>
+</ul>
+<p><strong>Why:</strong></p>
+<ul>
+<li>Capitalize on appreciation</li>
+<li>Stables provide safety net</li>
+<li>Can borrow more as collateral grows</li>
+</ul>
+<hr />
+<h3 id="bear-market-prices-falling">Bear Market (Prices Falling)<a class="headerlink" href="#bear-market-prices-falling" title="Permanent link">&para;</a></h3>
+<p><strong>Optimize for:</strong></p>
+<ul>
+<li>Capital preservation</li>
+<li>Reduce liquidation risk</li>
+<li>Increase stable allocation</li>
+</ul>
+<p><strong>Target mix:</strong></p>
+<ul>
+<li>40% ETHST + WBTCST (minimum exposure)</li>
+<li>60% stables (protection)</li>
+</ul>
+<p><strong>Why:</strong></p>
+<ul>
+<li>Reduce downside</li>
+<li>Higher LTV on stables lets you maintain debt</li>
+<li>Less chance of liquidation</li>
+</ul>
+<hr />
+<h3 id="sideways-market-ranging">Sideways Market (Ranging)<a class="headerlink" href="#sideways-market-ranging" title="Permanent link">&para;</a></h3>
+<p><strong>Optimize for:</strong></p>
+<ul>
+<li>Yield generation</li>
+<li>Balanced risk</li>
+<li>Fee optimization</li>
+</ul>
+<p><strong>Target mix:</strong></p>
+<ul>
+<li>60% volatile (some upside exposure)</li>
+<li>40% stables (stability + higher LTV)</li>
+</ul>
+<p><strong>Why:</strong></p>
+<ul>
+<li>Balanced position</li>
+<li>Can add leverage safely</li>
+<li>Focus on yield vs price action</li>
+</ul>
+<hr />
+<h2 id="advanced-automated-rebalancing">Advanced: Automated Rebalancing<a class="headerlink" href="#advanced-automated-rebalancing" title="Permanent link">&para;</a></h2>
+<h3 id="set-rebalancing-triggers">Set Rebalancing Triggers<a class="headerlink" href="#set-rebalancing-triggers" title="Permanent link">&para;</a></h3>
+<p><strong>Volatility trigger:</strong>
+<div class="highlight"><pre><span></span><code>If portfolio_volatility &gt; 60%:
+    Sell 10% of volatile assets
+    Buy stablecoins
+    Rebalance monthly
+</code></pre></div></p>
+<p><strong>Drift trigger:</strong>
+<div class="highlight"><pre><span></span><code>If any asset &gt; 50% of portfolio:
+    Rebalance to target
+    Max 5% drift tolerance
+</code></pre></div></p>
+<p><strong>Price trigger:</strong>
+<div class="highlight"><pre><span></span><code>If ETHST drops &gt; 15%:
+    Sell some ETHST
+    Add stablecoins
+    Protect from further drops
+</code></pre></div></p>
+<p><strong>Implementation:</strong></p>
+<ul>
+<li>Manual: Check weekly, rebalance monthly</li>
+<li>Semi-auto: Price alerts + manual action</li>
+<li>Fully auto: Smart contract + keeper bot (advanced)</li>
+</ul>
+<hr />
+<h2 id="cost-benefit-analysis">Cost-Benefit Analysis<a class="headerlink" href="#cost-benefit-analysis" title="Permanent link">&para;</a></h2>
+<h3 id="rebalancing-costs">Rebalancing Costs<a class="headerlink" href="#rebalancing-costs" title="Permanent link">&para;</a></h3>
+<p><strong>Per rebalancing event:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>Cost</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Withdraw collateral</td>
+<td>$0.10</td>
+</tr>
+<tr>
+<td>Swap fees (0.3% × amount)</td>
+<td>$30-90</td>
+</tr>
+<tr>
+<td>Re-supply collateral</td>
+<td>$0.30</td>
+</tr>
+<tr>
+<td><strong>Total</strong></td>
+<td><strong>$30-100</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Frequency recommendations:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Portfolio Size</th>
+<th>Rebalance Frequency</th>
+<th>Annual Cost</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>&lt; $20k</td>
+<td>Quarterly</td>
+<td>$120-400</td>
+</tr>
+<tr>
+<td>$20k-$100k</td>
+<td>Monthly</td>
+<td>$360-1,200</td>
+</tr>
+<tr>
+<td>&gt; $100k</td>
+<td>Bi-weekly</td>
+<td>$780-2,600</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Benefits must exceed costs!</strong></p>
+<hr />
+<h3 id="when-rebalancing-pays-off">When Rebalancing Pays Off<a class="headerlink" href="#when-rebalancing-pays-off" title="Permanent link">&para;</a></h3>
+<p><strong>Example:</strong></p>
+<p><strong>Without rebalancing:</strong></p>
+<ul>
+<li>10 ETHST position</li>
+<li>ETHST drops 30%</li>
+<li>Liquidated, lose 10% = $900</li>
+</ul>
+<p><strong>With rebalancing (added stables):</strong></p>
+<ul>
+<li>Mixed collateral</li>
+<li>ETHST drops 30%</li>
+<li>Not liquidated</li>
+<li>Cost to rebalance: $50</li>
+</ul>
+<p><strong>Net benefit: $850</strong> ✅</p>
+<p><strong>Rebalancing is insurance</strong></p>
+<hr />
+<h2 id="real-example-portfolio-over-1-year">Real Example: Portfolio Over 1 Year<a class="headerlink" href="#real-example-portfolio-over-1-year" title="Permanent link">&para;</a></h2>
+<p><strong>Starting (January):</strong></p>
+<ul>
+<li>10 ETHST ($30k)</li>
+<li>50% LTV</li>
+<li>Volatility: 70%</li>
+</ul>
+<p><strong>Q1 (Bull market):</strong></p>
+<ul>
+<li>Optimized to 80% volatile, 20% stable</li>
+<li>Captured upside</li>
+<li>Grew to $38k</li>
+</ul>
+<p><strong>Q2 (Volatility spike):</strong></p>
+<ul>
+<li>Rebalanced to 50% volatile, 50% stable</li>
+<li>Reduced risk</li>
+<li>Avoided liquidation in June crash</li>
+</ul>
+<p><strong>Q3 (Bear market):</strong></p>
+<ul>
+<li>Further reduced to 30% volatile, 70% stable</li>
+<li>Preserved capital</li>
+<li>Value: $30k (vs $20k if stayed 100% ETHST)</li>
+</ul>
+<p><strong>Q4 (Recovery):</strong></p>
+<ul>
+<li>Increased back to 60% volatile, 40% stable</li>
+<li>Positioned for recovery</li>
+<li>End value: $36k</li>
+</ul>
+<p><strong>Result:</strong></p>
+<ul>
+<li>Started: $30k</li>
+<li>Ended: $36k (+20%)</li>
+<li>Without optimization: $25k (-17%)</li>
+<li><strong>Optimization added 37% relative gain</strong></li>
+</ul>
+<hr />
+<h2 id="optimization-checklist">Optimization Checklist<a class="headerlink" href="#optimization-checklist" title="Permanent link">&para;</a></h2>
+<h3 id="monthly-review">Monthly Review<a class="headerlink" href="#monthly-review" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] Calculate current allocation percentages</li>
+<li>[ ] Measure portfolio volatility</li>
+<li>[ ] Check asset correlations</li>
+<li>[ ] Compare to target allocation</li>
+<li>[ ] If drift &gt; 10%, plan rebalance</li>
+<li>[ ] Check market conditions</li>
+<li>[ ] Adjust target if needed</li>
+<li>[ ] Execute rebalancing if warranted</li>
+</ul>
+<h3 id="quarterly-deep-dive">Quarterly Deep Dive<a class="headerlink" href="#quarterly-deep-dive" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] Review all asset parameters (LTVs, etc.)</li>
+<li>[ ] Analyze 3-month performance</li>
+<li>[ ] Update target allocation</li>
+<li>[ ] Consider new assets</li>
+<li>[ ] Optimize debt structure</li>
+<li>[ ] Calculate rebalancing ROI</li>
+<li>[ ] Update strategy for next quarter</li>
+</ul>
+<hr />
+<h2 id="tools-resources">Tools &amp; Resources<a class="headerlink" href="#tools-resources" title="Permanent link">&para;</a></h2>
+<h3 id="portfolio-tracking">Portfolio Tracking<a class="headerlink" href="#portfolio-tracking" title="Permanent link">&para;</a></h3>
+<p><strong>Spreadsheet template:</strong>
+<div class="highlight"><pre><span></span><code>Columns:
+
+- Asset
+- Amount
+- Price
+- Value
+- % of Portfolio
+- Target %
+- Drift
+- Action Needed
+</code></pre></div></p>
+<p><strong>DeFi dashboards:</strong></p>
+<ul>
+<li>Zapper.fi</li>
+<li>DeBank</li>
+<li>Zerion</li>
+<li>Custom scripts</li>
+</ul>
+<h3 id="volatility-calculation">Volatility Calculation<a class="headerlink" href="#volatility-calculation" title="Permanent link">&para;</a></h3>
+<p><strong>Simple method:</strong></p>
+<ol>
+<li>Download 30-day price history</li>
+<li>Calculate daily returns</li>
+<li>Standard deviation × √365</li>
+<li>= Annual volatility</li>
+</ol>
+<p><strong>Or use:</strong></p>
+<ul>
+<li>TradingView indicators</li>
+<li>Crypto volatility indexes</li>
+<li>Risk management tools</li>
+</ul>
+<hr />
+<h2 id="when-not-to-optimize">When NOT to Optimize<a class="headerlink" href="#when-not-to-optimize" title="Permanent link">&para;</a></h2>
+<h3 id="skip-rebalancing-if">Skip Rebalancing If:<a class="headerlink" href="#skip-rebalancing-if" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] Drift &lt; 5% from target</li>
+<li>[ ] Rebalancing cost &gt; expected benefit</li>
+<li>[ ] Major market event imminent (wait)</li>
+<li>[ ] Portfolio &lt; $10k (not worth complexity)</li>
+<li>[ ] Already rebalanced this month</li>
+<li>[ ] Gas fees unusually high</li>
+</ul>
+<p><strong>Don't over-optimize</strong></p>
+<hr />
+<h2 id="common-mistakes">Common Mistakes<a class="headerlink" href="#common-mistakes" title="Permanent link">&para;</a></h2>
+<h3 id="rebalancing-too-often">❌ Rebalancing Too Often<a class="headerlink" href="#rebalancing-too-often" title="Permanent link">&para;</a></h3>
+<p><strong>Problem:</strong> Death by a thousand fees</p>
+<p><strong>Fix:</strong></p>
+<ul>
+<li>Set minimum drift threshold (10%)</li>
+<li>Maximum frequency (monthly)</li>
+<li>Calculate if cost &lt; benefit</li>
+</ul>
+<h3 id="chasing-past-performance">❌ Chasing Past Performance<a class="headerlink" href="#chasing-past-performance" title="Permanent link">&para;</a></h3>
+<p><strong>Problem:</strong> "BTC just pumped, let me add more"</p>
+<p><strong>Fix:</strong></p>
+<ul>
+<li>Stick to target allocation</li>
+<li>Rebalance means selling winners</li>
+<li>Buy low, sell high</li>
+</ul>
+<h3 id="ignoring-correlations">❌ Ignoring Correlations<a class="headerlink" href="#ignoring-correlations" title="Permanent link">&para;</a></h3>
+<p><strong>Problem:</strong> "Diversified" into 5 correlated assets</p>
+<p><strong>Fix:</strong></p>
+<ul>
+<li>Check correlation matrix</li>
+<li>True diversification = low correlation</li>
+<li>Include stables or negative correlation</li>
+</ul>
+<hr />
+<h2 id="summary">Summary<a class="headerlink" href="#summary" title="Permanent link">&para;</a></h2>
+<p><strong>Collateral optimization offers:</strong></p>
+<ul>
+<li>✅ Higher borrowing capacity</li>
+<li>✅ Lower portfolio volatility</li>
+<li>✅ Better risk-adjusted returns</li>
+<li>✅ Adaptive to market conditions</li>
+<li>❌ Requires active management</li>
+<li>❌ Ongoing rebalancing costs</li>
+</ul>
+<p><strong>Best for:</strong> Users with $20k+ portfolios willing to actively manage</p>
+<p><strong>Key metric:</strong> Risk-adjusted borrowing capacity</p>
+<p><strong>Golden rule:</strong> Rebalance when benefit &gt; cost</p>
+<hr />
+<h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
+<h3 id="related-strategies">Related Strategies<a class="headerlink" href="#related-strategies" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong><a href="../portfolio-rebalancing/">Portfolio Rebalancing</a></strong> - Execution guide</li>
+<li><strong><a href="../multi-asset-strategy/">Multi-Asset Strategy</a></strong> - Use multiple assets</li>
+<li><strong><a href="../risk-hedging/">Risk Management</a></strong> - Hedge your portfolio</li>
+</ul>
+<h3 id="learn-more">Learn More<a class="headerlink" href="#learn-more" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong><a href="../../safety/">Safety Guide</a></strong> - Risk management</li>
+<li><strong><a href="../../guides/borrow/">Lending Guide</a></strong> - Collateral basics</li>
+</ul>
+<h3 id="need-help">Need Help?<a class="headerlink" href="#need-help" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Support</strong>: <a href="https://support.blockapps.net">support.blockapps.net</a></li>
+<li><strong>Telegram</strong>: <a href="https://t.me/strato_net">t.me/strato_net</a></li>
+<li><strong>Docs</strong>: <a href="https://docs.strato.nexus">docs.strato.nexus</a></li>
+</ul>
+
+
+
+
+
+
+
+  
+    
+  
+  
+    
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Last update">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="January 22, 2026 16:13:05 UTC"><span class="timeago" datetime="2026-01-22T16:13:05+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="January 22, 2026 16:13:05 UTC">2026-01-22</span>
+  </span>
+
+    
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Created">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="January 5, 2026 17:52:18 UTC"><span class="timeago" datetime="2026-01-05T17:52:18+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="January 5, 2026 17:52:18 UTC">2026-01-05</span>
+  </span>
+
+    
+    
+    
+  </aside>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 BlockApps - STRATO Platform
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+    <a href="https://t.me/strato_net" target="_blank" rel="noopener" title="Telegram Community" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M256 8a248 248 0 1 0 0 496 248 248 0 1 0 0-496m115 168.7c-3.7 39.2-19.9 134.4-28.1 178.3-3.5 18.6-10.3 24.8-16.9 25.4-14.4 1.3-25.3-9.5-39.3-18.7-21.8-14.3-34.2-23.2-55.3-37.2-24.5-16.1-8.6-25 5.3-39.5 3.7-3.8 67.1-61.5 68.3-66.7.2-.7.3-3.1-1.2-4.4s-3.6-.8-5.1-.5c-2.2.5-37.1 23.5-104.6 69.1-9.9 6.8-18.9 10.1-26.9 9.9-8.9-.2-25.9-5-38.6-9.1-15.5-5-27.9-7.7-26.8-16.3.6-4.5 6.7-9 18.4-13.7 72.3-31.5 120.5-52.3 144.6-62.3 68.9-28.6 83.2-33.6 92.5-33.8 2.1 0 6.6.5 9.6 2.9 2 1.7 3.2 4.1 3.5 6.7.5 3.2.6 6.5.4 9.8z"/></svg>
+    </a>
+  
+    
+    
+    
+    
+    <a href="https://support.blockapps.net" target="_blank" rel="noopener" title="Support Portal" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M256 512a256 256 0 1 0 0-512 256 256 0 1 0 0 512m0-336c-17.7 0-32 14.3-32 32 0 13.3-10.7 24-24 24s-24-10.7-24-24c0-44.2 35.8-80 80-80s80 35.8 80 80c0 47.2-36 67.2-56 74.5v3.8c0 13.3-10.7 24-24 24s-24-10.7-24-24v-8.1c0-20.5 14.8-35.2 30.1-40.2 6.4-2.1 13.2-5.5 18.2-10.3 4.3-4.2 7.7-10 7.7-19.6 0-17.7-14.3-32-32-32zm-32 192a32 32 0 1 1 64 0 32 32 0 1 1-64 0"/></svg>
+    </a>
+  
+    
+    
+    
+    
+    <a href="https://docs.strato.nexus" target="_blank" rel="noopener" title="Documentation" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M384 512H96c-53 0-96-43-96-96V96C0 43 43 0 96 0h304c26.5 0 48 21.5 48 48v288c0 20.9-13.4 38.7-32 45.3V448c17.7 0 32 14.3 32 32s-14.3 32-32 32zM96 384c-17.7 0-32 14.3-32 32s14.3 32 32 32h256v-64zm32-232c0 13.3 10.7 24 24 24h176c13.3 0 24-10.7 24-24s-10.7-24-24-24H152c-13.3 0-24 10.7-24 24m24 72c-13.3 0-24 10.7-24 24s10.7 24 24 24h176c13.3 0 24-10.7 24-24s-10.7-24-24-24z"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.indexes", "navigation.instant", "navigation.tracking", "navigation.top", "navigation.expand", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit", "content.action.view"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../js/timeago.min.js"></script>
+      
+        <script src="../../js/timeago_mkdocs_material.js"></script>
+      
+    
+  </body>
+</html>

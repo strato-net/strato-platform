@@ -1,0 +1,2893 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="STRATO platform technical documentation (use-case first, end-user + developer)">
+      
+      
+        <meta name="author" content="BlockApps">
+      
+      
+        <link rel="canonical" href="https://docs.strato.nexus/concepts/">
+      
+      
+        <link rel="prev" href="../quick-start/">
+      
+      
+        <link rel="next" href="../scenarios/first-time-user/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Core Concepts - STRATO Technical Docs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../css/timeago.css">
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#core-concepts-for-end-users" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="STRATO Technical Docs" class="md-header__button md-logo" aria-label="STRATO Technical Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            STRATO Technical Docs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Core Concepts
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="STRATO Technical Docs" class="md-nav__button md-logo" aria-label="STRATO Technical Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    STRATO Technical Docs
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quick-start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Concepts
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Concepts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#transaction-vouchers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Transaction Vouchers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#wrapped-tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Wrapped Tokens
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#collateral" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Collateral
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#health-factor-lending" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Health Factor (Lending)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#collateralization-ratio-cdp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Collateralization Ratio (CDP)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#usdst" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        USDST
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reward-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reward Points
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#liquidation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Liquidation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#impermanent-loss-liquidity-provision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Impermanent Loss (Liquidity Provision)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#slippage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Slippage
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Quick Reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#key-metrics-to-remember" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Metrics to Remember
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#transaction-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Transaction Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#available-tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Available Tokens
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Available Tokens">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#native-wrapped-assets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Native &amp; Wrapped Assets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stablecoins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stablecoins
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#commodity-tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Commodity Tokens
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#governance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Governance
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Next Steps
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scenarios/first-time-user/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    First-Time User
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/borrow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Borrow USDST
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/mint-cdp/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mint USDST (CDP)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/swap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Swap Tokens
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/liquidity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Provide Liquidity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/bridge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bridge Assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/rewards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manage Rewards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Scenarios
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Scenarios
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scenarios/grow-position/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Grow Your Position
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scenarios/maximize-yield/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Maximize Yield
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scenarios/dca-strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DCA Strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scenarios/platform-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scenarios/portfolio-rebalancing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Portfolio Rebalancing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scenarios/risk-hedging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Risk Management & Hedging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scenarios/leverage-long/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Leverage Long Position
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scenarios/multi-asset-strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Asset Strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scenarios/collateral-optimization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Collateral Optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scenarios/arbitrage-market-making/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Arbitrage & Market Making
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scenarios/withdrawals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Withdrawals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing to STRATO
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Contributing to STRATO
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contribute/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contribute/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contribute/contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing Guidelines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building Apps on STRATO
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Building Apps on STRATO
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_1" id="__nav_8_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../build-apps/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    System Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../build-apps/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start (5 min)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_2" id="__nav_8_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Building
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../build-apps/integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../build-apps/e2e/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    E2E Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_3" id="__nav_8_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../build-apps/contract-addresses/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../build-apps/quick-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Cheat Sheet
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    App API (Getting Started)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/interactive-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Interactive Reference (Swagger)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/strato-node-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Platform API (Advanced)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../safety/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Safety & Risk
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#transaction-vouchers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Transaction Vouchers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#wrapped-tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Wrapped Tokens
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#collateral" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Collateral
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#health-factor-lending" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Health Factor (Lending)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#collateralization-ratio-cdp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Collateralization Ratio (CDP)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#usdst" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        USDST
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reward-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reward Points
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#liquidation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Liquidation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#impermanent-loss-liquidity-provision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Impermanent Loss (Liquidity Provision)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#slippage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Slippage
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Quick Reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#key-metrics-to-remember" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Metrics to Remember
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#transaction-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Transaction Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#available-tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Available Tokens
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Available Tokens">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#native-wrapped-assets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Native &amp; Wrapped Assets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stablecoins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stablecoins
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#commodity-tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Commodity Tokens
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#governance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Governance
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Next Steps
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="core-concepts-for-end-users">Core Concepts for End Users<a class="headerlink" href="#core-concepts-for-end-users" title="Permanent link">&para;</a></h1>
+<p>Essential concepts you must understand before using STRATO DeFi.</p>
+<h2 id="transaction-vouchers">Transaction Vouchers<a class="headerlink" href="#transaction-vouchers" title="Permanent link">&para;</a></h2>
+<p><strong>Definition:</strong> Free transaction fee credits automatically given when you bridge assets to STRATO.</p>
+<p><strong>Key points:</strong></p>
+<ul>
+<li><strong>10 vouchers</strong> per bridge-in (every time you bridge)</li>
+<li>Each voucher covers <strong>1 transaction fee</strong></li>
+<li>Used automatically before USDST</li>
+<li>After vouchers run out, fees are 0.01 USDST (~$0.01) per transaction</li>
+</ul>
+<p><strong>How it works:</strong>
+<div class="highlight"><pre><span></span><code>1. Bridge assets to STRATO
+2. Receive 10 free vouchers automatically
+3. First 10 transactions: FREE (voucher used)
+4. After 10 transactions: 0.01 USDST per transaction
+</code></pre></div></p>
+<p><strong>Example:</strong>
+<div class="highlight"><pre><span></span><code>Bridge 0.5 ETH to STRATO
+→ Receive 10 vouchers
+→ Do 10 transactions for free
+→ Bridge more assets later
+→ Receive 10 more vouchers
+</code></pre></div></p>
+<p><strong>Getting more vouchers:</strong>
+- Bridge assets again (any amount, any time)
+- Each bridge-in gives you 10 more vouchers</p>
+<hr />
+<h2 id="wrapped-tokens">Wrapped Tokens<a class="headerlink" href="#wrapped-tokens" title="Permanent link">&para;</a></h2>
+<p><strong>Definition:</strong> STRATO versions of Ethereum assets that you can use for DeFi operations on STRATO.</p>
+<p><strong>Why wrapped tokens?</strong></p>
+<p>When you bridge assets from Ethereum to STRATO, they become "wrapped" to work on the STRATO blockchain:</p>
+<ul>
+<li><strong>On Ethereum</strong>: You have ETH, WBTC, Gold, Silver</li>
+<li><strong>On STRATO</strong>: You have ETHST, WBTCST, GOLDST, SILVST (wrapped versions)</li>
+<li><strong>1:1 Peg</strong>: Always exchangeable 1:1 with the original</li>
+</ul>
+<p><strong>How it works:</strong></p>
+<div class="highlight"><pre><span></span><code>Bridge ETH from Ethereum → Receive ETHST on STRATO
+Use ETHST on STRATO → Bridge back → Receive ETH on Ethereum
+</code></pre></div>
+<p><strong>Common wrapped tokens:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Original (Ethereum)</th>
+<th>Wrapped (STRATO)</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ETH</td>
+<td>ETHST</td>
+<td>Wrapped ETH</td>
+</tr>
+<tr>
+<td>WBTC</td>
+<td>WBTCST</td>
+<td>Wrapped BTC</td>
+</tr>
+<tr>
+<td>Gold tokens</td>
+<td>GOLDST</td>
+<td>Tokenized Gold</td>
+</tr>
+<tr>
+<td>Silver tokens</td>
+<td>SILVST</td>
+<td>Tokenized Silver</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Key points:</strong></p>
+<ul>
+<li>✅ <strong>All STRATO operations</strong> use wrapped tokens (swaps, lending, collateral, pools)</li>
+<li>✅ <strong>Bridge operations</strong> convert automatically (ETH → ETHST when bridging in)</li>
+<li>✅ <strong>Always 1:1</strong> - No slippage or conversion fees between original and wrapped</li>
+<li>✅ <strong>Secure</strong> - Backed by locked original assets on Ethereum</li>
+</ul>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code>1. You bridge 2 ETH from Ethereum to STRATO
+2. You receive 2 ETHST on STRATO
+3. You use ETHST to:
+   - Supply as collateral
+   - Swap for USDST
+   - Provide liquidity in ETHST-USDST pool
+4. Later, bridge 2 ETHST back to Ethereum
+5. You receive 2 ETH on Ethereum
+</code></pre></div>
+<p><strong>Why this matters:</strong></p>
+<p>Throughout the documentation, you'll see:
+- "Supply ETHST" (not "Supply ETH")
+- "USDST-ETHST pool" (not "USDST-ETH pool")
+- "Swap WBTCST → ETHST" (not "Swap WBTC → ETH")</p>
+<p>This is because on STRATO, you're working with the wrapped versions!</p>
+<hr />
+<h2 id="collateral">Collateral<a class="headerlink" href="#collateral" title="Permanent link">&para;</a></h2>
+<p><strong>Definition:</strong> Assets you deposit to back your borrowing or minting.</p>
+<p><strong>Key points:</strong></p>
+<ul>
+<li>Locked while you have debt outstanding</li>
+<li>Value determines how much you can borrow/mint</li>
+<li>Can be liquidated if value drops too much</li>
+<li>Each asset has different parameters (LTV, liquidation threshold)</li>
+</ul>
+<p><strong>Example:</strong>
+<div class="highlight"><pre><span></span><code>Deposit: 1 ETHST ($3,000)
+Can borrow: Up to ~$2,100 (70% LTV)
+If ETHST drops to $2,000: Position at risk
+</code></pre></div></p>
+<h2 id="health-factor-lending">Health Factor (Lending)<a class="headerlink" href="#health-factor-lending" title="Permanent link">&para;</a></h2>
+<p><strong>Definition:</strong> Ratio showing how safe your lending position is.</p>
+<p><strong>Formula:</strong>
+<div class="highlight"><pre><span></span><code>Health Factor = (Collateral Value × Liquidation Threshold) / Borrowed Amount
+</code></pre></div></p>
+<p><strong>Rules:</strong></p>
+<ul>
+<li><strong>&gt; 2.0</strong>: Very safe (recommended)</li>
+<li><strong>1.5 - 2.0</strong>: Safe with buffer</li>
+<li><strong>1.0 - 1.5</strong>: Moderate risk</li>
+<li><strong>&lt; 1.0</strong>: LIQUIDATION occurs</li>
+</ul>
+<p><strong>Visual Guide:</strong></p>
+<pre class="mermaid"><code>stateDiagram-v2
+    [*] --&gt; VeryHealthy: HF &gt; 2.0
+    VeryHealthy --&gt; Healthy: Price drops
+    Healthy --&gt; AtRisk: Price drops
+    AtRisk --&gt; Liquidated: HF &lt; 1.0
+
+    Liquidated --&gt; [*]: Position closed
+
+    AtRisk --&gt; Healthy: Add collateral / Repay debt
+    Healthy --&gt; VeryHealthy: Add collateral / Repay debt
+
+    note right of VeryHealthy: Safe zone&lt;br/&gt;Recommended
+    note right of Healthy: Safe with buffer&lt;br/&gt;HF 1.5-2.0
+    note right of AtRisk: Moderate risk&lt;br/&gt;HF 1.0-1.5
+    note right of Liquidated: Position liquidated&lt;br/&gt;HF &lt; 1.0</code></pre>
+<p><strong>Example:</strong>
+<div class="highlight"><pre><span></span><code>Collateral: 10 ETHST @ $3,000 = $30,000
+Liquidation threshold: 80%
+Borrowed: 15,000 USDST
+
+Health Factor = ($30,000 × 0.8) / $15,000 = 1.6
+Status: Safe, but watch ETHST price
+</code></pre></div></p>
+<h2 id="collateralization-ratio-cdp">Collateralization Ratio (CDP)<a class="headerlink" href="#collateralization-ratio-cdp" title="Permanent link">&para;</a></h2>
+<p><strong>Definition:</strong> Ratio of collateral value to minted USDST (CDP version of health factor).</p>
+<p><strong>Formula:</strong>
+<div class="highlight"><pre><span></span><code>CR = (Collateral Value / Minted USDST) × 100%
+</code></pre></div></p>
+<p><strong>Rules:</strong></p>
+<ul>
+<li><strong>200%+</strong>: Very safe</li>
+<li><strong>150-200%</strong>: Moderate risk</li>
+<li><strong>&lt; 150%</strong>: Often liquidated (varies by asset)</li>
+</ul>
+<p><strong>Example:</strong>
+<div class="highlight"><pre><span></span><code>Collateral: 5 ETHST @ $3,000 = $15,000
+Minted: 10,000 USDST
+
+CR = ($15,000 / $10,000) × 100% = 150%
+Status: At minimum - risky!
+</code></pre></div></p>
+<h2 id="usdst">USDST<a class="headerlink" href="#usdst" title="Permanent link">&para;</a></h2>
+<p><strong>Definition:</strong> STRATO's USD-pegged stablecoin.</p>
+<p><strong>Key points:</strong></p>
+<ul>
+<li>Pegged to $1 USD</li>
+<li>Can be obtained by borrowing (Lending) or minting (CDP)</li>
+<li>Used for fees, trading, and as stable value storage</li>
+<li>Must be repaid/burned to unlock collateral</li>
+</ul>
+<p><strong>Uses:</strong></p>
+<ul>
+<li>Pay transaction fees on STRATO</li>
+<li>Stable asset for trading</li>
+<li>Collateral for other DeFi operations</li>
+<li>Bridge out for USD on other chains</li>
+</ul>
+<h2 id="reward-points">Reward Points<a class="headerlink" href="#reward-points" title="Permanent link">&para;</a></h2>
+<p><strong>Definition:</strong> STRATO's governance and rewards token.</p>
+<p><strong>Key points:</strong></p>
+<ul>
+<li>Earned by participating in DeFi activities</li>
+<li>Used for governance voting (future)</li>
+<li>Can be traded or held for value</li>
+<li>Rewards distributed seasonally</li>
+</ul>
+<p><strong>How to earn:</strong></p>
+<ul>
+<li>Supply collateral to lending pool</li>
+<li>Borrow USDST</li>
+<li>Provide liquidity to swap pools</li>
+<li>Mint USDST via CDP</li>
+<li>Complete swaps</li>
+</ul>
+<h2 id="liquidation">Liquidation<a class="headerlink" href="#liquidation" title="Permanent link">&para;</a></h2>
+<p><strong>Definition:</strong> Forced closure of your position when collateral value falls too low.</p>
+<p><strong>What happens:</strong></p>
+<ol>
+<li>Your position health factor &lt; 1.0 (or CR &lt; minimum)</li>
+<li>A liquidator repays your debt</li>
+<li>Liquidator takes your collateral + bonus (5-10%)</li>
+<li>You lose collateral value beyond your debt</li>
+</ol>
+<p><strong>Example liquidation:</strong>
+<div class="highlight"><pre><span></span><code>Before:
+
+- Collateral: 1 ETHST @ $3,000
+- Borrowed: 2,400 USDST
+- Health factor: 1.0
+
+ETHST drops to $2,800:
+
+- Health factor: 0.93
+- LIQUIDATION TRIGGERED
+
+After:
+
+- Lost: 1 ETHST ($2,800)
+- Kept: 2,400 USDST
+- Net loss: $400 + liquidation penalty (~$140)
+- Total loss: ~$540
+</code></pre></div></p>
+<p><strong>How to avoid:</strong></p>
+<ul>
+<li>Maintain high health factor (2.0+) or CR (200%+)</li>
+<li>Add collateral when prices drop</li>
+<li>Repay debt to improve ratio</li>
+<li>Set price alerts</li>
+</ul>
+<h2 id="impermanent-loss-liquidity-provision">Impermanent Loss (Liquidity Provision)<a class="headerlink" href="#impermanent-loss-liquidity-provision" title="Permanent link">&para;</a></h2>
+<p><strong>Definition:</strong> Loss from providing liquidity to swap pools when token prices diverge.</p>
+<p><strong>When it happens:</strong></p>
+<ul>
+<li>You provide liquidity to a pool (e.g., ETH-USDC)</li>
+<li>Token prices change significantly</li>
+<li>Pool auto-rebalances</li>
+<li>You end up with different amounts than if you just held</li>
+</ul>
+<p><strong>Example:</strong>
+<div class="highlight"><pre><span></span><code>Initial deposit:
+
+- 1 ETHST ($3,000) + 3,000 USDST = $6,000 total
+
+ETH doubles to $6,000:
+
+- Pool rebalances to: 0.707 ETHST + 4,242 USDST
+- Pool value: $8,485
+- If you just held: 1 ETHST ($6,000) + 3,000 USDST = $9,000
+- Impermanent loss: $515 (5.7%)
+
+BUT: Swap fees earned may offset this loss
+</code></pre></div></p>
+<p><strong>When it's worth it:</strong></p>
+<ul>
+<li>High trading volume pools (lots of fees)</li>
+<li>Stablecoin-stablecoin pairs (minimal price divergence)</li>
+<li>Short-term price movements (loss is "impermanent")</li>
+</ul>
+<h2 id="slippage">Slippage<a class="headerlink" href="#slippage" title="Permanent link">&para;</a></h2>
+<p><strong>Definition:</strong> Difference between expected and actual trade price.</p>
+<p><strong>Causes:</strong></p>
+<ul>
+<li>Pool size too small for your trade</li>
+<li>Price moves between preview and execution</li>
+<li>Network congestion delays</li>
+</ul>
+<p><strong>Example:</strong>
+<div class="highlight"><pre><span></span><code>Expected: Swap 1 ETH for 3,000 USDC
+Slippage: 0.5%
+Minimum received: 2,985 USDC
+
+If price moves more than 0.5%, transaction reverts
+</code></pre></div></p>
+<p><strong>Settings:</strong></p>
+<ul>
+<li>Low slippage (0.1-0.5%): Safer, may fail in volatile markets</li>
+<li>High slippage (1-5%): More tolerant, risk of worse price</li>
+</ul>
+<h2 id="quick-reference">Quick Reference<a class="headerlink" href="#quick-reference" title="Permanent link">&para;</a></h2>
+<h3 id="key-metrics-to-remember">Key Metrics to Remember<a class="headerlink" href="#key-metrics-to-remember" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Health Factor &gt; 2.0</strong> (lending) or <strong>CR &gt; 200%</strong> (CDP) = Safe</li>
+<li><strong>Always keep reserve USDST</strong> for transaction fees</li>
+<li><strong>Monitor prices daily</strong> when you have active positions</li>
+<li><strong>Set alerts</strong> at liquidation prices</li>
+</ul>
+<h3 id="transaction-flow">Transaction Flow<a class="headerlink" href="#transaction-flow" title="Permanent link">&para;</a></h3>
+<p>Typically:</p>
+<ol>
+<li>Approve token spending (one-time per token)</li>
+<li>Execute main action (supply, borrow, swap, etc.)</li>
+<li>Wait for confirmation (~5-10 seconds)</li>
+<li>Check transaction success</li>
+</ol>
+<hr />
+<h2 id="available-tokens">Available Tokens<a class="headerlink" href="#available-tokens" title="Permanent link">&para;</a></h2>
+<p>STRATO supports various tokens for trading, lending, and collateral.</p>
+<div class="admonition info">
+<p class="admonition-title">Understanding Wrapped Tokens</p>
+<p>All tokens bridged from Ethereum are automatically wrapped to work on STRATO. See <a href="#wrapped-tokens">Wrapped Tokens</a> section above for details.</p>
+</div>
+<h3 id="native-wrapped-assets">Native &amp; Wrapped Assets<a class="headerlink" href="#native-wrapped-assets" title="Permanent link">&para;</a></h3>
+<p><strong>ETHST</strong> (Wrapped ETH):</p>
+<ul>
+<li>Bridged from Ethereum mainnet</li>
+<li>1:1 peg with ETH</li>
+<li>Primary trading and collateral asset</li>
+</ul>
+<p><strong>WBTCST</strong> (Wrapped BTC):</p>
+<ul>
+<li>Bridged from Ethereum (WBTC)</li>
+<li>Represents Bitcoin value</li>
+<li>High-value collateral</li>
+</ul>
+<h3 id="stablecoins">Stablecoins<a class="headerlink" href="#stablecoins" title="Permanent link">&para;</a></h3>
+<p><strong>USDST</strong> (STRATO USD):</p>
+<ul>
+<li>Protocol stablecoin (described above)</li>
+<li>Minted via CDP or borrowed from lending pool</li>
+<li>Pegged to 1 USD</li>
+<li>Used for fees and trading</li>
+</ul>
+<h3 id="commodity-tokens">Commodity Tokens<a class="headerlink" href="#commodity-tokens" title="Permanent link">&para;</a></h3>
+<p><strong>GOLDST</strong> (Gold):</p>
+<ul>
+<li>Represents gold value</li>
+<li>Commodity-backed</li>
+<li>Trading and collateral</li>
+</ul>
+<p><strong>SILVST</strong> (Silver):</p>
+<ul>
+<li>Represents silver value</li>
+<li>Commodity-backed</li>
+<li>Trading pair with GOLDST</li>
+</ul>
+<h3 id="governance">Governance<a class="headerlink" href="#governance" title="Permanent link">&para;</a></h3>
+<p><strong>Reward Points</strong>:</p>
+<ul>
+<li>STRATO governance token (described above)</li>
+<li>Earned through DeFi activities</li>
+<li>Used for voting and governance</li>
+</ul>
+<div class="admonition tip">
+<p class="admonition-title">Getting Tokens</p>
+<p>Most tokens are obtained by <strong><a href="../guides/bridge/">bridging from Ethereum</a></strong>. USDST and Reward Points are earned/minted on STRATO directly.</p>
+</div>
+<h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
+<p>Now that you understand the core concepts:</p>
+<ul>
+<li><strong><a href="../quick-start/">Quick Start Guide</a></strong> - Get set up in 10 minutes</li>
+<li><strong><a href="../safety/">Review Safety Practices</a></strong> - Security and risk management</li>
+<li><strong><a href="../guides/borrow/">Borrow USDST Guide</a></strong> - Put concepts into practice</li>
+<li><strong><a href="../guides/mint-cdp/">Mint USDST via CDP Guide</a></strong> - Alternative approach</li>
+</ul>
+
+
+
+
+
+
+
+  
+    
+  
+  
+    
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Last update">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="January 22, 2026 16:13:05 UTC"><span class="timeago" datetime="2026-01-22T16:13:05+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="January 22, 2026 16:13:05 UTC">2026-01-22</span>
+  </span>
+
+    
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Created">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="January 5, 2026 17:52:18 UTC"><span class="timeago" datetime="2026-01-05T17:52:18+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="January 5, 2026 17:52:18 UTC">2026-01-05</span>
+  </span>
+
+    
+    
+    
+  </aside>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 BlockApps - STRATO Platform
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+    <a href="https://t.me/strato_net" target="_blank" rel="noopener" title="Telegram Community" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M256 8a248 248 0 1 0 0 496 248 248 0 1 0 0-496m115 168.7c-3.7 39.2-19.9 134.4-28.1 178.3-3.5 18.6-10.3 24.8-16.9 25.4-14.4 1.3-25.3-9.5-39.3-18.7-21.8-14.3-34.2-23.2-55.3-37.2-24.5-16.1-8.6-25 5.3-39.5 3.7-3.8 67.1-61.5 68.3-66.7.2-.7.3-3.1-1.2-4.4s-3.6-.8-5.1-.5c-2.2.5-37.1 23.5-104.6 69.1-9.9 6.8-18.9 10.1-26.9 9.9-8.9-.2-25.9-5-38.6-9.1-15.5-5-27.9-7.7-26.8-16.3.6-4.5 6.7-9 18.4-13.7 72.3-31.5 120.5-52.3 144.6-62.3 68.9-28.6 83.2-33.6 92.5-33.8 2.1 0 6.6.5 9.6 2.9 2 1.7 3.2 4.1 3.5 6.7.5 3.2.6 6.5.4 9.8z"/></svg>
+    </a>
+  
+    
+    
+    
+    
+    <a href="https://support.blockapps.net" target="_blank" rel="noopener" title="Support Portal" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M256 512a256 256 0 1 0 0-512 256 256 0 1 0 0 512m0-336c-17.7 0-32 14.3-32 32 0 13.3-10.7 24-24 24s-24-10.7-24-24c0-44.2 35.8-80 80-80s80 35.8 80 80c0 47.2-36 67.2-56 74.5v3.8c0 13.3-10.7 24-24 24s-24-10.7-24-24v-8.1c0-20.5 14.8-35.2 30.1-40.2 6.4-2.1 13.2-5.5 18.2-10.3 4.3-4.2 7.7-10 7.7-19.6 0-17.7-14.3-32-32-32zm-32 192a32 32 0 1 1 64 0 32 32 0 1 1-64 0"/></svg>
+    </a>
+  
+    
+    
+    
+    
+    <a href="https://docs.strato.nexus" target="_blank" rel="noopener" title="Documentation" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M384 512H96c-53 0-96-43-96-96V96C0 43 43 0 96 0h304c26.5 0 48 21.5 48 48v288c0 20.9-13.4 38.7-32 45.3V448c17.7 0 32 14.3 32 32s-14.3 32-32 32zM96 384c-17.7 0-32 14.3-32 32s14.3 32 32 32h256v-64zm32-232c0 13.3 10.7 24 24 24h176c13.3 0 24-10.7 24-24s-10.7-24-24-24H152c-13.3 0-24 10.7-24 24m24 72c-13.3 0-24 10.7-24 24s10.7 24 24 24h176c13.3 0 24-10.7 24-24s-10.7-24-24-24z"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.indexes", "navigation.instant", "navigation.tracking", "navigation.top", "navigation.expand", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit", "content.action.view"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../js/timeago.min.js"></script>
+      
+        <script src="../js/timeago_mkdocs_material.js"></script>
+      
+    
+  </body>
+</html>

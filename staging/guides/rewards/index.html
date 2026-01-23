@@ -1,0 +1,3814 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="STRATO platform technical documentation (use-case first, end-user + developer)">
+      
+      
+        <meta name="author" content="BlockApps">
+      
+      
+        <link rel="canonical" href="https://docs.strato.nexus/guides/rewards/">
+      
+      
+        <link rel="prev" href="../bridge/">
+      
+      
+        <link rel="next" href="../../scenarios/grow-position/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Manage Rewards - STRATO Technical Docs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../css/timeago.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#manage-rewards" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="STRATO Technical Docs" class="md-header__button md-logo" aria-label="STRATO Technical Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            STRATO Technical Docs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Manage Rewards
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="STRATO Technical Docs" class="md-nav__button md-logo" aria-label="STRATO Technical Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    STRATO Technical Docs
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../quick-start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Concepts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scenarios/first-time-user/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    First-Time User
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../borrow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Borrow USDST
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mint-cdp/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mint USDST (CDP)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../swap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Swap Tokens
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../liquidity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Provide Liquidity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bridge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bridge Assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manage Rewards
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manage Rewards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#complete-example-earn-claim-reward-points-rewards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Complete Example: Earn &amp; Claim Reward Points Rewards
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Complete Example: Earn &amp; Claim Reward Points Rewards">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#quick-walkthrough" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Walkthrough
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-earn-reward-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to Earn Reward Points
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How to Earn Reward Points">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#earning-activities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Earning Activities
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reward-rates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reward Rates
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prerequisites
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-by-step-check-your-rewards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step-by-Step: Check Your Rewards
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step-by-Step: Check Your Rewards">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-1-go-to-rewards-page" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1: Go to Rewards Page
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-view-pending-rewards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2: View Pending Rewards
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-3-review-earning-history" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3: Review Earning History
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-by-step-claim-rewards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step-by-Step: Claim Rewards
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step-by-Step: Claim Rewards">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-1-go-to-rewards-page_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1: Go to Rewards Page
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-click-claim" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2: Click Claim
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-3-confirm-transaction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3: Confirm Transaction
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-to-claim" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to Claim
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-to-do-with-reward-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What to Do with Reward Points
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What to Do with Reward Points">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#option-1-hold" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option 1: Hold
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-2-swap-for-other-tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option 2: Swap for Other Tokens
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-3-provide-reward-point-liquidity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option 3: Provide Reward Point Liquidity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-4-use-for-governance-coming-soon" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option 4: Use for Governance (Coming Soon)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#maximizing-rewards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Maximizing Rewards
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Maximizing Rewards">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#highest-earning-activities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Highest-Earning Activities
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#optimal-strategies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optimal Strategies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#timing-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Timing Considerations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reward-seasons" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reward Seasons
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Reward Seasons">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-are-seasons" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What Are Seasons?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#season-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Season Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tracking-analytics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tracking &amp; Analytics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tracking &amp; Analytics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#personal-dashboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Personal Dashboard
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#activity-breakdown" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Activity Breakdown
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#projections" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Projections
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#common-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common Issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Common Issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#no-rewards-to-claim" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "No rewards to claim"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#claim-transaction-failed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Claim transaction failed"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rewards-lower-than-expected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Rewards lower than expected"
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#best-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Best Practices
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Best Practices">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#claiming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Claiming
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#maximizing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Maximizing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#security" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#understanding-reward-math" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Understanding Reward Math
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Understanding Reward Math">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-rewards-are-calculated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How Rewards Are Calculated
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#apr-calculation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        APR Calculation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reward-points-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reward Points Details
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Reward Points Details">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#token-info" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Token Info
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#where-to-trade" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where to Trade
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#price-tracking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Price Tracking
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#whats-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What's Next?
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What&#39;s Next?">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#optimize-your-earnings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optimize Your Earnings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#learn-more" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Learn More
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#need-help" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Need Help?
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Scenarios
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Scenarios
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scenarios/grow-position/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Grow Your Position
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scenarios/maximize-yield/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Maximize Yield
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scenarios/dca-strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DCA Strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scenarios/platform-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scenarios/portfolio-rebalancing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Portfolio Rebalancing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scenarios/risk-hedging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Risk Management & Hedging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scenarios/leverage-long/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Leverage Long Position
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scenarios/multi-asset-strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Asset Strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scenarios/collateral-optimization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Collateral Optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scenarios/arbitrage-market-making/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Arbitrage & Market Making
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scenarios/withdrawals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Withdrawals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing to STRATO
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Contributing to STRATO
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contribute/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contribute/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contribute/contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing Guidelines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building Apps on STRATO
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Building Apps on STRATO
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_1" id="__nav_8_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../build-apps/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    System Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../build-apps/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start (5 min)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_2" id="__nav_8_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Building
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../build-apps/integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../build-apps/e2e/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    E2E Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_3" id="__nav_8_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../build-apps/contract-addresses/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../build-apps/quick-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Cheat Sheet
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    App API (Getting Started)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/interactive-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Interactive Reference (Swagger)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/strato-node-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Platform API (Advanced)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../safety/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Safety & Risk
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#complete-example-earn-claim-reward-points-rewards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Complete Example: Earn &amp; Claim Reward Points Rewards
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Complete Example: Earn &amp; Claim Reward Points Rewards">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#quick-walkthrough" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Walkthrough
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-earn-reward-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to Earn Reward Points
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How to Earn Reward Points">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#earning-activities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Earning Activities
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reward-rates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reward Rates
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prerequisites
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-by-step-check-your-rewards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step-by-Step: Check Your Rewards
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step-by-Step: Check Your Rewards">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-1-go-to-rewards-page" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1: Go to Rewards Page
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-view-pending-rewards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2: View Pending Rewards
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-3-review-earning-history" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3: Review Earning History
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-by-step-claim-rewards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step-by-Step: Claim Rewards
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step-by-Step: Claim Rewards">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-1-go-to-rewards-page_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1: Go to Rewards Page
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-click-claim" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2: Click Claim
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-3-confirm-transaction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3: Confirm Transaction
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-to-claim" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to Claim
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-to-do-with-reward-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What to Do with Reward Points
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What to Do with Reward Points">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#option-1-hold" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option 1: Hold
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-2-swap-for-other-tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option 2: Swap for Other Tokens
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-3-provide-reward-point-liquidity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option 3: Provide Reward Point Liquidity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-4-use-for-governance-coming-soon" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option 4: Use for Governance (Coming Soon)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#maximizing-rewards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Maximizing Rewards
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Maximizing Rewards">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#highest-earning-activities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Highest-Earning Activities
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#optimal-strategies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optimal Strategies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#timing-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Timing Considerations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reward-seasons" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reward Seasons
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Reward Seasons">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-are-seasons" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What Are Seasons?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#season-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Season Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tracking-analytics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tracking &amp; Analytics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tracking &amp; Analytics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#personal-dashboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Personal Dashboard
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#activity-breakdown" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Activity Breakdown
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#projections" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Projections
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#common-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common Issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Common Issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#no-rewards-to-claim" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "No rewards to claim"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#claim-transaction-failed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Claim transaction failed"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rewards-lower-than-expected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Rewards lower than expected"
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#best-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Best Practices
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Best Practices">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#claiming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Claiming
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#maximizing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Maximizing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#security" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#understanding-reward-math" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Understanding Reward Math
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Understanding Reward Math">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-rewards-are-calculated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How Rewards Are Calculated
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#apr-calculation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        APR Calculation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reward-points-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reward Points Details
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Reward Points Details">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#token-info" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Token Info
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#where-to-trade" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where to Trade
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#price-tracking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Price Tracking
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#whats-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What's Next?
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What&#39;s Next?">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#optimize-your-earnings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optimize Your Earnings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#learn-more" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Learn More
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#need-help" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Need Help?
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="manage-rewards">Manage Rewards<a class="headerlink" href="#manage-rewards" title="Permanent link">&para;</a></h1>
+<p>Earn and claim Reward Points for participating in STRATO DeFi.</p>
+<div class="admonition note">
+<p class="admonition-title">Variable Rewards</p>
+<p>APR estimates and reward rates shown are based on current emission rates and typical conditions. Actual rewards may vary based on total participation, emission schedule changes, and your activity level. Always check current reward rates in the app.</p>
+</div>
+<hr />
+<h2 id="complete-example-earn-claim-reward-points-rewards">Complete Example: Earn &amp; Claim Reward Points Rewards<a class="headerlink" href="#complete-example-earn-claim-reward-points-rewards" title="Permanent link">&para;</a></h2>
+<p><strong>Your situation:</strong></p>
+<ul>
+<li>You've been: Using STRATO DeFi for 30 days</li>
+<li>Activities: Provided liquidity, borrowed USDST</li>
+<li>You've earned: 150 Reward Points</li>
+</ul>
+<p><strong>What you'll do:</strong></p>
+<ol>
+<li>Check your pending rewards</li>
+<li>Claim your Reward Points</li>
+<li>Decide what to do with it</li>
+</ol>
+<p><strong>Time needed:</strong> 2 minutes<br />
+<strong>Gas cost:</strong> ~$0.10 to claim</p>
+<hr />
+<h3 id="quick-walkthrough">Quick Walkthrough<a class="headerlink" href="#quick-walkthrough" title="Permanent link">&para;</a></h3>
+<p><strong>Step 1: Check Rewards</strong>
+- Go to <strong>Rewards</strong> page
+- See breakdown:</p>
+<ul>
+<li>Liquidity providing: 100 Points</li>
+<li>Borrowing: 30 Points</li>
+<li>Swaps: 20 Points</li>
+<li><strong>Total pending: 150 Reward Points</strong></li>
+<li>Current value: 150 Reward Points × $2 = <strong>$300</strong></li>
+</ul>
+<p><strong>Step 2: Claim Rewards</strong>
+- Click <strong>"Claim All"</strong>
+- Confirm in wallet (~$0.10 gas)
+- Wait 1-2 seconds</p>
+<p><strong>Result:</strong>
+<div class="highlight"><pre><span></span><code>✅ Claimed: 150 Reward Points
+✅ Value: $300
+✅ Cost: $0.10 gas
+✅ Tokens in your wallet
+</code></pre></div></p>
+<p><strong>Step 3: Use Your Reward Points</strong>
+- <strong>Option A:</strong> Hold for potential appreciation
+- <strong>Option B:</strong> Swap for USDST (instant $300)
+- <strong>Option C:</strong> Provide Reward Point liquidity (earn more fees)</p>
+<p><strong>Your earnings:</strong></p>
+<ul>
+<li>30 days of DeFi activity</li>
+<li>Earned: 150 Reward Points ($300)</li>
+<li>Average: $10/day in Reward Points</li>
+<li>Plus: Trading fees from liquidity</li>
+</ul>
+<hr />
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<p><strong>What are Reward Points?</strong>
+- <strong>Reward Points</strong>: STRATO's governance and rewards token
+- Earned by using STRATO DeFi (borrowing, liquidity, swaps, etc.)
+- Distributed continuously based on activity
+- Can be claimed anytime and traded or held</p>
+<p><strong>Why earn Reward Points?</strong>
+- <strong>Governance</strong>: Vote on protocol changes (coming soon)
+- <strong>Additional yield</strong>: Bonus returns on top of DeFi activities
+- <strong>Ecosystem participation</strong>: Support and benefit from STRATO growth</p>
+<hr />
+<h2 id="how-to-earn-reward-points">How to Earn Reward Points<a class="headerlink" href="#how-to-earn-reward-points" title="Permanent link">&para;</a></h2>
+<h3 id="earning-activities">Earning Activities<a class="headerlink" href="#earning-activities" title="Permanent link">&para;</a></h3>
+<p><strong>Lending Pool</strong>:</p>
+<ul>
+<li>✅ Supply collateral to lending pool</li>
+<li>✅ Borrow USDST from lending pool</li>
+<li>Rewards proportional to supply/borrow amounts and duration</li>
+</ul>
+<p><strong>CDP (Collateralized Debt Positions)</strong>:</p>
+<ul>
+<li>✅ Mint USDST via CDP vaults</li>
+<li>✅ Maintain CDP positions</li>
+<li>Rewards based on minted amount and duration</li>
+</ul>
+<p><strong>Liquidity Provision</strong>:</p>
+<ul>
+<li>✅ Provide liquidity to swap pools</li>
+<li>✅ Earn from high-volume pools</li>
+<li>Bonus rewards for priority pools (check app for current incentives)</li>
+</ul>
+<p><strong>Swapping</strong>:</p>
+<ul>
+<li>✅ Execute swaps on STRATO</li>
+<li>Smaller rewards per swap, but adds up</li>
+</ul>
+<p><strong>Referrals</strong> (if available):</p>
+<ul>
+<li>✅ Refer friends to STRATO</li>
+<li>Earn % of their rewards</li>
+</ul>
+<h3 id="reward-rates">Reward Rates<a class="headerlink" href="#reward-rates" title="Permanent link">&para;</a></h3>
+<p>Rates vary by:</p>
+<ul>
+<li><strong>Activity type</strong>: Liquidity provision often earns more</li>
+<li><strong>Pool/market</strong>: Some pools have boosted rewards</li>
+<li><strong>Season</strong>: Rates adjust periodically (check current rates in app)</li>
+<li><strong>Total participation</strong>: Your share of total pool activity</li>
+</ul>
+<p><strong>Check current rates</strong>:</p>
+<ul>
+<li>App → <strong>Rewards</strong> section</li>
+<li>View APR for each activity</li>
+<li>Compare to optimize earnings</li>
+</ul>
+<hr />
+<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
+<ul>
+<li>[ ] STRATO account with connected wallet</li>
+<li>[ ] Active DeFi positions (lending, CDP, liquidity, or swaps)</li>
+<li>[ ] Small USDST for gas to claim rewards (&lt; $0.10)</li>
+</ul>
+<hr />
+<h2 id="step-by-step-check-your-rewards">Step-by-Step: Check Your Rewards<a class="headerlink" href="#step-by-step-check-your-rewards" title="Permanent link">&para;</a></h2>
+<h3 id="step-1-go-to-rewards-page">Step 1: Go to Rewards Page<a class="headerlink" href="#step-1-go-to-rewards-page" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Navigate to <strong>Rewards</strong> section in STRATO app</li>
+<li>Connect wallet if not already connected</li>
+</ol>
+<h3 id="step-2-view-pending-rewards">Step 2: View Pending Rewards<a class="headerlink" href="#step-2-view-pending-rewards" title="Permanent link">&para;</a></h3>
+<p>See your unclaimed Reward Points:</p>
+<ul>
+<li><strong>Total pending</strong>: All unclaimed Reward Points across activities</li>
+<li><strong>By activity</strong>: Breakdown per source</li>
+<li>Lending rewards</li>
+<li>CDP rewards</li>
+<li>Liquidity rewards</li>
+<li>Swap rewards</li>
+<li><strong>USD value</strong>: Current value in dollars</li>
+</ul>
+<h3 id="step-3-review-earning-history">Step 3: Review Earning History<a class="headerlink" href="#step-3-review-earning-history" title="Permanent link">&para;</a></h3>
+<p>Check:</p>
+<ul>
+<li><strong>Daily earnings</strong>: Reward Points earned per day recently</li>
+<li><strong>Historical rewards</strong>: Past claims and amounts</li>
+<li><strong>Earning rate</strong>: Projected annual earnings at current rate</li>
+</ul>
+<hr />
+<h2 id="step-by-step-claim-rewards">Step-by-Step: Claim Rewards<a class="headerlink" href="#step-by-step-claim-rewards" title="Permanent link">&para;</a></h2>
+<h3 id="step-1-go-to-rewards-page_1">Step 1: Go to Rewards Page<a class="headerlink" href="#step-1-go-to-rewards-page_1" title="Permanent link">&para;</a></h3>
+<p>Ensure you have:</p>
+<ul>
+<li>Pending Reward Points to claim</li>
+<li>Small USDST for gas (&lt; $0.10)</li>
+</ul>
+<h3 id="step-2-click-claim">Step 2: Click Claim<a class="headerlink" href="#step-2-click-claim" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Click <strong>Claim All</strong> (or select specific rewards)</li>
+<li>Review amount to claim</li>
+<li>Check gas fee estimate</li>
+</ol>
+<h3 id="step-3-confirm-transaction">Step 3: Confirm Transaction<a class="headerlink" href="#step-3-confirm-transaction" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Confirm transaction in wallet</li>
+<li>Pay gas fee (&lt; $0.10 in USDST)</li>
+<li>Wait for confirmation (1-2 seconds)</li>
+</ol>
+<p>✅ <strong>Done!</strong> Reward Points added to your wallet.</p>
+<h3 id="when-to-claim">When to Claim<a class="headerlink" href="#when-to-claim" title="Permanent link">&para;</a></h3>
+<p><strong>Optimal claiming</strong>:</p>
+<ul>
+<li>Claim weekly or monthly to save gas</li>
+<li>Wait until minimum claim amount (e.g., &gt; 10 Reward Points)</li>
+<li>Batch claim with other transactions</li>
+</ul>
+<p><strong>Immediate claiming</strong>:</p>
+<ul>
+<li>When Reward Point price is high (sell opportunity)</li>
+<li>Before major protocol changes</li>
+<li>If you need liquidity</li>
+</ul>
+<hr />
+<h2 id="what-to-do-with-reward-points">What to Do with Reward Points<a class="headerlink" href="#what-to-do-with-reward-points" title="Permanent link">&para;</a></h2>
+<h3 id="option-1-hold">Option 1: Hold<a class="headerlink" href="#option-1-hold" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Keep Reward Points in wallet</li>
+<li>Benefit from potential price appreciation</li>
+<li>Use for future governance voting</li>
+</ul>
+<h3 id="option-2-swap-for-other-tokens">Option 2: Swap for Other Tokens<a class="headerlink" href="#option-2-swap-for-other-tokens" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Go to <strong>Swap</strong> section</li>
+<li>Select Reward Points → USDST (or other token)</li>
+<li>Execute swap</li>
+<li>Take profits or reinvest</li>
+</ol>
+<p>See <strong><a href="../swap/">Swap Guide</a></strong> for instructions.</p>
+<h3 id="option-3-provide-reward-point-liquidity">Option 3: Provide Reward Point Liquidity<a class="headerlink" href="#option-3-provide-reward-point-liquidity" title="Permanent link">&para;</a></h3>
+<p>Earn additional yields:</p>
+<ol>
+<li>Go to <strong>Pools</strong> section</li>
+<li>Find Reward Point liquidity pools (e.g., RewardPoints-USDC)</li>
+<li>Provide liquidity</li>
+<li>Earn trading fees + more Reward Points</li>
+</ol>
+<p>See <strong><a href="../liquidity/">Liquidity Guide</a></strong> for details.</p>
+<h3 id="option-4-use-for-governance-coming-soon">Option 4: Use for Governance (Coming Soon)<a class="headerlink" href="#option-4-use-for-governance-coming-soon" title="Permanent link">&para;</a></h3>
+<p>Future utility:</p>
+<ul>
+<li>Vote on protocol proposals</li>
+<li>Influence reward distributions</li>
+<li>Shape STRATO development</li>
+</ul>
+<hr />
+<h2 id="maximizing-rewards">Maximizing Rewards<a class="headerlink" href="#maximizing-rewards" title="Permanent link">&para;</a></h2>
+<h3 id="highest-earning-activities">Highest-Earning Activities<a class="headerlink" href="#highest-earning-activities" title="Permanent link">&para;</a></h3>
+<p><strong>Typically highest APR</strong>:</p>
+<ol>
+<li><strong>Liquidity provision</strong> in priority pools</li>
+<li><strong>CDP minting</strong> (especially during bonus periods)</li>
+<li><strong>Lending supply</strong> (large amounts, long duration)</li>
+<li><strong>Borrowing</strong> (pays interest but earns Reward Points)</li>
+</ol>
+<p><strong>Check current boosts</strong> in app's Rewards section.</p>
+<h3 id="optimal-strategies">Optimal Strategies<a class="headerlink" href="#optimal-strategies" title="Permanent link">&para;</a></h3>
+<h4 id="strategy-1-liquidity-focus">Strategy 1: Liquidity Focus<a class="headerlink" href="#strategy-1-liquidity-focus" title="Permanent link">&para;</a></h4>
+<ol>
+<li>Provide liquidity to high-reward pools</li>
+<li>Keep positions for extended periods</li>
+<li>Claim and reinvest rewards weekly</li>
+<li>Compound for maximum growth</li>
+</ol>
+<h4 id="strategy-2-cdp-efficiency">Strategy 2: CDP Efficiency<a class="headerlink" href="#strategy-2-cdp-efficiency" title="Permanent link">&para;</a></h4>
+<ol>
+<li>Mint USDST via CDP (lower fees than borrowing)</li>
+<li>Use minted USDST for other activities</li>
+<li>Earn Reward Points from both CDP and other activities</li>
+<li>Maintain healthy collateralization ratio</li>
+</ol>
+<h4 id="strategy-3-diversified-approach">Strategy 3: Diversified Approach<a class="headerlink" href="#strategy-3-diversified-approach" title="Permanent link">&para;</a></h4>
+<ol>
+<li>Split capital across activities</li>
+<li>Borrow, provide liquidity, and mint via CDP</li>
+<li>Earn from multiple sources</li>
+<li>Reduces risk concentration</li>
+</ol>
+<h3 id="timing-considerations">Timing Considerations<a class="headerlink" href="#timing-considerations" title="Permanent link">&para;</a></h3>
+<p><strong>Boost periods</strong>:</p>
+<ul>
+<li>Watch for special boost events</li>
+<li>Increase participation during high-reward periods</li>
+<li>Check announcements for bonuses</li>
+</ul>
+<p><strong>Gas optimization</strong>:</p>
+<ul>
+<li>Batch claim rewards with other transactions</li>
+<li>Claim during low activity periods (if variable gas)</li>
+</ul>
+<hr />
+<h2 id="reward-seasons">Reward Seasons<a class="headerlink" href="#reward-seasons" title="Permanent link">&para;</a></h2>
+<h3 id="what-are-seasons">What Are Seasons?<a class="headerlink" href="#what-are-seasons" title="Permanent link">&para;</a></h3>
+<p>Reward Points distributed in seasons:</p>
+<ul>
+<li><strong>Fixed duration</strong>: E.g., 3-6 months per season</li>
+<li><strong>Total Reward Points pool</strong>: Fixed amount allocated per season</li>
+<li><strong>Rate adjustments</strong>: Rates set at season start</li>
+<li><strong>Fresh start</strong>: New season = new reward structure</li>
+</ul>
+<h3 id="season-changes">Season Changes<a class="headerlink" href="#season-changes" title="Permanent link">&para;</a></h3>
+<p><strong>What changes between seasons</strong>:</p>
+<ul>
+<li>Total Reward Points allocated</li>
+<li>Reward rates per activity</li>
+<li>Boosted pools/activities</li>
+<li>Earning multipliers</li>
+</ul>
+<p><strong>What stays same</strong>:</p>
+<ul>
+<li>Earning mechanisms</li>
+<li>Claim process</li>
+<li>Reward Points utility</li>
+</ul>
+<p><strong>Check current season</strong>:</p>
+<ul>
+<li>App → Rewards → Season info</li>
+<li>See end date and total remaining</li>
+</ul>
+<hr />
+<h2 id="tracking-analytics">Tracking &amp; Analytics<a class="headerlink" href="#tracking-analytics" title="Permanent link">&para;</a></h2>
+<h3 id="personal-dashboard">Personal Dashboard<a class="headerlink" href="#personal-dashboard" title="Permanent link">&para;</a></h3>
+<p>Monitor your rewards:</p>
+<ul>
+<li><strong>Pending rewards</strong>: Unclaimed Reward Points</li>
+<li><strong>Claimed history</strong>: Past claims</li>
+<li><strong>Earning rate</strong>: Daily/weekly Reward Points earned</li>
+<li><strong>USD value</strong>: Current and historical values</li>
+</ul>
+<h3 id="activity-breakdown">Activity Breakdown<a class="headerlink" href="#activity-breakdown" title="Permanent link">&para;</a></h3>
+<p>See earnings by source:</p>
+<ul>
+<li><strong>Lending</strong>: Supply + borrow rewards</li>
+<li><strong>CDP</strong>: Minting rewards</li>
+<li><strong>Liquidity</strong>: Pool-specific rewards</li>
+<li><strong>Swaps</strong>: Trading rewards</li>
+</ul>
+<h3 id="projections">Projections<a class="headerlink" href="#projections" title="Permanent link">&para;</a></h3>
+<p>Estimate future earnings:</p>
+<ul>
+<li>Based on current positions</li>
+<li>Assumes constant rates (rates may change)</li>
+<li>Helps plan strategies</li>
+</ul>
+<hr />
+<h2 id="common-issues">Common Issues<a class="headerlink" href="#common-issues" title="Permanent link">&para;</a></h2>
+<h3 id="no-rewards-to-claim">"No rewards to claim"<a class="headerlink" href="#no-rewards-to-claim" title="Permanent link">&para;</a></h3>
+<p><strong>Cause</strong>: Haven't accrued rewards yet</p>
+<p><strong>Fix</strong>:</p>
+<ul>
+<li>Start participating (borrow, provide liquidity, etc.)</li>
+<li>Wait for rewards to accumulate (check after 24 hours)</li>
+<li>Verify you have active positions</li>
+</ul>
+<h3 id="claim-transaction-failed">"Claim transaction failed"<a class="headerlink" href="#claim-transaction-failed" title="Permanent link">&para;</a></h3>
+<p><strong>Causes</strong>:</p>
+<ul>
+<li>Insufficient USDST for gas</li>
+<li>Rewards already claimed</li>
+<li>Network congestion</li>
+</ul>
+<p><strong>Fix</strong>:</p>
+<ul>
+<li>Get USDST for gas fees</li>
+<li>Refresh page to see updated balance</li>
+<li>Try again after a few seconds</li>
+</ul>
+<h3 id="rewards-lower-than-expected">"Rewards lower than expected"<a class="headerlink" href="#rewards-lower-than-expected" title="Permanent link">&para;</a></h3>
+<p><strong>Reasons</strong>:</p>
+<ul>
+<li>Rates changed during season</li>
+<li>More participants (dilutes pool)</li>
+<li>Position size decreased</li>
+<li>Rates apply to partial period</li>
+</ul>
+<p><strong>Check</strong>:</p>
+<ul>
+<li>Current rates in app</li>
+<li>Your position history</li>
+<li>Season changes</li>
+</ul>
+<hr />
+<h2 id="best-practices">Best Practices<a class="headerlink" href="#best-practices" title="Permanent link">&para;</a></h2>
+<h3 id="claiming">Claiming<a class="headerlink" href="#claiming" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] Claim at least once per season</li>
+<li>[ ] Wait for minimum amount to save gas</li>
+<li>[ ] Batch with other transactions</li>
+<li>[ ] Record claim amounts for tax purposes</li>
+</ul>
+<h3 id="maximizing">Maximizing<a class="headerlink" href="#maximizing" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] Focus on highest-reward activities</li>
+<li>[ ] Maintain positions long-term</li>
+<li>[ ] Reinvest rewards (compound)</li>
+<li>[ ] Monitor boost periods</li>
+</ul>
+<h3 id="security">Security<a class="headerlink" href="#security" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] Verify Reward Points token address before swapping</li>
+<li>[ ] Use official STRATO app for claims</li>
+<li>[ ] Don't share wallet private keys</li>
+<li>[ ] Track claimed amounts</li>
+</ul>
+<hr />
+<h2 id="understanding-reward-math">Understanding Reward Math<a class="headerlink" href="#understanding-reward-math" title="Permanent link">&para;</a></h2>
+<h3 id="how-rewards-are-calculated">How Rewards Are Calculated<a class="headerlink" href="#how-rewards-are-calculated" title="Permanent link">&para;</a></h3>
+<p><strong>General formula</strong>:
+<div class="highlight"><pre><span></span><code>Your rewards = (Your share of activity) × (Total pool rewards) × (Time period)
+</code></pre></div></p>
+<p><strong>Example - Liquidity rewards</strong>:</p>
+<ul>
+<li>Total pool: 10,000 Reward Points per month</li>
+<li>Your liquidity: $10,000</li>
+<li>Total pool liquidity: $1,000,000</li>
+<li>Your share: 1%</li>
+<li>Your rewards: 10,000 × 1% = 100 Points per month</li>
+</ul>
+<h3 id="apr-calculation">APR Calculation<a class="headerlink" href="#apr-calculation" title="Permanent link">&para;</a></h3>
+<p><strong>Annual Percentage Rate (APR)</strong>:
+<div class="highlight"><pre><span></span><code>APR = (Annual rewards in $) / (Your position value in $) × 100%
+</code></pre></div></p>
+<p><strong>Example</strong>:</p>
+<ul>
+<li>Your position: $10,000</li>
+<li>Monthly rewards: 100 Points</li>
+<li>Reward Point price: $2</li>
+<li>Monthly $ rewards: 100 × $2 = $200</li>
+<li>Annual $ rewards: $200 × 12 = $2,400</li>
+<li><strong>APR: $2,400 / $10,000 = 24%</strong></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>APR is estimated and changes with Reward Point price, reward rates, and participation levels.</p>
+</div>
+<hr />
+<h2 id="reward-points-details">Reward Points Details<a class="headerlink" href="#reward-points-details" title="Permanent link">&para;</a></h2>
+<h3 id="token-info">Token Info<a class="headerlink" href="#token-info" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Symbol</strong>: STRP (Reward Points)</li>
+<li><strong>Type</strong>: ERC20 on STRATO</li>
+<li><strong>Use cases</strong>: Governance, rewards, trading</li>
+<li><strong>Supply</strong>: Check tokenomics documentation</li>
+</ul>
+<h3 id="where-to-trade">Where to Trade<a class="headerlink" href="#where-to-trade" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>STRATO Swap</strong>: Primary trading venue</li>
+<li><strong>Liquidity pools</strong>: RewardPoints-USDC, RewardPoints-ETH</li>
+<li><strong>External exchanges</strong>: (if listed)</li>
+</ul>
+<h3 id="price-tracking">Price Tracking<a class="headerlink" href="#price-tracking" title="Permanent link">&para;</a></h3>
+<p>Monitor Reward Point value:</p>
+<ul>
+<li>App → Swap → Reward Point price</li>
+<li>Liquidity pool stats</li>
+<li>External price trackers (if available)</li>
+</ul>
+<hr />
+<h2 id="whats-next">What's Next?<a class="headerlink" href="#whats-next" title="Permanent link">&para;</a></h2>
+<h3 id="optimize-your-earnings">Optimize Your Earnings<a class="headerlink" href="#optimize-your-earnings" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong><a href="../liquidity/">Provide Liquidity</a></strong> - High-reward activity</li>
+<li><strong><a href="../mint-cdp/">Mint via CDP</a></strong> - Efficient Reward Points earning</li>
+<li><strong><a href="../borrow/">Borrow USDST</a></strong> - Earn while borrowing</li>
+</ul>
+<h3 id="learn-more">Learn More<a class="headerlink" href="#learn-more" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong><a href="../../concepts/">Core Concepts</a></strong> - Understand Reward Points role</li>
+<li><strong><a href="../../safety/">Safety Guide</a></strong> - Protect your rewards</li>
+<li><strong><a href="../../faq/">FAQ</a></strong> - Common reward questions</li>
+</ul>
+<hr />
+<h2 id="need-help">Need Help?<a class="headerlink" href="#need-help" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>FAQ</strong>: <a href="../../faq/#rewards">Rewards Questions</a></li>
+<li><strong>Support</strong>: <a href="https://support.blockapps.net">support.blockapps.net</a></li>
+<li><strong>API Reference</strong>: <a href="../../reference/interactive-api/">Interactive API (Swagger)</a></li>
+<li><strong>Telegram</strong>: <a href="https://t.me/strato_net">t.me/strato_net</a></li>
+</ul>
+
+
+
+
+
+
+
+  
+    
+  
+  
+    
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Last update">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="January 22, 2026 16:13:05 UTC"><span class="timeago" datetime="2026-01-22T16:13:05+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="January 22, 2026 16:13:05 UTC">2026-01-22</span>
+  </span>
+
+    
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Created">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="January 5, 2026 17:52:18 UTC"><span class="timeago" datetime="2026-01-05T17:52:18+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="January 5, 2026 17:52:18 UTC">2026-01-05</span>
+  </span>
+
+    
+    
+    
+  </aside>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 BlockApps - STRATO Platform
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+    <a href="https://t.me/strato_net" target="_blank" rel="noopener" title="Telegram Community" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M256 8a248 248 0 1 0 0 496 248 248 0 1 0 0-496m115 168.7c-3.7 39.2-19.9 134.4-28.1 178.3-3.5 18.6-10.3 24.8-16.9 25.4-14.4 1.3-25.3-9.5-39.3-18.7-21.8-14.3-34.2-23.2-55.3-37.2-24.5-16.1-8.6-25 5.3-39.5 3.7-3.8 67.1-61.5 68.3-66.7.2-.7.3-3.1-1.2-4.4s-3.6-.8-5.1-.5c-2.2.5-37.1 23.5-104.6 69.1-9.9 6.8-18.9 10.1-26.9 9.9-8.9-.2-25.9-5-38.6-9.1-15.5-5-27.9-7.7-26.8-16.3.6-4.5 6.7-9 18.4-13.7 72.3-31.5 120.5-52.3 144.6-62.3 68.9-28.6 83.2-33.6 92.5-33.8 2.1 0 6.6.5 9.6 2.9 2 1.7 3.2 4.1 3.5 6.7.5 3.2.6 6.5.4 9.8z"/></svg>
+    </a>
+  
+    
+    
+    
+    
+    <a href="https://support.blockapps.net" target="_blank" rel="noopener" title="Support Portal" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M256 512a256 256 0 1 0 0-512 256 256 0 1 0 0 512m0-336c-17.7 0-32 14.3-32 32 0 13.3-10.7 24-24 24s-24-10.7-24-24c0-44.2 35.8-80 80-80s80 35.8 80 80c0 47.2-36 67.2-56 74.5v3.8c0 13.3-10.7 24-24 24s-24-10.7-24-24v-8.1c0-20.5 14.8-35.2 30.1-40.2 6.4-2.1 13.2-5.5 18.2-10.3 4.3-4.2 7.7-10 7.7-19.6 0-17.7-14.3-32-32-32zm-32 192a32 32 0 1 1 64 0 32 32 0 1 1-64 0"/></svg>
+    </a>
+  
+    
+    
+    
+    
+    <a href="https://docs.strato.nexus" target="_blank" rel="noopener" title="Documentation" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M384 512H96c-53 0-96-43-96-96V96C0 43 43 0 96 0h304c26.5 0 48 21.5 48 48v288c0 20.9-13.4 38.7-32 45.3V448c17.7 0 32 14.3 32 32s-14.3 32-32 32zM96 384c-17.7 0-32 14.3-32 32s14.3 32 32 32h256v-64zm32-232c0 13.3 10.7 24 24 24h176c13.3 0 24-10.7 24-24s-10.7-24-24-24H152c-13.3 0-24 10.7-24 24m24 72c-13.3 0-24 10.7-24 24s10.7 24 24 24h176c13.3 0 24-10.7 24-24s-10.7-24-24-24z"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.indexes", "navigation.instant", "navigation.tracking", "navigation.top", "navigation.expand", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit", "content.action.view"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../js/timeago.min.js"></script>
+      
+        <script src="../../js/timeago_mkdocs_material.js"></script>
+      
+    
+  </body>
+</html>

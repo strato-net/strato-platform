@@ -1,0 +1,3431 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="STRATO platform technical documentation (use-case first, end-user + developer)">
+      
+      
+        <meta name="author" content="BlockApps">
+      
+      
+        <link rel="canonical" href="https://docs.strato.nexus/scenarios/risk-hedging/">
+      
+      
+        <link rel="prev" href="../portfolio-rebalancing/">
+      
+      
+        <link rel="next" href="../leverage-long/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Risk Management & Hedging - STRATO Technical Docs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../css/timeago.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#risk-management-hedging" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="STRATO Technical Docs" class="md-header__button md-logo" aria-label="STRATO Technical Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            STRATO Technical Docs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Risk Management & Hedging
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="STRATO Technical Docs" class="md-nav__button md-logo" aria-label="STRATO Technical Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    STRATO Technical Docs
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../quick-start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Concepts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../first-time-user/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    First-Time User
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/borrow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Borrow USDST
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/mint-cdp/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mint USDST (CDP)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/swap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Swap Tokens
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/liquidity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Provide Liquidity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/bridge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bridge Assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/rewards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manage Rewards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Scenarios
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Scenarios
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../grow-position/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Grow Your Position
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../maximize-yield/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Maximize Yield
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dca-strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DCA Strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platform-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../portfolio-rebalancing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Portfolio Rebalancing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Risk Management & Hedging
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Risk Management & Hedging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Strategy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#complete-example-hedge-10-ethst-position" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Complete Example: Hedge 10 ETHST Position
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#understanding-defi-risks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Understanding DeFi Risks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Understanding DeFi Risks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#primary-risks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Primary Risks
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hedging-strategy-1-stable-collateral-mix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hedging Strategy 1: Stable Collateral Mix
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Hedging Strategy 1: Stable Collateral Mix">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#impact-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Impact Analysis
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hedging-strategy-2-safety-buffer-better" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hedging Strategy 2: Safety Buffer (Better)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Hedging Strategy 2: Safety Buffer (Better)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#implementation_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-the-safety-buffer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using the Safety Buffer
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hedging-strategy-3-delta-neutral-position" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hedging Strategy 3: Delta-Neutral Position
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Hedging Strategy 3: Delta-Neutral Position">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#concept" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Concept
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hedging-strategy-4-gradual-de-risking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hedging Strategy 4: Gradual De-Risking
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Hedging Strategy 4: Gradual De-Risking">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-1-normal-market" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1: Normal Market
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-volatility-increases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2: Volatility Increases
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-market-crashing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3: Market Crashing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-4-recovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 4: Recovery
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cost-benefit-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cost-Benefit Analysis
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Cost-Benefit Analysis">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#strategy-1-mixed-collateral" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Strategy 1: Mixed Collateral
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#strategy-2-safety-buffer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Strategy 2: Safety Buffer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#strategy-3-delta-neutral" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Strategy 3: Delta-Neutral
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#strategy-4-gradual-de-risk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Strategy 4: Gradual De-Risk
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#real-example-2022-bear-market" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Real Example: 2022 Bear Market
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#recommended-buffer-sizes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommended Buffer Sizes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#automation-ideas-advanced" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Automation Ideas (Advanced)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#red-flags-when-to-hedge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Red Flags: When to Hedge
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Red Flags: When to Hedge">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#market-signals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Market Signals
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#position-signals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Position Signals
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary-hedge-strategy-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary: Hedge Strategy Selection
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Next Steps
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Next Steps">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#need-help" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Need Help?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../leverage-long/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Leverage Long Position
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../multi-asset-strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Asset Strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../collateral-optimization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Collateral Optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../arbitrage-market-making/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Arbitrage & Market Making
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../withdrawals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Withdrawals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing to STRATO
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Contributing to STRATO
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contribute/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contribute/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contribute/contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing Guidelines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building Apps on STRATO
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Building Apps on STRATO
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_1" id="__nav_8_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../build-apps/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    System Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../build-apps/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start (5 min)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_2" id="__nav_8_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Building
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../build-apps/integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../build-apps/e2e/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    E2E Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_3" id="__nav_8_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../build-apps/contract-addresses/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../build-apps/quick-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Cheat Sheet
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    App API (Getting Started)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/interactive-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Interactive Reference (Swagger)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/strato-node-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Platform API (Advanced)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../safety/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Safety & Risk
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Strategy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#complete-example-hedge-10-ethst-position" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Complete Example: Hedge 10 ETHST Position
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#understanding-defi-risks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Understanding DeFi Risks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Understanding DeFi Risks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#primary-risks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Primary Risks
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hedging-strategy-1-stable-collateral-mix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hedging Strategy 1: Stable Collateral Mix
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Hedging Strategy 1: Stable Collateral Mix">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#impact-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Impact Analysis
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hedging-strategy-2-safety-buffer-better" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hedging Strategy 2: Safety Buffer (Better)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Hedging Strategy 2: Safety Buffer (Better)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#implementation_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-the-safety-buffer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using the Safety Buffer
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hedging-strategy-3-delta-neutral-position" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hedging Strategy 3: Delta-Neutral Position
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Hedging Strategy 3: Delta-Neutral Position">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#concept" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Concept
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hedging-strategy-4-gradual-de-risking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hedging Strategy 4: Gradual De-Risking
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Hedging Strategy 4: Gradual De-Risking">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-1-normal-market" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1: Normal Market
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-volatility-increases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2: Volatility Increases
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-market-crashing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3: Market Crashing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-4-recovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 4: Recovery
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cost-benefit-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cost-Benefit Analysis
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Cost-Benefit Analysis">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#strategy-1-mixed-collateral" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Strategy 1: Mixed Collateral
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#strategy-2-safety-buffer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Strategy 2: Safety Buffer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#strategy-3-delta-neutral" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Strategy 3: Delta-Neutral
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#strategy-4-gradual-de-risk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Strategy 4: Gradual De-Risk
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#real-example-2022-bear-market" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Real Example: 2022 Bear Market
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#recommended-buffer-sizes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommended Buffer Sizes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#automation-ideas-advanced" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Automation Ideas (Advanced)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#red-flags-when-to-hedge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Red Flags: When to Hedge
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Red Flags: When to Hedge">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#market-signals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Market Signals
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#position-signals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Position Signals
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary-hedge-strategy-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary: Hedge Strategy Selection
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Next Steps
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Next Steps">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#need-help" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Need Help?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="risk-management-hedging">Risk Management &amp; Hedging<a class="headerlink" href="#risk-management-hedging" title="Permanent link">&para;</a></h1>
+<p>Protect your DeFi positions from market volatility and liquidation risk.</p>
+<hr />
+<h2 id="the-strategy">The Strategy<a class="headerlink" href="#the-strategy" title="Permanent link">&para;</a></h2>
+<p>Use stablecoins and diversification to hedge against collateral price drops while maintaining DeFi positions.</p>
+<p><strong>What you'll learn:</strong></p>
+<ul>
+<li>Hedge collateral volatility</li>
+<li>Reduce liquidation risk</li>
+<li>Maintain upside exposure</li>
+<li>Balance risk and return</li>
+</ul>
+<p><strong>Result:</strong> Sleep better while staying in DeFi</p>
+<hr />
+<h2 id="complete-example-hedge-10-ethst-position">Complete Example: Hedge 10 ETHST Position<a class="headerlink" href="#complete-example-hedge-10-ethst-position" title="Permanent link">&para;</a></h2>
+<p><strong>Your situation:</strong></p>
+<ul>
+<li>Collateral: 10 ETHST ($30,000)</li>
+<li>Borrowed: 16,000 USDST</li>
+<li>Health Factor: 1.5</li>
+<li><strong>Problem:</strong> Worried about ETHST crash</li>
+</ul>
+<p><strong>The hedge:</strong></p>
+<ol>
+<li>Mint additional USDST via CDP</li>
+<li>Swap portion to stablecoins</li>
+<li>Hold as safety buffer</li>
+<li>If ETHST drops: Use stables to add collateral</li>
+</ol>
+<p><strong>Time needed:</strong> 10 minutes<br />
+<strong>Cost:</strong> ~$0.50 gas + swap fees</p>
+<hr />
+<h2 id="understanding-defi-risks">Understanding DeFi Risks<a class="headerlink" href="#understanding-defi-risks" title="Permanent link">&para;</a></h2>
+<h3 id="primary-risks">Primary Risks<a class="headerlink" href="#primary-risks" title="Permanent link">&para;</a></h3>
+<p><strong>1. Collateral Volatility</strong>
+- ETHST drops 30% → Health factor plummets
+- Risk: Liquidation</p>
+<p><strong>2. Interest Rate Changes</strong>
+- Borrow rates spike during volatility
+- Debt grows faster</p>
+<p><strong>3. Smart Contract Risk</strong>
+- Platform exploits (rare but possible)
+- Mitigation: Audited contracts, insurance</p>
+<p><strong>4. Liquidation Cascade</strong>
+- Market-wide selloff
+- Mass liquidations drive prices lower</p>
+<hr />
+<h2 id="hedging-strategy-1-stable-collateral-mix">Hedging Strategy 1: Stable Collateral Mix<a class="headerlink" href="#hedging-strategy-1-stable-collateral-mix" title="Permanent link">&para;</a></h2>
+<p><strong>Mix volatile and stable collateral</strong></p>
+<h3 id="implementation">Implementation<a class="headerlink" href="#implementation" title="Permanent link">&para;</a></h3>
+<p><strong>Starting:</strong></p>
+<ul>
+<li>10 ETHST ($30,000) = 100% volatile</li>
+</ul>
+<p><strong>Target:</strong></p>
+<ul>
+<li>6 ETHST ($18,000) = 60% volatile</li>
+<li>12,000 USDST ($12,000) = 40% stable</li>
+</ul>
+<p><strong>Steps:</strong></p>
+<ol>
+<li>
+<p><strong>Mint USDST via CDP:</strong></p>
+</li>
+<li>
+<p>Mint 6,000 USDST (low CR)</p>
+</li>
+<li>
+<p>Stability fee: 2.5%</p>
+</li>
+<li>
+<p><strong>Swap to stablecoins:</strong></p>
+</li>
+<li>
+<p>Swap 6,000 USDST → USDST</p>
+</li>
+<li>
+<p>Cost: ~$18 (0.3% fee)</p>
+</li>
+<li>
+<p><strong>Supply USDST as collateral:</strong></p>
+</li>
+<li>
+<p>Add 6,000 USDST to collateral</p>
+</li>
+<li>
+<p>Now have mixed collateral</p>
+</li>
+<li>
+<p><strong>Optional - Remove some ETH:</strong></p>
+</li>
+<li>
+<p>Withdraw 2 ETHST    - Sell or hold separately</p>
+</li>
+<li>Keep 8 ETHST + 6,000 USDST collateral</li>
+</ol>
+<p><strong>Result:</strong>
+<div class="highlight"><pre><span></span><code>Before:
+
+- 10 ETHST collateral
+- 16,000 USDST debt
+- HF: 1.5
+- Risk: High (100% ETHST exposure)
+
+After:
+
+- 8 ETHST + 6,000 USDST collateral
+- 22,000 USDST debt (16k original + 6k new)
+- HF: 1.09
+- Risk: Lower (60% ETHST, 40% stable)
+</code></pre></div></p>
+<h3 id="impact-analysis">Impact Analysis<a class="headerlink" href="#impact-analysis" title="Permanent link">&para;</a></h3>
+<p><strong>If ETHST drops 25%:</strong></p>
+<p><strong>Without hedge:</strong></p>
+<ul>
+<li>Collateral: $22,500 (10 ETHST @ $2,250)</li>
+<li>Debt: 16,000</li>
+<li>HF: 1.12 (safe)</li>
+</ul>
+<p><strong>With hedge:</strong></p>
+<ul>
+<li>Collateral: $24,000 (8 ETHST @ $2,250 + 6k USDST)</li>
+<li>Debt: 22,000</li>
+<li>HF: 0.87 (liquidated!)</li>
+</ul>
+<p><strong>Wait, that's worse!</strong> Need to adjust...</p>
+<hr />
+<h2 id="hedging-strategy-2-safety-buffer-better">Hedging Strategy 2: Safety Buffer (Better)<a class="headerlink" href="#hedging-strategy-2-safety-buffer-better" title="Permanent link">&para;</a></h2>
+<p><strong>Hold stablecoins OUTSIDE collateral as emergency fund</strong></p>
+<h3 id="implementation_1">Implementation<a class="headerlink" href="#implementation_1" title="Permanent link">&para;</a></h3>
+<p><strong>Step 1: Create Safety Buffer</strong></p>
+<ol>
+<li>
+<p><strong>Mint USDST via CDP:</strong></p>
+</li>
+<li>
+<p>Use 10 ETHST collateral</p>
+</li>
+<li>Mint 7,000 USDST</li>
+<li>
+<p>CR: 286% (safe)</p>
+</li>
+<li>
+<p><strong>Swap to stablecoins:</strong></p>
+</li>
+<li>
+<p>Swap to 7,000 USDST    - Hold in wallet (NOT as collateral)</p>
+</li>
+<li>
+<p><strong>Keep borrowing position:</strong></p>
+</li>
+<li>
+<p>10 ETHST collateral</p>
+</li>
+<li>16,000 borrowed + 7,000 minted = 23,000 debt</li>
+<li>HF: 1.04 (safe with buffer ready!)</li>
+</ol>
+<p><strong>Result:</strong>
+<div class="highlight"><pre><span></span><code>Collateral: 10 ETHST ($30,000)
+Debt: 23,000 USDST
+HF: 1.04
+Safety buffer: 7,000 USDST in wallet
+</code></pre></div></p>
+<h3 id="using-the-safety-buffer">Using the Safety Buffer<a class="headerlink" href="#using-the-safety-buffer" title="Permanent link">&para;</a></h3>
+<p><strong>If ETHST drops 25% ($3,000 → $2,250):</strong></p>
+<ol>
+<li>
+<p><strong>Without buffer:</strong></p>
+</li>
+<li>
+<p>Collateral: $22,500</p>
+</li>
+<li>Debt: 23,000</li>
+<li>
+<p>HF: 0.78 → LIQUIDATED ❌</p>
+</li>
+<li>
+<p><strong>With buffer:</strong></p>
+</li>
+<li>
+<p>Use 7,000 USDST from wallet</p>
+</li>
+<li>Swap → 3.11 ETHST (at $2,250)</li>
+<li>Supply as collateral</li>
+<li>New collateral: 13.11 ETHST ($29,498)</li>
+<li>HF: 1.03 ✅ Saved!</li>
+</ol>
+<p><strong>The buffer saved you from liquidation</strong></p>
+<hr />
+<h2 id="hedging-strategy-3-delta-neutral-position">Hedging Strategy 3: Delta-Neutral Position<a class="headerlink" href="#hedging-strategy-3-delta-neutral-position" title="Permanent link">&para;</a></h2>
+<p><strong>Advanced: Maintain DeFi position with zero price exposure</strong></p>
+<h3 id="concept">Concept<a class="headerlink" href="#concept" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Long ETHST (via collateral)</li>
+<li>Short ETHST (via perps or options)</li>
+<li>Net: Zero price exposure</li>
+<li>Earn: Lending/LP fees minus short costs</li>
+</ul>
+<p><strong>Implementation on STRATO:</strong></p>
+<ol>
+<li><strong>Supply 10 ETHST collateral</strong></li>
+<li><strong>Borrow USDST against it</strong></li>
+<li><strong>Short ETHST on another platform</strong> (e.g., dYdX, GMX)</li>
+<li><strong>Net exposure:</strong> Zero ETHST price risk</li>
+</ol>
+<p><strong>Pros:</strong></p>
+<ul>
+<li>Completely hedged</li>
+<li>Earn DeFi yields without price risk</li>
+<li>Perfect for ranging markets</li>
+</ul>
+<p><strong>Cons:</strong></p>
+<ul>
+<li>Complex to manage</li>
+<li>Shorting costs (funding rates)</li>
+<li>Need account on derivatives platform</li>
+<li>May not be net profitable</li>
+</ul>
+<p><strong>Not commonly recommended for most users</strong></p>
+<hr />
+<h2 id="hedging-strategy-4-gradual-de-risking">Hedging Strategy 4: Gradual De-Risking<a class="headerlink" href="#hedging-strategy-4-gradual-de-risking" title="Permanent link">&para;</a></h2>
+<p><strong>As market becomes uncertain, gradually reduce risk</strong></p>
+<h3 id="phase-1-normal-market">Phase 1: Normal Market<a class="headerlink" href="#phase-1-normal-market" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code>Collateral: 10 ETHST
+Debt: 15,000 USDST
+HF: 1.2
+Risk: Moderate
+</code></pre></div>
+<h3 id="phase-2-volatility-increases">Phase 2: Volatility Increases<a class="headerlink" href="#phase-2-volatility-increases" title="Permanent link">&para;</a></h3>
+<p><strong>Actions:</strong></p>
+<ol>
+<li>Repay 3,000 USDST</li>
+<li>Improve HF to 1.4</li>
+<li>Cost: Interest stops on repaid amount</li>
+</ol>
+<div class="highlight"><pre><span></span><code>Collateral: 10 ETHST
+Debt: 12,000 USDST
+HF: 1.4
+Risk: Lower
+</code></pre></div>
+<h3 id="phase-3-market-crashing">Phase 3: Market Crashing<a class="headerlink" href="#phase-3-market-crashing" title="Permanent link">&para;</a></h3>
+<p><strong>Actions:</strong></p>
+<ol>
+<li>Repay another 5,000 USDST</li>
+<li>HF increases to 2.57</li>
+<li>Very safe from liquidation</li>
+</ol>
+<div class="highlight"><pre><span></span><code>Collateral: 10 ETHST
+Debt: 7,000 USDST
+HF: 2.57
+Risk: Very low
+</code></pre></div>
+<h3 id="phase-4-recovery">Phase 4: Recovery<a class="headerlink" href="#phase-4-recovery" title="Permanent link">&para;</a></h3>
+<p><strong>Actions:</strong></p>
+<ol>
+<li>Borrow again as market stabilizes</li>
+<li>Return to normal risk level</li>
+<li>Missed some downside, kept position open</li>
+</ol>
+<p><strong>This is the simplest and most reliable hedge strategy</strong></p>
+<hr />
+<h2 id="cost-benefit-analysis">Cost-Benefit Analysis<a class="headerlink" href="#cost-benefit-analysis" title="Permanent link">&para;</a></h2>
+<h3 id="strategy-1-mixed-collateral">Strategy 1: Mixed Collateral<a class="headerlink" href="#strategy-1-mixed-collateral" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Setup cost</td>
+<td>$18 (swap fees)</td>
+</tr>
+<tr>
+<td>Ongoing cost</td>
+<td>Increased debt interest</td>
+</tr>
+<tr>
+<td>Benefit</td>
+<td>Reduced volatility</td>
+</tr>
+<tr>
+<td>Best for</td>
+<td>Conservative users</td>
+</tr>
+</tbody>
+</table>
+<h3 id="strategy-2-safety-buffer">Strategy 2: Safety Buffer<a class="headerlink" href="#strategy-2-safety-buffer" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Setup cost</td>
+<td>$18 (swap fees)</td>
+</tr>
+<tr>
+<td>Ongoing cost</td>
+<td>Opportunity cost on buffer</td>
+</tr>
+<tr>
+<td>Benefit</td>
+<td>Emergency protection</td>
+</tr>
+<tr>
+<td>Best for</td>
+<td>Moderate risk-takers</td>
+</tr>
+</tbody>
+</table>
+<h3 id="strategy-3-delta-neutral">Strategy 3: Delta-Neutral<a class="headerlink" href="#strategy-3-delta-neutral" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Setup cost</td>
+<td>Varies (exchange fees)</td>
+</tr>
+<tr>
+<td>Ongoing cost</td>
+<td>Shorting funding rates</td>
+</tr>
+<tr>
+<td>Benefit</td>
+<td>Zero price risk</td>
+</tr>
+<tr>
+<td>Best for</td>
+<td>Advanced traders</td>
+</tr>
+</tbody>
+</table>
+<h3 id="strategy-4-gradual-de-risk">Strategy 4: Gradual De-Risk<a class="headerlink" href="#strategy-4-gradual-de-risk" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Setup cost</td>
+<td>None</td>
+</tr>
+<tr>
+<td>Ongoing cost</td>
+<td>Reduced interest (benefit!)</td>
+</tr>
+<tr>
+<td>Benefit</td>
+<td>Simple, effective</td>
+</tr>
+<tr>
+<td>Best for</td>
+<td>Everyone</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Recommendation: Strategy 4 (Gradual De-Risk) for most users</strong></p>
+<hr />
+<h2 id="real-example-2022-bear-market">Real Example: 2022 Bear Market<a class="headerlink" href="#real-example-2022-bear-market" title="Permanent link">&para;</a></h2>
+<p><strong>User: Bob</strong></p>
+<p><strong>May 2022:</strong></p>
+<ul>
+<li>Collateral: 10 ETHST @ $3,000 = $30k</li>
+<li>Debt: 15,000 USDST</li>
+<li>HF: 1.2</li>
+</ul>
+<p><strong>Bob's action:</strong> Implemented Safety Buffer
+- Minted 5,000 USDST via CDP
+- Swapped to USDST - Held as emergency fund</p>
+<p><strong>November 2022:</strong></p>
+<ul>
+<li>ETHST crashed to $1,200 (-60%)</li>
+<li>Collateral now: $12,000</li>
+<li>Debt: 20,000 (15k + 5k minted)</li>
+<li>HF: Would be 0.36 → LIQUIDATED</li>
+</ul>
+<p><strong>Bob's response:</strong></p>
+<ul>
+<li>Used 5,000 USDST buffer</li>
+<li>Bought 4.16 ETHST @ $1,200</li>
+<li>Added to collateral</li>
+<li>New collateral: 14.16 ETHST @ $1,200 = $17k</li>
+<li>New HF: 0.51 (still liquidated!)</li>
+</ul>
+<p><strong>Bob needed more buffer!</strong></p>
+<p><strong>Lesson:</strong> In extreme crashes (&gt;50%), even buffers may not be enough</p>
+<hr />
+<h2 id="recommended-buffer-sizes">Recommended Buffer Sizes<a class="headerlink" href="#recommended-buffer-sizes" title="Permanent link">&para;</a></h2>
+<p><strong>By leverage level:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Leverage</th>
+<th>Debt/Collateral</th>
+<th>Buffer Size</th>
+<th>Can Survive Drop</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Low</td>
+<td>30-40%</td>
+<td>10%</td>
+<td>40-50% crash</td>
+</tr>
+<tr>
+<td>Medium</td>
+<td>50-60%</td>
+<td>20%</td>
+<td>30-35% crash</td>
+</tr>
+<tr>
+<td>High</td>
+<td>60-70%</td>
+<td>30%</td>
+<td>20-25% crash</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Formula:</strong>
+<div class="highlight"><pre><span></span><code>Buffer = (Target drop% × Collateral value) - Available borrowing room
+</code></pre></div></p>
+<p><strong>Example:</strong></p>
+<ul>
+<li>Want to survive 40% drop</li>
+<li>Collateral: $30k</li>
+<li>Current debt: $15k (50%)</li>
+<li>Max debt: $22.5k (75%)</li>
+<li>Available room: $7.5k</li>
+</ul>
+<p><strong>If 40% drop:</strong></p>
+<ul>
+<li>New collateral: $18k</li>
+<li>Debt stays: $15k</li>
+<li>HF would be: 0.72 (liquidated)</li>
+</ul>
+<p><strong>Buffer needed:</strong></p>
+<ul>
+<li>$15k / 0.6 = $25k collateral needed</li>
+<li>Have $18k after drop</li>
+<li>Need: $7k buffer</li>
+</ul>
+<p><strong>Buffer needed: ~$7k (~23% of original collateral)</strong></p>
+<hr />
+<h2 id="automation-ideas-advanced">Automation Ideas (Advanced)<a class="headerlink" href="#automation-ideas-advanced" title="Permanent link">&para;</a></h2>
+<p><strong>Set up automatic hedging:</strong></p>
+<ol>
+<li>
+<p><strong>Price-triggered repayments:</strong></p>
+</li>
+<li>
+<p>If ETHST &lt; $2,700: Auto-repay 2k USDST</p>
+</li>
+<li>If ETHST &lt; $2,400: Auto-repay another 3k</li>
+<li>
+<p>Requires keeper bots or limit orders</p>
+</li>
+<li>
+<p><strong>Dynamic collateral ratios:</strong></p>
+</li>
+<li>
+<p>Monitor volatility index</p>
+</li>
+<li>Auto-rebalance to stable collateral when volatility spikes</li>
+<li>
+<p>Requires custom scripts</p>
+</li>
+<li>
+<p><strong>Health factor triggers:</strong></p>
+</li>
+<li>
+<p>If HF &lt; 1.5: Auto-add collateral from buffer</p>
+</li>
+<li>Keeper bot watches on-chain</li>
+<li>Executes transactions when needed</li>
+</ol>
+<p><strong>Most users:</strong> Manual monitoring is sufficient</p>
+<hr />
+<h2 id="red-flags-when-to-hedge">Red Flags: When to Hedge<a class="headerlink" href="#red-flags-when-to-hedge" title="Permanent link">&para;</a></h2>
+<h3 id="market-signals">Market Signals<a class="headerlink" href="#market-signals" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] VIX &gt; 30 (high volatility)</li>
+<li>[ ] ETHST drops &gt; 10% in 24 hours</li>
+<li>[ ] Liquidations spiking across DeFi</li>
+<li>[ ] Macro uncertainty (Fed meetings, etc.)</li>
+<li>[ ] Funding rates extremely negative/positive</li>
+</ul>
+<h3 id="position-signals">Position Signals<a class="headerlink" href="#position-signals" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] Your HF drops below 1.5</li>
+<li>[ ] Borrow rates suddenly spike</li>
+<li>[ ] Can't sleep worrying about position</li>
+<li>[ ] Position size is uncomfortable</li>
+<li>[ ] Haven't checked in 3+ days</li>
+</ul>
+<p><strong>If 3+ boxes checked: Consider hedging or de-risking</strong></p>
+<hr />
+<h2 id="summary-hedge-strategy-selection">Summary: Hedge Strategy Selection<a class="headerlink" href="#summary-hedge-strategy-selection" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Your Situation</th>
+<th>Recommended Strategy</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Beginner, worried</td>
+<td>Gradual De-Risk (#4)</td>
+</tr>
+<tr>
+<td>Medium position</td>
+<td>Safety Buffer (#2)</td>
+</tr>
+<tr>
+<td>Large position</td>
+<td>Mixed Collateral (#1)</td>
+</tr>
+<tr>
+<td>Advanced trader</td>
+<td>Delta-Neutral (#3)</td>
+</tr>
+<tr>
+<td>Market crashing</td>
+<td>De-Risk immediately</td>
+</tr>
+<tr>
+<td>Bull market</td>
+<td>Light hedge or none</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Golden rule:</strong> Hedge when you can't afford not to</p>
+<hr />
+<h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong><a href="../portfolio-rebalancing/">Portfolio Rebalancing</a></strong> - Diversify risk</li>
+<li><strong><a href="../withdrawals/">Exit Strategy</a></strong> - When hedges fail</li>
+<li><strong><a href="../../safety/">Safety Guide</a></strong> - Comprehensive risk overview</li>
+</ul>
+<h3 id="need-help">Need Help?<a class="headerlink" href="#need-help" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Support</strong>: <a href="https://support.blockapps.net">support.blockapps.net</a></li>
+<li><strong>Telegram</strong>: <a href="https://t.me/strato_net">t.me/strato_net</a></li>
+<li><strong>Docs</strong>: <a href="https://docs.strato.nexus">docs.strato.nexus</a></li>
+</ul>
+
+
+
+
+
+
+
+  
+    
+  
+  
+    
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Last update">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="January 22, 2026 16:13:05 UTC"><span class="timeago" datetime="2026-01-22T16:13:05+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="January 22, 2026 16:13:05 UTC">2026-01-22</span>
+  </span>
+
+    
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Created">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="January 5, 2026 17:52:18 UTC"><span class="timeago" datetime="2026-01-05T17:52:18+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="January 5, 2026 17:52:18 UTC">2026-01-05</span>
+  </span>
+
+    
+    
+    
+  </aside>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 BlockApps - STRATO Platform
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+    <a href="https://t.me/strato_net" target="_blank" rel="noopener" title="Telegram Community" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M256 8a248 248 0 1 0 0 496 248 248 0 1 0 0-496m115 168.7c-3.7 39.2-19.9 134.4-28.1 178.3-3.5 18.6-10.3 24.8-16.9 25.4-14.4 1.3-25.3-9.5-39.3-18.7-21.8-14.3-34.2-23.2-55.3-37.2-24.5-16.1-8.6-25 5.3-39.5 3.7-3.8 67.1-61.5 68.3-66.7.2-.7.3-3.1-1.2-4.4s-3.6-.8-5.1-.5c-2.2.5-37.1 23.5-104.6 69.1-9.9 6.8-18.9 10.1-26.9 9.9-8.9-.2-25.9-5-38.6-9.1-15.5-5-27.9-7.7-26.8-16.3.6-4.5 6.7-9 18.4-13.7 72.3-31.5 120.5-52.3 144.6-62.3 68.9-28.6 83.2-33.6 92.5-33.8 2.1 0 6.6.5 9.6 2.9 2 1.7 3.2 4.1 3.5 6.7.5 3.2.6 6.5.4 9.8z"/></svg>
+    </a>
+  
+    
+    
+    
+    
+    <a href="https://support.blockapps.net" target="_blank" rel="noopener" title="Support Portal" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M256 512a256 256 0 1 0 0-512 256 256 0 1 0 0 512m0-336c-17.7 0-32 14.3-32 32 0 13.3-10.7 24-24 24s-24-10.7-24-24c0-44.2 35.8-80 80-80s80 35.8 80 80c0 47.2-36 67.2-56 74.5v3.8c0 13.3-10.7 24-24 24s-24-10.7-24-24v-8.1c0-20.5 14.8-35.2 30.1-40.2 6.4-2.1 13.2-5.5 18.2-10.3 4.3-4.2 7.7-10 7.7-19.6 0-17.7-14.3-32-32-32zm-32 192a32 32 0 1 1 64 0 32 32 0 1 1-64 0"/></svg>
+    </a>
+  
+    
+    
+    
+    
+    <a href="https://docs.strato.nexus" target="_blank" rel="noopener" title="Documentation" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M384 512H96c-53 0-96-43-96-96V96C0 43 43 0 96 0h304c26.5 0 48 21.5 48 48v288c0 20.9-13.4 38.7-32 45.3V448c17.7 0 32 14.3 32 32s-14.3 32-32 32zM96 384c-17.7 0-32 14.3-32 32s14.3 32 32 32h256v-64zm32-232c0 13.3 10.7 24 24 24h176c13.3 0 24-10.7 24-24s-10.7-24-24-24H152c-13.3 0-24 10.7-24 24m24 72c-13.3 0-24 10.7-24 24s10.7 24 24 24h176c13.3 0 24-10.7 24-24s-10.7-24-24-24z"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.indexes", "navigation.instant", "navigation.tracking", "navigation.top", "navigation.expand", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit", "content.action.view"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../js/timeago.min.js"></script>
+      
+        <script src="../../js/timeago_mkdocs_material.js"></script>
+      
+    
+  </body>
+</html>
