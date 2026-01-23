@@ -181,7 +181,7 @@ const PriceTracking = () => {
 
   // Check if user has balance for an asset
   // For pools, always return false (can't sell a pool directly)
-  // For tokens/LP tokens, check the balance from activeTokens
+  // For tokens/LP tokens, check the balance from activeTokens only (don't trust asset.balance)
   const hasAssetBalance = useCallback((asset: EarningAsset): boolean => {
     // Pools can't be sold directly
     if ((asset as any).isPool === true) {
@@ -189,7 +189,8 @@ const PriceTracking = () => {
     }
     if (!asset.address) return false;
 
-    // Check activeTokens for user balance
+    // Only check activeTokens for user balance - this is the source of truth
+    // Don't use asset.balance as it may contain pool/token balances, not user balances
     const token = activeTokens.find((t: any) => {
       const address = t.address || t.token?.address;
       return address?.toLowerCase() === asset.address.toLowerCase();
@@ -201,12 +202,7 @@ const PriceTracking = () => {
       return balanceBigInt > 0n;
     }
 
-    // Fallback to asset.balance if not found in activeTokens
-    if (asset.balance) {
-      const balanceBigInt = BigInt(asset.balance);
-      return balanceBigInt > 0n;
-    }
-
+    // No balance found in activeTokens means user doesn't own it
     return false;
   }, [activeTokens]);
 
@@ -218,6 +214,25 @@ const PriceTracking = () => {
     return balance > 0n;
   }, [usdstBalance]);
 
+  // Check if user has balance for a specific token address
+  const hasTokenBalance = useCallback((tokenAddress: string | undefined): boolean => {
+    if (!tokenAddress) return false;
+    
+    // Check activeTokens for user balance
+    const token = activeTokens.find((t: any) => {
+      const address = t.address || t.token?.address;
+      return address?.toLowerCase() === tokenAddress.toLowerCase();
+    });
+    
+    if (token) {
+      const balance = token.balance || token.token?.balance || token.balances?.[0]?.balance || '0';
+      const balanceBigInt = BigInt(balance);
+      return balanceBigInt > 0n;
+    }
+    
+    return false;
+  }, [activeTokens]);
+
   // Handle opening swap modal
   const handleOpenSwap = useCallback(async (asset: EarningAsset, mode: 'buy' | 'sell') => {
     // Wait for swappable tokens to be loaded if needed
@@ -225,10 +240,19 @@ const PriceTracking = () => {
       await refetchSwappableTokens();
     }
 
-    const swapToken = convertToSwapToken(asset);
-    if (!swapToken) {
-      console.error('Could not convert asset to SwapToken');
-      return;
+    // Check if this is a pool
+    const isPool = (asset as any).isPool === true;
+    
+    // For pools, use tokenA and tokenB instead of the pool address
+    let tokenA: any = null;
+    let tokenB: any = null;
+    if (isPool) {
+      tokenA = (asset as any).tokenA;
+      tokenB = (asset as any).tokenB;
+      if (!tokenA || !tokenB) {
+        console.error('Pool asset missing tokenA or tokenB');
+        return;
+      }
     }
 
     // Find USDST in swappable tokens
@@ -260,54 +284,142 @@ const PriceTracking = () => {
     let preparedFromAsset: SwapToken | undefined;
     let preparedToAsset: SwapToken | undefined;
 
-    if (mode === 'buy') {
-      // Buy: USDST (from) -> Asset (to)
-      // Fetch pairable tokens for USDST first to ensure the asset is available
-      const updatedPairableTokens = await fetchPairableTokens(usdstAddress);
-
-      // Find the matching token in pairable tokens to ensure it has all required fields
-      const matchingSwapToken = updatedPairableTokens.find(t =>
-        t.address.toLowerCase() === asset.address.toLowerCase()
-      ) || swapToken;
-
-      // Prepare assets with explicit addresses and all required fields
-      preparedFromAsset = {
-        ...usdstToken,
-        address: usdstAddress,
-        balance: usdstToken.balance || usdstBalance || '0',
-        symbol: 'USDST',
-        _symbol: 'USDST',
-      };
-      preparedToAsset = {
-        ...matchingSwapToken,
-        address: asset.address,
-        symbol: asset.symbol,
-        _symbol: asset.symbol,
-      };
+    if (isPool) {
+      // For pools:
+      // Buy: tokenB (from) -> tokenA (to)  [e.g., USDST -> ETHST]
+      // Sell: tokenA (from) -> tokenB (to)  [e.g., ETHST -> USDST]
+      
+      if (mode === 'buy') {
+        // Buy: tokenB (from) -> tokenA (to)
+        const tokenBAddress = tokenB.address || tokenB.token?.address;
+        const tokenAAddress = tokenA.address || tokenA.token?.address;
+        
+        // Fetch pairable tokens for tokenB to get tokenA
+        const updatedPairableTokens = await fetchPairableTokens(tokenBAddress);
+        
+        // Find tokenA in pairable tokens
+        const matchingTokenA = updatedPairableTokens.find(t =>
+          t.address.toLowerCase() === tokenAAddress.toLowerCase()
+        );
+        
+        // Find tokenB in swappable tokens or create from pool data
+        const matchingTokenB = swappableTokens.find(t =>
+          t.address.toLowerCase() === tokenBAddress.toLowerCase()
+        ) || {
+          address: tokenBAddress,
+          _symbol: tokenB._symbol || tokenB.symbol || tokenB.token?._symbol || tokenB.token?.symbol || 'TOKENB',
+          symbol: tokenB._symbol || tokenB.symbol || tokenB.token?._symbol || tokenB.token?.symbol || 'TOKENB',
+          balance: '0',
+          poolBalance: tokenB.balance || tokenB.token?.balance || '0',
+          decimals: tokenB.decimals || tokenB.token?.decimals || 18,
+        };
+        
+        preparedFromAsset = matchingTokenB;
+        preparedToAsset = matchingTokenA || {
+          address: tokenAAddress,
+          _symbol: tokenA._symbol || tokenA.symbol || tokenA.token?._symbol || tokenA.token?.symbol || 'TOKENA',
+          symbol: tokenA._symbol || tokenA.symbol || tokenA.token?._symbol || tokenA.token?.symbol || 'TOKENA',
+          balance: '0',
+          poolBalance: tokenA.balance || tokenA.token?.balance || '0',
+          decimals: tokenA.decimals || tokenA.token?.decimals || 18,
+        };
+      } else {
+        // Sell: tokenA (from) -> tokenB (to)
+        const tokenAAddress = tokenA.address || tokenA.token?.address;
+        const tokenBAddress = tokenB.address || tokenB.token?.address;
+        
+        // Fetch pairable tokens for tokenA to get tokenB
+        const updatedPairableTokens = await fetchPairableTokens(tokenAAddress);
+        
+        // Find tokenB in pairable tokens
+        const matchingTokenB = updatedPairableTokens.find(t =>
+          t.address.toLowerCase() === tokenBAddress.toLowerCase()
+        );
+        
+        // Find tokenA in swappable tokens or create from pool data
+        const matchingTokenA = swappableTokens.find(t =>
+          t.address.toLowerCase() === tokenAAddress.toLowerCase()
+        ) || {
+          address: tokenAAddress,
+          _symbol: tokenA._symbol || tokenA.symbol || tokenA.token?._symbol || tokenA.token?.symbol || 'TOKENA',
+          symbol: tokenA._symbol || tokenA.symbol || tokenA.token?._symbol || tokenA.token?.symbol || 'TOKENA',
+          balance: '0',
+          poolBalance: tokenA.balance || tokenA.token?.balance || '0',
+          decimals: tokenA.decimals || tokenA.token?.decimals || 18,
+        };
+        
+        preparedFromAsset = matchingTokenA;
+        preparedToAsset = matchingTokenB || {
+          address: tokenBAddress,
+          _symbol: tokenB._symbol || tokenB.symbol || tokenB.token?._symbol || tokenB.token?.symbol || 'TOKENB',
+          symbol: tokenB._symbol || tokenB.symbol || tokenB.token?._symbol || tokenB.token?.symbol || 'TOKENB',
+          balance: '0',
+          poolBalance: tokenB.balance || tokenB.token?.balance || '0',
+          decimals: tokenB.decimals || tokenB.token?.decimals || 18,
+        };
+      }
     } else {
-      // Sell: Asset (from) -> USDST (to)
-      // Fetch pairable tokens for the asset first to ensure USDST is available
-      const updatedPairableTokens = await fetchPairableTokens(asset.address);
+      // For regular tokens, use the existing logic
+      const swapToken = convertToSwapToken(asset);
+      if (!swapToken) {
+        console.error('Could not convert asset to SwapToken');
+        return;
+      }
 
-      // Find USDST in pairable tokens
-      const matchingUsdstToken = updatedPairableTokens.find(t =>
-        t.address.toLowerCase() === usdstAddress.toLowerCase()
-      ) || usdstToken;
+      if (mode === 'buy') {
+        // Buy: USDST (from) -> Asset (to)
+        // Fetch pairable tokens for USDST first to ensure the asset is available
+        const updatedPairableTokens = await fetchPairableTokens(usdstAddress);
 
-      // Prepare assets with explicit addresses and all required fields
-      preparedFromAsset = {
-        ...swapToken,
-        address: asset.address,
-        symbol: asset.symbol,
-        _symbol: asset.symbol,
-      };
-      preparedToAsset = {
-        ...matchingUsdstToken,
-        address: usdstAddress,
-        balance: matchingUsdstToken.balance || usdstBalance || '0',
-        symbol: 'USDST',
-        _symbol: 'USDST',
-      };
+        // Find the matching token in pairable tokens to ensure it has all required fields
+        const matchingSwapToken = updatedPairableTokens.find(t =>
+          t.address.toLowerCase() === asset.address.toLowerCase()
+        ) || swapToken;
+
+        // Prepare assets with explicit addresses and all required fields
+        preparedFromAsset = {
+          ...usdstToken,
+          address: usdstAddress,
+          balance: usdstToken.balance || usdstBalance || '0',
+          symbol: 'USDST',
+          _symbol: 'USDST',
+        };
+        preparedToAsset = {
+          ...matchingSwapToken,
+          address: asset.address,
+          symbol: asset.symbol,
+          _symbol: asset.symbol,
+        };
+      } else {
+        // Sell: Asset (from) -> USDST (to)
+        // Fetch pairable tokens for the asset first to ensure USDST is available
+        const updatedPairableTokens = await fetchPairableTokens(asset.address);
+
+        // Find USDST in pairable tokens
+        const matchingUsdstToken = updatedPairableTokens.find(t =>
+          t.address.toLowerCase() === usdstAddress.toLowerCase()
+        ) || usdstToken;
+
+        // Prepare assets with explicit addresses and all required fields
+        preparedFromAsset = {
+          ...swapToken,
+          address: asset.address,
+          symbol: asset.symbol,
+          _symbol: asset.symbol,
+        };
+        preparedToAsset = {
+          ...matchingUsdstToken,
+          address: usdstAddress,
+          balance: matchingUsdstToken.balance || usdstBalance || '0',
+          symbol: 'USDST',
+          _symbol: 'USDST',
+        };
+      }
+    }
+
+    if (!preparedFromAsset || !preparedToAsset) {
+      console.error('Failed to prepare swap assets');
+      return;
     }
 
     // Store tokens for FixedSwapWidget (don't use SwapContext state)
@@ -1049,28 +1161,53 @@ const PriceTracking = () => {
                   </SelectContent>
             </Select>
             {/* Buy/Sell buttons */}
-            {asset && (
-              <div className="flex gap-1 shrink-0">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-7 px-2 text-xs"
-                  onClick={() => handleOpenSwap(asset, 'buy')}
-                  disabled={!hasUsdstBalance}
-                >
-                  <span className={hasUsdstBalance ? 'text-green-500' : 'text-muted-foreground'}>Buy</span>
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-7 px-2 text-xs"
-                  onClick={() => handleOpenSwap(asset, 'sell')}
-                  disabled={!hasAssetBalance(asset)}
-                >
-                  <span className={hasAssetBalance(asset) ? 'text-red-500' : 'text-muted-foreground'}>Sell</span>
-                </Button>
-              </div>
-            )}
+            {asset && (() => {
+              const isPool = (asset as any).isPool === true;
+              let buyEnabled = false;
+              let sellEnabled = false;
+              
+              if (isPool) {
+                // For pools:
+                // Buy: needs tokenB balance (e.g., USDST for ETHST-USDST pool)
+                // Sell: needs tokenA balance (e.g., ETHST for ETHST-USDST pool)
+                const tokenA = (asset as any).tokenA;
+                const tokenB = (asset as any).tokenB;
+                const tokenAAddress = tokenA?.address || tokenA?.token?.address;
+                const tokenBAddress = tokenB?.address || tokenB?.token?.address;
+                
+                buyEnabled = hasTokenBalance(tokenBAddress);
+                sellEnabled = hasTokenBalance(tokenAAddress);
+              } else {
+                // For regular tokens:
+                // Buy: needs USDST balance
+                // Sell: needs asset balance
+                buyEnabled = hasUsdstBalance;
+                sellEnabled = hasAssetBalance(asset);
+              }
+              
+              return (
+                <div className="flex gap-1 shrink-0">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => handleOpenSwap(asset, 'buy')}
+                    disabled={!buyEnabled}
+                  >
+                    <span className={buyEnabled ? 'text-green-500' : 'text-muted-foreground'}>Buy</span>
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => handleOpenSwap(asset, 'sell')}
+                    disabled={!sellEnabled}
+                  >
+                    <span className={sellEnabled ? 'text-red-500' : 'text-muted-foreground'}>Sell</span>
+                  </Button>
+                </div>
+              );
+            })()}
             {/* Chart type toggle */}
             <ToggleGroup
               type="single"
