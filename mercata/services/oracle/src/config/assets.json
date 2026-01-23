@@ -10,7 +10,7 @@
     "PAXG": {
       "targetAssetAddress": "491cdfe98470bfe69b662ab368826dca0fc2f24d"
     },
-    "sUSDS": {
+    "SUSDS": {
       "targetAssetAddress": "6e2d93d323edf1b3cc4672a909681b6a430cae64"
     },
     "USDST": {
@@ -19,6 +19,9 @@
     },
     "WBTC": {
       "targetAssetAddress": "7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9"
+    },
+    "WSTETH":{
+      "targetAssetAddress": "0000000000000000000000000000000000000000"
     },
     "XAG": {
       "targetAssetAddress": "2c59ef92d08efde71fe1a1cb5b45f4f6d48fcc94",
