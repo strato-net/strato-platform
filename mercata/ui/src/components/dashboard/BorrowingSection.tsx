@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { formatUnits } from "ethers";
 import { NewLoanData } from "@/interface";
 import RiskLevelProgress from "@/components/ui/RiskLevelProgress";
+import { getTextColor } from "@/utils/lendingUtils";
 
 interface BorrowingSectionProps {
   loanData?: NewLoanData;
@@ -12,16 +13,6 @@ interface BorrowingSectionProps {
 
 const BorrowingSection = ({ loanData }: BorrowingSectionProps) => {
   const navigate = useNavigate()
-
-  function getTextColor(value: number, maxValue = 10) {
-    const clamped = Math.min(Math.max(value, 1), maxValue);
-    const ratio = (clamped - 1) / (maxValue - 1);
-
-    const red = Math.round(255 * (1 - ratio));
-    const green = Math.round(255 * ratio);
-
-    return `rgb(${red}, ${green}, 0)`;
-  }
 
   // Calculate available borrowing power from loanData
   const availableBorrowingPower = loanData?.maxAvailableToBorrowUSD 
@@ -111,7 +102,7 @@ const BorrowingSection = ({ loanData }: BorrowingSectionProps) => {
 
               <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
                 <span className="text-muted-foreground text-sm sm:text-base">Health Factor</span>
-                <span className="font-semibold text-sm sm:text-base" style={{ color: getTextColor((loanData?.healthFactor || 0)) }}>
+                <span className="font-semibold text-sm sm:text-base" style={{ color: getTextColor((loanData?.healthFactor || 0), 3, currentBorrowed === 0) }}>
                   {(() => {
                     // Check if there's no outstanding debt
                     if (currentBorrowed === 0) {
