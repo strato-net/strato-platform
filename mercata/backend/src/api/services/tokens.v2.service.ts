@@ -48,12 +48,12 @@ export const getEarningAssets = async (
 ): Promise<EarningAsset[]> => {
   // Build token query params - include user balance filter only if userAddress provided
   const tokenParams: Record<string, string> = {
-    select: buildTokenSelectFields({
-      images: true,
-      attributes: true,
+        select: buildTokenSelectFields({
+          images: true,
+          attributes: true,
       balance: !!userAddress, // Only include balance if user is logged in
-    }).join(","),
-    status: "eq.2",
+        }).join(","),
+        status: "eq.2",
   };
   if (userAddress) {
     tokenParams["balances.key"] = `eq.${userAddress}`;
@@ -68,19 +68,19 @@ export const getEarningAssets = async (
   // Add user-specific queries only if userAddress is provided
   if (userAddress) {
     basePromises.push(
-      cirrus.get(accessToken, "/" + CollateralVault + "-userCollaterals", {
-        params: {
-          select: "user:key,asset:key2,amount:value::text",
-          key: `eq.${userAddress}`,
-          value: `gt.0`,
-        },
-      }),
-      cirrus.get(accessToken, `/${CDPEngine}-vaults`, {
-        params: {
-          select: "user:key,asset:key2,amount:value->>collateral::text",
-          key: `eq.${userAddress}`,
-          "value->>collateral": `gt.0`,
-        },
+    cirrus.get(accessToken, "/" + CollateralVault + "-userCollaterals", {
+      params: {
+        select: "user:key,asset:key2,amount:value::text",
+        key: `eq.${userAddress}`,
+        value: `gt.0`,
+      },
+    }),
+    cirrus.get(accessToken, `/${CDPEngine}-vaults`, {
+      params: {
+        select: "user:key,asset:key2,amount:value->>collateral::text",
+        key: `eq.${userAddress}`,
+        "value->>collateral": `gt.0`,
+      },
       })
     );
   }

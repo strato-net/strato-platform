@@ -3,11 +3,11 @@ import { Link, useSearchParams } from 'react-router-dom';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import MobileBottomNav from '../components/dashboard/MobileBottomNav';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle
+import { 
+  Card, 
+  CardContent,  
+  CardHeader, 
+  CardTitle 
 } from "@/components/ui/card";
 import { Tabs as AntdTabs } from "antd";
 import AssetSummary from '@/components/dashboard/AssetSummary';
@@ -22,6 +22,7 @@ import BridgeIn from '@/components/bridge/BridgeIn';
 import { useBridgeContext } from '@/context/BridgeContext';
 import DepositTransactionDetails from '@/components/dashboard/DepositTransactionDetails';
 import { cataAddress } from '@/lib/constants';
+import GuestSignInBanner from '@/components/ui/GuestSignInBanner';
 
 const DepositsPage = () => {
   const [searchParams] = useSearchParams();
@@ -78,6 +79,9 @@ const DepositsPage = () => {
       <div className="h-screen flex flex-col transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
         <DashboardHeader title="Deposits" />
         <main className="flex-1 p-4 md:p-6 pb-16 md:pb-6 overflow-y-auto">
+          {!isLoggedIn && (
+            <GuestSignInBanner message="Sign in to deposit and start earning" />
+          )}
           <style>{`
             .custom-tabs .ant-tabs-tab {
               justify-content: center !important;
@@ -174,14 +178,14 @@ const DepositsPage = () => {
           </div>
           {/* Deposit History - hidden on mobile and for guests */}
           {isLoggedIn && (
-            <Card className="shadow-sm hidden md:block">
-              <CardHeader>
-                <CardTitle>Deposit History</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <DepositTransactionDetails context="deposits" />
-              </CardContent>
-            </Card>
+          <Card className="shadow-sm hidden md:block">
+            <CardHeader>
+              <CardTitle>Deposit History</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <DepositTransactionDetails context="deposits" />
+            </CardContent>
+          </Card>
           )}
         </main>
       </div>

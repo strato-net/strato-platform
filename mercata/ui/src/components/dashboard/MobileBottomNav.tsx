@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -19,6 +19,14 @@ import {
 import { Drawer, DrawerClose, DrawerContent } from '@/components/ui/drawer';
 import { useUser } from '@/context/UserContext';
 
+// Primary navigation items
+const PRIMARY_NAV_ITEMS = [
+  { icon: LayoutDashboard, label: 'Portfolio', path: '/dashboard' },
+  { icon: ArrowUpDown, label: 'Deposit', path: '/dashboard/deposits' },
+  { icon: Landmark, label: 'Borrow', path: '/dashboard/borrow' },
+  { icon: ArrowLeftRight, label: 'Swap', path: '/dashboard/swap' },
+];
+
 // Items shown in "More" drawer
 const MORE_ITEMS = [
   { icon: Send, label: 'Transfer', path: '/dashboard/transfer' },
@@ -37,19 +45,8 @@ const MobileBottomNav = () => {
   const navigate = useNavigate();
   const { isAdmin } = useUser();
 
-  // Primary navigation items
-  const PRIMARY_NAV_ITEMS = useMemo(() => [
-    { icon: LayoutDashboard, label: 'Portfolio', path: '/dashboard' },
-    { icon: ArrowUpDown, label: 'Deposit', path: '/dashboard/deposits' },
-    { icon: Landmark, label: 'Borrow', path: '/dashboard/borrow' },
-    { icon: ArrowLeftRight, label: 'Swap', path: '/dashboard/swap' },
-  ], []);
-
   const isActive = (path: string) => {
     if (path === '/dashboard') return pathname === '/dashboard';
-    if (path === '/dashboard/deposits') {
-      return pathname === '/dashboard/deposits';
-    }
     return pathname.startsWith(path);
   };
 

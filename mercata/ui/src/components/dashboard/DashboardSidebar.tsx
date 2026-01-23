@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTheme } from 'next-themes';
 import { 
@@ -30,6 +30,15 @@ interface NavItem {
 }
 
 
+const PRIMARY_NAV_ITEMS: NavItem[] = [
+  { icon: LayoutDashboard, label: 'Portfolio', path: '/dashboard' },
+  { icon: ArrowUpDown, label: 'Deposit', path: '/dashboard/deposits' },
+  { icon: Send, label: 'Transfer', path: '/dashboard/transfer' },
+  { icon: Landmark, label: 'Borrow', path: '/dashboard/borrow' },
+  { icon: ArrowLeftRight, label: 'Swap', path: '/dashboard/swap' },
+  { icon: Gift, label: 'Rewards', path: '/dashboard/rewards' },
+];
+
 const MORE_NAV_ITEMS: NavItem[] = [
   { icon: Activity, label: 'Activity Feed', path: '/dashboard/activity' },
   { icon: Download, label: 'Withdrawals', path: '/dashboard/withdrawals' },
@@ -44,16 +53,6 @@ const DashboardSidebar = () => {
   const { pathname } = useLocation();
   const { resolvedTheme } = useTheme();
   const [isMoreOpen, setIsMoreOpen] = useState(false);
-
-  // Primary navigation items - dynamically set Deposit path based on login status
-  const PRIMARY_NAV_ITEMS: NavItem[] = useMemo(() => [
-    { icon: LayoutDashboard, label: 'Portfolio', path: '/dashboard' },
-    { icon: ArrowUpDown, label: 'Deposit', path: '/dashboard/deposits' },
-    { icon: Send, label: 'Transfer', path: '/dashboard/transfer' },
-    { icon: Landmark, label: 'Borrow', path: '/dashboard/borrow' },
-    { icon: ArrowLeftRight, label: 'Swap', path: '/dashboard/swap' },
-    { icon: Gift, label: 'Rewards', path: '/dashboard/rewards' },
-  ], []);
 
   useEffect(() => {
     const updateWidth = () => {
@@ -81,9 +80,6 @@ const DashboardSidebar = () => {
 
   const isActive = (path: string) => {
     if (path === '/dashboard') return pathname === '/dashboard';
-    if (path === '/dashboard/deposits') {
-      return pathname === '/dashboard/deposits';
-    }
     return pathname.startsWith(path);
   };
 

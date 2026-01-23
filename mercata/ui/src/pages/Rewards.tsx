@@ -16,7 +16,7 @@ import { useSearchParams } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { LogIn, Trophy, Gift, TrendingUp } from "lucide-react";
+import { LogIn, Gift } from "lucide-react";
 
 const Rewards = () => {
   const [searchParams] = useSearchParams();
@@ -104,37 +104,20 @@ const Rewards = () => {
         <div className="mx-auto w-16 h-16 bg-gradient-to-br from-purple-100 to-blue-100 dark:from-purple-900/30 dark:to-blue-900/30 rounded-full flex items-center justify-center mb-4">
           <Gift className="w-8 h-8 text-purple-600 dark:text-purple-400" />
         </div>
-        <CardTitle className="text-xl">Track Your Rewards</CardTitle>
+        <CardTitle className="text-xl">Start Earning Rewards</CardTitle>
         <CardDescription className="text-base">
-          Sign in to view your personal rewards, track your earnings, and claim your CATA tokens.
+          Sign in to start earning CATA tokens and track your rewards.
         </CardDescription>
       </CardHeader>
       <CardContent className="text-center space-y-4">
-        <div className="flex flex-col sm:flex-row gap-3 justify-center items-center text-sm text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <Trophy className="w-4 h-4 text-yellow-500" />
-            <span>View your rank</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-green-500" />
-            <span>Track earnings</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Gift className="w-4 h-4 text-purple-500" />
-            <span>Claim rewards</span>
-          </div>
-        </div>
         <Button 
           onClick={handleLogin}
           className="gap-2"
           size="lg"
         >
           <LogIn className="w-4 h-4" />
-          Sign In to View Your Rewards
+          Sign In to Get Started
         </Button>
-        <p className="text-xs text-muted-foreground">
-          Explore the leaderboard and activities while you're here!
-        </p>
       </CardContent>
     </Card>
   );

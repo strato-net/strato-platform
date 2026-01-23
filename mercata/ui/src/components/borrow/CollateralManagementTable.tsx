@@ -208,7 +208,7 @@ const CollateralManagementTable = ({
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p>{guestMode ? "Sign in to supply collateral" : hasWalletBalance ? "Deposit tokens as collateral to enable borrowing. You can withdraw these tokens later." : "No tokens in wallet to supply"}</p>
+                            <p>{hasWalletBalance ? "Deposit tokens as collateral to enable borrowing. You can withdraw these tokens later." : "No tokens in wallet to supply"}</p>
                           </TooltipContent>
                         </Tooltip>
                       </div>
@@ -232,9 +232,7 @@ const CollateralManagementTable = ({
                             const isPaused = asset?.isPaused;
 
                             let tooltipMessage = "";
-                            if (guestMode) {
-                              tooltipMessage = "Sign in to withdraw collateral";
-                            } else if (isPaused) {
+                            if (isPaused) {
                               tooltipMessage = "Lending Pool is on pause. Action currently disabled.";
                             } else if (canWithdraw) {
                               tooltipMessage = "Withdraw collateral.\nReduces borrowing power.";

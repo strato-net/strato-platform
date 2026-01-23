@@ -724,7 +724,7 @@ router.get("/admin/all-configs", authHandler.authorizeRequest(true), CDPControll
  *                 type: object
  *                 additionalProperties: true
  */
-router.get("/bad-debt", authHandler.authorizeRequest(true), CDPController.getBadDebt);
+router.get("/bad-debt", authHandler.authorizeRequest(), CDPController.getBadDebt);
 
 /**
  * @openapi

@@ -19,6 +19,7 @@ import RepayForm from "@/components/borrow/RepayForm";
 import CollateralManagementTable from "@/components/borrow/CollateralManagementTable";
 import { useSmartPolling } from "@/hooks/useSmartPolling";
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
+import GuestSignInBanner from '@/components/ui/GuestSignInBanner';
 
 const Borrow = () => {
   const { userAddress, isLoggedIn } = useUser();
@@ -322,6 +323,9 @@ const Borrow = () => {
         <DashboardHeader title="Borrow" />
 
         <main className="p-4 md:p-6">
+          {!isLoggedIn && (
+            <GuestSignInBanner message="Sign in to borrow USDST" />
+          )}
           <BorrowView />
         </main>
       </div>
