@@ -16,6 +16,7 @@ async function fetchVoucherBalance(): Promise<bigint> {
                 'Content-Type': 'application/json'
             },
             params: {
+                address: `eq.${CONSTANTS.VOUCHER_ADDRESS}`,
                 key: `eq.${userAddr}`,
                 select: 'balance:value::text'
             },
@@ -79,7 +80,7 @@ export async function checkBalances(): Promise<void> {
     const usdstBalanceUSD = Number(usdstBalance) / 1e18;
     
     // Check if total transactions are below minimum threshold
-    if (totalTransactions < CONSTANTS.MIN_TRANSACTIONS_THRESHOLD) {
+    if (totalTransactions <= CONSTANTS.MIN_TRANSACTIONS_THRESHOLD) {
         const error = `Total possible transactions (${totalTransactions}) below minimum threshold (${CONSTANTS.MIN_TRANSACTIONS_THRESHOLD}). Voucher: ${voucherBalanceUSD} (${voucherTransactions} txs), USDST: ${usdstBalanceUSD} (${usdstTransactions} txs)`;
         logError('BalanceChecker', new Error(error));
         
