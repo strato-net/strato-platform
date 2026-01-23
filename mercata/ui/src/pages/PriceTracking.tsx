@@ -15,7 +15,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import CandlestickChart, { OHLCData } from '@/components/charts/CandlestickChart';
-import { Loader2, TrendingUp, TrendingDown, Search, BarChart3, LineChart as LineChartIcon, ArrowUp, ArrowDown } from 'lucide-react';
+import { Loader2, TrendingUp, TrendingDown, Search, BarChart3, LineChart as LineChartIcon, ArrowUp, ArrowDown, GripVertical } from 'lucide-react';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { EarningAsset } from '@mercata/shared-types';
 import { format } from 'date-fns';
@@ -135,7 +135,7 @@ const PriceTracking = () => {
     } catch (error) {
       console.error('Failed to load widgets from localStorage:', error);
     }
-    
+
     // Default configuration: tokens on top row, pools on bottom row
     // We'll set the actual addresses after assets are loaded
     return Array.from({ length: 8 }, (_, i) => ({
@@ -161,13 +161,13 @@ const PriceTracking = () => {
   // Convert EarningAsset to SwapToken format
   const convertToSwapToken = useCallback((asset: EarningAsset): SwapToken | null => {
     if (!asset.address) return null;
-    
+
     // Find the asset in swappableTokens first (has all the pool info)
     const swapToken = swappableTokens.find(t => t.address.toLowerCase() === asset.address.toLowerCase());
     if (swapToken) {
       return swapToken;
     }
-    
+
     // Otherwise create a basic SwapToken from EarningAsset
     return {
       address: asset.address,
@@ -188,25 +188,25 @@ const PriceTracking = () => {
       return false;
     }
     if (!asset.address) return false;
-    
+
     // Check activeTokens for user balance
     const token = activeTokens.find((t: any) => {
       const address = t.address || t.token?.address;
       return address?.toLowerCase() === asset.address.toLowerCase();
     });
-    
+
     if (token) {
       const balance = token.balance || token.token?.balance || token.balances?.[0]?.balance || '0';
       const balanceBigInt = BigInt(balance);
       return balanceBigInt > 0n;
     }
-    
+
     // Fallback to asset.balance if not found in activeTokens
     if (asset.balance) {
       const balanceBigInt = BigInt(asset.balance);
       return balanceBigInt > 0n;
     }
-    
+
     return false;
   }, [activeTokens]);
 
@@ -233,13 +233,13 @@ const PriceTracking = () => {
 
     // Find USDST in swappable tokens
     let usdstToken = swappableTokens.find(t => t.address.toLowerCase() === usdstAddress.toLowerCase());
-    
+
     // If USDST not found, wait a bit and try again, or create a basic one
     if (!usdstToken) {
       // Try fetching pairable tokens to refresh the list
       await refetchSwappableTokens();
       usdstToken = swappableTokens.find(t => t.address.toLowerCase() === usdstAddress.toLowerCase());
-      
+
       if (!usdstToken) {
         // Create a basic USDST token as fallback
         usdstToken = {
@@ -264,15 +264,15 @@ const PriceTracking = () => {
       // Buy: USDST (from) -> Asset (to)
       // Fetch pairable tokens for USDST first to ensure the asset is available
       const updatedPairableTokens = await fetchPairableTokens(usdstAddress);
-      
+
       // Find the matching token in pairable tokens to ensure it has all required fields
-      const matchingSwapToken = updatedPairableTokens.find(t => 
+      const matchingSwapToken = updatedPairableTokens.find(t =>
         t.address.toLowerCase() === asset.address.toLowerCase()
       ) || swapToken;
-      
+
       // Prepare assets with explicit addresses and all required fields
-      preparedFromAsset = { 
-        ...usdstToken, 
+      preparedFromAsset = {
+        ...usdstToken,
         address: usdstAddress,
         balance: usdstToken.balance || usdstBalance || '0',
         symbol: 'USDST',
@@ -288,12 +288,12 @@ const PriceTracking = () => {
       // Sell: Asset (from) -> USDST (to)
       // Fetch pairable tokens for the asset first to ensure USDST is available
       const updatedPairableTokens = await fetchPairableTokens(asset.address);
-      
+
       // Find USDST in pairable tokens
-      const matchingUsdstToken = updatedPairableTokens.find(t => 
+      const matchingUsdstToken = updatedPairableTokens.find(t =>
         t.address.toLowerCase() === usdstAddress.toLowerCase()
       ) || usdstToken;
-      
+
       // Prepare assets with explicit addresses and all required fields
       preparedFromAsset = {
         ...swapToken,
@@ -301,8 +301,8 @@ const PriceTracking = () => {
         symbol: asset.symbol,
         _symbol: asset.symbol,
       };
-      preparedToAsset = { 
-        ...matchingUsdstToken, 
+      preparedToAsset = {
+        ...matchingUsdstToken,
         address: usdstAddress,
         balance: matchingUsdstToken.balance || usdstBalance || '0',
         symbol: 'USDST',
@@ -313,7 +313,7 @@ const PriceTracking = () => {
     // Store tokens for FixedSwapWidget (don't use SwapContext state)
     setSwapFromToken(preparedFromAsset);
     setSwapToToken(preparedToAsset);
-    
+
     // Open modal
     setSwapModalOpen(true);
   }, [convertToSwapToken, swappableTokens, setFromAsset, setToAsset, fetchPairableTokens, refetchSwappableTokens, usdstBalance]);
@@ -333,7 +333,7 @@ const PriceTracking = () => {
           params: { status: 'eq.2' },
         });
         const tokens = Array.isArray(tokensResponse.data) ? tokensResponse.data : (tokensResponse.data?.tokens || []);
-        
+
         // Fetch pools from /swap-pools endpoint
         const poolsResponse = await api.get<any[]>('/swap-pools');
         const pools = poolsResponse.data || [];
@@ -354,18 +354,18 @@ const PriceTracking = () => {
           .map((token: any) => {
             const symbol = token._symbol || token.symbol || token.token?._symbol || token.token?.symbol || 'UNKNOWN';
             const address = token.address || token.token?.address;
-            const isLPToken = 
+            const isLPToken =
               symbol.endsWith('-LP') ||
               symbol === 'SUSDST' ||
               symbol === 'MUSDST' ||
               symbol === 'SUSDSST' ||
               token.description === 'Liquidity Provider Token' ||
               token.token?.description === 'Liquidity Provider Token';
-            
+
             // Use user balance if available, otherwise use token balance
             const userBalance = userBalances.get(address?.toLowerCase() || '');
             const balance = userBalance || token.balance || token.token?.balance || token.balances?.[0]?.balance || '0';
-            
+
             return {
               ...token,
               symbol,
@@ -385,7 +385,7 @@ const PriceTracking = () => {
           const tokenABalance = parseFloat(pool.tokenA?.balance || pool.tokenABalance || '0');
           const tokenBBalance = parseFloat(pool.tokenB?.balance || pool.tokenBBalance || '0');
           const poolPrice = tokenABalance > 0 ? (tokenBBalance / tokenABalance).toString() : '0';
-          
+
           return {
             address: pool.address,
             symbol: pool.poolName || pool.poolSymbol || `${pool.tokenA?._symbol || 'A'}-${pool.tokenB?._symbol || 'B'}`,
@@ -409,7 +409,7 @@ const PriceTracking = () => {
             // Use user balance if available, otherwise use LP token balance
             const userBalance = userBalances.get(lpToken.address?.toLowerCase() || '');
             const balance = userBalance || lpToken.balance || '0';
-            
+
             return {
               address: lpToken.address,
               symbol: lpToken._symbol || lpToken.symbol || `${pool.poolName || 'Pool'}-LP`,
@@ -457,19 +457,19 @@ const PriceTracking = () => {
     if (!hasInitialized.current && filteredAssets.length > 0) {
       // Check if widgets are already configured (from localStorage or user selection)
       const hasConfiguredWidgets = widgets.some(w => w.assetAddress !== null);
-      
+
       if (!hasConfiguredWidgets) {
         // Default tokens: GOLDST, SILVST, ETHST, WBTCST
         const defaultTokenSymbols = ['GOLDST', 'SILVST', 'ETHST', 'WBTCST'];
         // Default pools: GOLDST-USDST, SILVST-USDST, ETHST-USDST, WBTCST-USDST
         const defaultPoolNames = ['GOLDST-USDST', 'SILVST-USDST', 'ETHST-USDST', 'WBTCST-USDST'];
-        
+
         setWidgets((prev) => {
           const updated = [...prev];
-          
+
           // Set top row (0-3) with tokens
           defaultTokenSymbols.forEach((symbol, index) => {
-            const asset = filteredAssets.find(a => 
+            const asset = filteredAssets.find(a =>
               a.symbol === symbol && !(a as any).isPool && !a.isPoolToken
             );
             if (asset) {
@@ -479,7 +479,7 @@ const PriceTracking = () => {
               };
             }
           });
-          
+
           // Set bottom row (4-7) with pools
           defaultPoolNames.forEach((poolName, index) => {
             // Try to find pool by poolName or symbol (case-insensitive)
@@ -487,7 +487,7 @@ const PriceTracking = () => {
               if ((a as any).isPool !== true) return false;
               const aPoolName = (a as any).poolName || '';
               const aSymbol = a.symbol || '';
-              return aPoolName.toLowerCase() === poolName.toLowerCase() || 
+              return aPoolName.toLowerCase() === poolName.toLowerCase() ||
                      aSymbol.toLowerCase() === poolName.toLowerCase() ||
                      aSymbol.toLowerCase().includes(poolName.toLowerCase().replace('-', ''));
             });
@@ -498,7 +498,7 @@ const PriceTracking = () => {
               };
             }
           });
-          
+
           hasInitialized.current = true;
           return updated;
         });
@@ -517,13 +517,13 @@ const PriceTracking = () => {
         });
         const priceHistory = response.data.data || [];
         if (priceHistory.length === 0) return [];
-        
+
         // Convert price history entries to format expected by convertToOHLC
         const formattedHistory = priceHistory.map((entry: any) => {
-          const timestamp = entry.blockTimestamp 
-            ? new Date(entry.blockTimestamp).getTime() 
-            : (entry.timestamp instanceof Date 
-              ? entry.timestamp.getTime() 
+          const timestamp = entry.blockTimestamp
+            ? new Date(entry.blockTimestamp).getTime()
+            : (entry.timestamp instanceof Date
+              ? entry.timestamp.getTime()
               : new Date(entry.timestamp).getTime());
           return {
             timestamp,
@@ -549,10 +549,10 @@ const PriceTracking = () => {
         });
         const priceHistory = response.data || [];
         const intervalMs = getIntervalMs(interval);
-        
+
         // Convert pool balance history to OHLC (simplified - using balance as price)
         if (priceHistory.length === 0) return [];
-        
+
         const ohlcData: OHLCData[] = [];
         priceHistory.forEach((point: { timestamp: number; balance: number }, index: number) => {
           const price = point.balance;
@@ -565,7 +565,7 @@ const PriceTracking = () => {
             close: price,
           });
         });
-        
+
         return ohlcData;
       } catch (error) {
         console.error(`Failed to fetch pool price history for ${poolAddress}:`, error);
@@ -606,7 +606,7 @@ const PriceTracking = () => {
         const isPool = (asset as any).isPool === true;
     // Include timeRange and interval in dataKey so different configs are cached separately
     const dataKey = `${widget.id}-${widget.assetAddress}-${widget.timeRange}-${widget.interval}`;
-    
+
     // Set loading state
     setAssetData((prev) => {
       const updated = new Map(prev);
@@ -673,25 +673,25 @@ const PriceTracking = () => {
 
   // Track previous widget configs to only fetch changed widgets
   const prevWidgetsRef = useRef<Map<string, string>>(new Map());
-  
+
   // Fetch data when widgets change - only for changed widgets
   useEffect(() => {
     if (filteredAssets.length === 0) return;
-    
+
     const currentWidgetKeys = new Map<string, string>();
-    
+
     widgets.forEach((widget) => {
       const key = `${widget.id}-${widget.assetAddress}-${widget.timeRange}-${widget.interval}`;
       currentWidgetKeys.set(widget.id, key);
-      
+
       const prevKey = prevWidgetsRef.current.get(widget.id);
-      
+
       // Only fetch if widget config changed or if it's a new widget with an asset
       if (key !== prevKey && widget.assetAddress) {
         fetchWidgetData(widget);
       }
     });
-    
+
     // Update ref for next comparison
     prevWidgetsRef.current = currentWidgetKeys;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -710,7 +710,7 @@ const PriceTracking = () => {
       return updated;
     });
   };
-  
+
   // Save widgets to localStorage whenever they change (for other updates like timeRange, interval, chartType)
   useEffect(() => {
     if (hasInitialized.current) {
@@ -724,7 +724,7 @@ const PriceTracking = () => {
 
   // Memoize hover handlers per widget to prevent unnecessary rerenders
   const hoverHandlersRef = useRef<Map<string, (hoverData: any) => void>>(new Map());
-  
+
   const getHoverHandler = useCallback((widgetId: string) => {
     if (!hoverHandlersRef.current.has(widgetId)) {
       hoverHandlersRef.current.set(widgetId, (hoverData: any) => {
@@ -742,6 +742,65 @@ const PriceTracking = () => {
   }, []);
 
   // Render a single chart widget
+
+  // Drag and drop handlers
+  const [draggedWidgetId, setDraggedWidgetId] = useState<string | null>(null);
+  const [dragOverWidgetId, setDragOverWidgetId] = useState<string | null>(null);
+
+  const handleDragStart = (e: React.DragEvent, widgetId: string) => {
+    setDraggedWidgetId(widgetId);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', widgetId);
+  };
+
+  const handleDragOver = (e: React.DragEvent, widgetId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (draggedWidgetId && draggedWidgetId !== widgetId) {
+      setDragOverWidgetId(widgetId);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setDragOverWidgetId(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetWidgetId: string) => {
+    e.preventDefault();
+    if (!draggedWidgetId || draggedWidgetId === targetWidgetId) {
+      setDraggedWidgetId(null);
+      setDragOverWidgetId(null);
+      return;
+    }
+
+    const draggedIndex = widgets.findIndex(w => w.id === draggedWidgetId);
+    const targetIndex = widgets.findIndex(w => w.id === targetWidgetId);
+
+    if (draggedIndex === -1 || targetIndex === -1) {
+      setDraggedWidgetId(null);
+      setDragOverWidgetId(null);
+      return;
+    }
+
+    const newWidgets = [...widgets];
+    const [removed] = newWidgets.splice(draggedIndex, 1);
+    newWidgets.splice(targetIndex, 0, removed);
+
+    setWidgets(newWidgets);
+    try {
+      localStorage.setItem(WIDGET_STORAGE_KEY, JSON.stringify(newWidgets));
+    } catch (error) {
+      console.error('Failed to save widgets to localStorage:', error);
+    }
+
+    setDraggedWidgetId(null);
+    setDragOverWidgetId(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedWidgetId(null);
+    setDragOverWidgetId(null);
+  };
 
   const renderChartWidget = (widget: WidgetConfig) => {
           const dataKey = widget.assetAddress ? `${widget.id}-${widget.assetAddress}-${widget.timeRange}-${widget.interval}` : null;
@@ -763,10 +822,31 @@ const PriceTracking = () => {
           const _hoverUpdateKey = hoverUpdateKey;
 
     return (
-      <Card key={widget.id} className="w-full">
+      <div
+        className={`w-full ${dragOverWidgetId === widget.id ? 'ring-2 ring-primary rounded-lg' : ''}`}
+        onDragOver={(e) => handleDragOver(e, widget.id)}
+        onDragLeave={handleDragLeave}
+        onDrop={(e) => handleDrop(e, widget.id)}
+      >
+      <Card
+        key={widget.id}
+        className={`w-full relative ${draggedWidgetId === widget.id ? 'opacity-50' : ''}`}
+      >
         <CardHeader className="pb-2">
-          {/* Top row: Asset selector, Buy/Sell buttons, Chart type buttons, Price/Change (with overflow) */}
+          {/* Top row: Drag handle, Asset selector, Buy/Sell buttons, Chart type buttons, Price/Change (with overflow) */}
           <div className="flex items-center gap-2 mb-2">
+            <div
+              className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground shrink-0"
+              draggable
+              onDragStart={(e) => {
+                handleDragStart(e, widget.id);
+                e.stopPropagation();
+              }}
+              onDragEnd={handleDragEnd}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <GripVertical className="h-4 w-4" />
+            </div>
             <Search className="h-4 w-4 text-muted-foreground shrink-0" />
             <Select
               value={widget.assetAddress || 'none'}
@@ -840,9 +920,9 @@ const PriceTracking = () => {
             <CardContent className="pt-2">
               {widget.assetAddress ? (
                 <CandlestickChart
-              data={ohlcData} 
-              loading={isLoading} 
-              height={250} 
+              data={ohlcData}
+              loading={isLoading}
+              height={250}
               showVolume={false}
               chartType={widget.chartType}
               onHoverDataChange={getHoverHandler(widget.id)}
@@ -862,7 +942,7 @@ const PriceTracking = () => {
               onValueChange={(value) => {
                 const newTimeRange = value as TimeRange;
                 const defaultInterval = DEFAULT_INTERVALS[newTimeRange];
-                updateWidget(widget.id, { 
+                updateWidget(widget.id, {
                   timeRange: newTimeRange,
                   interval: defaultInterval,
                 });
@@ -901,6 +981,7 @@ const PriceTracking = () => {
           </div>
         </CardContent>
       </Card>
+      </div>
     );
   };
 
@@ -929,7 +1010,7 @@ const PriceTracking = () => {
         </main>
       </div>
       <MobileBottomNav />
-      
+
       {/* Swap Modal */}
       <Dialog open={swapModalOpen} onOpenChange={(open) => {
         setSwapModalOpen(open);

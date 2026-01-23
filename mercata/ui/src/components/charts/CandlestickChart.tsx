@@ -70,8 +70,8 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({
       const timeFormat = timeRange === '1h' ? 'HH:mm:ss' : (showDates ? 'MMM d' : 'HH:mm');
       return {
         ...d,
-        date: showDates 
-          ? format(new Date(d.timestamp), 'MMM d') 
+        date: showDates
+          ? format(new Date(d.timestamp), 'MMM d')
           : (timeRange === '1h' ? format(new Date(d.timestamp), 'HH:mm:ss') : format(new Date(d.timestamp), 'HH:mm')),
         fullDate: format(new Date(d.timestamp), 'MMM d, HH:mm'),
       };
@@ -81,16 +81,16 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({
   // Calculate custom ticks for x-axis (3-4 labels)
   const xAxisTicks = useMemo(() => {
     if (chartData.length === 0) return [];
-    
+
     // Calculate time difference between first and last data points
     const timeDiff = chartData[chartData.length - 1].timestamp - chartData[0].timestamp;
     const timeDiffDays = timeDiff / (1000 * 60 * 60 * 24); // Convert to days
     const timeDiffHours = timeDiff / (1000 * 60 * 60); // Convert to hours
-    
+
     // Use fewer ticks for shorter time ranges to avoid overlap
     const step = Math.max(1, Math.floor((chartData.length - 1) / 3));
     const ticks: string[] = [];
-    
+
     // Always include first
     ticks.push(chartData[0].date);
     // Add evenly spaced ticks in between
@@ -144,10 +144,10 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({
   // Calculate line color based on first vs latest price
   const lineColor = useMemo(() => {
     if (chartType !== 'line' || chartData.length === 0) return '#3b82f6'; // Default blue
-    
+
     const firstPrice = chartData[0].close;
     const latestPrice = chartData[chartData.length - 1].close;
-    
+
     // Otherwise, green if up, red if down
     return latestPrice > firstPrice ? '#22c55e' : '#ef4444';
   }, [chartData, chartType]);
@@ -225,30 +225,30 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({
                 const [min, max] = yAxisDomain;
                 const range = max - min;
                 const chartHeight = height * (showVolume ? 0.7 : 1);
-                
+
                 // Calculate the chart's top position
                 // y is the position of close, so we can work backwards
                 const closeRatio = (max - payload.close) / range;
                 // Estimate chart top - this is approximate
                 const estimatedChartTop = y - (closeRatio * chartHeight);
-                
+
                 const valueToY = (value: number) => {
                   const ratio = (max - value) / range;
                   return estimatedChartTop + (ratio * chartHeight);
                 };
-                
+
                 const highY = valueToY(payload.high);
                 const lowY = valueToY(payload.low);
                 const openY = valueToY(payload.open);
                 const closeY = y; // Use the provided y position
-                
+
                 const isUp = payload.close >= payload.open;
                 const color = isUp ? '#22c55e' : '#ef4444';
-                
+
                 const bodyTop = Math.min(openY, closeY);
                 const bodyBottom = Math.max(openY, closeY);
                 const bodyHeight = Math.max(1, bodyBottom - bodyTop);
-                
+
                 const candleWidth = Math.max(2, width * 0.6);
                 const candleX = x + (width - candleWidth) / 2;
                 const wickX = x + width / 2;
@@ -383,8 +383,8 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({
         )}
 
         <ResponsiveContainer width="100%" height={chartHeightPx}>
-          <ComposedChart 
-            data={chartData} 
+          <ComposedChart
+            data={chartData}
             margin={chartMargin}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
