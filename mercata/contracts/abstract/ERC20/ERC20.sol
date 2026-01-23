@@ -52,14 +52,6 @@ abstract contract ERC20 is Context, IERC20, IERC20Metadata { //MERCATA_COMPATIBI
     }
 
     /**
-     * @dev Exposes a way for derived contracts to mutate the private _name and _symbol
-     */
-    function _setNameAndSymbol(string name_, string symbol_) internal {
-        _name = name_;
-        _symbol = symbol_;
-    }
-
-    /**
      * @dev Sets the values for {name} and {symbol}.
      *
      * All two of these values are immutable: they can only be set once during

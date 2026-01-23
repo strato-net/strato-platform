@@ -136,10 +136,6 @@ contract record Token is ERC20, Ownable, TokenMetadata, Pausable {
         _setAttribute(key, value);
     }
 
-    function setNameAndSymbol(string name_, string symbol_) external onlyOwner {
-        _setNameAndSymbol(name_, symbol_);
-    }
-
     function decimals() external view virtual override returns (uint8) {
         return customDecimals;
     }
