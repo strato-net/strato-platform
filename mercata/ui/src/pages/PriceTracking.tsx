@@ -24,8 +24,8 @@ import { useSwapContext } from '@/context/SwapContext';
 import { usdstAddress } from '@/lib/constants';
 import { SwapToken } from '@/interface';
 
-type TimeRange = '1d' | '7d' | '1m' | '3m' | '6m' | '1y' | 'all';
-type Interval = '5m' | '15m' | '1h' | '4h' | '1d';
+type TimeRange = '1h' | '1d' | '7d' | '1m' | '3m' | '6m' | '1y' | 'all';
+type Interval = '10s' | '5m' | '15m' | '1h' | '4h' | '1d';
 type ChartType = 'line' | 'candlestick';
 
 interface AssetPriceData {
@@ -46,8 +46,20 @@ interface WidgetConfig {
   chartType: ChartType;
 }
 
-const TIME_RANGES: TimeRange[] = ['1d', '7d', '1m', '3m', '6m', '1y', 'all'];
-const INTERVALS: Interval[] = ['5m', '15m', '1h', '4h', '1d'];
+const TIME_RANGES: TimeRange[] = ['1h', '1d', '7d', '1m', '3m', '6m', '1y', 'all'];
+const INTERVALS: Interval[] = ['10s', '5m', '15m', '1h', '4h', '1d'];
+
+// Default intervals for each time range
+const DEFAULT_INTERVALS: Record<TimeRange, Interval> = {
+  '1h': '10s',
+  '1d': '5m',
+  '7d': '15m',
+  '1m': '1h',
+  '3m': '4h',
+  '6m': '4h',
+  '1y': '1d',
+  'all': '1d',
+};
 
 // Convert price history to OHLC candles
 const convertToOHLC = (
@@ -98,62 +110,6 @@ const convertToOHLC = (
 
   return ohlcData;
 };
-
-// Separate memoized component for OHLC/hover text to prevent chart rerenders
-const OHLCText = memo(({ 
-  hoveredData, 
-  ohlcData, 
-  chartType 
-}: { 
-  hoveredData: any; 
-  ohlcData: OHLCData[]; 
-  chartType: ChartType;
-}) => {
-  if (hoveredData) {
-    const open = hoveredData.open ?? 0;
-    const high = hoveredData.high ?? 0;
-    const low = hoveredData.low ?? 0;
-    const close = hoveredData.close ?? 0;
-    
-    if (chartType === 'line') {
-      const change = close - open;
-      const changePercent = open !== 0 ? ((change / open) * 100) : 0;
-      return (
-        <div className="flex items-center gap-2">
-          <span className="text-muted-foreground">{hoveredData.fullDate || ''}</span>
-          <span className="font-medium">${close.toFixed(2)}</span>
-          <span className={change >= 0 ? 'text-green-500' : 'text-red-500'}>
-            {change >= 0 ? '+' : ''}{change.toFixed(2)} ({changePercent >= 0 ? '+' : ''}{changePercent.toFixed(2)}%)
-          </span>
-        </div>
-      );
-    } else {
-      return (
-        <div className="flex items-center gap-2 truncate">
-          <span className="text-muted-foreground">{hoveredData.fullDate || ''}</span>
-          <span className="font-medium">${close.toFixed(2)}</span>
-          <span>O ${open.toFixed(2)}</span>
-          <span>H ${high.toFixed(2)}</span>
-          <span>L ${low.toFixed(2)}</span>
-          <span>C ${close.toFixed(2)}</span>
-        </div>
-      );
-    }
-  }
-  
-  if (ohlcData.length > 0 && ohlcData[0]) {
-    return (
-      <div className="truncate">
-        O {((ohlcData[0].open ?? 0)).toFixed(2)} H {Math.max(...ohlcData.map((d) => d.high ?? 0)).toFixed(2)} L{' '}
-        {Math.min(...ohlcData.map((d) => d.low ?? 0)).toFixed(2)} C {((ohlcData[ohlcData.length - 1]?.close ?? 0)).toFixed(2)}
-      </div>
-    );
-  }
-  
-  return null;
-});
-
-OHLCText.displayName = 'OHLCText';
 
 const WIDGET_STORAGE_KEY = 'price-tracking-widgets';
 
@@ -622,6 +578,8 @@ const PriceTracking = () => {
   // Get interval in milliseconds
   const getIntervalMs = (interval: Interval): number => {
     switch (interval) {
+      case '10s':
+        return 10 * 1000;
       case '5m':
         return 5 * 60 * 1000;
       case '15m':
@@ -807,7 +765,7 @@ const PriceTracking = () => {
     return (
       <Card key={widget.id} className="w-full">
         <CardHeader className="pb-2">
-          {/* Top row: Asset selector - fixed width */}
+          {/* Top row: Asset selector, Buy/Sell buttons, Chart type buttons, Price/Change (with overflow) */}
           <div className="flex items-center gap-2 mb-2">
             <Search className="h-4 w-4 text-muted-foreground shrink-0" />
             <Select
@@ -816,7 +774,7 @@ const PriceTracking = () => {
                 updateWidget(widget.id, { assetAddress: value === 'none' ? null : value })
               }
             >
-              <SelectTrigger className="h-8 text-sm w-40">
+              <SelectTrigger className="h-8 text-sm w-64">
                 <SelectValue placeholder="Select asset" />
               </SelectTrigger>
                   <SelectContent>
@@ -838,74 +796,37 @@ const PriceTracking = () => {
                     })}
                   </SelectContent>
             </Select>
-            {/* Price and change - shown inline on larger screens, below on smaller */}
+            {/* Buy/Sell buttons */}
             {asset && (
-              <div className="hidden md:flex items-center gap-2 ml-auto">
-                <span className="text-sm font-medium whitespace-nowrap">${price.toFixed(2)}</span>
-                <div className={`flex items-center gap-1 text-xs whitespace-nowrap ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
-                  {isPositive ? <TrendingUp className="h-3 w-3 shrink-0" /> : <TrendingDown className="h-3 w-3 shrink-0" />}
-                  <span>
-                    {isPositive ? '+' : ''}
-                    {change.toFixed(2)} ({isPositive ? '+' : ''}
-                    {changePercent.toFixed(2)}%)
-                  </span>
-                </div>
+              <div className="flex gap-1 shrink-0">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => handleOpenSwap(asset, 'buy')}
+                  disabled={!hasUsdstBalance}
+                >
+                  <span className={hasUsdstBalance ? 'text-green-500' : 'text-muted-foreground'}>Buy</span>
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => handleOpenSwap(asset, 'sell')}
+                  disabled={!hasAssetBalance(asset)}
+                >
+                  <span className={hasAssetBalance(asset) ? 'text-red-500' : 'text-muted-foreground'}>Sell</span>
+                </Button>
               </div>
             )}
-          </div>
-          {/* Price row - shown on smaller screens, hidden on larger */}
-          {asset && (
-            <div className="flex items-center gap-2 mb-2 md:hidden">
-              <span className="text-sm font-medium whitespace-nowrap">${price.toFixed(2)}</span>
-              <div className={`flex items-center gap-1 text-xs whitespace-nowrap ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
-                {isPositive ? <TrendingUp className="h-3 w-3 shrink-0" /> : <TrendingDown className="h-3 w-3 shrink-0" />}
-                <span>
-                  {isPositive ? '+' : ''}
-                  {change.toFixed(2)} ({isPositive ? '+' : ''}
-                  {changePercent.toFixed(2)}%)
-                </span>
-              </div>
-            </div>
-          )}
-          {/* Bottom row: Time range, interval, chart type toggle, and OHLC */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <Select
-              value={widget.timeRange}
-              onValueChange={(value) => updateWidget(widget.id, { timeRange: value as TimeRange })}
-            >
-              <SelectTrigger className="h-7 text-xs w-24">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {TIME_RANGES.map((range) => (
-                  <SelectItem key={range} value={range}>
-                    {range.toUpperCase()}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
-              value={widget.interval}
-              onValueChange={(value) => updateWidget(widget.id, { interval: value as Interval })}
-            >
-              <SelectTrigger className="h-7 text-xs w-28">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {INTERVALS.map((interval) => (
-                  <SelectItem key={interval} value={interval}>
-                    {interval}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* Chart type toggle */}
             <ToggleGroup
               type="single"
               value={widget.chartType}
               onValueChange={(value) => {
                 if (value) updateWidget(widget.id, { chartType: value as ChartType });
               }}
-              className="h-7"
+              className="h-7 shrink-0"
             >
               <ToggleGroupItem value="line" aria-label="Line chart" size="sm" className="h-7 px-2">
                 <LineChartIcon className="h-3.5 w-3.5" />
@@ -914,69 +835,9 @@ const PriceTracking = () => {
                 <BarChart3 className="h-3.5 w-3.5" />
               </ToggleGroupItem>
             </ToggleGroup>
-            {/* OHLC data - show hover data if available, otherwise show static OHLC */}
-            <div className="text-xs text-muted-foreground ml-auto overflow-hidden min-h-[1.25rem]">
-              {hoveredData ? (
-                widget.chartType === 'line' ? (
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground">{hoveredData.fullDate}</span>
-                    <span className="font-medium">${((hoveredData.close ?? 0)).toFixed(2)}</span>
-                    {(() => {
-                      const open = hoveredData.open ?? 0;
-                      const close = hoveredData.close ?? 0;
-                      const change = close - open;
-                      const changePercent = open !== 0 ? ((change / open) * 100) : 0;
-                      return (
-                        <span className={change >= 0 ? 'text-green-500' : 'text-red-500'}>
-                          {change >= 0 ? '+' : ''}{change.toFixed(2)} ({changePercent >= 0 ? '+' : ''}{changePercent.toFixed(2)}%)
-                        </span>
-                      );
-                    })()}
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 truncate">
-                    <span className="text-muted-foreground">{hoveredData.fullDate}</span>
-                    <span className="font-medium">${((hoveredData.close ?? 0)).toFixed(2)}</span>
-                    <span>O ${((hoveredData.open ?? 0)).toFixed(2)}</span>
-                    <span>H ${((hoveredData.high ?? 0)).toFixed(2)}</span>
-                    <span>L ${((hoveredData.low ?? 0)).toFixed(2)}</span>
-                    <span>C ${((hoveredData.close ?? 0)).toFixed(2)}</span>
-                  </div>
-                )
-              ) : ohlcData.length > 0 && ohlcData[0] ? (
-                <div className="truncate">
-                  O {((ohlcData[0].open ?? 0)).toFixed(2)} H {Math.max(...ohlcData.map((d) => d.high ?? 0)).toFixed(2)} L{' '}
-                  {Math.min(...ohlcData.map((d) => d.low ?? 0)).toFixed(2)} C {((ohlcData[ohlcData.length - 1]?.close ?? 0)).toFixed(2)}
-                </div>
-              ) : null}
-            </div>
           </div>
             </CardHeader>
             <CardContent className="pt-2">
-              {asset && (
-                <div className="flex gap-2 mb-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="flex-1 h-7 text-xs"
-                    onClick={() => handleOpenSwap(asset, 'buy')}
-                    disabled={!hasUsdstBalance}
-                  >
-                    <ArrowUp className="h-3 w-3 mr-1" />
-                    Buy
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="flex-1 h-7 text-xs"
-                    onClick={() => handleOpenSwap(asset, 'sell')}
-                    disabled={!hasAssetBalance(asset)}
-                  >
-                    <ArrowDown className="h-3 w-3 mr-1" />
-                    Sell
-                  </Button>
-                </div>
-              )}
               {widget.assetAddress ? (
                 <CandlestickChart
               data={ohlcData} 
@@ -985,12 +846,59 @@ const PriceTracking = () => {
               showVolume={false}
               chartType={widget.chartType}
               onHoverDataChange={getHoverHandler(widget.id)}
+              timeRange={widget.timeRange}
             />
           ) : (
             <div className="flex items-center justify-center h-[250px] text-muted-foreground text-sm">
               Select an asset to view price chart
             </div>
           )}
+          {/* Bottom row: Range and Interval selectors */}
+          <div className="flex items-center gap-2 mt-2 pt-2 border-t">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Range:</span>
+            <Select
+              value={widget.timeRange}
+              onValueChange={(value) => {
+                const newTimeRange = value as TimeRange;
+                const defaultInterval = DEFAULT_INTERVALS[newTimeRange];
+                updateWidget(widget.id, { 
+                  timeRange: newTimeRange,
+                  interval: defaultInterval,
+                });
+              }}
+            >
+                <SelectTrigger className="h-7 text-xs w-24">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TIME_RANGES.map((range) => (
+                    <SelectItem key={range} value={range}>
+                      {range.toUpperCase()}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Interval:</span>
+              <Select
+                value={widget.interval}
+                onValueChange={(value) => updateWidget(widget.id, { interval: value as Interval })}
+              >
+                <SelectTrigger className="h-7 text-xs w-28">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {INTERVALS.map((interval) => (
+                    <SelectItem key={interval} value={interval}>
+                      {interval}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </CardContent>
       </Card>
     );

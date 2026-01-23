@@ -31,6 +31,7 @@ interface CandlestickChartProps {
   showVolume?: boolean;
   chartType?: 'line' | 'candlestick';
   onHoverDataChange?: (data: any) => void;
+  timeRange?: string; // Time range like '1d', '7d', etc. to determine date format
 }
 
 const CandlestickChart: React.FC<CandlestickChartProps> = ({
@@ -40,18 +41,69 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({
   showVolume = true,
   chartType = 'line',
   onHoverDataChange,
+  timeRange,
 }) => {
   const [hoverX, setHoverX] = useState<number | null>(null);
+  const [hoverY, setHoverY] = useState<number | null>(null);
   const chartContainerRef = useRef<HTMLDivElement>(null);
+  const hoverLabelRef = useRef<string | null>(null);
+  const hoverPriceRef = useRef<number | null>(null);
+
+  // Determine if we should show dates or times based on time range
+  const showDates = useMemo(() => {
+    if (!timeRange) {
+      // If no timeRange provided, check the actual data span
+      if (data.length >= 2) {
+        const timeSpan = data[data.length - 1].timestamp - data[0].timestamp;
+        return timeSpan > 24 * 60 * 60 * 1000; // > 1 day
+      }
+      return false;
+    }
+    // Check if timeRange is greater than 1 day
+    return timeRange !== '1h' && timeRange !== '1d';
+  }, [timeRange, data]);
 
   const chartData = useMemo(() => {
     if (!data || data.length === 0) return [];
-    return data.map((d) => ({
-      ...d,
-      date: format(new Date(d.timestamp), 'HH:mm'),
-      fullDate: format(new Date(d.timestamp), 'MMM d, HH:mm'),
-    }));
-  }, [data]);
+    return data.map((d) => {
+      // For very short intervals (10s), show time with seconds
+      const timeFormat = timeRange === '1h' ? 'HH:mm:ss' : (showDates ? 'MMM d' : 'HH:mm');
+      return {
+        ...d,
+        date: showDates 
+          ? format(new Date(d.timestamp), 'MMM d') 
+          : (timeRange === '1h' ? format(new Date(d.timestamp), 'HH:mm:ss') : format(new Date(d.timestamp), 'HH:mm')),
+        fullDate: format(new Date(d.timestamp), 'MMM d, HH:mm'),
+      };
+    });
+  }, [data, showDates, timeRange]);
+
+  // Calculate custom ticks for x-axis (3-4 labels)
+  const xAxisTicks = useMemo(() => {
+    if (chartData.length === 0) return [];
+    
+    // Calculate time difference between first and last data points
+    const timeDiff = chartData[chartData.length - 1].timestamp - chartData[0].timestamp;
+    const timeDiffDays = timeDiff / (1000 * 60 * 60 * 24); // Convert to days
+    const timeDiffHours = timeDiff / (1000 * 60 * 60); // Convert to hours
+    
+    // Use fewer ticks for shorter time ranges to avoid overlap
+    const step = Math.max(1, Math.floor((chartData.length - 1) / 3));
+    const ticks: string[] = [];
+    
+    // Always include first
+    ticks.push(chartData[0].date);
+    // Add evenly spaced ticks in between
+    for (let i = step; i < chartData.length - 1; i += step) {
+      ticks.push(chartData[i].date);
+    }
+    // Always include the last data point if it's not already included
+    // const lastDate = chartData[chartData.length - 1]?.date || '';
+    // if (ticks[ticks.length - 1] !== lastDate) {
+    //   ticks.push(lastDate);
+    // }
+    return ticks;
+  }, [chartData]);
 
   const yAxisDomain = useMemo(() => {
     if (chartData.length === 0) return [0, 100];
@@ -60,6 +112,26 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({
     const max = Math.max(...allValues);
     const padding = (max - min) * 0.1;
     return [Math.max(0, min - padding), max + padding];
+  }, [chartData]);
+
+  const currentPrice = useMemo(() => {
+    if (chartData.length === 0) return null;
+    return chartData[chartData.length - 1]?.close ?? null;
+  }, [chartData]);
+
+  // Overall trend color (green/red) based on first vs latest close
+  const trendColor = useMemo(() => {
+    if (chartData.length < 2) return '#22c55e';
+    const firstPrice = chartData[0].close;
+    const latestPrice = chartData[chartData.length - 1].close;
+    return latestPrice >= firstPrice ? '#22c55e' : '#ef4444';
+  }, [chartData]);
+
+  const trendBgClass = useMemo(() => {
+    if (chartData.length < 2) return 'bg-green-600';
+    const firstPrice = chartData[0].close;
+    const latestPrice = chartData[chartData.length - 1].close;
+    return latestPrice >= firstPrice ? 'bg-green-600' : 'bg-red-600';
   }, [chartData]);
 
   const volumeDomain = useMemo(() => {
@@ -75,16 +147,39 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({
     
     const firstPrice = chartData[0].close;
     const latestPrice = chartData[chartData.length - 1].close;
-    const percentChange = Math.abs((latestPrice - firstPrice) / firstPrice) * 100;
-    
-    // If within 1%, use blue
-    if (percentChange <= 1) {
-      return '#3b82f6'; // Blue
-    }
     
     // Otherwise, green if up, red if down
     return latestPrice > firstPrice ? '#22c55e' : '#ef4444';
   }, [chartData, chartType]);
+
+  const chartHeightPx = showVolume ? height * 0.7 : height;
+  const chartMargin = useMemo(() => ({ top: 10, right: 40, left: 10, bottom: 5 }), []);
+
+  const currentPriceYPx = useMemo(() => {
+    if (currentPrice === null) return null;
+    const [min, max] = yAxisDomain;
+    const range = max - min;
+    if (range <= 0) return null;
+    const innerHeight = chartHeightPx - chartMargin.top - chartMargin.bottom - 32;
+    // y = top + (max - value) / (max - min) * innerHeight
+    return chartMargin.top + ((max - currentPrice) / range) * innerHeight;
+  }, [currentPrice, yAxisDomain, chartHeightPx, chartMargin.top, chartMargin.bottom]);
+
+  const yPxToValue = useCallback((yPx: number): number | null => {
+    const [min, max] = yAxisDomain;
+    const range = max - min;
+    if (range <= 0) return null;
+    const innerHeight = chartHeightPx - chartMargin.top - chartMargin.bottom - 32;
+    if (innerHeight <= 0) return null;
+
+    // activeCoordinate.y from Recharts is relative to the plot area (after margins)
+    // So yPx is already 0 at top of plot area, innerHeight at bottom
+    // Clamp within plot area
+    const clampedY = Math.min(Math.max(yPx, 0), innerHeight);
+    const t = clampedY / innerHeight; // 0 at top, 1 at bottom
+    // value = max - t * (max - min)
+    return max - t * range;
+  }, [yAxisDomain, chartHeightPx, chartMargin.top, chartMargin.bottom]);
 
   // Memoize the chart components to prevent rerenders
   const chartComponents = useMemo(() => {
@@ -102,7 +197,8 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({
           axisLine={false}
           tickLine={false}
           tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
-          interval="preserveStartEnd"
+          ticks={xAxisTicks}
+          interval={0}
         />
         <YAxis
           domain={yAxisDomain}
@@ -206,21 +302,31 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({
       if (onHoverDataChange) {
         onHoverDataChange(payload);
       }
+      // Keep a label for the hover timestamp without extra state
+      hoverLabelRef.current = payload?.fullDate || payload?.date || null;
       // Use the activeCoordinate from Recharts
-      // The coordinate is in the SVG coordinate system
-      // ResponsiveContainer makes the SVG fill the container, and Recharts handles margins internally
-      // So activeCoordinate.x is already in the correct position relative to the container
+      // activeCoordinate is relative to the SVG element (includes margins)
+      // For x: includes left margin
+      // For y: includes top margin
       if (state.activeCoordinate) {
         setHoverX(state.activeCoordinate.x);
+        setHoverY(state.activeCoordinate.y);
+        // Convert container-relative y to plot-relative y for value calculation
+        const plotY = state.activeCoordinate.y - chartMargin.top;
+        const yValue = yPxToValue(plotY);
+        hoverPriceRef.current = yValue;
       }
     }
-  }, [onHoverDataChange]);
+  }, [onHoverDataChange, yPxToValue, chartMargin.top]);
 
   const handleMouseLeave = useCallback(() => {
     setHoverX(null);
+    setHoverY(null);
     if (onHoverDataChange) {
       onHoverDataChange(null);
     }
+    hoverLabelRef.current = null;
+    hoverPriceRef.current = null;
   }, [onHoverDataChange]);
 
   if (loading) {
@@ -249,10 +355,37 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({
   return (
     <div className="w-full">
       <div className="relative" ref={chartContainerRef}>
-        <ResponsiveContainer width="100%" height={showVolume ? height * 0.7 : height}>
+        {/* Current price dotted line + right-side price pill */}
+        {currentPriceYPx !== null && currentPrice !== null && (
+          <>
+            <div
+              className="absolute pointer-events-none"
+              style={{
+                left: 0,
+                right: 0,
+                top: `${currentPriceYPx}px`,
+                borderTop: `1px dotted ${trendColor}`,
+                opacity: 0.9,
+              }}
+            />
+            <div
+              className={`absolute pointer-events-none text-white text-[10px] font-semibold px-1.5 py-0.5 rounded z-10 ${trendBgClass}`}
+              style={{
+                left: `${chartMargin.left}px`,
+                top: `${currentPriceYPx}px`,
+                transform: 'translateY(-50%)',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.25)',
+              }}
+            >
+              {currentPrice.toFixed(2)}
+            </div>
+          </>
+        )}
+
+        <ResponsiveContainer width="100%" height={chartHeightPx}>
           <ComposedChart 
             data={chartData} 
-            margin={{ top: 10, right: 10, left: 10, bottom: 5 }}
+            margin={chartMargin}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
           >
@@ -272,6 +405,53 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({
               opacity: 0.5,
             }}
           />
+        )}
+        {/* Horizontal line overlay + left price pill (hover) */}
+        {hoverY !== null && (
+          <>
+            <div
+              className="absolute pointer-events-none"
+              style={{
+                left: 0,
+                right: 0,
+                top: `${hoverY}px`,
+                borderTop: '1px dashed hsl(var(--muted-foreground))',
+                opacity: 0.5,
+              }}
+            />
+            {hoverPriceRef.current !== null && (
+              <div
+                className="absolute pointer-events-none z-10"
+                style={{
+                  left: `${chartMargin.left}px`,
+                  top: `${hoverY}px`,
+                  transform: 'translateY(-50%)',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.25)',
+                }}
+              >
+                <div className="bg-background/90 border border-border text-foreground text-[10px] font-semibold px-1.5 py-0.5 rounded">
+                  {hoverPriceRef.current.toFixed(2)}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+        {/* Hover timestamp pill aligned with vertical line */}
+        {hoverX !== null && hoverLabelRef.current && (
+          <div
+            className="absolute pointer-events-none z-10"
+            style={{
+              left: `${hoverX}px`,
+              bottom: 6,
+              transform: 'translateX(-50%)',
+              maxWidth: '90%',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <div className="bg-background/90 border border-border text-foreground text-[10px] font-medium px-1.5 py-0.5 rounded shadow-sm">
+              {hoverLabelRef.current}
+            </div>
+          </div>
         )}
       </div>
       {showVolume && (

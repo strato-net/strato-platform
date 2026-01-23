@@ -107,12 +107,12 @@ const TokenInputDisplay = ({
 }) => {
   const formattedBalance = useMemo(() => {
     if (!asset) return "0.00";
-    return formatBalance(userBalanceWei, asset.decimals || 18);
+    return formatBalance(userBalanceWei, asset._symbol, asset.customDecimals || 18);
   }, [userBalanceWei, asset]);
 
   const formattedPoolBalance = useMemo(() => {
     if (!asset) return "0.00";
-    return formatBalance(poolBalanceWei, asset.decimals || 18);
+    return formatBalance(poolBalanceWei, asset._symbol, asset.customDecimals || 18);
   }, [poolBalanceWei, asset]);
 
   return (

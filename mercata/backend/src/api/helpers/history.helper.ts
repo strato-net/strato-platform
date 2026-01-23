@@ -31,6 +31,13 @@ export interface HistorySnapshot {
 export const getHistoryParams = (duration?: string, end?: string): HistoryParams => {
   const endTimestamp = end ? Date.parse(end) : Date.now();
   switch (duration) {
+    case '1h': {
+      return {
+        endTimestamp,
+        interval: 1000 * 10, // 10 seconds
+        numTicks: 360 // 1 hour = 360 * 10 seconds
+      }
+    }
     case '5d': {
       return {
         endTimestamp,
