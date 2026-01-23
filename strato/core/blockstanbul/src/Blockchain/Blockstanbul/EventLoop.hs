@@ -151,17 +151,17 @@ nextRound nt = do
   proposer .= leader
   proposal .= Nothing
   self <- use selfAddr
-  when (Just leader == fmap Validator self) $ do
+  valB <- use validatorBehavior
+  when (Just leader == fmap Validator self && valB) $ do
     lock <- use blockLock
     v <- use view
-    valB <- use validatorBehavior
     case lock of
       Nothing -> use myBlock >>= \case
-        Just myBlk | blockHeaderBlockNumber (blockHeader myBlk) == fromIntegral (v ^. sequence) && isJust self && valB -> do 
+        Just myBlk | blockHeaderBlockNumber (blockHeader myBlk) == fromIntegral (v ^. sequence) + 1 -> do
           msg <- signMessage (Preprepare v myBlk)
           yieldR msg
         _ -> pure ()
-      Just lb -> when (isJust self && valB) $ do
+      Just lb -> do
         msg <- signMessage (Preprepare v lb)
         yieldR msg
 
