@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/table";
 import { ChevronDown, ChevronRight, PauseCircle } from "lucide-react";
 import { useUser } from "@/context/UserContext";
-import GuestSignInPrompt from "@/components/ui/GuestSignInPrompt";
+import { Link } from "react-router-dom";
 const shorten = (addr: string) => addr.slice(0, 6) + "..." + addr.slice(-4);
 const weiToEther = (v?: string) => {
   if (!v) return 0;
@@ -50,12 +50,19 @@ const LiquidationsSection: React.FC = () => {
   // Guest view - show static UI
   if (!isLoggedIn) {
     return (
-      <GuestSignInPrompt
-        cardTitle="Lending Pool Liquidations"
-        title="Liquidate Unhealthy Positions"
-        description="View and liquidate unhealthy lending positions to earn liquidation bonuses. When a borrower's health factor falls below 1, their position becomes eligible for liquidation."
-        buttonText="Sign In to View Positions"
-      />
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg md:text-xl">Lending Pool Liquidations</CardTitle>
+        </CardHeader>
+        <CardContent className="px-3 md:px-6">
+          <div className="text-center py-12">
+            <h3 className="text-xl md:text-2xl font-semibold mb-4">Liquidate Unhealthy Positions</h3>
+            <Button asChild size="lg">
+              <Link to="/login">Sign In to View Positions</Link>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 

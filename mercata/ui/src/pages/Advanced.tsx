@@ -12,7 +12,6 @@ import SafetyModuleSection from '@/components/dashboard/SafetyModuleSection';
 import VaultsList from '@/components/cdp/VaultsList';
 import LiquidationsView from '@/components/cdp/LiquidationsView';
 import BadDebtView from '@/components/cdp/BadDebtView';
-import GuestVaultsView from '@/components/cdp/GuestVaultsView';
 // New v2 components
 import Mint from '@/components/cdp/v2/components/Mint/Mint';
 import DebtPosition from '@/components/cdp/v2/components/DebtPosition';
@@ -39,7 +38,7 @@ const Advanced = () => {
       setBorrowActiveTab(subtabParam);
     }
   }, [searchParams]);
-  const { refreshVaults, cdpAssets, loadingAssets } = useCDP();
+  const { refreshVaults } = useCDP();
   const { isLoggedIn } = useUser();
   const [vaultsRefreshTrigger, setVaultsRefreshTrigger] = useState(0);
   const [mintPlannerRefreshTrigger, setMintPlannerRefreshTrigger] = useState(0);
@@ -114,17 +113,18 @@ const Advanced = () => {
                       </TabsTrigger>
                     </TabsList>
                     <TabsContent value="vaults">
-                      {isLoggedIn ? (
-                        <div className="flex flex-col lg:flex-row gap-6">
-                          {/* Left Column - Mint Section (New v2) */}
-                          <div className="w-full lg:w-[60%]">
-                            <Mint
-                              onSuccess={handleQuickMintSuccess}
-                              refreshTrigger={mintPlannerRefreshTrigger}
-                            />
-                          </div>
+                      <div className="flex flex-col lg:flex-row gap-6">
+                        {/* Left Column - Mint Section (New v2) */}
+                        <div className={isLoggedIn ? "w-full lg:w-[60%]" : "w-full"}>
+                          <Mint
+                            onSuccess={handleQuickMintSuccess}
+                            refreshTrigger={mintPlannerRefreshTrigger}
+                            guestMode={!isLoggedIn}
+                          />
+                        </div>
 
-                          {/* Right Column - Position and Vaults (New v2) */}
+                        {/* Right Column - Position and Vaults (only for logged-in users) */}
+                        {isLoggedIn && (
                           <div className="w-full lg:w-[40%] space-y-6">
                             <DebtPosition refreshTrigger={vaultsRefreshTrigger} />
                             <VaultsList
@@ -132,10 +132,8 @@ const Advanced = () => {
                               onVaultActionSuccess={handleVaultActionSuccess}
                             />
                           </div>
-                        </div>
-                      ) : (
-                        <GuestVaultsView cdpAssets={cdpAssets} loadingAssets={loadingAssets} />
-                      )}
+                        )}
+                      </div>
                     </TabsContent>
                     <TabsContent value="bad-debt">
                       <BadDebtView guestMode={!isLoggedIn} />

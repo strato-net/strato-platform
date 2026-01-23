@@ -61,30 +61,30 @@ const JuniorNoteView: React.FC<JuniorNoteViewProps> = ({ badDebtData, onBadDebtU
         </CardContent>
       </Card>
 
-      {/* Action Tabs - Hidden for guests */}
-      {!guestMode && (
-        <Tabs defaultValue="claim" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 h-auto">
-            <TabsTrigger value="claim" className="text-xs md:text-sm py-2">My Junior Note</TabsTrigger>
-            <TabsTrigger value="open" className="text-xs md:text-sm py-2">Cover Bad Debt</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="claim" className="space-y-4">
-            <JuniorNote 
-              refreshTrigger={refreshTrigger}
-              onNoteActionSuccess={handleNoteActionSuccess}
-            />
-          </TabsContent>
-          
-          <TabsContent value="open" className="space-y-4">
-            <OpenJuniorNoteWidget 
-              onSuccess={handleNoteOpened} 
-              assetBadDebt={assetBadDebtMap}
-              onBadDebtCovered={onBadDebtUpdate}
-            />
-          </TabsContent>
-        </Tabs>
-      )}
+      {/* Action Tabs - Visible for all, guest mode handled in child components */}
+      <Tabs defaultValue="claim" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 h-auto">
+          <TabsTrigger value="claim" className="text-xs md:text-sm py-2">My Junior Note</TabsTrigger>
+          <TabsTrigger value="open" className="text-xs md:text-sm py-2">Cover Bad Debt</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="claim" className="space-y-4">
+          <JuniorNote 
+            refreshTrigger={refreshTrigger}
+            onNoteActionSuccess={handleNoteActionSuccess}
+            guestMode={guestMode}
+          />
+        </TabsContent>
+        
+        <TabsContent value="open" className="space-y-4">
+          <OpenJuniorNoteWidget 
+            onSuccess={handleNoteOpened} 
+            assetBadDebt={assetBadDebtMap}
+            onBadDebtCovered={onBadDebtUpdate}
+            guestMode={guestMode}
+          />
+        </TabsContent>
+      </Tabs>
 
       {/* Additional Information */}
       <Card>

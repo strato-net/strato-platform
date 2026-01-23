@@ -138,7 +138,7 @@ const Hero = () => {
                 Deposit your assets and watch them grow. Earn competitive yields automatically with our simple savings solution.
               </p>
               <Link 
-                to={isLoggedIn ? "/dashboard/deposits" : "/deposits-preview"}
+                to="/dashboard/deposits"
                 className="inline-flex items-center gap-2 text-strato-lightblue font-medium hover:gap-3 transition-all duration-300"
               >
                 Start Saving

@@ -372,25 +372,17 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
   }, [getAllTokens]);
 
   // ========== POLLING EFFECTS ==========
-  // Earning assets polling (30s interval) - only when logged in
+  // Earning assets - fetch once on mount for all users, poll only for logged-in users
   useEffect(() => {
-    if (!isLoggedIn) {
-      // Clear any existing interval if user logs out
-      if (earningAssetsIntervalRef.current) {
-        clearInterval(earningAssetsIntervalRef.current);
-        earningAssetsIntervalRef.current = null;
-      }
-      if (earningAssetsAbortControllerRef.current) {
-        earningAssetsAbortControllerRef.current.abort();
-      }
-      return;
-    }
-
+    // Always fetch earning assets once (works for guests too - returns public data)
     getEarningAssets(true);
 
-    earningAssetsIntervalRef.current = setInterval(() => {
-      getEarningAssets(false);
-    }, 30000);
+    // Only set up polling interval for logged-in users
+    if (isLoggedIn) {
+      earningAssetsIntervalRef.current = setInterval(() => {
+        getEarningAssets(false);
+      }, 30000);
+    }
 
     return () => {
       if (earningAssetsIntervalRef.current) {

@@ -52,9 +52,10 @@ import DepositProgressModal, { DepositStep } from "./DepositProgressModal";
 
 interface BridgeInProps {
   isSaving?: boolean;
+  guestMode?: boolean;
 }
 
-const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false }) => {
+const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false }) => {
   // Hooks & Context
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
@@ -189,6 +190,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false }) => {
 
   const isButtonDisabled = useMemo(
     () =>
+      guestMode ||
       isLoading ||
       !hasValidAmount ||
       !selectedToken ||
@@ -198,6 +200,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false }) => {
       isBalanceLoading ||
       !isTokenPermitted,
     [
+      guestMode,
       isLoading,
       hasValidAmount,
       selectedToken,
@@ -629,7 +632,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false }) => {
       </div>
 
       <div className="w-full">
-        <BridgeWalletStatus />
+        <BridgeWalletStatus guestMode={guestMode} />
       </div>
 
       <TokenSelector

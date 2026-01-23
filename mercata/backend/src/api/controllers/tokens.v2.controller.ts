@@ -44,7 +44,8 @@ class TokensV2Controller {
   ): Promise<void> {
     try {
       const { accessToken, address: userAddress } = req;
-      const tokens = await getEarningAssets(accessToken, userAddress);
+      // userAddress may be undefined for anonymous access
+      const tokens = await getEarningAssets(accessToken, userAddress as string | undefined);
       res.status(RestStatus.OK).json(tokens);
     } catch (error) {
       next(error);

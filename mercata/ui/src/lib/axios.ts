@@ -67,6 +67,8 @@ const GUEST_SAFE_URLS = [
   '/lending/loans',
   '/cdp/vaults',
   '/cdp/assets',
+  // Bad Debt page (protocol-level data, safe for guests)
+  '/cdp/bad-debt',
   // StratoStats page
   '/tokens/stats',
   '/cdp/stats',

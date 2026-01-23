@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { cdpService, Vault,AssetConfig } from '@/services/cdpService';
+import { Vault } from '@/services/cdpService';
 import { useUser } from '@/context/UserContext';
 import { api } from '@/lib/axios';
 
@@ -8,8 +8,6 @@ type CDPContextType = {
   loading: boolean;
   refreshVaults: () => Promise<void>;
   totalCDPDebt: string | undefined;
-  cdpAssets: AssetConfig[];
-  loadingAssets: boolean;
 };
 
 const CDPContext = createContext<CDPContextType | undefined>(undefined);
@@ -17,16 +15,12 @@ const CDPContext = createContext<CDPContextType | undefined>(undefined);
 export const CDPProvider = ({ children }: { children: React.ReactNode }) => {
   const [vaults, setVaults] = useState<Vault[]>([]);
   const [loading, setLoading] = useState(false); // Start with false, will be set to true when fetching
-  const [cdpAssets, setCdpAssets] = useState<AssetConfig[]>([]);
-  const [loadingAssets, setLoadingAssets] = useState(false);
   const { isLoggedIn } = useUser();
 
   // ========== REFS ==========
   const vaultsIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const vaultsAbortControllerRef = useRef<AbortController | null>(null);
-  const assetsAbortControllerRef = useRef<AbortController | null>(null);
   const hasFetchedVaults = useRef(false);
-  const hasFetchedAssets = useRef(false);
 
   const fetchVaults = useCallback(async (showLoading: boolean = false) => {
     if (!isLoggedIn) {
@@ -69,41 +63,6 @@ export const CDPProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [isLoggedIn]);
 
-  // Fetch CDP assets (public data - works for guests too)
-  const fetchAssets = useCallback(async () => {
-    if (hasFetchedAssets.current) return; // Only fetch once
-    
-    if (assetsAbortControllerRef.current) {
-      assetsAbortControllerRef.current.abort();
-    }
-
-    assetsAbortControllerRef.current = new AbortController();
-    setLoadingAssets(true);
-
-    try {
-      const response = await api.get<AssetConfig[]>("/cdp/assets", {
-        signal: assetsAbortControllerRef.current.signal
-      });
-      
-      if (!assetsAbortControllerRef.current.signal.aborted) {
-        setCdpAssets(response.data);
-        hasFetchedAssets.current = true;
-      }
-    } catch (error: any) {
-      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
-        return;
-      }
-      console.error('Failed to fetch CDP assets:', error);
-      if (!assetsAbortControllerRef.current?.signal.aborted) {
-        setCdpAssets([]);
-      }
-    } finally {
-      if (!assetsAbortControllerRef.current?.signal.aborted) {
-        setLoadingAssets(false);
-      }
-    }
-  }, []);
-
   // Calculate total CDP debt across all vaults
   const totalCDPDebt = hasFetchedVaults.current
     ? vaults.reduce((total, vault) => {
@@ -111,16 +70,6 @@ export const CDPProvider = ({ children }: { children: React.ReactNode }) => {
         return (BigInt(total) + vaultDebt).toString();
       }, '0')
     : undefined;
-
-  // ========== FETCH CDP ASSETS ON MOUNT (works for guests) ==========
-  useEffect(() => {
-    fetchAssets();
-    return () => {
-      if (assetsAbortControllerRef.current) {
-        assetsAbortControllerRef.current.abort();
-      }
-    };
-  }, [fetchAssets]);
 
   // ========== POLLING EFFECTS ==========
   // Vaults polling (60s interval)
@@ -149,9 +98,7 @@ export const CDPProvider = ({ children }: { children: React.ReactNode }) => {
       vaults,
       loading,
       refreshVaults: fetchVaults,
-      totalCDPDebt,
-      cdpAssets,
-      loadingAssets
+      totalCDPDebt
     }}>
       {children}
     </CDPContext.Provider>

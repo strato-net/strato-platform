@@ -40,6 +40,7 @@ interface BorrowFormProps {
   stopPolling?: () => void;
   userRewards?: UserRewardsData | null;
   rewardsLoading?: boolean;
+  guestMode?: boolean;
 }
 
   // In custom mode, each asset row can be driven by:
@@ -49,7 +50,7 @@ type CustomCollateralEntry =
   | { source: "wei"; wei: bigint }
   | { source: "usd"; usd: string };
 
-const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalance, collateralInfo, startPolling, stopPolling, userRewards, rewardsLoading }: BorrowFormProps) => {
+const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalance, collateralInfo, startPolling, stopPolling, userRewards, rewardsLoading, guestMode = false }: BorrowFormProps) => {
   const [borrowAmount, setBorrowAmount] = useState<string>("");
   const [borrowAmountError, setBorrowAmountError] = useState<string>("");
   const [customBorrowError, setCustomBorrowError] = useState<string>("");
@@ -502,7 +503,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
                 handlePollingUpdate(formatUnits(BigInt(maxAmount)));
               } catch {}
             }}
-            disabled={Number(availableToBorrow) <= 0}
+            disabled={guestMode || Number(availableToBorrow) <= 0}
             className="px-4"
           >
             MAX
@@ -584,6 +585,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
       <Button
         onClick={handleBorrow}
         disabled={
+          guestMode ||
           !borrowAmount ||
           !!borrowAmountError ||
           !!customBorrowError ||
@@ -601,7 +603,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
         {borrowLoading ? (
           <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-2"></div>
         ) : null}
-        Borrow
+        {guestMode ? "Sign In to Borrow" : "Borrow"}
       </Button>
 
       {/* Auto Supply Collateral Checkbox and Dropdown - Only show when collateral is needed */}

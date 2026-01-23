@@ -11,6 +11,7 @@ interface AssetsProps {
   tokens: EarningAsset[];
   isDashboard?: boolean;
   inActiveTokens: TokenType[];
+  guestMode?: boolean;
 }
 
 const AssetsList = ({
@@ -18,6 +19,7 @@ const AssetsList = ({
   tokens,
   inActiveTokens,
   isDashboard = true,
+  guestMode = false,
 }: AssetsProps) => {
   const [showNonEarningAssetsTable, setShowNonEarningAssetsTable] =
     useState(false);
@@ -163,28 +165,28 @@ const AssetsList = ({
                       </td>
                       <td className="hidden md:table-cell py-4 px-4 whitespace-nowrap text-right">
                         <p className="font-medium text-foreground">
-                          {!asset?.balance || asset.balance === "0"
+                          {guestMode || !asset?.balance || asset.balance === "0"
                             ? "-"
                             : formatBalance(asset.balance, undefined, 18, 1, 2)}
                         </p>
                       </td>
                       <td className="hidden md:table-cell py-4 px-4 whitespace-nowrap text-right">
                         <p className="font-medium text-foreground">
-                          {!asset?.collateralBalance || asset.collateralBalance === "0"
+                          {guestMode || !asset?.collateralBalance || asset.collateralBalance === "0"
                             ? "-"
                             : formatBalance(asset.collateralBalance, undefined, 18, 1, 4)}
                         </p>
                       </td>
                       <td className="py-3 md:py-4 px-3 md:px-4 whitespace-nowrap text-right">
                         <p className="font-medium text-sm md:text-base text-foreground">
-                          {!asset?.value || asset.value === "0.00" || parseFloat(asset.value) === 0
+                          {guestMode || !asset?.value || asset.value === "0.00" || parseFloat(asset.value) === 0
                             ? "-"
                             : `$${asset.value}`}
                         </p>
                       </td>
                       <td className="py-3 md:py-4 px-3 md:px-4 whitespace-nowrap text-right">
                         <p className="font-medium text-sm md:text-base text-foreground">
-                          {!asset?.totalBalance || asset.totalBalance === "0"
+                          {guestMode || !asset?.totalBalance || asset.totalBalance === "0"
                             ? "-"
                             : formatBalance(asset.totalBalance, undefined, 18, 1, 4)}
                         </p>

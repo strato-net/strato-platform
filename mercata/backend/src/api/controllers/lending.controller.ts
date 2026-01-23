@@ -214,10 +214,12 @@ class LendingController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, address: userAddress } = req;
-      validateUserAddress(userAddress);
+      const { accessToken, address } = req;
+      // Check if actual user token exists in headers (not service token fallback)
+      const hasUserToken = !!(req.headers["x-user-access-token"] || req.headers["authorization"]);
+      const userAddress = hasUserToken ? address : undefined;
 
-      const result = await collateralAndBalance(accessToken, userAddress as string);
+      const result = await collateralAndBalance(accessToken, userAddress);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);

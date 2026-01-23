@@ -17,6 +17,7 @@ interface RepayFormProps {
   onRepay: (amount: string) => void;
   usdstBalance: string;
   voucherBalance: string;
+  guestMode?: boolean;
 }
 
 // Component to display numbers with 2 decimals, showing full value on hover
@@ -59,7 +60,7 @@ const FormattedAmount = ({
   );
 };
 
-const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance }: RepayFormProps) => {
+const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance, guestMode = false }: RepayFormProps) => {
   const [repayAmount, setRepayAmount] = useState<string>("");
   const [repayAmountError, setRepayAmountError] = useState<string>("");
   const [feeError, setFeeError] = useState<string>("");
@@ -199,11 +200,12 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance 
                   setRepayAmountError("");
                 } catch {}
               }}
-                disabled={(() => {
+                disabled={guestMode || (() => {
                 return BigInt(maxAmount) === 0n;
               })()}
               className="px-2 py-1 mr-1 bg-muted hover:bg-muted/80 rounded-full text-foreground text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
               title={(() => {
+                if (guestMode) return "Sign in to repay";
                 const owed = BigInt(loans?.totalAmountOwed || 0);
                 return owed === 0n ? "No amount available to repay" : "Set to total debt (Repay All)";
               })()}
@@ -298,6 +300,7 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance 
       <Button
         onClick={handleRepay}
         disabled={
+          guestMode ||
           repayLoading ||
           !repayAmount ||
           !!feeError ||
@@ -309,7 +312,7 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance 
         {repayLoading ? (
           <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-2"></div>
         ) : (
-          "Repay"
+          guestMode ? "Sign In to Repay" : "Repay"
         )}
       </Button>
       </div>

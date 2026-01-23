@@ -39,9 +39,10 @@ import { DECIMAL, ADDRESS, UNITS, USD } from '@/components/cdp/v2/cdpTypes';
 interface MintProps {
   onSuccess?: () => void;
   refreshTrigger?: number;
+  guestMode?: boolean;
 }
 
-const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
+const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger, guestMode = false }) => {
 
 
   // ============================================================================
@@ -250,6 +251,11 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   // ============================================================================
 
   const fetchVaultCandidates = useCallback(async () => {
+    // Skip API call for guests
+    if (guestMode) {
+      setVaultCandidates([]);
+      return;
+    }
     try {
       const { existingVaults, potentialVaults } = await cdpService.getVaultCandidates();
       const candidates = [...existingVaults, ...potentialVaults];
@@ -257,7 +263,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     } catch {
       setVaultCandidates([]);
     }
-  }, []);
+  }, [guestMode]);
 
   useEffect(() => {
     fetchVaultCandidates();
@@ -273,14 +279,24 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   }, [vaultCandidates, sliderMinHF, hasInitializedHF]);
 
   useEffect(() => {
+    // Skip for guests
+    if (guestMode) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     fetchAllPrices()
       .catch(() => setError('Could not load CDP data'))
       .finally(() => setLoading(false));
-  }, [fetchAllPrices, refreshTrigger]);
+  }, [fetchAllPrices, refreshTrigger, guestMode]);
 
   useEffect(() => {
+    // Skip for guests
+    if (guestMode) {
+      setCurrentAverageHF(undefined);
+      return;
+    }
     const fetchCurrentPosition = async () => {
       try {
         const positions = await cdpService.getVaults();
@@ -300,7 +316,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
       }
     };
     fetchCurrentPosition();
-  }, [refreshTrigger]);
+  }, [refreshTrigger, guestMode]);
 
   // ============================================================================
   // Effects - Allocation Computation
@@ -688,6 +704,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   // ============================================================================
 
   const isButtonDisabled = 
+    guestMode ||
     (autoAllocate ? (mintAmount <= 0 && !isMaxMode) : parseFloat(totalManualMint) <= 0) || 
     allocations.length === 0 || 
     transactionsExecuting || 
@@ -720,8 +737,8 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
             minHF={sliderMinHF}
             currentHF={currentAverageHF}
             sliderRangeColor={sliderColor}
-            inputDisabled={!autoAllocate}
-            sliderDisabled={!autoAllocate}
+            inputDisabled={guestMode || !autoAllocate}
+            sliderDisabled={guestMode || !autoAllocate}
             averageVaultHealth={projectedVaultHealth}
             showButton={false}
             actionButtonLabel="Confirm Mint"
@@ -736,14 +753,15 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
               id="auto-supply"
               checked={autoAllocate}
               onCheckedChange={(checked) => handleAutoAllocateChange(checked === true)}
+              disabled={guestMode}
             />
-            <Label htmlFor="auto-supply" className="text-sm cursor-pointer">
+            <Label htmlFor="auto-supply" className={`text-sm ${guestMode ? 'text-muted-foreground' : 'cursor-pointer'}`}>
               Automatically allocate across vaults
             </Label>
           </div>
 
-          {/* Warning Messages */}
-          {shouldLockInput && autoAllocate ? (
+          {/* Warning Messages - only for logged-in users */}
+          {!guestMode && (shouldLockInput && autoAllocate ? (
             <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
               <p className="text-sm font-semibold text-red-800 dark:text-red-200 mb-2">Insufficient Collateral</p>
               <p className="text-xs text-red-700 dark:text-red-300">
@@ -770,10 +788,10 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
                   : 'No vaults are available for minting at this time.'}
               </p>
             </div>
-          ) : null}
+          ) : null)}
 
-          {/* Debt Constraint Warning */}
-          {(debtFloorHit || debtCeilingHit) && (
+          {/* Debt Constraint Warning - only for logged-in users */}
+          {!guestMode && (debtFloorHit || debtCeilingHit) && (
             <div className="p-3 rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
               <p className="text-xs text-amber-800 dark:text-amber-200">
                 ⚠️ One or more vaults have hit a debt {debtFloorHit && debtCeilingHit ? 'floor/ceiling' : debtFloorHit ? 'floor' : 'ceiling'}. Effective mint amount may be lower than requested.
@@ -781,17 +799,29 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
             </div>
           )}
 
-          {/* Confirm Button */}
-          <Button
-            disabled={isButtonDisabled}
-            onClick={handleConfirmMint}
-            className="w-full"
-          >
-            {transactionsExecuting ? 'Processing...' : 'Confirm Mint'}
-          </Button>
+          {/* Confirm Button / Sign In Button */}
+          {guestMode ? (
+            <Button
+              onClick={() => {
+                const theme = localStorage.getItem('theme') || 'light';
+                window.location.href = `/login?theme=${theme}`;
+              }}
+              className="w-full"
+            >
+              Sign in to mint USDST
+            </Button>
+          ) : (
+            <Button
+              disabled={isButtonDisabled}
+              onClick={handleConfirmMint}
+              className="w-full"
+            >
+              {transactionsExecuting ? 'Processing...' : 'Confirm Mint'}
+            </Button>
+          )}
 
-          {/* Vault Breakdown */}
-          {(!autoAllocate || !(allocations.length === 0 && parseFloat(availableToMint.replace(/,/g, '')) <= 0)) && (
+          {/* Vault Breakdown - only for logged-in users */}
+          {!guestMode && (!autoAllocate || !(allocations.length === 0 && parseFloat(availableToMint.replace(/,/g, '')) <= 0)) && (
             <VaultBreakdown
               vaultCandidates={mergedVaultCandidates}
               showMintAmounts={true}
@@ -812,10 +842,12 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
             />
           )}
 
-          {/* Transaction Fee */}
-          <div className="text-sm text-muted-foreground">
-            Transaction Fee: {formatUSD(totalFees, 2)} USDST ({Math.round(totalFees * 100)} vouchers)
-          </div>
+          {/* Transaction Fee - only for logged-in users */}
+          {!guestMode && (
+            <div className="text-sm text-muted-foreground">
+              Transaction Fee: {formatUSD(totalFees, 2)} USDST ({Math.round(totalFees * 100)} vouchers)
+            </div>
+          )}
 
           {/* Rewards Display */}
           {userRewards && cdpActivity && (

@@ -162,7 +162,7 @@ router.post("/collateral/withdraw-max", authHandler.authorizeRequest(), LendingC
  *               type: object
  *               additionalProperties: true
  */
-router.get("/collateral", authHandler.authorizeRequest(), LendingController.getCollateralAndBalance);
+router.get("/collateral", authHandler.authorizeRequest(true), LendingController.getCollateralAndBalance);
 router.post("/collateral", authHandler.authorizeRequest(), LendingController.supplyCollateral);
 router.delete("/collateral", authHandler.authorizeRequest(), LendingController.withdrawCollateral);
 

@@ -95,7 +95,7 @@ export const LendingProvider = ({
   }, []);
 
   const fetchCollateralInfo = useCallback(async (signal?: AbortSignal) => {
-    if (!isLoggedIn) return;
+    // Fetch collateral info for all users (guests get public data with "0" balances)
     try {
       setLoadingCollateral(true);
       const res = await api.get<CollateralData[]>("/lending/collateral", {
@@ -109,7 +109,7 @@ export const LendingProvider = ({
     } finally {
       setLoadingCollateral(false);
     }
-  }, [isLoggedIn]); 
+  }, []); 
 
   const fetchLoans = useCallback(async (showLoading: boolean = false) => {
     if (loansAbortControllerRef.current) {
@@ -234,13 +234,11 @@ export const LendingProvider = ({
   };
 
 
-  // Run initialization - liquidity info for all users, collateral only when logged in
+  // Run initialization - liquidity and collateral info for all users
   useEffect(() => {
     fetchLiquidityInfo(); // Pool stats are public
-    if (isLoggedIn) {
-      fetchCollateralInfo();
-    }
-  }, [isLoggedIn, fetchLiquidityInfo, fetchCollateralInfo]);
+    fetchCollateralInfo(); // Collateral assets info is public (user balances are "0" for guests)
+  }, [fetchLiquidityInfo, fetchCollateralInfo]);
 
   // ========== POLLING EFFECTS ==========
   // Loans polling (60s interval)

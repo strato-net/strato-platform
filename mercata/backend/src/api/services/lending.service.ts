@@ -460,7 +460,7 @@ export const repay = async (
 
 export const collateralAndBalance = async (
   accessToken: string,
-  userAddress: string,
+  userAddress?: string,
 ) => {
   const registry = await getPool(accessToken, {
     select:
@@ -481,14 +481,30 @@ export const collateralAndBalance = async (
   }
 
   const isPaused = registry.lendingPool._paused;
-
   const assets = registry.lendingPool.assetConfigs?.map((a: any) => a.asset).filter((asset: string) => asset !== registry.lendingPool.borrowableAsset) || [];
-  const userCollaterals = (registry.collateralVault.userCollaterals || []).filter((c: any) => c.user === userAddress);
+  
+  // For guests (no userAddress), skip user-specific queries
+  let userCollaterals: any[] = [];
+  let tokenMap = new Map();
+
+  if (userAddress) {
+    // Logged-in user: fetch user's collaterals and balances
+    userCollaterals = (registry.collateralVault.userCollaterals || []).filter((c: any) => c.user === userAddress);
   const userTokens = await getBalance(accessToken, userAddress, {
     address: `in.(${assets.join(",")})`, select: `address,user:key,balance:value::text,token:${Token}(_name,_symbol,_owner,_totalSupply::text,customDecimals,images:${Token}-images(value))`
   });
+    tokenMap = new Map(userTokens.map((t: any) => [t.address, t]));
+  } else {
+    // Guest: fetch token metadata only (no balances)
+    if (assets.length > 0) {
+      const tokens = await getTokens(accessToken, {
+        address: `in.(${assets.join(",")})`,
+        select: `address,_name,_symbol,_owner,_totalSupply::text,customDecimals,images:${Token}-images(value)`
+      });
+      tokenMap = new Map(tokens.map((t: any) => [t.address, { address: t.address, balance: "0", token: t }]));
+    }
+  }
 
-  const tokenMap = new Map(userTokens.map((t: any) => [t.address, t]));
   const collateralMap = new Map(userCollaterals.map((c: any) => [c.asset, c]));
 
   // Create maps for asset configs and prices
@@ -505,12 +521,13 @@ export const collateralAndBalance = async (
     priceMap.set(price.asset, price.price);
   });
 
-  return assets
-    .filter((asset: string) => {
+  // Filter assets that have token data
+  const filteredAssets = assets.filter((asset: string) => {
       const token = tokenMap.get(asset) as any;
       return token;
-    })
-    .map((asset: string) => {
+  });
+
+  const result = filteredAssets.map((asset: string) => {
       const token = tokenMap.get(asset) as any;
       const collateral = collateralMap.get(asset) as any;
       const assetConfig = assetConfigMap.get(asset);
@@ -548,6 +565,8 @@ export const collateralAndBalance = async (
         isPaused,
       };
     });
+
+  return result;
 };
 
 export const liquidityAndBalance = async (

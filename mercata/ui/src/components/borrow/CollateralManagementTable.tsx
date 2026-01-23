@@ -21,6 +21,7 @@ interface CollateralManagementTableProps {
   loans: NewLoanData | null;
   onSupply: (asset: CollateralData) => void;
   onWithdraw: (asset: CollateralData) => void;
+  guestMode?: boolean;
 }
 
 const LoadingSpinner = () => (
@@ -103,6 +104,7 @@ const CollateralManagementTable = ({
   loans,
   onSupply,
   onWithdraw,
+  guestMode = false,
 }: CollateralManagementTableProps) => {
   return (
     <Card>
@@ -148,8 +150,8 @@ const CollateralManagementTable = ({
                 const hasWalletBalance = BigInt(asset?.userBalance || 0) > 0n;
                 const hasSuppliedBalance = parseFloat(asset?.collateralizedAmount || "0") > 0;
                 
-                // Only show assets that have either wallet balance or supplied balance
-                if (!hasWalletBalance && !hasSuppliedBalance) return null;
+                // For guests, show all assets; for logged-in users, only show assets with balance
+                if (!guestMode && !hasWalletBalance && !hasSuppliedBalance) return null;
                 
                 return (
                   <TableRow key={asset?.address}>
@@ -199,14 +201,14 @@ const CollateralManagementTable = ({
                             <Button
                               size="sm"
                               onClick={() => onSupply(asset)}
-                              disabled={!hasWalletBalance}
+                              disabled={guestMode || !hasWalletBalance}
                             >
                               <ArrowDownCircle className="h-4 w-4 mr-1" />
                               Supply
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p>{hasWalletBalance ? "Deposit tokens as collateral to enable borrowing. You can withdraw these tokens later." : "No tokens in wallet to supply"}</p>
+                            <p>{guestMode ? "Sign in to supply collateral" : hasWalletBalance ? "Deposit tokens as collateral to enable borrowing. You can withdraw these tokens later." : "No tokens in wallet to supply"}</p>
                           </TooltipContent>
                         </Tooltip>
                       </div>
@@ -230,7 +232,9 @@ const CollateralManagementTable = ({
                             const isPaused = asset?.isPaused;
 
                             let tooltipMessage = "";
-                            if (isPaused) {
+                            if (guestMode) {
+                              tooltipMessage = "Sign in to withdraw collateral";
+                            } else if (isPaused) {
                               tooltipMessage = "Lending Pool is on pause. Action currently disabled.";
                             } else if (canWithdraw) {
                               tooltipMessage = "Withdraw collateral.\nReduces borrowing power.";
@@ -246,7 +250,7 @@ const CollateralManagementTable = ({
                                   <span className="cursor-help">
                                     <Button
                                       onClick={() => onWithdraw(asset)}
-                                      disabled={!canWithdraw || !hasCollateral || isPaused}
+                                      disabled={guestMode || !canWithdraw || !hasCollateral || isPaused}
                                     >
                                       {isPaused ? (
                                         <PauseCircle className="h-4 w-4 mr-1" />

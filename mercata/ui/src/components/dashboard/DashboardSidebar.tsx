@@ -40,7 +40,7 @@ const MORE_NAV_ITEMS: NavItem[] = [
 ];
 
 const DashboardSidebar = () => {
-  const { isAdmin, isLoggedIn } = useUser();
+  const { isAdmin } = useUser();
   const { pathname } = useLocation();
   const { resolvedTheme } = useTheme();
   const [isMoreOpen, setIsMoreOpen] = useState(false);
@@ -48,12 +48,12 @@ const DashboardSidebar = () => {
   // Primary navigation items - dynamically set Deposit path based on login status
   const PRIMARY_NAV_ITEMS: NavItem[] = useMemo(() => [
     { icon: LayoutDashboard, label: 'Portfolio', path: '/dashboard' },
-    { icon: ArrowUpDown, label: 'Deposit', path: isLoggedIn ? '/dashboard/deposits' : '/deposits-preview' },
+    { icon: ArrowUpDown, label: 'Deposit', path: '/dashboard/deposits' },
     { icon: Send, label: 'Transfer', path: '/dashboard/transfer' },
     { icon: Landmark, label: 'Borrow', path: '/dashboard/borrow' },
     { icon: ArrowLeftRight, label: 'Swap', path: '/dashboard/swap' },
     { icon: Gift, label: 'Rewards', path: '/dashboard/rewards' },
-  ], [isLoggedIn]);
+  ], []);
 
   useEffect(() => {
     const updateWidth = () => {
@@ -81,9 +81,8 @@ const DashboardSidebar = () => {
 
   const isActive = (path: string) => {
     if (path === '/dashboard') return pathname === '/dashboard';
-    // Handle deposits-preview as active for Deposit tab
-    if (path === '/deposits-preview' || path === '/dashboard/deposits') {
-      return pathname === '/dashboard/deposits' || pathname === '/deposits-preview';
+    if (path === '/dashboard/deposits') {
+      return pathname === '/dashboard/deposits';
     }
     return pathname.startsWith(path);
   };

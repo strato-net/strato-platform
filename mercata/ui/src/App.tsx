@@ -19,7 +19,6 @@ import Dashboard from "./pages/Dashboard";
 import SwapAsset from "./pages/SwapAsset";
 import Transfer from "./pages/Transfer";
 import DepositsPage from "./pages/DepositsPage";
-import DepositsGuestPage from "./pages/DepositsGuestPage";
 import AssetDetail from "./pages/AssetDetail";
 import Advanced from "./pages/Advanced";
 import ActivityFeed from "./pages/ActivityFeed";
@@ -140,7 +139,6 @@ const App = () => {
                               <UsdstBalanceBox />
                               <Routes>
                                 <Route path="/" element={<Index />} />
-                                <Route path="/deposits-preview" element={<DepositsGuestPage />} />
                                 <Route path="/claim" element={<Claim />} />
                                 <Route
                                   path="/dashboard"

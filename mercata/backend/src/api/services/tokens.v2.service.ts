@@ -44,36 +44,52 @@ export const getTokens = async (
 
 export const getEarningAssets = async (
   accessToken: string,
-  userAddress: string
+  userAddress?: string
 ): Promise<EarningAsset[]> => {
-  const [tokens, collaterals, cdps, rawPrices] = await Promise.all([
-    cirrus.get(accessToken, "/" + Token, {
-      params: {
-        "balances.key": `eq.${userAddress}`,
-        select: buildTokenSelectFields({
-          images: true,
-          attributes: true,
-          balance: true,
-        }).join(","),
-        status: "eq.2",
-      },
-    }),
-    cirrus.get(accessToken, "/" + CollateralVault + "-userCollaterals", {
-      params: {
-        select: "user:key,asset:key2,amount:value::text",
-        key: `eq.${userAddress}`,
-        value: `gt.0`,
-      },
-    }),
-    cirrus.get(accessToken, `/${CDPEngine}-vaults`, {
-      params: {
-        select: "user:key,asset:key2,amount:value->>collateral::text",
-        key: `eq.${userAddress}`,
-        "value->>collateral": `gt.0`,
-      },
-    }),
+  // Build token query params - include user balance filter only if userAddress provided
+  const tokenParams: Record<string, string> = {
+    select: buildTokenSelectFields({
+      images: true,
+      attributes: true,
+      balance: !!userAddress, // Only include balance if user is logged in
+    }).join(","),
+    status: "eq.2",
+  };
+  if (userAddress) {
+    tokenParams["balances.key"] = `eq.${userAddress}`;
+  }
+
+  // For guests, only fetch tokens and prices (skip user-specific collateral data)
+  const basePromises: Promise<any>[] = [
+    cirrus.get(accessToken, "/" + Token, { params: tokenParams }),
     getCompletePriceMap(accessToken),
-  ]);
+  ];
+
+  // Add user-specific queries only if userAddress is provided
+  if (userAddress) {
+    basePromises.push(
+      cirrus.get(accessToken, "/" + CollateralVault + "-userCollaterals", {
+        params: {
+          select: "user:key,asset:key2,amount:value::text",
+          key: `eq.${userAddress}`,
+          value: `gt.0`,
+        },
+      }),
+      cirrus.get(accessToken, `/${CDPEngine}-vaults`, {
+        params: {
+          select: "user:key,asset:key2,amount:value->>collateral::text",
+          key: `eq.${userAddress}`,
+          "value->>collateral": `gt.0`,
+        },
+      })
+    );
+  }
+
+  const results = await Promise.all(basePromises);
+  const tokens = results[0];
+  const rawPrices = results[1];
+  const collaterals = userAddress ? results[2] : { data: [] };
+  const cdps = userAddress ? results[3] : { data: [] };
 
   const collateralMap = new Map<string, bigint>();
   [...(collaterals.data || []), ...(cdps.data || [])].forEach((item: any) =>
@@ -84,12 +100,12 @@ export const getEarningAssets = async (
   );
 
   return (tokens.data || []).map((t: any) => {
-    const balance = t.balances?.[0]?.balance || "0";
+    const balance = userAddress ? (t.balances?.[0]?.balance || "0") : "0";
     const price = rawPrices.get(t.address) || "0";
     const collateralBalance = (collateralMap.get(t.address) || 0n).toString();
     const totalBalance = BigInt(balance) + BigInt(collateralBalance);
     const value =
-      price && price !== "0"
+      userAddress && price && price !== "0"
         ? (
             Number((totalBalance * BigInt(price)) / DECIMALS) / Number(DECIMALS)
           ).toFixed(2)
