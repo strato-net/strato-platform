@@ -6,6 +6,13 @@ This directory contains [Claude Code skills](https://code.claude.com/docs/en/ski
 
 Claude skills are reusable AI agents that can be invoked with slash commands (e.g., `/improve-docs`). They provide specialized capabilities for common tasks and can be shared across projects.
 
+**All skills follow the meta-cognitive reasoning framework** defined in [REASONING.md](REASONING.md), which emphasizes:
+- Skeptical verification of claims
+- Explicit confidence scoring (0.0-1.0)
+- Precision over politeness
+- Evidence-based analysis
+- Transparent reasoning with self-checks
+
 ## Available Skills
 
 ### 📝 `/improve-docs` - Documentation Improvement

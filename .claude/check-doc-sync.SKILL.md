@@ -13,6 +13,8 @@ allowed-tools:
 
 Verify that the published documentation at https://docs.strato.nexus matches the source files in `/techdocs` and identify any discrepancies.
 
+**Reasoning Framework:** Follow the meta-cognitive reasoning guidelines in [REASONING.md](REASONING.md) - verify file existence with high confidence, quantify certainty of findings, and provide evidence-based reports.
+
 ## Purpose
 
 Ensure that:

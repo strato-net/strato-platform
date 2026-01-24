@@ -13,6 +13,8 @@ allowed-tools:
 
 Analyze and improve documentation in the STRATO platform repository with focus on clarity, technical accuracy, completeness, and user experience.
 
+**Reasoning Framework:** Follow the meta-cognitive reasoning guidelines in [REASONING.md](REASONING.md) - be skeptical, verify claims, express confidence explicitly, and prefer precision over politeness.
+
 ## Documentation Structure Context
 
 All documentation is in `/techdocs` and published to https://docs.strato.nexus (MkDocs Material theme).
