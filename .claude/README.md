@@ -26,11 +26,11 @@ Claude skills are reusable AI agents that can be invoked with slash commands (e.
 # Review all user scenarios
 /improve-docs techdocs/scenarios/
 
-# Review internal API specification
-/improve-docs docs/mercata/Lending.md
+# Review technical API specification
+/improve-docs techdocs/technical/api-specs/lending-spec.md
 
 # Review all architecture docs
-/improve-docs docs/architecture/
+/improve-docs techdocs/technical/architecture/
 ```
 
 **What it checks:**
@@ -84,22 +84,30 @@ Claude skills are reusable AI agents that can be invoked with slash commands (e.
 
 ## Documentation Structure
 
-This repository has **two documentation directories** with different purposes:
+All documentation is in **`/techdocs`** and published to https://docs.strato.nexus (MkDocs with Material theme).
 
-### `/techdocs` - Public Documentation
-- **Published to:** https://docs.strato.nexus
-- **Build system:** MkDocs with Material theme
-- **Audience:** End users, external developers
-- **Content:** User guides, tutorials, scenarios, public APIs
-- **Style:** Conversational, step-by-step, beginner-friendly
+Documentation is organized by audience and depth:
 
-### `/docs` - Internal Specifications
-- **Published:** No (internal only)
-- **Audience:** Platform developers, contributors
-- **Content:** Architecture specs, smart contract formulas, design docs
-- **Style:** Technical, precise, implementation-focused
+### `/techdocs/guides` & `/techdocs/scenarios` - User Documentation
+- **Audience:** End users performing DeFi operations
+- **Content:** Step-by-step guides, end-to-end scenarios
+- **Style:** Conversational, beginner-friendly, with real examples
 
-**Important:** Skills understand this distinction and apply appropriate standards to each.
+### `/techdocs/build-apps` & `/techdocs/reference` - Developer Documentation
+- **Audience:** External developers building apps on STRATO
+- **Content:** API references, integration guides, quick starts
+- **Style:** Technical but accessible, code-focused
+
+### `/techdocs/technical` - Technical Documentation
+- **Audience:** Core platform developers, contributors
+- **Content:** Design specs, detailed architecture, smart contract formulas, test plans
+- **Style:** Implementation-focused, formula-heavy, precise
+
+### `/techdocs/contribute` - Contributor Documentation
+- **Audience:** Platform contributors
+- **Content:** Setup guides, architecture overview, contribution guidelines
+
+**Important:** Skills understand these distinctions and apply appropriate standards to each section.
 
 ---
 

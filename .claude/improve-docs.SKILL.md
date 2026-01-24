@@ -15,21 +15,33 @@ Analyze and improve documentation in the STRATO platform repository with focus o
 
 ## Documentation Structure Context
 
-This repository has two documentation directories with distinct purposes:
+All documentation is in `/techdocs` and published to https://docs.strato.nexus (MkDocs Material theme).
 
-### `/techdocs` - Public User Documentation
-- **Published to:** https://docs.strato.nexus (MkDocs Material theme)
-- **Audience:** End users, external developers building apps
+The documentation is organized by audience and depth:
+
+### User Documentation
+- **Location:** `techdocs/guides/`, `techdocs/scenarios/`
+- **Audience:** End users performing DeFi operations
 - **Tone:** Tutorial-focused, workflow-based, beginner-friendly
-- **Content:** User guides, quick starts, scenarios, public API docs
 - **Style:** Conversational, step-by-step, with real examples and numbers
 
-### `/docs` - Internal Technical Specifications
-- **Published:** Not published (internal only)
-- **Audience:** Platform developers, contributors, internal teams
+### Developer Documentation
+- **Location:** `techdocs/build-apps/`, `techdocs/reference/`
+- **Audience:** External developers building apps on STRATO
+- **Tone:** API-focused, integration-oriented
+- **Style:** Technical but accessible, code examples, REST API specs
+
+### Technical Documentation
+- **Location:** `techdocs/technical/`
+- **Audience:** Core platform developers, contributors
 - **Tone:** Implementation-focused, specification-level
-- **Content:** Infrastructure specs, smart contract formulas, design docs, test plans
+- **Content:** Design docs, detailed architecture, smart contract formulas, test plans
 - **Style:** Technical, precise, formula-heavy
+
+### Contributor Documentation
+- **Location:** `techdocs/contribute/`
+- **Audience:** Platform contributors
+- **Content:** Setup guides, architecture overview, contribution guidelines
 
 ## What to Do When Invoked
 
@@ -38,11 +50,11 @@ When the user runs `/improve-docs [file-path]` or `/improve-docs [directory]`:
 1. **Read the Target Documentation**
    - Use Read tool to load the specified file(s)
    - If a directory is specified, use Glob to find all `.md` files
-   - Determine if it's from `/techdocs` (public) or `/docs` (internal)
+   - Determine audience level from path: `guides/` or `scenarios/` (users), `build-apps/` or `reference/` (developers), `technical/` (core devs), `contribute/` (contributors)
 
 2. **Analyze Against Appropriate Standards**
 
-   **For `/techdocs` (Public Docs):**
+   **For User Docs (`guides/`, `scenarios/`):**
    - ✅ **Clarity:** Is it understandable for non-experts?
    - ✅ **Completeness:** Are there worked examples with real numbers?
    - ✅ **User Journey:** Does it guide users step-by-step?
@@ -52,7 +64,14 @@ When the user runs `/improve-docs [file-path]` or `/improve-docs [directory]`:
    - ✅ **Action-Oriented:** Are UI paths clear ("Click X → Select Y")?
    - ✅ **Consistency:** Does it match the tone/style of other guides?
 
-   **For `/docs` (Internal Specs):**
+   **For Developer Docs (`build-apps/`, `reference/`):**
+   - ✅ **API Accuracy:** Do endpoints, parameters match actual API?
+   - ✅ **Code Examples:** Are snippets complete and runnable?
+   - ✅ **Integration Clarity:** Is the integration path clear?
+   - ✅ **Authentication:** Are auth requirements explained?
+   - ✅ **Error Handling:** Are error codes documented?
+
+   **For Technical Docs (`technical/`):**
    - ✅ **Technical Accuracy:** Are formulas, configs, and specs correct?
    - ✅ **Completeness:** Are all contract methods/API endpoints documented?
    - ✅ **Precision:** Are data types, units, and ranges specified?
@@ -147,12 +166,12 @@ When the user runs `/improve-docs [file-path]` or `/improve-docs [directory]`:
 4. Suggest adding Mermaid diagram for borrow flow
 5. Check if Swagger reference link works
 
-### Example 2: Review API Specification
+### Example 2: Review Technical Specification
 
-**User:** `/improve-docs docs/mercata/Lending.md`
+**User:** `/improve-docs techdocs/technical/api-specs/lending-spec.md`
 
 **Action:**
-1. Read `docs/mercata/Lending.md`
+1. Read `techdocs/technical/api-specs/lending-spec.md`
 2. Check formulas for correctness
 3. Verify all contract methods are documented
 4. Compare with actual smart contract source if accessible
@@ -176,14 +195,19 @@ When the user runs `/improve-docs [file-path]` or `/improve-docs [directory]`:
 
 ### Tone Matching
 
-**For Public Docs (`/techdocs`):**
+**For User Docs (`guides/`, `scenarios/`):**
 - Use second person ("you")
 - Active voice
 - Conversational but professional
 - Explain "why" not just "what"
 - Add encouragement ("Great! Now you can...")
 
-**For Internal Docs (`/docs`):**
+**For Developer Docs (`build-apps/`, `reference/`):**
+- Clear, direct technical writing
+- Code-focused with working examples
+- Assume technical background
+
+**For Technical Docs (`technical/`):**
 - Technical precision over readability
 - Passive voice acceptable for specs
 - Mathematical notation is expected
@@ -277,17 +301,20 @@ Do NOT modify:
 ## Usage
 
 ```bash
-# Review a single file
+# Review a user guide
 /improve-docs techdocs/guides/borrow.md
 
-# Review a directory
+# Review all scenarios
 /improve-docs techdocs/scenarios/
 
-# Review internal spec
-/improve-docs docs/architecture/infrastructure.md
+# Review technical specification
+/improve-docs techdocs/technical/architecture/infrastructure.md
 
-# Review all API docs
-/improve-docs docs/mercata/
+# Review all technical docs
+/improve-docs techdocs/technical/
+
+# Review developer integration guide
+/improve-docs techdocs/build-apps/integration.md
 ```
 
 After analysis, I will present findings and ask which improvements you'd like me to apply.
