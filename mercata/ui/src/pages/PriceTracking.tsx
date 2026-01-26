@@ -461,18 +461,27 @@ const PriceTracking = () => {
         });
 
         // Transform tokens to match EarningAsset format
+        // Filter out LP tokens - only keep active tokens (GOLDST, SILVST, ETHST, WBTCST, PAXGST, XAUtST, sUSDSST)
         const transformedTokens: EarningAsset[] = tokens
-          .filter((token: any) => token.address && (token._symbol || token.symbol)) // Filter out invalid tokens
-          .map((token: any) => {
-            const symbol = token._symbol || token.symbol || token.token?._symbol || token.token?.symbol || 'UNKNOWN';
-            const address = token.address || token.token?.address;
+          .filter((token: any) => {
+            if (!token.address || !(token._symbol || token.symbol)) return false;
+            
+            const symbol = token._symbol || token.symbol || token.token?._symbol || token.token?.symbol || '';
+            
+            // Exclude LP tokens (but allow sUSDSST/SUSDSST as it's an active token)
             const isLPToken =
               symbol.endsWith('-LP') ||
               symbol === 'SUSDST' ||
               symbol === 'MUSDST' ||
-              symbol === 'SUSDSST' ||
               token.description === 'Liquidity Provider Token' ||
               token.token?.description === 'Liquidity Provider Token';
+            
+            // Only include if it's not an LP token
+            return !isLPToken;
+          })
+          .map((token: any) => {
+            const symbol = token._symbol || token.symbol || token.token?._symbol || token.token?.symbol || 'UNKNOWN';
+            const address = token.address || token.token?.address;
 
             // Use user balance if available, otherwise use token balance
             const userBalance = userBalances.get(address?.toLowerCase() || '');
@@ -485,7 +494,7 @@ const PriceTracking = () => {
               price: token.price || token.token?.price || '0',
               balance,
               value: token.value || '0',
-              isPoolToken: isLPToken,
+              isPoolToken: false, // No LP tokens in the list
               isPool: false, // Regular token, not a pool
               collateralBalance: '0',
             };
@@ -513,30 +522,8 @@ const PriceTracking = () => {
           };
         });
 
-        // Transform LP tokens from pools
-        const transformedLPTokens: EarningAsset[] = pools
-          .filter((pool: any) => pool.lpToken?.address)
-          .map((pool: any) => {
-            const lpToken = pool.lpToken;
-            // Use user balance if available, otherwise use LP token balance
-            const userBalance = userBalances.get(lpToken.address?.toLowerCase() || '');
-            const balance = userBalance || lpToken.balance || '0';
-
-            return {
-              address: lpToken.address,
-              symbol: lpToken._symbol || lpToken.symbol || `${pool.poolName || 'Pool'}-LP`,
-              price: lpToken.price || '0',
-              balance,
-              value: lpToken.value || '0',
-              isPoolToken: true, // This is an LP token
-              isPool: false,
-              collateralBalance: '0',
-              poolAddress: pool.address, // Reference to parent pool
-            };
-          });
-
-        // Combine all assets: tokens, pools, and LP tokens
-        const allAssets = [...transformedTokens, ...transformedPools, ...transformedLPTokens];
+        // Combine all assets: tokens and pools only (no LP tokens)
+        const allAssets = [...transformedTokens, ...transformedPools];
         setAvailableAssets(allAssets);
       } catch (error) {
         console.error('Failed to fetch assets:', error);

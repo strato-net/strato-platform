@@ -35,7 +35,6 @@ const MORE_ITEMS = [
   { icon: Activity, label: 'Activity Feed', path: '/dashboard/activity' },
   { icon: Download, label: 'Withdrawals', path: '/dashboard/withdrawals' },
   { icon: BarChart3, label: 'STRATO Stats', path: '/dashboard/stats' },
-  { icon: LineChart, label: 'Trading Desk', path: '/dashboard/trading-desk' },
   { icon: Droplets, label: 'Advanced', path: '/dashboard/advanced' },
   { icon: UserPlus, label: 'My Referrals', path: '/dashboard/referrals' },
   { icon: Shield, label: 'Admin', path: '/dashboard/admin', adminOnly: true },
