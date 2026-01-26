@@ -78,6 +78,7 @@ import qualified Data.ByteString        as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import Data.Decimal
+import Data.Char (isDigit)
 import Data.Foldable (for_)
 import Data.List
 import qualified Data.List.NonEmpty as NE
@@ -1419,6 +1420,14 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
       SContract contractName' $
           fromMaybe (internalError "a call to create did not create an address" execResults) $
             erNewContractAddress execResults
+-- Handle type cast function calls like uint256(x), int128(x), bytes32(x), etc.
+expToVar' (CC.FunctionCall _ (CC.Variable _ name) args)
+  | ("uint" `isPrefixOf` name && all isDigit (drop 4 name)) ||
+    ("int" `isPrefixOf` name && all isDigit (drop 3 name)) ||
+    ("bytes" `isPrefixOf` name && not (null (drop 5 name)) && all isDigit (drop 5 name)) = do
+      argVals <- argsToVals args
+      Constant <$> callBuiltin name argVals
+
 -- case to catch a using statement function like _x.add(3)
 
 expToVar' (CC.FunctionCall _ e args) = do
@@ -2103,6 +2112,23 @@ callBuiltin "bytes" [SString s, SString "raw"] = pure . SBytes $ BC.pack s
 callBuiltin "bytes" [SAddress a _] = pure . SBytes . B.pack . word160ToBytes $ unAddress a
 callBuiltin "uint" args = return $ intBuiltin args
 callBuiltin "int" args = return $ intBuiltin args
+-- Handle sized integer type casts (uint256, uint128, uint120, int256, etc.)
+callBuiltin name args
+  | "uint" `isPrefixOf` name && all isDigit (drop 4 name) = return $ intBuiltin args
+  | "int" `isPrefixOf` name && all isDigit (drop 3 name) = return $ intBuiltin args
+-- Handle sized bytes type casts (bytes1, bytes2, ..., bytes32)
+-- bytes32(integer) - treat as same bit representation, mask to size
+callBuiltin name [SInteger i]
+  | "bytes" `isPrefixOf` name && not (null (drop 5 name)) && all isDigit (drop 5 name) =
+      let size = read (drop 5 name) :: Int
+          sizeMask = (2 ^ (8 * size)) - 1
+      in return $ SInteger (i .&. sizeMask)
+callBuiltin name [SString s]
+  | "bytes" `isPrefixOf` name && not (null (drop 5 name)) && all isDigit (drop 5 name) =
+      -- Convert string to integer representation
+      let bytes = BC.pack s
+          i = byteString2Integer bytes
+      in return $ SInteger i
 callBuiltin "decimal" args = return $ decimalBuiltin args
 callBuiltin "identity" [v] = return v
 callBuiltin "log" args = SNULL <$ traverse (liftIO . putStrLn <=< showSM) args
