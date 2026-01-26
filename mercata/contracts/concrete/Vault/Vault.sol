@@ -1,3 +1,4 @@
+import "VaultFactory.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 import "../../abstract/ERC20/IERC20.sol";
 import "../../abstract/ERC20/utils/Pausable.sol";
@@ -23,7 +24,6 @@ contract record Vault is Ownable, Pausable {
     event MinReserveUpdated(address indexed asset, uint newMinReserve);
     event BotExecutorUpdated(address indexed newBotExecutor);
     event PriceOracleUpdated(address indexed newPriceOracle);
-    event SwapExecuted(address indexed tokenIn, address indexed tokenOut, uint amountIn, uint amountOut);
 
     // Minimum USD value for the first deposit to prevent share manipulation attacks (1e18 = $1)
     uint public MIN_FIRST_DEPOSIT_USD;
@@ -35,11 +35,11 @@ contract record Vault is Ownable, Pausable {
     // STATE VARIABLES
     // ═══════════════════════════════════════════════════════════════════════════════
 
-    // Share token (created via TokenFactory)
-    address public shareToken;
+    /// @notice The vault factory that created this vault
+    VaultFactory public vaultFactory;
 
-    // Token factory for creating and validating tokens
-    TokenFactory public tokenFactory;
+    // Share token
+    address public shareToken;
 
     // Supported assets
     address[] public record supportedAssets;
@@ -74,7 +74,7 @@ contract record Vault is Ownable, Pausable {
         address _shareToken
     ) external onlyOwner {
         WAD = 1e18;
-        MIN_FIRST_DEPOSIT_USD = 50000 * 1e18; // $50,000
+        MIN_FIRST_DEPOSIT_USD = 50000 * WAD; // $50,000
 
         require(_priceOracle != address(0), "Vault: invalid oracle");
         require(_botExecutor != address(0), "Vault: invalid bot executor");
@@ -83,6 +83,7 @@ contract record Vault is Ownable, Pausable {
         priceOracle = PriceOracle(_priceOracle);
         botExecutor = _botExecutor;
         shareToken = _shareToken;
+        vaultFactory = VaultFactory(msg.sender);
 
         emit PriceOracleUpdated(_priceOracle);
         emit BotExecutorUpdated(_botExecutor);
@@ -99,6 +100,16 @@ contract record Vault is Ownable, Pausable {
 
     modifier onlySupportedAsset(address asset) {
         require(isSupported[asset], "Vault: asset not supported");
+        _;
+    }
+
+    /// @notice Modifier to check if the caller is the vault factory
+    modifier onlyVaultFactory() {
+        require(
+            msg.sender == address(vaultFactory)
+            || msg.sender == owner(),
+            "Vault: caller is not VaultFactory"
+        );
         _;
     }
 
@@ -145,7 +156,7 @@ contract record Vault is Ownable, Pausable {
         require(sharesMinted > 0, "Vault: zero shares");
 
         // Transfer tokens from depositor to vault
-        bool success = IERC20(assetIn).transferFrom(msg.sender, address(this), amountIn);
+        bool success = IERC20(assetIn).transferFrom(msg.sender, address(botExecutor), amountIn);
         require(success, "Vault: transfer failed");
 
         // Mint shares to depositor
@@ -167,7 +178,7 @@ contract record Vault is Ownable, Pausable {
 
         for (uint i = 0; i < supportedAssets.length; i++) {
             address asset = supportedAssets[i];
-            uint balance = IERC20(asset).balanceOf(address(this));
+            uint balance = IERC20(asset).balanceOf(address(botExecutor));
             uint minRes = minReserve[asset];
 
             if (balance < minRes) {
@@ -216,7 +227,7 @@ contract record Vault is Ownable, Pausable {
         uint withdrawableEquity = getWithdrawableEquity();
         require(amountUSD <= withdrawableEquity, "Vault: insufficient withdrawable liquidity");
 
-        // Burn shares first (checks-effects-interactions)
+        // Burn shares first 
         Token(shareToken).burn(msg.sender, sharesBurned);
 
         // Calculate and transfer payouts
@@ -271,7 +282,7 @@ contract record Vault is Ownable, Pausable {
 
         for (uint i = 0; i < supportedAssets.length; i++) {
             address asset = supportedAssets[i];
-            uint balance = IERC20(asset).balanceOf(address(this));
+            uint balance = IERC20(asset).balanceOf(address(botExecutor));
             uint minRes = minReserve[asset];
 
             // Calculate withdrawable amount for this asset
@@ -307,7 +318,7 @@ contract record Vault is Ownable, Pausable {
             }
 
             if (payout > 0) {
-                bool success = IERC20(asset).transfer(msg.sender, payout);
+                bool success = IERC20(asset).transferFrom(address(botExecutor), msg.sender, payout);
                 require(success, "Vault: transfer failed");
                 emit WithdrawalPayout(msg.sender, asset, payout);
             }
@@ -326,7 +337,7 @@ contract record Vault is Ownable, Pausable {
     function getTotalEquity() public view returns (uint equity) {
         for (uint i = 0; i < supportedAssets.length; i++) {
             address asset = supportedAssets[i];
-            uint balance = IERC20(asset).balanceOf(address(this));
+            uint balance = IERC20(asset).balanceOf(address(botExecutor));
 
             if (balance > 0) {
                 uint price = priceOracle.getAssetPrice(asset);
@@ -345,7 +356,7 @@ contract record Vault is Ownable, Pausable {
     function getWithdrawableEquity() public view returns (uint withdrawableEquity) {
         for (uint i = 0; i < supportedAssets.length; i++) {
             address asset = supportedAssets[i];
-            uint balance = IERC20(asset).balanceOf(address(this));
+            uint balance = IERC20(asset).balanceOf(address(botExecutor));
             uint minRes = minReserve[asset];
 
             if (balance > minRes) {
@@ -384,7 +395,7 @@ contract record Vault is Ownable, Pausable {
      */
     function getWithdrawableBalance(address asset) public view returns (uint withdrawable) {
         require(isSupported[asset], "Vault: asset not supported");
-        uint balance = IERC20(asset).balanceOf(address(this));
+        uint balance = IERC20(asset).balanceOf(address(botExecutor));
         uint minRes = minReserve[asset];
 
         if (balance > minRes) {
@@ -417,7 +428,7 @@ contract record Vault is Ownable, Pausable {
         uint price
     ) {
         require(isSupported[asset], "Vault: asset not supported");
-        balance = IERC20(asset).balanceOf(address(this));
+        balance = IERC20(asset).balanceOf(address(botExecutor));
         minRes = minReserve[asset];
         withdrawable = balance > minRes ? balance - minRes : 0;
         price = priceOracle.getAssetPrice(asset);
@@ -434,7 +445,7 @@ contract record Vault is Ownable, Pausable {
         uint count = 0;
         for (uint i = 0; i < supportedAssets.length; i++) {
             address asset = supportedAssets[i];
-            uint balance = IERC20(asset).balanceOf(address(this));
+            uint balance = IERC20(asset).balanceOf(address(botExecutor));
             if (balance < minReserve[asset]) {
                 count++;
             }
@@ -444,7 +455,7 @@ contract record Vault is Ownable, Pausable {
         uint idx = 0;
         for (uint j = 0; j < supportedAssets.length; j++) {
             address asset = supportedAssets[j];
-            uint balance = IERC20(asset).balanceOf(address(this));
+            uint balance = IERC20(asset).balanceOf(address(botExecutor));
             if (balance < minReserve[asset]) {
                 deficitAssets[idx] = asset;
                 idx++;
@@ -495,7 +506,7 @@ contract record Vault is Ownable, Pausable {
      */
     function removeSupportedAsset(address asset) external onlyOwner {
         require(isSupported[asset], "Vault: asset not supported");
-        require(IERC20(asset).balanceOf(address(this)) == 0, "Vault: asset has balance");
+        require(IERC20(asset).balanceOf(address(botExecutor)) == 0, "Vault: asset has balance");
 
         isSupported[asset] = false;
 
@@ -521,8 +532,7 @@ contract record Vault is Ownable, Pausable {
      * @param asset Address of the asset
      * @param newMinReserve New minimum reserve amount (token base units, 18 decimals)
      */
-    function setMinReserve(address asset, uint newMinReserve) external onlyOwner {
-        require(isSupported[asset], "Vault: asset not supported");
+    function setMinReserve(address asset, uint newMinReserve) external onlyOwner onlySupportedAsset(asset) {
         minReserve[asset] = newMinReserve;
         emit MinReserveUpdated(asset, newMinReserve);
     }
@@ -546,23 +556,6 @@ contract record Vault is Ownable, Pausable {
         emit PriceOracleUpdated(newPriceOracle);
     }
 
-    /**
-     * @notice Set token factory address
-     * @param _tokenFactory Address of the token factory
-     */
-    function setTokenFactory(address _tokenFactory) external onlyOwner {
-        require(_tokenFactory != address(0), "Vault: invalid token factory");
-        tokenFactory = TokenFactory(_tokenFactory);
-    }
-
-    /**
-     * @notice Set share token address (for migration purposes)
-     * @param _shareToken Address of the share token
-     */
-    function setShareToken(address _shareToken) external onlyOwner {
-        require(_shareToken != address(0), "Vault: invalid share token");
-        shareToken = _shareToken;
-    }
 
     /**
      * @notice Pause the vault (blocks deposits and withdrawals)
@@ -587,10 +580,8 @@ contract record Vault is Ownable, Pausable {
      * @param token Address of the token to rescue
      * @param to Recipient address
      * @param amount Amount to rescue
-     * @dev Only for non-supported tokens; supported tokens cannot be rescued
      */
     function rescueToken(address token, address to, uint amount) external onlyOwner {
-        require(!isSupported[token], "Vault: cannot rescue supported token");
         require(to != address(0), "Vault: invalid recipient");
         bool success = IERC20(token).transfer(to, amount);
         require(success, "Vault: transfer failed");
