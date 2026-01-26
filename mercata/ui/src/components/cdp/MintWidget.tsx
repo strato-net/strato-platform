@@ -9,7 +9,7 @@ import { useUserTokens } from "@/context/UserTokensContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { formatBalance as formatBalanceUtil, formatWeiToDecimalHP, formatNumber, formatDecimalToWeiHP } from "@/utils/numberUtils";
 import { api } from "@/lib/axios";
-import { CompactRewardsDisplay } from "@/components/rewards/CompactRewardsDisplay";
+import { RewardsWidget } from "@/components/rewards/RewardsWidget";
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 
 interface MintWidgetProps {
@@ -978,7 +978,7 @@ const MintWidget: React.FC<MintWidgetProps> = ({ onSuccess, title = "Mint Agains
         const displayAmount = parseFloat(mintAmount || "0") > 0 ? mintAmount : undefined;
         
         return (
-          <CompactRewardsDisplay
+          <RewardsWidget
             key={mintAmount || depositAmount}
             userRewards={userRewards}
             activityName={cdpActivity.activity.name}

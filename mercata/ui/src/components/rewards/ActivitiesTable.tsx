@@ -93,6 +93,8 @@ export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) =
                       <TooltipContent>
                         <p className="max-w-xs">
                           The total amount staked across all users in this activity. Your share of rewards is proportional to your stake relative to this total.
+                          <br /><br />
+                          Note: Different activities may use different stake units (token units, USD-notional, or shares).
                         </p>
                       </TooltipContent>
                     </Tooltip>
@@ -106,10 +108,22 @@ export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) =
                 const emissionRateStr = activity?.emissionRate || null;
                 const emissionPerDay = emissionRateStr ? formatEmissionRatePerDay(emissionRateStr) : "?";
                 const emissionPerWeek = emissionRateStr ? formatEmissionRatePerWeek(emissionRateStr) : "?";
-                // Use totalStake directly (not dollarized since we don't know which assets)
+                
+                // Format total stake with denomination context
                 const totalStakeStr = activity?.totalStake || null;
                 const totalStakeDecimal = totalStakeStr ? formatBalance(totalStakeStr, "", 18, 18, 18) : null;
-                const totalStakeFormatted = totalStakeDecimal ? formatRoundedWithCommas(roundByMagnitude(totalStakeDecimal)) : "?";
+                const totalStakeRounded = totalStakeDecimal ? formatRoundedWithCommas(roundByMagnitude(totalStakeDecimal)) : "?";
+                
+                // Prefer backend-provided USD TVL when available (works for LP/share tokens too)
+                // Otherwise, format USD-notional activities as USD
+                let totalStakeFormatted = totalStakeRounded;
+                if (activity?.totalStakeUsd && activity.totalStakeUsd !== "0") {
+                  const tvlRounded = formatRoundedWithCommas(roundByMagnitude(formatBalance(activity.totalStakeUsd, "", 18, 18, 18)));
+                  totalStakeFormatted = `$${tvlRounded}`;
+                } else if (activity?.stakeDenomination === "usd_notional" && totalStakeRounded !== "?") {
+                  totalStakeFormatted = `$${totalStakeRounded}`;
+                }
+                
                 const lastUpdateTimeStr = activity?.lastUpdateTime || null;
                 const lastUpdate = lastUpdateTimeStr ? new Date(Number(lastUpdateTimeStr) * 1000) : null;
                 const timeAgo = lastUpdate ? formatDistanceToNow(lastUpdate, { addSuffix: true }) : "?";
@@ -151,6 +165,17 @@ export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) =
                         {emissionPerWeek !== "?" && (
                           <div className="text-xs text-muted-foreground">{emissionPerWeek} points/week</div>
                         )}
+                        {(() => {
+                          const totalStakeUsd = activity?.totalStakeUsd ? BigInt(activity.totalStakeUsd) : null;
+                          if (!emissionRateStr || emissionPerDay === "?" || !totalStakeUsd || totalStakeUsd === 0n) return null;
+                          const ptsPerDollarPerDayWei = (BigInt(emissionRateStr) * 86400n * BigInt(10 ** 18)) / totalStakeUsd;
+                          const formatted = formatRoundedWithCommas(roundByMagnitude(formatBalance(ptsPerDollarPerDayWei.toString(), "", 18, 18, 18)));
+                          return (
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {formatted} pts/$1/day
+                            </div>
+                          );
+                        })()}
                       </div>
                     </TableCell>
                     <TableCell>{totalStakeFormatted}</TableCell>

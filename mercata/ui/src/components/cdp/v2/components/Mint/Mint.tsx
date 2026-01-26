@@ -12,7 +12,7 @@ import type { VaultCandidate, Allocation, TransactionProgress, WEI } from '@/com
 import { formatUnits } from 'ethers';
 import { formatNumberWithCommas, parseCommaNumber } from '@/utils/numberUtils';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
-import { CompactRewardsDisplay } from '@/components/rewards/CompactRewardsDisplay';
+import { RewardsWidget } from '@/components/rewards/RewardsWidget';
 import MintProgressModal, { type ProgressStep } from '../../../MintProgressModal';
 import LoanForm from './LoanForm';
 import VaultBreakdown from './VaultBreakdown';
@@ -829,7 +829,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
 
           {/* Rewards Display */}
           {userRewards && cdpActivity && (
-            <CompactRewardsDisplay
+            <RewardsWidget
               key={mintAmount}
               userRewards={userRewards}
               activityName={cdpActivity.activity.name}

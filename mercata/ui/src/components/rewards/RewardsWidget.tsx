@@ -4,30 +4,28 @@ import {
   formatRoundedWithCommas,
   roundByMagnitude,
 } from "@/services/rewardsService";
-import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
+import { formatBalance, safeParseUnits, calculateTokenValue } from "@/utils/numberUtils";
 import { TrendingUp, TrendingDown, Sparkles, Star, Coins } from "lucide-react";
 import { Pool } from "@/interface";
+import { useOracleContext } from "@/context/OracleContext";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-interface CompactRewardsDisplayProps {
+interface RewardsWidgetProps {
   userRewards: UserRewardsData | null;
   activityName: string;
-  // For most activities: direct input amount
   inputAmount?: string;
-  // For withdrawals
   isWithdrawal?: boolean;
-  // For LP deposits: pool data to calculate expected LP tokens
   poolData?: Pool | null;
   tokenAAmount?: string;
   tokenBAmount?: string;
-  // For LP withdrawals: percentage and available balance
   withdrawPercent?: string;
   availableLPBalance?: string;
-  // Action label for display (e.g., "Deposit", "Withdraw", "Swap")
   actionLabel?: string;
+  swapTokenInAddress?: string;
 }
 
 // ============================================================================
@@ -78,6 +76,7 @@ const calculateExpectedLPTokens = (
 
 /**
  * Calculate the stake change amount based on activity type and input.
+ * For USD-notional activities (Swap), converts input to USD using oracle price.
  */
 const calculateStakeChange = (
   activityName: string,
@@ -87,7 +86,10 @@ const calculateStakeChange = (
   tokenAAmount: string | undefined,
   tokenBAmount: string | undefined,
   withdrawPercent: string | undefined,
-  availableLPBalance: string | undefined
+  availableLPBalance: string | undefined,
+  stakeDenomination: string | undefined,
+  swapTokenInAddress: string | undefined,
+  getPrice: (address: string) => string | null
 ): bigint => {
   const isLPActivity = activityName.toLowerCase().includes("swap lp");
 
@@ -106,7 +108,18 @@ const calculateStakeChange = (
     return calculateExpectedLPTokens(tokenA, tokenB, poolData);
   }
 
-  // Other activities (swaps, CDP, lending): use input amount directly
+  // USD-notional activities (Swap): convert input amount to USD using oracle
+  if (stakeDenomination === "usd_notional" && swapTokenInAddress && inputAmount) {
+    const priceWei = getPrice(swapTokenInAddress);
+    if (priceWei) {
+      // Convert inputAmount (in tokenIn units) to USD-notional (18 decimals)
+      const inputWei = safeParseUnits(inputAmount, 18);
+      const priceScaled = BigInt(priceWei);
+      return (inputWei * priceScaled) / BigInt(10 ** 18);
+    }
+  }
+
+  // Other activities (CDP, lending, etc.): use input amount directly
   return safeParseUnits(inputAmount || "0", 18);
 };
 
@@ -133,24 +146,49 @@ const calculateNewStakes = (
 
 /**
  * Format a BigInt rate value to display string.
+ * Returns both formatted value and raw numeric value for tooltip display.
  */
-const formatRate = (rate: bigint): string => {
+const formatRate = (rate: bigint): { formatted: string; raw: string } => {
   const decimal = formatBalance(rate.toString(), "points", 18, 18, 18);
   const numeric = decimal.replace(/\s*points?\s*$/i, "").trim();
-  return numeric ? formatRoundedWithCommas(roundByMagnitude(numeric)) : "0";
+  const formatted = numeric ? formatRoundedWithCommas(roundByMagnitude(numeric)) : "0";
+  return { formatted, raw: numeric || "0" };
+};
+
+/**
+ * Component to render rate values with tooltip for "tiny" values
+ */
+const RateValue = ({ formatted, raw }: { formatted: string; raw: string }) => {
+  if (formatted === "tiny" && raw) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="cursor-help underline decoration-dotted">{formatted}</span>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>{raw}</p>
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+  
+  return <>{formatted}</>;
 };
 
 /**
  * Calculate percentage change between two rates.
+ * Uses basis points to avoid precision loss from BigInt->Number conversion.
  */
 const calculatePercentageChange = (
   oldRate: bigint,
   newRate: bigint
 ): number => {
   if (oldRate > 0n) {
-    const oldFloat = Number(oldRate) / 1e18;
-    const newFloat = Number(newRate) / 1e18;
-    return ((newFloat - oldFloat) / oldFloat) * 100;
+    // Calculate in basis points (10000 = 100%) to maintain precision
+    // Divide BigInt first to keep values in safe Number range
+    const diff = newRate - oldRate;
+    const basisPoints = (diff * 10000n) / oldRate;
+    return Number(basisPoints) / 100;
   }
   return newRate > 0n ? 100 : 0;
 };
@@ -159,7 +197,7 @@ const calculatePercentageChange = (
 // COMPONENT
 // ============================================================================
 
-export const CompactRewardsDisplay = ({
+export const RewardsWidget = ({
   userRewards,
   activityName,
   inputAmount,
@@ -170,7 +208,10 @@ export const CompactRewardsDisplay = ({
   withdrawPercent,
   availableLPBalance,
   actionLabel = isWithdrawal ? "Withdraw" : "Deposit",
-}: CompactRewardsDisplayProps) => {
+  swapTokenInAddress,
+}: RewardsWidgetProps) => {
+  const { getPrice } = useOracleContext();
+
   // ─────────────────────────────────────────────────────────────────────────
   // FILTER MATCHING ACTIVITIES
   // ─────────────────────────────────────────────────────────────────────────
@@ -178,6 +219,9 @@ export const CompactRewardsDisplay = ({
     userRewards?.activities.filter(
       (item) => item.activity.name.toLowerCase() === activityName.toLowerCase()
     ) || [];
+
+  const stakeDenomination = filteredActivities[0]?.activity?.stakeDenomination;
+  const stakeAssetAddress = filteredActivities[0]?.activity?.stakeAssetAddress;
 
   // ─────────────────────────────────────────────────────────────────────────
   // CALCULATE CURRENT RATE (using backend's personalEmissionRate for accuracy)
@@ -236,7 +280,10 @@ export const CompactRewardsDisplay = ({
             tokenAAmount,
             tokenBAmount,
             withdrawPercent,
-            availableLPBalance
+            availableLPBalance,
+            activity.stakeDenomination,
+            swapTokenInAddress,
+            getPrice
           );
 
           // Use derived totalStake if available, otherwise fall back to cached
@@ -277,27 +324,112 @@ export const CompactRewardsDisplay = ({
   if (isWithdrawal && newRate === 0n && currentRate === 0n) return null;
 
   // ─────────────────────────────────────────────────────────────────────────
+  // CALCULATE NORMALIZATION BASE (pts/$1/day)
+  //
+  // For user-facing "Earning Now", the correct normalization is:
+  //   pts/$1/day = (personal pts/day) / (personal stake USD)
+  //
+  // ─────────────────────────────────────────────────────────────────────────
+  let currentUserStakeUsd = 0n;
+  let newUserStakeUsd = 0n;
+
+  filteredActivities.forEach(({ activity, userInfo }) => {
+    const userStakeRaw = BigInt(userInfo?.stake || "0");
+
+    const stakeUsdFromBackend = userInfo?.stakeUsd ? BigInt(userInfo.stakeUsd) : null;
+    const unitPriceUsd = activity?.stakeUnitPriceUsd ? BigInt(activity.stakeUnitPriceUsd) : null;
+
+    const toUsd = (stakeWei: bigint): bigint => {
+      if (stakeUsdFromBackend !== null) return stakeUsdFromBackend;
+      if (stakeDenomination === "usd_notional") return stakeWei;
+      if (unitPriceUsd !== null) return (stakeWei * unitPriceUsd) / BigInt(10 ** 18);
+      // Fallback: attempt oracle-pricing for token_units when possible
+      if (stakeDenomination === "token_units" && stakeAssetAddress) {
+        const priceWei = getPrice(stakeAssetAddress);
+        if (priceWei) {
+          const usdStr = calculateTokenValue(stakeWei.toString(), priceWei);
+          return safeParseUnits(usdStr, 18);
+        }
+      }
+      return 0n;
+    };
+
+    currentUserStakeUsd += toUsd(userStakeRaw);
+
+    if (hasValidInput && activity?.emissionRate) {
+      const stakeChange = calculateStakeChange(
+        activityName,
+        isWithdrawal,
+        inputAmount,
+        poolData,
+        tokenAAmount,
+        tokenBAmount,
+        withdrawPercent,
+        availableLPBalance,
+        activity.stakeDenomination,
+        swapTokenInAddress,
+        getPrice
+      );
+
+      const { newStake } = calculateNewStakes(
+        userStakeRaw,
+        BigInt(activity.totalStake || "0"),
+        stakeChange,
+        isWithdrawal
+      );
+
+      // If backend provided stakeUsd for current stake, we can still compute new stake USD using unit price (if present).
+      if (stakeUsdFromBackend !== null && unitPriceUsd !== null) {
+        newUserStakeUsd += (newStake * unitPriceUsd) / BigInt(10 ** 18);
+      } else {
+        newUserStakeUsd += toUsd(newStake);
+      }
+    }
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
   // CALCULATE DISPLAY VALUES
   // ─────────────────────────────────────────────────────────────────────────
   const isIncrease = hasValidInput && newRate > currentRate;
   const isDecrease = hasValidInput && newRate < currentRate;
   const percentageChange = hasValidInput ? calculatePercentageChange(currentRate, newRate) : 0;
-  const formattedCurrentRate = formatRate(currentRate);
-  const formattedNewRate = formatRate(newRate);
-  const formattedPercentage = Math.abs(percentageChange).toFixed(1);
+  const currentRateFormatted = formatRate(currentRate);
+  const newRateFormatted = formatRate(newRate);
+  const formattedPercentage = Math.abs(percentageChange).toLocaleString("en-US", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  });
+
+  // Calculate pts/$1/day if we have USD stake for the user
+  const canShowNormalized = currentUserStakeUsd > 0n;
+  const currentRatePerDollar = canShowNormalized
+    ? (currentRate * BigInt(10 ** 18)) / currentUserStakeUsd
+    : 0n;
+  const newRatePerDollar = hasValidInput && newUserStakeUsd > 0n
+    ? (newRate * BigInt(10 ** 18)) / newUserStakeUsd
+    : 0n;
+  const currentRatePerDollarFormatted = canShowNormalized ? formatRate(currentRatePerDollar) : null;
+  const newRatePerDollarFormatted = hasValidInput && newUserStakeUsd > 0n ? formatRate(newRatePerDollar) : null;
 
   // ─────────────────────────────────────────────────────────────────────────
   // RENDER
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className="mt-3 p-3 bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 dark:from-amber-950 dark:via-yellow-950 dark:to-orange-950 border border-amber-200 dark:border-amber-800 rounded-lg shadow-sm max-w-sm">
+    <div className="mt-3 p-3 bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 dark:from-amber-950 dark:via-yellow-950 dark:to-orange-950 border border-amber-200 dark:border-amber-800 rounded-lg shadow-sm w-full">
       {/* Current Rate - Always visible */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <Coins className="h-4 w-4 text-amber-500 flex-shrink-0" />
           <span className="text-sm font-medium text-amber-800 dark:text-amber-200">Earning Now</span>
-          <span className="text-sm font-semibold text-amber-700 dark:text-amber-300">{formattedCurrentRate}</span>
+          <span className="text-sm font-semibold text-amber-700 dark:text-amber-300">
+            <RateValue formatted={currentRateFormatted.formatted} raw={currentRateFormatted.raw} />
+          </span>
           <span className="text-sm text-amber-600 dark:text-amber-400">pts/day</span>
+          {currentRatePerDollarFormatted && (
+            <span className="text-xs text-amber-500 dark:text-amber-500">
+              (<RateValue formatted={currentRatePerDollarFormatted.formatted} raw={currentRatePerDollarFormatted.raw} /> pts/$1/day)
+            </span>
+          )}
         </div>
         <Sparkles className="h-3.5 w-3.5 text-amber-400 flex-shrink-0" />
       </div>
@@ -312,9 +444,14 @@ export const CompactRewardsDisplay = ({
               </div>
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">After {actionLabel}</span>
               <span className={`text-sm font-semibold ${isIncrease ? 'text-green-600 dark:text-green-400' : isDecrease ? 'text-red-600 dark:text-red-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                {formattedNewRate}
+                <RateValue formatted={newRateFormatted.formatted} raw={newRateFormatted.raw} />
               </span>
               <span className="text-sm text-gray-500 dark:text-gray-400">pts/day</span>
+              {newRatePerDollarFormatted && (
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  (<RateValue formatted={newRatePerDollarFormatted.formatted} raw={newRatePerDollarFormatted.raw} /> pts/$1/day)
+                </span>
+              )}
             </div>
 
             {/* Percentage Badge */}
