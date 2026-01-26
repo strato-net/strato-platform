@@ -9,11 +9,12 @@ import {
   roundByMagnitude,
   formatRoundedWithCommas,
 } from "@/services/rewardsService";
-import { formatBalance } from "@/utils/numberUtils";
+import { formatBalance, calculateTokenValue, safeParseUnits } from "@/utils/numberUtils";
 import { Loader2, Coins, TrendingUp, Info, Clock, Star } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { useUser } from "@/context/UserContext";
+import { useOracleContext } from "@/context/OracleContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatDistanceToNow } from "date-fns";
 import { Link } from "react-router-dom";
@@ -32,6 +33,7 @@ export const UserRewardsSection = ({
 }: UserRewardsSectionProps) => {
   const { toast } = useToast();
   const { userAddress } = useUser();
+  const { getPrice } = useOracleContext();
   const [claimingActivityIds, setClaimingActivityIds] = useState<number[]>([]);
   const [isClaimingAll, setIsClaimingAll] = useState(false);
 
@@ -390,6 +392,31 @@ export const UserRewardsSection = ({
                     <div>
                       <p className="text-sm text-muted-foreground mb-1">Estimated Rewards/Day</p>
                       <p className="text-lg font-semibold">{estimatedPerDayFormatted}</p>
+                      {(() => {
+                        // Show pts/$1/day based on *user* stake USD (personal normalization)
+                        if (!activity || estimatedPerDayFormatted === "?" || !userInfo) return null;
+
+                        const userStakeUsd =
+                          userInfo.stakeUsd !== null && userInfo.stakeUsd !== undefined
+                            ? BigInt(userInfo.stakeUsd)
+                            : (activity.stakeUnitPriceUsd
+                                ? (BigInt(userInfo.stake || "0") * BigInt(activity.stakeUnitPriceUsd)) / BigInt(10 ** 18)
+                                : (activity.stakeDenomination === "usd_notional" ? BigInt(userInfo.stake || "0") : 0n));
+
+                        if (userStakeUsd === 0n) return null;
+
+                        const estimatedPerDayBig = BigInt(estimatedPerDay || "0");
+                        const ptsPerDollarPerDay = (estimatedPerDayBig * BigInt(10 ** 18)) / userStakeUsd;
+                        const formatted = formatRoundedWithCommas(
+                          roundByMagnitude(formatBalance(ptsPerDollarPerDay.toString(), "", 18, 18, 18))
+                        );
+
+                        return (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {formatted} pts/$1/day
+                          </p>
+                        );
+                      })()}
                     </div>
 
                     <div>
