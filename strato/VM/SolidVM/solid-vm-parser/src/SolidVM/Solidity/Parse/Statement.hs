@@ -332,6 +332,7 @@ array = do
   return $ ArrayExpression a exps
 
 -- Parses a JSON object style text into a Haskell Object literal type
+-- Uses `literal` for values to support nested objects (used by API argument parsing)
 objectE :: SolidityParser Expression
 objectE = do
   ~(a, exps) <- withPosition $ braces $ commaSep assoc
@@ -340,7 +341,7 @@ objectE = do
     assoc = do
       k <- many1 (noneOf ":")
       void colon
-      v <- expression
+      v <- literal
       return (stringToLabel $ init . maybe "" snd . uncons $ show k, v) -- get rid of the surrounding quotes
       {-
       // Precedence by order (see github.com/ethereum/solidity/pull/732)
