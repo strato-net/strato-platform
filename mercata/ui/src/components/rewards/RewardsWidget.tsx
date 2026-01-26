@@ -142,15 +142,18 @@ const formatRate = (rate: bigint): string => {
 
 /**
  * Calculate percentage change between two rates.
+ * Uses basis points to avoid precision loss from BigInt->Number conversion.
  */
 const calculatePercentageChange = (
   oldRate: bigint,
   newRate: bigint
 ): number => {
   if (oldRate > 0n) {
-    const oldFloat = Number(oldRate) / 1e18;
-    const newFloat = Number(newRate) / 1e18;
-    return ((newFloat - oldFloat) / oldFloat) * 100;
+    // Calculate in basis points (10000 = 100%) to maintain precision
+    // Divide BigInt first to keep values in safe Number range
+    const diff = newRate - oldRate;
+    const basisPoints = (diff * 10000n) / oldRate;
+    return Number(basisPoints) / 100;
   }
   return newRate > 0n ? 100 : 0;
 };
