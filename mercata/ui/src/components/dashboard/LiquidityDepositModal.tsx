@@ -19,7 +19,7 @@ import { useSwapContext } from '@/context/SwapContext';
 import { usdstAddress, DEPOSIT_FEE, rewardsEnabled } from "@/lib/constants";
 import { Pool } from '@/interface';
 import { safeParseUnits } from '@/utils/numberUtils';
-import { CompactRewardsDisplay } from '@/components/rewards/CompactRewardsDisplay';
+import { RewardsWidget } from '@/components/rewards/RewardsWidget';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 
 const formatNumber = (value: string | number): string => {
@@ -647,7 +647,7 @@ const LiquidityDepositModal = ({
             // For single token mode: pass input amount (less accurate estimate)
             if (depositMode === 'A&B') {
               return (
-                <CompactRewardsDisplay
+                <RewardsWidget
                   userRewards={userRewards}
                   activityName={activity.activity.name}
                   inputAmount={token1Amount || ""}
@@ -662,7 +662,7 @@ const LiquidityDepositModal = ({
               // Note: This is an estimate since single-token deposits involve a swap
               const singleTokenAmount = depositMode === 'A' ? token1Amount : token2Amount;
               return (
-                <CompactRewardsDisplay
+                <RewardsWidget
                   userRewards={userRewards}
                   activityName={activity.activity.name}
                   inputAmount={singleTokenAmount || ""}

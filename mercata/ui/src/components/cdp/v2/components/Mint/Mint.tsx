@@ -12,7 +12,7 @@ import type { VaultCandidate, Allocation, TransactionProgress, WEI } from '@/com
 import { formatUnits } from 'ethers';
 import { formatNumberWithCommas, parseCommaNumber } from '@/utils/numberUtils';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
-import { CompactRewardsDisplay } from '@/components/rewards/CompactRewardsDisplay';
+import { RewardsWidget } from '@/components/rewards/RewardsWidget';
 import MintProgressModal, { type ProgressStep } from '../../../MintProgressModal';
 import LoanForm from './LoanForm';
 import VaultBreakdown from './VaultBreakdown';
@@ -216,7 +216,16 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     return calculateAggregateHealthFactor(vaultData);
   }, [vaultCandidates, allocations]); // Recalculates when vaultCandidates or allocations change
 
-  const weightedAverageAPR = useMemo(() => calculateWeightedAverageAPR(allocations), [allocations]);
+  const displayedStabilityFee = useMemo(
+    () => calculateWeightedAverageAPR(mergedVaultCandidates),
+    [mergedVaultCandidates]
+  );
+
+  // Only show stability fee when there are allocations with mint amounts
+  const hasAllocationsWithMint = useMemo(
+    () => allocations.some(v => v.allocation && v.allocation.mintAmount > 0n),
+    [allocations]
+  );
 
   const transactionCount = useMemo(() => calculateTransactionCount(allocations), [allocations]);
 
@@ -709,7 +718,8 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
           <LoanForm
             availableLabel="Available to Mint"
             availableAmount={availableToMint}
-            averageStabilityFee={weightedAverageAPR || 1.5}
+            averageStabilityFee={displayedStabilityFee}
+            showStabilityFee={hasAllocationsWithMint}
             mintAmountInput={mintAmountInput}
             onMintAmountChange={handleMintAmountChange}
             onMaxClick={handleMaxClick}
@@ -819,7 +829,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
 
           {/* Rewards Display */}
           {userRewards && cdpActivity && (
-            <CompactRewardsDisplay
+            <RewardsWidget
               key={mintAmount}
               userRewards={userRewards}
               activityName={cdpActivity.activity.name}

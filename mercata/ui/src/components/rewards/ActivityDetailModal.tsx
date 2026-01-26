@@ -33,10 +33,18 @@ export const ActivityDetailModal = ({
 
   const emissionPerDay = formatEmissionRatePerDay(activity.emissionRate);
   const emissionPerWeek = formatEmissionRatePerWeek(activity.emissionRate);
-  const priceWei = getPrice(activity.sourceContract);
-  const totalTVLUSD = priceWei 
-    ? calculateTokenValue(activity.totalStake, priceWei)
-    : null;
+  const isUsdNotionalStake = activity.stakeDenomination === "usd_notional";
+
+  // Prefer backend-provided USD TVL when available.
+  const totalTVLUSD =
+    activity.totalStakeUsd !== null && activity.totalStakeUsd !== undefined
+      ? formatBalance(activity.totalStakeUsd, "", 18, 2, 2)
+      : (isUsdNotionalStake
+          ? formatBalance(activity.totalStake, "", 18, 2, 2)
+          : (() => {
+              const priceWei = getPrice(activity.sourceContract);
+              return priceWei ? calculateTokenValue(activity.totalStake, priceWei) : null;
+            })());
   const totalStakeDecimal = formatBalance(activity.totalStake, "", 18, 18, 18);
   const totalStakeFormatted = roundByMagnitude(totalStakeDecimal);
   const totalTVLFormatted = totalTVLUSD 
@@ -46,8 +54,15 @@ export const ActivityDetailModal = ({
   const lastUpdate = new Date(Number(activity.lastUpdateTime) * 1000);
   const timeAgo = formatDistanceToNow(lastUpdate, { addSuffix: true });
 
-  const userTVLUSD = userInfo && priceWei
-    ? calculateTokenValue(userInfo.stake, priceWei)
+  const userTVLUSD = userInfo
+    ? (userInfo.stakeUsd !== null && userInfo.stakeUsd !== undefined
+        ? formatBalance(userInfo.stakeUsd, "", 18, 2, 2)
+        : (isUsdNotionalStake
+            ? formatBalance(userInfo.stake, "", 18, 2, 2)
+            : (() => {
+                const priceWei = getPrice(activity.sourceContract);
+                return priceWei ? calculateTokenValue(userInfo.stake, priceWei) : null;
+              })()))
     : null;
   const userStakeDecimal = userInfo ? formatBalance(userInfo.stake, "", 18, 18, 18) : "0";
   const userStakeFormatted = roundByMagnitude(userStakeDecimal);

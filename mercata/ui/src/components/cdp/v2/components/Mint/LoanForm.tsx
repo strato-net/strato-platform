@@ -11,7 +11,8 @@ interface LoanFormProps {
   
   // Data
   availableAmount: string; // Formatted available amount
-  averageStabilityFee: number;
+  averageStabilityFee?: number;
+  showStabilityFee?: boolean; // Whether to display the stability fee row
   averageVaultHealth?: string | null; // Average health factor across all vaults
   
   // Mint amount state
@@ -44,6 +45,7 @@ const LoanForm: React.FC<LoanFormProps> = ({
   availableLabel = 'Available to Mint',
   availableAmount,
   averageStabilityFee,
+  showStabilityFee = false,
   averageVaultHealth,
   mintAmountInput,
   onMintAmountChange,
@@ -74,10 +76,12 @@ const LoanForm: React.FC<LoanFormProps> = ({
               <span className="text-sm text-muted-foreground">{availableLabel}</span>
               <span className="text-sm font-semibold tabular-nums">USDST {availableAmount}</span>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Average Stability Fee</span>
-              <span className="text-sm font-semibold tabular-nums">{formatPercentage(averageStabilityFee || 1.5)}</span>
-            </div>
+            {showStabilityFee && averageStabilityFee !== undefined && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Average Stability Fee</span>
+                <span className="text-sm font-semibold tabular-nums">{formatPercentage(averageStabilityFee)}</span>
+              </div>
+            )}
           </div>
 
           {/* Mint Amount Input */}
