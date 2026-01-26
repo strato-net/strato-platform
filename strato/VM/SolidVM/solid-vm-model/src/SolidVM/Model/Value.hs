@@ -224,14 +224,14 @@ coerceFromInt _ SString {} n = SString $ showHex n ""
 coerceFromInt _ SDecimal {} n = SDecimal $ Decimal 0 n
 coerceFromInt _ (SContract c _) n = SContract c $ fromIntegral n
 coerceFromInt ct (SEnumVal tipe _ _) n' =
-  fromMaybe (typeError "missing enum val" (tipe, n')) $ do
+  fromMaybe (typeError "missing enum val" $ show (tipe, n')) $ do
     let n = fromIntegral n'
     enumDef <- fmap fst . M.lookup tipe $ CC._enums ct
     when (n >= length enumDef) $ fail "enum val out of range"
     return $ SEnumVal tipe (enumDef !! n) $ fromIntegral n'
 coerceFromInt _ SNULL n = SInteger n
 coerceFromInt _ SReference{} n = SInteger n
-coerceFromInt _ t x = typeError "coerceFromInt: invalid literal for type" (t, x)
+coerceFromInt _ t x = typeError "coerceFromInt: invalid literal for type" $ show (t, x)
 
 -- coerceType allows integer literals to initialize integers, addresses, and
 -- strings (in the special case of 0) and bytes32, determined by type instead of value
@@ -242,7 +242,7 @@ coerceType ct xt = \case
     SVMType.String {} -> SString s
     SVMType.Bytes {} -> SString s
     SVMType.Decimal {} -> SDecimal (read s :: Decimal)
-    _ -> typeError "string literal must be string or bytes" (xt, s)
+    _ -> typeError "string literal must be string or bytes" $ show (xt, s)
   v -> v
 
 valEquals :: CC.Contract -> Value -> Value -> Bool
@@ -338,7 +338,7 @@ byteStringToValue x = Just . SInteger . rlpDecode . rlpDeserialize $ x
 
 castToInt :: Value -> Integer
 castToInt (SInteger i) = i
-castToInt s = typeError "castToInt" s
+castToInt s = typeError "castToInt" $ show s
 -}
 
 -- Evaluated ArgLists
