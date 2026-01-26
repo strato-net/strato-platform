@@ -1432,7 +1432,7 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <span className="text-sm font-bold tabular-nums cursor-help">
+                          <span className="text-sm font-bold tabular-nums cursor-help text-blue-600">
                             {totalMintDisplay} USDST
                           </span>
                         </TooltipTrigger>
