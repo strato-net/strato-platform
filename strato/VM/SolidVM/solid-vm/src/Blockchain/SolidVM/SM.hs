@@ -693,7 +693,7 @@ getVariableOfName name = do
       maybeThis,
       maybeConstant,
       --, maybeUserDefined
-      unknownVariable ("getVariableOfName " ++ (show (currentContract currentCallInfo ^. CC.storageDefs))) name
+      unknownVariable "not found" name
     ]
 
 withCallInfo ::
