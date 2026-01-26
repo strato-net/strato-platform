@@ -216,7 +216,16 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     return calculateAggregateHealthFactor(vaultData);
   }, [vaultCandidates, allocations]); // Recalculates when vaultCandidates or allocations change
 
-  const weightedAverageAPR = useMemo(() => calculateWeightedAverageAPR(allocations), [allocations]);
+  const displayedStabilityFee = useMemo(
+    () => calculateWeightedAverageAPR(mergedVaultCandidates),
+    [mergedVaultCandidates]
+  );
+
+  // Only show stability fee when there are allocations with mint amounts
+  const hasAllocationsWithMint = useMemo(
+    () => allocations.some(v => v.allocation && v.allocation.mintAmount > 0n),
+    [allocations]
+  );
 
   const transactionCount = useMemo(() => calculateTransactionCount(allocations), [allocations]);
 
@@ -709,7 +718,8 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
           <LoanForm
             availableLabel="Available to Mint"
             availableAmount={availableToMint}
-            averageStabilityFee={weightedAverageAPR || 1.5}
+            averageStabilityFee={displayedStabilityFee}
+            showStabilityFee={hasAllocationsWithMint}
             mintAmountInput={mintAmountInput}
             onMintAmountChange={handleMintAmountChange}
             onMaxClick={handleMaxClick}
