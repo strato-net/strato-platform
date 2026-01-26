@@ -60,6 +60,7 @@ import Blockchain.Strato.Model.Util (byteString2Integer)
 import Blockchain.Stream.Action (Action)
 import Blockchain.VMContext
 import Blockchain.VMOptions
+import Blockchain.Strato.Model.Options (computeNetworkID)
 import Control.Applicative
 import Control.DeepSeq (force)
 import Control.Exception (throw)
@@ -1193,6 +1194,8 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
       (Constant . SInteger . BlockHeader.difficulty . Env.blockHeader) <$> getEnv
     (SBuiltinVariable "block", "gaslimit") ->
       (Constant . SInteger . BlockHeader.gasLimit . Env.blockHeader) <$> getEnv
+    (SBuiltinVariable "block", "chainid") ->
+      return $ Constant $ SInteger computeNetworkID
     (SBuiltinVariable "super", method) -> do
       ctract <- getCurrentContract
       (_, cc) <- getCurrentCodeCollection

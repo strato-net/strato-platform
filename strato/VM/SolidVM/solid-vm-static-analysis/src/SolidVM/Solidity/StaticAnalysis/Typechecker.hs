@@ -801,6 +801,7 @@ typecheckMember (Static (SVMType.UnknownLabel "block") x) "number" = pure $ Stat
 typecheckMember (Static (SVMType.UnknownLabel "block") x) "coinbase" = pure $ Static (SVMType.Address True) x
 typecheckMember (Static (SVMType.UnknownLabel "block") x) "difficulty" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.UnknownLabel "block") x) "gaslimit" = pure $ Static (SVMType.Int Nothing Nothing) x
+typecheckMember (Static (SVMType.UnknownLabel "block") x) "chainid" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.UnknownLabel "block") x) "proposer" = pure $ Static (SVMType.Address False) x
 typecheckMember (Static (SVMType.UnknownLabel "type") x) "name" = pure $ (Static (SVMType.String Nothing) x)
 typecheckMember (Static (SVMType.UnknownLabel "type") x) "creationCode" = pure $ (Static (SVMType.String Nothing) x)
