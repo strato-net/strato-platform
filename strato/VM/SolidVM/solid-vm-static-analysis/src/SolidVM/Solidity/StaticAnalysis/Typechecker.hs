@@ -1765,10 +1765,16 @@ statementHelper (WhileStatement cond body x) = do
   bs <- statementsHelper' x body
   pure $ reduceType' x [cs, bs]
 statementHelper (ForStatement mInit mCond mPost body x) = do
+  -- Push a new scope for the entire for loop (so loop variable is scoped to the loop)
+  modify $ NE.cons (Nothing, M.empty)
   is <- maybe (pure $ topType' x) (simpleStatementHelper x) mInit
   cs <- maybe (pure $ topType' x) tcExpr mCond
   ps <- maybe (pure $ topType' x) tcExpr mPost
   bs <- statementsHelper' x body
+  -- Pop the for loop scope
+  modify $ \case
+    _ :| [] -> error "ForStatement: Stack underflow"
+    _ :| (s : rest) -> s :| rest
   pure $ reduceType' x [is, cs, ps, bs]
 statementHelper (Block x) = pure $ topType' x
 statementHelper (DoWhileStatement body cond x) = do
