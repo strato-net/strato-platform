@@ -621,9 +621,8 @@ typecheckStatic :: Type -> Type -> Either Text Type
 typecheckStatic (SVMType.Int s1 b1) (SVMType.Int s2 b2) =
   case (s1, s2) of
     (Just a, Just b) | a /= b -> Left "Mismatched signedness between integer values"
-    _ -> case (b1, b2) of
-      (Just a, Just b) | a /= b -> Left "Mismatched length between integer values"
-      _ -> Right $ SVMType.Int (s1 <|> s2) (b1 <|> b2)
+    -- Allow implicit widening: take the larger of the two lengths
+    _ -> Right $ SVMType.Int (s1 <|> s2) (max <$> b1 <*> b2 <|> b1 <|> b2)
 typecheckStatic (SVMType.String d1) (SVMType.String d2) =
   case (d1, d2) of
     (Just a, Just b) | a /= b -> Left "Mismatched dynamicity between string values"
