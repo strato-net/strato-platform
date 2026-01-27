@@ -395,17 +395,17 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({
     hoverPriceRef.current = null;
   }, [onHoverDataChange]);
 
-  // if (loading) {
-  //   return (
-  //     <Card className="w-full">
-  //       <CardContent className="flex items-center justify-center" style={{ height }}>
-  //         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-  //       </CardContent>
-  //     </Card>
-  //   );
-  // }
-
   if (chartData.length === 0) {
+    if (loading) {
+      return (
+        <Card className="w-full">
+          <CardContent className="flex items-center justify-center" style={{ height }}>
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </CardContent>
+        </Card>
+      );
+    }
+
     return (
       <Card className="w-full">
         <CardContent className="flex items-center justify-center text-muted-foreground" style={{ height }}>
