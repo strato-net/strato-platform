@@ -16,12 +16,15 @@ module SolidVM.Model.Value
     defaultValue,
     createDefaultValue,
     valEquals,
+    valueTypeName,
   )
 where
 
 import Blockchain.Data.RLP
 import Blockchain.SolidVM.Exception
 import Blockchain.Strato.Model.Address
+import qualified Data.ByteString.Char8 as BC
+import Text.Format
 import Control.Lens ((^.))
 import Control.Monad (forM, when)
 import Control.Monad.IO.Class
@@ -349,3 +352,47 @@ castToInt s = typeError "castToInt" $ show s
 
 -- Evaluated ArgLists
 type ValList = [Value]
+
+-- | Human-readable type name for Value constructors (used in error messages)
+valueTypeName :: Value -> String
+valueTypeName (SInteger _) = "Integer"
+valueTypeName (SDecimal _) = "Decimal"
+valueTypeName (SString _) = "String"
+valueTypeName (SBool _) = "Bool"
+valueTypeName (SAddress _ _) = "Address"
+valueTypeName (SUserDefined n _ _) = "UserDefined(" ++ show n ++ ")"
+valueTypeName (SEnum n) = "Enum(" ++ show n ++ ")"
+valueTypeName (SEnumVal n _ _) = "EnumVal(" ++ show n ++ ")"
+valueTypeName (SStructDef n) = "StructDef(" ++ show n ++ ")"
+valueTypeName (SStruct n _) = "Struct(" ++ show n ++ ")"
+valueTypeName (STuple _) = "Tuple"
+valueTypeName (SArray _) = "Array"
+valueTypeName (SMap _) = "Map"
+valueTypeName (SFunction n _) = "Function(" ++ show n ++ ")"
+valueTypeName (SBuiltinVariable n) = "BuiltinVariable(" ++ show n ++ ")"
+valueTypeName (SSetterGetter n _) = "SetterGetter(" ++ n ++ ")"
+valueTypeName (SContractDef n) = "ContractDef(" ++ show n ++ ")"
+valueTypeName (SContractItem _ n) = "ContractItem(" ++ show n ++ ")"
+valueTypeName (SContract n _) = "Contract(" ++ show n ++ ")"
+valueTypeName (SContractFunction _ n) = "ContractFunction(" ++ show n ++ ")"
+valueTypeName (SPush _ _) = "Push"
+valueTypeName SNULL = "Null"
+valueTypeName (SReference _) = "Reference"
+valueTypeName SHexDecodeAndTrim = "HexDecodeAndTrim"
+valueTypeName SStringConcat = "StringConcat"
+valueTypeName (SDeferredConstant n) = "DeferredConstant(" ++ show n ++ ")"
+valueTypeName SAddressToAscii = "AddressToAscii"
+valueTypeName SBreak = "Break"
+valueTypeName SContinue = "Continue"
+valueTypeName (SBytes _) = "Bytes"
+valueTypeName (SVariadic _) = "Variadic"
+
+-- | Format instance for human-readable Value output in error messages
+instance Format Value where
+  format (SReference (AddressPath addr path)) =
+    "Reference(" ++ take 10 (show addr) ++ ".../" ++ BC.unpack (MS.unparsePath path) ++ ")"
+  format (SInteger n) = "Integer(" ++ show n ++ ")"
+  format (SBool b) = "Bool(" ++ show b ++ ")"
+  format (SString s) = "String(" ++ show (take 20 s) ++ if length s > 20 then "...)" else ")"
+  format (SAddress a _) = "Address(" ++ take 10 (show a) ++ "...)"
+  format v = valueTypeName v

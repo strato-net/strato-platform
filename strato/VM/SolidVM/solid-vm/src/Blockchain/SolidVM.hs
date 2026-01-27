@@ -2255,7 +2255,18 @@ callBuiltin "fastForward" [SInteger seconds] = do
         pure $ env { Env.blockHeader = updatedBlockHeader }
       return SNULL
 
-callBuiltin x args = unknownFunction ("callBuiltin " ++ show args) x
+callBuiltin x args = unknownFunction (formatBuiltinError x args) x
+
+-- Format a helpful error message for builtin function calls
+formatBuiltinError :: String -> [Value] -> String
+formatBuiltinError funcName args =
+  "no matching overload for '" ++ funcName ++ "'\n" ++
+  "  received: (" ++ intercalate ", " (map valueTypeName args) ++ ")\n" ++
+  "  arguments:\n" ++ unlines (zipWith showArg [1..] args) ++
+  "  hint: builtin functions expect concrete values, not References"
+  where
+    showArg :: Int -> Value -> String
+    showArg n v = "    " ++ show n ++ ": " ++ format v
 
 -- Format argument mismatch error message (uses showType from Typechecker)
 formatArgMismatch :: [(Value, SVMType.Type)] -> String
@@ -2264,7 +2275,7 @@ formatArgMismatch pairs =
   where
     formatOne :: Int -> (Value, SVMType.Type) -> String
     formatOne n (val, expectedType) =
-      "  Argument " ++ show n ++ ": got " ++ show val ++ ", expected " ++ T.unpack (showType expectedType)
+      "  Argument " ++ show n ++ ": got " ++ valueTypeName val ++ ", expected " ++ T.unpack (showType expectedType)
 
 runTheConstructors :: MonadSM m => Address -> Address -> Keccak256 -> CC.CodeCollection -> SolidString -> ValList -> m ()
 runTheConstructors from to hsh cc contractName' argVals' = do
