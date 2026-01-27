@@ -1057,6 +1057,10 @@ expToVar' (CC.DecimalLiteral _ v) = return $ Constant $ SDecimal $ CC.unwrapDeci
 expToVar' (CC.AddressLiteral _ a) = return $ Constant $ SAddress a False
 expToVar' (CC.BoolLiteral _ b) = return $ Constant $ SBool b
 expToVar' (CC.HexaLiteral _ a) = return $ Constant $ SString $ BC.unpack . either (parseError "Couldn't parse hexadecimal literal: ") id . B16.decode $ BC.pack a
+expToVar' (CC.ObjectLiteral _ fields) = do
+  -- Convert each field expression to a variable
+  fieldVars <- mapM expToVar fields
+  return $ Constant $ SStruct (stringToLabel "") fieldVars
 expToVar' (CC.InlineBoundsCheck _ mL mU expr) = do
   var <- expToVar expr
   value <- getInt var
@@ -3093,7 +3097,11 @@ validateFunctionArguments func argVals = checkFunc $ func : CC._funcOverload fun
         -- (SAddress a _, SVMType.String _) -> pure . Just . SString $ show a
         (SAddress a _, SVMType.Int _ _) -> pure . Just . SInteger . fromIntegral $ unAddress a
         (SEnumVal r x y, SVMType.UnknownLabel u) -> pure . bool Nothing (Just $ SEnumVal r x y) $ r == u
-        (SStruct r x, SVMType.UnknownLabel u) -> pure . bool Nothing (Just $ SStruct r x) $ r == u
+        (SStruct r x, SVMType.UnknownLabel u) ->
+          -- Allow anonymous structs (empty name) to match any struct type
+          if r == stringToLabel "" || r == u
+            then pure . Just $ SStruct u x
+            else pure Nothing
         (SContract r x, SVMType.UnknownLabel u) -> pure . bool Nothing (Just $ SContract r x) $ r == u
         (SArray vs, SVMType.Array y ml) ->
           if (Just $ V.length vs) `SVMType.maybeEq` (fromIntegral <$> ml)
