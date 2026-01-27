@@ -28,6 +28,33 @@ export const activityFeedApi = {
   },
 
   /**
+   * Fetch activities filtered by exact (contract_name, event_name) pairs
+   */
+  getActivities: async (
+    activityTypePairs: Array<{ contract_name: string; event_name: string }>,
+    options: {
+      limit?: number;
+      offset?: number;
+      myActivity?: boolean;
+    } = {}
+  ): Promise<EventResponse> => {
+    const params = new URLSearchParams();
+    
+    // Format: "contract1:event1,contract2:event2"
+    const activityTypesStr = activityTypePairs
+      .map(p => `${p.contract_name}:${p.event_name}`)
+      .join(',');
+    params.append('activity_types', activityTypesStr);
+    
+    if (options.limit) params.append('limit', options.limit.toString());
+    if (options.offset) params.append('offset', options.offset.toString());
+    if (options.myActivity) params.append('my_activity', 'true');
+
+    const response = await api.get(`/events/activities?${params.toString()}`);
+    return response.data as EventResponse;
+  },
+
+  /**
    * Get contract names and event names for filtering
    */
   getFilterOptions: async (): Promise<{ 
