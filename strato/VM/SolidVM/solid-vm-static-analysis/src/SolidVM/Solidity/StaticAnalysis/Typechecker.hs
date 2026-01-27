@@ -646,9 +646,6 @@ typecheckStatic (SVMType.Bytes d1 b1) (SVMType.Bytes d2 b2) =
     _ -> case (b1, b2) of
       (Just a, Just b) | a /= b -> Left "Mismatched length between bytes values"
       _ -> Right $ SVMType.Bytes (d1 <|> d2) (b1 <|> b2)
--- Allow string <-> bytes32 compatibility for keccak256 return values (SolidVM historical behavior)
-typecheckStatic (SVMType.String _) (SVMType.Bytes _ (Just 32)) = Right $ SVMType.String Nothing
-typecheckStatic (SVMType.Bytes _ (Just 32)) (SVMType.String _) = Right $ SVMType.Bytes Nothing (Just 32)
 typecheckStatic SVMType.Decimal SVMType.Decimal = Right $ SVMType.Decimal
 typecheckStatic SVMType.Bool SVMType.Bool = Right SVMType.Bool
 typecheckStatic (SVMType.Address a) (SVMType.Address b) = Right $ SVMType.Address (a && b)
