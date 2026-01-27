@@ -71,13 +71,16 @@ const queryRegularEvents = async (
 
       if (amount === null) return null;
 
+      const userAttr = mapping[item.address]?.[item.event_name]?.user;
+      const user = userAttr ? (attributes[userAttr] || item.transaction_sender) : item.transaction_sender;
+
       return {
         address: item.address,
         event_name: item.event_name,
         block_number: blockNumber,
         block_timestamp: item.block_timestamp,
         event_index: eventIndex,
-        transaction_sender: item.transaction_sender,
+        transaction_sender: user,
         amount,
       } as ProtocolEvent;
     })
@@ -101,6 +104,7 @@ export const getEventQueryParams = async (): Promise<{
     params: {
       address: `eq.${config.rewards.address}`,
       collection_name: `eq.activities`,
+      "value->>emissionRate": "neq.0000000000000000000000000000000000000000", // Might break if rate becomes 0 on cirrus
       select: "value->>sourceContract,value->>actionableEvents",
     },
   });

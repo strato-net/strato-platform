@@ -1,0 +1,142 @@
+/* Custom styles for STRATO docs */
+
+/* Color-code navigation sections */
+.md-nav__item--section > .md-nav__link[title="End Users"] {
+    color: #4CAF50;
+    font-weight: 700;
+    font-size: 1.05em;
+}
+
+.md-nav__item--section > .md-nav__link[title="Developers"] {
+    color: #2196F3;
+    font-weight: 700;
+    font-size: 1.05em;
+}
+
+.md-nav__item--section > .md-nav__link[title="Reference"] {
+    color: #FF9800;
+    font-weight: 700;
+    font-size: 1.05em;
+}
+
+/* Add subtle background to active persona sections */
+.md-nav__item--active > .md-nav__link[title*="End Users"] {
+    background-color: rgba(76, 175, 80, 0.1);
+    border-left: 3px solid #4CAF50;
+    padding-left: 10px;
+}
+
+.md-nav__item--active > .md-nav__link[title*="Developers"] {
+    background-color: rgba(33, 150, 243, 0.1);
+    border-left: 3px solid #2196F3;
+    padding-left: 10px;
+}
+
+.md-nav__item--active > .md-nav__link[title*="Reference"] {
+    background-color: rgba(255, 152, 0, 0.1);
+    border-left: 3px solid #FF9800;
+    padding-left: 10px;
+}
+
+/* Add spacing between major sections */
+.md-nav__item--section {
+    margin-top: 1rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid rgba(0, 0, 0, 0.07);
+}
+
+.md-nav__item--section:first-of-type {
+    border-top: none;
+    margin-top: 0;
+}
+
+/* Make Getting Started stand out */
+.md-nav__link[title*="Getting Started"] {
+    font-weight: 600;
+    background-color: rgba(0, 0, 0, 0.03);
+    border-radius: 4px;
+    padding: 8px 12px;
+}
+
+/* Persona badges on content pages */
+.persona-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.85em;
+    font-weight: 600;
+    margin-bottom: 1rem;
+}
+
+.persona-badge.end-user {
+    background-color: #E8F5E9;
+    color: #2E7D32;
+    border: 1px solid #4CAF50;
+}
+
+.persona-badge.developer {
+    background-color: #E3F2FD;
+    color: #1565C0;
+    border: 1px solid #2196F3;
+}
+
+/* Enhance home page cards */
+.md-typeset div[style*="border-left"] {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.md-typeset div[style*="border-left"]:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Code block enhancements */
+.md-typeset pre > code {
+    border-radius: 6px;
+}
+
+/* Better admonition styling */
+.md-typeset .admonition {
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+/* Swagger UI Integration */
+#swagger-ui {
+    width: 100%;
+    margin-top: 2rem;
+}
+
+/* Make Swagger UI match MkDocs Material theme */
+.swagger-ui .topbar {
+    display: none !important;
+}
+
+.swagger-ui .info {
+    margin-top: 0;
+}
+
+.swagger-ui .scheme-container {
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+/* Ensure Swagger UI fits nicely within content area */
+.swagger-ui .wrapper {
+    padding: 0;
+}
+
+/* Match button colors to MkDocs Material theme */
+.swagger-ui .btn.execute {
+    background-color: #3f51b5;
+    border-color: #3f51b5;
+}
+
+.swagger-ui .btn.execute:hover {
+    background-color: #303f9f;
+    border-color: #303f9f;
+}
+

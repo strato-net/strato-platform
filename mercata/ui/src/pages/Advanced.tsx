@@ -1,29 +1,42 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
-import MobileSidebar from '../components/dashboard/MobileSidebar';
+import MobileBottomNav from '../components/dashboard/MobileBottomNav';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import LendingPoolSection from '@/components/dashboard/LendingPoolSection';
 import SwapPoolsSection from '@/components/dashboard/SwapPoolsSection';
 import LiquidationsSection from '@/components/dashboard/LiquidationsSection';
 import SafetyModuleSection from '@/components/dashboard/SafetyModuleSection';
-import MintPlanner from '@/components/cdp/MintPlanner';
 import VaultsList from '@/components/cdp/VaultsList';
 import LiquidationsView from '@/components/cdp/LiquidationsView';
 import BadDebtView from '@/components/cdp/BadDebtView';
 // New v2 components
-import Mint from '@/components/cdp/v2/Mint';
-import DebtPosition from '@/components/cdp/v2/DebtPosition';
+import Mint from '@/components/cdp/v2/components/Mint/Mint';
+import DebtPosition from '@/components/cdp/v2/components/DebtPosition';
 import { useCDP } from '@/context/CDPContext';
-import { CompactRewardsDisplay } from '@/components/rewards/CompactRewardsDisplay';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 import { useUserTokens } from '@/context/UserTokensContext';
 
 const Advanced = () => {
+  const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<"lending" | "swap" | "liquidations" | "safety" | "mint">("mint");
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [borrowActiveTab, setBorrowActiveTab] = useState('vaults');
+
+  // Handle query parameters for tab navigation from rewards page
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    const subtabParam = searchParams.get('subtab');
+
+    if (tabParam && ['lending', 'swap', 'liquidations', 'safety', 'mint'].includes(tabParam)) {
+      setActiveTab(tabParam as "lending" | "swap" | "liquidations" | "safety" | "mint");
+    }
+
+    if (subtabParam && ['vaults', 'bad-debt', 'liquidations'].includes(subtabParam)) {
+      setBorrowActiveTab(subtabParam);
+    }
+  }, [searchParams]);
   const { refreshVaults } = useCDP();
   const [vaultsRefreshTrigger, setVaultsRefreshTrigger] = useState(0);
   const [mintPlannerRefreshTrigger, setMintPlannerRefreshTrigger] = useState(0);
@@ -57,50 +70,43 @@ const Advanced = () => {
   }, [refreshAllCDPComponents]);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-16 md:pb-0">
       <DashboardSidebar />
-      <MobileSidebar 
-        isOpen={isMobileSidebarOpen} 
-        onClose={() => setIsMobileSidebarOpen(false)} 
-      />
-      <div className="transition-all duration-300 md:pl-64" style={{ paddingLeft: 'var(--sidebar-width, 0rem)' }}>
-        <DashboardHeader title="Advanced" onMenuClick={() => setIsMobileSidebarOpen(true)} />
+
+      <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
+        <DashboardHeader title="Advanced" />
         
-        <main className="px-6 pt-3 pb-6 max-w-7xl mx-auto">
-          <Card className="mb-6 bg-transparent border-0 rounded-none shadow-none">
-            <CardContent className="pt-6">
+        <main className="px-3 md:px-6 pt-2 md:pt-3 pb-2 md:pb-6 max-w-7xl mx-auto">
+          <Card className="mb-2 md:mb-6 bg-transparent border-0 rounded-none shadow-none">
+            <CardContent className="p-0 md:pt-4">
               <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "lending" | "swap" | "liquidations" | "safety" | "mint")} className="w-full">
-                <TabsList className="grid w-full grid-cols-5 mb-4">
-                  <TabsTrigger value="mint" className="text-sm sm:text-base">
+                <TabsList className="grid w-full grid-cols-5 mb-3 md:mb-4 h-auto gap-0.5 md:gap-1">
+                  <TabsTrigger value="mint" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
                     Mint
                   </TabsTrigger>
-                  <TabsTrigger value="lending" className="text-sm sm:text-base">
-                    <span className="hidden sm:inline">Lending Pools</span>
-                    <span className="sm:hidden">Lending</span>
+                  <TabsTrigger value="lending" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
+                    Lending
                   </TabsTrigger>
-                  <TabsTrigger value="swap" className="text-sm sm:text-base">
-                    <span className="hidden sm:inline">Swap Pools</span>
-                    <span className="sm:hidden">Swap</span>
+                  <TabsTrigger value="swap" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
+                    Swap
                   </TabsTrigger>
-                  <TabsTrigger value="safety" className="text-sm sm:text-base">
-                    <span className="hidden sm:inline">Safety Module</span>
-                    <span className="sm:hidden">Safety</span>
+                  <TabsTrigger value="safety" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
+                    Safety
                   </TabsTrigger>
-                  <TabsTrigger value="liquidations" className="text-sm sm:text-base">
-                    <span className="hidden sm:inline">Liquidations</span>
-                    <span className="sm:hidden">Liquidations</span>
+                  <TabsTrigger value="liquidations" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
+                    Liquidations
                   </TabsTrigger>
                 </TabsList>
                 <TabsContent value="mint">
                   <Tabs value={borrowActiveTab} onValueChange={(value) => setBorrowActiveTab(value)} className="w-full">
-                    <TabsList className="grid w-full grid-cols-3 mb-4">
-                      <TabsTrigger value="vaults" className="text-sm sm:text-base">
+                    <TabsList className="grid w-full grid-cols-3 mb-3 md:mb-4 h-auto">
+                      <TabsTrigger value="vaults" className="text-xs md:text-sm py-2 px-1 md:px-3">
                         Vaults
                       </TabsTrigger>
-                      <TabsTrigger value="bad-debt" className="text-sm sm:text-base">
+                      <TabsTrigger value="bad-debt" className="text-xs md:text-sm py-2 px-1 md:px-3">
                         Bad Debt
                       </TabsTrigger>
-                      <TabsTrigger value="liquidations" className="text-sm sm:text-base">
+                      <TabsTrigger value="liquidations" className="text-xs md:text-sm py-2 px-1 md:px-3">
                         Liquidations
                       </TabsTrigger>
                     </TabsList>
@@ -149,6 +155,8 @@ const Advanced = () => {
           </Card>
         </main>
       </div>
+
+      <MobileBottomNav />
     </div>
   );
 };

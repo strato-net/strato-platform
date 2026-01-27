@@ -13,7 +13,7 @@ import BridgeWalletStatus from "./BridgeWalletStatus";
 import NetworkSelector from "./NetworkSelector";
 import TokenSelector from "./TokenSelector";
 import TransactionSummary from "./TransactionSummary";
-import { BRIDGE_OUT_FEE, usdstAddress, DECIMAL } from "@/lib/constants";
+import { BRIDGE_OUT_FEE, usdstAddress, DECIMAL, MIN_USDST_WITHDRAWAL } from "@/lib/constants";
 import {
   handleAmountInputChange,
   computeMaxTransferable,
@@ -212,8 +212,17 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false }) => {
         maxAmount,
         DECIMAL
       );
+
+      // Additional minimum validation for "From Savings" (USDST withdrawal)
+      if (isSaving && value) {
+        const numValue = parseFloat(value.replace(/,/g, ""));
+        const minAmount = parseFloat(MIN_USDST_WITHDRAWAL);
+        if (!isNaN(numValue) && numValue > 0 && numValue < minAmount) {
+          setAmountError(`Amount must be at least ${MIN_USDST_WITHDRAWAL} USDST`);
+        }
+      }
     },
-    [maxAmount]
+    [maxAmount, isSaving]
   );
 
   const showConfirmModal = () => {
@@ -313,24 +322,29 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false }) => {
       />
 
       <div className="space-y-1.5">
-        <div className="flex justify-between items-center">
-          <Label htmlFor="amount">{modeLabels.amountLabel}</Label>
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-1">
+          <Label htmlFor="amount" className="text-sm">{modeLabels.amountLabel}</Label>
           {!maxAmount && isBalanceLoading ? (
             <div className="flex items-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-              <p className="text-sm text-muted-foreground">Fetching balance...</p>
+              <p className="text-xs md:text-sm text-muted-foreground">Fetching balance...</p>
             </div>
           ) : (
             maxAmount && (
-              <p className="text-sm text-muted-foreground">
-                Max: {formatBalance(
-                  maxAmount,
-                  undefined,
-                  DECIMAL,
-                  2,
-                  DECIMAL
-                )}
-              </p>
+              <div className="flex items-center gap-3">
+                <p className="text-xs md:text-sm text-muted-foreground">
+                  Max: {formatBalance(
+                    maxAmount,
+                    undefined,
+                    DECIMAL,
+                    2,
+                    6
+                  )}
+                </p>
+                <p className="text-xs md:text-sm text-muted-foreground">
+                  Min: {isSaving ? MIN_USDST_WITHDRAWAL : "0"}
+                </p>
+              </div>
             )
           )}
         </div>

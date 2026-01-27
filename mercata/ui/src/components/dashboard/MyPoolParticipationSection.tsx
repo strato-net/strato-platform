@@ -101,29 +101,29 @@ export default function MyPoolParticipationSection({
   };
 
   return (
-    <Card className="rounded-2xl shadow-sm w-full mb-6">
-      <CardHeader>
-        <CardTitle className="text-lg font-semibold text-foreground">
+    <Card className="rounded-xl shadow-sm w-full mb-6">
+      <CardHeader className="pb-2 md:pb-4">
+        <CardTitle className="text-base md:text-lg font-semibold text-foreground">
           My Pool Participation
         </CardTitle>
       </CardHeader>
 
-      <CardContent className="space-y-4">
-        {/* Header Row */}
-        <div className="grid grid-cols-4 px-4 text-sm text-muted-foreground font-medium">
+      <CardContent className="space-y-3 md:space-y-4 px-3 md:px-6">
+        {/* Header Row - 3 columns on mobile, 4 on desktop */}
+        <div className="grid grid-cols-3 md:grid-cols-4 px-3 md:px-4 text-xs md:text-sm text-muted-foreground font-medium">
           <div>Token</div>
-          <div className="text-center">Balance</div>
-          <div className="text-center">APY</div>
+          <div className="text-right md:text-center">Balance</div>
+          <div className="hidden md:block text-center">APY</div>
           <div className="text-right">Value</div>
         </div>
 
         {shouldShowLoading ? (
-          <div className="flex items-center justify-center gap-2">
+          <div className="flex items-center justify-center gap-2 py-4">
             <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary" />
             <span className="text-sm text-muted-foreground">Loading...</span>
           </div>
         ) : !hasData ? (
-          <div className="p-2 flex justify-center text-muted-foreground">
+          <div className="p-4 flex justify-center text-muted-foreground text-sm">
             No pool tokens found
           </div>
         ) : (
@@ -136,39 +136,37 @@ export default function MyPoolParticipationSection({
                 return (
                   <div key={token.address} className="space-y-0">
                     <div
-                      className={`grid grid-cols-4 items-center bg-muted/30 px-4 py-3 rounded-md`}
+                      className="grid grid-cols-3 md:grid-cols-4 items-center bg-muted/30 px-3 md:px-4 py-2.5 md:py-3 rounded-lg"
                     >
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 md:gap-2 min-w-0">
                         <Link
                           to={`/dashboard/deposits/${token.address}`}
-                          className="font-medium text-blue-600 hover:text-blue-800 underline transition-colors"
+                          className="font-medium text-sm md:text-base text-blue-600 hover:text-blue-800 underline transition-colors truncate"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          {token._name || token._symbol}
+                          {token._symbol || token._name}
                         </Link>
-                        {canExpand &&
-                          <div 
-                            className="cursor-pointer hover:opacity-70"
+                        {canExpand && (
+                          <button 
+                            className="cursor-pointer hover:opacity-70 shrink-0 p-0.5"
                             onClick={() => toggleExpanded(token.address)}
                           >
                             {isExpanded ? (
-                              <ChevronUp size={16} />
+                              <ChevronUp size={14} className="md:w-4 md:h-4" />
                             ) : (
-                              <ChevronDown size={16} />
+                              <ChevronDown size={14} className="md:w-4 md:h-4" />
                             )}
-                          </div>
-                        }
+                          </button>
+                        )}
                       </div>
 
-                      <div className="text-center font-semibold text-foreground">
+                      <div className="text-right md:text-center text-sm md:text-base font-semibold text-foreground">
                         {formattedBalance}
                       </div>
 
-                      <div className="text-center font-semibold text-foreground">
+                      <div className="hidden md:flex text-center font-semibold text-foreground justify-center">
                         {anyLoading ? (
-                          <div className="flex items-center justify-center">
-                            <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-primary" />
-                          </div>
+                          <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-primary" />
                         ) : apy ? (
                           `${apy}%`
                         ) : (
@@ -176,7 +174,7 @@ export default function MyPoolParticipationSection({
                         )}
                       </div>
 
-                      <div className="text-right font-medium text-foreground">
+                      <div className="text-right text-sm md:text-base font-medium text-foreground">
                         {value}
                       </div>
                     </div>
@@ -185,7 +183,7 @@ export default function MyPoolParticipationSection({
                       <LPTokenDropdown
                         lpToken={pool}
                         isExpanded={isExpanded}
-                        className="px-4"
+                        className="px-3 md:px-4"
                       />
                     )}
                   </div>

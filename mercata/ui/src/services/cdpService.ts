@@ -1,17 +1,18 @@
 import { api } from "@/lib/axios";
 import { parseUnitsWithTruncation } from "@/utils/numberUtils";
 import type {
-  VaultData,
+  Vault,
   AssetConfig,
   TransactionResponse,
   BadDebt,
   JuniorNote,
 } from "./cdpTypes";
-import type { VaultCandidateAPI } from "./MintService";
-import { apiToVaultCandidate, type VaultCandidate } from "./MintService";
+import type { VaultCandidateAPI } from "../components/cdp/v2/MintService";
+import { apiToVaultCandidate } from "../components/cdp/v2/MintService";
+import type { VaultCandidate } from "../components/cdp/v2/cdpTypes";
 
 export type {
-  VaultData,
+  Vault,
   AssetConfig,
   TransactionResponse,
   BadDebt,
@@ -45,7 +46,7 @@ const getAssetDecimals = async (asset: string): Promise<number> => {
 
 export const cdpService = {
   // Get user's CDP positions/vaults
-  async getVaults(): Promise<VaultData[]> {
+  async getVaults(): Promise<Vault[]> {
     const response = await api.get("/cdp/vaults");
     return response.data;
   },
@@ -59,16 +60,24 @@ export const cdpService = {
   },
 
   // Get specific vault for an asset
-  async getVault(asset: string): Promise<VaultData | null> {
+  async getVault(asset: string): Promise<Vault | null> {
     const response = await api.get(`/cdp/vaults/${asset}`);
     return response.data;
   },
 
   // Deposit collateral
-  async deposit(asset: string, amount: string): Promise<TransactionResponse> {
-    const decimals = await getAssetDecimals(asset);
-    // Use parseUnitsWithTruncation to handle amounts with too many decimal places
-    const amountWei = parseUnitsWithTruncation(amount, decimals).toString();
+  async deposit(asset: string, amount: string, isWei: boolean = false): Promise<TransactionResponse> {
+    let amountWei: string;
+    if (isWei) {
+      // Amount is already in wei format
+      amountWei = amount;
+      console.log('[cdpService.deposit] Received raw wei:', { asset, amountWei, note: 'No conversion needed' });
+    } else {
+      // Amount is in decimal format, convert to wei
+      const decimals = await getAssetDecimals(asset);
+      amountWei = parseUnitsWithTruncation(amount, decimals).toString();
+      console.log('[cdpService.deposit] Converted decimal to wei:', { asset, decimalAmount: amount, amountWei, decimals });
+    }
     const response = await api.post("/cdp/deposit", { asset, amount: amountWei });
     return response.data;
   },
@@ -101,9 +110,17 @@ export const cdpService = {
   },
 
   // Mint USDST
-  async mint(asset: string, amount: string): Promise<TransactionResponse> {
-    // Use parseUnitsWithTruncation to handle amounts with too many decimal places
-    const amountWei = parseUnitsWithTruncation(amount, USDST_DECIMALS).toString();
+  async mint(asset: string, amount: string, isWei: boolean = false): Promise<TransactionResponse> {
+    let amountWei: string;
+    if (isWei) {
+      // Amount is already in wei format
+      amountWei = amount;
+      console.log('[cdpService.mint] Received raw wei:', { asset, amountWei, note: 'No conversion needed' });
+    } else {
+      // Amount is in decimal format, convert to wei
+      amountWei = parseUnitsWithTruncation(amount, USDST_DECIMALS).toString();
+      console.log('[cdpService.mint] Converted decimal to wei:', { asset, decimalAmount: amount, amountWei, decimals: USDST_DECIMALS });
+    }
     const response = await api.post("/cdp/mint", { asset, amount: amountWei });
     return response.data;
   },
@@ -137,7 +154,7 @@ export const cdpService = {
   },
 
   // Get liquidatable positions
-  async getLiquidatable(): Promise<VaultData[]> {
+  async getLiquidatable(): Promise<Vault[]> {
     const response = await api.get("/cdp/liquidatable");
     return response.data;
   },
