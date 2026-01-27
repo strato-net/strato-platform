@@ -2300,9 +2300,15 @@ runTheConstructors from to hsh cc contractName' argVals' = do
     -- SVMType.Bool -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) $ MS.BBool False
 
     forM_ (reverse $ contract' ^. CC.parents) $ \parent -> do
-      for_ (M.lookup parent . CC._funcConstructorCalls =<< contract' ^. CC.constructor) $ \args'' -> do
-        vals <- traverse (getVar <=< expToVar) args''
-        runTheConstructors from to hsh cc parent vals
+      -- Get explicit constructor args if present, otherwise use empty args for parameterless constructors
+      let maybeArgs = M.lookup parent . CC._funcConstructorCalls =<< contract' ^. CC.constructor
+      case maybeArgs of
+        Just args'' -> do
+          vals <- traverse (getVar <=< expToVar) args''
+          runTheConstructors from to hsh cc parent vals
+        Nothing -> do
+          -- Call parent constructor with no arguments (handles parameterless parent constructors)
+          runTheConstructors from to hsh cc parent []
 
     case contract' ^. CC.constructor of
       Just theFunction -> do
