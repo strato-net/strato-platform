@@ -9,7 +9,6 @@ import LendingPoolSection from '@/components/dashboard/LendingPoolSection';
 import SwapPoolsSection from '@/components/dashboard/SwapPoolsSection';
 import LiquidationsSection from '@/components/dashboard/LiquidationsSection';
 import SafetyModuleSection from '@/components/dashboard/SafetyModuleSection';
-import MintPlanner from '@/components/cdp/MintPlanner';
 import VaultsList from '@/components/cdp/VaultsList';
 import LiquidationsView from '@/components/cdp/LiquidationsView';
 import BadDebtView from '@/components/cdp/BadDebtView';
@@ -17,7 +16,6 @@ import BadDebtView from '@/components/cdp/BadDebtView';
 import Mint from '@/components/cdp/v2/components/Mint/Mint';
 import DebtPosition from '@/components/cdp/v2/components/DebtPosition';
 import { useCDP } from '@/context/CDPContext';
-import { CompactRewardsDisplay } from '@/components/rewards/CompactRewardsDisplay';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 import { useUserTokens } from '@/context/UserTokensContext';
 

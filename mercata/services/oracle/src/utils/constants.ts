@@ -22,6 +22,14 @@ export const TIMEOUTS = {
     SUBMIT: 20000, 
     WAIT: 180000,
     STATUS: 10000,
+    FETCH: 30000,
+};
+
+// Oracle configuration
+export const ORACLE_CONFIG = {
+    MIN_VALID_SOURCES: 3,
+    MAX_SOURCE_DIVERGENCE_PERCENT: 5,    // Alert if sources differ by >5%
+    MAX_PRICE_CHANGE_PERCENT: 20,        // Alert if price changed >20% from last
 };
 
 // Retry delay configurations

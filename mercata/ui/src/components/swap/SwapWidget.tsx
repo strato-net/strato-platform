@@ -28,7 +28,7 @@ import { usePoolPolling } from "@/hooks/useSmartPolling";
 import { calculateSwapOutput, calculateSwapInput, calculateImpact } from "@/helpers/swapCalculations";
 import { computeMaxTransferable, handleAmountInputChange } from "@/utils/transferValidation";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { CompactRewardsDisplay } from "@/components/rewards/CompactRewardsDisplay";
+import { RewardsWidget } from "@/components/rewards/RewardsWidget";
 import { UserRewardsData } from "@/services/rewardsService";
 
 // ============================================================================
@@ -909,15 +909,14 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
         );
         if (!activity) return null;
 
-        // Swap rewards are tracked in USDST terms, so use the USDST side of the swap
-        const isFromUsdst = fromAsset?.address?.toLowerCase() === usdstAddress.toLowerCase();
-        const inputAmount = isFromUsdst ? fromAmount : toAmount;
-
+        // Swap rewards are tracked in USD-notional terms via tokenIn price conversion
+        // Pass fromAmount (amountIn) and fromAsset address for USD conversion
         return (
-          <CompactRewardsDisplay
+          <RewardsWidget
             userRewards={userRewards}
             activityName={activity.activity.name}
-            inputAmount={inputAmount}
+            inputAmount={fromAmount}
+            swapTokenInAddress={fromAsset?.address}
             actionLabel="Swap"
           />
         );

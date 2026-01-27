@@ -5,6 +5,7 @@ import { formatUnits } from "viem";
 import { Coins, Zap, Clock, RefreshCw, Star } from "lucide-react";
 import CopyButton from "@/components/ui/copy";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useState } from "react";
 
 interface RewardsOverviewProps {
@@ -126,9 +127,18 @@ export const RewardsOverview = ({ state, loading, onRefresh }: RewardsOverviewPr
                 <p className="text-xs text-muted-foreground mt-1">{emissionPerWeek} points/week</p>
               )}
               {totalStakeFormatted !== "?" && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Total Stake: {totalStakeFormatted}
-                </p>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <p className="text-xs text-muted-foreground mt-1 cursor-help">
+                      Total Stake: {totalStakeFormatted}
+                    </p>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="max-w-xs text-sm">
+                      This is the sum of stakes across all activities.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
               )}
             </div>
           </div>

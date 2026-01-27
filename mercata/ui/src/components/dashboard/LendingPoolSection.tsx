@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { LENDING_DEPOSIT_FEE, LENDING_WITHDRAW_FEE } from "@/lib/constants";
 import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
 import { rewardsEnabled } from "@/lib/constants";
-import { CompactRewardsDisplay } from "@/components/rewards/CompactRewardsDisplay";
+import { RewardsWidget } from "@/components/rewards/RewardsWidget";
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 
 const LendingPoolSection = () => {
@@ -235,7 +235,7 @@ const LendingPoolSection = () => {
                     Transaction Fee: {LENDING_DEPOSIT_FEE} USDST
                   </div>
                   {/* Estimated Rewards */}
-                  <CompactRewardsDisplay
+                  <RewardsWidget
                     userRewards={userRewards}
                     activityName="Lending Pool Liquidity"
                     inputAmount={depositAmount}
@@ -409,7 +409,7 @@ const LendingPoolSection = () => {
                     Transaction Fee: {LENDING_WITHDRAW_FEE} USDST
                   </div>
                   {/* Estimated Rewards Display */}
-                  <CompactRewardsDisplay
+                  <RewardsWidget
                     userRewards={userRewards}
                     activityName="Lending Pool Liquidity"
                     inputAmount={withdrawAmount}
