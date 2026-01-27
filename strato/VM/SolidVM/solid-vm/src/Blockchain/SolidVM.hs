@@ -2138,18 +2138,17 @@ callBuiltin name args
   | "uint" `isPrefixOf` name && all isDigit (drop 4 name) = return $ intBuiltin args
   | "int" `isPrefixOf` name && all isDigit (drop 3 name) = return $ intBuiltin args
 -- Handle sized bytes type casts (bytes1, bytes2, ..., bytes32)
--- bytes32(integer) - treat as same bit representation, mask to size
+-- bytes32(integer) - convert to bytes representation
 callBuiltin name [SInteger i]
   | "bytes" `isPrefixOf` name && not (null (drop 5 name)) && all isDigit (drop 5 name) =
       let size = read (drop 5 name) :: Int
           sizeMask = (2 ^ (8 * size)) - 1
-      in return $ SInteger (i .&. sizeMask)
+          maskedInt = i .&. sizeMask
+      in return $ SBytes $ integer2Bytes maskedInt
 callBuiltin name [SString s]
   | "bytes" `isPrefixOf` name && not (null (drop 5 name)) && all isDigit (drop 5 name) =
-      -- Convert string to integer representation
-      let bytes = BC.pack s
-          i = byteString2Integer bytes
-      in return $ SInteger i
+      -- Convert string to bytes representation
+      return $ SBytes $ BC.pack s
 callBuiltin "decimal" args = return $ decimalBuiltin args
 callBuiltin "identity" [v] = return v
 callBuiltin "log" args = SNULL <$ traverse (liftIO . putStrLn <=< showSM) args
