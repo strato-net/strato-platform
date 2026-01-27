@@ -69,9 +69,10 @@ const ActivityFeedFilters = memo(({
     : eventNames;
 
   // Deduplicate event names to prevent "DepositedDeposited" when "All Contracts" is selected
+  // Sort event names alphabetically
   const uniqueEventNames = Array.from(
     new Map(availableEvents.map(event => [event.name, event])).values()
-  );
+  ).sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <div className="mb-4 sm:mb-6 p-3 sm:p-4 border rounded-lg bg-muted/50 border-border">

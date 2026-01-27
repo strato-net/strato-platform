@@ -25,6 +25,33 @@ router.get("/vaults", authHandler.authorizeRequest(), CDPController.getVaults);
 
 /**
  * @openapi
+ * /cdp/vault-candidates:
+ *   get:
+ *     summary: List existing CDP vaults and potential vaults the user can open (based on non-collateral balance)
+ *     tags: [CDP]
+ *     responses:
+ *       200:
+ *         description: Existing vault candidates and potential vault candidates
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 existingVaults:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     additionalProperties: true
+ *                 potentialVaults:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     additionalProperties: true
+ */
+router.get("/vault-candidates", authHandler.authorizeRequest(), CDPController.getVaultCandidates);
+
+/**
+ * @openapi
  * /cdp/vaults/{asset}:
  *   get:
  *     summary: Fetch a single vault for an asset

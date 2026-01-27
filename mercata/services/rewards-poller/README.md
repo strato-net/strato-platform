@@ -59,6 +59,7 @@ cp .env.example .env
 
 #### Contract Addresses
 - `USDST_ADDRESS` - USDST token contract address (default: `937efa7e3a77e20bbdbd7c0d32b6514f368c1010`)
+- `VOUCHER_ADDRESS` - Voucher contract address (default: `000000000000000000000000000000000000100e`)
 
 #### Polling Configuration
 - `MAX_BATCH_SIZE` - Maximum number of actions per batch (default: `50`)
@@ -88,6 +89,7 @@ OPENID_DISCOVERY_URL=https://your-openid-provider/.well-known/openid-configurati
 REWARDS_CONTRACT_ADDRESS=0000000000000000000000000000000000000000
 PRICE_ORACLE_ADDRESS=0000000000000000000000000000000000000000
 USDST_ADDRESS=937efa7e3a77e20bbdbd7c0d32b6514f368c1010
+VOUCHER_ADDRESS=000000000000000000000000000000000000100e
 
 # API Configuration
 NODE_URL=https://your-strato-node-url

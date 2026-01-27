@@ -58,17 +58,27 @@ export const hiddenSwapPools: Set<string> = new Set([
    These are used to set bridge URL and rewards address based on network ID.
 */
 export const defaultBridgeServiceFor: Record<string, string> = {
-  "114784819836269":"https://bridge.testnet.stratomercata.com", // Helium testnet
-  "33056204878082667":"https://bridge.stratomercata.com",       // Upquark mainnet
+  "114784819836269":"https://bridge.testnet.strato.nexus", // Helium testnet
+  "33056204878082667":"https://bridge.strato.nexus",       // Upquark mainnet
 };
 export const defaultRewardsAddressFor: Record<string, string> = {
   "114784819836269": "170147f58738c9f46112a874030420b823901f3b", // Helium testnet
   "33056204878082667": "4a116cf8cb056036632aef08f7c0df27c720f1c0", // Upquark mainnet
 };
+export const defaultEscrowAddressFor: Record<string, string> = {
+  "114784819836269": "7fa32d329b5f61a1808418304eea249b1b0b28fc", // Helium testnet
+  "33056204878082667": "4b4a14095077946c20fb680980db511932b7cf4b", // Upquark mainnet
+}
+export const defaultReferralServiceFor: Record<string, string> = {
+  "114784819836269": "http://ec2-54-89-36-118.compute-1.amazonaws.com", // Helium testnet
+  "33056204878082667": "http://ec2-18-218-166-133.us-east-2.compute.amazonaws.com", // Upquark mainnet
+};
 
 export let bridgeUrl: string | undefined;
 export let rewards: string | undefined;
 export let networkId: string | undefined;
+export let referralUrl: string | undefined;
+export let escrow: string = '';
 
 export function setBridgeConfig(networkId: string) {
   if (process.env.BRIDGE_SERVICE_URL) {
@@ -86,6 +96,19 @@ export function setRewardsConfig(networkId: string) {
   }
 }
 
+export function setReferralConfig(networkId: string) {
+  if (process.env.ESCROW_ADDRESS) {
+    escrow = process.env.ESCROW_ADDRESS;
+  } else {
+    escrow = defaultEscrowAddressFor[networkId];
+  }
+  if (process.env.REDEMPTION_SERVER_URL) {
+    referralUrl = process.env.REDEMPTION_SERVER_URL;
+  } else {
+    referralUrl = defaultReferralServiceFor[networkId];
+  }
+}
+
 export async function initNetworkConfig() {
   // Import eth here to avoid circular dependency (eth depends on nodeUrl)
   const { eth } = await import("../utils/mercataApiHelper");
@@ -97,4 +120,5 @@ export async function initNetworkConfig() {
   }
   setBridgeConfig(networkId);
   setRewardsConfig(networkId);
+  setReferralConfig(networkId);
 }

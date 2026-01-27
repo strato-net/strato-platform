@@ -1,17 +1,34 @@
 import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { BORROW_FEE } from "@/lib/constants";
-import { safeParseUnits, addCommasToInput, formatWeiAmount, safeParseFloat, formatUnits } from "@/utils/numberUtils";
-import { NewLoanData, CollateralData, HealthImpactData } from "@/interface";
-import { calculateBorrowHealthImpact } from "@/utils/lendingUtils";
-import RiskLevelProgress from "@/components/ui/RiskLevelProgress";
-import HealthImpactDisplay from "@/components/ui/HealthImpactDisplay";
-import PercentageButtons from "../ui/PercentageButtons";
+import { Slider } from "@/components/ui/slider";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { HelpCircle, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
+import { safeParseUnits, addCommasToInput, formatUnits, formatBalance } from "@/utils/numberUtils";
+import { NewLoanData, CollateralData } from "@/interface";
+import { 
+  calculateAvailableToBorrowUSD, 
+  calculateHFSliderExtrema, 
+  calculateAfterBorrowHealthFactor,
+  recommendCollateralToSupply,
+  calculateAdditionalValueNeeded,
+  calculateBorrowTxFee,
+  determineErrorMessage,
+  calculateAdditionalCollateralAmountFromValue,
+  sortCollateralAssets,
+  calculateMaxCollateralValueUSDCentFloored,
+  centCeil,
+  centFloor,
+  getTextColor,
+  getRiskLabel
+} from "@/utils/lendingUtils";
 import { useLendingContext } from "@/context/LendingContext";
-import { computeMaxTransferable, handleAmountInputChange } from "@/utils/transferValidation";
+import { handleAmountInputChange } from "@/utils/transferValidation";
 import { UserRewardsData } from "@/services/rewardsService";
-import { CompactRewardsDisplay } from "../rewards/CompactRewardsDisplay";
+import { RewardsWidget } from "../rewards/RewardsWidget";
+import BorrowProgressModal, { BorrowStep } from "./BorrowProgressModal";
 
 interface BorrowFormProps {
   loans: NewLoanData | null;
@@ -26,42 +43,253 @@ interface BorrowFormProps {
   rewardsLoading?: boolean;
 }
 
+  // In custom mode, each asset row can be driven by:
+  // - exact wei (e.g. from recommendation or MAX button), or
+  // - a USD input (typed by the user) which determines wei.
+type CustomCollateralEntry =
+  | { source: "wei"; wei: bigint }
+  | { source: "usd"; usd: string };
+
 const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalance, collateralInfo, startPolling, stopPolling, userRewards, rewardsLoading }: BorrowFormProps) => {
   const [borrowAmount, setBorrowAmount] = useState<string>("");
   const [borrowAmountError, setBorrowAmountError] = useState<string>("");
+  const [customBorrowError, setCustomBorrowError] = useState<string>("");
   const [feeError, setFeeError] = useState<string>("");
-  const [riskLevel, setRiskLevel] = useState(0);
-  const [healthImpact, setHealthImpact] = useState<HealthImpactData>({
-    currentHealthFactor: 0,
-    newHealthFactor: 0,
-    healthImpact: 0,
-    isHealthy: true,
-  });
-  const { borrowMax } = useLendingContext();
+  const [targetHealthFactor, setTargetHealthFactor] = useState<number>(2.10);
+  const [autoSupplyCollateral, setAutoSupplyCollateral] = useState<boolean>(true);
+  const [isCollateralExpanded, setIsCollateralExpanded] = useState<boolean>(false);
+  const [customCollateralEntries, setCustomCollateralEntries] = useState<Map<string, CustomCollateralEntry>>(new Map());
+  const [progressModalOpen, setProgressModalOpen] = useState(false);
+  const [borrowSteps, setBorrowSteps] = useState<BorrowStep[]>([]);
+  const { supplyCollateral } = useLendingContext();
 
-  const maxAmount = useMemo(() => {
-    return computeMaxTransferable(loans?.maxAvailableToBorrowUSD, false, voucherBalance, usdstBalance, safeParseUnits(BORROW_FEE).toString(), setFeeError);
-  }, [voucherBalance, usdstBalance, loans?.maxAvailableToBorrowUSD]);
+  // Calculate slider extrema based on collateral configs
+  const sliderExtrema = useMemo(() => {
+    return calculateHFSliderExtrema(loans, collateralInfo);
+  }, [loans, collateralInfo]);
 
-  // Calculate risk level for borrow form
-  useEffect(() => {
-    try {
-      const existingBorrowedBigInt = BigInt(loans?.totalAmountOwed || 0);
-      const newBorrowAmountBigInt = safeParseUnits(borrowAmount || "0", 18);
-      const totalBorrowedBigInt = existingBorrowedBigInt + newBorrowAmountBigInt;
-      const collateralValueBigInt = BigInt(loans?.totalCollateralValueUSD || 0);
-
-      if (collateralValueBigInt === 0n) {
-        setRiskLevel(0);
-        return;
+  // Build collateral map from all available user balances (reused for calculations)
+  const potentialCollateral = useMemo(() => {
+    const map = new Map<CollateralData, bigint>();
+    if (collateralInfo) {
+      for (const collateral of collateralInfo) {
+        const balance = BigInt(collateral.userBalance ?? "0");
+        if (balance > 0n) {
+          map.set(collateral, balance);
+        }
       }
-
-      const risk = Number((totalBorrowedBigInt * 10000n) / collateralValueBigInt) / 100;
-      setRiskLevel(Math.min(risk, 100));
-    } catch {
-      setRiskLevel(0);
     }
-  }, [borrowAmount, loans?.totalCollateralValueUSD, loans?.totalAmountOwed]);
+    return map;
+  }, [collateralInfo]);
+
+  // Calculate available to borrow based on current health factor setting
+  // Includes all available collateral balances (max potential borrowing power)
+  // Amount is in wei; 10n**18n = 1 USD
+  const availableToBorrow = useMemo(() => {
+    if (!loans || !collateralInfo || collateralInfo.length === 0) return 0n;
+    return calculateAvailableToBorrowUSD(loans, targetHealthFactor, potentialCollateral);
+  }, [loans, collateralInfo, targetHealthFactor, potentialCollateral]);
+
+  // Calculate maximum borrowable at slider minimum (riskiest) health factor
+  // Amount is in wei; 10n**18n = 1 USD
+  const maxAtMinHF = useMemo(() => {
+    return calculateAvailableToBorrowUSD(loans, sliderExtrema.min, potentialCollateral);
+  }, [loans, sliderExtrema.min, potentialCollateral]);
+
+
+  // Current health factor display
+  const currentHF = useMemo(() => {
+    if (!loans) return null;
+    const owed = BigInt(loans.totalAmountOwed || 0);
+    if (owed <= 1n) return null; // No loan
+    return loans.healthFactor;
+  }, [loans]);
+
+  // Recommended collateral to supply based on borrow amount and target HF
+  const recommendedCollateral = useMemo(() => {
+    if (!loans || !collateralInfo || collateralInfo.length === 0 || !borrowAmount || parseFloat(borrowAmount) <= 0) {
+      return new Map<CollateralData, bigint>();
+    }
+    // Make a copy of collateralInfo to avoid mutating original
+    const collateralsCopy = [...collateralInfo];
+    return recommendCollateralToSupply(loans, targetHealthFactor, parseFloat(borrowAmount), collateralsCopy);
+  }, [loans, collateralInfo, borrowAmount, targetHealthFactor]);
+
+  // Build collateral table data
+  const collateralTableData = useMemo(() => {
+    const data: Array<{ collateral: CollateralData; amount: bigint; valueUSD: number }> = [];
+    
+    if (autoSupplyCollateral) {
+      // In auto mode, only show recommended collateral with amount > 0
+      for (const [collateral, amount] of recommendedCollateral.entries()) {
+        if (amount <= 0n) continue;
+        
+        const price = BigInt(collateral.assetPrice ?? "0");
+        const decimals = BigInt(10) ** BigInt(collateral.customDecimals ?? 18);
+        const valueUSD = Number((amount * price) / decimals) / 1e18;
+        data.push({ collateral, amount, valueUSD });
+      }
+    } else {
+      // In custom mode, show ALL collateral assets the user possesses
+      // Extract collaterals into array, sort them, then build data array in sorted order
+      const collateralsArray = Array.from(potentialCollateral.keys());
+      sortCollateralAssets(collateralsArray);
+
+      for (const collateral of collateralsArray) {
+        const entry = customCollateralEntries.get(collateral.address);
+        const price = BigInt(collateral.assetPrice ?? "0");
+        const decimals = collateral.customDecimals ?? 18;
+
+        const amount = (() => {
+          if (!entry) return 0n;
+          if (entry.source === "wei") return entry.wei;
+          if (entry.source === "usd") return calculateAdditionalCollateralAmountFromValue(entry.usd, price, decimals);
+          return 0n; // unreachable
+        })();
+
+        const tokenDecimals = BigInt(10) ** BigInt(decimals);
+        const valueUSD = Number((amount * price) / tokenDecimals) / 1e18;
+
+        data.push({ collateral, amount, valueUSD });
+      }
+    }
+    
+    return data;
+  }, [recommendedCollateral, autoSupplyCollateral, customCollateralEntries, potentialCollateral]);
+
+  // Total value of collateral in table
+  const totalCollateralValue = useMemo(() => {
+    return collateralTableData.reduce((sum, item) => sum + item.valueUSD, 0);
+  }, [collateralTableData]);
+
+  // Map of collateral addresses to whether their value exceeds maximum
+  const collateralExceedsMaxMap = useMemo(() => {
+    const map = new Map<string, boolean>();
+    if (autoSupplyCollateral) return map; // Only check in custom mode
+    
+    for (const item of collateralTableData) {
+      const balanceWei = BigInt(item.collateral.userBalance ?? "0");
+      map.set(item.collateral.address, item.amount > balanceWei);
+    }
+    
+    return map;
+  }, [autoSupplyCollateral, collateralTableData]);
+
+  // Check if any custom collateral values exceed their maximum
+  const hasExceededMaxCollateralValue = useMemo(() => {
+    return [...collateralExceedsMaxMap.values()].some(exceedsMax => exceedsMax);
+  }, [collateralExceedsMaxMap]);
+
+  // Calculate after-borrow health factor (includes new collateral being supplied)
+  const afterBorrowHF = useMemo(() => {
+    if (!loans || !borrowAmount || parseFloat(borrowAmount) <= 0) {
+      return null;
+    }
+    // Build collateral map from table data (includes auto or custom amounts)
+    const newCollateral = new Map<CollateralData, bigint>(
+      collateralTableData.map(item => [item.collateral, item.amount])
+    );
+    return calculateAfterBorrowHealthFactor(loans, parseFloat(borrowAmount), newCollateral);
+  }, [loans, borrowAmount, collateralTableData]);
+
+  // Additional collateral needed value (for header)
+  const additionalCollateralNeededValue = useMemo(() => {
+    // In auto mode, the amount needed is already what's supplied
+    if (autoSupplyCollateral) { return totalCollateralValue; }
+    // In custom mode, calculate what's needed to achieve target HF using strictest LT
+    if (!loans || !collateralInfo || collateralInfo.length === 0) return 0;
+    const borrowNum = parseFloat(borrowAmount || "0");
+    if (!borrowNum || borrowNum <= 0) return 0;
+    return Number(calculateAdditionalValueNeeded(collateralInfo, borrowNum, loans, targetHealthFactor));
+  }, [autoSupplyCollateral, totalCollateralValue, loans, collateralInfo, borrowAmount, targetHealthFactor]);
+
+  // Check if sufficient collateral is supplied in custom mode
+  const additionalCollateralShortfall = useMemo(() => {
+    if (autoSupplyCollateral) return 0; // Only check in custom mode
+    if (!borrowAmount || parseFloat(borrowAmount) <= 0) return 0; // No validation needed if no borrow amount
+    return additionalCollateralNeededValue - totalCollateralValue;
+  }, [autoSupplyCollateral, totalCollateralValue, additionalCollateralNeededValue, borrowAmount]);
+
+  const hasInsufficientCollateral = useMemo(() => {
+    return additionalCollateralShortfall > 0;
+  }, [additionalCollateralShortfall]);
+
+  const hasExcessCollateral = useMemo(() => {
+    const EXCESS_COLLATERAL_ALLOWANCE = 1.00; // Allow for 1 USD of excess
+    return additionalCollateralShortfall < -EXCESS_COLLATERAL_ALLOWANCE;
+  }, [autoSupplyCollateral, additionalCollateralShortfall, borrowAmount]);
+
+  // Calculate transaction fee based on number of collateral assets being supplied
+  const txFee = useMemo(() => {
+    const collateralCount = collateralTableData.filter(item => item.amount > 0n).length;
+    return calculateBorrowTxFee(collateralCount);
+  }, [collateralTableData]);
+
+  // Check if user can afford the transaction fee (separate from borrow amount)
+  useEffect(() => {
+    const feeWei = safeParseUnits(txFee.fee.toString(), 18);
+    const voucherBal = BigInt(voucherBalance || 0);
+    const usdstBal = safeParseUnits(usdstBalance || "0", 18);
+    
+    const canCover = voucherBal >= BigInt(txFee.voucher) || usdstBal >= feeWei;
+    if (!canCover) {
+      setFeeError("Insufficient USDST + voucher balance for transaction fee");
+    } else {
+      setFeeError("");
+    }
+  }, [txFee, voucherBalance, usdstBalance]);
+
+
+
+  // Automatically reset to auto-supply mode when borrow amount or health factor changes
+  useEffect(() => {
+    setAutoSupplyCollateral(true);
+  }, [borrowAmount, targetHealthFactor]);
+
+  // Handle checkbox change - expand when unchecked
+  const handleAutoSupplyChange = (checked: boolean) => {
+    setAutoSupplyCollateral(checked);
+    if (!checked) {
+      setIsCollateralExpanded(true);
+      // Initialize custom entries from ALL user-possessed collateral assets.
+      // - If we have a recommendation: preserve the exact recommended wei
+      // - Otherwise: initialize as USD-driven with 0.00.
+      const initialEntries = new Map<string, CustomCollateralEntry>();
+      for (const [collateral] of potentialCollateral.entries()) {
+        const recommendedAmount = recommendedCollateral.get(collateral);
+        if (recommendedAmount && recommendedAmount > 0n) {
+          initialEntries.set(collateral.address, { source: "wei", wei: recommendedAmount });
+        } else {
+          // Not in recommendation - initialize to zero
+          initialEntries.set(collateral.address, { source: "usd", usd: "0.00" });
+        }
+      }
+      setCustomCollateralEntries(initialEntries);
+    }
+  };
+
+  // Handle custom value change
+  const handleCustomValueChange = (address: string, value: string) => {
+    const newEntries = new Map(customCollateralEntries);
+    newEntries.set(address, { source: "usd", usd: value });
+    setCustomCollateralEntries(newEntries);
+  };
+
+  // Handle clicking available value to fill max
+  const handleFillAddCollatMaxValue = (collateral: CollateralData) => {
+    const balanceWei = BigInt(collateral.userBalance ?? "0");
+    const newEntries = new Map(customCollateralEntries);
+    newEntries.set(collateral.address, { source: "wei", wei: balanceWei });
+    setCustomCollateralEntries(newEntries);
+  };
+
+  // Get risk indicator color and label
+  const riskIndicator = useMemo(() => {
+    const label = getRiskLabel(targetHealthFactor);
+    if (label === 'Low Risk') return { label, color: 'text-green-500' };
+    if (label === 'Moderate Risk') return { label, color: 'text-yellow-500' };
+    return { label, color: 'text-red-500' };
+  }, [targetHealthFactor]);
 
   // Consolidated polling handler
   const handlePollingUpdate = (amount: string) => {
@@ -73,136 +301,289 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
   };
 
   const handleBorrow = async () => {
-    const maxWei = BigInt(loans?.maxAvailableToBorrowUSD || 0);
-    const wei = safeParseUnits(borrowAmount || "0", 18);
-
-    // If at or within 1 wei of the max available, route via parent as 'ALL' to use on-chain borrowMax and parent UX
-    if (maxWei > 0n && (wei >= maxWei || (maxWei > 0n && wei >= (maxWei - 1n)))) {
-      onBorrow('ALL');
+    // Build steps array
+    const steps: BorrowStep[] = [];
+    
+    // Filter to only collateral with non-zero amounts
+    const collateralToSupply = collateralTableData.filter(item => item.amount > 0n);
+    
+    // Add collateral supply steps if we have collateral to supply
+    for (const item of collateralToSupply) {
+      const decimals = item.collateral.customDecimals ?? 18;
+      const formattedAmount = formatUnits(item.amount, decimals);
+      steps.push({
+        id: `supply-${item.collateral.address}`,
+        label: `Supply ${item.collateral._symbol}`,
+        status: "pending",
+        asset: item.collateral,
+        amount: formattedAmount,
+      });
+    }
+    
+    // Add borrow step
+    steps.push({
+      id: "borrow",
+      label: `Borrow ${borrowAmount} USDST`,
+      status: "pending",
+    });
+    
+    // Initialize modal
+    setBorrowSteps(steps);
+    setProgressModalOpen(true);
+    
+    try {
+      // Execute collateral supplies first
+      for (const item of collateralToSupply) {
+        const stepId = `supply-${item.collateral.address}`;
+        
+        // Update step to processing
+        setBorrowSteps(prev => prev.map(s => 
+          s.id === stepId ? { ...s, status: "processing" } : s
+        ));
+        
+        try {
+          await supplyCollateral({
+            asset: item.collateral.address,
+            amount: item.amount.toString(),
+          });
+          
+          // Mark as completed
+          setBorrowSteps(prev => prev.map(s => 
+            s.id === stepId ? { ...s, status: "completed" } : s
+          ));
+        } catch (error: any) {
+          // Mark as error
+          setBorrowSteps(prev => prev.map(s => 
+            s.id === stepId ? { 
+              ...s, 
+              status: "error",
+              error: error.message || "Supply failed"
+            } : s
+          ));
+          throw error; // Don't execute later steps if this fails
+        }
+      }
+      
+      // Execute borrow step
+      setBorrowSteps(prev => prev.map(s => 
+        s.id === "borrow" ? { ...s, status: "processing" } : s
+      ));
+      try {
+        await onBorrow(borrowAmount);
+        // Mark borrow as completed
+        setBorrowSteps(prev => prev.map(s => 
+          s.id === "borrow" ? { ...s, status: "completed" } : s
+        ));
+      } catch (error: any) {
+        setBorrowSteps(prev => prev.map(s => 
+          s.id === "borrow" ? { 
+            ...s, 
+            status: "error",
+            error: error.message || "Borrow failed"
+          } : s
+        ));
+        throw error;
+      }
+    } catch (error: any) {
+      // Error already handled in individual steps
+    } finally {
+      // Reset form after completion (success or failure)
       setBorrowAmount("");
       setBorrowAmountError("");
+      setCustomBorrowError("");
       setFeeError("");
+      setCustomCollateralEntries(new Map());
+      setAutoSupplyCollateral(true);
+      setIsCollateralExpanded(false);
       handlePollingUpdate("");
+    }
+  };
+
+  // Handle slider change - convert position to HF value
+  const handleSliderChange = (values: number[]) => {
+    const sliderPos = values[0];
+    // Slider goes from max HF (left/0) to min HF (right/range)
+    const newHF = Number(sliderExtrema.max) - sliderPos;
+    setTargetHealthFactor(Math.round(newHF * 100) / 100);
+  };
+
+  // Convert HF to slider position
+  const sliderPosition = useMemo(() => {
+    return Number(sliderExtrema.max) - targetHealthFactor;
+  }, [targetHealthFactor, sliderExtrema]);
+
+  const interestRateDisplay = useMemo(() => {
+    if (!loans) return "-";
+    return `${(loans.interestRate / 100).toFixed(2)}%`;
+  }, [loans]);
+
+  const sliderRange = useMemo(() => {
+    return Number(sliderExtrema.max) - Number(sliderExtrema.min);
+  }, [sliderExtrema]);
+
+  const borrowAmountExceedsMax = useMemo(() => {
+    return safeParseUnits(borrowAmount || "0", 18) > availableToBorrow;
+  }, [borrowAmount, availableToBorrow]);
+
+  // We handle borrowAmountExceedsMax separately, since it updates on HF slider
+  const setBorrowAmountErrorIgnoringMax = (value: string) => {
+    if (value === "Maximum amount exceeded") {
+      setBorrowAmountError("");
+      return;
+    }
+    setBorrowAmountError(value);
+  };
+
+  // Update custom error message when borrow amount exceeds maximum at selected health factor
+  useEffect(() => {
+    if (!borrowAmount || !loans) {
+      setCustomBorrowError("");
       return;
     }
 
-    onBorrow(borrowAmount);
-    setBorrowAmount("");
-    setBorrowAmountError("");
-    setFeeError("");
-    handlePollingUpdate("");
-  };
+    const borrowAmountNum = parseFloat(borrowAmount);
+    if (isNaN(borrowAmountNum) || borrowAmountNum <= 0) {
+      setCustomBorrowError("");
+      return;
+    }
 
-  useEffect(()=>{
-    const borrowAmountWei = safeParseUnits(borrowAmount || "0", 18);
-    const res = calculateBorrowHealthImpact(borrowAmountWei, loans)    
-    setHealthImpact(res)
-  },[borrowAmount, loans])
-
-  const interestRateDisplay = (() => {
-    const raw = (loans as any)?.interestRate; // bps
-    const num = Number(raw);
-    if (!isFinite(num)) return "-";
-    return `${(num / 100).toFixed(2)}%`;
-  })();
+    if (borrowAmountExceedsMax) {
+      const errorMsg = determineErrorMessage(
+        borrowAmountNum,
+        availableToBorrow,
+        maxAtMinHF
+      );
+      setCustomBorrowError(errorMsg);
+    } else {
+      setCustomBorrowError("");
+    }
+  }, [borrowAmount, loans, availableToBorrow, maxAtMinHF, borrowAmountExceedsMax]);
 
   return (
     <div className="space-y-4 pt-4">
-      {/* Loan Details */}
-      <div className="space-y-3">
-        <div className="flex justify-between">
-          <span className="text-sm text-muted-foreground">Available to borrow</span>
-          <span className="font-medium">
-            USDST {safeParseFloat(formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18)) === 0 ? '-' : formatWeiAmount(loans?.maxAvailableToBorrowUSD || '0')}
-          </span>
+      {/* Header: Borrow USDST */}
+      <div className="space-y-1">
+        <h3 className="text-lg font-semibold">Borrow USDST</h3>
+        <div className="flex justify-between text-sm">
+          <span className="text-muted-foreground">Available to Borrow</span>
+          <span className="font-medium">USDST {Number(formatUnits(availableToBorrow, 18)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
         </div>
-        <div className="flex justify-between">
-          <span className="text-sm text-muted-foreground">Total Amount Owed</span>
-          <span className="font-medium">
-            {(() => {
-              const owed = (() => { try { return BigInt(loans?.totalAmountOwed || 0); } catch { return 0n; } })();
-              const display = owed <= 1n ? 0n : owed;
-              return `USDST ${formatUnits(display, 18)}`;
-            })()}
-          </span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-sm text-muted-foreground">Interest Rate</span>
-          <span className="font-medium">
-            {interestRateDisplay}
-          </span>
+        <div className="flex justify-between text-sm">
+          <span className="text-muted-foreground">Interest Rate</span>
+          <span className="font-medium">{interestRateDisplay}</span>
         </div>
       </div>
 
       {/* Borrow Amount Input */}
-      <div className="space-y-3">
-        <label className="text-sm font-medium">Borrow Amount (USDST)</label>
-        <div className="flex justify-between items-center text-xs text-muted-foreground">
-          <span>Min: 0.01 USDST</span>
-          <div>
-            <button
-              type="button"
-              onClick={() => {
-                try {
-                  setBorrowAmount(formatUnits(BigInt(maxAmount)));
-                  setBorrowAmountError("");
-                } catch {}
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Borrow Amount</label>
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Input
+              placeholder="0"
+              className={`pr-20 ${borrowAmountExceedsMax ? 'text-red-600' : ''}`}
+              value={addCommasToInput(borrowAmount)}
+              onChange={(e) => {
+                const value = e.target.value;
+                handleAmountInputChange(value, setBorrowAmount, setBorrowAmountErrorIgnoringMax, availableToBorrow.toString());
+                handlePollingUpdate(value);
               }}
-              disabled={safeParseFloat(formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18)) === 0}
-              className="px-2 py-1 mr-1 bg-muted hover:bg-muted/80 rounded-full text-muted-foreground hover:text-foreground text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-muted"
-              title={safeParseFloat(formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18)) === 0 ? "No amount available to borrow" : "Set to safe maximum available amount"}
-            >
-              Max :
-            </button>
-            <span>{safeParseFloat(formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18)) === 0 ? '-' : formatWeiAmount(loans?.maxAvailableToBorrowUSD || '0')} USDST</span>
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">USDST</span>
           </div>
-        </div>
-        <div className="relative">
-          <Input
-            placeholder="0.00"
-            className={`pr-16 ${safeParseUnits(borrowAmount || "0", 18) > BigInt(loans?.maxAvailableToBorrowUSD || 0) ? 'text-red-600' : ''}`}
-            value={addCommasToInput(borrowAmount)}
-            onChange={(e)=>{
-              const value = e.target.value;
-              handleAmountInputChange(value, setBorrowAmount, setBorrowAmountError, maxAmount);
+          <Button
+            variant="outline"
+            onClick={() => {
+              try {
+                const formattedMax = Number(formatUnits(availableToBorrow, 18)).toFixed(2);
+                setBorrowAmount(formattedMax);
+                setBorrowAmountError("");
+                handlePollingUpdate(formattedMax);
+              } catch {}
             }}
-          />
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">USDST</span>
+            disabled={availableToBorrow <= 0n}
+            className="px-4"
+          >
+            MAX
+          </Button>
         </div>
         {borrowAmountError && (
           <p className="text-red-600 text-sm">{borrowAmountError}</p>
         )}
-        <CompactRewardsDisplay
-          userRewards={userRewards}
-          activityName="Lending Pool Borrow"
-          inputAmount={borrowAmount}
-          actionLabel="Borrow"
-        />
-        <PercentageButtons
-          value={borrowAmount}
-          maxValue={maxAmount}
-          onChange={(val) => {
-            setBorrowAmount(val);
-          }}
-          className="mt-2"
-          disabled={BigInt(maxAmount) < 1e15} // Disable if less than 0.001 USDST (1e15 wei)
-        />
       </div>
 
-      {/* Risk Level */}
-      <RiskLevelProgress riskLevel={riskLevel} />
+      {/* Health Factor Slider */}
+      <TooltipProvider>
+        <div className="space-y-3 py-2">
+          <div className="flex items-center justify-between">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center gap-1.5 cursor-help">
+                  <span className="text-base font-semibold">Health Factor</span>
+                  <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                <p>Target health factor after borrowing. Higher = safer position with less borrowing. Lower = riskier with more borrowing.</p>
+              </TooltipContent>
+            </Tooltip>
+            <div className="flex items-center gap-2">
+              <span className="text-xl font-bold tabular-nums">{targetHealthFactor.toFixed(2)}</span>
+              <span className={`text-sm font-medium ${riskIndicator.color}`}>{riskIndicator.label}</span>
+            </div>
+          </div>
 
-      {/* Transaction Fee */}
-      <div className="px-4 py-3 bg-muted/50 rounded-md">
-        <HealthImpactDisplay healthImpact={healthImpact} showWarning={false} className="mb-4" />
-        <div className="flex justify-between text-sm mb-2">
-          <span className="text-muted-foreground">Transaction Fee</span>
-          <span className="font-medium">{BORROW_FEE} USDST ({parseFloat(BORROW_FEE) * 100} voucher)</span>
+          <Slider
+            value={[sliderPosition]}
+            min={0}
+            max={sliderRange}
+            step={0.01}
+            onValueChange={handleSliderChange}
+            className="w-full"
+          />
+
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>Safer</span>
+            <span>Riskier</span>
+          </div>
+
+          {/* Health Impact: Before => After */}
+          <div className="flex justify-between items-center text-sm border-t pt-3">
+            <span className="text-muted-foreground">Health Impact</span>
+            <span className="font-medium tabular-nums">
+              {currentHF === null ? (
+                <span style={{ color: getTextColor(0, 3, true) }}>No Loan</span>
+              ) : (
+                <span style={{ color: getTextColor(currentHF, 3) }}>{currentHF.toFixed(2)}</span>
+              )}
+              {' → '}
+              {afterBorrowHF && !customBorrowError ? (
+                <span style={{ color: getTextColor(Number(afterBorrowHF), 3) }}>{Number(afterBorrowHF).toFixed(2)}</span>
+              ) : '-'}
+            </span>
+          </div>
         </div>
-        {feeError && (
-          <p className="text-yellow-600 text-sm mt-1">{feeError}</p>
-        )}
-      </div>
+      </TooltipProvider>
+
+      {/* Warning Message Box - Above Borrow Button */}
+      {targetHealthFactor < 1.6 && !customBorrowError && (
+        <div className="p-4 border rounded-lg bg-red-500/10 dark:bg-red-500/20 border-red-500/30">
+          <div className="flex items-start gap-2 mb-2">
+            <AlertTriangle className="h-5 w-5 flex-shrink-0 text-red-600 dark:text-red-400" />
+            <p className="text-sm font-semibold text-red-800 dark:text-red-200">High Risk Warning</p>
+          </div>
+          <p className="text-sm whitespace-pre-line text-red-800 dark:text-red-200">
+            Borrowing at this risk level can result in liquidation if the collateral drops in value.
+          </p>
+        </div>
+      )}
+
+      {/* Error Message Box - Above Borrow Button */}
+      {customBorrowError && (
+        <div className="p-4 bg-red-500/10 dark:bg-red-500/20 border border-red-500/30 rounded-lg">
+          <p className="text-red-800 dark:text-red-200 text-sm whitespace-pre-line">{customBorrowError}</p>
+        </div>
+      )}
 
       {/* Borrow Button */}
       <Button
@@ -210,10 +591,15 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
         disabled={
           !borrowAmount ||
           !!borrowAmountError ||
+          !!customBorrowError ||
           !!feeError ||
           safeParseUnits(borrowAmount || "0") <= 0n ||
           borrowLoading ||
-          safeParseUnits(borrowAmount || "0") > BigInt(maxAmount)
+          progressModalOpen ||
+          borrowAmountExceedsMax ||
+          hasExceededMaxCollateralValue ||
+          hasInsufficientCollateral ||
+          hasExcessCollateral
         }
         className="w-full"
       >
@@ -223,47 +609,233 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
         Borrow
       </Button>
 
+      {/* Auto Supply Collateral Checkbox and Dropdown - Only show when collateral is needed */}
+      {collateralTableData.length > 0 && !customBorrowError && (
+        <>
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="auto-supply"
+              checked={autoSupplyCollateral}
+              onCheckedChange={handleAutoSupplyChange}
+            />
+            <label
+              htmlFor="auto-supply"
+              className="text-sm text-muted-foreground cursor-pointer select-none"
+            >
+              Automatically supply collateral
+            </label>
+          </div>
+
+          {/* Additional Collateral Needed Dropdown */}
+          <Collapsible
+            open={isCollateralExpanded}
+            onOpenChange={setIsCollateralExpanded}
+            className="border rounded-lg"
+          >
+        <CollapsibleTrigger className="flex items-center justify-between w-full px-4 py-3 text-sm font-medium hover:bg-muted/50 transition-colors">
+          <span>
+            Additional Collateral Needed{' '}
+            <span className="text-muted-foreground font-normal">
+              (Value: ${additionalCollateralNeededValue.toFixed(2)})
+            </span>
+          </span>
+          {isCollateralExpanded ? (
+            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          )}
+        </CollapsibleTrigger>
+        <CollapsibleContent className="px-4 pb-4">
+          <style>{`
+            /* Hide number input spinner arrows - @dev questionable */
+            .collateral-value-input[type="number"]::-webkit-outer-spin-button,
+            .collateral-value-input[type="number"]::-webkit-inner-spin-button {
+              -webkit-appearance: none;
+              margin: 0;
+            }
+            .collateral-value-input[type="number"] {
+              -moz-appearance: textfield;
+            }
+          `}</style>
+          {/* Total Value Header */}
+          <div className="text-sm font-medium mb-3 pt-2 border-t">
+            Selected Additional Collateral Value: ${totalCollateralValue.toFixed(2)}
+            {(() => {
+              // Show delta in custom mode (input-driven), where the user may be short or have excess.
+              if (autoSupplyCollateral) return null;
+              if (hasInsufficientCollateral) {
+                return (
+                  <span className="text-yellow-600 dark:text-yellow-400 ml-2">
+                    (${centCeil(additionalCollateralShortfall).toFixed(2)} more is needed)
+                  </span>
+                );
+              }
+              else if (hasExcessCollateral) {
+                return (
+                  <span className="text-yellow-600 dark:text-yellow-400 ml-2">
+                    (${centFloor(-additionalCollateralShortfall).toFixed(2)} less is needed)
+                  </span>
+                );
+              }
+              else if (additionalCollateralShortfall < -0.01) {
+                return (
+                  <span className="text-muted-foreground ml-2">
+                    (${centFloor(-additionalCollateralShortfall).toFixed(2)} slight excess)
+                  </span>
+                );
+              }
+              return null;
+            })()}
+          </div>
+
+          {/* Collateral Table */}
+          {collateralTableData.length > 0 ? (
+            <TooltipProvider>
+              <div className="space-y-1">
+                {/* Table Header */}
+                <div className="grid grid-cols-4 gap-4 text-xs text-muted-foreground pb-2">
+                  <span>Asset</span>
+                  <span className="text-center">Amount</span>
+                  <span className="text-right">Value</span>
+                  <span className="text-right">Available</span>
+                </div>
+
+                {/* Table Rows */}
+                {collateralTableData.map((item) => {
+                  const decimals = item.collateral.customDecimals ?? 18;
+                  const fullAmount = item.amount === 0n ? "0" : formatBalance(item.amount, undefined, decimals, 2);
+                  const displayAmount = item.amount === 0n ? "0" : formatBalance(item.amount, undefined, decimals, 0, 4);
+                  const tokenImage = item.collateral.images?.[0]?.value;
+                  
+                  const maxValueUSD = calculateMaxCollateralValueUSDCentFloored(item.collateral);
+
+                  return (
+                    <div
+                      key={item.collateral.address}
+                      className="grid grid-cols-4 gap-4 items-center py-2 text-sm"
+                    >
+                      {/* Asset */}
+                      <div className="flex items-center gap-2">
+                        {tokenImage ? (
+                          <img
+                            src={tokenImage}
+                            alt={item.collateral._symbol}
+                            className="w-5 h-5 rounded-full"
+                          />
+                        ) : (
+                          <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-xs">
+                            {item.collateral._symbol?.charAt(0) || '?'}
+                          </div>
+                        )}
+                        <span className="font-medium">{item.collateral._symbol}</span>
+                      </div>
+
+                      {/* Amount */}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="text-center tabular-nums cursor-help">
+                            {displayAmount}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{fullAmount}</p>
+                        </TooltipContent>
+                      </Tooltip>
+
+                      {/* Value */}
+                      {autoSupplyCollateral ? (
+                        <span className="text-right tabular-nums">
+                          ${item.valueUSD.toFixed(2)}
+                        </span>
+                      ) : (
+                        <div className="flex items-center justify-end gap-1">
+                          <span className="text-muted-foreground">$</span>
+                          <Input
+                            type="number"
+                            value={(() => {
+                              const entry = customCollateralEntries.get(item.collateral.address);
+                              if (entry && entry.source === "usd") return entry.usd;
+                              return item.valueUSD.toFixed(2);
+                            })()}
+                            onChange={(e) => handleCustomValueChange(item.collateral.address, e.target.value)}
+                            className={`collateral-value-input w-20 h-7 text-right text-sm px-2 ${collateralExceedsMaxMap.get(item.collateral.address) ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                          />
+                        </div>
+                      )}
+
+                      {/* Available */}
+                      {autoSupplyCollateral ? (
+                        <span className="text-right tabular-nums text-muted-foreground">
+                          ${maxValueUSD.toFixed(2)}
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleFillAddCollatMaxValue(item.collateral)}
+                          className="text-right tabular-nums text-muted-foreground underline cursor-pointer hover:text-foreground transition-colors"
+                        >
+                          ${maxValueUSD.toFixed(2)}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </TooltipProvider>
+          ) : (
+            <p className="text-sm text-muted-foreground py-2">
+              {borrowAmount && parseFloat(borrowAmount) > 0
+                ? "No additional collateral needed"
+                : "Enter a borrow amount to see collateral requirements"}
+            </p>
+          )}
+        </CollapsibleContent>
+      </Collapsible>
+        </>
+      )}
+
+      {/* Transaction Fee */}
+      <div className="flex justify-between text-sm">
+        <span className="text-muted-foreground underline cursor-help" title="Fee paid to process this transaction">Transaction Fee</span>
+        <span className="font-medium">{txFee.fee.toFixed(2)} USDST ({txFee.voucher} vouchers)</span>
+      </div>
+      {feeError && (
+        <p className="text-yellow-600 text-sm">{feeError}</p>
+      )}
+
+      {/* Rewards Display */}
+      <RewardsWidget
+        userRewards={userRewards}
+        activityName="Lending Pool Borrow"
+        inputAmount={borrowAmount}
+        actionLabel="Borrow"
+      />
+
       {/* Conditional Warning Messages */}
       {(() => {
-        const availableToBorrowFormatted = formatUnits(loans?.maxAvailableToBorrowUSD || 0);
-        const isZeroAvailable = safeParseFloat(availableToBorrowFormatted) === 0;
-        
-        // collateralInfo already contains only eligible collateral (balance > 0)
+        const isZeroAvailable = availableToBorrow <= 0n;
         const eligibleCollateralTokens = collateralInfo || [];
 
-        const borrowInfoMessage = (
-          <p className="text-muted-foreground mt-2">
-            Borrowing against your assets allows you to access liquidity
-            without selling your holdings. Be mindful of the risk level, as
-            high borrowing increases liquidation risk during market
-            volatility.
-          </p>
-        );
-
-        if (isZeroAvailable) {
+        if (isZeroAvailable && eligibleCollateralTokens.length === 0) {
           return (
-            <div className="mt-2">
-              <p className="text-muted-foreground">
-                You currently have no available borrowing power. Supply collateral to enable borrowing.
-              </p>
-              {borrowInfoMessage}
-            </div>
-          );
-        }
-
-        if (eligibleCollateralTokens.length === 0) {
-          return (
-            <div className="mt-2">
-              <p className="text-muted-foreground">
-                You have no eligible collateral. Supply assets to enable borrowing.
-              </p>
-              {borrowInfoMessage}
-            </div>
+            <p className="text-muted-foreground text-sm mt-2">
+              You have no eligible collateral. Supply assets to enable borrowing.
+            </p>
           );
         }
 
         return null;
       })()}
+
+      {/* Borrow Progress Modal */}
+      <BorrowProgressModal
+        open={progressModalOpen}
+        steps={borrowSteps}
+        onClose={() => {
+          setProgressModalOpen(false);
+          setBorrowSteps([]);
+        }}
+      />
     </div>
   );
 };

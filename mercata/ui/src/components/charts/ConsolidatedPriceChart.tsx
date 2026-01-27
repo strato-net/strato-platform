@@ -33,6 +33,7 @@ interface ConsolidatedPriceChartProps {
   swapLoading: boolean;
   title: string;
   subtitle?: string;
+  isLPToken?: boolean;
 }
 
 // Color scheme
@@ -65,8 +66,18 @@ const formatTooltipValue = (value: string | number): string => {
   })}`;
 };
 
-// Custom tooltip component that always shows both prices
-const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<Record<string, unknown>>; label?: string }) => {
+// Custom tooltip component
+const CustomTooltip = ({
+  active,
+  payload,
+  label,
+  isLPToken
+}: {
+  active?: boolean;
+  payload?: Array<Record<string, unknown>>;
+  label?: string;
+  isLPToken?: boolean;
+}) => {
   if (!active || !payload || payload.length === 0) {
     return null;
   }
@@ -76,6 +87,24 @@ const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?:
   const stratoPrice = dataPoint.swapPrice as number | undefined;
   const spotPrice = dataPoint.spotPrice as number | undefined;
 
+  // For LP tokens, only show NAV (spotPrice), not STRATO price
+  if (isLPToken) {
+    return (
+      <div className="rounded-lg border bg-background p-3 shadow-lg">
+        <p className="text-sm font-medium mb-2">{label}</p>
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: CHART_COLORS.SPOT }} />
+            <span className="text-sm">
+              Net Asset Value: {spotPrice !== undefined && spotPrice !== null ? formatTooltipValue(spotPrice) : 'N/A'}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // For regular tokens, show both prices
   return (
     <div className="rounded-lg border bg-background p-3 shadow-lg">
       <p className="text-sm font-medium mb-2">{label}</p>
@@ -150,6 +179,7 @@ const ConsolidatedPriceChart: React.FC<ConsolidatedPriceChartProps> = ({
   swapLoading,
   title,
   subtitle,
+  isLPToken = false,
 }) => {
   const renderChart = () => {
     const loading = spotLoading || swapLoading;
@@ -228,7 +258,7 @@ const ConsolidatedPriceChart: React.FC<ConsolidatedPriceChartProps> = ({
         <ChartContainer
           config={{
             spotPrice: {
-              label: "Spot Price",
+              label: isLPToken ? "Net Asset Value" : "Spot Price",
               theme: {
                 light: CHART_COLORS.SPOT,
                 dark: CHART_COLORS.SPOT,
@@ -292,13 +322,13 @@ const ConsolidatedPriceChart: React.FC<ConsolidatedPriceChartProps> = ({
                 iconType="line"
                 wrapperStyle={{ paddingBottom: '10px' }}
                 formatter={(value) => {
-                  if (value === 'spotPrice') return 'Spot Price';
+                  if (value === 'spotPrice') return isLPToken ? 'Net Asset Value' : 'Spot Price';
                   if (value === 'swapPrice') return 'STRATO Price';
                   return value;
                 }}
               />
               
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={<CustomTooltip isLPToken={isLPToken} />} />
               
               {/* Spot Price - Solid line with subtle gradient */}
               {hasSpotData && (
