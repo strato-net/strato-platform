@@ -8,6 +8,7 @@
 module SolidVM.Solidity.StaticAnalysis.Typechecker
   ( detector
   , detector'
+  , showType
   )
 where
 

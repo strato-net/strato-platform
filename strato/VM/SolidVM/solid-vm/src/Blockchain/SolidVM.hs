@@ -48,6 +48,7 @@ import Blockchain.SolidVM.Metrics
 import Blockchain.SolidVM.SM
 import Blockchain.SolidVM.SetGet
 import Blockchain.SolidVM.TraceTools
+import SolidVM.Solidity.StaticAnalysis.Typechecker (showType)
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Code
@@ -2256,6 +2257,15 @@ callBuiltin "fastForward" [SInteger seconds] = do
 
 callBuiltin x args = unknownFunction ("callBuiltin " ++ show args) x
 
+-- Format argument mismatch error message (uses showType from Typechecker)
+formatArgMismatch :: [(Value, SVMType.Type)] -> String
+formatArgMismatch pairs =
+  unlines $ zipWith formatOne [1..] pairs
+  where
+    formatOne :: Int -> (Value, SVMType.Type) -> String
+    formatOne n (val, expectedType) =
+      "  Argument " ++ show n ++ ": got " ++ show val ++ ", expected " ++ T.unpack (showType expectedType)
+
 runTheConstructors :: MonadSM m => Address -> Address -> Keccak256 -> CC.CodeCollection -> SolidString -> ValList -> m ()
 runTheConstructors from to hsh cc contractName' argVals' = do
   let !contract' =
@@ -2398,9 +2408,9 @@ runTheCall address' codeAddr contract' funcName hsh cc theFunction argVals' ro f
 
   argVals <- validateFunctionArguments theFunction argVals' >>= \case
     Just (_, av) -> pure av
-    Nothing -> typeError
-      "the argument values do not match up with the function signature"
-      (show $ zip argVals' (map (CC.indexedTypeType . snd) (CC._funcArgs theFunction)))
+    Nothing ->
+      let mismatchInfo = formatArgMismatch $ zip argVals' (map (CC.indexedTypeType . snd) (CC._funcArgs theFunction))
+      in typeError ("argument type mismatch in '" ++ funcName ++ "'") mismatchInfo
 
   let !args =
           let argMeta =

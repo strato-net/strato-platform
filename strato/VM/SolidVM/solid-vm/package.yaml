@@ -42,6 +42,7 @@ library:
   - solid-vm-compiler
   - solid-vm-model
   - solid-vm-parser
+  - solid-vm-static-analysis
   - source-tools
   - strato-model
   - text
