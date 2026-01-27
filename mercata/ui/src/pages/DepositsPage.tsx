@@ -141,7 +141,7 @@ const DepositsPage = () => {
                       } as React.CSSProperties
                     }
                   />
-                    <div className="mt-4 flex-1 min-h-0 overflow-auto">
+                    <div className="mt-4 flex-1 min-h-0 overflow-auto p-1 -m-1">
                       <BridgeIn isSaving={activeTab === "easy-savings"} guestMode={!isLoggedIn} />
                     </div>
                   </div>
