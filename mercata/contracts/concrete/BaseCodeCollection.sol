@@ -45,6 +45,11 @@ import "CDP/CDPReserve.sol";
 //Escrow
 import "Escrow/Escrow.sol";
 
+//Auctions
+import "./Auction/TokenLaunchAuction.sol";
+import "./Auction/PoolLpSeeder.sol";
+import "./Auction/LpTokenLockVault.sol";
+
 //Proxy
 import "Proxy/Proxy.sol";
 
@@ -71,6 +76,9 @@ contract record Mercata is Authorizable {
     Rewards public rewards;
     Token public cataToken;
     Escrow public escrow;
+    TokenLaunchAuction public tokenLaunchAuction;
+    PoolLpSeeder public poolLpSeeder;
+    LpTokenLockVault public lpTokenLockVault;
 
     constructor() public {
         // The owner of the implementation contract is ignored in favor of the proxy owner
@@ -190,6 +198,19 @@ contract record Mercata is Authorizable {
         address escrowImpl = address(new Escrow(implOwnerIgnored));
         escrow = Escrow(address(new Proxy(escrowImpl, this)));
         Ownable(escrow).transferOwnership(address(adminRegistry));
+
+        // Deploy auction contracts (initialize later)
+        address tokenLaunchAuctionImpl = address(new TokenLaunchAuction(implOwnerIgnored));
+        tokenLaunchAuction = TokenLaunchAuction(address(new Proxy(tokenLaunchAuctionImpl, this)));
+        Ownable(tokenLaunchAuction).transferOwnership(msg.sender);
+
+        address poolLpSeederImpl = address(new PoolLpSeeder(implOwnerIgnored));
+        poolLpSeeder = PoolLpSeeder(address(new Proxy(poolLpSeederImpl, this)));
+        Ownable(poolLpSeeder).transferOwnership(msg.sender);
+
+        address lpTokenLockVaultImpl = address(new LpTokenLockVault(implOwnerIgnored));
+        lpTokenLockVault = LpTokenLockVault(address(new Proxy(lpTokenLockVaultImpl, this)));
+        Ownable(lpTokenLockVault).transferOwnership(msg.sender);
 
         adminRegistry.swapAdmin(this, msg.sender);
     }
