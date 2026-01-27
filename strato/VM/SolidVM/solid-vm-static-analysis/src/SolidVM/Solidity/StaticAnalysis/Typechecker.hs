@@ -646,6 +646,9 @@ typecheckStatic (SVMType.Bytes d1 b1) (SVMType.Bytes d2 b2) =
     _ -> case (b1, b2) of
       (Just a, Just b) | a /= b -> Left "Mismatched length between bytes values"
       _ -> Right $ SVMType.Bytes (d1 <|> d2) (b1 <|> b2)
+-- Allow string <-> bytes32 compatibility for keccak256 return values (SolidVM historical behavior)
+typecheckStatic (SVMType.String _) (SVMType.Bytes _ (Just 32)) = Right $ SVMType.String Nothing
+typecheckStatic (SVMType.Bytes _ (Just 32)) (SVMType.String _) = Right $ SVMType.Bytes Nothing (Just 32)
 typecheckStatic SVMType.Decimal SVMType.Decimal = Right $ SVMType.Decimal
 typecheckStatic SVMType.Bool SVMType.Bool = Right SVMType.Bool
 typecheckStatic (SVMType.Address a) (SVMType.Address b) = Right $ SVMType.Address (a && b)
@@ -1371,6 +1374,8 @@ intArgs x =
       :| [ intType' x,
            stringType' x,
            decimalType' x,
+           bytesType' x,
+           addressType' x,
            Product [stringType' x, intType' x] x
          ]
 
@@ -1537,10 +1542,10 @@ getVarType' s@('b' : 'y' : 't' : 'e' : 's' : n) ctx = case n of
 getVarType' "byte" ctx = pure $ Function (byteArgs ctx) (intType' ctx) ctx [] [] False
 getVarType' "push" ctx = pure $ Function (topType' ctx) (Product [] ctx) ctx [] [] False
 getVarType' "identity" ctx = pure $ Function (topType' ctx) (topType' ctx) ctx [] [] False
-getVarType' "keccak256" ctx = pure $ Function (keccak256Args ctx) (stringType' ctx) ctx [] [] False
+getVarType' "keccak256" ctx = pure $ Function (keccak256Args ctx) (Static (SVMType.Bytes Nothing (Just 32)) ctx) ctx [] [] False
 getVarType' "log" ctx = pure $ Function (logArgs ctx) (Product [] ctx) ctx [] [] False
-getVarType' "sha256" ctx = pure $ Function (sha256Args ctx) (stringType' ctx) ctx [] [] False
-getVarType' "ripemd160" ctx = pure $ Function (ripemd160Args ctx) (stringType' ctx) ctx [] [] False
+getVarType' "sha256" ctx = pure $ Function (sha256Args ctx) (Static (SVMType.Bytes Nothing (Just 32)) ctx) ctx [] [] False
+getVarType' "ripemd160" ctx = pure $ Function (ripemd160Args ctx) (Static (SVMType.Bytes Nothing (Just 20)) ctx) ctx [] [] False
 getVarType' "modExp" ctx = pure $ Function (modexpArgs ctx) (intType' ctx) ctx [] [] False
 getVarType' "ecAdd" ctx = pure $ Function (ecAddArgs ctx) (Product [intType' ctx, intType' ctx] ctx) ctx [] [] False
 getVarType' "ecMul" ctx = pure $ Function (ecMulArgs ctx) (Product [intType' ctx, intType' ctx] ctx) ctx [] [] False
@@ -1555,7 +1560,7 @@ getVarType' "getUserCert" ctx = pure $ Function (getUserCertArgs ctx) (certType'
 getVarType' "addmod" ctx = pure $ Function (addmodArgs ctx) (intType' ctx) ctx [] [] False
 getVarType' "mulmod" ctx = pure $ Function (mulmodArgs ctx) (intType' ctx) ctx [] [] False
 getVarType' "payable" ctx = pure $ Function (payableArgs ctx) (Static (SVMType.Address True) ctx) ctx [] [] False
-getVarType' "blockhash" ctx = pure $ Function (blockhashArgs ctx) (stringType' ctx) ctx [] [] False
+getVarType' "blockhash" ctx = pure $ Function (blockhashArgs ctx) (Static (SVMType.Bytes Nothing (Just 32)) ctx) ctx [] [] False
 getVarType' "ecrecover" ctx = pure $ Function (ecrecoverArgs ctx) (addressType' ctx) ctx [] [] False
 getVarType' "parseCert" ctx = pure $ Function (parseCertArgs ctx) (certType' ctx) ctx [] [] False
 getVarType' "create" ctx = pure $ Function (createFuncArgs ctx) (addressType' ctx) ctx [] [] False
