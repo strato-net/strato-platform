@@ -15,8 +15,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import CandlestickChart, { OHLCData } from '@/components/charts/CandlestickChart';
-import { Loader2, TrendingUp, TrendingDown, Search, BarChart3, LineChart as LineChartIcon, ArrowUp, ArrowDown, GripVertical } from 'lucide-react';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Loader2, TrendingUp, TrendingDown, Search, CandlestickChart as CandlestickChartIcon, LineChart as LineChartIcon, ArrowUp, ArrowDown, GripVertical, CircleDollarSign } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { EarningAsset } from '@mercata/shared-types';
 import { format } from 'date-fns';
 import FixedSwapWidget from '@/components/swap/FixedSwapWidget';
@@ -44,6 +44,7 @@ interface WidgetConfig {
   timeRange: TimeRange;
   interval: Interval;
   chartType: ChartType;
+  showSpotPrice?: boolean; // When true and pool has spot data, show spot price line. Default true.
 }
 
 const TIME_RANGES: TimeRange[] = ['1h', '1d', '7d', '1m', '3m', '6m', '1y', 'all'];
@@ -144,6 +145,7 @@ const PriceTracking = () => {
       timeRange: '1d' as TimeRange,
       interval: '5m' as Interval,
       chartType: 'line' as ChartType,
+      showSpotPrice: true,
     }));
   });
   const [assetData, setAssetData] = useState<Map<string, AssetPriceData>>(new Map());
@@ -539,10 +541,10 @@ const PriceTracking = () => {
     fetchAllAssets();
   }, [activeTokens]);
 
-  // Get filtered and sorted assets
+  // Get filtered and sorted assets - only pools
   const filteredAssets = useMemo(() => {
     return availableAssets
-      .filter((asset) => asset.address && asset.symbol)
+      .filter((asset) => asset.address && asset.symbol && (asset as any).isPool === true)
       .sort((a, b) => {
         const valueA = parseFloat(a.value || '0');
         const valueB = parseFloat(b.value || '0');
@@ -558,28 +560,13 @@ const PriceTracking = () => {
       const hasConfiguredWidgets = widgets.some(w => w.assetAddress !== null);
 
       if (!hasConfiguredWidgets) {
-        // Default tokens: GOLDST, SILVST, ETHST, WBTCST
-        const defaultTokenSymbols = ['GOLDST', 'SILVST', 'ETHST', 'WBTCST'];
         // Default pools: GOLDST-USDST, SILVST-USDST, ETHST-USDST, WBTCST-USDST
         const defaultPoolNames = ['GOLDST-USDST', 'SILVST-USDST', 'ETHST-USDST', 'WBTCST-USDST'];
 
         setWidgets((prev) => {
           const updated = [...prev];
 
-          // Set top row (0-3) with tokens
-          defaultTokenSymbols.forEach((symbol, index) => {
-            const asset = filteredAssets.find(a =>
-              a.symbol === symbol && !(a as any).isPool && !a.isPoolToken
-            );
-            if (asset) {
-              updated[index] = {
-                ...updated[index],
-                assetAddress: asset.address,
-              };
-            }
-          });
-
-          // Set bottom row (4-7) with pools
+          // Set all widgets with pools
           defaultPoolNames.forEach((poolName, index) => {
             // Try to find pool by poolName or symbol (case-insensitive)
             const pool = filteredAssets.find(a => {
@@ -591,8 +578,8 @@ const PriceTracking = () => {
                      aSymbol.toLowerCase().includes(poolName.toLowerCase().replace('-', ''));
             });
             if (pool) {
-              updated[index + 4] = {
-                ...updated[index + 4],
+              updated[index] = {
+                ...updated[index],
                 assetAddress: pool.address,
               };
             }
@@ -639,41 +626,6 @@ const PriceTracking = () => {
     []
   );
 
-  // Fetch price history for a pool
-  const fetchPoolPriceHistory = useCallback(
-    async (poolAddress: string, duration: string, interval: Interval): Promise<OHLCData[]> => {
-      try {
-        const response = await api.get('/tokens/v2/pool-price-history/' + poolAddress, {
-          params: { duration },
-        });
-        const priceHistory = response.data || [];
-        const intervalMs = getIntervalMs(interval);
-
-        // Convert pool balance history to OHLC (simplified - using balance as price)
-        if (priceHistory.length === 0) return [];
-
-        const ohlcData: OHLCData[] = [];
-        priceHistory.forEach((point: { timestamp: number; balance: number }, index: number) => {
-          const price = point.balance;
-          const open = index > 0 ? ohlcData[index - 1].close : price;
-          ohlcData.push({
-            timestamp: point.timestamp,
-            open,
-            high: price,
-            low: price,
-            close: price,
-          });
-        });
-
-        return ohlcData;
-      } catch (error) {
-        console.error(`Failed to fetch pool price history for ${poolAddress}:`, error);
-        return [];
-      }
-    },
-    []
-  );
-
   // Get interval in milliseconds
   const getIntervalMs = useCallback((interval: Interval): number => {
     switch (interval) {
@@ -693,6 +645,136 @@ const PriceTracking = () => {
         return 5 * 60 * 1000;
     }
   }, []);
+
+  // Fetch price history for a pool
+  const fetchPoolPriceHistory = useCallback(
+    async (poolAddress: string, duration: string, interval: Interval, tokenAAddress?: string, tokenBAddress?: string): Promise<OHLCData[]> => {
+      try {
+        const response = await api.get('/tokens/v2/pool-price-history/' + poolAddress, {
+          params: { duration },
+        });
+        const priceHistory = response.data || [];
+        const intervalMs = getIntervalMs(interval);
+
+        // Convert pool balance history to OHLC (simplified - using balance as price)
+        if (priceHistory.length === 0) return [];
+
+        // Fetch token price histories for spot price calculation if addresses provided
+        let tokenAPriceHistory: any[] = [];
+        let tokenBPriceHistory: any[] = [];
+        if (tokenAAddress && tokenBAddress) {
+          try {
+            const [tokenAResponse, tokenBResponse] = await Promise.all([
+              api.get('/oracle/price-history/' + tokenAAddress, { params: { duration } }),
+              api.get('/oracle/price-history/' + tokenBAddress, { params: { duration } }),
+            ]);
+            tokenAPriceHistory = tokenAResponse.data.data || [];
+            tokenBPriceHistory = tokenBResponse.data.data || [];
+          } catch (error) {
+            console.warn('Failed to fetch token price histories for spot price:', error);
+          }
+        }
+
+        // Create a map of spot prices by timestamp (rounded to interval)
+        const spotPriceMap = new Map<number, number>();
+        if (tokenAPriceHistory.length > 0 && tokenBPriceHistory.length > 0) {
+          // Create maps of token prices by timestamp
+          const tokenAPriceMap = new Map<number, number>();
+          const tokenBPriceMap = new Map<number, number>();
+          
+          tokenAPriceHistory.forEach((entry: any) => {
+            const timestamp = entry.blockTimestamp
+              ? new Date(entry.blockTimestamp).getTime()
+              : (entry.timestamp instanceof Date
+                ? entry.timestamp.getTime()
+                : new Date(entry.timestamp).getTime());
+            const roundedTimestamp = Math.floor(timestamp / intervalMs) * intervalMs;
+            const price = parseFloat(entry.price);
+            const normalizedPrice = price > 1e10 ? price / 1e18 : price;
+            tokenAPriceMap.set(roundedTimestamp, normalizedPrice);
+          });
+          
+          tokenBPriceHistory.forEach((entry: any) => {
+            const timestamp = entry.blockTimestamp
+              ? new Date(entry.blockTimestamp).getTime()
+              : (entry.timestamp instanceof Date
+                ? entry.timestamp.getTime()
+                : new Date(entry.timestamp).getTime());
+            const roundedTimestamp = Math.floor(timestamp / intervalMs) * intervalMs;
+            const price = parseFloat(entry.price);
+            const normalizedPrice = price > 1e10 ? price / 1e18 : price;
+            tokenBPriceMap.set(roundedTimestamp, normalizedPrice);
+          });
+          
+          // Calculate spot price for each timestamp where both prices exist.
+          // Use exact matches first, then fill from nearest-neighbor so pool timestamps (e.g. 2h for 1m) align with oracle data.
+          const allTimestamps = new Set([...tokenAPriceMap.keys(), ...tokenBPriceMap.keys()]);
+          allTimestamps.forEach((ts) => {
+            const tokenAPrice = tokenAPriceMap.get(ts);
+            const tokenBPrice = tokenBPriceMap.get(ts);
+            if (tokenAPrice && tokenBPrice && tokenBPrice > 0) {
+              spotPriceMap.set(ts, tokenAPrice / tokenBPrice);
+            }
+          });
+          // For each pool timestamp we'll look up exact or nearest via getSpotPriceAt.
+          // Also seed spotPriceMap at pool timestamps by nearest A/B when backend uses different intervals (e.g. 1m = 2h).
+          const poolTimestamps = priceHistory.map((p: { timestamp: number }) => Math.floor(p.timestamp / intervalMs) * intervalMs);
+          const poolTsSet = new Set(poolTimestamps);
+          poolTsSet.forEach((ts) => {
+            if (spotPriceMap.has(ts)) return;
+            const aKeys = Array.from(tokenAPriceMap.keys()).sort((a, b) => Math.abs(a - ts) - Math.abs(b - ts));
+            const bKeys = Array.from(tokenBPriceMap.keys()).sort((a, b) => Math.abs(a - ts) - Math.abs(b - ts));
+            const maxDiff = intervalMs * 4;
+            const a = aKeys[0] != null && Math.abs(aKeys[0] - ts) <= maxDiff ? tokenAPriceMap.get(aKeys[0]) : undefined;
+            const b = bKeys[0] != null && Math.abs(bKeys[0] - ts) <= maxDiff ? tokenBPriceMap.get(bKeys[0]) : undefined;
+            if (a != null && b != null && b > 0) spotPriceMap.set(ts, a / b);
+          });
+        }
+
+        // Helper: get spot price at timestamp, or nearest available (for alignment when pool/oracle use different intervals, e.g. 1m)
+        const getSpotPriceAt = (t: number): number | undefined => {
+          const rounded = Math.floor(t / intervalMs) * intervalMs;
+          const exact = spotPriceMap.get(rounded);
+          if (exact !== undefined) return exact;
+          const keys = Array.from(spotPriceMap.keys());
+          if (keys.length === 0) return undefined;
+          const maxDiff = intervalMs * 3; // allow up to 3 intervals away
+          let best: number | undefined;
+          let bestDiff = Infinity;
+          for (const k of keys) {
+            const d = Math.abs(k - rounded);
+            if (d <= maxDiff && d < bestDiff) {
+              bestDiff = d;
+              best = spotPriceMap.get(k);
+            }
+          }
+          return best;
+        };
+
+        const ohlcData: OHLCData[] = [];
+        priceHistory.forEach((point: { timestamp: number; balance: number }, index: number) => {
+          const price = point.balance;
+          const open = index > 0 ? ohlcData[index - 1].close : price;
+          const spotPrice = getSpotPriceAt(point.timestamp);
+          
+          ohlcData.push({
+            timestamp: point.timestamp,
+            open,
+            high: price,
+            low: price,
+            close: price,
+            spotPrice,
+          });
+        });
+
+        return ohlcData;
+      } catch (error) {
+        console.error(`Failed to fetch pool price history for ${poolAddress}:`, error);
+        return [];
+      }
+    },
+    [getIntervalMs]
+  );
 
   // Fetch current price for a single asset (for polling)
   const fetchCurrentPrice = useCallback(async (widget: WidgetConfig): Promise<number | null> => {
@@ -797,8 +879,18 @@ const PriceTracking = () => {
     }
 
     try {
+      // For pools, get tokenA and tokenB addresses for spot price calculation
+      let tokenAAddress: string | undefined;
+      let tokenBAddress: string | undefined;
+      if (isPool) {
+        const tokenA = (asset as any).tokenA;
+        const tokenB = (asset as any).tokenB;
+        tokenAAddress = tokenA?.address || tokenA?.token?.address;
+        tokenBAddress = tokenB?.address || tokenB?.token?.address;
+      }
+      
       const ohlcData = isPool
-        ? await fetchPoolPriceHistory(widget.assetAddress, widget.timeRange, widget.interval)
+        ? await fetchPoolPriceHistory(widget.assetAddress, widget.timeRange, widget.interval, tokenAAddress, tokenBAddress)
         : await fetchTokenPriceHistory(widget.assetAddress, widget.timeRange, widget.interval);
 
       // If appending, merge with existing data
@@ -1086,6 +1178,7 @@ const PriceTracking = () => {
           const changePercent = data?.changePercent24h || 0;
           const isPositive = change >= 0;
           const ohlcData = data?.data || [];
+          const isPool = asset ? (asset as any).isPool === true : false;
           // Read from ref to avoid triggering chart rerenders
           const hoveredData = hoveredDataByWidgetRef.current.get(widget.id);
           // Use hoverUpdateKey to force text component to update when hover changes
@@ -1133,12 +1226,7 @@ const PriceTracking = () => {
                     {filteredAssets.map((a) => {
                       const isPool = (a as any).isPool === true;
                       const isLPToken = a.isPoolToken && !isPool;
-                      let label = a.symbol;
-                      if (isPool) {
-                        label += ' (Pool)';
-                      } else if (isLPToken) {
-                        label += ' (LP Token)';
-                      }
+                      const label = a.symbol;
                       return (
                         <SelectItem key={a.address} value={a.address}>
                           {label}
@@ -1195,35 +1283,62 @@ const PriceTracking = () => {
                 </div>
               );
             })()}
-            {/* Chart type toggle */}
-            <ToggleGroup
-              type="single"
-              value={widget.chartType}
-              onValueChange={(value) => {
-                if (value) updateWidget(widget.id, { chartType: value as ChartType });
-              }}
-              className="h-7 shrink-0"
-            >
-              <ToggleGroupItem value="line" aria-label="Line chart" size="sm" className="h-7 px-2">
-                <LineChartIcon className="h-3.5 w-3.5" />
-              </ToggleGroupItem>
-              <ToggleGroupItem value="candlestick" aria-label="Candlestick chart" size="sm" className="h-7 px-2">
-                <BarChart3 className="h-3.5 w-3.5" />
-              </ToggleGroupItem>
-            </ToggleGroup>
+            {/* Spot price toggle (pools only) - where line chart button was */}
+            {isPool && ohlcData.some(d => d.spotPrice !== undefined) && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant={widget.showSpotPrice !== false ? 'secondary' : 'ghost'}
+                    className="h-7 px-2 shrink-0"
+                    onClick={() => updateWidget(widget.id, { showSpotPrice: widget.showSpotPrice === false })}
+                    aria-label={widget.showSpotPrice !== false ? 'Hide Spot Price' : 'Show Spot Price'}
+                  >
+                    <CircleDollarSign className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{widget.showSpotPrice !== false ? 'Hide Spot Price' : 'Show Spot Price'}</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+            {/* Chart type toggle - single button, icon shows the type not currently shown */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 shrink-0"
+                  onClick={() => updateWidget(widget.id, { chartType: widget.chartType === 'line' ? 'candlestick' : 'line' })}
+                  aria-label={widget.chartType === 'line' ? 'Switch to candlestick chart' : 'Switch to line chart'}
+                >
+                  {widget.chartType === 'line' ? (
+                    <CandlestickChartIcon className="h-3.5 w-3.5" />
+                  ) : (
+                    <LineChartIcon className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{widget.chartType === 'line' ? 'Switch to candlestick chart' : 'Switch to line chart'}</p>
+              </TooltipContent>
+            </Tooltip>
           </div>
             </CardHeader>
             <CardContent className="pt-2">
               {widget.assetAddress ? (
                 <CandlestickChart
-              data={ohlcData}
-              loading={isLoading}
-              height={250}
-              showVolume={false}
-              chartType={widget.chartType}
-              onHoverDataChange={getHoverHandler(widget.id)}
-              timeRange={widget.timeRange}
-            />
+                  key={`${widget.id}-${widget.chartType}-${widget.showSpotPrice !== false}`}
+                  data={ohlcData}
+                  loading={isLoading}
+                  height={250}
+                  showVolume={false}
+                  chartType={widget.chartType}
+                  onHoverDataChange={getHoverHandler(widget.id)}
+                  timeRange={widget.timeRange}
+                  showSpotPrice={isPool && ohlcData.some(d => d.spotPrice !== undefined) && (widget.showSpotPrice !== false)}
+                  isDollarValued={isPool && (asset as any)?.tokenB?.address && (asset as any).tokenB.address === usdstAddress}
+                />
           ) : (
             <div className="flex items-center justify-center h-[250px] text-muted-foreground text-sm">
               Select an asset to view price chart
