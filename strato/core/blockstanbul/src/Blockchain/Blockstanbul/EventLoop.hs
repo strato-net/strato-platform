@@ -278,12 +278,12 @@ eventLoop ctx = execStateC ctx $
           ppl <- use proposal
           leader <- use proposer
           self <- use selfAddr
-          myBlock ?= blk
+          vs <- use validators
+          let blockWithVs = addValidators (S.toList vs) blk
+          pseal <- proposerSeal blockWithVs
+          let sealedBlk = addProposerSeal pseal blockWithVs
+          myBlock ?= sealedBlk
           when (isNothing ppl && Just leader == fmap Validator self) $ do
-            vs <- use validators
-            let blockWithVs = addValidators (S.toList vs) blk
-            pseal <- proposerSeal blockWithVs
-            let sealedBlk = addProposerSeal pseal blockWithVs
             mLocked <- use blockLock
             let realSealed = fromMaybe sealedBlk mLocked
             wantParent <- use lastParent
