@@ -75,7 +75,7 @@ const AssetsList = ({
             <span className="font-bold text-sm md:text-base">Earning Assets</span>
           </div>
         )}
-        <div className={`w-full ${isDashboard ? 'overflow-x-auto md:overflow-visible px-3 md:px-0' : 'overflow-hidden'}`}>
+        <div className={`w-full ${isDashboard ? 'overflow-x-auto md:overflow-visible px-3 md:px-0' : 'overflow-x-auto'}`}>
           <table className="w-full">
             <thead>
               <tr className="bg-muted/50">
