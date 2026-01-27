@@ -1502,12 +1502,12 @@ getVarType' "this" ctx = pure $ Static (SVMType.Address False) ctx
 getVarType' s@('u' : 'i' : 'n' : 't' : n) ctx = case n of
   [] -> pure $ Function (intArgs ctx) (Static (SVMType.Int (Just False) Nothing) ctx) ctx [] [] False
   _ -> case readMaybe n of
-    Just n' -> pure $ Function (intArgs ctx) (Static (SVMType.Int (Just False) (Just n')) ctx) ctx [] [] False
+    Just n' -> pure $ Function (intArgs ctx) (Static (SVMType.Int (Just False) (Just (n' `div` 8))) ctx) ctx [] [] False
     Nothing -> getVarTypeByName' (stringToLabel s) ctx
 getVarType' s@('i' : 'n' : 't' : n) ctx = case n of
   [] -> pure $ Function (intArgs ctx) (Static (SVMType.Int (Just True) Nothing) ctx) ctx [] [] False
   _ -> case readMaybe n of
-    Just n' -> pure $ Function (intArgs ctx) (Static (SVMType.Int (Just True) (Just n')) ctx) ctx [] [] False
+    Just n' -> pure $ Function (intArgs ctx) (Static (SVMType.Int (Just True) (Just (n' `div` 8))) ctx) ctx [] [] False
     Nothing -> getVarTypeByName' (stringToLabel s) ctx
 getVarType' "address" ctx = pure $ Function (addressArgs ctx) (Static (SVMType.Address False) ctx) ctx [] [] False
 --This is either the string() function or the string.member() function
