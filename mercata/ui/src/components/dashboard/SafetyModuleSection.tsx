@@ -13,7 +13,7 @@ import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { SAFETY_STAKE_FEE, SAFETY_REDEEM_FEE, usdstAddress, safetyModuleAddress, rewardsEnabled } from "@/lib/constants";
 import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
-import { CompactRewardsDisplay } from "@/components/rewards/CompactRewardsDisplay";
+import { RewardsWidget } from "@/components/rewards/RewardsWidget";
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 
 const SafetyModuleSection = () => {
@@ -301,7 +301,7 @@ const SafetyModuleSection = () => {
                     </>
                   )}
                   {/* Estimated Rewards */}
-                  <CompactRewardsDisplay
+                  <RewardsWidget
                     userRewards={userRewards}
                     activityName="Safety Module"
                     inputAmount={stakeAmount}

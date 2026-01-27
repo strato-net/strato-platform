@@ -70,7 +70,7 @@ const DebtPosition: React.FC<DebtPositionProps> = ({ refreshTrigger }) => {
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">Average Stability Fee</span>
             <span className="text-sm font-semibold">
-              {weightedAverageFee > 0 ? `${formatNumber(weightedAverageFee, 2)}%` : '1.50%'}
+              {positions.length === 0 || totalDebt === 0 ? '—' : `${formatNumber(weightedAverageFee, 2)}%`}
             </span>
           </div>
           <div className="flex items-center justify-between">
