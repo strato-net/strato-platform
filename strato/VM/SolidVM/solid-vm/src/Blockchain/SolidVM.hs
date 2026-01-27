@@ -1938,7 +1938,7 @@ expToVarDivide intOp decOp expr1 expr2 = do
 bitWidth :: Integer -> Integer
 bitWidth = go 0 . abs
   where go w 0 = w
-        go w n = let !v = w + 1 in go v (n `shiftR` 1)
+        go w n = let !v = w + 256 in go v (n `shiftR` 256)
 
 deductGasForOp :: MonadSM m => Integer -> m ()
 deductGasForOp n = decrementGas . Gas $ 1 + (n `shiftR` 8)
