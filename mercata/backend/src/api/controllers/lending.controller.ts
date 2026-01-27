@@ -11,7 +11,9 @@ import {
   supplyCollateral,
   withdrawCollateral,
   collateralAndBalance,
+  getPublicCollateralInfo,
   liquidityAndBalance,
+  getPublicLiquidityInfo,
   getLoan,
   listLiquidatableLoans,
   listNearUnhealthyLoans,
@@ -214,12 +216,38 @@ class LendingController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, address } = req;
-      // Check if actual user token exists in headers (not service token fallback)
-      const hasUserToken = !!(req.headers["x-user-access-token"] || req.headers["authorization"]);
-      const userAddress = hasUserToken ? address : undefined;
+      const { accessToken, address: userAddress } = req;
+      validateUserAddress(userAddress);
 
-      const result = await collateralAndBalance(accessToken, userAddress);
+      const result = await collateralAndBalance(accessToken, userAddress as string);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getPublicCollateralInfo(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken } = req;
+      const result = await getPublicCollateralInfo(accessToken);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getPublicLiquidityInfo(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken } = req;
+      const result = await getPublicLiquidityInfo(accessToken);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
@@ -233,9 +261,9 @@ class LendingController {
   ): Promise<void> {
     try {
       const { accessToken, address: userAddress } = req;
-      // userAddress is optional - if not provided, only pool stats are returned
+      validateUserAddress(userAddress);
 
-      const result = await liquidityAndBalance(accessToken, userAddress);
+      const result = await liquidityAndBalance(accessToken, userAddress as string);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);

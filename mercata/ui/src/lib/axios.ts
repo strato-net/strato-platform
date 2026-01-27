@@ -59,11 +59,11 @@ function extractApiErrorMessage(error: any): string {
 const GUEST_SAFE_URLS = [
   '/user/me',
   // DepositsGuestPage
-  '/tokens/v2/earning-assets',
+  '/tokens/v2/earning-assets/public',
   '/bridge/networkConfigs',
   '/bridge/bridgeableTokens',
   // Borrow page
-  '/lending/collateral',
+  '/lending/collateral/public',
   '/lending/loans',
   '/cdp/vaults',
   '/cdp/assets',
@@ -78,7 +78,7 @@ const GUEST_SAFE_URLS = [
   '/cdp/config',
   '/cdp/admin/global-paused',
   // Advanced page - Lending tab
-  '/lending/liquidity',
+  '/lending/liquidity/public',
   // Advanced page - Swap tab
   '/swap-pools',
   // Advanced page - Safety tab

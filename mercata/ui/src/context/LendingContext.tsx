@@ -77,11 +77,11 @@ export const LendingProvider = ({
   const loansAbortControllerRef = useRef<AbortController | null>(null);
 
   const fetchLiquidityInfo = useCallback(async (signal?: AbortSignal) => {
-    // Fetch liquidity info for all users (logged in or guest)
-    // Pool stats are public, user-specific data will be "0" for guests
-    setLoadingLiquidity(true);
     try {
-      const res = await api.get<LiquidityData>("/lending/liquidity", {
+      setLoadingLiquidity(true);
+      // Use different API endpoints based on login status
+      const endpoint = isLoggedIn ? "/lending/liquidity" : "/lending/liquidity/public";
+      const res = await api.get<LiquidityData>(endpoint, {
         signal,
       });
       if (res.data) {
@@ -92,13 +92,14 @@ export const LendingProvider = ({
     } finally {
       setLoadingLiquidity(false);
     }
-  }, []);
+  }, [isLoggedIn]);
 
   const fetchCollateralInfo = useCallback(async (signal?: AbortSignal) => {
-    // Fetch collateral info for all users (guests get public data with "0" balances)
     try {
       setLoadingCollateral(true);
-      const res = await api.get<CollateralData[]>("/lending/collateral", {
+      // Use different API endpoints based on login status
+      const endpoint = isLoggedIn ? "/lending/collateral" : "/lending/collateral/public";
+      const res = await api.get<CollateralData[]>(endpoint, {
         signal,
       });
       if (res.data) {
@@ -109,7 +110,7 @@ export const LendingProvider = ({
     } finally {
       setLoadingCollateral(false);
     }
-  }, []); 
+  }, [isLoggedIn]); 
 
   const fetchLoans = useCallback(async (showLoading: boolean = false) => {
     if (loansAbortControllerRef.current) {
@@ -236,8 +237,8 @@ export const LendingProvider = ({
 
   // Run initialization - liquidity and collateral info for all users
   useEffect(() => {
-    fetchLiquidityInfo(); // Pool stats are public
-    fetchCollateralInfo(); // Collateral assets info is public (user balances are "0" for guests)
+    fetchLiquidityInfo(); // Uses /lending/liquidity for logged-in, /lending/liquidity/public for guests
+    fetchCollateralInfo(); // Uses /lending/collateral for logged-in, /lending/collateral/public for guests
   }, [fetchLiquidityInfo, fetchCollateralInfo]);
 
   // ========== POLLING EFFECTS ==========

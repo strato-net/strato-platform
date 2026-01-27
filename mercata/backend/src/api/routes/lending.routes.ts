@@ -162,7 +162,8 @@ router.post("/collateral/withdraw-max", authHandler.authorizeRequest(), LendingC
  *               type: object
  *               additionalProperties: true
  */
-router.get("/collateral", authHandler.authorizeRequest(true), LendingController.getCollateralAndBalance);
+router.get("/collateral", authHandler.authorizeRequest(), LendingController.getCollateralAndBalance);
+router.get("/collateral/public", authHandler.authorizeRequest(true), LendingController.getPublicCollateralInfo);
 router.post("/collateral", authHandler.authorizeRequest(), LendingController.supplyCollateral);
 router.delete("/collateral", authHandler.authorizeRequest(), LendingController.withdrawCollateral);
 
@@ -181,7 +182,8 @@ router.delete("/collateral", authHandler.authorizeRequest(), LendingController.w
  *               type: object
  *               additionalProperties: true
  */
-router.get("/liquidity", authHandler.authorizeRequest(true), LendingController.getLiquidityAndBalance);
+router.get("/liquidity", authHandler.authorizeRequest(), LendingController.getLiquidityAndBalance);
+router.get("/liquidity/public", authHandler.authorizeRequest(true), LendingController.getPublicLiquidityInfo);
 
 /**
  * @openapi

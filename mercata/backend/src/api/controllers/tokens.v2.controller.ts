@@ -4,11 +4,13 @@ import {
   getBalanceHistory,
   getBorrowingHistory,
   getEarningAssets,
+  getPublicEarningAssets,
   getNetBalanceHistory,
   getPoolPriceHistory,
   getTokens
 } from "../services/tokens.v2.service";
 import { validateQueryParams } from "../validators/tokens.validator";
+import { validateUserAddress } from "../validators/common.validators";
 import { buildTokenSelectFields } from "../../config/tokensConstants";
 import { getHistoryParams } from "../helpers/history.helper";
 
@@ -44,8 +46,23 @@ class TokensV2Controller {
   ): Promise<void> {
     try {
       const { accessToken, address: userAddress } = req;
-      // userAddress may be undefined for anonymous access
-      const tokens = await getEarningAssets(accessToken, userAddress as string | undefined);
+      validateUserAddress(userAddress);
+
+      const tokens = await getEarningAssets(accessToken, userAddress as string);
+      res.status(RestStatus.OK).json(tokens);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getPublicEarningAssets(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken } = req;
+      const tokens = await getPublicEarningAssets(accessToken);
       res.status(RestStatus.OK).json(tokens);
     } catch (error) {
       next(error);
