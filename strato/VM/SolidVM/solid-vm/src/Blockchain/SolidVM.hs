@@ -1195,7 +1195,12 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
             Just (CC.ConstantDecl _ _ constExp _) -> expToVar constExp
             Nothing -> case constName `M.lookup` CC._structs cont of
               Just _ -> pure . Constant $ SStructDef constName
-              Nothing -> unknownConstant "constant member access" (contractName', constName)
+              Nothing -> case constName `M.lookup` CC._storageDefs cont of
+                Just _ -> do
+                  -- Storage variables from parent contracts are stored in the current contract
+                  addr <- getCurrentAddress
+                  return . Constant . SReference $ AddressPath addr (MS.singleton $ BC.pack $ labelToString constName)
+                Nothing -> unknownConstant "member access" (labelToString contractName' ++ "." ++ labelToString constName)
           Just (CC.ConstantDecl _ _ constExp _) -> expToVar constExp
     (SBuiltinVariable "block", "proposer") -> do
       env' <- getEnv
