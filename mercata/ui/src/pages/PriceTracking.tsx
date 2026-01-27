@@ -15,7 +15,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import CandlestickChart, { OHLCData } from '@/components/charts/CandlestickChart';
-import { Loader2, TrendingUp, TrendingDown, Search, CandlestickChart as CandlestickChartIcon, LineChart as LineChartIcon, ArrowUp, ArrowDown, GripVertical, CircleDollarSign } from 'lucide-react';
+import { Loader2, TrendingUp, TrendingDown, Search, ArrowUp, ArrowDown, GripVertical, CircleDollarSign } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { EarningAsset } from '@mercata/shared-types';
 import { format } from 'date-fns';
@@ -23,6 +23,9 @@ import FixedSwapWidget from '@/components/swap/FixedSwapWidget';
 import { useSwapContext } from '@/context/SwapContext';
 import { usdstAddress } from '@/lib/constants';
 import { SwapToken } from '@/interface';
+import { calculateSwapOutput } from '@/helpers/swapCalculations';
+import { formatUnits, safeParseUnits } from '@/utils/numberUtils';
+import type { Pool } from '@/interface';
 
 type TimeRange = '1h' | '1d' | '7d' | '1m' | '3m' | '6m' | '1y' | 'all';
 type Interval = '10s' | '5m' | '15m' | '1h' | '4h' | '1d';
@@ -117,12 +120,13 @@ const WIDGET_STORAGE_KEY = 'price-tracking-widgets';
 const PriceTracking = () => {
   const { earningAssets, usdstBalance } = useTokenContext();
   const { activeTokens, fetchTokens } = useUserTokens();
-  const { setFromAsset, setToAsset, swappableTokens, refetchSwappableTokens, fetchPairableTokens, getPoolByTokenPair } = useSwapContext();
+  const { setFromAsset, setToAsset, swappableTokens, refetchSwappableTokens, fetchPairableTokens, getPoolByTokenPair, getPoolByAddress } = useSwapContext();
   const [swapModalOpen, setSwapModalOpen] = useState(false);
-  const [swapMode, setSwapMode] = useState<'buy' | 'sell' | null>(null);
+  const [swapMode, setSwapMode] = useState<'buy' | 'sell' | 'arb' | null>(null);
   const [swapAsset, setSwapAsset] = useState<EarningAsset | null>(null);
   const [swapFromToken, setSwapFromToken] = useState<SwapToken | null>(null);
   const [swapToToken, setSwapToToken] = useState<SwapToken | null>(null);
+  const [swapInitialFromAmount, setSwapInitialFromAmount] = useState<string | null>(null);
   const [widgets, setWidgets] = useState<WidgetConfig[]>(() => {
     // Try to load from localStorage first
     try {
@@ -234,6 +238,123 @@ const PriceTracking = () => {
     
     return false;
   }, [activeTokens]);
+
+  // Return user balance (wei string) for a token address
+  const getTokenBalanceWei = useCallback((tokenAddress: string | undefined): string => {
+    if (!tokenAddress) return '0';
+    const token = activeTokens.find((t: any) => {
+      const address = t.address || t.token?.address;
+      return address?.toLowerCase() === tokenAddress.toLowerCase();
+    });
+    if (!token) return '0';
+    return token.balance || token.token?.balance || token.balances?.[0]?.balance || '0';
+  }, [activeTokens]);
+
+  // Compute arb-from amount (wei string) to align pool with oracle, capped by user balance
+  const computeArbFromAmountWei = useCallback((pool: Pool, isAToB: boolean, oracleRatio: number, userBalanceWei: string): string => {
+    const inReserve = isAToB
+      ? BigInt(pool.tokenA?.poolBalance || '0')
+      : BigInt(pool.tokenB?.poolBalance || '0');
+    const outReserve = isAToB
+      ? BigInt(pool.tokenB?.poolBalance || '0')
+      : BigInt(pool.tokenA?.poolBalance || '0');
+    const userWei = BigInt(userBalanceWei || '0');
+    const cap = inReserve < 1n ? 0n : (userWei < inReserve ? userWei : inReserve);
+    if (cap <= 0n || oracleRatio <= 0 || !Number.isFinite(oracleRatio)) return '0';
+    const feeRate = BigInt(pool.swapFeeRate || 0);
+    let lo = 0n;
+    let hi = cap;
+    for (let i = 0; i < 80; i++) {
+      const mid = (lo + hi) / 2n;
+      if (mid <= 0n) break;
+      try {
+        const out = BigInt(calculateSwapOutput(mid.toString(), pool, isAToB));
+        const netIn = mid - (mid * feeRate) / 10000n;
+        const denom = inReserve + netIn;
+        if (denom <= 0n) break;
+        const newRatio = Number(outReserve - out) / Number(denom);
+        if (newRatio > oracleRatio) lo = mid;
+        else hi = mid;
+      } catch {
+        hi = mid;
+      }
+    }
+    return lo.toString();
+  }, []);
+
+  // Handle opening swap modal for ARB: prefills amounts to align pool with spot
+  const handleOpenArb = useCallback(async (asset: EarningAsset) => {
+    const isPool = (asset as any).isPool === true;
+    if (!isPool) return;
+    if (swappableTokens.length === 0) await refetchSwappableTokens();
+
+    const pool = await getPoolByAddress(asset.address);
+    if (!pool?.tokenA || !pool?.tokenB) return;
+    const tokenA = pool.tokenA;
+    const tokenB = pool.tokenB;
+    const tokenAAddress = tokenA.address || (tokenA as any).token?.address;
+    const tokenBAddress = tokenB.address || (tokenB as any).token?.address;
+    if (!tokenAAddress || !tokenBAddress) return;
+
+    const poolRatio = parseFloat(pool.aToBRatio || '0');
+    const oracleA = parseFloat(pool.oracleAToBRatio || '0');
+    const oracleB = parseFloat(pool.oracleBToARatio || '0');
+    if (!Number.isFinite(poolRatio) || (!Number.isFinite(oracleA) && !Number.isFinite(oracleB))) return;
+
+    let isAToB: boolean;
+    let fromAmountWei: string;
+    if (poolRatio > oracleA && Number.isFinite(oracleA)) {
+      isAToB = true;
+      fromAmountWei = computeArbFromAmountWei(pool, true, oracleA, getTokenBalanceWei(tokenAAddress));
+    } else if (poolRatio < oracleA && Number.isFinite(oracleB)) {
+      isAToB = false;
+      fromAmountWei = computeArbFromAmountWei(pool, false, oracleB, getTokenBalanceWei(tokenBAddress));
+    } else {
+      fromAmountWei = '0';
+      isAToB = poolRatio > (oracleA || 0);
+    }
+
+    const fromTokenAddr = isAToB ? tokenAAddress : tokenBAddress;
+    // When align amount is 0 (e.g. missing oracle or no misalignment), prefill with user's balance.
+    // Prefer activeTokens; fall back to pool's token balance (from getPoolByAddress).
+    if (fromAmountWei === '0') {
+      const balanceWei = getTokenBalanceWei(fromTokenAddr)
+        || (isAToB ? (tokenA.balance || '0') : (tokenB.balance || '0'));
+      fromAmountWei = balanceWei;
+    }
+
+    const fromDecimals = isAToB ? (tokenA.customDecimals ?? tokenA.decimals ?? 18) : (tokenB.customDecimals ?? tokenB.decimals ?? 18);
+    const fromAmountHuman = fromAmountWei === '0' ? '0' : formatUnits(fromAmountWei, fromDecimals);
+
+    const toTokenAddr = isAToB ? tokenBAddress : tokenAAddress;
+    const updatedPairable = await fetchPairableTokens(fromTokenAddr);
+    const matchingTo = updatedPairable.find((t) => t.address.toLowerCase() === toTokenAddr.toLowerCase());
+    const matchingFrom = swappableTokens.find((t) => t.address.toLowerCase() === fromTokenAddr.toLowerCase());
+
+    const preparedFromAsset: SwapToken = matchingFrom || {
+      address: fromTokenAddr,
+      _symbol: (isAToB ? tokenA : tokenB)._symbol || (isAToB ? tokenA : tokenB).symbol || '',
+      symbol: (isAToB ? tokenA : tokenB)._symbol || (isAToB ? tokenA : tokenB).symbol || '',
+      balance: getTokenBalanceWei(fromTokenAddr),
+      poolBalance: (isAToB ? tokenA : tokenB).poolBalance || '0',
+      decimals: fromDecimals,
+    };
+    const preparedToAsset: SwapToken = matchingTo || {
+      address: toTokenAddr,
+      _symbol: (isAToB ? tokenB : tokenA)._symbol || (isAToB ? tokenB : tokenA).symbol || '',
+      symbol: (isAToB ? tokenB : tokenA)._symbol || (isAToB ? tokenB : tokenA).symbol || '',
+      balance: getTokenBalanceWei(toTokenAddr),
+      poolBalance: (isAToB ? tokenB : tokenA).poolBalance || '0',
+      decimals: (isAToB ? tokenB : tokenA).customDecimals ?? (isAToB ? tokenB : tokenA).decimals ?? 18,
+    };
+
+    setSwapAsset(asset);
+    setSwapMode('arb');
+    setSwapFromToken(preparedFromAsset);
+    setSwapToToken(preparedToAsset);
+    setSwapInitialFromAmount(fromAmountHuman);
+    setSwapModalOpen(true);
+  }, [getPoolByAddress, refetchSwappableTokens, swappableTokens, fetchPairableTokens, getTokenBalanceWei, computeArbFromAmountWei]);
 
   // Handle opening swap modal
   const handleOpenSwap = useCallback(async (asset: EarningAsset, mode: 'buy' | 'sell') => {
@@ -1283,7 +1404,19 @@ const PriceTracking = () => {
                 </div>
               );
             })()}
-            {/* Spot price toggle (pools only) - where line chart button was */}
+            {/* ARB button (pools only) - between Sell and spot price toggle */}
+            {isPool && (widget.showSpotPrice !== false) && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2 text-xs shrink-0"
+                onClick={() => handleOpenArb(asset)}
+                aria-label="Arbitrage"
+              >
+                <span className="text-amber-500">ARB</span>
+              </Button>
+            )}
+            {/* Spot price toggle (pools only) */}
             {isPool && ohlcData.some(d => d.spotPrice !== undefined) && (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -1302,27 +1435,6 @@ const PriceTracking = () => {
                 </TooltipContent>
               </Tooltip>
             )}
-            {/* Chart type toggle - single button, icon shows the type not currently shown */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-7 px-2 shrink-0"
-                  onClick={() => updateWidget(widget.id, { chartType: widget.chartType === 'line' ? 'candlestick' : 'line' })}
-                  aria-label={widget.chartType === 'line' ? 'Switch to candlestick chart' : 'Switch to line chart'}
-                >
-                  {widget.chartType === 'line' ? (
-                    <CandlestickChartIcon className="h-3.5 w-3.5" />
-                  ) : (
-                    <LineChartIcon className="h-3.5 w-3.5" />
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>{widget.chartType === 'line' ? 'Switch to candlestick chart' : 'Switch to line chart'}</p>
-              </TooltipContent>
-            </Tooltip>
           </div>
             </CardHeader>
             <CardContent className="pt-2">
@@ -1431,12 +1543,13 @@ const PriceTracking = () => {
           setSwapMode(null);
           setSwapFromToken(null);
           setSwapToToken(null);
+          setSwapInitialFromAmount(null);
         }
       }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {swapMode === 'buy' ? 'Buy' : 'Sell'} {swapAsset?.symbol || 'Asset'}
+              {swapMode === 'arb' ? 'Arbitrage' : swapMode === 'buy' ? 'Buy' : 'Sell'} {swapMode === 'arb' ? (swapAsset?.symbol ?? '') : (swapAsset?.symbol || 'Asset')}
             </DialogTitle>
           </DialogHeader>
           <div className="mt-4">
@@ -1444,6 +1557,7 @@ const PriceTracking = () => {
               <FixedSwapWidget
                 fromAsset={swapFromToken}
                 toAsset={swapToToken}
+                initialFromAmount={swapMode === 'arb' ? (swapInitialFromAmount ?? undefined) : undefined}
               />
             )}
           </div>

@@ -322,14 +322,15 @@ const SwapDialog = ({
 interface FixedSwapWidgetProps {
   fromAsset: SwapToken;
   toAsset: SwapToken;
+  initialFromAmount?: string;
 }
 
-const FixedSwapWidget = ({ fromAsset, toAsset }: FixedSwapWidgetProps) => {
+const FixedSwapWidget = ({ fromAsset, toAsset, initialFromAmount }: FixedSwapWidgetProps) => {
   // ========================================================================
   // CONTEXT & HOOKS
   // ========================================================================
   // Only use SwapContext for swap function and pool fetching, not for asset state
-  const { swap, getPoolByTokenPair, refreshSwapHistory } = useSwapContext();
+  const { swap, getPoolByTokenPair, refreshSwapHistory, refetchSwappableTokens } = useSwapContext();
   const { userAddress } = useUser();
   const { fetchTokens } = useUserTokens();
   const { usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
@@ -351,6 +352,7 @@ const FixedSwapWidget = ({ fromAsset, toAsset }: FixedSwapWidgetProps) => {
   const [editingField, setEditingField] = useState<'from' | 'to' | null>(null);
   const [maxTransferableError, setMaxTransferableError] = useState("");
   const [swapLoading, setSwapLoading] = useState(false);
+  const hasAppliedInitialFromAmount = useRef(false);
 
   // ========================================================================
   // COMPUTED VALUES
@@ -535,6 +537,15 @@ const FixedSwapWidget = ({ fromAsset, toAsset }: FixedSwapWidgetProps) => {
     }
   }, [pool, fromAsset, toAsset]);
 
+  // When opened with initialFromAmount (e.g. from ARB), prefill after pool loads
+  useEffect(() => {
+    if (!pool || !initialFromAmount || initialFromAmount === "" || hasAppliedInitialFromAmount.current) return;
+    hasAppliedInitialFromAmount.current = true;
+    setFromAmount(initialFromAmount);
+    setFromAmountError("");
+    calculateSwapAmount(initialFromAmount, true);
+  }, [pool, initialFromAmount, calculateSwapAmount]);
+
   const handleAmountChange = useCallback((isFrom: boolean, value: string) => {
     // Clean the input
     const cleanedValue = value.replace(/,/g, "").trim();
@@ -654,7 +665,18 @@ const FixedSwapWidget = ({ fromAsset, toAsset }: FixedSwapWidgetProps) => {
         variant: "destructive",
       });
     } finally {
-      // Always refresh and reset regardless of success or failure
+      setSwapLoading(false);
+      // Refetch balances first so the next swap open has correct amounts
+      await refreshSwapHistory();
+      await Promise.all([
+        fetchUsdstBalance(),
+        fetchTokens(),
+        refetchSwappableTokens(),
+        refreshLoans(),
+        refreshCollateral(),
+        fromAsset?.address && toAsset?.address ? getPoolByTokenPair(fromAsset.address, toAsset.address) : Promise.resolve(),
+      ]);
+      // Then close and reset
       setIsDialogOpen(false);
       setFromAmount('');
       setToAmount('');
@@ -662,17 +684,6 @@ const FixedSwapWidget = ({ fromAsset, toAsset }: FixedSwapWidgetProps) => {
       setToAmountError('');
       setMaxTransferableError('');
       setEditingField(null);
-      setSwapLoading(false);
-
-      await refreshSwapHistory();
-      // Refresh all contexts to ensure balances are updated
-      await Promise.all([
-        fetchUsdstBalance(),
-        fetchTokens(),
-        refreshLoans(),
-        refreshCollateral(),
-        fromAsset?.address && toAsset?.address ? getPoolByTokenPair(fromAsset.address, toAsset.address) : Promise.resolve(),
-      ]);
     }
   };
 
