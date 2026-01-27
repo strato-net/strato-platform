@@ -167,6 +167,7 @@ contract Describe_Vault is Authorizable {
         require(vault.botExecutor() == address(botExecutor), "Bot executor should be set");
         // Note: WAD is a public constant (1e18), no need to test its value
         require(vault.MIN_FIRST_DEPOSIT_USD() == MIN_FIRST_DEPOSIT_USD, "MIN_FIRST_DEPOSIT_USD should be $50,000");
+        require(vault.WAD() == 1e18, "WAD should be 1e18");
     }
 
     function it_vault_has_supported_assets() {
