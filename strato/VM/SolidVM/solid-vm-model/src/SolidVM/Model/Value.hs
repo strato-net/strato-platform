@@ -304,12 +304,7 @@ createDefaultValue ::
   CC.Contract ->
   SVMType.Type ->
   m Value
-createDefaultValue cc ctract (SVMType.Array elemType mLen) = case mLen of
-  Nothing -> return $ SArray V.empty  -- Dynamic array starts empty
-  Just len -> do  -- Fixed-size array: create with default elements
-    elemVal <- createDefaultValue cc ctract elemType
-    elems <- V.replicateM (fromIntegral len) (createVar elemVal)
-    return $ SArray elems
+createDefaultValue _ _ (SVMType.Array _ _) = return $ SArray V.empty
 createDefaultValue _ _ (SVMType.Mapping _ _ _) = return $ SMap M.empty
 createDefaultValue _ _ (SVMType.Int _ _) = return $ SInteger 0
 createDefaultValue _ _ SVMType.Bool = return $ SBool False
