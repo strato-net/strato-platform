@@ -23,8 +23,8 @@ const WithdrawalsPage = () => {
 
   useEffect(() => {
     const tabParam = searchParams.get("tab");
-    if (tabParam === "bridge-out") {
-      setActiveTab("bridge-out");
+    if (tabParam && ['from-savings', 'bridge-out'].includes(tabParam)) {
+      setActiveTab(tabParam as "from-savings" | "bridge-out");
     }
   }, [searchParams]);
 
@@ -122,7 +122,7 @@ const WithdrawalsPage = () => {
                         } as React.CSSProperties
                       }
                     />
-                    <div className="mt-4 flex-1 min-h-0 overflow-auto">
+                    <div className="mt-4 flex-1 min-h-0 overflow-auto p-1 -m-1">
                       <BridgeOut isSaving={activeTab === "from-savings"} />
                     </div>
                   </div>

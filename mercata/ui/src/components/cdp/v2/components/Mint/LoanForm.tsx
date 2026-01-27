@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import MintAmountInput from './MintAmountInput';
 import HFSlider from './HFSlider';
-import { formatPercentage } from '@/utils/loanUtils';
+import { formatPercentage } from '@/components/cdp/v2/cdpUtils';
 
 interface LoanFormProps {
   // Label configuration
@@ -11,7 +11,8 @@ interface LoanFormProps {
   
   // Data
   availableAmount: string; // Formatted available amount
-  averageStabilityFee: number;
+  averageStabilityFee?: number;
+  showStabilityFee?: boolean; // Whether to display the stability fee row
   averageVaultHealth?: string | null; // Average health factor across all vaults
   
   // Mint amount state
@@ -22,8 +23,8 @@ interface LoanFormProps {
   exceedsMaxMint?: boolean; // Whether input exceeds max available to mint
   
   // Health factor state
-  riskBuffer: number;
-  onRiskBufferChange: (value: number) => void;
+  targetHF: number;
+  onTargetHFChange: (value: number) => void;
   minHF?: number; // Minimum health factor for slider bounds
   currentHF?: number; // Current position health factor
   sliderRangeColor?: string; // Custom color for slider range bar
@@ -44,14 +45,15 @@ const LoanForm: React.FC<LoanFormProps> = ({
   availableLabel = 'Available to Mint',
   availableAmount,
   averageStabilityFee,
+  showStabilityFee = false,
   averageVaultHealth,
   mintAmountInput,
   onMintAmountChange,
   onMaxClick,
   isMaxMode,
   exceedsMaxMint = false,
-  riskBuffer,
-  onRiskBufferChange,
+  targetHF,
+  onTargetHFChange,
   minHF,
   currentHF,
   sliderRangeColor,
@@ -74,10 +76,12 @@ const LoanForm: React.FC<LoanFormProps> = ({
               <span className="text-sm text-muted-foreground">{availableLabel}</span>
               <span className="text-sm font-semibold tabular-nums">USDST {availableAmount}</span>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Average Stability Fee</span>
-              <span className="text-sm font-semibold tabular-nums">{formatPercentage(averageStabilityFee || 1.5)}</span>
-            </div>
+            {showStabilityFee && averageStabilityFee !== undefined && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Average Stability Fee</span>
+                <span className="text-sm font-semibold tabular-nums">{formatPercentage(averageStabilityFee)}</span>
+              </div>
+            )}
           </div>
 
           {/* Mint Amount Input */}
@@ -87,6 +91,7 @@ const LoanForm: React.FC<LoanFormProps> = ({
             onMaxClick={onMaxClick}
             isMaxMode={isMaxMode}
             exceedsMax={exceedsMaxMint}
+            maxAvailable={availableAmount}
             label="Mint Amount"
             placeholder="0"
             unit="USDST"
@@ -96,8 +101,8 @@ const LoanForm: React.FC<LoanFormProps> = ({
 
           {/* Health Factor Slider */}
           <HFSlider
-            value={riskBuffer}
-            onChange={onRiskBufferChange}
+            value={targetHF}
+            onChange={onTargetHFChange}
             minHF={minHF}
             currentHF={currentHF}
             averageVaultHealth={averageVaultHealth}

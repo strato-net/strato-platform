@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import Mint from './Mint';
+import Mint from './Mint/Mint';
 import Burn from './Burn';
 import DebtPosition from './DebtPosition';
 import VaultsList from '@/components/cdp/VaultsList';

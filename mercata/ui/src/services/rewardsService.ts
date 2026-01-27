@@ -14,12 +14,17 @@ export interface Activity {
   accRewardPerStake: string;
   lastUpdateTime: string; // Changed to string to match backend
   totalStake: string;
+  totalStakeUsd?: string | null;
+  stakeUnitPriceUsd?: string | null;
   allowedCaller: string;
   sourceContract: string;
+  stakeDenomination?: "token_units" | "usd_notional" | "unknown";
+  stakeAssetAddress?: string | null;
 }
 
 export interface RewardsUserInfo {
   stake: string;
+  stakeUsd?: string | null;
   userIndex: string;
 }
 
@@ -105,7 +110,11 @@ export const fetchActivities = async (forceRefresh: boolean = false): Promise<Ac
     accRewardPerStake: string;
     lastUpdateTime: string;
     totalStake: string;
+    totalStakeUsd?: string | null;
     sourceContract: string;
+    stakeDenomination?: "token_units" | "usd_notional" | "unknown";
+    stakeAssetAddress?: string | null;
+    stakeUnitPriceUsd?: string | null;
   }): Activity => ({
     activityId: activity.activityId,
     name: activity.name,
@@ -114,8 +123,12 @@ export const fetchActivities = async (forceRefresh: boolean = false): Promise<Ac
     accRewardPerStake: activity.accRewardPerStake,
     lastUpdateTime: activity.lastUpdateTime,
     totalStake: activity.totalStake,
+    totalStakeUsd: activity.totalStakeUsd ?? null,
+    stakeUnitPriceUsd: activity.stakeUnitPriceUsd ?? null,
     allowedCaller: "", // Not available in response
     sourceContract: activity.sourceContract,
+    stakeDenomination: activity.stakeDenomination,
+    stakeAssetAddress: activity.stakeAssetAddress ?? null,
   }));
 };
 
@@ -170,14 +183,20 @@ export const fetchUserRewards = async (userAddress: string, forceRefresh: boolea
       accRewardPerStake: string;
       lastUpdateTime: string;
       totalStake: string;
+      totalStakeUsd?: string | null;
       sourceContract: string;
       userStake: string;
+      userStakeUsd?: string | null;
       userIndex: string;
       personalEmissionRate: string;
+      stakeDenomination?: "token_units" | "usd_notional" | "unknown";
+      stakeAssetAddress?: string | null;
+      stakeUnitPriceUsd?: string | null;
     }) => ({
       activityId: activity.activityId,
       userInfo: {
         stake: activity.userStake,
+        stakeUsd: activity.userStakeUsd ?? null,
         userIndex: activity.userIndex,
       },
       activity: {
@@ -188,8 +207,12 @@ export const fetchUserRewards = async (userAddress: string, forceRefresh: boolea
         accRewardPerStake: activity.accRewardPerStake,
         lastUpdateTime: activity.lastUpdateTime,
         totalStake: activity.totalStake,
+        totalStakeUsd: activity.totalStakeUsd ?? null,
         allowedCaller: "", // Not in response
         sourceContract: activity.sourceContract,
+        stakeDenomination: activity.stakeDenomination,
+        stakeAssetAddress: activity.stakeAssetAddress ?? null,
+        stakeUnitPriceUsd: activity.stakeUnitPriceUsd ?? null,
       },
       personalEmissionRate: activity.personalEmissionRate,
     })),

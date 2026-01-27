@@ -5,6 +5,7 @@ import { CollateralData, NewLoanData } from "@/interface";
 import { formatUnits } from "ethers";
 import { formatBalance } from "@/utils/numberUtils";
 import { useMobileTooltip } from "@/hooks/use-mobile-tooltip";
+import { getTextColor } from "@/utils/lendingUtils";
 
 interface BorrowingSectionProps {
   userCollaterals: CollateralData[];
@@ -51,15 +52,6 @@ const InfoTooltip = ({ children, content }: { children: React.ReactNode; content
 
 
 const PositionSection = ({ loanData }: BorrowingSectionProps) => {
-  function getTextColor(value: number, maxValue = 10, noLoan = false) {
-    if (noLoan) return 'rgb(0, 255, 0)';
-    const clamped = Math.min(Math.max(value, 1), maxValue);
-    const ratio = (clamped - 1) / (maxValue - 1);
-    const red = Math.round(255 * (1 - ratio));
-    const green = Math.round(255 * ratio);
-    return `rgb(${red}, ${green}, 0)`;
-  }
-
   return (
     <Card className="border border-border shadow-sm">
       <CardHeader className="pb-4">

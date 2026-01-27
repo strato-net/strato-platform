@@ -1,4 +1,5 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import MobileBottomNav from '../components/dashboard/MobileBottomNav';
@@ -8,21 +9,34 @@ import LendingPoolSection from '@/components/dashboard/LendingPoolSection';
 import SwapPoolsSection from '@/components/dashboard/SwapPoolsSection';
 import LiquidationsSection from '@/components/dashboard/LiquidationsSection';
 import SafetyModuleSection from '@/components/dashboard/SafetyModuleSection';
-import MintPlanner from '@/components/cdp/MintPlanner';
 import VaultsList from '@/components/cdp/VaultsList';
 import LiquidationsView from '@/components/cdp/LiquidationsView';
 import BadDebtView from '@/components/cdp/BadDebtView';
 // New v2 components
-import Mint from '@/components/cdp/v2/Mint';
-import DebtPosition from '@/components/cdp/v2/DebtPosition';
+import Mint from '@/components/cdp/v2/components/Mint/Mint';
+import DebtPosition from '@/components/cdp/v2/components/DebtPosition';
 import { useCDP } from '@/context/CDPContext';
-import { CompactRewardsDisplay } from '@/components/rewards/CompactRewardsDisplay';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 import { useUserTokens } from '@/context/UserTokensContext';
 
 const Advanced = () => {
+  const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<"lending" | "swap" | "liquidations" | "safety" | "mint">("mint");
   const [borrowActiveTab, setBorrowActiveTab] = useState('vaults');
+
+  // Handle query parameters for tab navigation from rewards page
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    const subtabParam = searchParams.get('subtab');
+
+    if (tabParam && ['lending', 'swap', 'liquidations', 'safety', 'mint'].includes(tabParam)) {
+      setActiveTab(tabParam as "lending" | "swap" | "liquidations" | "safety" | "mint");
+    }
+
+    if (subtabParam && ['vaults', 'bad-debt', 'liquidations'].includes(subtabParam)) {
+      setBorrowActiveTab(subtabParam);
+    }
+  }, [searchParams]);
   const { refreshVaults } = useCDP();
   const [vaultsRefreshTrigger, setVaultsRefreshTrigger] = useState(0);
   const [mintPlannerRefreshTrigger, setMintPlannerRefreshTrigger] = useState(0);
