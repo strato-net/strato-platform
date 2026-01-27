@@ -58,7 +58,7 @@ export const getEarningAssets = async (
   };
 
   // Fetch tokens, prices, and user-specific collateral data
-  const results = await Promise.all([
+  const [tokens, rawPrices, collaterals, cdps] = await Promise.all([
     cirrus.get(accessToken, "/" + Token, { params: tokenParams }),
     getCompletePriceMap(accessToken),
     cirrus.get(accessToken, "/" + CollateralVault + "-userCollaterals", {
@@ -76,11 +76,6 @@ export const getEarningAssets = async (
       },
     }),
   ]);
-
-  const tokens = results[0];
-  const rawPrices = results[1];
-  const collaterals = results[2];
-  const cdps = results[3];
 
   const collateralMap = new Map<string, bigint>();
   [...(collaterals.data || []), ...(cdps.data || [])].forEach((item: any) =>
