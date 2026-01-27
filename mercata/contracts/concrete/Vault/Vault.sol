@@ -29,7 +29,7 @@ contract record Vault is Ownable, Pausable {
     uint public MIN_FIRST_DEPOSIT_USD;
 
     // WAD precision (1e18)
-    uint public constant WAD = 1e18;
+    uint public constant WAD;
 
     // Reentrancy guard
     bool private locked;
@@ -81,6 +81,8 @@ contract record Vault is Ownable, Pausable {
         require(_priceOracle != address(0), "Vault: invalid oracle");
         require(_botExecutor != address(0), "Vault: invalid bot executor");
         require(_shareToken != address(0), "Vault: invalid share token");
+
+        WAD = 1e18;
 
         priceOracle = PriceOracle(_priceOracle);
         botExecutor = _botExecutor;
