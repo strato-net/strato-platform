@@ -640,7 +640,8 @@ getVariableOfName name = do
         return $
           coerceType ctract _constType $ case _constInitialVal of
             CC.NumberLiteral _ x _ -> SInteger x
-            x -> todo "constant initial val" x
+            CC.AddressLiteral _ a -> SAddress a False
+            _ -> SDeferredConstant name  -- Complex expression, evaluate on access
 
       maybeStructDef :: Maybe Variable
       maybeStructDef =

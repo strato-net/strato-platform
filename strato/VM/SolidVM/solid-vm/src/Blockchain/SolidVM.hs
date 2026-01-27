@@ -1065,7 +1065,18 @@ expToVar' (CC.InlineBoundsCheck _ mL mU expr) = do
 expToVar' (CC.Variable _ "bytes32ToString") = return $ Constant $ SHexDecodeAndTrim
 expToVar' (CC.Variable _ "addressToAsciiString") = return $ Constant SAddressToAscii
 expToVar' (CC.Variable _ "now") = Constant . SInteger . round . utcTimeToPOSIXSeconds . BlockHeader.timestamp . Env.blockHeader <$> getEnv
-expToVar' (CC.Variable _ name) = getVariableOfName name
+expToVar' (CC.Variable _ name) = do
+  var <- getVariableOfName name
+  -- Handle deferred constants (complex expressions evaluated on access)
+  case var of
+    Constant (SDeferredConstant constName) -> do
+      contract <- getCurrentContract
+      (_, cc) <- getCurrentCodeCollection
+      let constMap = cc ^. CC.flConstants
+      case M.lookup constName $ (contract ^. CC.constants) `M.union` constMap of
+        Just constDecl -> expToVar (constDecl ^. CC.constInitialVal)
+        Nothing -> unknownConstant "deferred constant lookup" constName
+    _ -> return var
 expToVar' (CC.Unitary _ "-" e) = do
   var <- expToVar e
   value <- getRealNum var

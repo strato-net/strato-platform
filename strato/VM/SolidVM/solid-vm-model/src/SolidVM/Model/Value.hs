@@ -105,6 +105,7 @@ data Value
   | SHexDecodeAndTrim -- Hack to implement blockapps-sol's bytes32ToString without
   -- supporting indexing into bytes32s.
   | SStringConcat -- for easy concat of multiple arguments
+  | SDeferredConstant SolidString -- Constant with complex expression, evaluated on access
   | SAddressToAscii -- Hack to implement addressToAsciiString without supporting indexing into bytes
   | SBreak
   | SContinue
