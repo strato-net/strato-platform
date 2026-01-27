@@ -198,7 +198,9 @@ lookupStruct :: SolidString -> SSS [(SolidString, Type)]
 lookupStruct name = do
   cc <- asks codeCollection
   c <- asks contract
-  let str = fromMaybe [] $ msum [(M.lookup name (_structs c)), (M.lookup name (_flStructs cc))]
+  -- Search current contract, file-level, then all contracts (for nested structs in libraries)
+  let allContractStructs = msum [M.lookup name (_structs c') | c' <- M.elems (_contracts cc)]
+  let str = fromMaybe [] $ msum [(M.lookup name (_structs c)), (M.lookup name (_flStructs cc)), allContractStructs]
   pure $ f <$> str
   where
     f (t, ft, _) = (t, fieldTypeType ft)
