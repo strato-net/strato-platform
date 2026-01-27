@@ -95,10 +95,6 @@ contract record Vault is Ownable, Pausable {
     // MODIFIERS
     // ═══════════════════════════════════════════════════════════════════════════════
 
-    modifier onlyBotExecutor() {
-        require(msg.sender == botExecutor, "Vault: caller is not bot executor");
-        _;
-    }
 
     modifier onlySupportedAsset(address asset) {
         require(isSupported[asset], "Vault: asset not supported");
