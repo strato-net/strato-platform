@@ -272,6 +272,9 @@ lookupContractFunction :: SourceAnnotation Text -> SolidString -> SolidString ->
 lookupContractFunction x cName fName = do
   cc@CodeCollection {..} <- asks codeCollection
   ctract <- asks contract
+  -- Check if cName is the current contract or an ancestor (for inherited access)
+  let isInherited = cName == ctract ^. contractName || 
+                    cName `elem` maybe [] (map _contractName) (getParentsAnnotated cc ctract)
   case M.lookup cName _contracts of
     Nothing -> pure . bottom $ ("Unknown contract: " <> labelToText cName) <$ x
     Just c' -> local (\r -> r {contract = c'}) . recursively x $ do
@@ -295,7 +298,14 @@ lookupContractFunction x cName fName = do
                     fRets = Static (SVMType.Struct Nothing fName) x
                  in pure $ Function fArgs fRets x [] [] False
             Just VariableDecl {..} -> case _varVisibility of
-              Just Public -> constructGetterType x _varType
+              Just Public
+                -- If accessing from within inheritance hierarchy, return mutable storage
+                | isInherited -> pure . Mutable $ Static _varType x
+                -- Otherwise return getter for external access
+                | otherwise -> constructGetterType x _varType
+              -- Also allow internal storage vars to be accessed (returns mutable for assignment)
+              Just Internal -> pure . Mutable $ Static _varType x
+              Nothing -> pure . Mutable $ Static _varType x  -- default visibility is internal
               _ -> pure . bottom $
                     ( T.concat
                         [ "Unknown contract function: ",
@@ -308,7 +318,10 @@ lookupContractFunction x cName fName = do
           Just ConstantDecl {..} -> pure $ Static _constType x
         Just f -> pure . filterFuncs cc x fName f $
           case filter (\(Using n _ _) -> n == cName) . concat . M.elems $ ctract ^. usings of
-            [] -> [Internal, Private]
+            [] -> case c ^. contractType of
+              LibraryType -> [Private]  -- Library internal functions are callable directly
+              _ | isInherited -> [Private]  -- Inherited internal functions are accessible
+              _ -> [Internal, Private]
             _ -> []
 
   where
