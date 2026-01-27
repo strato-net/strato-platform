@@ -29,7 +29,10 @@ contract record Vault is Ownable, Pausable {
     uint public MIN_FIRST_DEPOSIT_USD;
 
     // WAD precision (1e18)
-    uint public WAD;
+    uint public constant WAD = 1e18;
+
+    // Reentrancy guard
+    bool private locked;
 
     // ═══════════════════════════════════════════════════════════════════════════════
     // STATE VARIABLES
@@ -73,7 +76,6 @@ contract record Vault is Ownable, Pausable {
         address _botExecutor,
         address _shareToken
     ) external onlyOwner {
-        WAD = 1e18;
         MIN_FIRST_DEPOSIT_USD = 50000 * WAD; // $50,000
 
         require(_priceOracle != address(0), "Vault: invalid oracle");
@@ -103,14 +105,12 @@ contract record Vault is Ownable, Pausable {
         _;
     }
 
-    /// @notice Modifier to check if the caller is the vault factory
-    modifier onlyVaultFactory() {
-        require(
-            msg.sender == address(vaultFactory)
-            || msg.sender == owner(),
-            "Vault: caller is not VaultFactory"
-        );
+    /// @notice Prevents reentrant calls to functions
+    modifier nonReentrant() {
+        require(!locked, "Vault: reentrant call");
+        locked = true;
         _;
+        locked = false;
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -127,7 +127,7 @@ contract record Vault is Ownable, Pausable {
      *   - First deposit requires minimum $50,000 USD value
      *   - Shares minted proportional to deposit value relative to total equity
      */
-    function deposit(address assetIn, uint amountIn) external whenNotPaused onlySupportedAsset(assetIn) returns (uint sharesMinted) {
+    function deposit(address assetIn, uint amountIn) external nonReentrant whenNotPaused onlySupportedAsset(assetIn) returns (uint sharesMinted) {
         require(shareToken != address(0), "Vault: not initialized");
         require(amountIn > 0, "Vault: zero amount");
 
@@ -208,7 +208,7 @@ contract record Vault is Ownable, Pausable {
      *   - Tokens at minimum reserve are skipped
      *   - Payout allocated proportionally to withdrawable USD weight
      */
-    function withdraw(uint amountUSD) external whenNotPaused returns (uint sharesBurned) {
+    function withdraw(uint amountUSD) external nonReentrant whenNotPaused returns (uint sharesBurned) {
         require(shareToken != address(0), "Vault: not initialized");
         require(amountUSD > 0, "Vault: zero amount");
 
@@ -243,7 +243,7 @@ contract record Vault is Ownable, Pausable {
      * @param sharesToBurn Number of shares to burn
      * @return amountUSD USD value withdrawn
      */
-    function withdrawShares(uint sharesToBurn) external whenNotPaused returns (uint amountUSD) {
+    function withdrawShares(uint sharesToBurn) external nonReentrant whenNotPaused returns (uint amountUSD) {
         require(shareToken != address(0), "Vault: not initialized");
         require(sharesToBurn > 0, "Vault: zero shares");
         require(IERC20(shareToken).balanceOf(msg.sender) >= sharesToBurn, "Vault: insufficient shares");
