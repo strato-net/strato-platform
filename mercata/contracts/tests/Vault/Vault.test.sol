@@ -138,6 +138,8 @@ contract Describe_Vault is Authorizable {
         // Transfer share token ownership to vault so it can mint/burn
         // (VaultFactory transfers to factory owner, we need vault to own it)
         Ownable(shareTokenAddress).transferOwnership(vaultAddress);
+        // adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(shareTokenAddress), "mint", address(vault));
+        // adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(shareTokenAddress), "burn", address(vault));
 
         // Add supported assets to vault
         vault.addSupportedAsset(tokenA);
