@@ -101,13 +101,49 @@ interface FilterQueryResult {
  * Returns filter parameters and optionally a custom query executor for complex cases
  */
 type ActivityFilter = (
-  userAddress: string,
+  userAddress: string | undefined,
   contractName: string,
   eventName: string,
   storageSelect: string,
   fetchLimit: number,
-  accessToken: string
+  accessToken: string,
+  timeRange?: string
 ) => Promise<FilterQueryResult>;
+
+/**
+ * Helper function to get time range filter for PostgREST
+ */
+const getTimeRangeFilter = (timeRange?: string): Record<string, string> => {
+  if (!timeRange || timeRange === 'all') {
+    return {};
+  }
+
+  const now = new Date();
+  let startDate: Date;
+
+  switch (timeRange) {
+    case 'today':
+      startDate = new Date(now);
+      startDate.setDate(now.getDate() - 1);
+      break;
+    case 'week':
+      startDate = new Date(now);
+      startDate.setDate(now.getDate() - 7);
+      break;
+    case 'month':
+      startDate = new Date(now);
+      startDate.setMonth(now.getMonth() - 1);
+      break;
+    default:
+      return {};
+  }
+
+  // Format as ISO string for PostgREST
+  const isoString = startDate.toISOString();
+  return {
+    "block_timestamp": `gte.${isoString}`,
+  };
+};
 
 /**
  * Mapping from (contract_name, event_name) to filter functions
@@ -115,7 +151,8 @@ type ActivityFilter = (
  */
 const activityFilters: Record<string, ActivityFilter> = {
   // Transfer events: filter by from OR to
-  "Token:Transfer": async (userAddress, contractName, eventName, storageSelect, fetchLimit, accessToken) => {
+  "Token:Transfer": async (userAddress, contractName, eventName, storageSelect, fetchLimit, accessToken, timeRange) => {
+    const timeFilter = getTimeRangeFilter(timeRange);
     const baseParams = {
       order: "block_timestamp.desc",
       select: `*,${storageSelect}`,
@@ -123,6 +160,7 @@ const activityFilters: Record<string, ActivityFilter> = {
       event_name: `eq.${eventName}`,
       limit: fetchLimit.toString(),
       offset: "0",
+      ...timeFilter,
     };
 
     const fromParams = {
@@ -140,6 +178,7 @@ const activityFilters: Record<string, ActivityFilter> = {
       event_name: `eq.${eventName}`,
       "attributes->>from": `eq.${userAddress}`,
       select: `${storageSelect},count()`,
+      ...timeFilter,
     };
 
     const toCountParams: Record<string, string> = {
@@ -147,6 +186,7 @@ const activityFilters: Record<string, ActivityFilter> = {
       event_name: `eq.${eventName}`,
       "attributes->>to": `eq.${userAddress}`,
       select: `${storageSelect},count()`,
+      ...timeFilter,
     };
 
     const [fromCountResponse, fromEventsResponse, toCountResponse, toEventsResponse] = await Promise.all([
@@ -187,29 +227,38 @@ const activityFilters: Record<string, ActivityFilter> = {
   },
 
   // Voucher Transfer events: same as Token Transfer
-  "Voucher:Transfer": async (userAddress, contractName, eventName, storageSelect, fetchLimit, accessToken) => {
+  "Voucher:Transfer": async (userAddress, contractName, eventName, storageSelect, fetchLimit, accessToken, timeRange) => {
     // Reuse the same logic as Token:Transfer
-    return activityFilters["Token:Transfer"]!(userAddress, contractName, eventName, storageSelect, fetchLimit, accessToken);
+    return activityFilters["Token:Transfer"]!(userAddress, contractName, eventName, storageSelect, fetchLimit, accessToken, timeRange);
   },
 
   // DepositCompleted events: filter by stratoRecipient
-  "MercataBridge:DepositCompleted": async (userAddress, contractName, eventName, storageSelect, fetchLimit, accessToken) => {
-    const params = {
+  "MercataBridge:DepositCompleted": async (userAddress, contractName, eventName, storageSelect, fetchLimit, accessToken, timeRange) => {
+    const timeFilter = getTimeRangeFilter(timeRange);
+    const params: Record<string, string> = {
       order: "block_timestamp.desc",
       select: `*,${storageSelect}`,
       "storage.contract.contract_name": `eq.${contractName}`,
       event_name: `eq.${eventName}`,
-      "attributes->>stratoRecipient": `eq.${userAddress}`,
       limit: fetchLimit.toString(),
       offset: "0",
+      ...timeFilter,
     };
+
+    if (userAddress) {
+      params["attributes->>stratoRecipient"] = `eq.${userAddress}`;
+    }
 
     const countParams: Record<string, string> = {
       "storage.contract.contract_name": `eq.${contractName}`,
       event_name: `eq.${eventName}`,
-      "attributes->>stratoRecipient": `eq.${userAddress}`,
       select: `${storageSelect},count()`,
+      ...timeFilter,
     };
+
+    if (userAddress) {
+      countParams["attributes->>stratoRecipient"] = `eq.${userAddress}`;
+    }
 
     const [countResponse, eventsResponse] = await Promise.all([
       cirrus.get(accessToken, `/${constants.Event}`, { params: countParams }),
@@ -231,7 +280,8 @@ const activityFilters: Record<string, ActivityFilter> = {
   },
 
   // USDSTMinted events: filter by owner
-  "CDPEngine:USDSTMinted": async (userAddress, contractName, eventName, storageSelect, fetchLimit, accessToken) => {
+  "CDPEngine:USDSTMinted": async (userAddress, contractName, eventName, storageSelect, fetchLimit, accessToken, timeRange) => {
+    const timeFilter = getTimeRangeFilter(timeRange);
     const params: Record<string, string> = {
       order: "block_timestamp.desc",
       select: `*,${storageSelect}`,
@@ -239,6 +289,7 @@ const activityFilters: Record<string, ActivityFilter> = {
       event_name: `eq.${eventName}`,
       limit: fetchLimit.toString(),
       offset: "0",
+      ...timeFilter,
     };
 
     if (userAddress) {
@@ -249,6 +300,7 @@ const activityFilters: Record<string, ActivityFilter> = {
       "storage.contract.contract_name": `eq.${contractName}`,
       event_name: `eq.${eventName}`,
       select: `${storageSelect},count()`,
+      ...timeFilter,
     };
 
     if (userAddress) {
@@ -275,7 +327,8 @@ const activityFilters: Record<string, ActivityFilter> = {
   },
 
   // Swap events: filter by sender
-  "Pool:Swap": async (userAddress, contractName, eventName, storageSelect, fetchLimit, accessToken) => {
+  "Pool:Swap": async (userAddress, contractName, eventName, storageSelect, fetchLimit, accessToken, timeRange) => {
+    const timeFilter = getTimeRangeFilter(timeRange);
     const params: Record<string, string> = {
       order: "block_timestamp.desc",
       select: `*,${storageSelect}`,
@@ -283,6 +336,7 @@ const activityFilters: Record<string, ActivityFilter> = {
       event_name: `eq.${eventName}`,
       limit: fetchLimit.toString(),
       offset: "0",
+      ...timeFilter,
     };
 
     if (userAddress) {
@@ -293,6 +347,7 @@ const activityFilters: Record<string, ActivityFilter> = {
       "storage.contract.contract_name": `eq.${contractName}`,
       event_name: `eq.${eventName}`,
       select: `${storageSelect},count()`,
+      ...timeFilter,
     };
 
     if (userAddress) {
@@ -322,23 +377,32 @@ const activityFilters: Record<string, ActivityFilter> = {
 /**
  * Default filter: filter by transaction_sender
  */
-const defaultFilter: ActivityFilter = async (userAddress, contractName, eventName, storageSelect, fetchLimit, accessToken) => {
+const defaultFilter: ActivityFilter = async (userAddress, contractName, eventName, storageSelect, fetchLimit, accessToken, timeRange) => {
+  const timeFilter = getTimeRangeFilter(timeRange);
   const params: Record<string, string> = {
     order: "block_timestamp.desc",
     select: `*,${storageSelect}`,
     "storage.contract.contract_name": `eq.${contractName}`,
     event_name: `eq.${eventName}`,
-    transaction_sender: `eq.${userAddress}`,
     limit: fetchLimit.toString(),
     offset: "0",
+    ...timeFilter,
   };
+
+  if (userAddress) {
+    params["transaction_sender"] = `eq.${userAddress}`;
+  }
 
   const countParams: Record<string, string> = {
     "storage.contract.contract_name": `eq.${contractName}`,
     event_name: `eq.${eventName}`,
-    transaction_sender: `eq.${userAddress}`,
     select: `${storageSelect},count()`,
+    ...timeFilter,
   };
+
+  if (userAddress) {
+    countParams["transaction_sender"] = `eq.${userAddress}`;
+  }
 
   const [countResponse, eventsResponse] = await Promise.all([
     cirrus.get(accessToken, `/${constants.Event}`, { params: countParams }),
@@ -364,7 +428,8 @@ export const getActivitiesByTypes = async (
   activityTypePairs: ActivityTypePair[],
   userAddress: string | undefined,
   limit: number,
-  offset: number
+  offset: number,
+  timeRange?: string
 ): Promise<EventResponse> => {
   const storageSelect = "storage!inner(contract!inner(contract_name))";
   
@@ -373,6 +438,8 @@ export const getActivitiesByTypes = async (
   // Note: For very high offsets, this will fetch many events and be slower
   // Consider implementing cursor-based pagination for better performance at scale
   const fetchLimit = limit + offset;
+  
+  const timeFilter = getTimeRangeFilter(timeRange);
   
   const pairQueries = activityTypePairs.map(async (pair) => {
     // If no userAddress, fetch all events without filtering
@@ -384,12 +451,14 @@ export const getActivitiesByTypes = async (
         event_name: `eq.${pair.event_name}`,
         limit: fetchLimit.toString(),
         offset: "0",
+        ...timeFilter,
       };
 
       const countParams: Record<string, string> = {
         "storage.contract.contract_name": `eq.${pair.contract_name}`,
         event_name: `eq.${pair.event_name}`,
         select: `${storageSelect},count()`,
+        ...timeFilter,
       };
 
       const [countResponse, eventsResponse] = await Promise.all([
@@ -415,7 +484,7 @@ export const getActivitiesByTypes = async (
     const filterKey = `${pair.contract_name}:${pair.event_name}`;
     const filter = activityFilters[filterKey] || defaultFilter;
     
-    return await filter(userAddress, pair.contract_name, pair.event_name, storageSelect, fetchLimit, accessToken);
+    return await filter(userAddress, pair.contract_name, pair.event_name, storageSelect, fetchLimit, accessToken, timeRange);
   });
 
   const pairResults = await Promise.all(pairQueries);

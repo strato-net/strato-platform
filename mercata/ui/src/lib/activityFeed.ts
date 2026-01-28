@@ -36,6 +36,7 @@ export const activityFeedApi = {
       limit?: number;
       offset?: number;
       myActivity?: boolean;
+      timeRange?: 'all' | 'today' | 'week' | 'month';
     } = {}
   ): Promise<EventResponse> => {
     const params = new URLSearchParams();
@@ -49,6 +50,9 @@ export const activityFeedApi = {
     if (options.limit) params.append('limit', options.limit.toString());
     if (options.offset) params.append('offset', options.offset.toString());
     if (options.myActivity) params.append('my_activity', 'true');
+    if (options.timeRange && options.timeRange !== 'all') {
+      params.append('time_range', options.timeRange);
+    }
 
     const response = await api.get(`/events/activities?${params.toString()}`);
     return response.data as EventResponse;

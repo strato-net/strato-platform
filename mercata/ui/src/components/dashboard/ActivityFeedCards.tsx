@@ -35,6 +35,7 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [selectedActivityType, setSelectedActivityType] = useState<string>("all");
+  const [selectedTimeRange, setSelectedTimeRange] = useState<string>("all");
   const [refreshKey, setRefreshKey] = useState(0);
   const itemsPerPage = 10;
 
@@ -67,6 +68,7 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
         limit: itemsPerPage,
         offset: offset,
         myActivity: isMyActivity,
+        timeRange: selectedTimeRange as 'all' | 'today' | 'week' | 'month',
       });
 
         // Collect token addresses using getTokenAddress from activity type configs
@@ -148,16 +150,16 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
     } finally {
       setLoading(false);
     }
-  }, [userAddress, isMyActivity, currentPage, selectedActivityType]);
+  }, [userAddress, isMyActivity, currentPage, selectedActivityType, selectedTimeRange]);
 
   useEffect(() => {
     fetchAllActivities();
   }, [fetchAllActivities, refreshKey]);
 
-  // Reset to page 1 when activity type changes
+  // Reset to page 1 when activity type or time range changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedActivityType]);
+  }, [selectedActivityType, selectedTimeRange]);
 
   const handleRefresh = useCallback(() => {
     setRefreshKey(prev => prev + 1);
@@ -220,30 +222,41 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
   return (
     <div>
       {/* Controls */}
-      <div className="flex items-center justify-between gap-4 mb-4">
-        <Select value={selectedActivityType} onValueChange={setSelectedActivityType}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Select activity type" />
-          </SelectTrigger>
-          <SelectContent>
-            {activityTypeOptions.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        
+      <div className="flex items-center gap-4 mb-4">
         <Button
           variant="outline"
-          size="sm"
           onClick={handleRefresh}
           disabled={loading}
-          className="flex items-center gap-2"
+          className="h-10 flex items-center gap-2"
         >
           <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           <span className="hidden sm:inline">Refresh</span>
         </Button>
+
+        <Select value={selectedActivityType} onValueChange={setSelectedActivityType}>
+        <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Select activity type" />
+        </SelectTrigger>
+        <SelectContent>
+            {activityTypeOptions.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+                {option.label}
+            </SelectItem>
+            ))}
+        </SelectContent>
+        </Select>
+        
+        <Select value={selectedTimeRange} onValueChange={setSelectedTimeRange}>
+        <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Select time range" />
+        </SelectTrigger>
+        <SelectContent>
+            <SelectItem value="all">All time</SelectItem>
+            <SelectItem value="today">Today</SelectItem>
+            <SelectItem value="week">This week</SelectItem>
+            <SelectItem value="month">This month</SelectItem>
+        </SelectContent>
+        </Select>
       </div>
 
       {/* Content Area */}

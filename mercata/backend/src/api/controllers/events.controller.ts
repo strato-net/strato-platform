@@ -56,13 +56,15 @@ class EventsController {
       const limit = parseInt(query.limit as string || "10");
       const offset = parseInt(query.offset as string || "0");
       const userAddress = query.my_activity === 'true' ? address : undefined;
+      const timeRange = query.time_range as string | undefined;
 
       const activities = await getActivitiesByTypes(
         accessToken,
         activityTypePairs,
         userAddress,
         limit,
-        offset
+        offset,
+        timeRange
       );
 
       res.status(RestStatus.OK).json(activities);
