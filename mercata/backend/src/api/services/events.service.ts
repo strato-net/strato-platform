@@ -232,22 +232,72 @@ const activityFilters: Record<string, ActivityFilter> = {
 
   // USDSTMinted events: filter by owner
   "CDPEngine:USDSTMinted": async (userAddress, contractName, eventName, storageSelect, fetchLimit, accessToken) => {
-    const params = {
+    const params: Record<string, string> = {
       order: "block_timestamp.desc",
       select: `*,${storageSelect}`,
       "storage.contract.contract_name": `eq.${contractName}`,
       event_name: `eq.${eventName}`,
-      "attributes->>owner": `eq.${userAddress}`,
       limit: fetchLimit.toString(),
       offset: "0",
     };
 
+    if (userAddress) {
+      params["attributes->>owner"] = `eq.${userAddress}`;
+    }
+
     const countParams: Record<string, string> = {
       "storage.contract.contract_name": `eq.${contractName}`,
       event_name: `eq.${eventName}`,
-      "attributes->>owner": `eq.${userAddress}`,
       select: `${storageSelect},count()`,
     };
+
+    if (userAddress) {
+      countParams["attributes->>owner"] = `eq.${userAddress}`;
+    }
+
+    const [countResponse, eventsResponse] = await Promise.all([
+      cirrus.get(accessToken, `/${constants.Event}`, { params: countParams }),
+      cirrus.get(accessToken, `/${constants.Event}`, { params }),
+    ]);
+
+    const total = countResponse.data?.[0]?.count || 0;
+    const data = eventsResponse.data || [];
+
+    const events = (data as any[]).map((event: any) => {
+      const { storage, ...eventWithoutStorage } = event;
+      return {
+        ...eventWithoutStorage,
+        contract_name: event.storage?.contract?.[0]?.contract_name || "",
+      };
+    });
+
+    return { events, total };
+  },
+
+  // Swap events: filter by sender
+  "Pool:Swap": async (userAddress, contractName, eventName, storageSelect, fetchLimit, accessToken) => {
+    const params: Record<string, string> = {
+      order: "block_timestamp.desc",
+      select: `*,${storageSelect}`,
+      "storage.contract.contract_name": `eq.${contractName}`,
+      event_name: `eq.${eventName}`,
+      limit: fetchLimit.toString(),
+      offset: "0",
+    };
+
+    if (userAddress) {
+      params["attributes->>sender"] = `eq.${userAddress}`;
+    }
+
+    const countParams: Record<string, string> = {
+      "storage.contract.contract_name": `eq.${contractName}`,
+      event_name: `eq.${eventName}`,
+      select: `${storageSelect},count()`,
+    };
+
+    if (userAddress) {
+      countParams["attributes->>sender"] = `eq.${userAddress}`;
+    }
 
     const [countResponse, eventsResponse] = await Promise.all([
       cirrus.get(accessToken, `/${constants.Event}`, { params: countParams }),

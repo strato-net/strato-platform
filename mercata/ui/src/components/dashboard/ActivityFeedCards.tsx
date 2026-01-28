@@ -72,7 +72,7 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
         // Collect token addresses using getTokenAddress from activity type configs
         const allTokenAddresses = [...new Set(
           response.events
-            .map(event => {
+            .flatMap(event => {
               // Find matching activity type
               const matchingType = Object.entries(activityTypes).find(
                 ([_, config]) =>
@@ -80,13 +80,12 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
                   config.event_name === event.event_name
               );
               
-              // Extract token address using the config's getTokenAddress function
+              // Extract token addresses using the config's getTokenAddress function
               if (matchingType && matchingType[1].getTokenAddress) {
                 return matchingType[1].getTokenAddress(event);
               }
-              return undefined;
+              return [];
             })
-            .filter((addr): addr is string => !!addr)
         )];
         const tokenSymbolMap = new Map<string, string>();
         
@@ -126,13 +125,18 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
 
           if (matchingType) {
             const [, config] = matchingType;
-            // Get token symbol using the config's getTokenAddress function
-            let tokenSymbol: string | undefined;
+            // Get token symbols using the config's getTokenAddress function
+            const tokenSymbolsMap = new Map<string, string>();
             if (config.getTokenAddress) {
-              const tokenAddress = config.getTokenAddress(event);
-              tokenSymbol = tokenAddress ? tokenSymbolMap.get(tokenAddress) : undefined;
+              const tokenAddresses = config.getTokenAddress(event);
+              tokenAddresses.forEach(address => {
+                const symbol = tokenSymbolMap.get(address);
+                if (symbol) {
+                  tokenSymbolsMap.set(address, symbol);
+                }
+              });
             }
-            const card = config.handler(event, tokenSymbol, userAddress);
+            const card = config.handler(event, tokenSymbolsMap, userAddress);
             allCards.push(card);
           }
         }
