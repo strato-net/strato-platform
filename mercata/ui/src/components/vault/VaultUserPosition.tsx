@@ -32,7 +32,8 @@ const formatShares = (value: string): string => {
 
 const formatPercent = (value: string): string => {
   try {
-    const num = parseFloat(value);
+    // ownershipPercent is in WAD format (18 decimals), representing a decimal (e.g., 1e18 = 100%)
+    const num = parseFloat(formatUnits(value, 18)) * 100; // Convert to percentage
     if (num === 0) return "0";
     if (num < 0.01) return "<0.01";
     return num.toLocaleString("en-US", {
