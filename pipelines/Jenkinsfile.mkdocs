@@ -246,11 +246,11 @@ pipeline {
         message: "Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' - Deployed ${params.GIT_REV} to ${params.DEPLOY_ENV} (${env.BUILD_URL}) on node ${env.NODE_NAME}"
       )
 
-//      slackSend(
-//        channel: '#engineering',
-//        color: 'good',
-//        message: "MkDocs deployment succeeded: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' - ${params.GIT_REV} to ${params.DEPLOY_ENV} (${env.BUILD_URL}) on node ${env.NODE_NAME}"
-//      )
+      slackSend(
+        channel: '#engineering',
+        color: 'good',
+        message: "MkDocs ${params.DEPLOY_ENV} deployment succeeded: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' - ${params.GIT_REV} to ${params.DEPLOY_ENV} (${env.BUILD_URL}) on node ${env.NODE_NAME}"
+      )
     }
 
     failure {
@@ -259,11 +259,11 @@ pipeline {
         message: "Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL}) on node ${env.NODE_NAME}"
       )
 
-//      slackSend(
-//        channel: '#engineering',
-//        color: 'danger',
-//        message: "MkDocs deployment failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' - ${params.GIT_REV} to ${params.DEPLOY_ENV} (${env.BUILD_URL}) on node ${env.NODE_NAME}"
-//      )
+      slackSend(
+        channel: '#engineering',
+        color: 'danger',
+        message: "MkDocs ${params.DEPLOY_ENV} deployment failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' - ${params.GIT_REV} to ${params.DEPLOY_ENV} (${env.BUILD_URL}) on node ${env.NODE_NAME}"
+      )
     }
   }
 }
