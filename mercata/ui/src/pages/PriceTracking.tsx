@@ -30,6 +30,7 @@ import type { Pool } from '@/interface';
 type TimeRange = '1h' | '1d' | '7d' | '1m' | '3m' | '6m' | '1y' | 'all';
 type Interval = '10s' | '5m' | '15m' | '1h' | '4h' | '1d';
 type ChartType = 'line' | 'candlestick';
+type SpotPriceMode = 'both' | 'pool' | 'spot';
 
 interface AssetPriceData {
   asset: EarningAsset | { address: string; symbol: string; isPoolToken: boolean };
@@ -47,7 +48,7 @@ interface WidgetConfig {
   timeRange: TimeRange;
   interval: Interval;
   chartType: ChartType;
-  showSpotPrice?: boolean; // When true and pool has spot data, show spot price line. Default true.
+  spotPriceMode?: SpotPriceMode; // both -> pool-only -> spot-only
 }
 
 const TIME_RANGES: TimeRange[] = ['1h', '1d', '7d', '1m', '3m', '6m', '1y', 'all'];
@@ -134,7 +135,12 @@ const PriceTracking = () => {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length === 8) {
-          return parsed;
+          // Migrate older config that used `showSpotPrice` boolean into 3-state `spotPriceMode`
+          return parsed.map((w: any) => {
+            if (w?.spotPriceMode) return w;
+            const mode: SpotPriceMode = w?.showSpotPrice === false ? 'pool' : 'both';
+            return { ...w, spotPriceMode: mode };
+          });
         }
       }
     } catch (error) {
@@ -149,7 +155,7 @@ const PriceTracking = () => {
       timeRange: '1d' as TimeRange,
       interval: '5m' as Interval,
       chartType: 'line' as ChartType,
-      showSpotPrice: true,
+      spotPriceMode: 'both' as SpotPriceMode,
     }));
   });
   const [assetData, setAssetData] = useState<Map<string, AssetPriceData>>(new Map());
@@ -1405,7 +1411,7 @@ const PriceTracking = () => {
               );
             })()}
             {/* ARB button (pools only) - between Sell and spot price toggle */}
-            {isPool && (widget.showSpotPrice !== false) && (
+            {isPool && (widget.spotPriceMode ?? 'both') === 'both' && (
               <Button
                 size="sm"
                 variant="ghost"
@@ -1422,16 +1428,26 @@ const PriceTracking = () => {
                 <TooltipTrigger asChild>
                   <Button
                     size="sm"
-                    variant={widget.showSpotPrice !== false ? 'secondary' : 'ghost'}
+                    variant={(widget.spotPriceMode ?? 'both') !== 'pool' ? 'secondary' : 'ghost'}
                     className="h-7 px-2 shrink-0"
-                    onClick={() => updateWidget(widget.id, { showSpotPrice: widget.showSpotPrice === false })}
-                    aria-label={widget.showSpotPrice !== false ? 'Hide Spot Price' : 'Show Spot Price'}
+                    onClick={() => {
+                      const cur: SpotPriceMode = (widget.spotPriceMode ?? 'both');
+                      const next: SpotPriceMode = cur === 'both' ? 'pool' : cur === 'pool' ? 'spot' : 'both';
+                      updateWidget(widget.id, { spotPriceMode: next });
+                    }}
+                    aria-label="Cycle spot/pool price display"
                   >
                     <CircleDollarSign className="h-3.5 w-3.5" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>{widget.showSpotPrice !== false ? 'Hide Spot Price' : 'Show Spot Price'}</p>
+                  <p>
+                    {(widget.spotPriceMode ?? 'both') === 'both'
+                      ? 'Showing: pool + spot'
+                      : (widget.spotPriceMode ?? 'both') === 'pool'
+                        ? 'Showing: pool only'
+                        : 'Showing: spot only'}
+                  </p>
                 </TooltipContent>
               </Tooltip>
             )}
@@ -1440,7 +1456,7 @@ const PriceTracking = () => {
             <CardContent className="pt-2">
               {widget.assetAddress ? (
                 <CandlestickChart
-                  key={`${widget.id}-${widget.chartType}-${widget.showSpotPrice !== false}`}
+                  key={`${widget.id}-${widget.chartType}-${widget.spotPriceMode ?? 'both'}`}
                   data={ohlcData}
                   loading={isLoading}
                   height={250}
@@ -1448,7 +1464,8 @@ const PriceTracking = () => {
                   chartType={widget.chartType}
                   onHoverDataChange={getHoverHandler(widget.id)}
                   timeRange={widget.timeRange}
-                  showSpotPrice={isPool && ohlcData.some(d => d.spotPrice !== undefined) && (widget.showSpotPrice !== false)}
+                  showSpotPrice={isPool && ohlcData.some(d => d.spotPrice !== undefined) && (widget.spotPriceMode ?? 'both') !== 'pool'}
+                  showPoolPrice={(widget.spotPriceMode ?? 'both') !== 'spot'}
                   isDollarValued={isPool && (asset as any)?.tokenB?.address && (asset as any).tokenB.address === usdstAddress}
                 />
           ) : (

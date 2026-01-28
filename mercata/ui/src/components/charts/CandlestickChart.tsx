@@ -34,6 +34,7 @@ interface CandlestickChartProps {
   onHoverDataChange?: (data: any) => void;
   timeRange?: string; // Time range like '1d', '7d', etc. to determine date format
   showSpotPrice?: boolean; // Whether to show spot price line (for pools)
+  showPoolPrice?: boolean; // Whether to show pool price series
   isDollarValued?: boolean; // Whether the chart should be shown in dollars
 }
 
@@ -46,6 +47,7 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({
   onHoverDataChange,
   timeRange,
   showSpotPrice = false,
+  showPoolPrice = true,
   isDollarValued = true,
 }) => {
   const [hoverX, setHoverX] = useState<number | null>(null);
@@ -99,37 +101,45 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({
   const yAxisDomain = useMemo(() => {
     if (chartData.length === 0) return [0, 100];
     const allValues = chartData.flatMap((d) => {
-      const vals = [d.high, d.low];
+      const vals: number[] = [];
+      if (showPoolPrice) vals.push(d.high, d.low);
       if (showSpotPrice && d.spotPrice != null) vals.push(d.spotPrice);
       return vals;
     });
+    if (allValues.length === 0) return [0, 100];
     const min = Math.min(...allValues);
     const max = Math.max(...allValues);
     let padding = (max - min) * 0.1;
     if (padding === 0 && max > 0) padding = max * 0.01; // 1% when pool price is flat
     if (padding === 0) padding = 1; // fallback so current price line can render
     return [Math.max(0, min - padding), max + padding];
-  }, [chartData, showSpotPrice]);
+  }, [chartData, showSpotPrice, showPoolPrice]);
 
   const currentPrice = useMemo(() => {
     if (chartData.length === 0) return null;
-    return chartData[chartData.length - 1]?.close ?? null;
-  }, [chartData]);
+    if (showPoolPrice) return chartData[chartData.length - 1]?.close ?? null;
+    if (showSpotPrice) return chartData[chartData.length - 1]?.spotPrice ?? null;
+    return null;
+  }, [chartData, showPoolPrice, showSpotPrice]);
 
   // Overall trend color (green/red) based on first vs latest close
   const trendColor = useMemo(() => {
     if (chartData.length < 2) return '#22c55e';
-    const firstPrice = chartData[0].close;
-    const latestPrice = chartData[chartData.length - 1].close;
+    const firstPrice = showPoolPrice ? chartData[0].close : (chartData[0].spotPrice ?? chartData[0].close);
+    const latestPrice = showPoolPrice
+      ? chartData[chartData.length - 1].close
+      : (chartData[chartData.length - 1].spotPrice ?? chartData[chartData.length - 1].close);
     return latestPrice >= firstPrice ? '#22c55e' : '#ef4444';
-  }, [chartData]);
+  }, [chartData, showPoolPrice]);
 
   const trendBgClass = useMemo(() => {
     if (chartData.length < 2) return 'bg-green-600';
-    const firstPrice = chartData[0].close;
-    const latestPrice = chartData[chartData.length - 1].close;
+    const firstPrice = showPoolPrice ? chartData[0].close : (chartData[0].spotPrice ?? chartData[0].close);
+    const latestPrice = showPoolPrice
+      ? chartData[chartData.length - 1].close
+      : (chartData[chartData.length - 1].spotPrice ?? chartData[chartData.length - 1].close);
     return latestPrice >= firstPrice ? 'bg-green-600' : 'bg-red-600';
-  }, [chartData]);
+  }, [chartData, showPoolPrice]);
 
   const volumeDomain = useMemo(() => {
     if (!showVolume || chartData.length === 0) return [0, 100];
@@ -142,23 +152,27 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({
   const lineColor = useMemo(() => {
     if (chartType !== 'line' || chartData.length === 0) return '#3b82f6'; // Default blue
 
-    const firstPrice = chartData[0].close;
-    const latestPrice = chartData[chartData.length - 1].close;
+    const firstPrice = showPoolPrice ? chartData[0].close : (chartData[0].spotPrice ?? chartData[0].close);
+    const latestPrice = showPoolPrice
+      ? chartData[chartData.length - 1].close
+      : (chartData[chartData.length - 1].spotPrice ?? chartData[chartData.length - 1].close);
 
     // Otherwise, green if up, red if down
     return latestPrice > firstPrice ? '#22c55e' : '#ef4444';
-  }, [chartData, chartType]);
+  }, [chartData, chartType, showPoolPrice]);
 
   // Calculate lighter spot price color (lighter version of main line color)
   const spotPriceColor = useMemo(() => {
     if (chartType !== 'line' || chartData.length === 0) return '#60a5fa'; // Lighter blue
     
-    const firstPrice = chartData[0].close;
-    const latestPrice = chartData[chartData.length - 1].close;
+    const firstPrice = showPoolPrice ? chartData[0].close : (chartData[0].spotPrice ?? chartData[0].close);
+    const latestPrice = showPoolPrice
+      ? chartData[chartData.length - 1].close
+      : (chartData[chartData.length - 1].spotPrice ?? chartData[chartData.length - 1].close);
     
     // Lighter green or red
     return latestPrice > firstPrice ? '#86efac' : '#fca5a5'; // Lighter versions of green/red
-  }, [chartData, chartType]);
+  }, [chartData, chartType, showPoolPrice]);
 
   const chartHeightPx = showVolume ? height * 0.7 : height;
   const chartMargin = useMemo(() => ({ top: 10, right: 40, left: 10, bottom: 5 }), []);
@@ -202,14 +216,15 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({
     const innerWidth = containerWidth - chartMargin.left - chartMargin.right;
 
     // Calculate Y position (same logic as currentPriceYPx)
-    const yPx = chartMargin.top + ((max - latest.close) / range) * innerHeight;
+    const latestValue = showPoolPrice ? latest.close : (latest.spotPrice ?? latest.close);
+    const yPx = chartMargin.top + ((max - latestValue) / range) * innerHeight;
 
     // Calculate X position - last point is at the right edge of the plot area
     // Recharts positions data points evenly, so the last point is at the right margin
     const xPx = chartMargin.left + innerWidth;
 
-    return { x: xPx, y: yPx, price: latest.close };
-  }, [chartData, chartContainerRef, yAxisDomain, chartHeightPx, chartMargin]);
+    return { x: xPx, y: yPx, price: latestValue };
+  }, [chartData, chartContainerRef, yAxisDomain, chartHeightPx, chartMargin, showPoolPrice]);
 
   const yPxToValue = useCallback((yPx: number): number | null => {
     const [min, max] = yAxisDomain;
@@ -261,7 +276,7 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({
             return `${isDollarValued ? '$' : ''}${value.toFixed(2)}`;
           }}
         />
-        {chartType === 'candlestick' && (
+        {chartType === 'candlestick' && showPoolPrice && (
           <>
             {/* Render candlesticks */}
             <Bar
@@ -333,33 +348,35 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({
         {chartType === 'line' && (
           <>
             {/* Main price line */}
-            <Line
-              type="monotone"
-              dataKey="close"
-              stroke={lineColor}
-              strokeWidth={2}
-              dot={false}
-              isAnimationActive={false}
-              activeDot={{ r: 4 }}
-            />
-            {/* Spot price line (for pools) */}
-            {showSpotPrice && (
+            {showPoolPrice && (
               <Line
                 type="monotone"
-                dataKey="spotPrice"
-                stroke={spotPriceColor}
-                strokeWidth={1.5}
-                strokeOpacity={0.6}
+                dataKey="close"
+                stroke={lineColor}
+                strokeWidth={2}
                 dot={false}
                 isAnimationActive={false}
-                activeDot={{ r: 3 }}
+                activeDot={{ r: 4 }}
               />
             )}
           </>
         )}
+        {/* Spot price line (for pools) - available in both chart types */}
+        {showSpotPrice && (
+          <Line
+            type="monotone"
+            dataKey="spotPrice"
+            stroke={spotPriceColor}
+            strokeWidth={1.5}
+            strokeOpacity={0.6}
+            dot={false}
+            isAnimationActive={false}
+            activeDot={{ r: 3 }}
+          />
+        )}
       </>
     );
-  }, [chartType, yAxisDomain, height, showVolume, lineColor, xAxisTicks, chartData, showDates, timeRange, showSpotPrice, spotPriceColor]);
+  }, [chartType, yAxisDomain, height, showVolume, lineColor, xAxisTicks, chartData, showDates, timeRange, showSpotPrice, spotPriceColor, showPoolPrice]);
 
   const handleMouseMove = useCallback((state: any) => {
     if (state && state.activePayload && state.activePayload.length > 0) {
@@ -450,7 +467,7 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({
           </>
         )}
         {/* Current pool price dotted line + pill - z-20 so it renders on top of everything */}
-        {currentPriceYPx !== null && currentPrice !== null && (
+        {showPoolPrice && currentPriceYPx !== null && currentPrice !== null && (
           <>
             <div
               className="absolute pointer-events-none z-20"
