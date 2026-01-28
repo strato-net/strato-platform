@@ -8,6 +8,7 @@
 # Optional ENV Vars:
 # - TOKEN_ENDPOINT
 # - TOKEN_FACTORY_PROXY_ADDRESS
+# - DRY_RUN
 # Additionally, configure your .env file for the `upgrade.js` script.
 
 set -e
@@ -45,20 +46,24 @@ fi
 tokencount=$(wc -l .listone | awk '{print $1}')
 echo "${tokencount} tokens found"
 
-read -n 1 -p "Ready to upgrade all tokens? (y/n): " choice
+read -n 1 -p "Ready to upgrade all tokens? (DRY_RUN: ${DRY_RUN:-false}) (y/n): " choice
 if [ "$choice" != "y" ]; then
   echo "Exiting..."
   exit 1
 fi
 
 echo npm run upgrade -- --proxy-address "${TOKEN_FACTORY_PROXY_ADDRESS}" --contract-name "TokenFactory" --contract-file "BaseCodeCollection.sol"
-npm run upgrade -- --proxy-address "${TOKEN_FACTORY_PROXY_ADDRESS}" --contract-name "TokenFactory" --contract-file "BaseCodeCollection.sol"
+if [ -z "$DRY_RUN" ]; then
+  npm run upgrade -- --proxy-address "${TOKEN_FACTORY_PROXY_ADDRESS}" --contract-name "TokenFactory" --contract-file "BaseCodeCollection.sol"
+fi
 i=0
 for tokenproxy in $(cat .listone); do
   i=$((i+1))
   echo "Upgrading token: ${token} (${i}/${tokencount})"
   echo npm run upgrade -- --proxy-address "${tokenproxy}" --contract-name "Token" --contract-file "BaseCodeCollection.sol"
-  npm run upgrade -- --proxy-address "${tokenproxy}" --contract-name "Token" --contract-file "BaseCodeCollection.sol"
+  if [ -z "$DRY_RUN" ]; then
+    npm run upgrade -- --proxy-address "${tokenproxy}" --contract-name "Token" --contract-file "BaseCodeCollection.sol"
+  fi
 done
 
 rm .listone .listtwo
