@@ -66,6 +66,7 @@ contract record TokenLaunchAuction is Ownable {
     event PreTgeTreasuryWithdrawn(uint amount);
     event UnsoldBurned(uint amount);
     event Unwound(uint availableUSDST, uint raisedUSDST);
+    event AuctionConfigUpdated(address caller);
 
     IERC20Metadata public usdToken;
     IStratoToken public stratoToken;
@@ -229,6 +230,85 @@ contract record TokenLaunchAuction is Ownable {
 
         initialized = true;
         emit AuctionInitialized(usdToken_, stratoToken_, saleSupply_);
+        emit AllowlistConfigured(allowlistEnabled, allowlistDurationSeconds);
+    }
+
+    function updateConfig(
+        address usdToken_,
+        address stratoToken_,
+        address treasuryWallet_,
+        address reserveWallet_,
+        address lpSeeder_,
+        address lpTokenLockVault_,
+        address transferLockController_,
+        uint saleSupply_,
+        uint claimTokenReserve_,
+        uint lpTokenReserve_,
+        uint minRaiseUSDST_,
+        uint maxRaiseUSDST_,
+        uint perAddressCapUSDST_,
+        uint priceTickUSDST_,
+        uint withdrawDelay_,
+        uint finalizeRewardUSDST_,
+        uint maxDistributionAttempts_,
+        bool allowlistEnabled_,
+        uint allowlistDurationSeconds_,
+        uint lpBps_,
+        uint treasuryBps_,
+        uint reserveBps_,
+        uint preTgeWithdrawBps_,
+        uint maxTgeDelay_
+    ) external onlyOwner {
+        require(initialized, "Not initialized");
+        require(!auctionStarted, "Auction started");
+        require(!auctionCanceled, "Auction canceled");
+        require(!finalized, "Finalized");
+        require(usdToken_ != address(0), "Invalid USDST");
+        require(stratoToken_ != address(0), "Invalid STRATO");
+        require(treasuryWallet_ != address(0), "Invalid treasury");
+        require(reserveWallet_ != address(0), "Invalid reserve");
+        require(priceTickUSDST_ > 0, "Invalid price tick");
+        require(maxDistributionAttempts_ > 0, "Invalid distribution attempts");
+        require(lpBps_ + treasuryBps_ + reserveBps_ == 10000, "Invalid bps");
+        require(preTgeWithdrawBps_ <= 10000, "Invalid preTGE bps");
+        require(claimTokenReserve_ >= saleSupply_, "Claim reserve < sale supply");
+
+        usdToken = IERC20Metadata(usdToken_);
+        stratoToken = IStratoToken(stratoToken_);
+        treasuryWallet = treasuryWallet_;
+        reserveWallet = reserveWallet_;
+        lpSeeder = lpSeeder_;
+        lpTokenLockVault = lpTokenLockVault_;
+        transferLockController = transferLockController_;
+
+        tokenUnit = 10 ** uint(stratoToken.decimals());
+
+        saleSupply = saleSupply_;
+        claimTokenReserve = claimTokenReserve_;
+        lpTokenReserve = lpTokenReserve_;
+        minRaiseUSDST = minRaiseUSDST_;
+        maxRaiseUSDST = maxRaiseUSDST_;
+        perAddressCapUSDST = perAddressCapUSDST_;
+        priceTickUSDST = priceTickUSDST_;
+        withdrawDelay = withdrawDelay_;
+        finalizeRewardUSDST = finalizeRewardUSDST_;
+        maxDistributionAttempts = maxDistributionAttempts_;
+
+        lpBps = lpBps_;
+        treasuryBps = treasuryBps_;
+        reserveBps = reserveBps_;
+
+        allowlistEnabled = allowlistEnabled_;
+        allowlistDurationSeconds = allowlistDurationSeconds_;
+        if (allowlistEnabled) {
+            require(allowlistDurationSeconds > 0, "Allowlist duration required");
+            require(allowlistDurationSeconds <= tier1WindowSeconds, "Allowlist > tier1");
+        }
+
+        preTgeWithdrawBps = preTgeWithdrawBps_;
+        maxTgeDelay = maxTgeDelay_;
+
+        emit AuctionConfigUpdated(msg.sender);
         emit AllowlistConfigured(allowlistEnabled, allowlistDurationSeconds);
     }
 
@@ -661,6 +741,52 @@ contract record TokenLaunchAuction is Ownable {
         require(claimable > 0, "Nothing to withdraw");
         bid.spentUSDST = 0;
         require(usdToken.transfer(msg.sender, claimable), "USDST transfer failed");
+    }
+
+    function resetForTesting() external onlyOwner {
+        require(!auctionStarted || finalized || auctionCanceled, "Auction active");
+
+        uint i;
+        for (i = 0; i < bids.length; i++) {
+            Bid storage bid = bids[i];
+            activeBudgetUSDST[bid.bidder] = 0;
+            userBidIds[bid.bidder].length = 0;
+        }
+        bids.length = 0;
+
+        auctionStarted = false;
+        auctionCanceled = false;
+        bidsPaused = false;
+        startTime = 0;
+        endTime = 0;
+        closeBufferStart = 0;
+        cancelTime = 0;
+
+        finalized = false;
+        success = false;
+        finalizeTime = 0;
+        clearingPrice = 0;
+        raisedUncappedUSDST = 0;
+        raisedUSDST = 0;
+        unsoldTokens = 0;
+        totalAllocated = 0;
+
+        lpUSDST = 0;
+        treasuryUSDST = 0;
+        reserveUSDST = 0;
+        preTgeWithdrawn = 0;
+
+        pendingDistributions = 0;
+        totalRefundsRemaining = 0;
+        totalCanceledRefundsRemaining = 0;
+
+        tgeTime = 0;
+        tgeExecuted = false;
+
+        unwound = false;
+        unwindAvailableUSDST = 0;
+        unwindRaisedUSDST = 0;
+        claimReserveRemaining = 0;
     }
 
     function _finalizeEmpty() internal {
