@@ -226,71 +226,14 @@ export const depositLiquidity = async (
 export const withdrawLiquidity = async (
   accessToken: string,
   userAddress: string,
-  amount: string,
-  includeStakedMToken: boolean = false
+  amount: string
 ) => {
   const { lendingPool } = await getPool(accessToken, { select: "lendingPool" });
   if (!lendingPool) {
     throw new Error("Lending pool address not found");
   }
 
-  // If includeStakedMToken is enabled, we might need to unstake first
-  if (includeStakedMToken) {
-    // Get mToken address first
-    const { mToken: { mToken } } = await getPool(accessToken, {
-      select: "mToken:lendingPool_fkey(mToken)"
-    });
-    if (!mToken) {
-      throw new Error("mToken address not found");
-    }
-
-    // Get current mUSDST balance in wallet
-    const unstakedMTokenBalance = await getTokenBalanceForUser(accessToken, mToken, userAddress);
-
-    // Get exchange rate to convert withdrawal amount (USDST) to required mTokens
-    const exchangeRateResponse = await getExchangeRateFromCirrus(accessToken);
-    const exchangeRate = exchangeRateResponse || "1000000000000000000"; // Default 1:1 if not available
-
-    // Convert withdrawal amount (USDST) to required mTokens
-    // Use ceiling division to ensure we unstake enough mTokens to cover the withdrawal
-    const amountWei = BigInt(amount);
-    const exchangeRateWei = BigInt(exchangeRate);
-    const numerator = amountWei * (10n ** 18n);
-    const requiredMTokenWei = (numerator + exchangeRateWei - 1n) / exchangeRateWei; // Ceiling division
-
-    // Check if we need to unstake
-    const unstakedMTokenWei = BigInt(unstakedMTokenBalance);
-
-    if (requiredMTokenWei > unstakedMTokenWei) {
-      // We need to unstake some mTokens first
-      const amountToUnstake = requiredMTokenWei - unstakedMTokenWei;
-
-      // Find the pool for this mToken
-      const rewardsPool = await findPoolByLpToken(accessToken, config.rewardsChef, mToken);
-
-      if (!rewardsPool) {
-        throw new Error(`No RewardsChef pool found for mToken ${mToken}. Cannot unstake before withdrawal.`);
-      }
-
-      // Build unstaking transaction
-      const unstakeTx = await buildFunctionTx({
-        contractName: extractContractName(RewardsChef),
-        contractAddress: config.rewardsChef,
-        method: "withdraw",
-        args: {
-          _pid: rewardsPool.poolIdx,
-          _amount: amountToUnstake.toString()
-        }
-      }, userAddress, accessToken);
-
-      // Execute unstaking transaction first
-      await postAndWaitForTx(accessToken, () =>
-        strato.post(accessToken, StratoPaths.transactionParallel, unstakeTx)
-      );
-    }
-  }
-
-  // Now proceed with the normal withdrawal
+  // Build withdrawal transaction
   const builtTx = await buildFunctionTx({
     contractName: extractContractName(LendingPool),
     contractAddress: lendingPool,
