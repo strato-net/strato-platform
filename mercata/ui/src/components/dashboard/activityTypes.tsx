@@ -23,6 +23,13 @@ import { Badge } from "@/components/ui/badge";
 export type ActivityHandler = (event: Event, tokenSymbol?: string, userAddress?: string | null) => ReactNode;
 
 /**
+ * Function to extract token/asset address from an event for fetching symbol
+ * @param event - The event data
+ * @returns The token/asset address, or undefined if not applicable
+ */
+export type TokenAddressExtractor = (event: Event) => string | undefined;
+
+/**
  * Activity type configuration
  * Defines filters for fetching events and handler for processing them
  */
@@ -30,6 +37,16 @@ export interface ActivityTypeConfig {
   contract_name: string;
   event_name: string;
   handler: ActivityHandler;
+  /**
+   * Display name for the activity type (used in dropdowns, etc.)
+   * If not provided, the activity type key will be used
+   */
+  displayName?: string;
+  /**
+   * Optional function to extract token/asset address from event for fetching symbol
+   * If not provided, no symbol will be fetched for this activity type
+   */
+  getTokenAddress?: TokenAddressExtractor;
 }
 
 /**
@@ -39,6 +56,8 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
   "Transfer": {
     contract_name: "Token", // Token contract emits Transfer events (inherits from ERC20)
     event_name: "Transfer",
+    displayName: "Transfer",
+    getTokenAddress: (event: Event) => event.address,
     handler: (event: Event, tokenSymbol?: string, userAddress?: string | null) => {
       const from = event.attributes.from || event.attributes.From || "";
       const to = event.attributes.to || event.attributes.To || "";
@@ -136,6 +155,8 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
   "VoucherTransfer": {
     contract_name: "Voucher", // Voucher contract emits Transfer events (inherits from ERC20)
     event_name: "Transfer",
+    displayName: "Voucher Transfer",
+    getTokenAddress: (event: Event) => event.address,
     handler: (event: Event, tokenSymbol?: string, userAddress?: string | null) => {
       const from = event.attributes.from || event.attributes.From || "";
       const to = event.attributes.to || event.attributes.To || "";
@@ -233,6 +254,8 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
   "Deposit": {
     contract_name: "MercataBridge",
     event_name: "DepositCompleted",
+    displayName: "Deposit",
+    getTokenAddress: (event: Event) => event.attributes.stratoToken || event.attributes.strato_token,
     handler: (event: Event, tokenSymbol?: string, userAddress?: string | null) => {
       const stratoRecipient = event.attributes.stratoRecipient || event.attributes.strato_recipient || "";
       const externalSender = event.attributes.externalSender || event.attributes.external_sender || "";
@@ -346,6 +369,103 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
                 </TooltipProvider>
               </div>
             )}
+          </CardContent>
+        </Card>
+      );
+    },
+  },
+  "CDPMint": {
+    contract_name: "CDPEngine",
+    event_name: "USDSTMinted",
+    displayName: "CDP Mint",
+    getTokenAddress: (event: Event) => event.attributes.asset || event.attributes.Asset,
+    handler: (event: Event, tokenSymbol?: string, userAddress?: string | null) => {
+      const owner = event.attributes.owner || event.attributes.Owner || "";
+      const asset = event.attributes.asset || event.attributes.Asset || "";
+      const amountUSD = event.attributes.amountUSD || event.attributes.amount_usd || "0";
+      
+      // Format value (USDST has 18 decimals)
+      const formatValue = (val: string) => {
+        try {
+          const formatted = formatUnits(BigInt(val), 18);
+          return parseFloat(formatted).toLocaleString(undefined, {
+            maximumFractionDigits: 6,
+            minimumFractionDigits: 0
+          });
+        } catch {
+          return val;
+        }
+      };
+      
+      const formatAddress = (addr: string) => {
+        if (!addr) return "N/A";
+        return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+      };
+      
+      const isUserAddress = (addr: string) => {
+        return userAddress && addr && addr.toLowerCase() === userAddress.toLowerCase();
+      };
+      
+      return (
+        <Card key={event.id}>
+          <CardHeader>
+            <CardTitle>CDP Mint</CardTitle>
+            <CardDescription>{event.contract_name}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex items-center gap-2 text-sm">
+              <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Owner:</span>
+              <div className="flex items-center gap-1">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <code className={`text-xs bg-muted px-2 py-1 rounded cursor-help ${isUserAddress(owner) ? "ring-2 ring-primary" : ""}`}>
+                        {formatAddress(owner)}
+                      </code>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="font-mono text-xs">{owner}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <CopyButton address={owner} />
+                {isUserAddress(owner) && (
+                  <Badge variant="default" className="ml-1 bg-primary text-primary-foreground text-xs">
+                    You
+                  </Badge>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-muted-foreground">Collateral Asset:</span>
+              <div className="flex items-center gap-1">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <code className="text-xs bg-muted px-2 py-1 rounded cursor-help">
+                        {formatAddress(asset)}
+                      </code>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="font-mono text-xs">{asset}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <CopyButton address={asset} />
+                {tokenSymbol && (
+                  <Badge variant="secondary" className="ml-1 text-xs">
+                    {tokenSymbol}
+                  </Badge>
+                )}
+              </div>
+            </div>
+            <div className="text-sm">
+              <span className="text-muted-foreground">Amount Minted: </span>
+              <span className="font-semibold">
+                {formatValue(amountUSD)} USDST
+              </span>
+            </div>
           </CardContent>
         </Card>
       );

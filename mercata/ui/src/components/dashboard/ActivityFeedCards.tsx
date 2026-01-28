@@ -69,25 +69,25 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
         myActivity: isMyActivity,
       });
 
-        // Fetch token symbols for Transfer and DepositCompleted events
-        const transferEvents = response.events.filter(
-          e => e.event_name === "Transfer"
-        );
-        const depositEvents = response.events.filter(
-          e => e.event_name === "DepositCompleted"
-        );
-        
-        // Collect token addresses from Transfer events (event.address)
-        const transferTokenAddresses = [...new Set(transferEvents.map(e => e.address))];
-        
-        // Collect token addresses from DepositCompleted events (stratoToken attribute)
-        const depositTokenAddresses = [...new Set(
-          depositEvents
-            .map(e => e.attributes.stratoToken || e.attributes.strato_token)
-            .filter(Boolean)
+        // Collect token addresses using getTokenAddress from activity type configs
+        const allTokenAddresses = [...new Set(
+          response.events
+            .map(event => {
+              // Find matching activity type
+              const matchingType = Object.entries(activityTypes).find(
+                ([_, config]) =>
+                  config.contract_name === event.contract_name &&
+                  config.event_name === event.event_name
+              );
+              
+              // Extract token address using the config's getTokenAddress function
+              if (matchingType && matchingType[1].getTokenAddress) {
+                return matchingType[1].getTokenAddress(event);
+              }
+              return undefined;
+            })
+            .filter((addr): addr is string => !!addr)
         )];
-        
-        const allTokenAddresses = [...new Set([...transferTokenAddresses, ...depositTokenAddresses])];
         const tokenSymbolMap = new Map<string, string>();
         
         if (allTokenAddresses.length > 0) {
@@ -126,14 +126,11 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
 
           if (matchingType) {
             const [, config] = matchingType;
-            // For Transfer events, use event.address
-            // For DepositCompleted events, use stratoToken attribute
+            // Get token symbol using the config's getTokenAddress function
             let tokenSymbol: string | undefined;
-            if (event.event_name === "Transfer") {
-              tokenSymbol = tokenSymbolMap.get(event.address);
-            } else if (event.event_name === "DepositCompleted") {
-              const stratoToken = event.attributes.stratoToken || event.attributes.strato_token;
-              tokenSymbol = stratoToken ? tokenSymbolMap.get(stratoToken) : undefined;
+            if (config.getTokenAddress) {
+              const tokenAddress = config.getTokenAddress(event);
+              tokenSymbol = tokenAddress ? tokenSymbolMap.get(tokenAddress) : undefined;
             }
             const card = config.handler(event, tokenSymbol, userAddress);
             allCards.push(card);
@@ -163,12 +160,12 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
     setCurrentPage(1); // Reset to first page on refresh
   }, []);
 
-  // Get activity type display names
+  // Get activity type display names from config
   const activityTypeOptions = [
     { value: "all", label: "All types" },
-    ...Object.keys(activityTypes).map(key => ({
+    ...Object.entries(activityTypes).map(([key, config]) => ({
       value: key,
-      label: key === "VoucherTransfer" ? "Voucher Transfer" : key,
+      label: config.displayName || key,
     })),
   ];
 
