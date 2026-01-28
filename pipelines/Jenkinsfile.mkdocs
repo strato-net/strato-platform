@@ -249,7 +249,7 @@ pipeline {
       slackSend(
         channel: '#engineering',
         color: 'good',
-        message: "MkDocs ${params.DEPLOY_ENV} deployment succeeded: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' - ${params.GIT_REV} to ${params.DEPLOY_ENV} (${env.BUILD_URL}) on node ${env.NODE_NAME}"
+        message: "MkDocs ${params.DEPLOY_ENV} deployment succeeded from ${params.GIT_REV}. Review at ${params.DEPLOY_ENV == 'prod' ? 'https://docs.strato.nexus' : 'https://docs.strato.nexus/staging/'}"
       )
     }
 
