@@ -33,11 +33,11 @@ const bulkTransferSchema = Joi.object({
   transfers: Joi.array()
     .items(bulkTransferItemSchema)
     .min(1)
-    .max(100)
+    .max(50)
     .required()
     .messages({
       "array.min": `"transfers" must contain at least 1 transfer`,
-      "array.max": `"transfers" cannot exceed 100 transfers per batch`,
+      "array.max": `"transfers" cannot exceed 50 transfers per batch`,
       "any.required": `"transfers" is required`,
     }),
 });

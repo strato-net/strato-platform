@@ -197,8 +197,8 @@ const BulkTransferModal = ({
         return;
       }
 
-      if (parsed.length > 100) {
-        alert("Maximum 100 transfers per batch allowed");
+      if (parsed.length > 50) {
+        alert("Maximum 50 transfers per batch allowed");
         return;
       }
 
@@ -377,7 +377,7 @@ const BulkTransferModal = ({
             Drag and drop your CSV file here, or click to browse
           </p>
           <p className="text-xs text-muted-foreground">
-            Maximum 100 transfers per batch
+            Maximum 50 transfers per batch
           </p>
           <input
             ref={fileInputRef}
