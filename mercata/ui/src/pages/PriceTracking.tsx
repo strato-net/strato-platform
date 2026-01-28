@@ -1535,17 +1535,24 @@ const PriceTracking = () => {
       <MobileBottomNav />
 
       {/* Swap Modal */}
-      <Dialog open={swapModalOpen} onOpenChange={(open) => {
-        setSwapModalOpen(open);
-        // Clear swap state when modal closes
-        if (!open) {
+      {(() => {
+        const closeSwapModal = () => {
+          setSwapModalOpen(false);
           setSwapAsset(null);
           setSwapMode(null);
           setSwapFromToken(null);
           setSwapToToken(null);
           setSwapInitialFromAmount(null);
-        }
-      }}>
+        };
+
+        return (
+          <Dialog
+            open={swapModalOpen}
+            onOpenChange={(open) => {
+              if (!open) closeSwapModal();
+              else setSwapModalOpen(true);
+            }}
+          >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
@@ -1558,11 +1565,14 @@ const PriceTracking = () => {
                 fromAsset={swapFromToken}
                 toAsset={swapToToken}
                 initialFromAmount={swapMode === 'arb' ? (swapInitialFromAmount ?? undefined) : undefined}
+                onSwapSuccess={closeSwapModal}
               />
             )}
           </div>
         </DialogContent>
-      </Dialog>
+          </Dialog>
+        );
+      })()}
     </div>
   );
 };

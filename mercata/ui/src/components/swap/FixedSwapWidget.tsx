@@ -323,9 +323,10 @@ interface FixedSwapWidgetProps {
   fromAsset: SwapToken;
   toAsset: SwapToken;
   initialFromAmount?: string;
+  onSwapSuccess?: () => void;
 }
 
-const FixedSwapWidget = ({ fromAsset, toAsset, initialFromAmount }: FixedSwapWidgetProps) => {
+const FixedSwapWidget = ({ fromAsset, toAsset, initialFromAmount, onSwapSuccess }: FixedSwapWidgetProps) => {
   // ========================================================================
   // CONTEXT & HOOKS
   // ========================================================================
@@ -638,6 +639,7 @@ const FixedSwapWidget = ({ fromAsset, toAsset, initialFromAmount }: FixedSwapWid
   const handleSwap = async () => {
     if (!fromAsset || !toAsset || !pool) return;
 
+    let succeeded = false;
     try {
       setSwapLoading(true);
       const isAToB = pool.tokenA?.address === fromAsset.address;
@@ -653,6 +655,7 @@ const FixedSwapWidget = ({ fromAsset, toAsset, initialFromAmount }: FixedSwapWid
         minAmountOut: toAmountMinWei.toString(),
       });
 
+      succeeded = true;
       toast({
         title: "Success",
         description: `Swapped ${fromAmount} ${fromAsset._symbol} for ${toAmount} ${toAsset._symbol}`,
@@ -684,6 +687,10 @@ const FixedSwapWidget = ({ fromAsset, toAsset, initialFromAmount }: FixedSwapWid
       setToAmountError('');
       setMaxTransferableError('');
       setEditingField(null);
+
+      if (succeeded) {
+        onSwapSuccess?.();
+      }
     }
   };
 
