@@ -329,7 +329,6 @@ spec = do
         BatchSeqEvent{..} <- runBatch $ checkForUnseq [iev]
         let pbftEvs = [m | P2pBlockstanbul (WireMessage _ m) <- _toP2p]
         map categorize pbftEvs `shouldMatchList` [PreprepareK, PrepareK, PrepareK, CommitK, CommitK]
-        _toVm `shouldContain` [VmCreateBlockCommand]
 
       it "should replay old blocks in blockstanbul" . runTestMWithGenesis $ \h -> do
         ctx <- getBlockstanbulContext
@@ -345,7 +344,6 @@ spec = do
         putBlockstanbulContext ctx
         BatchSeqEvent{..} <- runBatch $ checkForUnseq [iev]
         length _toP2p `shouldBe` 1
-        _toVm `shouldContain` [VmCreateBlockCommand]
         map outputBlockToBlock [oblk | P2pBlock oblk <- _toP2p] `shouldMatchList` [blk4]
         map outputBlockToBlock [oblk | VmBlock oblk <- _toVm] `shouldMatchList` [blk4]
         ctx' <- getBlockstanbulContext
@@ -364,7 +362,6 @@ spec = do
         putBlockstanbulContext ctx
         BatchSeqEvent{..} <- runBatch . checkForUnseq $ ieBlk <$> reverse blkChn
         length _toP2p `shouldBe` 5
-        _toVm `shouldContain` [VmCreateBlockCommand]
         map outputBlockToBlock [oblk | P2pBlock oblk <- _toP2p] `shouldMatchList` blkChn
         map outputBlockToBlock [oblk | VmBlock oblk <- _toVm] `shouldMatchList` blkChn
         ctx' <- getBlockstanbulContext

@@ -24,10 +24,12 @@ module Blockchain.Sequencer.Monad
     pairToVmTx,
     createFirstTimer,
     createNewTimer,
+    createNewViewTimer,
+    updateViewTimer,
     fuseChannels,
     seenTransactionDB,
     blockstanbulContext,
-    latestRoundNumber
+    latestViewAndProposal
   )
 where
 
@@ -35,6 +37,8 @@ import BlockApps.Logging
 import Blockchain.Blockstanbul
 import Blockchain.Constants
 import Blockchain.Model.SyncState
+import Blockchain.Data.Block
+import Blockchain.Data.BlockHeader
 import Blockchain.EthConf
 import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.CablePackage
@@ -52,7 +56,7 @@ import Control.Concurrent (threadDelay)
 import Control.Concurrent.AlarmClock
 import Control.Concurrent.STM.TMChan
 import Control.Lens
-import Control.Monad (unless)
+import Control.Monad (unless, when)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Kafka
@@ -79,7 +83,7 @@ data Modification a = Modification a | Deletion deriving (Show)
 data SequencerContext = SequencerContext
   { _seenTransactionDB :: !SeenTransactionDB,
     _blockstanbulContext :: BlockstanbulContext,
-    _latestRoundNumber :: IORef RoundNumber
+    _latestViewAndProposal :: IORef (View, Maybe Block)
   }
 
 makeLenses ''SequencerContext
@@ -87,7 +91,7 @@ makeLenses ''SequencerContext
 type MonadBlockstanbul m =
   ( MonadIO m,
     HasBlockstanbulContext m,
-    Mod.Accessible (IORef RoundNumber) m,
+    Mod.Accessible (IORef (View, Maybe Block)) m,
     Mod.Accessible (TMChan RoundNumber) m,
     Mod.Accessible BlockPeriod m,
     Mod.Accessible RoundPeriod m,
@@ -135,8 +139,8 @@ instance Monad m => Mod.Modifiable SeenTransactionDB (StateT SequencerContext m)
   get _ = use seenTransactionDB
   put _ = modify' . (.~) seenTransactionDB
 
-instance {-# OVERLAPPING #-} Monad m => Mod.Accessible (IORef RoundNumber) (StateT SequencerContext m) where
-  access _ = use latestRoundNumber
+instance {-# OVERLAPPING #-} Monad m => Mod.Accessible (IORef (View, Maybe Block)) (StateT SequencerContext m) where
+  access _ = use latestViewAndProposal
 
 instance {-# OVERLAPPING #-} Monad m => Mod.Accessible (TMChan RoundNumber) (ReaderT SequencerConfig m) where
   access _ = asks blockstanbulTimeouts
@@ -218,12 +222,12 @@ runSequencerM c bc m = do
         dbPath = depBlockDBPath c
         stxSize = seenTransactionDBSize c
     depBlock <- DependentBlockDB <$> LDB.open dbPath LDB.defaultOptions {LDB.createIfMissing = True, LDB.cacheSize = dbCS}
-    latestRound <- liftIO $ newIORef 0
+    latestVandP <- liftIO $ newIORef (View 0 0, Nothing)
     flip runReaderT c{dependentBlockDB = depBlock} $ runStateT m
       SequencerContext
         { _seenTransactionDB = mkSeenTxDB stxSize,
           _blockstanbulContext = bc,
-          _latestRoundNumber = latestRound
+          _latestViewAndProposal = latestVandP
         }
 
   return $ fst a
@@ -245,8 +249,8 @@ createNewTimer ::
   RoundNumber ->
   m ()
 createNewTimer rn = do
-  rnref <- Mod.access (Mod.Proxy @(IORef RoundNumber))
-  liftIO $ atomicModifyIORef' rnref (\x -> (max rn x, ()))
+  rnref <- Mod.access (Mod.Proxy @(IORef (View, Maybe Block)))
+  liftIO $ atomicModifyIORef' rnref (\(View r s, mb) -> ((View (max rn r) s, mb), ()))
   ch <- Mod.access (Mod.Proxy @(TMChan RoundNumber))
   dt <- unRoundPeriod <$> Mod.access (Mod.Proxy @(RoundPeriod))
   let act :: AlarmClock UTCTime -> IO ()
@@ -256,12 +260,37 @@ createNewTimer rn = do
         -- The first RoundChange for this message may have not
         -- been seen, so we keep firing at the same interval
         -- until an alarm lands and the round changes
-        unless (globalRN > rn) $ do
+        unless (_round (fst globalRN) > rn) $ do
           next <- addUTCTime dt <$> getCurrentTime
           setAlarm this' next
   alarm <- liftIO $ newAlarmClock act
   next <- addUTCTime dt <$> liftIO getCurrentTime
   liftIO $ setAlarm alarm next
+
+createNewViewTimer :: MonadBlockstanbul m => Block -> m ()
+createNewViewTimer b = do
+  updateViewTimer
+  vpref <- Mod.access (Mod.Proxy @(IORef (View, Maybe Block)))
+  vCur <- fst <$> liftIO (readIORef vpref)
+  let v = vCur{ _sequence = max 1 $ fromIntegral (number $ blockBlockData b) - 1 }
+  ch <- Mod.access (Mod.Proxy @(TMChan RoundNumber))
+  let act :: AlarmClock UTCTime -> IO ()
+      act this' = do
+        (v', p) <- readIORef vpref
+        when (v >= v' && isNothing p) $ do
+          atomically . writeTMChan ch $ _round v'
+          next <- addUTCTime 5 <$> getCurrentTime
+          setAlarm this' next
+  alarm <- liftIO $ newAlarmClock act
+  next <- addUTCTime 2 <$> liftIO getCurrentTime
+  liftIO $ setAlarm alarm next
+
+updateViewTimer :: MonadBlockstanbul m => m ()
+updateViewTimer = do
+  v <- currentView
+  p <- _proposal <$> getBlockstanbulContext
+  vpref <- Mod.access (Mod.Proxy @(IORef (View, Maybe Block)))
+  liftIO $ atomicModifyIORef' vpref (\_ -> ((v, p), ()))
 
 fuseChannels :: (MonadIO m, MonadReader SequencerConfig m) =>
                 m (ConduitM () SeqLoopEvent SequencerM ())

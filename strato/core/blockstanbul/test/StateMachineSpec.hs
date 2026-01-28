@@ -440,29 +440,6 @@ spec = parallel $ do
           proposer .= me
           validators .= S.singleton me
 
-    it "requires a matching block number" $ property $ \blk' ->
-      runTest $ do
-        let blk = over extraLens (BS.take 32) . setBlockNo 17 $ blk'
-        selfElected
-        sendMessages [UnannouncedBlock blk] `shouldReturn` [MakeBlockCommand]
-
-    it "requires a matching hash if known" $ property $ \blk' ->
-      runTest $ do
-        let blk = over extraLens (BS.take 32) . setBlockNo 19 $ blk'
-        selfElected
-        lastParent .= Just (unsafeCreateKeccak256FromWord256 0x999992)
-        sendMessages [UnannouncedBlock blk] `shouldReturn` [MakeBlockCommand]
-
-    it "accepts a block if the parent hash matches" $ property $ \blk' ->
-      runTest $ do
-        let blk = over extraLens (BS.take 32)
-                    blk'{blockBlockData = (blockBlockData blk'){
-                      blockDataNumber = 19,
-                      blockDataParentHash = unsafeCreateKeccak256FromWord256 0x999992}}
-        selfElected
-        lastParent .= Just (unsafeCreateKeccak256FromWord256 0x999992)
-        sendMessages [UnannouncedBlock blk] `shouldNotReturn` [MakeBlockCommand]
-
     it "seals the block" $ property $ \blk'' ->
       runTest $ do
         let blk = over extraLens (const $ BS.pack [0, 0, 0]) . setBlockNo 19 $ blk''

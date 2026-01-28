@@ -291,14 +291,10 @@ router.patch("/loans", authHandler.authorizeRequest(), LendingController.repay);
  *             type: object
  *             required:
  *               - amount
- *               - includeStakedMToken
  *             properties:
  *               amount:
  *                 type: string
  *                 description: Liquidity amount to withdraw (decimal string)
- *               includeStakedMToken:
- *                 type: boolean
- *                 description: Whether to include staked mTokens in the withdrawal
  *     responses:
  *       200:
  *         description: Withdrawal transaction payload
