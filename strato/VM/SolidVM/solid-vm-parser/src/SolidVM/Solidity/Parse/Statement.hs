@@ -522,6 +522,7 @@ literal =
       do
         ~(a, (n, u)) <- withPosition $ (,) <$> integer <*> optionMaybe numberUnit
         pure $ NumberLiteral a n u,
+      myHexParser,
       do
         (a, str) <- withPosition stringLiteral
         pure $ case readMaybe str of
