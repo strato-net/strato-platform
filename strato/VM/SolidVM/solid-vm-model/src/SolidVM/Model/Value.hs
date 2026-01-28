@@ -280,7 +280,9 @@ defaultValue _ (SVMType.Int _ _) = SInteger 0
 defaultValue _ SVMType.Bool = SBool False
 defaultValue _ (SVMType.Address _) = (SAddress 0) False
 defaultValue _ (SVMType.String _) = SString ""
-defaultValue _ (SVMType.Bytes _ _) = SString ""
+defaultValue _ (SVMType.Bytes _ mSize) = SBytes $ case mSize of
+  Just n -> BC.replicate (fromIntegral n) '\0'
+  Nothing -> BC.empty
 defaultValue _ SVMType.Decimal = SDecimal 0
 defaultValue ctract (SVMType.UnknownLabel name) =
   fromMaybe (SContract name 0x0) $
@@ -310,7 +312,9 @@ createDefaultValue _ _ (SVMType.Int _ _) = return $ SInteger 0
 createDefaultValue _ _ SVMType.Bool = return $ SBool False
 createDefaultValue _ _ (SVMType.Address _) = return $ (SAddress 0) False
 createDefaultValue _ _ (SVMType.String _) = return $ SString ""
-createDefaultValue _ _ (SVMType.Bytes _ _) = return $ SString ""
+createDefaultValue _ _ (SVMType.Bytes _ mSize) = return $ SBytes $ case mSize of
+  Just n -> BC.replicate (fromIntegral n) '\0'  -- Fixed-size bytes (e.g., bytes32)
+  Nothing -> BC.empty  -- Dynamic bytes
 createDefaultValue _ _ SVMType.Decimal = return $ SDecimal 0
 createDefaultValue cc ctract (SVMType.UnknownLabel name) =
   case (M.lookup name $ CC._enums ctract, M.lookup name $ CC._structs ctract) of
