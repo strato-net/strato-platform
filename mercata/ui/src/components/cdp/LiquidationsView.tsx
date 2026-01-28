@@ -96,12 +96,12 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ guestMode = false }
 
         // Fetch USDST balance and max amounts only for logged-in users
         if (!guestMode) {
-          await fetchUsdstBalance();
-          const availableUsdstWei = BigInt(usdstBalance || "0");
-          const availableUsdstDecimal = parseFloat(
-            formatWeiToDecimalHP(availableUsdstWei.toString(), 18)
-          );
-          setAvailableUsdstBalance(availableUsdstDecimal);
+        await fetchUsdstBalance();
+        const availableUsdstWei = BigInt(usdstBalance || "0");
+        const availableUsdstDecimal = parseFloat(
+          formatWeiToDecimalHP(availableUsdstWei.toString(), 18)
+        );
+        setAvailableUsdstBalance(availableUsdstDecimal);
 
           // Fetch max liquidatable amounts for all vaults (pre-fetch for better UX)
           const maxPromises = filteredLiquidatable.map(async (vault, index) => {
@@ -471,38 +471,40 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ guestMode = false }
                 <div key={vaultKey} className="border rounded-lg">
                   {/* Collapsed View */}
                   <div 
-                    className="p-3 md:p-4 cursor-pointer hover:bg-muted/50 flex items-center gap-2 md:gap-4"
+                    className="p-3 md:p-4 cursor-pointer hover:bg-muted/50"
                     onClick={() => toggleExpanded(vaultKey)}
                   >
-                    <div className="flex items-center shrink-0">
+                    <div className="flex items-start gap-2 md:gap-4">
+                      <div className="flex items-center shrink-0 pt-0.5">
                       {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                     </div>
-                    <div className="flex-1 grid grid-cols-5 gap-2 md:gap-8">
+                      <div className="flex-1 grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-8">
                       <div className="min-w-0">
-                        <span className="text-xs md:text-sm text-muted-foreground">Borrower</span>
-                        <div className="font-medium font-mono text-xs md:text-sm truncate">
+                          <span className="text-xs text-muted-foreground">Borrower</span>
+                          <div className="font-medium font-mono text-xs md:text-sm truncate mt-0.5">
                           {vault.borrower ? `${vault.borrower.slice(0, 6)}...${vault.borrower.slice(-4)}` : "Unknown"}
                         </div>
                       </div>
                       <div className="min-w-0">
-                        <span className="text-xs md:text-sm text-muted-foreground">Borrowed</span>
-                        <div className="font-medium text-xs md:text-sm">{formatNumber(parseFloat(formatWeiToDecimalHP(vault.debtAmount, 18)))} USDST</div>
-                      </div>
-                      <div className="min-w-0">
-                        <span className="text-xs md:text-sm text-muted-foreground">Up for Liquidation</span>
-                        <div className="font-medium text-xs md:text-sm">
-                          {positionMaxValues[vaultKey] ? `${formatNumber(positionMaxValues[vaultKey])} USDST` : "—"}
+                          <span className="text-xs text-muted-foreground">Borrowed</span>
+                          <div className="font-medium text-xs md:text-sm mt-0.5">{formatNumber(parseFloat(formatWeiToDecimalHP(vault.debtAmount, 18)))} USDST</div>
                         </div>
-                      </div>
-                      <div className="min-w-0">
-                        <span className="text-xs md:text-sm text-muted-foreground">Max Profit</span>
-                        <div className="font-medium text-xs md:text-sm text-green-600">
-                          {calculateMaxProfit(vault, index)}
+                        <div className="min-w-0">
+                          <span className="text-xs text-muted-foreground">Up for Liquidation</span>
+                          <div className="font-medium text-xs md:text-sm mt-0.5">
+                            {positionMaxValues[vaultKey] ? `${formatNumber(positionMaxValues[vaultKey])} USDST` : "—"}
+                          </div>
                         </div>
+                        <div className="min-w-0">
+                          <span className="text-xs text-muted-foreground">Max Profit</span>
+                          <div className="font-medium text-xs md:text-sm text-green-600 mt-0.5">
+                            {calculateMaxProfit(vault, index)}
+                          </div>
+                        </div>
+                        <div className="min-w-0 md:text-left">
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">Health Factor</span>
+                          <div className="font-medium text-xs md:text-sm text-red-600 dark:text-red-400 mt-0.5">{formatNumber(vault.healthFactor)}</div>
                       </div>
-                      <div className="min-w-0 text-right md:text-left">
-                        <span className="text-xs md:text-sm text-muted-foreground whitespace-nowrap">Health Factor</span>
-                        <div className="font-medium text-xs md:text-sm text-red-600 dark:text-red-400">{formatNumber(vault.healthFactor)}</div>
                       </div>
                     </div>
                   </div>
@@ -510,120 +512,128 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ guestMode = false }
                   {/* Expanded View */}
                   {isExpanded && (
                     <div className="border-t bg-muted/30">
-                      {/* Table Header - with left padding to align with collapsed view (chevron width + gap) */}
-                      <div className="flex items-center gap-2 md:gap-4 p-3 md:p-4 text-xs md:text-sm text-muted-foreground font-medium border-b border-border">
-                        <div className="w-4 shrink-0"></div>
-                        <div className="flex-1 grid grid-cols-5 gap-2 md:gap-8">
-                          <div>Asset</div>
-                          <div>Amount</div>
-                          <div>Value</div>
-                          <div className="flex items-center gap-1">
-                            Liquidatable
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Info className="h-3 w-3 cursor-help" />
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>Calculated based on your USDST balance</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            Your Profit
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Info className="h-3 w-3 cursor-help" />
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>Profit based on the amount you enter</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {/* Table Row - Position Values - with left padding to align with collapsed view */}
-                      <div className="flex items-center gap-2 md:gap-4 p-3 md:p-4 border-b text-xs md:text-sm">
-                        <div className="w-4 shrink-0"></div>
-                        <div className="flex-1 grid grid-cols-5 gap-2 md:gap-8 items-center">
-                          <div className="flex items-center space-x-1 md:space-x-1.5 min-w-0">
-                            <div className="w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-white text-[10px] md:text-xs font-bold flex-shrink-0">
-                              {vault.symbol.charAt(0)}
+                      {/* Single scrollable container for both header and data */}
+                      <div className="overflow-x-auto">
+                        <div className="min-w-[600px]">
+                          {/* Table Header */}
+                          <div className="flex items-center gap-2 md:gap-4 p-3 md:p-4 text-xs text-muted-foreground font-medium border-b border-border">
+                            <div className="w-4 shrink-0"></div>
+                            <div className="flex-1 grid grid-cols-5 gap-2 md:gap-4">
+                              <div className="min-w-[80px]">Asset</div>
+                              <div className="min-w-[80px]">Amount</div>
+                              <div className="min-w-[80px]">Value</div>
+                              <div className="min-w-[100px] flex items-center gap-1">
+                                <span className="whitespace-nowrap">Liquidatable</span>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Info className="h-3 w-3 cursor-help flex-shrink-0" />
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Calculated based on your USDST balance</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
+                              <div className="min-w-[100px] flex items-center gap-1">
+                                <span className="whitespace-nowrap">Your Profit</span>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Info className="h-3 w-3 cursor-help flex-shrink-0" />
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Profit based on the amount you enter</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
                             </div>
-                            <span className="font-medium truncate">{vault.symbol}</span>
                           </div>
-                          <div className="truncate">{formatNumber(parseFloat(formatWeiToDecimalHP(vault.collateralAmount, vault.collateralAmountDecimals)))}</div>
-                          <div className="truncate">${formatNumber(parseFloat(formatWeiToDecimalHP(vault.collateralValueUSD, 18)))}</div>
-                          <div className="truncate font-medium">
-                            {maxValues[vaultKey] ? `${formatNumber(maxValues[vaultKey])} USDST` : "—"}
-                          </div>
-                          <div className={`flex items-center gap-1 font-medium truncate ${isBalanceLimitingProfit(vaultKey) ? 'text-yellow-600' : 'text-green-600'}`}>
-                            {calculateYourProfit(vault, liquidationAmount, index)}
-                            {isBalanceLimitingProfit(vaultKey) && (
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <AlertTriangle className="h-3 w-3 text-yellow-600 cursor-help flex-shrink-0" />
-                                  </TooltipTrigger>
-                                  <TooltipContent className="max-w-[250px] whitespace-normal">
-                                    <p>Your USDST balance ({formatNumber(availableUsdstBalance)}) limits your liquidation capacity. Acquire more USDST to maximize profits.</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            )}
+                          
+                          {/* Table Row - Position Values */}
+                          <div className="flex items-center gap-2 md:gap-4 p-3 md:p-4 border-b text-xs md:text-sm">
+                            <div className="w-4 shrink-0"></div>
+                            <div className="flex-1 grid grid-cols-5 gap-2 md:gap-4 items-center">
+                              <div className="flex items-center space-x-1.5 min-w-[80px]">
+                                <div className="w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-white text-[10px] md:text-xs font-bold flex-shrink-0">
+                                  {vault.symbol.charAt(0)}
+                                </div>
+                                <span className="font-medium truncate">{vault.symbol}</span>
+                              </div>
+                              <div className="truncate min-w-[80px]">{formatNumber(parseFloat(formatWeiToDecimalHP(vault.collateralAmount, vault.collateralAmountDecimals)))}</div>
+                              <div className="truncate min-w-[80px]">${formatNumber(parseFloat(formatWeiToDecimalHP(vault.collateralValueUSD, 18)))}</div>
+                              <div className="truncate font-medium min-w-[100px]">
+                                {maxValues[vaultKey] ? `${formatNumber(maxValues[vaultKey])} USDST` : "—"}
+                              </div>
+                              <div className={`flex items-center gap-1 font-medium min-w-[100px] ${isBalanceLimitingProfit(vaultKey) ? 'text-yellow-600' : 'text-green-600'}`}>
+                                <span className="truncate">{calculateYourProfit(vault, liquidationAmount, index)}</span>
+                                {isBalanceLimitingProfit(vaultKey) && (
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <AlertTriangle className="h-3 w-3 text-yellow-600 cursor-help flex-shrink-0" />
+                                      </TooltipTrigger>
+                                      <TooltipContent className="max-w-[250px] whitespace-normal">
+                                        <p>Your USDST balance ({formatNumber(availableUsdstBalance)}) limits your liquidation capacity. Acquire more USDST to maximize profits.</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                )}
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>
                       
                       {/* Action Row - Input and Button */}
                       <div className="p-3 md:p-4">
-                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                          {/* Transaction Fee Display - Left */}
+                        <div className="flex flex-col gap-3">
+                          {/* Transaction Fee Display */}
                           <p className="text-xs text-muted-foreground">
                             Transaction Fee: 0.02 USDST
                           </p>
                           
-                          {/* Error messages + Input and Buttons - Right */}
-                          <div className="flex items-center gap-2">
-                            {/* Error messages - immediately left of input */}
-                            {(isAmountExceedsMax(vaultKey) || isUsdstBalanceInsufficient()) && (
-                              <p className="text-xs text-red-500">
-                                {isUsdstBalanceInsufficient() ? "Insufficient USDST Balance" : "Max amount reached"}
-                              </p>
-                            )}
+                          {/* Error messages */}
+                          {(isAmountExceedsMax(vaultKey) || isUsdstBalanceInsufficient()) && (
+                            <p className="text-xs text-red-500">
+                              {isUsdstBalanceInsufficient() ? "Insufficient USDST Balance" : "Max amount reached"}
+                            </p>
+                          )}
+                          
+                          {/* Input and Buttons */}
+                          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                             <Input
                               type="number"
                               placeholder="Amount to liquidate"
                               value={liquidationAmount}
                               onChange={(e) => handleLiquidationAmountChange(vaultKey, e.target.value)}
-                              className={`w-40 text-sm ${isAmountExceedsMax(vaultKey) ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+                              className={`flex-1 sm:w-40 text-sm ${isAmountExceedsMax(vaultKey) ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
                               min="0"
                               step="0.01"
                             />
-                            <Button 
-                              variant={maxStates[vaultKey] ? "default" : "outline"}
-                              size="sm" 
-                              className={`min-w-[50px] ${maxStates[vaultKey] ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}`}
-                              onClick={() => handleMaxClick(vault, vaultKey)}
-                              disabled={guestMode || isUsdstBalanceInsufficient()}
-                            >
-                              MAX
-                            </Button>
-                            <Button 
-                              className="bg-red-600 hover:bg-red-700 text-white text-sm"
-                              size="sm"
-                              onClick={() => handleLiquidate(vault, vaultKey)}
-                              disabled={guestMode || isLiquidating || !liquidationAmount || isAmountExceedsMax(vaultKey) || isUsdstBalanceInsufficient()}
-                            >
-                              {isLiquidating ? "Liquidating..." : "Liquidate"}
-                            </Button>
+                            <div className="flex items-center gap-2">
+                              <Button 
+                                variant={maxStates[vaultKey] ? "default" : "outline"}
+                                size="sm" 
+                                className={`flex-1 sm:min-w-[50px] ${maxStates[vaultKey] ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}`}
+                                onClick={() => handleMaxClick(vault, vaultKey)}
+                                disabled={guestMode || isUsdstBalanceInsufficient()}
+                              >
+                                MAX
+                              </Button>
+                              <Button 
+                                className="flex-1 sm:flex-initial bg-red-600 hover:bg-red-700 text-white text-sm"
+                                size="sm"
+                                onClick={() => handleLiquidate(vault, vaultKey)}
+                                disabled={guestMode || isLiquidating || !liquidationAmount || isAmountExceedsMax(vaultKey) || isUsdstBalanceInsufficient()}
+                              >
+                                {isLiquidating ? "Liquidating..." : "Liquidate"}
+                              </Button>
+                            </div>
                             {/* Guest mode message */}
                             {guestMode && (
-                              <span className="text-xs text-muted-foreground ml-2">
+                              <span className="text-xs text-muted-foreground text-center sm:text-left">
                                 Sign in to liquidate
                               </span>
                             )}

@@ -33,6 +33,7 @@ const Borrow = () => {
   const [modalLoading, setModalLoading] = useState(false);
   const [repayLoading, setRepayLoading] = useState(false);
   const [eligibleCollateral, setEligibleCollateral] = useState<CollateralData[]>([]);
+  const [activeTab, setActiveTab] = useState<"borrow" | "repay">("borrow");
   const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
   const { toast } = useToast();
@@ -230,9 +231,18 @@ const Borrow = () => {
 
   const guestMode = !isLoggedIn;
 
-  // Main borrow view - works for both logged-in and guest users
-  const BorrowView = () => (
-    <>
+  return (
+    <div className="min-h-screen bg-background pb-16 md:pb-0">
+      <DashboardSidebar />
+
+      <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
+        <DashboardHeader title="Borrow" />
+
+        <main className="p-4 md:p-6">
+          {!isLoggedIn && (
+            <GuestSignInBanner message="Sign in to borrow USDST" />
+          )}
+          
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
             {/* Left Column - Borrow/Repay Tabbed Card */}
             <Card>
@@ -242,7 +252,7 @@ const Borrow = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                <Tabs defaultValue="borrow" className="w-full">
+                <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "borrow" | "repay")} className="w-full">
                   <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="borrow">Borrow</TabsTrigger>
                     <TabsTrigger value="repay">Repay</TabsTrigger>
@@ -290,43 +300,28 @@ const Borrow = () => {
                 guestMode={guestMode}
               />
             </div>
-      </div>
+          </div>
 
-      {!guestMode && modalState.isOpen && modalState.type && selectedAsset && (
-        <CollateralModal 
-            type={modalState.type}
-            loading={modalLoading}
-            asset={selectedAsset}
-            loanData={loans}
-            isOpen={modalState.isOpen}
-            onClose={closeModal}
-            onAction={(amount) => {
-              if (modalState.type === "supply") {
-                executeSupply(selectedAsset, amount);
-              } else if (modalState.type === "withdraw") {
-                executeWithdraw(selectedAsset, amount);
-              }
-            }}
-            usdstBalance={usdstBalance}
-            voucherBalance={voucherBalance}
-            transactionFee={modalState.type === "supply" ? SUPPLY_COLLATERAL_FEE : WITHDRAW_COLLATERAL_FEE}
-        />
-      )}
-    </>
-  );
-
-  return (
-    <div className="min-h-screen bg-background pb-16 md:pb-0">
-      <DashboardSidebar />
-
-      <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
-        <DashboardHeader title="Borrow" />
-
-        <main className="p-4 md:p-6">
-          {!isLoggedIn && (
-            <GuestSignInBanner message="Sign in to borrow USDST" />
+          {!guestMode && modalState.isOpen && modalState.type && selectedAsset && (
+            <CollateralModal 
+                type={modalState.type}
+                loading={modalLoading}
+                asset={selectedAsset}
+                loanData={loans}
+                isOpen={modalState.isOpen}
+                onClose={closeModal}
+                onAction={(amount) => {
+                  if (modalState.type === "supply") {
+                    executeSupply(selectedAsset, amount);
+                  } else if (modalState.type === "withdraw") {
+                    executeWithdraw(selectedAsset, amount);
+                  }
+                }}
+                usdstBalance={usdstBalance}
+                voucherBalance={voucherBalance}
+                transactionFee={modalState.type === "supply" ? SUPPLY_COLLATERAL_FEE : WITHDRAW_COLLATERAL_FEE}
+            />
           )}
-          <BorrowView />
         </main>
       </div>
 
