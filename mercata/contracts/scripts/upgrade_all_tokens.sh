@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# Usage: scripts/upgrade_all_tokens.sh
 # Required ENV Vars:
 # - OAUTH_CLIENT_SECRET
 # - OAUTH_CLIENT_ID
@@ -7,13 +8,9 @@
 # Optional ENV Vars:
 # - TOKEN_ENDPOINT
 # - TOKEN_FACTORY_PROXY_ADDRESS
+# Additionally, configure your .env file for the `upgrade.js` script.
 
 set -e
-
-# Load .env file
-set -a
-[ -f .env ] && source .env
-set +a
 
 TOKEN_ENDPOINT="${TOKEN_ENDPOINT:-https://keycloak.blockapps.net/auth/realms/mercata/protocol/openid-connect/token}"
 
@@ -47,6 +44,12 @@ fi
 
 tokencount=$(wc -l .listone | awk '{print $1}')
 echo "${tokencount} tokens found"
+
+read -n 1 -p "Ready to upgrade all tokens? (y/n): " choice
+if [ "$choice" != "y" ]; then
+  echo "Exiting..."
+  exit 1
+fi
 
 echo npm run upgrade -- --proxy-address "${TOKEN_FACTORY_PROXY_ADDRESS}" --contract-name "TokenFactory" --contract-file "BaseCodeCollection.sol"
 npm run upgrade -- --proxy-address "${TOKEN_FACTORY_PROXY_ADDRESS}" --contract-name "TokenFactory" --contract-file "BaseCodeCollection.sol"
