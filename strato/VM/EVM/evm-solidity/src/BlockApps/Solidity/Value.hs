@@ -272,7 +272,7 @@ simpleValueToText sv = case sv of
   ValueAddress addr -> Text.pack $ "\"" ++ formatAddressWithoutColor addr ++ "\""
   ValueString tx -> '"' `Text.cons` escapeStringValue tx `Text.snoc` '"'
   ValueInt _ _ v -> Text.pack $ show v
-  ValueBytes _ b -> Text.pack $ show . Base16.encode $ b
+  ValueBytes _ b -> "hex\"" <> Text.decodeUtf8 (Base16.encode b) <> "\""
   ValueDecimal v -> Text.pack $ show v
 
 textToValue :: Maybe TypeDefs -> Text -> Type -> Either Text Value
