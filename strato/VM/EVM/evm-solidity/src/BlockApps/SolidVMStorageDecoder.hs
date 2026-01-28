@@ -224,6 +224,7 @@ fromBasic = \case
   BBool b -> SimpleValue $ ValueBool b
   BInteger n -> SimpleValue $! valueInt n
   BString bs -> SimpleValue $! valueBytes bs
+  BBytes bs -> SimpleValue $! V.ValueBytes Nothing bs
   BDecimal v -> SimpleValue $! ValueDecimal v
   BAddress a -> SimpleValue $! ValueAddress a
   BContract _ c -> ValueContract c

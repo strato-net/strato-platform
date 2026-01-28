@@ -53,6 +53,7 @@ fromBasic = \case
   MS.BString s -> case decodeUtf8' s of
     Right t -> SString $ T.unpack t
     Left _ -> SString $ BC.unpack s
+  MS.BBytes bs -> SBytes bs
   MS.BDecimal v -> SDecimal $ read $ BC.unpack v
   MS.BBool b -> SBool b
   MS.BAddress a -> SAddress a False
@@ -70,7 +71,7 @@ toBasic = \case
   SContract n a -> Just $ MS.BContract n a
   SEnumVal k t num -> Just $ MS.BEnumVal k t num
   SUserDefined _ _ x -> toBasic x
-  SBytes bs -> Just $ MS.BString bs
+  SBytes bs -> Just $ MS.BBytes bs
   _ -> Nothing
 
 setVar :: MonadSM m => Variable -> Value -> m ()
