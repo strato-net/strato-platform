@@ -133,7 +133,6 @@ data VmEvent
   = VmTx Timestamp OutputTx
   | VmBlock OutputBlock
   | VmJsonRpcCommand JsonRpcCommand
-  | VmCreateBlockCommand
   | VmGetMPNodesRequest TO.TXOrigin [StateRoot]
   | VmMPNodesReceived [NodeData]
   | VmRunPreprepare BDB.Block
@@ -153,7 +152,6 @@ instance ShowConstructor VmEvent where
   showConstructor VmTx{} = "VmTx"
   showConstructor VmBlock{} = "VmBlock"
   showConstructor VmJsonRpcCommand{} = "VmJsonRpcCommand"
-  showConstructor VmCreateBlockCommand{} = "VmCreateBlockCommand"
   showConstructor VmGetMPNodesRequest{} = "VmGetMPNodesRequest"
   showConstructor VmMPNodesReceived{} = "VmMPNodesReceived"
   showConstructor VmRunPreprepare{} = "VmRunPreprepare"
