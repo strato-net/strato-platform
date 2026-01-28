@@ -2497,9 +2497,19 @@ runTheCall address' codeAddr contract' funcName hsh cc theFunction argVals' ro f
                   case mReturnVar of
                     Nothing -> unknownVariable "findNamedReturns" name
                     Just returnVar -> Constant <$> getVar returnVar
+    -- Check if library function should return a value but didn't
+    -- Only error for libraries (to catch stub functions like Poseidon)
+    -- Regular contracts may have legacy code that relied on SNULL behavior
+    let isLibrary = CC._contractType contract' == CC.LibraryType
+    let checkMissingReturn mVal = case mVal of
+          Just v -> pure $ Just v
+          Nothing -> if null (CC._funcVals theFunction) || not isLibrary
+                     then pure Nothing  -- No return type, or not a library - allow old behavior
+                     else typeError ("Library function '" ++ labelToString funcName ++ "' must return a value") 
+                                    "library function has declared return type but no implementation"
     val' <- case val of
-      Nothing -> findNamedReturns
-      Just SNULL -> findNamedReturns
+      Nothing -> findNamedReturns >>= checkMissingReturn
+      Just SNULL -> findNamedReturns >>= checkMissingReturn
       Just {} -> pure val
     pure val'
 
