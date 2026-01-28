@@ -13,6 +13,8 @@
 
 set -e
 
+source .env
+
 TOKEN_ENDPOINT="${TOKEN_ENDPOINT:-https://keycloak.blockapps.net/auth/realms/mercata/protocol/openid-connect/token}"
 
 TOKEN_FACTORY_PROXY_ADDRESS="${TOKEN_FACTORY_PROXY_ADDRESS:-000000000000000000000000000000000000100b}"
@@ -49,6 +51,7 @@ echo "${tokencount} tokens found"
 read -n 1 -p "Ready to upgrade all tokens? (DRY_RUN: ${DRY_RUN:-false}) (y/n): " choice
 if [ "$choice" != "y" ]; then
   echo "Exiting..."
+  # don't delete .listone or .listtwo; maybe the user is stopping here to check them
   exit 1
 fi
 
