@@ -25,11 +25,13 @@
     },
     "XAG": {
       "targetAssetAddress": "2c59ef92d08efde71fe1a1cb5b45f4f6d48fcc94",
-      "weekendProxy": "KAG"
+      "weekendProxy": "KAG",
+      "equivalentAssets": ["KAG"]
     },
     "XAU": {
       "targetAssetAddress": "cdc93d30182125e05eec985b631c7c61b3f63ff0",
-      "weekendProxy": "PAXG"
+      "weekendProxy": "PAXG",
+      "equivalentAssets": ["XAUT"]
     },
     "XAUT": {
       "targetAssetAddress": "47de839c03a3b014c0cc4f3b9352979a5038f910"
