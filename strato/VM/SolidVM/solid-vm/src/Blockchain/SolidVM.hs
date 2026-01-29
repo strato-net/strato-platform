@@ -1009,21 +1009,20 @@ expToPath x@(CC.IndexAccess _ parent mIndex) = do
       _ -> expToPath parent
 
   idx <- getVar =<< maybe (typeError "empty index is only valid at type level" $ show x) expToVar mIndex
-  -- For SReference (uninitialized storage), read the actual value, defaulting to 0
-  idx' <- case idx of
-    SReference (AddressPath addr key) -> do
-      val <- getSolidStorageKeyVal' addr key
-      case val of
-        MS.BDefault -> pure $ SInteger 0  -- Uninitialized storage defaults to 0
-        _ -> pure $ fromBasic val
-    _ -> pure idx
-  pure . apSnoc parPath $ case idx' of
+  currentBlockNum <- BlockHeader.number . Env.blockHeader <$> getEnv
+  -- Helium network ID = 114784819836269
+  -- Blocks before 25000 on helium have TXs that relied on the buggy behavior, so preserve it there
+  let isHeliumPreFork = computeNetworkID == 114784819836269 && currentBlockNum < 25000
+  pure . apSnoc parPath $ case idx of
     SAddress a _ -> MS.Index . BC.pack $ show a
     SInteger i -> MS.Index . BC.pack $ show i
     SBool b -> MS.Index $ bool "false" "true" b
     SString s -> MS.Index . DT.encodeUtf8 $ T.pack s
     SBytes bs -> MS.Index bs  -- bytes32 keys in mappings
-    _ -> typeError "invalid index" $ show idx'
+    SReference _
+      | isHeliumPreFork -> typeError "invalid index" $ show idx  -- Preserve old buggy behavior for pre-fork blocks
+      | otherwise -> MS.Index . BC.pack $ "0"  -- Uninitialized storage defaults to 0
+    _ -> typeError "invalid index" $ show idx
 expToPath (CC.MemberAccess _ parent field) = do
   apt <- do
     parvar <- expToVar parent
