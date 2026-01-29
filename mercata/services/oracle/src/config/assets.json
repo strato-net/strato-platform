@@ -1,51 +1,38 @@
 {
   "assets": {
     "ETH": {
-      "name": "ETH-USD",
-      "tokenAddress": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
       "targetAssetAddress": "93fb7295859b2d70199e0a4883b7c320cf874e6c"
     },
-    "WBTC": {
-      "name": "WBTC-USD",
-      "tokenAddress": "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
-      "targetAssetAddress": "7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9"
+    "KAG": {
+      "targetAssetAddress": "2c59ef92d08efde71fe1a1cb5b45f4f6d48fcc94",
+      "submit": false
     },
     "PAXG": {
-      "name": "PAXG-USD",
-      "tokenAddress": "0x45804880De22913dAFE09f4980848ECE6EcbAf78",
       "targetAssetAddress": "491cdfe98470bfe69b662ab368826dca0fc2f24d"
     },
-    "XAU": {
-      "name": "XAU-USD",
-      "targetAssetAddress": "cdc93d30182125e05eec985b631c7c61b3f63ff0"
-    },
-    "XAUT": {
-      "name": "XAUT-USD",
-      "tokenAddress": "0x68749665ff8d2d112fa859aa293f07a622782f38",
-      "targetAssetAddress": "47de839c03a3b014c0cc4f3b9352979a5038f910"
-    },
-    "XAG": {
-      "name": "XAG-USD",
-      "targetAssetAddress": "2c59ef92d08efde71fe1a1cb5b45f4f6d48fcc94"
+    "SUSDS": {
+      "targetAssetAddress": "6e2d93d323edf1b3cc4672a909681b6a430cae64"
     },
     "USDST": {
-      "name": "USDST-USD",
       "targetAssetAddress": "937efa7e3a77e20bbdbd7c0d32b6514f368c1010",
       "constantPrice": 1000000000000000000
     },
-    "XAU-WEEKEND": {
-      "name": "PAXG-USD-WEEKEND",
-      "tokenAddress": "0x45804880De22913dAFE09f4980848ECE6EcbAf78",
-      "targetAssetAddress": "cdc93d30182125e05eec985b631c7c61b3f63ff0"
+    "WBTC": {
+      "targetAssetAddress": "7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9"
     },
-    "XAG-WEEKEND": {
-      "name": "KAG-USD-WEEKEND",
-      "targetAssetAddress": "2c59ef92d08efde71fe1a1cb5b45f4f6d48fcc94"
+    "WSTETH":{
+      "targetAssetAddress": "f2aa370405030a434ae07e7826178325c675e925"
     },
-    "sUSDS": {
-      "name": "sUSDS-USD",
-      "tokenAddress": "0xa3931d71877c0e7a3148cb7eb4463524fec27fbd",
-      "targetAssetAddress": "6e2d93d323edf1b3cc4672a909681b6a430cae64"
+    "XAG": {
+      "targetAssetAddress": "2c59ef92d08efde71fe1a1cb5b45f4f6d48fcc94",
+      "weekendProxy": "KAG"
+    },
+    "XAU": {
+      "targetAssetAddress": "cdc93d30182125e05eec985b631c7c61b3f63ff0",
+      "weekendProxy": "PAXG"
+    },
+    "XAUT": {
+      "targetAssetAddress": "47de839c03a3b014c0cc4f3b9352979a5038f910"
     }
   }
-} 
+}

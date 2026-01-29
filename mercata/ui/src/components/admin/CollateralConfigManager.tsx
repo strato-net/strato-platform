@@ -282,17 +282,18 @@ const CollateralConfigManager = () => {
   return (
     <div className="space-y-6">
       <Card className="dark:bg-card">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between dark:text-foreground">
-            <span className="flex items-center space-x-2">
-              <AlertTriangle className="h-5 w-5" />
-              <span>System Control</span>
+        <CardHeader className="px-4 md:px-6">
+          <CardTitle className="flex items-center justify-between gap-2 dark:text-foreground">
+            <span className="flex items-center gap-1.5 md:space-x-2 shrink-0">
+              <AlertTriangle className="h-4 w-4 md:h-5 md:w-5" />
+              <span className="text-base md:text-xl whitespace-nowrap">System Control</span>
             </span>
             <Button
               onClick={handleToggleGlobalPause}
               disabled={loading}
               variant={globalPaused ? "destructive" : "default"}
-              className="flex items-center space-x-2"
+              size="sm"
+              className={`flex items-center gap-1 md:space-x-2 text-xs md:text-sm ${!globalPaused ? 'bg-orange-500 hover:bg-orange-600' : ''}`}
             >
               {loading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -301,7 +302,7 @@ const CollateralConfigManager = () => {
               ) : (
                 <Pause className="h-4 w-4" />
               )}
-              <span>{globalPaused ? 'Unpause System' : 'Pause System'}</span>
+              <span className="whitespace-nowrap">{globalPaused ? 'Unpause System' : 'Pause System'}</span>
             </Button>
           </CardTitle>
           <CardDescription>
@@ -321,14 +322,14 @@ const CollateralConfigManager = () => {
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2 dark:bg-muted">
-          <TabsTrigger value="add" className="flex items-center space-x-2 data-[state=active]:bg-background dark:data-[state=active]:bg-card">
+        <TabsList className="grid w-full grid-cols-2 h-auto dark:bg-muted">
+          <TabsTrigger value="add" className="flex items-center gap-1 md:space-x-2 text-xs md:text-sm py-2 data-[state=active]:bg-background dark:data-[state=active]:bg-card">
             <Plus className="h-4 w-4" />
-            <span>Add/Edit Config</span>
+            <span className="whitespace-nowrap">Add/Edit Config</span>
           </TabsTrigger>
-          <TabsTrigger value="manage" className="flex items-center space-x-2 data-[state=active]:bg-background dark:data-[state=active]:bg-card">
+          <TabsTrigger value="manage" className="flex items-center gap-1 md:space-x-2 text-xs md:text-sm py-2 data-[state=active]:bg-background dark:data-[state=active]:bg-card">
             <Settings className="h-4 w-4" />
-            <span>Manage Assets</span>
+            <span className="whitespace-nowrap">Manage Assets</span>
           </TabsTrigger>
         </TabsList>
 
@@ -538,18 +539,18 @@ const CollateralConfigManager = () => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="manage" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Settings className="h-5 w-5" />
-                <span>Manage Collateral Assets</span>
+        <TabsContent value="manage" className="space-y-4 md:space-y-6">
+          <Card className="overflow-hidden">
+            <CardHeader className="px-4 md:px-6">
+              <CardTitle className="flex items-center gap-1.5 md:space-x-2 text-base md:text-xl">
+                <Settings className="h-4 w-4 md:h-5 md:w-5" />
+                <span className="whitespace-nowrap">Manage Collateral Assets</span>
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-xs md:text-sm">
                 View and manage existing collateral asset configurations
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-4 md:px-6">
               {loading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin text-strato-blue" />
@@ -562,35 +563,36 @@ const CollateralConfigManager = () => {
                   </AlertDescription>
                 </Alert>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-3 md:space-y-4">
                   {assets.map((asset) => (
-                    <Card key={asset.asset} className="border-l-4 border-l-strato-blue">
-                      <CardContent className="pt-6">
-                        <div className="flex items-center justify-between">
-                          <div className="space-y-2">
-                            <div className="flex items-center space-x-2">
-                              <h3 className="font-semibold">{asset.symbol}</h3>
+                    <Card key={asset.asset} className="border-l-4 border-l-strato-blue overflow-hidden">
+                      <CardContent className="pt-4 md:pt-6 px-3 md:px-6">
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                          <div className="space-y-1 md:space-y-2 min-w-0">
+                            <div className="flex flex-wrap items-center gap-1.5 md:space-x-2">
+                              <h3 className="font-semibold text-sm md:text-base">{asset.symbol}</h3>
                               {asset.isPaused && asset.isSupported && (
-                                <Badge variant="destructive">Paused</Badge>
+                                <Badge variant="destructive" className="text-[10px] md:text-xs">Paused</Badge>
                               )}
                               {!asset.isPaused && asset.isSupported && (
-                                <Badge variant="default">Active</Badge>
+                                <Badge variant="default" className="text-[10px] md:text-xs">Active</Badge>
                               )}
-                              <Badge variant={asset.isSupported ? "outline" : "destructive"}>
+                              <Badge variant={asset.isSupported ? "outline" : "destructive"} className="text-[10px] md:text-xs">
                                 {asset.isSupported ? 'Supported' : 'Not Supported'}
                               </Badge>
                             </div>
-                            <p className="text-sm text-muted-foreground font-mono">{asset.asset}</p>
+                            <p className="text-xs md:text-sm text-muted-foreground font-mono truncate">{asset.asset}</p>
                           </div>
                           
-                          <div className="flex items-center space-x-2">
+                          <div className="flex items-center gap-2 shrink-0">
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => handleEditAsset(asset)}
                               disabled={loading}
+                              className="text-xs"
                             >
-                              <Edit className="h-4 w-4 mr-1" />
+                              <Edit className="h-3 w-3 md:h-4 md:w-4 mr-1" />
                               Edit
                             </Button>
                             
@@ -600,8 +602,9 @@ const CollateralConfigManager = () => {
                                 size="sm"
                                 onClick={() => handleToggleDisable(asset.asset, true)}
                                 disabled={loading}
+                                className="text-xs"
                               >
-                                <Play className="h-4 w-4 mr-1" />
+                                <Play className="h-3 w-3 md:h-4 md:w-4 mr-1" />
                                 Enable
                               </Button>
                             ) : (
@@ -611,10 +614,11 @@ const CollateralConfigManager = () => {
                                     variant="outline"
                                     size="sm"
                                     disabled={loading}
+                                    className="text-xs"
                                   >
-                                    <Settings className="h-4 w-4 mr-1" />
+                                    <Settings className="h-3 w-3 md:h-4 md:w-4 mr-1" />
                                     Actions
-                                    <ChevronDown className="h-4 w-4 ml-1" />
+                                    <ChevronDown className="h-3 w-3 md:h-4 md:w-4 ml-1" />
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">

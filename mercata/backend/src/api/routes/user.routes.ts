@@ -258,4 +258,38 @@ router.post("/admin/dismiss", authHandler.authorizeRequest(), UserController.dis
  */
 router.get("/admin/issues", authHandler.authorizeRequest(), UserController.getOpenIssues);
 
+/**
+ * @openapi
+ * /user/admin/issues/executed:
+ *   get:
+ *     summary: List executed administrative issues with pagination
+ *     tags: [Admin]
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Items per page
+ *     responses:
+ *       200:
+ *         description: Paginated executed issues
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 executed:
+ *                   type: array
+ *                 executedTotal:
+ *                   type: integer
+ */
+router.get("/admin/issues/executed", authHandler.authorizeRequest(), UserController.getExecutedIssues);
+
 export default router;

@@ -23,14 +23,14 @@ const TransactionSummary: React.FC<TransactionSummaryProps> = ({
   formatBalanceDisplay,
 }) => {
   return (
-    <div className="rounded-xl border border-border bg-muted/50 p-4 space-y-3 text-sm text-muted-foreground">
-      <div className="flex items-center justify-between">
+    <div className="rounded-xl border border-border bg-muted/50 p-3 md:p-4 space-y-2 md:space-y-3 text-xs md:text-sm text-muted-foreground">
+      <div>
         <span>
           Amount will be rounded down to{" "}
           {selectedToken?.externalDecimals || "18"} decimal places
         </span>
       </div>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-0.5 md:gap-2">
         <span>Transaction Fee</span>
         <span className="font-medium text-foreground">
           {BRIDGE_OUT_FEE} USDST ({FEE_VOUCHER} voucher)
@@ -38,14 +38,14 @@ const TransactionSummary: React.FC<TransactionSummaryProps> = ({
       </div>
       {selectedToken?.maxPerWithdrawal &&
         BigInt(selectedToken.maxPerWithdrawal) > 0n && (
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-0.5 md:gap-2">
             <span>Max Per Withdrawal</span>
             <span className="font-medium text-foreground">
               {formatUnits(selectedToken.maxPerWithdrawal, DECIMAL).toString()}
             </span>
           </div>
         )}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-0.5 md:gap-2">
         <span>{selectedToken?.stratoTokenSymbol || ""} Balance</span>
         <span className="font-medium text-foreground">
           {formatBalanceDisplay(balanceImpact.before)}
@@ -54,7 +54,7 @@ const TransactionSummary: React.FC<TransactionSummaryProps> = ({
             : " → " + formatBalanceDisplay(balanceImpact.after)}
         </span>
       </div>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-0.5 md:gap-2">
         <span>Outcome</span>
         <span className="font-medium text-foreground">
           {amount || "0.00"} {selectedToken?.externalSymbol || ""} to{" "}

@@ -5,6 +5,7 @@ import { formatUnits } from "viem";
 import { Coins, Zap, Clock, RefreshCw, Star } from "lucide-react";
 import CopyButton from "@/components/ui/copy";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useState } from "react";
 
 interface RewardsOverviewProps {
@@ -93,11 +94,11 @@ export const RewardsOverview = ({ state, loading, onRefresh }: RewardsOverviewPr
 
   return (
     <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
+      <CardHeader className="px-4 md:px-6 pb-3 md:pb-4">
+        <div className="flex items-start justify-between gap-2">
           <div>
-            <CardTitle>{seasonDisplay} Reward Overview</CardTitle>
-            <CardDescription>Global rewards system statistics</CardDescription>
+            <CardTitle className="text-lg md:text-xl">{seasonDisplay} Reward Overview</CardTitle>
+            <CardDescription className="text-xs md:text-sm">Global rewards system statistics</CardDescription>
           </div>
           {onRefresh && (
             <Button
@@ -105,41 +106,50 @@ export const RewardsOverview = ({ state, loading, onRefresh }: RewardsOverviewPr
               size="sm"
               onClick={handleRefresh}
               disabled={loading || isRefreshing}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 px-2 md:px-3"
             >
               <RefreshCw className={`h-4 w-4 ${(loading || isRefreshing) ? "animate-spin" : ""}`} />
-              Refresh
+              <span className="hidden md:inline">Refresh</span>
             </Button>
           )}
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-4 md:px-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="flex items-start space-x-3">
             <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
-              <Zap className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              <Zap className="h-4 w-4 md:h-5 md:w-5 text-blue-600 dark:text-blue-400" />
             </div>
             <div className="flex-1">
-              <p className="text-sm text-muted-foreground">Total Emission Rate</p>
-              <p className="text-2xl font-semibold">{emissionPerDay} {emissionPerDay !== "?" && "points/day"}</p>
+              <p className="text-xs md:text-sm text-muted-foreground">Total Emission Rate</p>
+              <p className="text-xl md:text-2xl font-semibold">{emissionPerDay} {emissionPerDay !== "?" && "points/day"}</p>
               {emissionPerWeek !== "?" && (
                 <p className="text-xs text-muted-foreground mt-1">{emissionPerWeek} points/week</p>
               )}
               {totalStakeFormatted !== "?" && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Total Stake: {totalStakeFormatted}
-                </p>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <p className="text-xs text-muted-foreground mt-1 cursor-help">
+                      Total Stake: {totalStakeFormatted}
+                    </p>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="max-w-xs text-sm">
+                      This is the sum of stakes across all activities.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
               )}
             </div>
           </div>
 
           <div className="flex items-start space-x-3">
             <div className="p-2 bg-amber-100 dark:bg-amber-900 rounded-lg">
-              <Star className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              <Star className="h-4 w-4 md:h-5 md:w-5 text-amber-600 dark:text-amber-400" />
             </div>
             <div className="flex-1">
-              <p className="text-sm text-muted-foreground">Total Earned</p>
-              <p className="text-2xl font-semibold">
+              <p className="text-xs md:text-sm text-muted-foreground">Total Earned</p>
+              <p className="text-xl md:text-2xl font-semibold">
                 {state.totalDistributed ? 
                   formatRoundedWithCommas(roundByMagnitude(String(parseFloat(state.totalDistributed) / 1e18))) 
                   : "0"}
@@ -150,10 +160,10 @@ export const RewardsOverview = ({ state, loading, onRefresh }: RewardsOverviewPr
 
           <div className="flex items-start space-x-3">
             <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
-              <Coins className="h-5 w-5 text-green-600 dark:text-green-400" />
+              <Coins className="h-4 w-4 md:h-5 md:w-5 text-green-600 dark:text-green-400" />
             </div>
             <div className="flex-1">
-              <p className="text-sm text-muted-foreground">Reward Token</p>
+              <p className="text-xs md:text-sm text-muted-foreground">Reward Token</p>
               {state.rewardToken && (
                 <div className="flex items-center gap-1 mt-1">
                   <p className="text-sm font-semibold font-mono">
@@ -170,11 +180,11 @@ export const RewardsOverview = ({ state, loading, onRefresh }: RewardsOverviewPr
 
           <div className="flex items-start space-x-3">
             <div className="p-2 bg-purple-100 dark:bg-purple-900 rounded-lg">
-              <Clock className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+              <Clock className="h-4 w-4 md:h-5 md:w-5 text-purple-600 dark:text-purple-400" />
             </div>
             <div className="flex-1">
-              <p className="text-sm text-muted-foreground">Last Update</p>
-              <p className="text-lg font-semibold">
+              <p className="text-xs md:text-sm text-muted-foreground">Last Update</p>
+              <p className="text-base md:text-lg font-semibold">
                 {state.lastBlockHandled && state.lastBlockHandled !== "0"
                   ? `Block ${state.lastBlockHandled}`
                   : "?"}

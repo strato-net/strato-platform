@@ -1,12 +1,11 @@
 {
   "Alchemy": {
-    "url": "https://api.g.alchemy.com/prices/v1/${API_KEY}/tokens/by-address",
-    "method": "POST",
-    "body": "addresses",
+    "url": "https://api.g.alchemy.com/prices/v1/${API_KEY}/tokens/by-symbol",
+    "params": "symbols[]",
     "parse": "data[].prices[0].value",
     "timestamp": "data[0].prices[0].lastUpdatedAt",
-    "batchMode": true,
-    "apiKeyEnvVar": "ALCHEMY_API_KEY"
+    "apiKeyEnvVar": "ALCHEMY_API_KEY",
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "KAG", "WSTETH"]
   },
   "CoinMarketCap": {
     "url": "https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest",
@@ -14,16 +13,16 @@
     "headers": "X-CMC_PRO_API_KEY",
     "parse": "data.{symbol}[0].quote.USD.price",
     "timestamp": "data.{firstSymbol}[0].quote.USD.last_updated",
-    "batchMode": true,
-    "apiKeyEnvVar": "COINMARKETCAP_API_KEY"
+    "apiKeyEnvVar": "COINMARKETCAP_API_KEY",
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "WSTETH"]
   },
   "Metals.dev": {
     "url": "https://api.metals.dev/v1/latest",
     "params": "api_key,currency=USD,unit=toz,metals",
     "parse": "metals.{metal}",
     "timestamp": "timestamps.metal",
-    "batchMode": true,
     "apiKeyEnvVar": "METALS_DEV_API_KEY",
+    "assets": ["XAU", "XAG"],
     "symbolMapping": {
       "XAU": "gold",
       "XAG": "silver"
@@ -34,22 +33,54 @@
     "params": "access_key,base=USD,symbols",
     "parse": "rates.USD{symbol}",
     "timestamp": "timestamp",
-    "batchMode": true,
-    "apiKeyEnvVar": "METALS_API_API_KEY"
+    "apiKeyEnvVar": "METALS_API_API_KEY",
+    "assets": ["XAU", "XAG"]
   },
   "CoinGecko": {
     "url": "https://pro-api.coingecko.com/api/v3/simple/price",
     "params": "x_cg_pro_api_key,ids,vs_currencies=usd,include_last_updated_at=true",
     "parse": "{id}.usd",
     "timestamp": "{id}.last_updated_at",
-    "batchMode": true,
     "apiKeyEnvVar": "COINGECKO_API_KEY",
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "KAG", "WSTETH"],
     "symbolMapping": {
       "ETH": "ethereum",
       "WBTC": "wrapped-bitcoin",
       "PAXG": "pax-gold",
       "XAUT": "tether-gold",
-      "KAG": "kinesis-silver"
+      "SUSDS": "susds",
+      "KAG": "kinesis-silver",
+      "WSTETH": "wrapped-steth"
     }
+  },
+  "CoinAPI": {
+    "url": "https://rest.coinapi.io/v1/assets",
+    "params": "filter_asset_id",
+    "headers": "X-CoinAPI-Key",
+    "parse": "assets",
+    "timestamp": "data_quote_start",
+    "apiKeyEnvVar": "COINAPI_API_KEY",
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "WSTETH"]
+  },
+  "LiveCoinWatch": {
+    "url": "https://api.livecoinwatch.com/coins/map",
+    "method": "POST",
+    "headers": "x-api-key",
+    "body": "codes",
+    "parse": "coins",
+    "apiKeyEnvVar": "LIVECOINWATCH_API_KEY",
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "KAG", "WSTETH"]
+  },
+  "Commodities-API": {
+    "url": "https://commodities-api.com/api/latest",
+    "params": "access_key,base=USD,symbols",
+    "parse": "data.rates.{symbol}",
+    "timestamp": "data.timestamp",
+    "apiKeyEnvVar": "COMMODITIES_API_KEY",
+    "assets": ["XAU", "XAG"]
+  },
+  "constant": {
+    "parse": "constant",
+    "assets": ["USDST"]
   }
-} 
+}

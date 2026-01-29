@@ -175,7 +175,6 @@ data OutEvent
   = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
   | ToCommit Block
   | FailedHistoric Block
-  | MakeBlockCommand
   | ResetTimer RoundNumber
   | -- Announce that the global consensus is ahead of us by
     -- some number of blocks, and hope that a higher power
@@ -194,7 +193,6 @@ instance Format OutEvent where
   format (OMsg (MsgAuth s _) msg) = "OMsg " ++ format msg ++ " " ++ format s
   format (ToCommit blk) = "ToCommit " ++ format (blockHash blk)
   format (FailedHistoric blk) = "FailedHistoric " ++ format (blockHash blk)
-  format MakeBlockCommand = "MakeBlockCommand"
   format (ResetTimer rn) = "ResetTimer " ++ format rn
   format (GapFound we they p) = "GapFound " ++ show (we, they, p)
   format (LeadFound we they p) = "LeadFound " ++ show (we, they, p)
@@ -228,7 +226,6 @@ outShortLog loc eoev = do
       OMsg a m -> shortFormat $ WireMessage a m
       ToCommit blk -> prefix ++ CL.blue "TO_COMMIT " ++ blkNum blk
       FailedHistoric blk -> prefix ++ CL.blue "FAILED_HISTORIC " ++ blkNum blk
-      MakeBlockCommand -> prefix ++ CL.blue "MAKE_BLOCK_COMMAND"
       ResetTimer rn -> prefix ++ CL.blue "RESET_TIMER " ++ show rn
       GapFound h r p -> prefix ++ CL.blue "GAP_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
       LeadFound h r p -> prefix ++ CL.blue "LEAD_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
