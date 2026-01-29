@@ -2039,6 +2039,7 @@ intBuiltin [SDecimal v] = SInteger (decimalMantissa $ roundTo 0 v)
 intBuiltin [SString hex] = integerToValue $ parseBaseInt hex 16
 intBuiltin [SString hex, SInteger 16] = integerToValue $ parseBaseInt hex 16
 intBuiltin [SString dec, SInteger 10] = integerToValue $ parseBaseInt dec 10
+intBuiltin [SBytes bs] = SInteger $ byteString2Integer bs
 intBuiltin [SNULL] = SInteger 0
 intBuiltin [SReference{}] = SInteger 0
 intBuiltin args = typeError "numeric cast - invalid args" $ show args
