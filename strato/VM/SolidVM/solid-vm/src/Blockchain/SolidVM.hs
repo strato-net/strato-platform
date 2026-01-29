@@ -1014,6 +1014,8 @@ expToPath x@(CC.IndexAccess _ parent mIndex) = do
     SInteger i -> MS.Index . BC.pack $ show i
     SBool b -> MS.Index $ bool "false" "true" b
     SString s -> MS.Index . DT.encodeUtf8 $ T.pack s
+    SBytes bs -> MS.Index bs  -- bytes32 keys in mappings
+    SReference _ -> MS.Index . BC.pack $ "0"  -- Uninitialized storage defaults to 0
     _ -> typeError "invalid index" $ show idx
 expToPath (CC.MemberAccess _ parent field) = do
   apt <- do
