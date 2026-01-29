@@ -293,7 +293,7 @@ populateStorageDBs' genesisInfo genesisBlock genesisChainId sr pub = do
               A._transactionSender = Ad.Address 0,
               A._actionData =
                 OMap.singleton (a, A.ActionData storageDiff),
-              A._newCodeCollections = [],
+              A._newCodeCollections = OMap.empty,
               A._events = addressEvents,
               A._delegatecalls = delegatecalls
             }
