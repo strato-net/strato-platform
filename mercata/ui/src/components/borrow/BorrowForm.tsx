@@ -489,6 +489,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
                 handleAmountInputChange(value, setBorrowAmount, setBorrowAmountErrorIgnoringMax, availableToBorrow.toString());
                 handlePollingUpdate(value);
               }}
+              disabled={guestMode}
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">USDST</span>
           </div>
@@ -541,6 +542,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
             step={0.01}
             onValueChange={handleSliderChange}
             className="w-full"
+            disabled={guestMode}
           />
 
           <div className="flex justify-between text-xs text-muted-foreground">
@@ -619,6 +621,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
               id="auto-supply"
               checked={autoSupplyCollateral}
               onCheckedChange={handleAutoSupplyChange}
+              disabled={guestMode}
             />
             <label
               htmlFor="auto-supply"
@@ -631,10 +634,13 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
           {/* Additional Collateral Needed Dropdown */}
           <Collapsible
             open={isCollateralExpanded}
-            onOpenChange={setIsCollateralExpanded}
+            onOpenChange={guestMode ? undefined : setIsCollateralExpanded}
             className="border rounded-lg"
           >
-        <CollapsibleTrigger className="flex items-center justify-between w-full px-4 py-3 text-sm font-medium hover:bg-muted/50 transition-colors">
+        <CollapsibleTrigger 
+          className="flex items-center justify-between w-full px-4 py-3 text-sm font-medium hover:bg-muted/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={guestMode}
+        >
           <span>
             Additional Collateral Needed{' '}
             <span className="text-muted-foreground font-normal">
@@ -761,6 +767,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
                             })()}
                             onChange={(e) => handleCustomValueChange(item.collateral.address, e.target.value)}
                             className={`collateral-value-input w-20 h-7 text-right text-sm px-2 ${collateralExceedsMaxMap.get(item.collateral.address) ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                            disabled={guestMode}
                           />
                         </div>
                       )}

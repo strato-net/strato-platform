@@ -611,6 +611,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ guestMode = false }
                               className={`flex-1 sm:w-40 text-sm ${isAmountExceedsMax(vaultKey) ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
                               min="0"
                               step="0.01"
+                              disabled={guestMode}
                             />
                             <div className="flex items-center gap-2">
                               <Button 

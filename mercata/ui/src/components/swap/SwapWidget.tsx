@@ -352,52 +352,52 @@ const SwapDialog = ({
   isLoading
 }: SwapDialogProps) => (
   <Dialog open={isOpen} onOpenChange={onOpenChange}>
-    <DialogContent>
+    <DialogContent className="max-w-[95vw] sm:max-w-md">
       <DialogHeader>
-        <DialogTitle>Confirm Swap</DialogTitle>
-        <DialogDescription>
+        <DialogTitle className="text-lg md:text-xl">Confirm Swap</DialogTitle>
+        <DialogDescription className="text-xs md:text-sm">
           Please review the details below. Slippage tolerance and fees have already been applied.
         </DialogDescription>
       </DialogHeader>
       <div className="py-4 space-y-4">
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">You pay:</span>
-          <span className="font-semibold">
+        <div className="flex justify-between items-center gap-2">
+          <span className="text-sm md:text-base text-muted-foreground flex-shrink-0">You pay:</span>
+          <span className="font-semibold text-sm md:text-base text-right break-words">
             {fromAmount} {fromAsset?._symbol || ""}
           </span>
         </div>
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">You receive:</span>
-          <span className="font-semibold">
+        <div className="flex justify-between items-center gap-2">
+          <span className="text-sm md:text-base text-muted-foreground flex-shrink-0">You receive:</span>
+          <span className="font-semibold text-sm md:text-base text-right break-words">
             {toAmount} {toAsset?._symbol || ""}
           </span>
         </div>
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">Minimum received (after slippage):</span>
-          <span className="font-semibold">
+        <div className="flex justify-between items-start gap-2">
+          <span className="text-sm md:text-base text-muted-foreground flex-shrink-0 min-w-[140px]">Minimum received (after slippage):</span>
+          <span className="font-semibold text-sm md:text-base text-right break-words">
             {toAmountMin} {toAsset?._symbol || ""}
           </span>
         </div>
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">Exchange rate:</span>
-          <span className="flex flex-col items-end gap-0.5">
-            <span className="font-semibold">1 {fromAsset?._symbol || ""} ≈ {exchangeRate} {toAsset?._symbol || ""}</span>
+        <div className="flex justify-between items-start gap-2">
+          <span className="text-sm md:text-base text-muted-foreground flex-shrink-0">Exchange rate:</span>
+          <span className="flex flex-col items-end gap-0.5 text-right min-w-0 flex-1">
+            <span className="font-semibold text-xs md:text-sm break-words">1 {fromAsset?._symbol || ""} ≈ {exchangeRate} {toAsset?._symbol || ""}</span>
             {invertedExchangeRate && (
-              <span className="text-muted-foreground/70">1 {toAsset?._symbol || ""} ≈ {invertedExchangeRate} {fromAsset?._symbol || ""}</span>
+              <span className="text-muted-foreground/70 text-xs md:text-sm break-words">1 {toAsset?._symbol || ""} ≈ {invertedExchangeRate} {fromAsset?._symbol || ""}</span>
             )}
           </span>
         </div>
         {isHighPriceImpact && (
-          <div className="text-yellow-600 text-sm mt-2">
+          <div className="text-yellow-600 text-xs md:text-sm mt-2">
             ⚠️ High price impact — you may receive fewer tokens than expected.
           </div>
         )}
       </div>
-      <DialogFooter>
-        <Button variant="outline" onClick={() => onOpenChange(false)}>
+      <DialogFooter className="flex-col sm:flex-row gap-2">
+        <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">
           Cancel
         </Button>
-        <Button disabled={isLoading} onClick={onConfirm} className="bg-strato-blue hover:bg-strato-blue/90">
+        <Button disabled={isLoading} onClick={onConfirm} className="w-full sm:w-auto bg-strato-blue hover:bg-strato-blue/90">
           {isLoading && <LoadingSpinner />} Confirm Swap
         </Button>
       </DialogFooter>

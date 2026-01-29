@@ -61,13 +61,15 @@ const GuestReferralsView = () => {
                   </div>
                 </div>
 
-                <Button 
-                  onClick={handleLogin} 
-                  className="bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white px-8 py-3 text-lg"
-                >
-                  <LogIn className="mr-2 h-5 w-5" />
-                  Sign In to Create Referrals
-                </Button>
+                <div className="flex justify-center">
+                  <Button 
+                    onClick={handleLogin} 
+                    className="w-full sm:w-auto bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white px-6 sm:px-8 py-3 text-base sm:text-lg flex items-center justify-center"
+                  >
+                    <LogIn className="mr-2 h-5 w-5 flex-shrink-0" />
+                    <span className="whitespace-nowrap">Sign In to Create Referrals</span>
+                  </Button>
+                </div>
               </CardContent>
             </Card>
 

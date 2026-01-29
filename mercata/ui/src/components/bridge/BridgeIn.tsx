@@ -639,7 +639,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
         selectedToken={selectedToken}
         tokens={currentTokens}
         onTokenChange={setSelectedToken}
-        disabled={isLoading}
+        disabled={guestMode || isLoading}
       />
 
       <div className="space-y-1.5">
@@ -674,7 +674,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
           }`}
           value={amount}
           onChange={(e) => handleAmountChange(e.target.value)}
-          disabled={!isConnected || isLoading}
+          disabled={guestMode || !isConnected || isLoading}
         />
         {amountError && <p className="text-sm text-red-500">{amountError}</p>}
         
@@ -685,7 +685,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
             onChange={handleAmountChange}
             decimals={parseInt(selectedToken?.externalDecimals || "18")}
             className="mt-2"
-            disabled={isLoading}
+            disabled={guestMode || isLoading}
           />
                     )}
       </div>
@@ -707,7 +707,8 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
             type="checkbox" 
             className="accent-blue-600" 
             checked={autoDeposit} 
-            onChange={e => setAutoDeposit(e.target.checked)} 
+            onChange={e => setAutoDeposit(e.target.checked)}
+            disabled={guestMode}
           />
           Earn saving rate by offering USDST for lending
         </label>

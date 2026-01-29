@@ -230,6 +230,7 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance,
               const value = e.target.value;
               handleAmountInputChange(value, setRepayAmount, setRepayAmountError, maxAmount);
             }}
+            disabled={guestMode}
           />
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">USDST</span>
         </div>
@@ -245,7 +246,7 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance,
             setRepayAmount(val);
           }}
           className="pt-2"
-          disabled={BigInt(maxAmount) < 1e15} // Disable if less than 0.001 USDST (1e15 wei)
+          disabled={guestMode || BigInt(maxAmount) < 1e15} // Disable if less than 0.001 USDST (1e15 wei)
         />
       </div>
 
