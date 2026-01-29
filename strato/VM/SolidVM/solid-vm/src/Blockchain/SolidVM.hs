@@ -2588,6 +2588,7 @@ encodeForReturn' (SStruct _ vs) = do
   pure $ "{" ++ intercalate "," encodedItems ++ "}"
 encodeForReturn' SNULL = pure "0"
 encodeForReturn' SReference{} = pure "0"
+encodeForReturn' (SBytes bs) = return $ show $ B16.encode bs
 encodeForReturn' x = todo "Cannot encode this return type: " x
 
 --formatAddressWithoutColor : padded the address with 40 bytes
