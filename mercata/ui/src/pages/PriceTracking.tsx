@@ -631,10 +631,16 @@ const PriceTracking = () => {
 
         // Transform pools - add pool entries (not LP tokens)
         const transformedPools: EarningAsset[] = pools.map((pool: any) => {
-          // Calculate pool price from token balances (ratio)
-          const tokenABalance = parseFloat(pool.tokenA?.balance || pool.tokenABalance || '0');
-          const tokenBBalance = parseFloat(pool.tokenB?.balance || pool.tokenBBalance || '0');
-          const poolPrice = tokenABalance > 0 ? (tokenBBalance / tokenABalance).toString() : '0';
+          // Stable pools: use bToARatio (A per B). Non-stable: use tokenBBalance/tokenABalance (B per A).
+          const isStable = pool.isStable === true;
+          let poolPrice: string;
+          if (isStable && pool.aToBRatio != null && String(pool.aToBRatio) !== '0') {
+            poolPrice = String(pool.aToBRatio);
+          } else {
+            const tokenABalance = parseFloat(pool.tokenA?.balance || pool.tokenABalance || '0');
+            const tokenBBalance = parseFloat(pool.tokenB?.balance || pool.tokenBBalance || '0');
+            poolPrice = tokenABalance > 0 ? (tokenBBalance / tokenABalance).toString() : '0';
+          }
 
           return {
             address: pool.address,
@@ -648,6 +654,7 @@ const PriceTracking = () => {
             poolName: pool.poolName,
             tokenA: pool.tokenA,
             tokenB: pool.tokenB,
+            isStable: !!isStable,
           };
         });
 
@@ -773,9 +780,9 @@ const PriceTracking = () => {
     }
   }, []);
 
-  // Fetch price history for a pool
+  // Fetch price history for a pool. For stable pools (isStable) use bToARatio convention (A/B); backend returns B/A so we invert.
   const fetchPoolPriceHistory = useCallback(
-    async (poolAddress: string, duration: string, interval: Interval, tokenAAddress?: string, tokenBAddress?: string): Promise<OHLCData[]> => {
+    async (poolAddress: string, duration: string, interval: Interval, tokenAAddress?: string, tokenBAddress?: string, isStable?: boolean): Promise<OHLCData[]> => {
       try {
         const response = await api.get('/tokens/v2/pool-price-history/' + poolAddress, {
           params: { duration },
@@ -880,6 +887,7 @@ const PriceTracking = () => {
 
         const ohlcData: OHLCData[] = [];
         priceHistory.forEach((point: { timestamp: number; balance: number }, index: number) => {
+          // Backend returns balance = tokenBBalance/tokenABalance (B/A). For stable pools use A/B = 1/balance.
           const price = point.balance;
           const open = index > 0 ? ohlcData[index - 1].close : price;
           const spotPrice = getSpotPriceAt(point.timestamp);
@@ -914,19 +922,15 @@ const PriceTracking = () => {
 
     try {
       if (isPool) {
-        // For pools, try bToARatio first, then calculate from balances
         const response = await api.get(`/swap-pools/${widget.assetAddress}`);
         const pool = response.data;
+        const isStable = pool.isStable === true;
 
-        // Try bToARatio first (could be string or number)
         const aToBRatioStr = pool.aToBRatio?.toString() || '0';
         const aToBRatio = parseFloat(aToBRatioStr);
-        if (aToBRatio > 0 && !isNaN(aToBRatio)) {
-          return aToBRatio;
-        }
+        if (aToBRatio > 0 && !isNaN(aToBRatio)) return aToBRatio;
 
-        // Fallback to calculating from balances (same logic as initial pool loading)
-        // Try multiple possible locations for balances
+        // Fallback: balance ratio (B/A)
         const tokenABalance = parseFloat(
           pool.tokenA?.balance ||
           pool.tokenABalance ||
@@ -941,9 +945,9 @@ const PriceTracking = () => {
         );
 
         if (tokenABalance > 0 && !isNaN(tokenABalance) && !isNaN(tokenBBalance)) {
-          const calculatedPrice = tokenBBalance / tokenABalance;
-          if (calculatedPrice > 0 && !isNaN(calculatedPrice)) {
-            return calculatedPrice;
+          const ratio = tokenBBalance / tokenABalance;
+          if (ratio > 0 && !isNaN(ratio)) {
+            return isStable ? aToBRatio : ratio;
           }
         }
 
@@ -1017,7 +1021,7 @@ const PriceTracking = () => {
       }
       
       const ohlcData = isPool
-        ? await fetchPoolPriceHistory(widget.assetAddress, widget.timeRange, widget.interval, tokenAAddress, tokenBAddress)
+        ? await fetchPoolPriceHistory(widget.assetAddress, widget.timeRange, widget.interval, tokenAAddress, tokenBAddress, (asset as any).isStable === true)
         : await fetchTokenPriceHistory(widget.assetAddress, widget.timeRange, widget.interval);
 
       // If appending, merge with existing data

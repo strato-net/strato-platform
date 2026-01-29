@@ -497,6 +497,13 @@ export const getPoolPriceHistory = async (
     if (tokenABalance === 0) {
       return { balance: 0.0 };
     }
+
+    const balanceRatio = tokenBBalance / tokenABalance; 
+
+    if (h.data.isStable) {
+        return { balance: parseFloat(h.data.aToBRatio) || balanceRatio };
+    }
+
     return { balance: tokenBBalance / tokenABalance };
   }
 
