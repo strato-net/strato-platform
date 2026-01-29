@@ -30,7 +30,6 @@ where
 import BlockApps.Logging
 import Blockchain.DB.CodeDB
 import Blockchain.DB.ModifyStateDB (pay)
-import Blockchain.DB.SolidStorageDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockHeader (BlockHeader)
 import qualified Blockchain.Data.BlockHeader as BlockHeader
@@ -227,6 +226,7 @@ createReturnEnv blockData sender' origin' proposer' availableGas newAddress code
   fmap (fmap $ either solidvmErrorResults id) . runSM (Just code) env' gasInfo' $ do
 
     (hsh, cc) <- codeCollectionFromSource isRunningTests True $ DT.encodeUtf8 initCode
+    addNewCodeCollection hsh cc
     let eArgExps = traverse (runParser parseArg initialParserState "" . T.unpack) argsStrings
         !argExps = either (parseError "create arguments") id eArgExps
     argVals <- argsToVals argExps
@@ -2172,6 +2172,7 @@ callBuiltin "create" args@(SString contractName' : SString contractSrc : argVals
   -- testnet won't exist anymore and the stateroot mismatches will be fixed.
   isRunningTests <- Env.runningTests <$> getEnv
   (hsh, cc) <- codeCollectionFromSource isRunningTests True $ BC.pack contractSrc
+  addNewCodeCollection hsh cc
   newAddress <- getNewAddress creator
   execResults <- create' creator newAddress hsh cc contractName' argVals
 
@@ -2194,6 +2195,7 @@ callBuiltin "create2" args@(salt : n@(SString contractName') : SString contractS
   -- testnet won't exist anymore and the stateroot mismatches will be fixed.
   isRunningTests <- Env.runningTests <$> getEnv
   (hsh, cc) <- codeCollectionFromSource isRunningTests True $ BC.pack contractSrc
+  addNewCodeCollection hsh cc
   newAddress <- getNewAddressWithSalt creator salt hsh $ n:argVals
   execResults <- create' creator newAddress hsh cc contractName' argVals
   case erNewContractAddress execResults of
@@ -2293,16 +2295,7 @@ runTheConstructors from to hsh cc contractName' argVals' = do
         _ <- runModifiersAndStatements modContentsList commands
         pure ()
       Nothing -> return ()
-    let getUsername []     = pure "BlockApps"
-        getUsername (x:xs) = do
-          userNameValue <- getSolidStorageKeyVal' x $ MS.StoragePath [MS.Field "username"]
-          case userNameValue of
-            MS.BString userNameString -> pure $ DT.decodeUtf8 userNameString
-            _ -> getUsername xs
-
-    cs <- Mod.get (Mod.Proxy @[CallInfo])
-    userName <- getUsername $ currentAddress <$> cs
-    addNewCodeCollection userName hsh cc
+    userName <- getUsername
     addDelegatecall to to (Just userName) $ T.pack contractName'
 
   return ()
