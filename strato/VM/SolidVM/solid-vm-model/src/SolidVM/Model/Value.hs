@@ -202,6 +202,7 @@ rlpEncodeValue SNULL = rlpEncodeValue $ SInteger 0
 rlpEncodeValue SReference{} = rlpEncodeValue $ SInteger 0
 rlpEncodeValue (SInteger i) = rlpEncode i
 rlpEncodeValue (SString s) = rlpEncode s
+rlpEncodeValue (SBytes bs) = rlpEncode bs
 rlpEncodeValue (SDecimal decimal) = rlpEncode $ show decimal
 rlpEncodeValue (SBool b) = rlpEncode b
 rlpEncodeValue (SAddress a _) = rlpEncode a
