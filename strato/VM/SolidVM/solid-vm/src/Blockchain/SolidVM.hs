@@ -1324,14 +1324,16 @@ expToVar' (CC.Binary _ "!=" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
   val2 <- getVar =<< expToVar expr2
   ctract <- getCurrentContract
+  (_, cc) <- getCurrentCodeCollection
   onTraced $ liftIO $ putStrLn $ "            %%%% val1 = " ++ show val1 ++ "\n            %%%% val2 = " ++ show val2
-  return . Constant . SBool . not $ valEquals ctract val1 val2
+  return . Constant . SBool . not $ valEquals ctract cc val1 val2
 expToVar' (CC.Binary _ "==" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
   val2 <- getVar =<< expToVar expr2
   ctract <- getCurrentContract
+  (_, cc) <- getCurrentCodeCollection
   logVals val1 val2
-  return . Constant . SBool $ valEquals ctract val1 val2
+  return . Constant . SBool $ valEquals ctract cc val1 val2
 expToVar' (CC.Binary _ "<" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
   val2 <- getVar =<< expToVar expr2
@@ -2328,7 +2330,7 @@ runTheConstructors from to hsh cc contractName' argVals' = do
             go [] _ = pure []
             go _ [] = pure []
             go ((t,n):tns) (v:vs') = do
-              let correctedVal = coerceType contract' t v
+              let correctedVal = coerceType contract' cc t v
               var <- createVar correctedVal
               ((n,(t,var)):) <$> go tns vs'
         map (fmap snd) <$> go argTypeNames argVals
@@ -2449,7 +2451,7 @@ runTheCall address' codeAddr contract' funcName hsh cc theFunction argVals' ro f
               go [] _ = []
               go _ [] = []
               go ((n,t):nts) (v:vs') =
-                let v' = coerceType contract' t v
+                let v' = coerceType contract' cc t v
                  in (n,(t,v')) : go nts vs'
            in fmap snd <$> go argMeta argVals
   let locals = args ++ returns

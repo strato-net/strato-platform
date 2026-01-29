@@ -25,6 +25,7 @@ import Blockchain.SolidVM.Exception
 import Blockchain.Strato.Model.Address
 import qualified Data.ByteString.Char8 as BC
 import Text.Format
+import Control.Applicative ((<|>))
 import Control.Lens ((^.))
 import Control.Monad (forM, when)
 import Control.Monad.IO.Class
@@ -39,6 +40,7 @@ import Data.Vector (Vector)
 import qualified Data.Vector as V
 import Data.Word
 import Numeric
+import SolidVM.Model.CodeCollection (CodeCollection)
 import qualified SolidVM.Model.CodeCollection as CC
 import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Storable as MS
@@ -220,29 +222,30 @@ rlpEncodeValues xs = rlpEncodeValue $ STuple $ V.fromList $ Constant <$> xs
 -- coerceFromInt is useful to force integer literals
 -- to assume the type that was intended for them, once
 -- it is determined that their expected type is
-coerceFromInt :: CC.Contract -> Value -> Integer -> Value
-coerceFromInt _ SInteger {} n = SInteger n
-coerceFromInt _ (SAddress _ b) n = SAddress (fromIntegral n) b
-coerceFromInt _ SBool {} n = SBool $ n /= 0
-coerceFromInt _ SString {} 0 = SString ""
-coerceFromInt _ SString {} n = SString $ showHex n ""
-coerceFromInt _ SDecimal {} n = SDecimal $ Decimal 0 n
-coerceFromInt _ (SContract c _) n = SContract c $ fromIntegral n
-coerceFromInt ct (SEnumVal tipe _ _) n' =
+coerceFromInt :: CC.Contract -> CodeCollection -> Value -> Integer -> Value
+coerceFromInt _ _ SInteger {} n = SInteger n
+coerceFromInt _ _ (SAddress _ b) n = SAddress (fromIntegral n) b
+coerceFromInt _ _ SBool {} n = SBool $ n /= 0
+coerceFromInt _ _ SString {} 0 = SString ""
+coerceFromInt _ _ SString {} n = SString $ showHex n ""
+coerceFromInt _ _ SDecimal {} n = SDecimal $ Decimal 0 n
+coerceFromInt _ _ (SContract c _) n = SContract c $ fromIntegral n
+coerceFromInt ct cc (SEnumVal tipe _ _) n' =
   fromMaybe (typeError "missing enum val" $ show (tipe, n')) $ do
     let n = fromIntegral n'
-    enumDef <- fmap fst . M.lookup tipe $ CC._enums ct
+    -- Look up enum in contract first, then fall back to file-level enums
+    enumDef <- fmap fst $ M.lookup tipe (CC._enums ct) <|> M.lookup tipe (cc ^. CC.flEnums)
     when (n >= length enumDef) $ fail "enum val out of range"
     return $ SEnumVal tipe (enumDef !! n) $ fromIntegral n'
-coerceFromInt _ SNULL n = SInteger n
-coerceFromInt _ SReference{} n = SInteger n
-coerceFromInt _ t x = typeError "coerceFromInt: invalid literal for type" $ show (t, x)
+coerceFromInt _ _ SNULL n = SInteger n
+coerceFromInt _ _ SReference{} n = SInteger n
+coerceFromInt _ _ t x = typeError "coerceFromInt: invalid literal for type" $ show (t, x)
 
 -- coerceType allows integer literals to initialize integers, addresses, and
 -- strings (in the special case of 0) and bytes32, determined by type instead of value
-coerceType :: CC.Contract -> SVMType.Type -> Value -> Value
-coerceType ct xt = \case
-  SInteger i -> coerceFromInt ct (defaultValue ct xt) i
+coerceType :: CC.Contract -> CodeCollection -> SVMType.Type -> Value -> Value
+coerceType ct cc xt = \case
+  SInteger i -> coerceFromInt ct cc (defaultValue ct xt) i
   SString s -> case xt of
     SVMType.String {} -> SString s
     SVMType.Bytes {} -> SString s
@@ -250,11 +253,11 @@ coerceType ct xt = \case
     _ -> typeError "string literal must be string or bytes" $ show (xt, s)
   v -> v
 
-valEquals :: CC.Contract -> Value -> Value -> Bool
-valEquals ct lhs rhs = case (lhs, rhs) of
+valEquals :: CC.Contract -> CodeCollection -> Value -> Value -> Bool
+valEquals ct cc lhs rhs = case (lhs, rhs) of
   (SInteger _, SInteger _) -> lhs == rhs
-  (SInteger i, _) -> coerceFromInt ct rhs i == rhs
-  (_, SInteger i) -> lhs == coerceFromInt ct lhs i
+  (SInteger i, _) -> coerceFromInt ct cc rhs i == rhs
+  (_, SInteger i) -> lhs == coerceFromInt ct cc lhs i
   _ -> lhs == rhs
 
 createVar' :: MonadIO m => Value -> m Variable

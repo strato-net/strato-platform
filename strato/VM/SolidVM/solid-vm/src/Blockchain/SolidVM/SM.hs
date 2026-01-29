@@ -635,10 +635,11 @@ getVariableOfName name = do
       maybeConstant :: Maybe Variable
       maybeConstant = fmap (t "constant constant" . Constant) $ do
         let ctract = currentContract currentCallInfo
-        let constMap = (codeCollection currentCallInfo) ^. CC.flConstants
+        let cc = codeCollection currentCallInfo
+        let constMap = cc ^. CC.flConstants
         CC.ConstantDecl {..} <- M.lookup name $ (ctract ^. CC.constants) `M.union` constMap
         return $
-          coerceType ctract _constType $ case _constInitialVal of
+          coerceType ctract cc _constType $ case _constInitialVal of
             CC.NumberLiteral _ x _ -> SInteger x
             CC.AddressLiteral _ a -> SAddress a False
             _ -> SDeferredConstant name  -- Complex expression, evaluate on access
