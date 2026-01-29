@@ -1,10 +1,6 @@
 import { api } from "@/lib/axios";
 import { formatUnits } from "viem";
-import { dummyRewardsState, dummyActivities, getDummyUserRewards } from "./rewardsDummyData";
 import { safeBigInt } from "@/utils/numberUtils";
-
-// Set this to true to use dummy data, false to use backend API
-const USE_DUMMY_DATA = false;
 
 export interface Activity {
   activityId: number;
@@ -69,13 +65,6 @@ export interface LeaderboardResponse {
  * @param forceRefresh - If true, bypasses cache and fetches fresh data from blockchain
  */
 export const fetchRewardsState = async (forceRefresh: boolean = false): Promise<RewardsState> => {
-  
-  if (USE_DUMMY_DATA) {
-    return new Promise((resolve) => {
-      setTimeout(() => resolve(dummyRewardsState), 300);
-    });
-  }
-  
   try {
     const params = forceRefresh ? { refresh: "true" } : {};
     const response = await api.get<RewardsState>("/rewards/overview", { params });
@@ -91,12 +80,6 @@ export const fetchRewardsState = async (forceRefresh: boolean = false): Promise<
  * @param forceRefresh - If true, bypasses cache and fetches fresh data from blockchain
  */
 export const fetchActivities = async (forceRefresh: boolean = false): Promise<Activity[]> => {
-  if (USE_DUMMY_DATA) {
-    return new Promise((resolve) => {
-      setTimeout(() => resolve(dummyActivities), 300);
-    });
-  }
-  
   const params = forceRefresh ? { refresh: "true" } : {};
   const response = await api.get(`/rewards/activities`, { params });
   const activities = response.data;
@@ -134,21 +117,10 @@ export const fetchActivities = async (forceRefresh: boolean = false): Promise<Ac
 
 /**
  * Fetch single activity by ID
- * TODO: Replace with actual API call once contract is deployed
  */
 export const fetchActivity = async (activityId: number): Promise<Activity> => {
-  // Return dummy data until contract is deployed
-  const activity = dummyActivities.find((a) => a.activityId === activityId);
-  if (!activity) {
-    throw new Error(`Activity ${activityId} not found`);
-  }
-  return new Promise((resolve) => {
-    setTimeout(() => resolve(activity), 300); // Simulate network delay
-  });
-  
-  // Uncomment when contract is deployed:
-  // const response = await api.get<Activity>(`/rewards/activities/${activityId}`);
-  // return response.data;
+  const response = await api.get<Activity>(`/rewards/activities/${activityId}`);
+  return response.data;
 };
 
 /**
@@ -156,12 +128,6 @@ export const fetchActivity = async (activityId: number): Promise<Activity> => {
  * @param forceRefresh - If true, bypasses cache and fetches fresh data from blockchain
  */
 export const fetchUserRewards = async (userAddress: string, forceRefresh: boolean = false): Promise<UserRewardsData> => {
-  if (USE_DUMMY_DATA) {
-    return new Promise((resolve) => {
-      setTimeout(() => resolve(getDummyUserRewards(userAddress)), 300);
-    });
-  }
-  
   const params = forceRefresh ? { refresh: "true" } : {};
   const response = await api.get(`/rewards/activities/${userAddress}`, { params });
   const data = response.data;
@@ -515,14 +481,6 @@ export const formatRoundedWithCommas = (value: string): string => {
  * Backend will handle the contract interaction
  */
 export const claimAllRewards = async (userAddress: string): Promise<{ success: boolean; txHash?: string }> => {
-  if (USE_DUMMY_DATA) {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({ success: true, txHash: "0x0000000000000000000000000000000000000000000000000000000000000000" });
-      }, 1000);
-    });
-  }
-  
   try {
     const response = await api.post("/rewards/claim-all");
     return response.data;
@@ -540,14 +498,6 @@ export const claimAllRewards = async (userAddress: string): Promise<{ success: b
  * Backend will handle the contract interaction
  */
 export const claimRewards = async (userAddress: string, activityIds: number[]): Promise<{ success: boolean; txHash?: string }> => {
-  if (USE_DUMMY_DATA) {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({ success: true, txHash: "0x0000000000000000000000000000000000000000000000000000000000000000" });
-      }, 1000);
-    });
-  }
-  
   // Use the first activityId for the claim endpoint (since it's /claim/:activityId)
   // TODO: Update backend to accept multiple activityIds or call multiple times
   if (activityIds.length === 0) {

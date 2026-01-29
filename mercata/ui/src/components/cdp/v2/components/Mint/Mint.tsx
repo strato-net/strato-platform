@@ -138,16 +138,23 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger, guestMode = fals
   // Memos - Allocations
   // ============================================================================
 
-  const maxAllocationsForTargetHF = useMemo<VaultCandidate[]>(() => {
-    if (vaultCandidates.length === 0) return [];
+  const maxAllocationsResult = useMemo<{ allocations: VaultCandidate[]; debtFloorHit: boolean; debtCeilingHit: boolean }>(() => {
+    if (vaultCandidates.length === 0) {
+      return { allocations: [], debtFloorHit: false, debtCeilingHit: false };
+    }
     try {
       const isAtMinHF = Math.abs(targetHF - sliderMinHF) < 0.01;
       const result = isAtMinHF 
         ? getAbsoluteMaxAllocations(vaultCandidates)
         : getMaxAllocations(vaultCandidates, targetHF);
-      return addAllocationsToVaultCandidates(result, vaultCandidates);
+      const allocationsWithCandidates = addAllocationsToVaultCandidates(result.allocations, vaultCandidates);
+      return { 
+        allocations: allocationsWithCandidates, 
+        debtFloorHit: result.debtFloorHit, 
+        debtCeilingHit: result.debtCeilingHit 
+      };
     } catch {
-      return [];
+      return { allocations: [], debtFloorHit: false, debtCeilingHit: false };
     }
   }, [targetHF, sliderMinHF, vaultCandidates]);
 
@@ -177,8 +184,8 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger, guestMode = fals
   [targetHF, vaultCandidates]);
 
   const totalMaxMint: WEI = useMemo(() => 
-    calculateTotalMaxMint(maxAllocationsForTargetHF),
-  [maxAllocationsForTargetHF]);
+    calculateTotalMaxMint(maxAllocationsResult.allocations),
+  [maxAllocationsResult.allocations]);
 
   const availableToMint = useMemo(() => 
     calculateAvailableToMint(totalMaxMint),
@@ -250,7 +257,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger, guestMode = fals
   // Derived Values
   // ============================================================================
 
-  const shouldLockInput = maxAllocationsForTargetHF.length === 0 || totalMaxMint === 0n;
+  const shouldLockInput = maxAllocationsResult.allocations.length === 0 || totalMaxMint === 0n;
   const exceedsMaxCollateral = !isMaxMode && mintAmountUSDST > 0n && mintAmountUSDST > totalHeadroom;
 
 
@@ -337,10 +344,11 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger, guestMode = fals
     let result: OptimalAllocationResult;
 
     if (isMaxMode) {
+      // Use the computed flags from maxAllocationsResult instead of hard-coding false
       result = {
-        optimalAllocations: maxAllocationsForTargetHF,
-        debtFloorHit: false,
-        debtCeilingHit: false,
+        optimalAllocations: maxAllocationsResult.allocations,
+        debtFloorHit: maxAllocationsResult.debtFloorHit,
+        debtCeilingHit: maxAllocationsResult.debtCeilingHit,
       };
     } else {
       result = computeOptimalAllocations(
@@ -355,7 +363,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger, guestMode = fals
     setOptimalAllocations(result.optimalAllocations);
     setDebtFloorHit(result.debtFloorHit);
     setDebtCeilingHit(result.debtCeilingHit);
-  }, [mintAmountUSDST, targetHF, vaultCandidates, isMaxMode, maxAllocationsForTargetHF, autoAllocate]);
+  }, [mintAmountUSDST, targetHF, vaultCandidates, isMaxMode, maxAllocationsResult, autoAllocate]);
 
   useEffect(() => {
     prevAutoSupplyRef.current = autoAllocate;
