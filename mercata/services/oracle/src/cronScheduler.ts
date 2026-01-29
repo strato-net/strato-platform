@@ -240,10 +240,14 @@ async function processAllAssets(configLoader: ConfigLoader): Promise<void> {
         configLoader
     );
     
-    // Partition into valid and failed prices in single pass
+    // Partition into valid and failed prices, excluding proxy-only assets (submit: false)
+    const allAssets = configLoader.getAllAssets();
     const validPrices: AggregatedPrice[] = [];
     const failedPrices: AggregatedPrice[] = [];
-    aggregatedPrices.forEach(p => (p.failed ? failedPrices : validPrices).push(p));
+    aggregatedPrices.forEach(p => {
+        if (allAssets[p.assetKey].submit === false) return;
+        (p.failed ? failedPrices : validPrices).push(p);
+    });
     
     if (validPrices.length === 0) {
         throw new Error('No valid prices to submit');
