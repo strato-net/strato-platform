@@ -1,8 +1,6 @@
-import { useState } from "react";
-import { ChevronDown, ChevronUp, Wallet, Percent, Coins, Loader2 } from "lucide-react";
+import { Wallet, Coins, Loader2, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useVaultContext } from "@/context/VaultContext";
 import { formatUnits } from "ethers";
 
@@ -30,31 +28,19 @@ const formatShares = (value: string): string => {
   }
 };
 
-const formatPercent = (value: string): string => {
+const formatEarnings = (value: string): { formatted: string; isPositive: boolean; isZero: boolean } => {
   try {
-    // ownershipPercent is in WAD format (18 decimals), representing a decimal (e.g., 1e18 = 100%)
-    const num = parseFloat(formatUnits(value, 18)) * 100; // Convert to percentage
-    if (num === 0) return "0";
-    if (num < 0.01) return "<0.01";
-    return num.toLocaleString("en-US", {
+    const num = parseFloat(formatUnits(value, 18));
+    const isZero = num === 0;
+    const isPositive = num >= 0;
+    const absFormatted = Math.abs(num).toLocaleString("en-US", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
+    const formatted = isPositive ? `+$${absFormatted}` : `-$${absFormatted}`;
+    return { formatted: isZero ? "$0.00" : formatted, isPositive, isZero };
   } catch {
-    return "0";
-  }
-};
-
-const formatTokenAmount = (value: string, decimals: number = 18): string => {
-  try {
-    const num = parseFloat(formatUnits(value, decimals));
-    if (num === 0) return "0";
-    if (num < 0.0001) return "<0.0001";
-    return num.toLocaleString("en-US", {
-      maximumFractionDigits: 6,
-    });
-  } catch {
-    return "0";
+    return { formatted: "$0.00", isPositive: true, isZero: true };
   }
 };
 
@@ -64,37 +50,17 @@ interface VaultUserPositionProps {
 }
 
 const VaultUserPosition = ({ onDeposit, onWithdraw }: VaultUserPositionProps) => {
-  const [isExpanded, setIsExpanded] = useState(false);
   const { vaultState } = useVaultContext();
   const {
     userShares,
     userValueUsd,
-    ownershipPercent,
-    totalShares,
-    assets,
+    allTimeEarnings,
     paused,
     loadingUser,
     shareTokenSymbol,
   } = vaultState;
 
   const hasPosition = BigInt(userShares || "0") > BigInt(0);
-  const totalSharesBigInt = BigInt(totalShares || "1");
-
-  // Calculate pro-rata holdings for each asset
-  const proRataHoldings = assets.map((asset) => {
-    const assetBalance = BigInt(asset.balance || "0");
-    const userSharesBigInt = BigInt(userShares || "0");
-
-    // user's share of this asset = (userShares / totalShares) * assetBalance
-    const userAmount = totalSharesBigInt > BigInt(0)
-      ? (userSharesBigInt * assetBalance) / totalSharesBigInt
-      : BigInt(0);
-
-    return {
-      ...asset,
-      userAmount: userAmount.toString(),
-    };
-  });
 
   if (loadingUser) {
     return (
@@ -159,58 +125,19 @@ const VaultUserPosition = ({ onDeposit, onWithdraw }: VaultUserPositionProps) =>
 
               <div className="bg-muted/50 rounded-lg p-4">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                  <Percent className="h-4 w-4" />
-                  Ownership
+                  <TrendingUp className="h-4 w-4" />
+                  All-Time Earnings
                 </div>
-                <div className="text-2xl font-bold">
-                  {formatPercent(ownershipPercent)}%
-                </div>
+                {(() => {
+                  const { formatted, isPositive, isZero } = formatEarnings(allTimeEarnings);
+                  return (
+                    <div className={`text-2xl font-bold ${isZero ? "" : isPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                      {formatted}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
-
-            {/* Pro-rata Holdings (Collapsible) */}
-            {assets.length > 0 && (
-              <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
-                <CollapsibleTrigger asChild>
-                  <Button variant="ghost" className="w-full justify-between">
-                    <span className="text-sm">Pro-rata Token Holdings</span>
-                    {isExpanded ? (
-                      <ChevronUp className="h-4 w-4" />
-                    ) : (
-                      <ChevronDown className="h-4 w-4" />
-                    )}
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="mt-2">
-                  <div className="bg-muted/30 rounded-lg p-4 space-y-2">
-                    {proRataHoldings.map((holding) => (
-                      <div
-                        key={holding.address}
-                        className="flex items-center justify-between py-2 border-b border-border last:border-0"
-                      >
-                        <div className="flex items-center gap-2">
-                          {holding.images?.[0]?.value ? (
-                            <img
-                              src={holding.images[0].value}
-                              alt={holding.symbol}
-                              className="w-6 h-6 rounded-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-xs text-white font-medium">
-                              {holding.symbol?.slice(0, 2)}
-                            </div>
-                          )}
-                          <span className="font-medium">{holding.symbol}</span>
-                        </div>
-                        <span className="font-mono text-sm">
-                          {formatTokenAmount(holding.userAmount)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            )}
 
             {/* Action Buttons */}
             <div className="flex gap-4">

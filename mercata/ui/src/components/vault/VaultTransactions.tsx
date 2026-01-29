@@ -1,5 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
-import { Loader2, ArrowUpRight, ArrowDownLeft, RefreshCw, ExternalLink } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,38 +10,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { api } from "@/lib/axios";
 import { formatUnits } from "ethers";
-
-export interface VaultTransaction {
-  id: string;
-  type: "deposit" | "withdraw" | "rebalance" | "swap" | "other";
-  timestamp: string;
-  txHash: string;
-  tokenIn?: {
-    address: string;
-    symbol: string;
-    amount: string;
-  };
-  tokenOut?: {
-    address: string;
-    symbol: string;
-    amount: string;
-  };
-  usdValue?: string;
-  status: "success" | "pending" | "failed";
-}
-
-const formatAddress = (address: string): string => {
-  if (!address) return "N/A";
-  return `${address.slice(0, 6)}...${address.slice(-4)}`;
-};
+import { useVaultContext } from "@/context/VaultContext";
 
 const formatTimestamp = (timestamp: string): string => {
   if (!timestamp) return "N/A";
@@ -67,103 +36,15 @@ const formatTokenAmount = (value: string, decimals: number = 18): string => {
   }
 };
 
-const formatUsd = (value: string): string => {
-  try {
-    const num = parseFloat(formatUnits(value, 18));
-    return num.toLocaleString("en-US", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-  } catch {
-    return "0.00";
-  }
-};
-
-const getTransactionIcon = (type: string) => {
-  switch (type) {
-    case "deposit":
-      return <ArrowDownLeft className="h-4 w-4 text-green-600" />;
-    case "withdraw":
-      return <ArrowUpRight className="h-4 w-4 text-red-600" />;
-    case "rebalance":
-    case "swap":
-      return <RefreshCw className="h-4 w-4 text-blue-600" />;
-    default:
-      return <RefreshCw className="h-4 w-4 text-gray-600" />;
-  }
-};
-
-const getTransactionBadgeColor = (type: string): "default" | "secondary" | "destructive" | "outline" => {
-  switch (type) {
-    case "deposit":
-      return "default";
-    case "withdraw":
-      return "destructive";
-    case "rebalance":
-    case "swap":
-      return "secondary";
-    default:
-      return "outline";
-  }
-};
-
-const getStatusBadgeColor = (status: string): "default" | "secondary" | "destructive" | "outline" => {
-  switch (status) {
-    case "success":
-      return "default";
-    case "pending":
-      return "secondary";
-    case "failed":
-      return "destructive";
-    default:
-      return "outline";
-  }
-};
-
 const VaultTransactions = () => {
-  const [transactions, setTransactions] = useState<VaultTransaction[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const fetchTransactions = useCallback(async (showLoading: boolean = true) => {
-    if (showLoading) {
-      setLoading(true);
-    } else {
-      setRefreshing(true);
-    }
-
-    try {
-      const res = await api.get("/vault/transactions", {
-        params: { limit: 20 },
-      });
-
-      if (res.data?.transactions) {
-        setTransactions(res.data.transactions);
-      }
-    } catch (err) {
-      console.error("Error fetching vault transactions:", err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchTransactions(true);
-
-    // Poll every 30 seconds
-    const interval = setInterval(() => {
-      fetchTransactions(false);
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, [fetchTransactions]);
+  const { vaultState, refreshTransactions } = useVaultContext();
+  const { transactions, loadingTransactions } = vaultState;
 
   const handleRefresh = () => {
-    fetchTransactions(false);
+    refreshTransactions(false);
   };
 
-  if (loading) {
+  if (loadingTransactions && transactions.length === 0) {
     return (
       <Card>
         <CardHeader>
@@ -186,9 +67,9 @@ const VaultTransactions = () => {
           variant="ghost"
           size="sm"
           onClick={handleRefresh}
-          disabled={refreshing}
+          disabled={loadingTransactions}
         >
-          <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+          <RefreshCw className={`h-4 w-4 ${loadingTransactions ? "animate-spin" : ""}`} />
         </Button>
       </CardHeader>
       <CardContent>
@@ -204,9 +85,6 @@ const VaultTransactions = () => {
                   <TableHead>Type</TableHead>
                   <TableHead>Time</TableHead>
                   <TableHead>Details</TableHead>
-                  <TableHead className="text-right">Value (USD)</TableHead>
-                  <TableHead className="text-center">Status</TableHead>
-                  <TableHead className="text-center">Tx</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -214,8 +92,8 @@ const VaultTransactions = () => {
                   <TableRow key={tx.id}>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        {getTransactionIcon(tx.type)}
-                        <Badge variant={getTransactionBadgeColor(tx.type)}>
+                        <RefreshCw className="h-4 w-4 text-blue-600" />
+                        <Badge variant="secondary">
                           {tx.type.charAt(0).toUpperCase() + tx.type.slice(1)}
                         </Badge>
                       </div>
@@ -243,37 +121,6 @@ const VaultTransactions = () => {
                           <span className="text-muted-foreground text-sm">—</span>
                         )}
                       </div>
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {tx.usdValue ? `$${formatUsd(tx.usdValue)}` : "—"}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Badge variant={getStatusBadgeColor(tx.status)}>
-                        {tx.status.charAt(0).toUpperCase() + tx.status.slice(1)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0"
-                              onClick={() => {
-                                // Could link to block explorer
-                                navigator.clipboard.writeText(tx.txHash);
-                              }}
-                            >
-                              <ExternalLink className="h-4 w-4 text-muted-foreground" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="font-mono text-xs">{formatAddress(tx.txHash)}</p>
-                            <p className="text-xs text-muted-foreground">Click to copy</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
                     </TableCell>
                   </TableRow>
                 ))}

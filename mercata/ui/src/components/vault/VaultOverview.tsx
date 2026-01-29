@@ -18,7 +18,8 @@ const formatUsd = (value: string): string => {
 
 const formatApy = (value: string): string => {
   try {
-    const num = parseFloat(value) * 100;
+    // APY is stored in WAD format (18 decimals), so divide by 1e18 first
+    const num = parseFloat(formatUnits(value, 18)) * 100;
     return num.toFixed(2) + "%";
   } catch {
     return "0.00%";
