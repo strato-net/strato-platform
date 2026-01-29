@@ -165,7 +165,6 @@ logEventSummaries evs = do
     getNames (VmTx _ _) = "TX"
     getNames (VmBlock _) = "Block"
     getNames (VmJsonRpcCommand _) = "JsonRpcCommand"
-    getNames VmCreateBlockCommand = "CreateBlockCommand"
     getNames (VmGetMPNodesRequest _ _) = "GetMPNodesRequest"
     getNames (VmMPNodesReceived _) = "MPNodesReceived"
     getNames (VmRunPreprepare _) = "VmRunPreprepare"

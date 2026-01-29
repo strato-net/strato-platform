@@ -302,8 +302,8 @@ instance {-# OVERLAPPING #-} MonadIO m => Mod.Modifiable SeenTransactionDB (Core
   get _   = asks (_sequencerContext . _corePeerContext) >>= fmap _seenTransactionDB . readTVarIO
   put _ s = asks (_sequencerContext . _corePeerContext) >>= atomically . flip modifyTVar' (seenTransactionDB .~ s)
 
-instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible (IORef RoundNumber) (CoreT m) where
-  access _   = asks (_sequencerContext . _corePeerContext) >>= fmap _latestRoundNumber . readTVarIO
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible (IORef (View, Maybe Block)) (CoreT m) where
+  access _   = asks (_sequencerContext . _corePeerContext) >>= fmap _latestViewAndProposal . readTVarIO
 
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible (TMChan RoundNumber) (CoreT m) where
   access _ = asks _corePeerTimerChan
@@ -629,12 +629,12 @@ newBlockstanbulContext network' as valBehav =
 
 newSequencerContext :: MonadIO m => BlockstanbulContext -> m SequencerContext
 newSequencerContext bc = do
-  latestRound <- newIORef 0
+  latestVAndP <- newIORef (View 0 0, Nothing)
   pure $
     SequencerContext
       { _seenTransactionDB = mkSeenTxDB 1024,
         _blockstanbulContext = bc,
-        _latestRoundNumber = latestRound
+        _latestViewAndProposal = latestVAndP
       }
 
 -- coreContext is useful for testing because it doesn't require
@@ -842,7 +842,6 @@ corePeerSequencer = do
   unseqSource <- asks _corePeerUnseqSource
   seqVmSource <- asks _corePeerSeqVmSource
   seqP2pSource <- asks _corePeerSeqP2pSource
-  atomically $ writeTQueue seqVmSource [VmCreateBlockCommand]
   createFirstTimer
   runConduit $
     sourceTQueue unseqSource

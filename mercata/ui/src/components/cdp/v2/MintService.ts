@@ -55,13 +55,14 @@ export function apiToVaultCandidate(api: VaultCandidateAPI): VaultCandidate {
 export function getMaxAllocations(
   candidates: VaultCandidate[],
   targetHF: DECIMAL
-): Allocation[] {
-  if (candidates.length === 0 || targetHF <= 0) return [];
+): Allocations {
+  if (candidates.length === 0 || targetHF <= 0) {
+    return { allocations: [], debtFloorHit: false, debtCeilingHit: false };
+  }
   
   const allocations: Allocation[] = [];
-
-  // Track asset balances > 0 for comparison
-  const assetBalances: Array<{ assetAddress: ADDRESS; symbol: string; balance: UNITS }> = [];
+  let debtFloorHit = false;
+  let debtCeilingHit = false;
 
   for (const candidate of candidates) {
     if ((candidate.potentialCollateral <= 0n && candidate.currentCollateral <= 0n) || candidate.oraclePrice <= 0n) {
@@ -74,20 +75,38 @@ export function getMaxAllocations(
 
     const result = allocate(candidate, headroom, targetCR, candidate.globalDebt, true);
 
-    // Only push if result is an Allocation (not an error string) with mintAmount > 0
-    if (result !== 'DEBT_FLOOR_HIT' && result !== 'DEBT_CEILING_HIT' && result !== 'NO_HEADROOM' && result.mintAmount > 0n) {
+    // Track debt floor/ceiling hits
+    if (result === 'DEBT_FLOOR_HIT') {
+      debtFloorHit = true;
+      continue;
+    }
+    if (result === 'DEBT_CEILING_HIT') {
+      debtCeilingHit = true;
+      continue;
+    }
+    if (result === 'NO_HEADROOM') {
+      continue;
+    }
+    
+    // Only push allocations with mintAmount > 0
+    if (result.mintAmount > 0n) {
       allocations.push(result);
     }
   }
 
-  return allocations;
+  return { allocations, debtFloorHit, debtCeilingHit };
 }
 
 // Only used when HF slider is at rightmost (minimum HF) AND max mode is enabled
-export function getAbsoluteMaxAllocations(candidates: VaultCandidate[]): Allocation[] {
-  if (candidates.length === 0) return [];
+export function getAbsoluteMaxAllocations(candidates: VaultCandidate[]): Allocations {
+  if (candidates.length === 0) {
+    return { allocations: [], debtFloorHit: false, debtCeilingHit: false };
+  }
   
   const allocations: Allocation[] = [];
+  let debtFloorHit = false;
+  let debtCeilingHit = false;
+
   for (const candidate of candidates) {
     if (candidate.oraclePrice <= 0n) {
       continue;
@@ -115,12 +134,14 @@ export function getAbsoluteMaxAllocations(candidates: VaultCandidate[]): Allocat
       const ceilingHeadroom = candidate.vaultConfig.debtCeiling - candidate.globalDebt;
       if (maxMintAmount > ceilingHeadroom) {
         maxMintAmount = ceilingHeadroom;
+        debtCeilingHit = true;
       }
     }
     
     // Check debt floor
     const totalDebt = candidate.currentDebt + maxMintAmount;
     if (totalDebt > 0n && totalDebt < candidate.vaultConfig.debtFloor) {
+      debtFloorHit = true;
       continue;
     }
     
@@ -133,7 +154,7 @@ export function getAbsoluteMaxAllocations(candidates: VaultCandidate[]): Allocat
     }
   }
 
-  return allocations;
+  return { allocations, debtFloorHit, debtCeilingHit };
 }
 
 

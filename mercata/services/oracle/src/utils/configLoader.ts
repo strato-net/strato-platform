@@ -54,12 +54,6 @@ export class ConfigLoader {
     }
 
     public getAllAssets(): Record<string, Asset> {
-        const result: Record<string, Asset> = {};
-        Object.entries(this.assets).forEach(([key, asset]) => {
-            if (asset.submit !== false) {
-                result[key] = asset;
-            }
-        });
-        return result;
+        return this.assets;
     }
 }
