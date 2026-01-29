@@ -135,8 +135,13 @@ function aggregatePrices(
 
         const collect = (names: string[], symbol: string) => {
             names.forEach(name => {
-                const data = sourceResults.get(name)?.success && sourceResults.get(name)?.prices[symbol];
-                if (data) sources.push({ name, price: data.price });
+                const result = sourceResults.get(name);
+                const data = result?.success && result?.prices[symbol];
+                if (data) {
+                    sources.push({ name, price: data.price });
+                } else if (result?.success) {
+                    logInfo('CronScheduler', `${symbol}: ${name} returned no price (API succeeded but symbol missing from response)`);
+                }
             });
             return sources.length;
         };
@@ -180,6 +185,40 @@ function aggregatePrices(
     });
 }
 
+/**
+ * Adds equivalent asset prices as additional sources.
+ * For example, XAU (gold) can use XAUT (Tether Gold) as an equivalent since both track gold price.
+ * This allows assets with few direct sources to benefit from equivalent assets that have more sources.
+ * The equivalent asset's aggregated median price is added as a single additional source.
+ */
+function addEquivalentAssetPrices(prices: AggregatedPrice[], configLoader: ConfigLoader): AggregatedPrice[] {
+    const allAssets = configLoader.getAllAssets();
+    prices.forEach(p => {
+        const asset = allAssets[p.assetKey];
+        if (!asset.equivalentAssets) return;
+
+        // Add each equivalent asset's median price as an additional source
+        const sourceCountBefore = p.sources.length;
+        asset.equivalentAssets.forEach(equivKey => {
+            const equiv = prices.find(ap => ap.assetKey === equivKey);
+            if (equiv && !equiv.failed && equiv.medianPrice > 0) {
+                p.sources.push({ name: `${equivKey}(equiv)`, price: equiv.medianPrice });
+                p.expectedSourceCount += 1;
+            }
+        });
+
+        // Recalculate median if we added any equivalent sources
+        if (p.sources.length > sourceCountBefore) {
+            p.medianPrice = calculateMedian(p.sources.map(s => s.price));
+            if (p.failed && p.sources.length >= ORACLE_CONFIG.MIN_VALID_SOURCES) {
+                delete p.failed;
+                delete p.error;
+            }
+        }
+    });
+    return prices;
+}
+
 // ============================================================================
 // Main Orchestrator
 // ============================================================================
@@ -196,12 +235,19 @@ async function processAllAssets(configLoader: ConfigLoader): Promise<void> {
     logInfo('CronScheduler', `Market ${marketClosed ? 'closed' : 'open'}, processing ${assetCount} assets`);
     
     const sourceResults = await fetchFromAllSources(configLoader);
-    const aggregatedPrices = aggregatePrices(configLoader, sourceResults, marketClosed, previousPrices);
+    const aggregatedPrices = addEquivalentAssetPrices(
+        aggregatePrices(configLoader, sourceResults, marketClosed, previousPrices),
+        configLoader
+    );
     
-    // Partition into valid and failed prices in single pass
+    // Partition into valid and failed prices, excluding proxy-only assets (submit: false)
+    const allAssets = configLoader.getAllAssets();
     const validPrices: AggregatedPrice[] = [];
     const failedPrices: AggregatedPrice[] = [];
-    aggregatedPrices.forEach(p => (p.failed ? failedPrices : validPrices).push(p));
+    aggregatedPrices.forEach(p => {
+        if (allAssets[p.assetKey].submit === false) return;
+        (p.failed ? failedPrices : validPrices).push(p);
+    });
     
     if (validPrices.length === 0) {
         throw new Error('No valid prices to submit');

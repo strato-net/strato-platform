@@ -183,7 +183,7 @@ type MonadSM m =
     Mod.Modifiable Action m,
     Mod.Modifiable (Q.Seq Event) m,
     Mod.Modifiable (Q.Seq Action.Delegatecall) m,
-    Mod.Modifiable [(Text, CodeCollection)] m,
+    Mod.Modifiable (OMap.OMap (Text, Keccak256) CodeCollection) m,
     Mod.Modifiable (Maybe DebugSettings) m,
     MonadUnliftIO m, --todo: remove
     MonadCatch m,
@@ -424,7 +424,7 @@ instance MonadUnliftIO m => Mod.Modifiable (Q.Seq Action.Delegatecall) (SM m) wh
   get _ = gets (Action._delegatecalls . _action)
   put _ q = modify $ action . Action.delegatecalls .~ q
 
-instance MonadUnliftIO m => Mod.Modifiable ([(Text, CodeCollection)]) (SM m) where
+instance MonadUnliftIO m => Mod.Modifiable (OMap.OMap (Text, Keccak256) CodeCollection) (SM m) where
   get _ = gets (Action._newCodeCollections . _action)
   put _ q = modify $ action . Action.newCodeCollections .~ q
 
@@ -512,7 +512,7 @@ startingAction env' =
       _blockNumber = blockHeaderBlockNumber $ Env.blockHeader env',
       _transactionSender = Env.sender env',
       _actionData = OMap.empty,
-      _newCodeCollections = [],
+      _newCodeCollections = OMap.empty,
       _events = Q.empty,
       _delegatecalls = Q.empty
     }
@@ -907,8 +907,8 @@ addEvent newEvent = Mod.modify_ (Mod.Proxy @(Q.Seq Event)) $ pure . (Q.|> newEve
 addDelegatecall :: Mod.Modifiable (Q.Seq Action.Delegatecall) m => Address -> Address -> Maybe T.Text -> T.Text -> m ()
 addDelegatecall s c o n = Mod.modify_ (Mod.Proxy @(Q.Seq Action.Delegatecall)) $ pure . (Q.|> Action.Delegatecall s c o n)
 
-addNewCodeCollection :: Mod.Modifiable [(Text, CodeCollection)] m => Text -> CodeCollection -> m ()
-addNewCodeCollection userName cc = Mod.modify_ (Mod.Proxy @([(Text, CodeCollection)])) $ pure . ((userName, cc):)
+addNewCodeCollection :: Mod.Modifiable (OMap.OMap (Text, Keccak256) CodeCollection) m => Text -> Keccak256 -> CodeCollection -> m ()
+addNewCodeCollection userName ch cc = Mod.modify_ (Mod.Proxy @(OMap.OMap (Text, Keccak256) CodeCollection)) $ pure . (OMap.|> ((userName, ch), cc))
 
 getBlockHashWithNumber :: MonadSM m => Integer -> Keccak256 -> m (Maybe Keccak256)
 getBlockHashWithNumber num h = do
