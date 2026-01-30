@@ -134,7 +134,6 @@ export const VaultProvider = ({ children }: { children: React.ReactNode }) => {
   const [vaultState, setVaultState] = useState<VaultState>(defaultVaultState);
   const { isLoggedIn } = useUser();
 
-  const vaultIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const vaultAbortControllerRef = useRef<AbortController | null>(null);
 
   const fetchVaultInfo = useCallback(async (showLoading: boolean = false) => {
@@ -312,27 +311,14 @@ export const VaultProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [isLoggedIn, fetchVaultInfo, fetchUserPosition, fetchUserBalances, fetchTransactions]);
 
-  // Polling effect (60s interval)
+  // Cleanup abort controller on unmount
   useEffect(() => {
-    if (!isLoggedIn) return;
-
-    vaultIntervalRef.current = setInterval(() => {
-      fetchVaultInfo(false);
-      fetchUserPosition();
-      fetchUserBalances();
-      fetchTransactions(false);
-    }, 60000);
-
     return () => {
-      if (vaultIntervalRef.current) {
-        clearInterval(vaultIntervalRef.current);
-        vaultIntervalRef.current = null;
-      }
       if (vaultAbortControllerRef.current) {
         vaultAbortControllerRef.current.abort();
       }
     };
-  }, [isLoggedIn, fetchVaultInfo, fetchUserPosition, fetchUserBalances, fetchTransactions]);
+  }, []);
 
   const contextValue = useMemo(
     () => ({
