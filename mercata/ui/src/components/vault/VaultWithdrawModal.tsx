@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Loader2, AlertCircle } from "lucide-react";
+import { AlertCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,12 +10,12 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useVaultContext } from "@/context/VaultContext";
 import { useToast } from "@/hooks/use-toast";
 import { formatUnits, parseUnits } from "ethers";
 import { api } from "@/lib/axios";
 import WithdrawBasketPreview, { BasketItem } from "./WithdrawBasketPreview";
+import { Alert, AlertDescription } from "../ui/alert";
 
 interface VaultWithdrawModalProps {
   isOpen: boolean;
@@ -138,8 +138,8 @@ const VaultWithdrawModal = ({ isOpen, onClose, onSuccess }: VaultWithdrawModalPr
 
       setPreviewLoading(true);
       try {
-        const res = await api.post("/vault/withdraw/preview", {
-          amountUsd: actualUsdAmount,
+        const res = await api.get("/vault/withdraw/preview", {
+          params: { amountUsd: actualUsdAmount },
         });
 
         if (res.data?.basket) {
@@ -220,25 +220,26 @@ const VaultWithdrawModal = ({ isOpen, onClose, onSuccess }: VaultWithdrawModalPr
         variant: "success",
       });
 
-      await refreshVault(false);
+      // Close modal first, then refresh in background
+      setWithdrawLoading(false);
       handleClose();
       onSuccess();
+
+      // Refresh vault data in background (don't await)
+      refreshVault(false);
     } catch (err: any) {
       toast({
         title: "Withdrawal Failed",
         description: err.message || "An error occurred during withdrawal",
         variant: "destructive",
       });
-    } finally {
       setWithdrawLoading(false);
     }
   };
 
-  const hasSkippedTokens = basket.some((item) => !item.included);
-
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Withdraw from Vault</DialogTitle>
           <DialogDescription>
@@ -324,6 +325,15 @@ const VaultWithdrawModal = ({ isOpen, onClose, onSuccess }: VaultWithdrawModalPr
             </div>
           </div>
 
+          {/* Warning for skipped tokens */}
+          {
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Tokens will be received based on availability.
+              </AlertDescription>
+            </Alert>
+          }
           {/* Basket Preview */}
           {BigInt(actualUsdAmount || "0") > BigInt(0) && !validationError && (
             <>
@@ -340,16 +350,7 @@ const VaultWithdrawModal = ({ isOpen, onClose, onSuccess }: VaultWithdrawModalPr
             </>
           )}
 
-          {/* Warning for skipped tokens */}
-          {hasSkippedTokens && (
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                Some tokens will be skipped because they are at minimum reserve levels.
-                You will receive a proportionally adjusted basket of available tokens.
-              </AlertDescription>
-            </Alert>
-          )}
+
 
           {/* Shares to Burn */}
           {BigInt(actualUsdAmount || "0") > BigInt(0) && !validationError && (

@@ -248,6 +248,51 @@ router.post("/deposit", authHandler.authorizeRequest(), VaultController.deposit)
 
 /**
  * @openapi
+ * /vault/withdraw/preview:
+ *   get:
+ *     summary: Preview withdrawal basket
+ *     description: Get a preview of the tokens that would be received for a given withdrawal amount
+ *     tags:
+ *       - Vault
+ *     parameters:
+ *       - in: query
+ *         name: amountUsd
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: USD value to preview (18 decimals)
+ *     responses:
+ *       200:
+ *         description: Withdrawal basket preview
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 basket:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       address:
+ *                         type: string
+ *                       symbol:
+ *                         type: string
+ *                       name:
+ *                         type: string
+ *                       weightPercent:
+ *                         type: string
+ *                       usdValue:
+ *                         type: string
+ *                       tokenAmount:
+ *                         type: string
+ *                       included:
+ *                         type: boolean
+ */
+router.get("/withdraw/preview", authHandler.authorizeRequest(), VaultController.withdrawPreview);
+
+/**
+ * @openapi
  * /vault/withdraw:
  *   post:
  *     summary: Withdraw from the vault

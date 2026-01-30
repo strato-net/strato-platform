@@ -4,6 +4,7 @@ import {
   getVaultInfo,
   getUserPosition,
   getUserBalances,
+  getWithdrawPreview,
   deposit,
   withdraw,
   pause,
@@ -104,6 +105,28 @@ class VaultController {
       const { accessToken, address: userAddress, body } = req;
       validateDepositArgs(body);
       const result = await deposit(accessToken, userAddress as string, body);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Preview withdrawal basket
+   */
+  static async withdrawPreview(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, query } = req;
+      const amountUsd = query.amountUsd as string;
+      if (!amountUsd) {
+        res.status(RestStatus.BAD_REQUEST).json({ error: "amountUsd is required" });
+        return;
+      }
+      const result = await getWithdrawPreview(accessToken, amountUsd);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);

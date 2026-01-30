@@ -1,4 +1,3 @@
-import { Check, X } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -7,7 +6,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { formatUnits } from "ethers";
 
 export interface BasketItem {
@@ -66,12 +64,11 @@ const formatPercent = (value: string): string => {
 
 const WithdrawBasketPreview = ({ basket, totalUsd }: WithdrawBasketPreviewProps) => {
   const includedItems = basket.filter((item) => item.included);
-  const skippedItems = basket.filter((item) => !item.included);
 
-  if (basket.length === 0) {
+  if (includedItems.length === 0) {
     return (
       <div className="text-center py-4 text-muted-foreground">
-        No withdrawal basket to display.
+        No tokens available for withdrawal.
       </div>
     );
   }
@@ -79,7 +76,7 @@ const WithdrawBasketPreview = ({ basket, totalUsd }: WithdrawBasketPreviewProps)
   return (
     <div className="space-y-4">
       <div className="text-sm font-medium">
-        Withdrawal Basket Preview
+        You will receive
       </div>
 
       <div className="rounded-lg border overflow-hidden">
@@ -90,11 +87,9 @@ const WithdrawBasketPreview = ({ basket, totalUsd }: WithdrawBasketPreviewProps)
               <TableHead className="text-right">Weight</TableHead>
               <TableHead className="text-right">USD Value</TableHead>
               <TableHead className="text-right">Amount</TableHead>
-              <TableHead className="text-center">Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {/* Included items */}
             {includedItems.map((item) => (
               <TableRow key={item.address}>
                 <TableCell>
@@ -122,49 +117,6 @@ const WithdrawBasketPreview = ({ basket, totalUsd }: WithdrawBasketPreviewProps)
                 <TableCell className="text-right font-mono">
                   {formatTokenAmount(item.tokenAmount)}
                 </TableCell>
-                <TableCell className="text-center">
-                  <Badge variant="default" className="gap-1">
-                    <Check className="h-3 w-3" />
-                    Included
-                  </Badge>
-                </TableCell>
-              </TableRow>
-            ))}
-
-            {/* Skipped items (grayed out) */}
-            {skippedItems.map((item) => (
-              <TableRow key={item.address} className="opacity-50">
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    {item.images?.[0]?.value ? (
-                      <img
-                        src={item.images[0].value}
-                        alt={item.symbol}
-                        className="w-6 h-6 rounded-full object-cover grayscale"
-                      />
-                    ) : (
-                      <div className="w-6 h-6 rounded-full bg-gray-400 flex items-center justify-center text-xs text-white font-medium">
-                        {item.symbol?.slice(0, 2)}
-                      </div>
-                    )}
-                    <span className="font-medium text-muted-foreground">{item.symbol}</span>
-                  </div>
-                </TableCell>
-                <TableCell className="text-right font-mono text-muted-foreground">
-                  {formatPercent(item.weightPercent)}%
-                </TableCell>
-                <TableCell className="text-right font-mono text-muted-foreground">
-                  $0.00
-                </TableCell>
-                <TableCell className="text-right font-mono text-muted-foreground">
-                  0
-                </TableCell>
-                <TableCell className="text-center">
-                  <Badge variant="secondary" className="gap-1">
-                    <X className="h-3 w-3" />
-                    At Reserve
-                  </Badge>
-                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -176,14 +128,6 @@ const WithdrawBasketPreview = ({ basket, totalUsd }: WithdrawBasketPreviewProps)
         <span className="font-medium">Total Value</span>
         <span className="text-lg font-bold">${formatUsd(totalUsd)}</span>
       </div>
-
-      {skippedItems.length > 0 && (
-        <div className="text-sm text-muted-foreground bg-muted/50 rounded-lg p-3">
-          <strong>Note:</strong> {skippedItems.length} token{skippedItems.length > 1 ? "s" : ""} skipped
-          because they are at minimum reserve levels. Your withdrawal will be distributed among
-          available tokens proportionally.
-        </div>
-      )}
     </div>
   );
 };

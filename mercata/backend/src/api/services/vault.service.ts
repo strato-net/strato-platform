@@ -808,6 +808,134 @@ export const deposit = async (
   );
 };
 
+export interface WithdrawBasketItem {
+  address: string;
+  symbol: string;
+  name: string;
+  weightPercent: string;
+  usdValue: string;
+  tokenAmount: string;
+  included: boolean;
+  images?: { value: string }[];
+}
+
+/**
+ * Preview withdrawal basket - shows what tokens user will receive
+ * Mirrors the smart contract's _executeWithdrawalPayouts logic
+ */
+export const getWithdrawPreview = async (
+  accessToken: string,
+  amountUsd: string
+): Promise<{ basket: WithdrawBasketItem[] }> => {
+  const vaultAddress = await getVaultAddress(accessToken);
+
+  if (!vaultAddress) {
+    return { basket: [] };
+  }
+
+  const vaultData = await getVaultData(accessToken, vaultAddress);
+
+  if (!vaultData) {
+    return { basket: [] };
+  }
+
+  const botExecutor = vaultData.botExecutor;
+  const priceOracleAddress = vaultData.priceOracle || "";
+  const supportedAssetAddresses: string[] = (vaultData.supportedAssets || [])
+    .filter((addr: string) => addr && addr !== "0000000000000000000000000000000000000000");
+
+  // Build min reserve map
+  const minReserveMap = new Map<string, string>();
+  for (const entry of vaultData.minReserve || []) {
+    if (entry.asset) {
+      minReserveMap.set(entry.asset.toLowerCase(), entry.amount || "0");
+    }
+  }
+
+  const amountUsdBN = BigInt(amountUsd);
+
+  // Calculate withdrawable equity (same as contract)
+  let withdrawableEquity = 0n;
+  const assetData: Array<{
+    address: string;
+    symbol: string;
+    name: string;
+    balance: bigint;
+    minReserve: bigint;
+    withdrawable: bigint;
+    price: bigint;
+    withdrawableUsd: bigint;
+    images?: { value: string }[];
+  }> = [];
+
+  for (const assetAddress of supportedAssetAddresses) {
+    const tokenInfo = await getTokenInfo(accessToken, assetAddress);
+    const balance = await getTokenBalance(accessToken, assetAddress, botExecutor);
+    const balanceBN = BigInt(balance);
+    const minReserve = minReserveMap.get(assetAddress.toLowerCase()) || "0";
+    const minReserveBN = BigInt(minReserve);
+    const priceUsd = await getAssetPrice(accessToken, priceOracleAddress, assetAddress);
+    const priceBN = BigInt(priceUsd);
+
+    const withdrawable = balanceBN > minReserveBN ? balanceBN - minReserveBN : 0n;
+    const withdrawableUsd = priceBN > 0n ? (withdrawable * priceBN) / WAD : 0n;
+
+    withdrawableEquity += withdrawableUsd;
+
+    assetData.push({
+      address: assetAddress,
+      symbol: tokenInfo.symbol,
+      name: tokenInfo.name,
+      balance: balanceBN,
+      minReserve: minReserveBN,
+      withdrawable,
+      price: priceBN,
+      withdrawableUsd,
+      images: tokenInfo.images,
+    });
+  }
+
+  // Build basket (mirrors _executeWithdrawalPayouts logic)
+  const basket: WithdrawBasketItem[] = assetData.map((asset) => {
+    const included = asset.withdrawable > 0n;
+
+    if (!included || withdrawableEquity === 0n) {
+      return {
+        address: asset.address,
+        symbol: asset.symbol,
+        name: asset.name,
+        weightPercent: "0",
+        usdValue: "0",
+        tokenAmount: "0",
+        included: false,
+        images: asset.images,
+      };
+    }
+
+    // Calculate weight: withdrawableUsd / withdrawableEquity * 100
+    const weightPercent = Number((asset.withdrawableUsd * 10000n) / withdrawableEquity) / 100;
+
+    // Calculate payout USD: amountUsd * withdrawableUsd / withdrawableEquity
+    const payoutUsd = (amountUsdBN * asset.withdrawableUsd) / withdrawableEquity;
+
+    // Calculate token amount: (payoutUsd * WAD) / price
+    const tokenAmount = asset.price > 0n ? (payoutUsd * WAD) / asset.price : 0n;
+
+    return {
+      address: asset.address,
+      symbol: asset.symbol,
+      name: asset.name,
+      weightPercent: weightPercent.toFixed(2),
+      usdValue: payoutUsd.toString(),
+      tokenAmount: tokenAmount.toString(),
+      included: true,
+      images: asset.images,
+    };
+  });
+
+  return { basket };
+};
+
 /**
  * Withdraw from the vault by USD amount
  */
