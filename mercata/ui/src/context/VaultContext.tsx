@@ -38,6 +38,15 @@ export interface VaultTransaction {
   };
 }
 
+export interface UserTokenBalance {
+  address: string;
+  symbol: string;
+  name: string;
+  balance: string;
+  priceUsd: string;
+  images?: { value: string }[];
+}
+
 export interface VaultState {
   // Global metrics
   totalEquity: string;
@@ -62,6 +71,10 @@ export interface VaultState {
   loading: boolean;
   loadingUser: boolean;
   loadingTransactions: boolean;
+  loadingBalances: boolean;
+
+  // User's token balances for deposit
+  userTokenBalances: UserTokenBalance[];
 
   // Deposit eligibility
   deficitAssets: string[];
@@ -78,6 +91,7 @@ type VaultContextType = {
   vaultState: VaultState;
   refreshVault: (showLoading?: boolean) => Promise<void>;
   refreshUserPosition: () => Promise<void>;
+  refreshUserBalances: () => Promise<void>;
   refreshTransactions: (showLoading?: boolean) => Promise<void>;
   deposit: (args: { token: string; amount: string }) => Promise<void>;
   withdraw: (args: { amountUsd: string }) => Promise<{ basket: Array<{ token: string; amount: string }> }>;
@@ -106,6 +120,8 @@ const defaultVaultState: VaultState = {
   loading: true,
   loadingUser: true,
   loadingTransactions: true,
+  loadingBalances: true,
+  userTokenBalances: [],
   deficitAssets: [],
   shareTokenSymbol: "sVAULT",
   shareTokenAddress: "",
@@ -220,6 +236,31 @@ export const VaultProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, []);
 
+  const fetchUserBalances = useCallback(async () => {
+    if (!isLoggedIn) return;
+
+    setVaultState(prev => ({ ...prev, loadingBalances: true }));
+
+    try {
+      const res = await api.get("/vault/balances");
+
+      if (res.data?.balances) {
+        setVaultState(prev => ({
+          ...prev,
+          userTokenBalances: res.data.balances,
+          loadingBalances: false,
+        }));
+      }
+    } catch (err: any) {
+      if (err.name === "AbortError" || err.code === "ERR_CANCELED" || err.name === "CanceledError") {
+        return;
+      }
+      console.error("Error fetching user balances:", err);
+    } finally {
+      setVaultState(prev => ({ ...prev, loadingBalances: false }));
+    }
+  }, [isLoggedIn]);
+
   const deposit = async (args: { token: string; amount: string }) => {
     await api.post("/vault/deposit", args);
   };
@@ -257,17 +298,19 @@ export const VaultProvider = ({ children }: { children: React.ReactNode }) => {
   const refreshVault = useCallback(async (showLoading: boolean = false) => {
     await fetchVaultInfo(showLoading);
     await fetchUserPosition();
+    await fetchUserBalances();
     await fetchTransactions(showLoading);
-  }, [fetchVaultInfo, fetchUserPosition, fetchTransactions]);
+  }, [fetchVaultInfo, fetchUserPosition, fetchUserBalances, fetchTransactions]);
 
   // Initialize on mount and when logged in
   useEffect(() => {
     if (isLoggedIn) {
       fetchVaultInfo(true);
       fetchUserPosition();
+      fetchUserBalances();
       fetchTransactions(true);
     }
-  }, [isLoggedIn, fetchVaultInfo, fetchUserPosition, fetchTransactions]);
+  }, [isLoggedIn, fetchVaultInfo, fetchUserPosition, fetchUserBalances, fetchTransactions]);
 
   // Polling effect (60s interval)
   useEffect(() => {
@@ -276,6 +319,7 @@ export const VaultProvider = ({ children }: { children: React.ReactNode }) => {
     vaultIntervalRef.current = setInterval(() => {
       fetchVaultInfo(false);
       fetchUserPosition();
+      fetchUserBalances();
       fetchTransactions(false);
     }, 60000);
 
@@ -288,13 +332,14 @@ export const VaultProvider = ({ children }: { children: React.ReactNode }) => {
         vaultAbortControllerRef.current.abort();
       }
     };
-  }, [isLoggedIn, fetchVaultInfo, fetchUserPosition, fetchTransactions]);
+  }, [isLoggedIn, fetchVaultInfo, fetchUserPosition, fetchUserBalances, fetchTransactions]);
 
   const contextValue = useMemo(
     () => ({
       vaultState,
       refreshVault,
       refreshUserPosition: fetchUserPosition,
+      refreshUserBalances: fetchUserBalances,
       refreshTransactions: fetchTransactions,
       deposit,
       withdraw,
@@ -305,7 +350,7 @@ export const VaultProvider = ({ children }: { children: React.ReactNode }) => {
       adminAddAsset,
       adminRemoveAsset,
     }),
-    [vaultState, refreshVault, fetchUserPosition, fetchTransactions]
+    [vaultState, refreshVault, fetchUserPosition, fetchUserBalances, fetchTransactions]
   );
 
   return (

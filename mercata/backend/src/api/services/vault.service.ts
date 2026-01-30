@@ -518,6 +518,65 @@ const getUserDepositWithdrawTotals = async (
 // PUBLIC SERVICE FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════════════════
 
+export interface UserTokenBalance {
+  address: string;
+  symbol: string;
+  name: string;
+  balance: string;
+  priceUsd: string;
+  images?: { value: string }[];
+}
+
+/**
+ * Get user's token balances for all supported vault assets
+ * Returns only tokens where the user has a positive balance
+ */
+export const getUserBalances = async (
+  accessToken: string,
+  userAddress: string
+): Promise<{ balances: UserTokenBalance[] }> => {
+  const vaultAddress = await getVaultAddress(accessToken);
+
+  if (!vaultAddress) {
+    return { balances: [] };
+  }
+
+  const vaultData = await getVaultData(accessToken, vaultAddress);
+
+  if (!vaultData) {
+    return { balances: [] };
+  }
+
+  const priceOracleAddress = vaultData.priceOracle || "";
+  const supportedAssetAddresses: string[] = (vaultData.supportedAssets || [])
+    .filter((addr: string) => addr && addr !== "0000000000000000000000000000000000000000");
+
+  const balances: UserTokenBalance[] = [];
+
+  for (const assetAddress of supportedAssetAddresses) {
+    // Get user's balance for this asset
+    const balance = await getTokenBalance(accessToken, assetAddress, userAddress);
+    const balanceBN = BigInt(balance);
+
+    // Only include tokens where user has a positive balance
+    if (balanceBN > 0n) {
+      const tokenInfo = await getTokenInfo(accessToken, assetAddress);
+      const priceUsd = await getAssetPrice(accessToken, priceOracleAddress, assetAddress);
+
+      balances.push({
+        address: assetAddress,
+        symbol: tokenInfo.symbol,
+        name: tokenInfo.name,
+        balance,
+        priceUsd,
+        images: tokenInfo.images,
+      });
+    }
+  }
+
+  return { balances };
+};
+
 /**
  * Get comprehensive vault info (global state)
  */

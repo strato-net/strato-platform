@@ -107,6 +107,52 @@ router.get("/user", authHandler.authorizeRequest(), VaultController.getUserPosit
 
 /**
  * @openapi
+ * /vault/balances:
+ *   get:
+ *     summary: Get user's token balances for vault assets
+ *     description: Retrieve the authenticated user's balances for all supported vault assets. Only returns tokens where the user has a positive balance.
+ *     tags:
+ *       - Vault
+ *     responses:
+ *       200:
+ *         description: User balances retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 balances:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       address:
+ *                         type: string
+ *                         description: Token contract address
+ *                       symbol:
+ *                         type: string
+ *                         description: Token symbol
+ *                       name:
+ *                         type: string
+ *                         description: Token name
+ *                       balance:
+ *                         type: string
+ *                         description: User's balance (18 decimals)
+ *                       priceUsd:
+ *                         type: string
+ *                         description: Current price in USD (18 decimals)
+ *                       images:
+ *                         type: array
+ *                         items:
+ *                           type: object
+ *                           properties:
+ *                             value:
+ *                               type: string
+ */
+router.get("/balances", authHandler.authorizeRequest(), VaultController.getBalances);
+
+/**
+ * @openapi
  * /vault/transactions:
  *   get:
  *     summary: Get bot swap transactions

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,21 +17,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useVaultContext, VaultAsset } from "@/context/VaultContext";
+import { useVaultContext } from "@/context/VaultContext";
 import { useToast } from "@/hooks/use-toast";
 import { formatUnits, parseUnits } from "ethers";
-import { api } from "@/lib/axios";
 
 const MIN_FIRST_DEPOSIT_USD = 50000;
-
-interface TokenBalance {
-  address: string;
-  balance: string;
-  symbol: string;
-  name: string;
-  priceUsd: string;
-  images?: { value: string }[];
-}
 
 interface VaultDepositModalProps {
   isOpen: boolean;
@@ -62,54 +52,35 @@ const VaultDepositModal = ({ isOpen, onClose, onSuccess }: VaultDepositModalProp
   const [selectedToken, setSelectedToken] = useState<string>("");
   const [amount, setAmount] = useState<string>("");
   const [depositLoading, setDepositLoading] = useState(false);
-  const [balancesLoading, setBalancesLoading] = useState(false);
-  const [tokenBalances, setTokenBalances] = useState<TokenBalance[]>([]);
 
   const { vaultState, deposit, refreshVault } = useVaultContext();
   const { toast } = useToast();
 
   const {
-    assets,
     deficitAssets,
     totalShares,
     totalEquity,
     paused,
+    userTokenBalances,
+    loadingBalances,
   } = vaultState;
 
   const isFirstDeposit = BigInt(totalShares || "0") === BigInt(0);
 
-  // Fetch user's token balances for supported assets
-  useEffect(() => {
-    const fetchBalances = async () => {
-      if (!isOpen || assets.length === 0) return;
-
-      setBalancesLoading(true);
-      try {
-        const res = await api.get("/vault/balances");
-        if (res.data?.balances) {
-          setTokenBalances(res.data.balances);
-        }
-      } catch (err) {
-        console.error("Error fetching balances:", err);
-      } finally {
-        setBalancesLoading(false);
-      }
-    };
-
-    fetchBalances();
-  }, [isOpen, assets]);
-
   // Filter available tokens based on deficit rule
+  // Backend already filters to only tokens user owns (balance > 0)
   const availableTokens = useMemo(() => {
     if (deficitAssets.length > 0) {
-      // Only allow deposit of deficit tokens
-      return tokenBalances.filter((token) =>
-        deficitAssets.includes(token.address.toLowerCase())
+      // Normalize deficit addresses to lowercase for comparison
+      const deficitAddressesLower = deficitAssets.map((addr) => addr.toLowerCase());
+      // Only allow deposit of deficit tokens that user owns
+      return userTokenBalances.filter((token) =>
+        deficitAddressesLower.includes(token.address.toLowerCase())
       );
     }
-    // Allow all supported tokens
-    return tokenBalances;
-  }, [tokenBalances, deficitAssets]);
+    // Allow all supported tokens that user owns
+    return userTokenBalances;
+  }, [userTokenBalances, deficitAssets]);
 
   // Get the selected token's details
   const selectedTokenData = useMemo(() => {
@@ -200,16 +171,19 @@ const VaultDepositModal = ({ isOpen, onClose, onSuccess }: VaultDepositModalProp
         variant: "success",
       });
 
-      await refreshVault(false);
+      // Close modal first, then refresh in background
+      setDepositLoading(false);
       handleClose();
       onSuccess();
+      
+      // Refresh vault data in background (don't await)
+      refreshVault(false);
     } catch (err: any) {
       toast({
         title: "Deposit Failed",
         description: err.message || "An error occurred during deposit",
         variant: "destructive",
       });
-    } finally {
       setDepositLoading(false);
     }
   };
@@ -240,35 +214,49 @@ const VaultDepositModal = ({ isOpen, onClose, onSuccess }: VaultDepositModalProp
           {/* Token Selector */}
           <div className="space-y-2">
             <label className="text-sm font-medium">Select Token</label>
-            <Select
-              value={selectedToken}
-              onValueChange={setSelectedToken}
-              disabled={balancesLoading || availableTokens.length === 0}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={balancesLoading ? "Loading..." : "Select a token"} />
-              </SelectTrigger>
-              <SelectContent>
-                {availableTokens.map((token) => (
-                  <SelectItem key={token.address} value={token.address}>
-                    <div className="flex items-center gap-2">
-                      {token.images?.[0]?.value ? (
-                        <img
-                          src={token.images[0].value}
-                          alt={token.symbol}
-                          className="w-5 h-5 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-xs text-white">
-                          {token.symbol?.slice(0, 1)}
-                        </div>
-                      )}
-                      <span>{token.symbol}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {!loadingBalances && availableTokens.length === 0 ? (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  {deficitAssets.length > 0
+                    ? "You don't own any deficit tokens. Only deficit tokens can be deposited when reserves are low."
+                    : "You don't own any supported vault tokens."}
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <Select
+                value={selectedToken}
+                onValueChange={(value) => {
+                  setSelectedToken(value);
+                  setAmount("");
+                }}
+                disabled={loadingBalances || availableTokens.length === 0}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={loadingBalances ? "Loading..." : "Select a token"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableTokens.map((token) => (
+                    <SelectItem key={token.address} value={token.address}>
+                      <div className="flex items-center gap-2">
+                        {token.images?.[0]?.value ? (
+                          <img
+                            src={token.images[0].value}
+                            alt={token.symbol}
+                            className="w-5 h-5 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-xs text-white">
+                            {token.symbol?.slice(0, 1)}
+                          </div>
+                        )}
+                        <span>{token.symbol}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
           {/* Amount Input */}
