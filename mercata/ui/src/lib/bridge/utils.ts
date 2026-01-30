@@ -155,6 +155,8 @@ export function getExplorerUrl(chainId: string, txHash: string): string {
       return `https://optimistic.etherscan.io/tx/${txHash}`;
     case 8453: // Base
       return `https://basescan.org/tx/${txHash}`;
+    case 84532: // Base Sepolia
+      return `https://sepolia.basescan.org/tx/${txHash}`;
     case 42161: // Arbitrum
       return `https://arbiscan.io/tx/${txHash}`;
     case 56: // BSC
