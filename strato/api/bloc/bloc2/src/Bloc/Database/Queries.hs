@@ -16,10 +16,12 @@
 module Bloc.Database.Queries
   ( sourceToContractDetails,
     getContractByAddress,
+    getContractWithCodeCollectionByAddress,
     getContractByAccountsFilterParams,
     getContractDetailsForContract,
     getContractDetailsByCodeHash,
     getCodeCollectionByCodePtr,
+    getContractWithCodeCollectionByCodePtr,
     evmContractSolidVMError,
   )
 where
@@ -70,6 +72,23 @@ getContractByAddress ::
 getContractByAddress a = getContractByAccountsFilterParams
   $ accountsFilterParams
   & qaAddress ?~ a
+
+-- | Get contract and code collection by address (for file-level struct access)
+getContractWithCodeCollectionByAddress ::
+  ( MonadIO m,
+    HasCodeDB m,
+    A.Selectable Address AddressState m,
+    (Keccak256 `A.Selectable` SourceMap) m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m
+  ) =>
+  Address ->
+  m (Maybe (Contract, CodeCollection))
+getContractWithCodeCollectionByAddress a = runMaybeT $ do
+  (AddressStateRef' r _) <- MaybeT . fmap listToMaybe $ getAccount' 
+    $ accountsFilterParams & qaAddress ?~ a
+  codePtr <- MaybeT . pure $ addressStateRefCodePtr r
+  (contract, cc) <- MaybeT $ either (const Nothing) Just <$> getContractWithCodeCollectionByCodePtr codePtr
+  pure (contract, cc)
 
 getContractByAccountsFilterParams ::
   ( MonadIO m,
@@ -150,6 +169,25 @@ getCodeCollectionByCodePtr ::
   CodePtr ->
   m (Either Text CodeCollection)
 getCodeCollectionByCodePtr = runExceptT . fmap snd . getCodeHashAndCollection
+
+-- | Get both the contract and code collection (for file-level struct access)
+getContractWithCodeCollectionByCodePtr ::
+  ( MonadIO m,
+    HasCodeDB m,
+    A.Selectable Address AddressState m,
+    (Keccak256 `A.Selectable` SourceMap) m
+  ) =>
+  CodePtr ->
+  m (Either Text (Contract, CodeCollection))
+getContractWithCodeCollectionByCodePtr codePtr = runExceptT $ do
+  nameStr <- case codePtr of
+    SolidVMCode n _ -> pure n
+    _ -> throwE "EVM contracts no longer supported"
+  (_, cc) <- getCodeHashAndCollection codePtr
+  contract <- case Map.lookup nameStr $ _contracts cc of
+    Nothing -> throwE $ "Could not find contract " <> (Text.pack nameStr) <> " in code collection " <> Text.pack (format codePtr)
+    Just d -> pure d
+  pure $ force (contract, cc)
 
 getCodeHashAndCollection ::
   ( MonadIO m,

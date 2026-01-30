@@ -41,6 +41,7 @@ library:
     - lens
     - monad-alter
     - monad-logger
+    - ordered-containers
     - mtl
     - parsec
     - blockapps-secp256k1-haskell
