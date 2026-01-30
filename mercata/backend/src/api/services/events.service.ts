@@ -226,12 +226,6 @@ const activityFilters: Record<string, ActivityFilter> = {
     return { events: Array.from(eventMap.values()), total };
   },
 
-  // Voucher Transfer events: same as Token Transfer
-  "Voucher:Transfer": async (userAddress, contractName, eventName, storageSelect, fetchLimit, accessToken, timeRange) => {
-    // Reuse the same logic as Token:Transfer
-    return activityFilters["Token:Transfer"]!(userAddress, contractName, eventName, storageSelect, fetchLimit, accessToken, timeRange);
-  },
-
   // DepositCompleted events: filter by stratoRecipient
   "MercataBridge:DepositCompleted": async (userAddress, contractName, eventName, storageSelect, fetchLimit, accessToken, timeRange) => {
     const timeFilter = getTimeRangeFilter(timeRange);
