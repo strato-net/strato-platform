@@ -10,7 +10,6 @@ import {
   getTokens
 } from "../services/tokens.v2.service";
 import { validateQueryParams } from "../validators/tokens.validator";
-import { validateUserAddress } from "../validators/common.validators";
 import { buildTokenSelectFields } from "../../config/tokensConstants";
 import { getHistoryParams } from "../helpers/history.helper";
 
@@ -46,9 +45,7 @@ class TokensV2Controller {
   ): Promise<void> {
     try {
       const { accessToken, address: userAddress } = req;
-      validateUserAddress(userAddress);
-
-      const tokens = await getEarningAssets(accessToken, userAddress as string);
+      const tokens = await getEarningAssets(accessToken, userAddress);
       res.status(RestStatus.OK).json(tokens);
     } catch (error) {
       next(error);

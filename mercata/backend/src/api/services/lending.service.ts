@@ -431,8 +431,8 @@ export const collateralAndBalance = async (
   const userTokens = await getBalance(accessToken, userAddress, {
     address: `in.(${assets.join(",")})`, select: `address,user:key,balance:value::text,token:${Token}(_name,_symbol,_owner,_totalSupply::text,customDecimals,images:${Token}-images(value))`
   });
-  const tokenMap = new Map(userTokens.map((t: any) => [t.address, t]));
 
+  const tokenMap = new Map(userTokens.map((t: any) => [t.address, t]));
   const collateralMap = new Map(userCollaterals.map((c: any) => [c.asset, c]));
 
   // Create maps for asset configs and prices
@@ -449,13 +449,12 @@ export const collateralAndBalance = async (
     priceMap.set(price.asset, price.price);
   });
 
-  // Filter assets that have token data
-  const filteredAssets = assets.filter((asset: string) => {
+  return assets
+    .filter((asset: string) => {
       const token = tokenMap.get(asset) as any;
       return token;
-  });
-
-  const result = filteredAssets.map((asset: string) => {
+    })
+    .map((asset: string) => {
       const token = tokenMap.get(asset) as any;
       const collateral = collateralMap.get(asset) as any;
       const assetConfig = assetConfigMap.get(asset);
@@ -493,8 +492,6 @@ export const collateralAndBalance = async (
         isPaused,
       };
     });
-
-  return result;
 };
 
 export const getPublicCollateralInfo = async (

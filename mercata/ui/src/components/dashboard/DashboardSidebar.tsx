@@ -78,10 +78,8 @@ const DashboardSidebar = () => {
     }
   }, [pathname, isAdmin]);
 
-  const isActive = (path: string) => {
-    if (path === '/dashboard') return pathname === '/dashboard';
-    return pathname.startsWith(path);
-  };
+  const isActive = (path: string) => 
+    path === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(path);
 
   const renderNavItem = ({ icon: Icon, label, path }: NavItem) => {
     const active = isActive(path);

@@ -46,21 +46,18 @@ export const getEarningAssets = async (
   accessToken: string,
   userAddress: string
 ): Promise<EarningAsset[]> => {
-  // Build token query params - include user balance filter
-  const tokenParams: Record<string, string> = {
+  const [tokens, collaterals, cdps, rawPrices] = await Promise.all([
+    cirrus.get(accessToken, "/" + Token, {
+      params: {
+        "balances.key": `eq.${userAddress}`,
         select: buildTokenSelectFields({
           images: true,
           attributes: true,
           balance: true,
         }).join(","),
         status: "eq.2",
-        "balances.key": `eq.${userAddress}`,
-  };
-
-  // Fetch tokens, prices, and user-specific collateral data
-  const [tokens, rawPrices, collaterals, cdps] = await Promise.all([
-    cirrus.get(accessToken, "/" + Token, { params: tokenParams }),
-    getCompletePriceMap(accessToken),
+      },
+    }),
     cirrus.get(accessToken, "/" + CollateralVault + "-userCollaterals", {
       params: {
         select: "user:key,asset:key2,amount:value::text",
@@ -75,6 +72,7 @@ export const getEarningAssets = async (
         "value->>collateral": `gt.0`,
       },
     }),
+    getCompletePriceMap(accessToken),
   ]);
 
   const collateralMap = new Map<string, bigint>();

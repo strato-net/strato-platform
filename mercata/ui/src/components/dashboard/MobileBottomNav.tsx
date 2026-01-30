@@ -19,7 +19,7 @@ import {
 import { Drawer, DrawerClose, DrawerContent } from '@/components/ui/drawer';
 import { useUser } from '@/context/UserContext';
 
-// Primary navigation items
+// Primary navigation items shown in bottom bar
 const PRIMARY_NAV_ITEMS = [
   { icon: LayoutDashboard, label: 'Portfolio', path: '/dashboard' },
   { icon: ArrowUpDown, label: 'Deposit', path: '/dashboard/deposits' },
@@ -45,10 +45,8 @@ const MobileBottomNav = () => {
   const navigate = useNavigate();
   const { isAdmin } = useUser();
 
-  const isActive = (path: string) => {
-    if (path === '/dashboard') return pathname === '/dashboard';
-    return pathname.startsWith(path);
-  };
+  const isActive = (path: string) => 
+    path === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(path);
 
   const isMoreActive = MORE_ITEMS.some(item => isActive(item.path));
 
