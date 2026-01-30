@@ -17,12 +17,16 @@ const formatUsd = (value: string): string => {
 };
 
 const formatApy = (value: string): string => {
+  // If vault is too young, show "-"
+  if (value === "-") return "-";
+  
   try {
-    // APY is stored in WAD format (18 decimals), so divide by 1e18 first
-    const num = parseFloat(formatUnits(value, 18)) * 100;
+    // APY is returned as a percentage number (e.g., "26.50" for 26.50%)
+    const num = parseFloat(value);
+    if (isNaN(num)) return "-";
     return num.toFixed(2) + "%";
   } catch {
-    return "0.00%";
+    return "-";
   }
 };
 

@@ -269,7 +269,6 @@ const getHistoricalTokenBalance = async (
   date: string // Format: YYYY-MM-DD
 ): Promise<string> => {
   try {
-    console.log(`[APY DEBUG] getHistoricalTokenBalance: token=${tokenAddress}, holder=${holderAddress}, date=${date}`);
     const { data } = await cirrus.get(accessToken, "/history@mapping", {
       params: {
         address: `eq.${tokenAddress}`,
@@ -280,12 +279,8 @@ const getHistoricalTokenBalance = async (
       },
     });
 
-    console.log(`[APY DEBUG] getHistoricalTokenBalance response:`, JSON.stringify(data));
-    // value is a direct number field
     const value = data?.[0]?.value;
-    const result = value ? String(BigInt(Math.floor(value))) : "0";
-    console.log(`[APY DEBUG] getHistoricalTokenBalance result: ${result}`);
-    return result;
+    return value ? String(BigInt(Math.floor(value))) : "0";
   } catch (error) {
     console.error(`Error fetching historical balance for ${tokenAddress}:`, error);
     return "0";
@@ -302,7 +297,6 @@ const getHistoricalAssetPrice = async (
   date: string // Format: YYYY-MM-DD
 ): Promise<string> => {
   try {
-    console.log(`[APY DEBUG] getHistoricalAssetPrice: oracle=${oracleAddress}, asset=${assetAddress}, date=${date}`);
     const { data } = await cirrus.get(accessToken, "/history@mapping", {
       params: {
         address: `eq.${oracleAddress}`,
@@ -313,12 +307,8 @@ const getHistoricalAssetPrice = async (
       },
     });
 
-    console.log(`[APY DEBUG] getHistoricalAssetPrice response:`, JSON.stringify(data));
-    // value is a direct number field
     const value = data?.[0]?.value;
-    const result = value ? String(BigInt(Math.floor(value))) : "0";
-    console.log(`[APY DEBUG] getHistoricalAssetPrice result: ${result}`);
-    return result;
+    return value ? String(BigInt(Math.floor(value))) : "0";
   } catch (error) {
     console.error(`Error fetching historical price for ${assetAddress}:`, error);
     return "0";
@@ -406,37 +396,6 @@ const getHistoricalEquity = async (
   return totalEquity;
 };
 
-/**
- * Get the first deposit date for the vault
- */
-const getFirstDepositDate = async (
-  accessToken: string,
-  vaultAddress: string
-): Promise<string | null> => {
-  try {
-    const { data } = await cirrus.get(accessToken, `/${Vault}-Deposited`, {
-      params: {
-        select: "block_timestamp",
-        address: `eq.${vaultAddress}`,
-        order: "block_timestamp.asc",
-        limit: "1",
-      },
-    });
-
-    if (!data?.[0]?.block_timestamp) {
-      return null;
-    }
-
-    // Parse the timestamp and return YYYY-MM-DD format
-    const timestamp = data[0].block_timestamp;
-    // Timestamp format: "2025-01-28 01:46:31 UTC"
-    const date = new Date(timestamp);
-    return date.toISOString().split("T")[0];
-  } catch (error) {
-    console.error("Error fetching first deposit date:", error);
-    return null;
-  }
-};
 
 /**
  * Get APY for the vault based on performance over time
@@ -453,22 +412,12 @@ const getAPY = async (
   supportedAssets: string[]
 ): Promise<string> => {
   try {
-    console.log(`[APY DEBUG] getAPY called with:`);
-    console.log(`  vaultAddress: ${vaultAddress}`);
-    console.log(`  currentEquity: ${currentEquity.toString()}`);
-    console.log(`  botExecutor: ${botExecutor}`);
-    console.log(`  priceOracleAddress: ${priceOracleAddress}`);
-    console.log(`  supportedAssets: ${JSON.stringify(supportedAssets)}`);
-
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    let startDate = thirtyDaysAgo.toISOString().split("T")[0]; // YYYY-MM-DD
-    let daysInPeriod = 30;
-
-    console.log(`[APY DEBUG] Trying 30-day period, startDate: ${startDate}`);
+    const startDate = thirtyDaysAgo.toISOString().split("T")[0]; // YYYY-MM-DD
 
     // Get historical equity from 30 days ago
-    let startEquity = await getHistoricalEquity(
+    const startEquity = await getHistoricalEquity(
       accessToken,
       vaultAddress,
       botExecutor,
@@ -476,102 +425,40 @@ const getAPY = async (
       supportedAssets,
       startDate
     );
-    console.log(`[APY DEBUG] startEquity (30 days): ${startEquity.toString()}`);
 
-    // If no historical equity from 30 days ago, fall back to first deposit date
+    // If vault is less than 30 days old, return "-"
     if (startEquity === 0n) {
-      console.log(`[APY DEBUG] No data from 30 days ago, finding first deposit date...`);
-      
-      const firstDepositDate = await getFirstDepositDate(accessToken, vaultAddress);
-      console.log(`[APY DEBUG] firstDepositDate: ${firstDepositDate}`);
-      
-      if (!firstDepositDate) {
-        console.log(`[APY DEBUG] No deposits found, returning 0 APY`);
-        return "0";
-      }
-
-      // Calculate days since first deposit
-      const firstDepositTime = new Date(firstDepositDate).getTime();
-      const nowTime = now.getTime();
-      daysInPeriod = Math.floor((nowTime - firstDepositTime) / (24 * 60 * 60 * 1000));
-      console.log(`[APY DEBUG] daysInPeriod since first deposit: ${daysInPeriod}`);
-
-      // Need at least 1 day of data
-      if (daysInPeriod < 1) {
-        console.log(`[APY DEBUG] Vault is less than 1 day old, returning 0 APY`);
-        return "0";
-      }
-
-      // Use the day AFTER first deposit as start date (first deposit establishes initial equity)
-      const dayAfterFirstDeposit = new Date(firstDepositTime + 24 * 60 * 60 * 1000);
-      startDate = dayAfterFirstDeposit.toISOString().split("T")[0];
-      console.log(`[APY DEBUG] Using startDate (day after first deposit): ${startDate}`);
-
-      // Get historical equity from that date
-      startEquity = await getHistoricalEquity(
-        accessToken,
-        vaultAddress,
-        botExecutor,
-        priceOracleAddress,
-        supportedAssets,
-        startDate
-      );
-      console.log(`[APY DEBUG] startEquity (from first deposit + 1 day): ${startEquity.toString()}`);
-
-      // If still no equity, use the first deposit value as starting point
-      if (startEquity === 0n) {
-        console.log(`[APY DEBUG] Still no historical equity, using first deposit total as startEquity`);
-        const { totalDepositsUsd: firstDayDeposits } = await getDepositsWithdrawalsInPeriod(
-          accessToken,
-          vaultAddress,
-          firstDepositDate
-        );
-        // For the first period, startEquity is approximately the deposits made
-        // This is a simplification but reasonable for new vaults
-        startEquity = firstDayDeposits;
-        startDate = firstDepositDate;
-        console.log(`[APY DEBUG] Using first deposits as startEquity: ${startEquity.toString()}`);
-        
-        if (startEquity === 0n) {
-          console.log(`[APY DEBUG] No starting equity found, returning 0 APY`);
-          return "0";
-        }
-      }
+      return "-";
     }
 
-    // Get deposits and withdrawals in the period
+    // Get deposits and withdrawals in the 30-day period
     const { totalDepositsUsd, totalWithdrawalsUsd } = await getDepositsWithdrawalsInPeriod(
       accessToken,
       vaultAddress,
       startDate
     );
-    console.log(`[APY DEBUG] totalDepositsUsd: ${totalDepositsUsd.toString()}`);
-    console.log(`[APY DEBUG] totalWithdrawalsUsd: ${totalWithdrawalsUsd.toString()}`);
 
     // Calculate profit: (currentEquity - startEquity) + totalWithdrawals - totalDeposits
     const profit = (currentEquity - startEquity) + totalWithdrawalsUsd - totalDepositsUsd;
-    console.log(`[APY DEBUG] profit: ${profit.toString()}`);
 
     // Calculate period return: profit / startEquity
-    const periodReturnScaled = (profit * WAD) / startEquity;
-    console.log(`[APY DEBUG] periodReturnScaled: ${periodReturnScaled.toString()}`);
-
-    // Calculate APY: ((1 + periodReturn)^(365/daysInPeriod)) - 1
-    const periodReturn = Number(periodReturnScaled) / Number(WAD);
-    console.log(`[APY DEBUG] periodReturn: ${periodReturn}`);
-    console.log(`[APY DEBUG] daysInPeriod for annualization: ${daysInPeriod}`);
+    const periodReturn = Number(profit) / Number(startEquity);
     
-    const apy = Math.pow(1 + periodReturn, 365 / daysInPeriod) - 1;
-    console.log(`[APY DEBUG] apy (decimal): ${apy}`);
+    // Guard against invalid values (periodReturn <= -1 would cause issues with pow)
+    if (periodReturn <= -1) {
+      return "-";
+    }
+    
+    // Calculate APY: ((1 + periodReturn)^(365/30)) - 1
+    const apy = Math.pow(1 + periodReturn, 365 / 30) - 1;
 
-    // Convert back to WAD format (18 decimals)
-    const apyWad = BigInt(Math.round(apy * Number(WAD)));
-    console.log(`[APY DEBUG] apyWad: ${apyWad.toString()}`);
+    // Return APY as percentage (e.g., 26.5 for 26.5%)
+    const apyPercent = apy * 100;
 
-    return apyWad.toString();
+    return apyPercent.toFixed(2);
   } catch (error) {
     console.error("Error calculating APY:", error);
-    return "0";
+    return "-";
   }
 };
 
