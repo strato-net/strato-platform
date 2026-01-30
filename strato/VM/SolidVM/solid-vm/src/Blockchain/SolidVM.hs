@@ -2040,17 +2040,26 @@ binopAssign oper lhs rhs = do
   setVar varToAssign next
   return $ Constant next
 
-intBuiltin :: [Value] -> Value
-intBuiltin [SEnumVal _ _ enumNum] = SInteger $ fromIntegral enumNum
-intBuiltin [SInteger n] = SInteger n
-intBuiltin [SDecimal v] = SInteger (decimalMantissa $ roundTo 0 v)
-intBuiltin [SString hex] = integerToValue $ parseBaseInt hex 16
-intBuiltin [SString hex, SInteger 16] = integerToValue $ parseBaseInt hex 16
-intBuiltin [SString dec, SInteger 10] = integerToValue $ parseBaseInt dec 10
-intBuiltin [SBytes bs] = SInteger $ byteString2Integer bs  -- bytes32 -> uint256 cast
-intBuiltin [SNULL] = SInteger 0
-intBuiltin [SReference{}] = SInteger 0
-intBuiltin args = typeError "numeric cast - invalid args" $ show args
+-- | Convert a value to an integer. Signedness and bit size are currently ignored;
+-- we discourage fixed-size integer types in SolidVM but support this function for
+-- backwards compatibility with existing Solidity contracts.
+intBuiltin :: Bool -> Maybe Int -> [Value] -> Value
+intBuiltin _ _ [SEnumVal _ _ enumNum] = SInteger $ fromIntegral enumNum
+intBuiltin _ _ [SInteger n] = SInteger n
+intBuiltin _ _ [SDecimal v] = SInteger (decimalMantissa $ roundTo 0 v)
+intBuiltin _ _ [SString hex] = integerToValue $ parseBaseInt hex 16
+intBuiltin _ _ [SString hex, SInteger 16] = integerToValue $ parseBaseInt hex 16
+intBuiltin _ _ [SString dec, SInteger 10] = integerToValue $ parseBaseInt dec 10
+intBuiltin _ _ [SBytes bs] = SInteger $ byteString2Integer bs  -- bytes32 -> uint256 cast
+intBuiltin _ _ [SNULL] = SInteger 0
+intBuiltin _ _ [SReference{}] = SInteger 0
+intBuiltin signed mSize [] = typeError (funcName ++ " called with no arguments") ""
+  where
+    funcName = (if signed then "int" else "uint") ++ maybe "" show mSize
+intBuiltin signed mSize (arg:_) = typeError (funcName ++ " cannot convert " ++ valueTypeName arg) $
+  "expected integer, decimal, enum, string, or bytes; got " ++ format arg
+  where
+    funcName = (if signed then "int" else "uint") ++ maybe "" show mSize
 
 integerToValue :: Either String Integer -> Value
 integerToValue (Right n) = SInteger n
@@ -2142,12 +2151,12 @@ callBuiltin "bytes" [SString s] = pure . SBytes . DT.encodeUtf8 $ T.pack s
 callBuiltin "bytes" [SString s, SString "utf-8"] = pure . SBytes . DT.encodeUtf8 $ T.pack s
 callBuiltin "bytes" [SString s, SString "raw"] = pure . SBytes $ BC.pack s
 callBuiltin "bytes" [SAddress a _] = pure . SBytes . B.pack . word160ToBytes $ unAddress a
-callBuiltin "uint" args = return $ intBuiltin args
-callBuiltin "int" args = return $ intBuiltin args
+callBuiltin "uint" args = return $ intBuiltin False Nothing args
+callBuiltin "int" args = return $ intBuiltin True Nothing args
 -- Handle sized integer type casts (uint256, uint128, uint120, int256, etc.)
 callBuiltin name args
-  | "uint" `isPrefixOf` name && all isDigit (drop 4 name) = return $ intBuiltin args
-  | "int" `isPrefixOf` name && all isDigit (drop 3 name) = return $ intBuiltin args
+  | "uint" `isPrefixOf` name && all isDigit (drop 4 name) = return $ intBuiltin False (Just $ read $ drop 4 name) args
+  | "int" `isPrefixOf` name && all isDigit (drop 3 name) = return $ intBuiltin True (Just $ read $ drop 3 name) args
 -- Handle sized bytes type casts (bytes1, bytes2, ..., bytes32)
 -- bytes32(integer) - convert to bytes representation
 callBuiltin name [SInteger i]
