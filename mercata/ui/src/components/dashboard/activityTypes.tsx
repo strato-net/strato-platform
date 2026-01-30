@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import type { Event } from "@mercata/shared-types";
-import { Card, CardTitle, CardHeader, CardContent, CardDescription } from "../ui/card";
+import { Card, CardTitle, CardHeader, CardContent } from "../ui/card";
 import { formatUnits } from "viem";
 import { ArrowUpRight, ArrowDownLeft, ArrowDown } from "lucide-react";
 import {
@@ -90,7 +90,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
         <Card key={event.id}>
           <CardHeader>
             <CardTitle>Transfer</CardTitle>
-            <CardDescription>{event.contract_name}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
             <div className="flex items-center gap-2 text-sm">
@@ -190,7 +189,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
         <Card key={event.id}>
           <CardHeader>
             <CardTitle>Transfer</CardTitle>
-            <CardDescription>{event.contract_name}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
             <div className="flex items-center gap-2 text-sm">
@@ -298,7 +296,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
         <Card key={event.id}>
           <CardHeader>
             <CardTitle>Deposit Completed</CardTitle>
-            <CardDescription>{event.contract_name}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
             <div className="flex items-center gap-2 text-sm">
@@ -421,7 +418,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
         <Card key={event.id}>
           <CardHeader>
             <CardTitle>CDP Mint</CardTitle>
-            <CardDescription>{event.contract_name}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
             <div className="flex items-center gap-2 text-sm">
@@ -527,7 +523,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
         <Card key={event.id}>
           <CardHeader>
             <CardTitle>Swap</CardTitle>
-            <CardDescription>{event.contract_name}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
             <div className="flex items-center gap-2 text-sm">
@@ -648,7 +643,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
         <Card key={event.id}>
           <CardHeader>
             <CardTitle>Rewards Claimed</CardTitle>
-            <CardDescription>{event.contract_name}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
             <div className="flex items-center gap-2 text-sm">
@@ -818,7 +812,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
         <Card key={event.id}>
           <CardHeader>
             <CardTitle>Referral Redeemed</CardTitle>
-            <CardDescription>{event.contract_name}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
             <div className="flex items-center gap-2 text-sm">
