@@ -47,7 +47,6 @@ export const adminRegistry = process.env.ADMIN_REGISTRY || "00000000000000000000
 export const voucher = process.env.VOUCHER_CONTRACT_ADDRESS || "000000000000000000000000000000000000100e";
 export const cdpRegistry = process.env.CDP_REGISTRY || "0000000000000000000000000000000000001012";
 export const rewardsChef = process.env.REWARDS_CHEF || "000000000000000000000000000000000000101f";
-export const vaultFactory = process.env.VAULT_FACTORY;
 
 // Hidden swap pools - these pools are filtered out from API responses
 export const hiddenSwapPools: Set<string> = new Set([
@@ -75,11 +74,16 @@ export const defaultReferralServiceFor: Record<string, string> = {
   "33056204878082667": "http://ec2-18-218-166-133.us-east-2.compute.amazonaws.com", // Upquark mainnet
 };
 
+export const defaultVaultFactoryFor: Record<string, string> = {
+  "114784819836269": "37b446ec53607a0cdae38c820b838baf240a8b74" // Helium testnet
+};
+
 export let bridgeUrl: string | undefined;
 export let rewards: string | undefined;
 export let networkId: string | undefined;
 export let referralUrl: string | undefined;
 export let escrow: string = '';
+export let vaultFactory: string = '';
 
 export function setBridgeConfig(networkId: string) {
   if (process.env.BRIDGE_SERVICE_URL) {
@@ -110,6 +114,14 @@ export function setReferralConfig(networkId: string) {
   }
 }
 
+export function setVaultFactoryConfig(networkId: string) {
+  if (process.env.VAULT_FACTORY) {
+    vaultFactory = process.env.VAULT_FACTORY;
+  } else {
+    vaultFactory = defaultVaultFactoryFor[networkId];
+  }
+}
+
 export async function initNetworkConfig() {
   // Import eth here to avoid circular dependency (eth depends on nodeUrl)
   const { eth } = await import("../utils/mercataApiHelper");
@@ -122,4 +134,5 @@ export async function initNetworkConfig() {
   setBridgeConfig(networkId);
   setRewardsConfig(networkId);
   setReferralConfig(networkId);
+  setVaultFactoryConfig(networkId);
 }
