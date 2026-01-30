@@ -116,14 +116,16 @@ const VaultAdminTab = () => {
           variant: "success",
         });
       }
-      await refreshVault(false);
+      // Stop spinner and close dialog first, then refresh in background
+      setPauseLoading(false);
+      setConfirmPauseOpen(false);
+      refreshVault(false);
     } catch (err: any) {
       toast({
         title: "Error",
         description: err.message || "Failed to toggle pause state",
         variant: "destructive",
       });
-    } finally {
       setPauseLoading(false);
       setConfirmPauseOpen(false);
     }
@@ -140,16 +142,16 @@ const VaultAdminTab = () => {
         description: `Successfully added asset to vault.`,
         variant: "success",
       });
-      await refreshVault(false);
+      setAddAssetLoading(false);
       setNewAssetAddress("");
       setAddAssetModalOpen(false);
+      refreshVault(false);
     } catch (err: any) {
       toast({
         title: "Error",
         description: err.message || "Failed to add asset",
         variant: "destructive",
       });
-    } finally {
       setAddAssetLoading(false);
     }
   };
@@ -165,14 +167,15 @@ const VaultAdminTab = () => {
         description: "Successfully removed asset from vault.",
         variant: "success",
       });
-      await refreshVault(false);
+      setRemoveAssetLoading(false);
+      setRemoveAssetAddress(null);
+      refreshVault(false);
     } catch (err: any) {
       toast({
         title: "Error",
         description: err.message || "Failed to remove asset",
         variant: "destructive",
       });
-    } finally {
       setRemoveAssetLoading(false);
       setRemoveAssetAddress(null);
     }
@@ -195,14 +198,17 @@ const VaultAdminTab = () => {
         description: `Min reserve for ${edit.symbol} updated to ${edit.newMinReserve}`,
         variant: "success",
       });
-      await refreshVault(false);
+      setReserveEdits((prev) => ({
+        ...prev,
+        [address]: { ...prev[address], isSaving: false, isEditing: false },
+      }));
+      refreshVault(false);
     } catch (err: any) {
       toast({
         title: "Error",
         description: err.message || "Failed to update reserve",
         variant: "destructive",
       });
-    } finally {
       setReserveEdits((prev) => ({
         ...prev,
         [address]: { ...prev[address], isSaving: false, isEditing: false },
@@ -221,15 +227,15 @@ const VaultAdminTab = () => {
         description: "Successfully updated bot executor address.",
         variant: "success",
       });
-      await refreshVault(false);
+      setBotExecutorLoading(false);
       setNewBotExecutor("");
+      refreshVault(false);
     } catch (err: any) {
       toast({
         title: "Error",
         description: err.message || "Failed to update bot executor",
         variant: "destructive",
       });
-    } finally {
       setBotExecutorLoading(false);
     }
   };
@@ -544,7 +550,7 @@ const VaultAdminTab = () => {
           </DialogHeader>
           <div className="space-y-4">
             <Input
-              placeholder="Token address (e.g., 0x...)"
+              placeholder="Token address"
               value={newAssetAddress}
               onChange={(e) => setNewAssetAddress(e.target.value)}
             />

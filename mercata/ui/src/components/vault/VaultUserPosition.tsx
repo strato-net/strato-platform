@@ -94,6 +94,11 @@ const VaultUserPosition = ({ onDeposit, onWithdraw }: VaultUserPositionProps) =>
             <p className="text-muted-foreground mb-4">
               You don't have any vault shares yet. Deposit tokens to start earning.
             </p>
+            {paused && (
+              <p className="text-sm text-orange-600 dark:text-orange-400 mb-2">
+                Vault is paused. Deposits are disabled.
+              </p>
+            )}
             <Button onClick={onDeposit} disabled={paused}>
               Make Your First Deposit
             </Button>
@@ -140,22 +145,29 @@ const VaultUserPosition = ({ onDeposit, onWithdraw }: VaultUserPositionProps) =>
             </div>
 
             {/* Action Buttons */}
-            <div className="flex gap-4">
-              <Button
-                onClick={onDeposit}
-                disabled={paused}
-                className="flex-1"
-              >
-                Deposit
-              </Button>
-              <Button
-                onClick={onWithdraw}
-                disabled={paused || !hasPosition}
-                variant="outline"
-                className="flex-1"
-              >
-                Withdraw
-              </Button>
+            <div className="flex flex-col gap-2">
+              {paused && (
+                <p className="text-sm text-orange-600 dark:text-orange-400 text-center">
+                  Vault is paused. Deposits and withdrawals are disabled.
+                </p>
+              )}
+              <div className="flex gap-4">
+                <Button
+                  onClick={onDeposit}
+                  disabled={paused}
+                  className="flex-1"
+                >
+                  Deposit
+                </Button>
+                <Button
+                  onClick={onWithdraw}
+                  disabled={paused || !hasPosition}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  Withdraw
+                </Button>
+              </div>
             </div>
           </>
         )}
