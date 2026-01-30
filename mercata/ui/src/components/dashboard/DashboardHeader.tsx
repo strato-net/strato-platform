@@ -1,194 +1,187 @@
-import { Avatar, AvatarFallback } from "../ui/avatar";
 import { useUser } from '@/context/UserContext';
 import { useNetwork } from '@/context/NetworkContext';
-import CopyButton from '../ui/copy';
-import { LogOutIcon, Menu, Copy } from 'lucide-react';
-import {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-} from "@/components/ui/popover";
+import { useTheme } from 'next-themes';
+import { LogOutIcon, Copy, ChevronLeft } from 'lucide-react';
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { useAccount, useDisconnect } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { ModeToggle } from '../mode-toggle';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import STRATOICON from '@/assets/icon.png';
+import STRATOICONDARK from '@/assets/dark-theme-strato-compressed-logo.png';
 
 interface DashboardHeaderProps {
   title: string;
-  onMenuClick?: () => void;
 }
 
 const GRADIENT_BUTTON_CLASS = "w-full bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90";
 
-const DashboardHeader = ({ title, onMenuClick }: DashboardHeaderProps) => {
+const DashboardHeader = ({ title }: DashboardHeaderProps) => {
   const { userAddress, userName, logout } = useUser();
   const { isTestnet } = useNetwork();
+  const { resolvedTheme } = useTheme();
   const { address: walletAddress, isConnected } = useAccount();
   const { disconnect } = useDisconnect();
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const [searchParams] = useSearchParams();
 
-  const truncateAddress = (address: string | null | undefined, front: number = 6, back: number = 4) => {
-    if (!address) return "N/A";
-    if (address.length <= front + back) return address;
-    return `${address.substring(0, front)}...${address.substring(address.length - back)}`;
+  const isPortfolioPage = pathname === '/dashboard';
+  
+  // Handle back navigation - check for 'from' query param for bridge-transactions page
+  const handleBackClick = () => {
+    const fromPage = searchParams.get('from');
+    if (pathname === '/bridge-transactions' && fromPage) {
+      if (fromPage === 'deposits') {
+        navigate('/dashboard/deposits');
+      } else if (fromPage === 'withdrawals') {
+        navigate('/dashboard/withdrawals');
+      } else {
+        navigate('/dashboard');
+      }
+    } else {
+      navigate('/dashboard');
+    }
+  };
+
+  const truncateAddress = (address: string | null | undefined, front = 6, back = 4) => {
+    if (!address || address.length <= front + back) return address || "N/A";
+    return `${address.slice(0, front)}...${address.slice(-back)}`;
   };
 
   const copyAddress = async (address: string | null, label: string) => {
-    if (address) {
-      await navigator.clipboard.writeText(address);
-      toast({
-        title: 'Address copied!',
-        description: `${label} address copied to clipboard`,
-        duration: 2000,
-      });
-    }
-  };
-
-  const AddressRow = ({ address, onCopy, showTooltip = false, textColor = "text-foreground" }: { 
-    address: string | null; 
-    onCopy: () => void;
-    showTooltip?: boolean;
-    textColor?: string;
-  }) => {
-    const content = (
-      <div className={`flex items-center justify-between w-full gap-1 text-xs font-mono ${textColor} cursor-pointer`}>
-        <span className="flex-1 min-w-0">{truncateAddress(address, 16, 8)}</span>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onCopy();
-          }}
-          className="hover:text-foreground transition-colors flex-shrink-0"
-        >
-          <Copy size={12} />
-        </button>
-      </div>
-    );
-
-    if (showTooltip && address) {
-      return (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>{content}</TooltipTrigger>
-            <TooltipContent>
-              <p>{address}</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      );
-    }
-
-    return content;
+    if (!address) return;
+    await navigator.clipboard.writeText(address);
+    toast({ title: 'Address copied!', description: `${label} address copied to clipboard`, duration: 2000 });
   };
 
   return (
-    <header className="bg-background border-b border-border py-4 px-6 flex items-center justify-between">
-      <div className="flex items-center gap-3">
-        <button
-          onClick={onMenuClick}
-          className="md:hidden mr-4 p-2 hover:bg-muted rounded-md"
+    <header className="bg-background border-b border-border py-4 px-4 md:px-6 flex items-center justify-between">
+      <div className="flex items-center gap-2 md:gap-3">
+        {/* Back button for non-portfolio pages - redirects based on origin or to Portfolio */}
+        {!isPortfolioPage && (
+          <button 
+            onClick={handleBackClick}
+            className="flex items-center justify-center p-1 hover:bg-muted rounded-md transition-colors"
+          >
+            <ChevronLeft size={20} className="text-muted-foreground" />
+          </button>
+        )}
+        {/* Logo on mobile - tapping redirects to Portfolio */}
+        <button 
+          onClick={() => navigate('/dashboard')}
+          className="md:hidden focus:outline-none"
         >
-          <Menu size={20} />
+          <img 
+            src={resolvedTheme === 'dark' ? STRATOICONDARK : STRATOICON} 
+            alt="STRATO" 
+            className="h-8" 
+          />
         </button>
-        <h1 className="text-xl font-bold">{title}</h1>
+        {/* Title always visible */}
+        <h1 className="text-base md:text-xl font-bold whitespace-nowrap">{title}</h1>
         {isTestnet && (
-          <span className="bg-orange-500 text-white px-3 py-1.5 rounded-md text-sm font-bold uppercase tracking-wide shadow-md">
+          <span className="bg-orange-500 text-white px-2 py-1 rounded text-xs font-bold uppercase hidden sm:inline-block">
             TESTNET
           </span>
         )}
       </div>
 
-      <div className="flex items-center space-x-4">
+      <div className="flex items-center gap-2 md:gap-3">
         <ModeToggle />
-        <div className="flex items-center">
-          <div className="flex flex-col items-end mr-3">
-            <span className="text-sm font-medium">{userName || "N/A"}</span>
-            <div className="flex items-center">
-              <span className="text-xs text-muted-foreground">{truncateAddress(userAddress)}</span>
-              <CopyButton address={userAddress}/>
-            </div>
-          </div>
-          <Popover>
-            <PopoverTrigger asChild>
-              <div className="relative">
-                <Avatar className="w-8 h-8 bg-strato-blue cursor-pointer">
-                  <AvatarFallback className="text-white text-xs bg-strato-blue">
-                    {userName ? userName.substring(0, 2).toUpperCase() : "NA"}
-                  </AvatarFallback>
-                </Avatar>
-                <div
-                  className={`absolute top-0 right-0 w-3 h-3 rounded-full border-2 border-white ${
-                    isConnected ? "bg-green-500" : "bg-red-500"
-                  }`}
-                />
-              </div>
-            </PopoverTrigger>
-            <PopoverContent className="w-full p-3 shadow-md mt-2" align="end" side="bottom">
-              <div className="flex flex-col space-y-3">
-                <div className="flex flex-col space-y-0.5">
-                  <div className="text-sm font-medium">{userName || "N/A"}</div>
-                  <AddressRow 
-                    address={userAddress} 
-                    onCopy={() => copyAddress(userAddress, 'User')}
-                    textColor="text-muted-foreground"
-                  />
+        
+        <Popover>
+          <PopoverTrigger asChild>
+            <button className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-[#1e2a4a] flex items-center justify-center cursor-pointer hover:opacity-90 transition-opacity">
+              <span className="text-white text-xs md:text-sm font-semibold">
+                {userName?.slice(0, 2).toUpperCase() || "NA"}
+              </span>
+            </button>
+          </PopoverTrigger>
+          
+          <PopoverContent className="w-64 md:w-72 p-3 md:p-4" align="end">
+            <div className="space-y-3 md:space-y-4">
+              {/* User Info */}
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-[#1e2a4a] flex items-center justify-center shrink-0">
+                  <span className="text-white text-sm font-semibold">
+                    {userName?.slice(0, 2).toUpperCase() || "NA"}
+                  </span>
                 </div>
-
-                <div className="border-t border-border pt-3">
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <div className="text-xs font-medium text-muted-foreground">External Wallet</div>
-                    <div
-                      className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
-                        isConnected ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
-                      }`}
-                    >
-                      {isConnected ? "Connected" : "Disconnected"}
-                    </div>
+                <div className="min-w-0">
+                  <p className="font-medium text-sm truncate">{userName || "N/A"}</p>
+                  <div className="flex items-center gap-1.5 text-[10px] md:text-xs text-muted-foreground font-mono">
+                    <span className="truncate">{truncateAddress(userAddress, 8, 4)}</span>
+                    <button onClick={() => copyAddress(userAddress, 'User')} className="hover:text-foreground shrink-0">
+                      <Copy size={10} />
+                    </button>
                   </div>
-                  {isConnected ? (
-                    <div className="flex flex-col space-y-2">
-                      <AddressRow 
-                        address={walletAddress} 
-                        onCopy={() => copyAddress(walletAddress, 'Wallet')}
-                        showTooltip
-                      />
-                      <Button onClick={() => disconnect()} className={GRADIENT_BUTTON_CLASS}>
-                        Disconnect Wallet
-                      </Button>
-                    </div>
-                  ) : (
-                    <ConnectButton.Custom>
-                      {({ openConnectModal, authenticationStatus, mounted }) => {
-                        const ready = mounted && authenticationStatus !== 'loading';
-                        if (!ready) return null;
-
-                        return (
-                          <Button onClick={openConnectModal} className={GRADIENT_BUTTON_CLASS}>
-                            Connect Wallet
-                          </Button>
-                        );
-                      }}
-                    </ConnectButton.Custom>
-                  )}
-                </div>
-
-                <div className="border-t border-border pt-3">
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={logout}
-                    className="w-full"
-                  >
-                    <LogOutIcon />
-                    Logout
-                  </Button>
                 </div>
               </div>
-            </PopoverContent>
-          </Popover>
-        </div>
+
+              {/* External Wallet */}
+              <div className="border-t pt-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] md:text-xs font-medium text-muted-foreground">External Wallet</span>
+                  <span className={`px-1.5 py-0.5 rounded text-[9px] md:text-[10px] font-semibold ${
+                    isConnected ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
+                  }`}>
+                    {isConnected ? "Connected" : "Disconnected"}
+                  </span>
+                </div>
+                
+                {isConnected ? (
+                  <div className="space-y-2">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="flex items-center gap-1.5 text-[10px] md:text-xs font-mono">
+                            <span>{truncateAddress(walletAddress, 8, 4)}</span>
+                            <button onClick={() => copyAddress(walletAddress, 'Wallet')} className="hover:text-foreground">
+                              <Copy size={10} />
+                            </button>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent><p>{walletAddress}</p></TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <Button onClick={() => disconnect()} size="sm" className={`${GRADIENT_BUTTON_CLASS} h-8 text-xs`}>
+                      Disconnect Wallet
+                    </Button>
+                  </div>
+                ) : (
+                  <ConnectButton.Custom>
+                    {({ openConnectModal, mounted, authenticationStatus }) => {
+                      if (!mounted || authenticationStatus === 'loading') return null;
+                      return (
+                        <Button onClick={openConnectModal} size="sm" className={`${GRADIENT_BUTTON_CLASS} h-8 text-xs`}>
+                          Connect Wallet
+                        </Button>
+                      );
+                    }}
+                  </ConnectButton.Custom>
+                )}
+              </div>
+
+              {/* Logout */}
+              <div className="border-t pt-3">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={logout} 
+                  className="w-full h-9 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 justify-start gap-2"
+                >
+                  <LogOutIcon size={16} />
+                  <span className="text-sm font-medium">Logout</span>
+                </Button>
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
     </header>
   );

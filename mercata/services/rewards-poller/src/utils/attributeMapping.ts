@@ -9,6 +9,11 @@ const MERCATA_PREFIX = "BlockApps-";
 const PriceOracleEvents = `${MERCATA_PREFIX}PriceOracle-PriceUpdated`;
 const PriceOracleBatchUpdateEvents = `${MERCATA_PREFIX}PriceOracle-BatchPricesUpdated`;
 
+const PRICE_CONVERSION_MAP: Record<string, string> = {
+  Swap: "tokenIn",
+  DepositCompleted: "stratoToken",
+};
+
 const toBigIntSafeString = (value: string | number): string => {
   if (typeof value === "string") {
     return value;
@@ -20,6 +25,7 @@ export interface AttributeMapping {
   [contractAddress: string]: {
     [eventName: string]: {
       amount: string;
+      user?: string;
     };
   };
 }
@@ -163,12 +169,13 @@ export const extractAmountFromAttributes = async (
     return null;
   }
 
-  if (eventName === "Swap") {
-    const tokenIn = attributes.tokenIn;
-    if (!tokenIn) {
+  const tokenAttributeName = PRICE_CONVERSION_MAP[eventName];
+  if (tokenAttributeName) {
+    const tokenAddress = attributes[tokenAttributeName];
+    if (!tokenAddress) {
       logError(
         "AttributeMapping",
-        new Error(`tokenIn not found in Swap event`),
+        new Error(`${tokenAttributeName} not found in ${eventName} event`),
         {
           operation: "extractAmountFromAttributes",
           contractAddress,
@@ -179,18 +186,27 @@ export const extractAmountFromAttributes = async (
       return null;
     }
 
-    const price = await getPriceAtTimestamp(tokenIn, blockTimestamp);
+    if (eventName === "DepositCompleted") {
+      const isUsdt =
+        tokenAddress.toLowerCase() === config.usdst.address.toLowerCase();
+
+      if (!isUsdt) {
+        return null;
+      }
+    }
+
+    const price = await getPriceAtTimestamp(tokenAddress, blockTimestamp);
     if (!price) {
       logError(
         "AttributeMapping",
         new Error(
-          `Price not found for token ${tokenIn} at timestamp ${blockTimestamp}`
+          `Price not found for token ${tokenAddress} at timestamp ${blockTimestamp}`
         ),
         {
           operation: "extractAmountFromAttributes",
           contractAddress,
           eventName,
-          tokenIn,
+          tokenAddress,
           blockTimestamp,
         }
       );

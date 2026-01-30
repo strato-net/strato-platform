@@ -16,6 +16,8 @@ import { useState } from "react";
 import { useUser } from "@/context/UserContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatDistanceToNow } from "date-fns";
+import { Link } from "react-router-dom";
+import { getActivityLink } from "@/lib/rewards/activityLinks";
 
 interface UserRewardsSectionProps {
   userRewards: UserRewardsData | null;
@@ -225,18 +227,18 @@ export const UserRewardsSection = ({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {/* Total Claimable Card */}
       <Card>
-        <CardHeader>
-          <CardTitle>Total Claimable Rewards</CardTitle>
-          <CardDescription>Rewards ready to claim now</CardDescription>
+        <CardHeader className="px-4 md:px-6 pb-2 md:pb-4">
+          <CardTitle className="text-base md:text-lg">Total Claimable Rewards</CardTitle>
+          <CardDescription className="text-xs md:text-sm">Rewards ready to claim now</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between">
+        <CardContent className="px-4 md:px-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
             <div>
-              <div className="flex items-center space-x-2 mb-2">
-                <Coins className="h-5 w-5 text-yellow-500" />
-                <p className="text-3xl font-bold">{totalClaimableFormatted}</p>
+              <div className="flex items-center space-x-2 mb-1 md:mb-2">
+                <Coins className="h-4 w-4 md:h-5 md:w-5 text-yellow-500" />
+                <p className="text-2xl md:text-3xl font-bold">{totalClaimableFormatted}</p>
               </div>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs md:text-sm text-muted-foreground">
                 Amount you will receive if you click "Claim All"
               </p>
             </div>
@@ -244,6 +246,7 @@ export const UserRewardsSection = ({
               onClick={handleClaimAll}
               disabled={!hasClaimable || isClaimingAll || !userAddress}
               size="lg"
+              className="w-full md:w-auto"
             >
               {isClaimingAll ? (
                 <>
@@ -262,20 +265,20 @@ export const UserRewardsSection = ({
 
         {/* Total Earned Card */}
         <Card>
-          <CardHeader>
-            <CardTitle>Total Claimed </CardTitle>
+          <CardHeader className="px-4 md:px-6 pb-2 md:pb-4">
+            <CardTitle className="text-base md:text-lg">Total Claimed</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="flex items-center space-x-2 mb-2">
-              <Star className="h-5 w-5 text-amber-500" />
-              <p className="text-3xl font-bold">
+          <CardContent className="px-4 md:px-6">
+            <div className="flex items-center space-x-2 mb-1 md:mb-2">
+              <Star className="h-4 w-4 md:h-5 md:w-5 text-amber-500" />
+              <p className="text-2xl md:text-3xl font-bold">
                 {formatRoundedWithCommas(roundByMagnitude(
                   formatBalance(userRewards?.claimedRewards || "0", "points", 18, 18, 18)
                     .replace(/\s*points?\s*$/i, '').trim()
                 ))} points
               </p>
             </div>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs md:text-sm text-muted-foreground">
               Reward Points
             </p>
           </CardContent>
@@ -327,16 +330,30 @@ export const UserRewardsSection = ({
             const lastUpdate = lastUpdateTimeStr ? new Date(Number(lastUpdateTimeStr) * 1000) : null;
             const timeAgo = lastUpdate ? formatDistanceToNow(lastUpdate, { addSuffix: true }) : "?";
 
+            const activityLink = activity?.name ? getActivityLink(activity.name) : null;
+            const displayName = activity?.name 
+              ? (activity.name.length > 30 
+                  ? activity.name.substring(0, 30) + "..." 
+                  : activity.name)
+              : "?";
+
             return (
               <Card key={activity.activityId}>
                 <CardHeader>
                   <div>
                     <CardTitle className="text-lg flex items-center gap-2">
-                      {activity?.name 
-                        ? (activity.name.length > 30 
-                            ? activity.name.substring(0, 30) + "..." 
-                            : activity.name)
-                        : "?"}
+                      {activity?.name ? (
+                        activityLink ? (
+                          <Link
+                            to={activityLink}
+                            className="text-primary hover:underline transition-colors"
+                          >
+                            {displayName}
+                          </Link>
+                        ) : (
+                          displayName
+                        )
+                      ) : "?"}
                       <Badge variant="secondary">
                         {activity?.activityType !== undefined && activity?.activityType !== null
                           ? (activity.activityType === 1 ? "One-Time" : "Position")
