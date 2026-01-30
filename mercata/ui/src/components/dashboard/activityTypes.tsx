@@ -14,6 +14,27 @@ import CopyButton from "@/components/ui/copy";
 import { Badge } from "@/components/ui/badge";
 
 /**
+ * Format block timestamp to readable date string
+ */
+const formatEventDate = (timestamp: string | undefined): string => {
+  if (!timestamp || timestamp === 'N/A') return 'N/A';
+  try {
+    const date = new Date(timestamp.replace(' UTC', 'Z').replace(' ', 'T'));
+    if (isNaN(date.getTime())) return 'N/A';
+    const formattedDate = date.toLocaleString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    return formattedDate;
+  } catch {
+    return 'N/A';
+  }
+};
+
+/**
  * Activity handler function type
  * Processes events and returns Card components
  * @param event - The event data
@@ -147,6 +168,9 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
                 {tokenSymbol && ` ${tokenSymbol}`}
               </span>
             </div>
+            <div className="text-xs text-muted-foreground pt-2 border-t">
+              {formatEventDate(event.block_timestamp)}
+            </div>
           </CardContent>
         </Card>
       );
@@ -274,6 +298,9 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
                 </TooltipProvider>
               </div>
             )}
+            <div className="text-xs text-muted-foreground pt-2 border-t">
+              {formatEventDate(event.block_timestamp)}
+            </div>
           </CardContent>
         </Card>
       );
@@ -373,6 +400,9 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
               <span className="font-semibold">
                 {formatValue(amountUSD)} USDST
               </span>
+            </div>
+            <div className="text-xs text-muted-foreground pt-2 border-t">
+              {formatEventDate(event.block_timestamp)}
             </div>
           </CardContent>
         </Card>
@@ -499,6 +529,9 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
               </div>
               <span className="text-muted-foreground">({formatValue(amountOut)})</span>
             </div>
+            <div className="text-xs text-muted-foreground pt-2 border-t">
+              {formatEventDate(event.block_timestamp)}
+            </div>
           </CardContent>
         </Card>
       );
@@ -575,6 +608,9 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
               <span className="font-semibold">
                 {formatValue(amount)} CATA
               </span>
+            </div>
+            <div className="text-xs text-muted-foreground pt-2 border-t">
+              {formatEventDate(event.block_timestamp)}
             </div>
           </CardContent>
         </Card>
@@ -792,6 +828,9 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
                   </Tooltip>
                 </TooltipProvider>
               )}
+            </div>
+            <div className="text-xs text-muted-foreground pt-2 border-t">
+              {formatEventDate(event.block_timestamp)}
             </div>
           </CardContent>
         </Card>
