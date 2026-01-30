@@ -254,7 +254,7 @@ valueToText = \case
     let pairs = map (\(sv, v) -> simpleValueToText sv <> ": " <> valueToText v) $ Map.toList m
      in "{" <> Text.intercalate "," pairs <> "}"
   ValueContract addr -> Text.pack $ show addr
-  ValueEnum {} -> error "ValueEnum to text"
+  ValueEnum _ _ numVal -> Text.pack $ show numVal  -- Integer for coerceType
   ValueFunction {} -> error "ValueFunction to text"
   ValueStruct m ->
     "{" <> Text.intercalate "," (map (\(k, v) -> Text.concat [k, ":", valueToText v]) $ Map.toList m) <> "}"
