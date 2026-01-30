@@ -424,9 +424,8 @@ export const collateralAndBalance = async (
   }
 
   const isPaused = registry.lendingPool._paused;
+
   const assets = registry.lendingPool.assetConfigs?.map((a: any) => a.asset).filter((asset: string) => asset !== registry.lendingPool.borrowableAsset) || [];
-  
-  // Fetch user's collaterals and balances
   const userCollaterals = (registry.collateralVault.userCollaterals || []).filter((c: any) => c.user === userAddress);
   const userTokens = await getBalance(accessToken, userAddress, {
     address: `in.(${assets.join(",")})`, select: `address,user:key,balance:value::text,token:${Token}(_name,_symbol,_owner,_totalSupply::text,customDecimals,images:${Token}-images(value))`

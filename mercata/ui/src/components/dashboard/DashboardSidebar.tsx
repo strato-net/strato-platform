@@ -29,7 +29,6 @@ interface NavItem {
   adminOnly?: boolean;
 }
 
-
 const PRIMARY_NAV_ITEMS: NavItem[] = [
   { icon: LayoutDashboard, label: 'Portfolio', path: '/dashboard' },
   { icon: ArrowUpDown, label: 'Deposit', path: '/dashboard/deposits' },
