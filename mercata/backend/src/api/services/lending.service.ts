@@ -589,8 +589,8 @@ export const liquidityAndBalance = async (
   accessToken: string,
   userAddress: string,
 ) => {
-  // Build query - userLoan filter for logged-in user
-  const queryParams: Record<string, string> = {
+  // Fetch pool data with explicit select (index fields + userLoan + prices + pause status)
+  const registry = await getPool(accessToken, {
     select:
       `lendingPool:lendingPool_fkey(` +
         `address,borrowableAsset,mToken,_paused,` +
@@ -604,14 +604,9 @@ export const liquidityAndBalance = async (
       `oracle:priceOracle_fkey(address,` +
         `prices:${PriceOracle}-prices(asset:key,price:value::text)` +
       `),` +
-      `liquidityPool:liquidityPool_fkey(address)`
-  };
-  
-  // Filter userLoan by userAddress
-  queryParams["lendingPool.userLoan.key"] = `eq.${userAddress}`;
-
-  // Fetch pool data with explicit select (index fields + userLoan + prices + pause status)
-  const registry = await getPool(accessToken, queryParams);
+      `liquidityPool:liquidityPool_fkey(address)`,
+    "lendingPool.userLoan.key": `eq.${userAddress}`
+  });
 
   const { borrowableAsset, mToken, assetConfigs, _paused } = registry.lendingPool || {};
   const allCollaterals = registry.collateralVault?.userCollaterals || [];
@@ -622,19 +617,16 @@ export const liquidityAndBalance = async (
   }
 
   // Fetch token metadata with balances included
-  const balanceKeys = `in.(${userAddress},${registry.liquidityPool?.address || ''})`;
-  
   const tokenData = await getTokens(accessToken, {
     address: `in.(${borrowableAsset},${mToken})`,
     select: `address,_name,_symbol,_owner,_totalSupply::text,customDecimals,balances:${Token}-_balances(user:key,balance:value::text)`,
-    "balances.key": balanceKeys
+    "balances.key": `in.(${userAddress},${registry.liquidityPool?.address || ''})`
   });
 
   // Extract token data and user balances
   const borrowableToken = tokenData.find(token => token.address === borrowableAsset);
   const mTokenInfo = tokenData.find(token => token.address === mToken);
 
-  // User balances
   const borrowableBalance = borrowableToken?.balances?.find((b: any) => b.user === userAddress)?.balance || "0";
   const mTokenBalance = mTokenInfo?.balances?.find((b: any) => b.user === userAddress)?.balance || "0";
 
@@ -804,12 +796,10 @@ export const getPublicLiquidityInfo = async (
   }
 
   // Fetch token metadata - only pool balances (no user balances)
-  const balanceKeys = `eq.${registry.liquidityPool?.address || ''}`;
-  
   const tokenData = await getTokens(accessToken, {
     address: `in.(${borrowableAsset},${mToken})`,
     select: `address,_name,_symbol,_owner,_totalSupply::text,customDecimals,balances:${Token}-_balances(user:key,balance:value::text)`,
-    "balances.key": balanceKeys
+    "balances.key": `eq.${registry.liquidityPool?.address || ''}`
   });
 
   // Extract token data
