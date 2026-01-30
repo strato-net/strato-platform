@@ -372,6 +372,134 @@ const activityFilters: Record<string, ActivityFilter> = {
 
     return { events, total };
   },
+
+  // RewardsClaimed events: filter by user
+  "Rewards:RewardsClaimed": async (userAddress, contractName, eventName, storageSelect, fetchLimit, accessToken, timeRange) => {
+    const timeFilter = getTimeRangeFilter(timeRange);
+    const params: Record<string, string> = {
+      order: "block_timestamp.desc",
+      select: `*,${storageSelect}`,
+      "storage.contract.contract_name": `eq.${contractName}`,
+      event_name: `eq.${eventName}`,
+      limit: fetchLimit.toString(),
+      offset: "0",
+      ...timeFilter,
+    };
+
+    if (userAddress) {
+      params["attributes->>user"] = `eq.${userAddress}`;
+    }
+
+    const countParams: Record<string, string> = {
+      "storage.contract.contract_name": `eq.${contractName}`,
+      event_name: `eq.${eventName}`,
+      select: `${storageSelect},count()`,
+      ...timeFilter,
+    };
+
+    if (userAddress) {
+      countParams["attributes->>user"] = `eq.${userAddress}`;
+    }
+
+    const [countResponse, eventsResponse] = await Promise.all([
+      cirrus.get(accessToken, `/${constants.Event}`, { params: countParams }),
+      cirrus.get(accessToken, `/${constants.Event}`, { params }),
+    ]);
+
+    const total = countResponse.data?.[0]?.count || 0;
+    const data = eventsResponse.data || [];
+
+    const events = (data as any[]).map((event: any) => {
+      const { storage, ...eventWithoutStorage } = event;
+      return {
+        ...eventWithoutStorage,
+        contract_name: event.storage?.contract?.[0]?.contract_name || "",
+      };
+    });
+
+    return { events, total };
+  },
+
+  // Referral Redeemed events: filter by sender OR recipient
+  "Escrow:Redeemed": async (userAddress, contractName, eventName, storageSelect, fetchLimit, accessToken, timeRange) => {
+    if (!userAddress) {
+      // If no userAddress, use default filter (no user-specific filtering)
+      return defaultFilter(userAddress, contractName, eventName, storageSelect, fetchLimit, accessToken, timeRange);
+    }
+
+    const timeFilter = getTimeRangeFilter(timeRange);
+    const baseParams = {
+      order: "block_timestamp.desc",
+      select: `*,${storageSelect}`,
+      "storage.contract.contract_name": `eq.${contractName}`,
+      event_name: `eq.${eventName}`,
+      limit: fetchLimit.toString(),
+      offset: "0",
+      ...timeFilter,
+    };
+
+    const senderParams = {
+      ...baseParams,
+      "attributes->>sender": `eq.${userAddress}`,
+    };
+
+    const recipientParams = {
+      ...baseParams,
+      "attributes->>recipient": `eq.${userAddress}`,
+    };
+
+    const senderCountParams: Record<string, string> = {
+      "storage.contract.contract_name": `eq.${contractName}`,
+      event_name: `eq.${eventName}`,
+      "attributes->>sender": `eq.${userAddress}`,
+      select: `${storageSelect},count()`,
+      ...timeFilter,
+    };
+
+    const recipientCountParams: Record<string, string> = {
+      "storage.contract.contract_name": `eq.${contractName}`,
+      event_name: `eq.${eventName}`,
+      "attributes->>recipient": `eq.${userAddress}`,
+      select: `${storageSelect},count()`,
+      ...timeFilter,
+    };
+
+    const [senderCountResponse, senderEventsResponse, recipientCountResponse, recipientEventsResponse] = await Promise.all([
+      cirrus.get(accessToken, `/${constants.Event}`, { params: senderCountParams }),
+      cirrus.get(accessToken, `/${constants.Event}`, { params: senderParams }),
+      cirrus.get(accessToken, `/${constants.Event}`, { params: recipientCountParams }),
+      cirrus.get(accessToken, `/${constants.Event}`, { params: recipientParams }),
+    ]);
+
+    const senderTotal = senderCountResponse.data?.[0]?.count || 0;
+    const recipientTotal = recipientCountResponse.data?.[0]?.count || 0;
+    
+    const senderEvents = (senderEventsResponse.data || []).map((event: any) => {
+      const { storage, ...eventWithoutStorage } = event;
+      return {
+        ...eventWithoutStorage,
+        contract_name: event.storage?.contract?.[0]?.contract_name || "",
+      };
+    });
+    
+    const recipientEvents = (recipientEventsResponse.data || []).map((event: any) => {
+      const { storage, ...eventWithoutStorage } = event;
+      return {
+        ...eventWithoutStorage,
+        contract_name: event.storage?.contract?.[0]?.contract_name || "",
+      };
+    });
+
+    // Deduplicate by id
+    const eventMap = new Map<number, any>();
+    [...senderEvents, ...recipientEvents].forEach(event => {
+      eventMap.set(event.id, event);
+    });
+
+    const total = Math.max(senderTotal, recipientTotal); // Conservative estimate
+
+    return { events: Array.from(eventMap.values()), total };
+  },
 };
 
 /**

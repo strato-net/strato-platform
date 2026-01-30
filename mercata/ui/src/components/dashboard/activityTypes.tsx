@@ -608,4 +608,300 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       );
     },
   },
+  "RewardsClaimed": {
+    contract_name: "Rewards",
+    event_name: "RewardsClaimed",
+    displayName: "Rewards Claimed",
+    getTokenAddress: (event: Event) => {
+      // The reward token address is stored in the Rewards contract, not in the event
+      // We could fetch it from the contract, but for now return empty array
+      // The amount will be displayed without a symbol
+      return [];
+    },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null) => {
+      const user = event.attributes.user || event.attributes.User || "";
+      const amount = event.attributes.amount || event.attributes.Amount || "0";
+      
+      // Format value (assuming 18 decimals for CATA token)
+      const formatValue = (val: string) => {
+        try {
+          const formatted = formatUnits(BigInt(val), 18);
+          return parseFloat(formatted).toLocaleString(undefined, {
+            maximumFractionDigits: 6,
+            minimumFractionDigits: 0
+          });
+        } catch {
+          return val;
+        }
+      };
+      
+      const formatAddress = (addr: string) => {
+        if (!addr) return "N/A";
+        return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+      };
+      
+      const isUserAddress = (addr: string) => {
+        return userAddress && addr && addr.toLowerCase() === userAddress.toLowerCase();
+      };
+      
+      return (
+        <Card key={event.id}>
+          <CardHeader>
+            <CardTitle>Rewards Claimed</CardTitle>
+            <CardDescription>{event.contract_name}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex items-center gap-2 text-sm">
+              <ArrowDown className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">User:</span>
+              <div className="flex items-center gap-1">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <code className={`text-xs bg-muted px-2 py-1 rounded cursor-help ${isUserAddress(user) ? "ring-2 ring-primary" : ""}`}>
+                        {formatAddress(user)}
+                      </code>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="font-mono text-xs">{user}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <CopyButton address={user} />
+                {isUserAddress(user) && (
+                  <Badge variant="default" className="ml-1 bg-primary text-primary-foreground text-xs">
+                    You
+                  </Badge>
+                )}
+              </div>
+            </div>
+            <div className="text-sm">
+              <span className="text-muted-foreground">Amount: </span>
+              <span className="font-semibold">
+                {formatValue(amount)} CATA
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      );
+    },
+  },
+  "ReferralRedeemed": {
+    contract_name: "Escrow",
+    event_name: "Redeemed",
+    displayName: "Referral Redeemed",
+    getTokenAddress: (event: Event) => {
+      // Helper to normalize arrays from object format (handles Cirrus/PostgREST JSONB format)
+      const normalizeToArray = (value: any): any[] => {
+        if (Array.isArray(value)) {
+          return value;
+        }
+        if (value && typeof value === 'object') {
+          // Convert object like { '0': 'value1', '1': 'value2' } to array
+          const keys = Object.keys(value).sort((a, b) => parseInt(a) - parseInt(b));
+          return keys.map(key => value[key]);
+        }
+        if (typeof value === 'string') {
+          // Try parsing as JSON string
+          try {
+            const parsed = JSON.parse(value);
+            return normalizeToArray(parsed);
+          } catch {
+            return [];
+          }
+        }
+        return [];
+      };
+      
+      // tokens is an array in the event attributes
+      const tokens = event.attributes.tokens || event.attributes.Tokens;
+      const tokenArray = normalizeToArray(tokens);
+      return tokenArray.filter(Boolean) as string[];
+    },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null) => {
+      const sender = event.attributes.sender || event.attributes.Sender || "";
+      const recipient = event.attributes.recipient || event.attributes.Recipient || "";
+      const tokens = event.attributes.tokens || event.attributes.Tokens || [];
+      const amounts = event.attributes.amounts || event.attributes.Amounts || [];
+      
+      // Helper to normalize arrays from object format (handles Cirrus/PostgREST JSONB format)
+      const normalizeToArray = (value: any): any[] => {
+        if (Array.isArray(value)) {
+          return value;
+        }
+        if (value && typeof value === 'object') {
+          // Convert object like { '0': 'value1', '1': 'value2' } to array
+          const keys = Object.keys(value).sort((a, b) => parseInt(a) - parseInt(b));
+          return keys.map(key => value[key]);
+        }
+        if (typeof value === 'string') {
+          // Try parsing as JSON string
+          try {
+            const parsed = JSON.parse(value);
+            return normalizeToArray(parsed);
+          } catch {
+            return [];
+          }
+        }
+        return [];
+      };
+      
+      // Normalize arrays (they might be stored as objects with numeric keys)
+      const tokenArray = normalizeToArray(tokens);
+      const amountArray = normalizeToArray(amounts);
+      
+      // Format value (assuming 18 decimals for ERC20 tokens)
+      const formatValue = (val: string | number) => {
+        try {
+          const valStr = String(val);
+          if (!valStr || valStr === "0" || valStr === "null" || valStr === "undefined") {
+            return "0";
+          }
+          const formatted = formatUnits(BigInt(valStr), 18);
+          return parseFloat(formatted).toLocaleString(undefined, {
+            maximumFractionDigits: 6,
+            minimumFractionDigits: 0
+          });
+        } catch (e) {
+          console.warn("Failed to format amount:", val, e);
+          return String(val);
+        }
+      };
+      
+      const formatAddress = (addr: string) => {
+        if (!addr) return "N/A";
+        return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+      };
+      
+      const isUserAddress = (addr: string) => {
+        return userAddress && addr && addr.toLowerCase() === userAddress.toLowerCase();
+      };
+      
+      // Format token amounts - show first token if available
+      // Try multiple ways to access the first amount
+      const firstToken = tokenArray[0] || "";
+      let firstAmount: string | number | undefined = amountArray[0];
+      
+      // If amountArray is empty, try accessing amounts directly as object properties
+      if (!firstAmount && amounts && typeof amounts === 'object' && !Array.isArray(amounts)) {
+        firstAmount = amounts['0'] || amounts[0] || amounts['amounts.0'] || amounts['amounts[0]'];
+      }
+      
+      // If still no amount, try checking if it's stored as a string representation
+      if (!firstAmount && typeof amounts === 'string') {
+        try {
+          const parsed = JSON.parse(amounts);
+          const parsedArray = normalizeToArray(parsed);
+          firstAmount = parsedArray[0];
+        } catch {
+          // Not JSON, ignore
+        }
+      }
+      
+      const tokenSymbol = firstToken ? tokenSymbols.get(String(firstToken)) : undefined;
+      const displayAmount = firstAmount ? formatValue(firstAmount) : "0";
+      const hasMultipleTokens = tokenArray.length > 1;
+      
+      // Build list of all token amounts for tooltip
+      const allTokenAmounts = tokenArray.map((token, index) => {
+        const amount = amountArray[index];
+        const symbol = token ? tokenSymbols.get(String(token)) : undefined;
+        const formattedAmount = amount ? formatValue(amount) : "0";
+        return {
+          token,
+          amount: formattedAmount,
+          symbol: symbol || "TOKEN"
+        };
+      });
+      
+      return (
+        <Card key={event.id}>
+          <CardHeader>
+            <CardTitle>Referral Redeemed</CardTitle>
+            <CardDescription>{event.contract_name}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex items-center gap-2 text-sm">
+              <ArrowDownLeft className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Referred By:</span>
+              <div className="flex items-center gap-1">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <code className={`text-xs bg-muted px-2 py-1 rounded cursor-help ${isUserAddress(sender) ? "ring-2 ring-primary" : ""}`}>
+                        {formatAddress(sender)}
+                      </code>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="font-mono text-xs">{sender}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <CopyButton address={sender} />
+                {isUserAddress(sender) && (
+                  <Badge variant="default" className="ml-1 bg-primary text-primary-foreground text-xs">
+                    You
+                  </Badge>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Referred User:</span>
+              <div className="flex items-center gap-1">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <code className={`text-xs bg-muted px-2 py-1 rounded cursor-help ${isUserAddress(recipient) ? "ring-2 ring-primary" : ""}`}>
+                        {formatAddress(recipient)}
+                      </code>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="font-mono text-xs">{recipient}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <CopyButton address={recipient} />
+                {isUserAddress(recipient) && (
+                  <Badge variant="default" className="ml-1 bg-primary text-primary-foreground text-xs">
+                    You
+                  </Badge>
+                )}
+              </div>
+            </div>
+            <div className="text-sm">
+              <span className="text-muted-foreground">Amount: </span>
+              <span className="font-semibold">
+                {displayAmount}
+                {tokenSymbol ? ` ${tokenSymbol}` : firstToken ? ` (${formatAddress(firstToken)})` : ""}
+              </span>
+              {hasMultipleTokens && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="text-muted-foreground cursor-help ml-1">
+                        +{tokenArray.length - 1} more
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-sm">
+                      <div className="space-y-1">
+                        <p className="font-semibold text-xs mb-2">All tokens:</p>
+                        {allTokenAmounts.map((item, index) => (
+                          <div key={index} className="text-xs">
+                            <span className="font-medium">
+                              {item.amount} {item.symbol !== "TOKEN" ? item.symbol : `(${formatAddress(item.token)})`}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      );
+    },
+  },
 };
