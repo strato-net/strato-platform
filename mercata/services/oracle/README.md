@@ -34,6 +34,7 @@ COINGECKO_API_KEY=your-coingecko-api-key
 METALS_DEV_API_KEY=your-metals-dev-key
 METALS_API_API_KEY=your-metals-api-key
 COMMODITIES_API_KEY=your-commodities-api-key
+COMMODITY_PRICE_API_KEY=your-commodity-price-api-key
 COINAPI_API_KEY=your-coinapi-api-key
 LIVECOINWATCH_API_KEY=your-livecoinwatch-api-key
 

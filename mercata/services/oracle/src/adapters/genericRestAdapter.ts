@@ -212,6 +212,23 @@ function parseResponse(data: any, sourceConfig: SourceConfig): BatchPriceResult 
             }
         });
         
+    // CommodityPriceAPI: rates.{symbol} object with close price
+    } else if (parsePattern === 'rates.{symbol}' && data.rates) {
+        symbols.forEach(symbol => {
+            const rate = data.rates[symbol];
+            if (rate) {
+                // Handle both direct number and object with close price
+                const priceUSD = typeof rate === 'number' ? rate : (rate.close || rate.price || rate.value);
+                if (priceUSD) {
+                    const price = Math.floor(parseFloat(priceUSD) * 1e18);
+                    if (isValidPrice(price)) {
+                        const ts = data.timestamp ? new Date(data.timestamp * 1000).toISOString() : new Date().toISOString();
+                        result[symbol] = { price, feedTimestamp: ts };
+                    }
+                }
+            }
+        });
+        
     // Generic fallback
     } else {
         symbols.forEach(symbol => {

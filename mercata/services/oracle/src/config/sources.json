@@ -79,6 +79,15 @@
     "apiKeyEnvVar": "COMMODITIES_API_KEY",
     "assets": ["XAU", "XAG"]
   },
+  "CommodityPriceAPI": {
+    "url": "https://api.commoditypriceapi.com/v2/rates/latest",
+    "params": "symbols",
+    "headers": "x-api-key",
+    "parse": "rates.{symbol}",
+    "timestamp": "timestamp",
+    "apiKeyEnvVar": "COMMODITY_PRICE_API_KEY",
+    "assets": ["XAU", "XAG"]
+  },
   "constant": {
     "parse": "constant",
     "assets": ["USDST"]
