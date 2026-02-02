@@ -932,7 +932,7 @@ getContractNameAndHash address' = do
 
   case codeHash of
     SolidVMCode cn ch' -> return (stringToLabel cn, ch')
-    ch -> internalError ("SolidVM for non-solidvm code at address " ++ formatAddressWithoutColor address') (format ch)
+    _ -> missingCodeCollection ("contract call to address 0x" ++ formatAddressWithoutColor address' ++ " failed") ("no contract deployed at this address" :: String)
 
 getCodeAndCollection :: MonadSM m => Address -> m (CC.Contract, Keccak256, CC.CodeCollection)
 getCodeAndCollection address' = do
