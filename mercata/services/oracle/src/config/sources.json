@@ -88,6 +88,31 @@
     "apiKeyEnvVar": "COMMODITY_PRICE_API_KEY",
     "assets": ["XAU", "XAG"]
   },
+  "TwelveData": {
+    "url": "https://api.twelvedata.com/price",
+    "params": "apikey,symbol",
+    "parse": "{symbol}.price",
+    "apiKeyEnvVar": "TWELVEDATA_API_KEY",
+    "comment": "Also supports crypto: ETH/USD, BTC/USD, WBTC/USD, PAXG/USD, XAUT/USD. XAG requires Grow plan ($29/mo)",
+    "assets": ["XAU"],
+    "symbolMapping": {
+      "XAU": "XAU/USD"
+    }
+  },
+  "OANDA": {
+    "url": "https://api-fxpractice.oanda.com/v3/accounts/${ACCOUNT_ID}/pricing",
+    "params": "instruments",
+    "headers": "Authorization",
+    "parse": "oanda.prices",
+    "apiKeyEnvVar": "OANDA_API_KEY",
+    "accountIdEnvVar": "OANDA_ACCOUNT_ID",
+    "comment": "Practice API. Use api-fxtrade.oanda.com for live",
+    "assets": ["XAU", "XAG"],
+    "symbolMapping": {
+      "XAU": "XAU_USD",
+      "XAG": "XAG_USD"
+    }
+  },
   "constant": {
     "parse": "constant",
     "assets": ["USDST"]
