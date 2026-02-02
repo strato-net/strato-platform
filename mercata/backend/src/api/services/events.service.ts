@@ -170,7 +170,7 @@ const singleAttributeFilter: ActivityFilter = async (
 ) => {
   const timeFilter = getTimeRangeFilter(timeRange);
   const attribute = filterConfig?.type === "single" ? filterConfig.attribute : undefined;
-  
+
   // Build exclusion filter for protocol contracts if needed
   const excludeProtocolFilter: Record<string, string> = {};
   if (filterConfig?.excludeProtocolContracts && protocolContractAddresses.size > 0) {
@@ -278,11 +278,11 @@ const orAttributeFilter: ActivityFilter = async (
 
   const timeFilter = getTimeRangeFilter(timeRange);
   const attributes = filterConfig?.type === "or" ? (filterConfig.attributes || []) : [];
-  
+
   if (attributes.length === 0) {
     throw new Error("OR filter requires at least one attribute");
   }
-  
+
   // Build exclusion filter for protocol contracts if needed
   const excludeProtocolFilter: Record<string, string> = {};
   if (filterConfig?.excludeProtocolContracts && protocolContractAddresses.size > 0) {
@@ -324,7 +324,7 @@ const orAttributeFilter: ActivityFilter = async (
   attributeParams.forEach(params => {
     allPromises.push(cirrus.get(accessToken, `/${constants.Event}`, { params }));
   });
-  
+
   if (allPromises.length === 0) {
     return { events: [], total: 0 };
   }

@@ -90,7 +90,7 @@ export type TokenAddressExtractor = (event: Event) => string[];
 /**
  * Filter configuration for backend event filtering
  */
-export type FilterConfig = 
+export type FilterConfig =
   | { type: "single"; attribute: string; excludeProtocolContracts?: boolean }
   | { type: "or"; attributes: string[]; excludeProtocolContracts?: boolean };
 

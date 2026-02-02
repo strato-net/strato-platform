@@ -148,7 +148,7 @@ export async function initProtocolContractAddresses() {
       const registry = cdpRegistryData[0];
       const cdpEngineAddress = registry.cdpEngine?.address || registry.cdpEngine;
       const cdpVaultAddress = registry.cdpVault?.address || registry.cdpVault;
-      
+
       if (cdpEngineAddress) {
         addresses.add(cdpEngineAddress.toLowerCase());
       }
@@ -174,7 +174,7 @@ export async function initProtocolContractAddresses() {
       const lendingPoolAddress = registry.lendingPool?.address || registry.lendingPool;
       const collateralVaultAddress = registry.collateralVault?.address || registry.collateralVault;
       const liquidityPoolAddress = registry.liquidityPool?.address || registry.liquidityPool;
-      
+
       if (lendingPoolAddress) {
         addresses.add(lendingPoolAddress.toLowerCase());
       }

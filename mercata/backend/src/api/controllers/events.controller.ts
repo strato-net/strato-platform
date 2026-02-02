@@ -70,8 +70,8 @@ class EventsController {
       const activityTypePairs: ActivityTypePair[] = activityTypesParam.split(',').map((pair) => {
         const [contract_name, event_name] = pair.split(':');
         const key = `${contract_name}:${event_name}`;
-        return { 
-          contract_name, 
+        return {
+          contract_name,
           event_name,
           filterConfig: filterConfigsMap.get(key)
         };
