@@ -16,17 +16,26 @@ const formatUsd = (value: string): string => {
   }
 };
 
-const formatApy = (value: string): string => {
+const formatApy = (value: string): { formatted: string; isPositive: boolean; isNeutral: boolean } => {
   // If vault is too young, show "-"
-  if (value === "-") return "-";
+  if (value === "-") return { formatted: "-", isPositive: true, isNeutral: true };
 
   try {
     // APY is returned as a percentage number (e.g., "26.50" for 26.50%)
     const num = parseFloat(value);
-    if (isNaN(num)) return "-";
-    return num.toFixed(2) + "%";
+    if (isNaN(num)) return { formatted: "-", isPositive: true, isNeutral: true };
+    
+    const isPositive = num >= 0;
+    const isNeutral = num === 0;
+    const absFormatted = Math.abs(num).toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    const formatted = (isPositive ? "+" : "-") + absFormatted + "%";
+    
+    return { formatted: isNeutral ? "0.00%" : formatted, isPositive, isNeutral };
   } catch {
-    return "-";
+    return { formatted: "-", isPositive: true, isNeutral: true };
   }
 };
 
@@ -87,14 +96,21 @@ const VaultOverview = () => {
           tooltip="Total number of vault shares in circulation"
         />
 
-        <AssetSummary
-          title="APY (30d)"
-          value={`${formatApy(apy)}`}
-          icon={<TrendingUp className="text-white" size={18} />}
-          color="bg-orange-500"
-          isLoading={loading}
-          tooltip="Annual percentage yield of the vault in the last 30 days"
-        />
+        {(() => {
+          const { formatted, isPositive, isNeutral } = formatApy(apy);
+          const valueColor = isNeutral ? "" : isPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400";
+          return (
+            <AssetSummary
+              title="APY"
+              value={formatted}
+              icon={<TrendingUp className="text-white" size={18} />}
+              color="bg-orange-500"
+              isLoading={loading}
+              tooltip="Annualized percentage yield based on vault performance (30 days or since first deposit for younger vaults)"
+              valueClassName={valueColor}
+            />
+          );
+        })()}
       </div>
     </div>
   );

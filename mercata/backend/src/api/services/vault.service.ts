@@ -19,6 +19,55 @@ const {
 
 const WAD = BigInt(10) ** BigInt(18);
 
+/**
+ * Safely convert a string to BigInt, returning 0n for invalid inputs.
+ * Handles empty strings, scientific notation, and other formats.
+ */
+const safeBigInt = (value: string | null | undefined): bigint => {
+  if (!value) return 0n;
+  const trimmed = value.trim();
+  if (trimmed === "") return 0n;
+  
+  // Pure integer string - direct conversion
+  if (/^-?\d+$/.test(trimmed)) {
+    return BigInt(trimmed);
+  }
+  
+  // Scientific notation (e.g., "5e+22", "1.5e10", "3E18")
+  const sciMatch = trimmed.match(/^(-?\d+\.?\d*)[eE]([+-]?\d+)$/);
+  if (sciMatch) {
+    const [, mantissa, exponent] = sciMatch;
+    const exp = parseInt(exponent, 10);
+    
+    // Split mantissa into integer and decimal parts
+    const [intPart, decPart = ""] = mantissa.replace("-", "").split(".");
+    const isNegative = mantissa.startsWith("-");
+    
+    // Combine and shift decimal point
+    const combined = intPart + decPart;
+    const shift = exp - decPart.length;
+    
+    let result: string;
+    if (shift >= 0) {
+      result = combined + "0".repeat(shift);
+    } else {
+      // Truncate decimals (floor toward zero)
+      const cutPoint = combined.length + shift;
+      result = cutPoint > 0 ? combined.slice(0, cutPoint) : "0";
+    }
+    
+    return BigInt(isNegative ? "-" + result : result);
+  }
+  
+  // Decimal number without exponent - truncate to integer
+  if (/^-?\d+\.\d+$/.test(trimmed)) {
+    const intPart = trimmed.split(".")[0];
+    return BigInt(intPart || "0");
+  }
+  
+  return 0n;
+};
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // TYPES
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -282,6 +331,7 @@ const getHistoricalTokenBalance = async (
   try {
     const { data } = await cirrus.get(accessToken, "/history@mapping", {
       params: {
+        select: "value::text",
         address: `eq.${tokenAddress}`,
         collection_name: "eq._balances",
         "key->>key": `eq.${holderAddress}`,
@@ -291,7 +341,9 @@ const getHistoricalTokenBalance = async (
     });
 
     const value = data?.[0]?.value;
-    return value ? String(BigInt(Math.floor(value))) : "0";
+    // Ensure we always return a valid number string, never empty
+    if (!value || value === "") return "0";
+    return value;
   } catch (error) {
     console.error(`Error fetching historical balance for ${tokenAddress}:`, error);
     return "0";
@@ -310,6 +362,7 @@ const getHistoricalAssetPrice = async (
   try {
     const { data } = await cirrus.get(accessToken, "/history@mapping", {
       params: {
+        select: "value::text",
         address: `eq.${oracleAddress}`,
         collection_name: "eq.prices",
         "key->>key": `eq.${assetAddress}`,
@@ -319,7 +372,9 @@ const getHistoricalAssetPrice = async (
     });
 
     const value = data?.[0]?.value;
-    return value ? String(BigInt(Math.floor(value))) : "0";
+    // Ensure we always return a valid number string, never empty
+    if (!value || value === "") return "0";
+    return value;
   } catch (error) {
     console.error(`Error fetching historical price for ${assetAddress}:`, error);
     return "0";
@@ -390,13 +445,12 @@ const getHistoricalEquity = async (
   let totalEquity = 0n;
 
   for (const assetAddress of supportedAssets) {
-    // Get historical balance
+    // Get historical balance and price
     const balance = await getHistoricalTokenBalance(accessToken, assetAddress, botExecutor, date);
-    const balanceBN = BigInt(balance);
+    const balanceBN = safeBigInt(balance);
 
-    // Get historical price
     const price = await getHistoricalAssetPrice(accessToken, priceOracleAddress, assetAddress, date);
-    const priceBN = BigInt(price);
+    const priceBN = safeBigInt(price);
 
     // Calculate value: (balance * price) / WAD
     if (priceBN > 0n) {
@@ -407,6 +461,36 @@ const getHistoricalEquity = async (
   return totalEquity;
 };
 
+
+/**
+ * Get the first deposit timestamp for the vault
+ */
+const getFirstDepositDate = async (
+  accessToken: string,
+  vaultAddress: string
+): Promise<{ date: string; timestamp: Date } | null> => {
+  try {
+    const { data: depositEvents } = await cirrus.get(accessToken, `/${Vault}-Deposited`, {
+      params: {
+        select: "block_timestamp",
+        address: `eq.${vaultAddress}`,
+        order: "block_timestamp.asc",
+        limit: "1",
+      },
+    });
+
+    if (!depositEvents?.length || !depositEvents[0]?.block_timestamp) {
+      return null;
+    }
+
+    const timestamp = new Date(depositEvents[0].block_timestamp);
+    const date = timestamp.toISOString().split("T")[0]; // YYYY-MM-DD
+    return { date, timestamp };
+  } catch (error) {
+    console.error("Error fetching first deposit date:", error);
+    return null;
+  }
+};
 
 /**
  * Get APY for the vault based on performance over time
@@ -425,10 +509,11 @@ const getAPY = async (
   try {
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const startDate = thirtyDaysAgo.toISOString().split("T")[0]; // YYYY-MM-DD
+    let startDate = thirtyDaysAgo.toISOString().split("T")[0]; // YYYY-MM-DD
+    let periodDays = 30;
 
     // Get historical equity from 30 days ago
-    const startEquity = await getHistoricalEquity(
+    let startEquity = await getHistoricalEquity(
       accessToken,
       vaultAddress,
       botExecutor,
@@ -437,12 +522,55 @@ const getAPY = async (
       startDate
     );
 
-    // If vault is less than 30 days old, return "-"
+    // If vault is less than 30 days old, use time since first deposit
     if (startEquity === 0n) {
-      return "-";
+      const firstDeposit = await getFirstDepositDate(accessToken, vaultAddress);
+      
+      if (!firstDeposit) {
+        return "-"; // No deposits yet
+      }
+
+      // Calculate days since first deposit
+      const msSinceFirstDeposit = now.getTime() - firstDeposit.timestamp.getTime();
+      periodDays = msSinceFirstDeposit / (24 * 60 * 60 * 1000);
+      
+      // Need at least 1 day of history for meaningful APY
+      if (periodDays < 1) {
+        return "-";
+      }
+
+      // Use the day AFTER the first deposit as the start date for deposits/withdrawals query
+      // This way the first deposit is "baked into" the startEquity and not double-counted
+      const dayAfterFirstDeposit = new Date(firstDeposit.timestamp.getTime() + 24 * 60 * 60 * 1000);
+      startDate = dayAfterFirstDeposit.toISOString().split("T")[0];
+      
+      // Get equity at the day after first deposit (should reflect the initial deposit)
+      startEquity = await getHistoricalEquity(
+        accessToken,
+        vaultAddress,
+        botExecutor,
+        priceOracleAddress,
+        supportedAssets,
+        startDate
+      );
+
+      // If still no historical equity (edge case), use first deposit's value
+      if (startEquity === 0n) {
+        // Get deposits on the first deposit day to use as starting equity
+        const { totalDepositsUsd } = await getDepositsWithdrawalsInPeriod(
+          accessToken,
+          vaultAddress,
+          firstDeposit.date
+        );
+        startEquity = totalDepositsUsd;
+      }
+
+      if (startEquity === 0n) {
+        return "-";
+      }
     }
 
-    // Get deposits and withdrawals in the 30-day period
+    // Get deposits and withdrawals in the period
     const { totalDepositsUsd, totalWithdrawalsUsd } = await getDepositsWithdrawalsInPeriod(
       accessToken,
       vaultAddress,
@@ -450,18 +578,24 @@ const getAPY = async (
     );
 
     // Calculate profit: (currentEquity - startEquity) + totalWithdrawals - totalDeposits
+    // All values are BigInt to preserve precision
     const profit = (currentEquity - startEquity) + totalWithdrawalsUsd - totalDepositsUsd;
 
-    // Calculate period return: profit / startEquity
-    const periodReturn = Number(profit) / Number(startEquity);
+    // Calculate period return using BigInt with 18 decimal precision
+
+    // periodReturn = profit * WAD / startEquity (result is scaled by 1e18)
+    const periodReturnScaled = (profit * WAD) / startEquity;
+    
+    // Convert to decimal: divide by 1e18
+    const periodReturn = Number(periodReturnScaled) / 1e18;
     
     // Guard against invalid values (periodReturn <= -1 would cause issues with pow)
     if (periodReturn <= -1) {
       return "-";
     }
     
-    // Calculate APY: ((1 + periodReturn)^(365/30)) - 1
-    const apy = Math.pow(1 + periodReturn, 365 / 30) - 1;
+    // Calculate APY: ((1 + periodReturn)^(365/periodDays)) - 1
+    const apy = Math.pow(1 + periodReturn, 365 / periodDays) - 1;
 
     // Return APY as percentage (e.g., 26.5 for 26.5%)
     const apyPercent = apy * 100;
@@ -567,7 +701,7 @@ export const getUserBalances = async (
   for (const assetAddress of supportedAssetAddresses) {
     // Get user's balance for this asset
     const balance = await getTokenBalance(accessToken, assetAddress, userAddress);
-    const balanceBN = BigInt(balance);
+    const balanceBN = safeBigInt(balance);
 
     // Only include tokens where user has a positive balance
     if (balanceBN > 0n) {
@@ -648,25 +782,25 @@ export const getVaultInfo = async (accessToken: string): Promise<VaultInfo> => {
     
     // Get balance held by bot executor
     const balance = await getTokenBalance(accessToken, assetAddress, botExecutor);
-    const balanceBN = BigInt(balance);
+    const balanceBN = safeBigInt(balance);
     
     // Get min reserve
     const minReserve = minReserveMap.get(assetAddress.toLowerCase()) || "0";
-    const minReserveBN = BigInt(minReserve);
+    const minReserveBN = safeBigInt(minReserve);
     
     // Calculate withdrawable
     const withdrawable = balanceBN > minReserveBN ? (balanceBN - minReserveBN).toString() : "0";
-    const withdrawableBN = BigInt(withdrawable);
+    const withdrawableBN = safeBigInt(withdrawable);
     
     // Get price
     const priceUsd = await getAssetPrice(accessToken, priceOracleAddress, assetAddress);
-    const priceBN = BigInt(priceUsd);
+    const priceBN = safeBigInt(priceUsd);
     
     // Calculate value in USD
     const valueUsd = priceBN > 0n ? ((balanceBN * priceBN) / WAD).toString() : "0";
     const withdrawableValueUsd = priceBN > 0n ? ((withdrawableBN * priceBN) / WAD) : 0n;
     
-    totalEquity += BigInt(valueUsd);
+    totalEquity += safeBigInt(valueUsd);
     withdrawableEquity += withdrawableValueUsd;
     
     // Check for deficit
@@ -689,7 +823,7 @@ export const getVaultInfo = async (accessToken: string): Promise<VaultInfo> => {
 
   // Calculate NAV per share
   let navPerShare = WAD.toString(); // Default to $1 per share
-  const totalSharesBN = BigInt(totalShares);
+  const totalSharesBN = safeBigInt(totalShares);
   if (totalSharesBN > 0n && totalEquity > 0n) {
     navPerShare = ((totalEquity * WAD) / totalSharesBN).toString();
   }
@@ -750,15 +884,15 @@ export const getUserPosition = async (
 
   // Get user's share balance
   const userShares = await getTokenBalance(accessToken, shareToken, userAddress);
-  const userSharesBN = BigInt(userShares);
+  const userSharesBN = safeBigInt(userShares);
 
   // Get total shares
   const totalShares = await getTokenTotalSupply(accessToken, shareToken);
-  const totalSharesBN = BigInt(totalShares);
+  const totalSharesBN = safeBigInt(totalShares);
 
   // Get vault info for NAV calculation
   const vaultInfo = await getVaultInfo(accessToken);
-  const navPerShare = BigInt(vaultInfo.navPerShare);
+  const navPerShare = safeBigInt(vaultInfo.navPerShare);
 
   // Calculate user's USD value
   const userValueUsd = userSharesBN > 0n ? ((userSharesBN * navPerShare) / WAD).toString() : "0";
@@ -771,7 +905,7 @@ export const getUserPosition = async (
     userAddress
   );
   const netDeposited = totalDepositedUsd - totalWithdrawnUsd;
-  const allTimeEarnings = (BigInt(userValueUsd) - netDeposited).toString();
+  const allTimeEarnings = (safeBigInt(userValueUsd) - netDeposited).toString();
 
   return {
     userShares,
@@ -863,7 +997,7 @@ export const getWithdrawPreview = async (
     }
   }
 
-  const amountUsdBN = BigInt(amountUsd);
+  const amountUsdBN = safeBigInt(amountUsd);
 
   // Calculate withdrawable equity (same as contract)
   let withdrawableEquity = 0n;
@@ -882,11 +1016,11 @@ export const getWithdrawPreview = async (
   for (const assetAddress of supportedAssetAddresses) {
     const tokenInfo = await getTokenInfo(accessToken, assetAddress);
     const balance = await getTokenBalance(accessToken, assetAddress, botExecutor);
-    const balanceBN = BigInt(balance);
+    const balanceBN = safeBigInt(balance);
     const minReserve = minReserveMap.get(assetAddress.toLowerCase()) || "0";
-    const minReserveBN = BigInt(minReserve);
+    const minReserveBN = safeBigInt(minReserve);
     const priceUsd = await getAssetPrice(accessToken, priceOracleAddress, assetAddress);
-    const priceBN = BigInt(priceUsd);
+    const priceBN = safeBigInt(priceUsd);
 
     const withdrawable = balanceBN > minReserveBN ? balanceBN - minReserveBN : 0n;
     const withdrawableUsd = priceBN > 0n ? (withdrawable * priceBN) / WAD : 0n;
