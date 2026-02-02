@@ -40,19 +40,17 @@ export type ActivityTypeIcon = "transfer" | "deposit" | "cdp-mint" | "swap" | "r
 /**
  * Layout configuration for activity cards
  */
-export type LayoutConfig =
-  | { type: "standard" } // Default: all fields in a single line with bullets
-  | {
-      type: "two-line";
-      line1: {
-        fieldLabels: string[]; // Which field labels go on line 1
-        renderer?: "amount-with-token" | "amounts-with-arrow"; // Special renderer for line 1
-      };
-      line2: {
-        fieldLabels: string[]; // Which field labels go on line 2
-        renderer?: "addresses-with-arrow" | "addresses-with-bullet" | "addresses-with-arrow-and-text"; // Special renderer for line 2
-      };
-    };
+export type LayoutConfig = {
+  type: "two-line";
+  line1: {
+    fieldLabels: string[]; // Which field labels go on line 1
+    renderer?: "amount-with-token" | "amounts-with-arrow"; // Special renderer for line 1
+  };
+  line2: {
+    fieldLabels: string[]; // Which field labels go on line 2
+    renderer?: "addresses-with-arrow" | "addresses-with-bullet" | "addresses-with-arrow-and-text"; // Special renderer for line 2
+  };
+};
 
 export interface ActivityCardData {
   title: string;
@@ -60,7 +58,7 @@ export interface ActivityCardData {
   timestamp: string;
   eventId?: string; // For React key
   activityTypeIcon?: ActivityTypeIcon; // Icon type for the activity
-  layout?: LayoutConfig; // Layout configuration for rendering
+  layout: LayoutConfig; // Layout configuration for rendering
 }
 
 /**
@@ -395,9 +393,7 @@ export const ActivityCard = ({ data }: { data: ActivityCardData }) => {
 
   // Build description based on layout config
   let descriptionParts: ReactNode[];
-  const layout = data.layout || { type: "standard" };
-
-  if (layout.type === "two-line") {
+  const layout = data.layout;
     // Render line 1
     const line1Fields = layout.line1.fieldLabels
       .map(label => findFieldByLabel(label))
@@ -506,36 +502,6 @@ export const ActivityCard = ({ data }: { data: ActivityCardData }) => {
       <div key="line1">{line1}</div>,
       <div key="line2">{line2}</div>
     ];
-  } else {
-    // Standard layout: all fields with bullets
-    descriptionParts = [];
-    data.fields.forEach((field, index) => {
-      if (index > 0) {
-        descriptionParts.push(<span key={`sep-${index}`}> • </span>);
-      }
-
-      const fieldIcon = field.icon ? getIcon(field.icon) : null;
-
-      descriptionParts.push(
-        <span key={index} className="inline-flex items-center gap-1">
-          {fieldIcon}
-          <span className="text-muted-foreground">{field.label}:</span>
-          {renderFieldValue(field)}
-          {field.badge && (
-            <Badge variant="secondary" className="text-xs">
-              {field.badge}
-            </Badge>
-          )}
-          {field.isUserAddress && (
-            <Badge variant="default" className="bg-primary text-primary-foreground text-xs">
-              You
-            </Badge>
-          )}
-          {field.additionalContent}
-        </span>
-      );
-    });
-  }
 
   return (
     <Card key={data.eventId} className="hover:bg-muted/50 transition-colors">
@@ -549,15 +515,9 @@ export const ActivityCard = ({ data }: { data: ActivityCardData }) => {
           {/* Middle: Title and Description */}
           <div className="flex-1 min-w-0">
             <h3 className="font-medium text-sm mb-1">{data.title}</h3>
-            {layout.type === "two-line" ? (
-              <div className="text-xs space-y-1">
-                {descriptionParts}
-              </div>
-            ) : (
-              <div className="text-xs flex flex-wrap items-center gap-1">
-                {descriptionParts}
-              </div>
-            )}
+            <div className="text-xs space-y-1">
+              {descriptionParts}
+            </div>
           </div>
 
           {/* Right: Timestamp */}
