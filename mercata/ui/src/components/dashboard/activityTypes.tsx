@@ -377,6 +377,56 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       };
     },
   },
+  "Borrow": {
+    contract_name: "LendingPool",
+    event_name: "Borrowed",
+    displayName: "Borrow",
+    getTokenAddress: (event: Event) => {
+      const asset = event.attributes.asset || event.attributes.Asset;
+      return asset ? [asset] : [];
+    },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+      const user = event.attributes.user || event.attributes.User || "";
+      const asset = event.attributes.asset || event.attributes.Asset || "";
+      const amount = event.attributes.amount || event.attributes.Amount || "0";
+      const tokenSymbol = asset ? tokenSymbols.get(asset) : undefined;
+
+      const fields: ActivityField[] = [
+        {
+          label: "Borrower",
+          value: user,
+          type: "address",
+          icon: "arrow-up-right",
+          isUserAddress: isUserAddress(user, userAddress),
+        },
+        addImageToField(
+          {
+            label: "Asset",
+            value: asset,
+            type: "address",
+            badge: tokenSymbol,
+          },
+          asset,
+          tokenImages,
+          tokenSymbols
+        ),
+        {
+          label: "Amount",
+          value: formatValue(amount),
+          type: "amount",
+          badge: tokenSymbol,
+        },
+      ];
+
+      return {
+        title: "Borrow",
+        fields,
+        timestamp: event.block_timestamp || "",
+        eventId: event.id?.toString(),
+        activityTypeIcon: "borrow",
+      };
+    },
+  },
   "ReferralRedeemed": {
     contract_name: "Escrow",
     event_name: "Redeemed",

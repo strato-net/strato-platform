@@ -367,6 +367,53 @@ const activityFilters: Record<string, ActivityFilter> = {
     return { events, total };
   },
 
+  // Borrowed events: filter by user
+  "LendingPool:Borrowed": async (userAddress, contractName, eventName, storageSelect, fetchLimit, accessToken, timeRange) => {
+    const timeFilter = getTimeRangeFilter(timeRange);
+    const params: Record<string, string> = {
+      order: "block_timestamp.desc",
+      select: `*,${storageSelect}`,
+      "storage.contract.contract_name": `eq.${contractName}`,
+      event_name: `eq.${eventName}`,
+      limit: fetchLimit.toString(),
+      offset: "0",
+      ...timeFilter,
+    };
+
+    if (userAddress) {
+      params["attributes->>user"] = `eq.${userAddress}`;
+    }
+
+    const countParams: Record<string, string> = {
+      "storage.contract.contract_name": `eq.${contractName}`,
+      event_name: `eq.${eventName}`,
+      select: `${storageSelect},count()`,
+      ...timeFilter,
+    };
+
+    if (userAddress) {
+      countParams["attributes->>user"] = `eq.${userAddress}`;
+    }
+
+    const [countResponse, eventsResponse] = await Promise.all([
+      cirrus.get(accessToken, `/${constants.Event}`, { params: countParams }),
+      cirrus.get(accessToken, `/${constants.Event}`, { params }),
+    ]);
+
+    const total = countResponse.data?.[0]?.count || 0;
+    const data = eventsResponse.data || [];
+
+    const events = (data as any[]).map((event: any) => {
+      const { storage, ...eventWithoutStorage } = event;
+      return {
+        ...eventWithoutStorage,
+        contract_name: event.storage?.contract?.[0]?.contract_name || "",
+      };
+    });
+
+    return { events, total };
+  },
+
   // RewardsClaimed events: filter by user
   "Rewards:RewardsClaimed": async (userAddress, contractName, eventName, storageSelect, fetchLimit, accessToken, timeRange) => {
     const timeFilter = getTimeRangeFilter(timeRange);

@@ -4,6 +4,7 @@ import {
   ArrowUpRight, 
   ArrowDownLeft, 
   ArrowDown,
+  ArrowUp,
   ArrowRightLeft,
   ArrowLeftRight,
   Download,
@@ -38,7 +39,7 @@ export interface ActivityField {
   imageFallback?: string; // Fallback text (e.g., symbol) when no image
 }
 
-export type ActivityTypeIcon = "transfer" | "deposit" | "cdp-mint" | "swap" | "rewards" | "referral";
+export type ActivityTypeIcon = "transfer" | "deposit" | "cdp-mint" | "swap" | "rewards" | "referral" | "borrow";
 
 export interface ActivityCardData {
   title: string;
@@ -113,6 +114,8 @@ const getActivityTypeIcon = (type?: ActivityTypeIcon): { icon: LucideIcon; color
       return { icon: Gift, color: "bg-yellow-500" };
     case "referral":
       return { icon: UserPlus, color: "bg-pink-500" };
+    case "borrow":
+      return { icon: Landmark, color: "bg-indigo-500" };
     default:
       return { icon: ArrowRightLeft, color: "bg-gray-500" };
   }
