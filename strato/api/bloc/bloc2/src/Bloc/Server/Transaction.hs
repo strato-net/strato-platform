@@ -117,6 +117,7 @@ postBlocTransactionBody ::
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable Address AddressState m,
     A.Selectable Keccak256 SourceMap m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
     HasCodeDB m,
     HasBlocEnv m,
     HasVault m
@@ -255,6 +256,7 @@ postBlocTransactionUnsigned ::
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable Address AddressState m,
     A.Selectable Keccak256 SourceMap m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
     HasCodeDB m,
     HasBlocEnv m,
     HasVault m
