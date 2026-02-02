@@ -8,11 +8,11 @@ import { FunctionInput } from "../../types/types";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
+import * as config from "../../config/config";
 
 const {
   Vault,
   VaultFactory,
-  vaultFactory,
   Token,
   PriceOracle,
 } = constants;
@@ -82,16 +82,27 @@ export interface VaultTransaction {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /**
+ * Get vault factory address or throw error
+ */
+const getVaultFactoryAddress = (): string => {
+  if (!config.vaultFactory) {
+    throw new Error("Vault factory address not configured");
+  }
+  return config.vaultFactory;
+};
+
+/**
  * Get the primary vault address from VaultFactory
  * For now, we use the first vault in the factory's allVaults array
  */
 const getVaultAddress = async (accessToken: string): Promise<string | null> => {
   try {
+    const vaultFactoryAddress = getVaultFactoryAddress();
     // In Cirrus, arrays are stored in separate tables: ContractName-arrayName
     const { data } = await cirrus.get(accessToken, `/${VaultFactory}-allVaults`, {
       params: {
         select: "value",
-        address: `eq.${vaultFactory}`,
+        address: `eq.${vaultFactoryAddress}`,
         order: "key.asc",
         limit: "1",
       },

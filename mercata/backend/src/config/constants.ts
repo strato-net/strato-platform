@@ -1,4 +1,5 @@
-import { lendingRegistry, poolFactory, tokenFactory, adminRegistry, mercataBridge, cdpRegistry, voucher, vaultFactory } from "./config";
+import { lendingRegistry, poolFactory, tokenFactory, adminRegistry, mercataBridge, cdpRegistry, voucher } from "./config";
+import * as config from "./config";
 import {
   SWAP_CONTRACTS,
   SWAP_TOKEN_SELECT_FIELDS,
@@ -144,7 +145,7 @@ export const constants = (() => {
     Voucher,
     Vault,
     VaultFactory,
-    vaultFactory,
+    get vaultFactory() { return config.vaultFactory; },  // Use getter to get current value after init
     mercataBridge,
     Event,
     tokenSelectFields,
