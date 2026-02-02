@@ -19,6 +19,7 @@ import { useCDP } from '@/context/CDPContext';
 import { useUser } from '@/context/UserContext';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 import { useUserTokens } from '@/context/UserTokensContext';
+import GuestSignInBanner from '@/components/ui/GuestSignInBanner';
 
 const Advanced = () => {
   const [searchParams] = useSearchParams();
@@ -113,6 +114,9 @@ const Advanced = () => {
                       </TabsTrigger>
                     </TabsList>
                     <TabsContent value="vaults">
+                      {!isLoggedIn && (
+                        <GuestSignInBanner message="Sign in to create vaults and mint USDST" />
+                      )}
                       <div className="flex flex-col lg:flex-row gap-6">
                         {/* Left Column - Mint Section (New v2) */}
                         <div className={isLoggedIn ? "w-full lg:w-[60%]" : "w-full"}>
@@ -139,20 +143,35 @@ const Advanced = () => {
                       <BadDebtView guestMode={!isLoggedIn} />
                     </TabsContent>
                     <TabsContent value="liquidations">
+                      {!isLoggedIn && (
+                        <GuestSignInBanner message="Sign in to view and liquidate CDP positions" />
+                      )}
                       <LiquidationsView guestMode={!isLoggedIn} />
                     </TabsContent>
                   </Tabs>
                 </TabsContent>
                 <TabsContent value="lending">
+                  {!isLoggedIn && (
+                    <GuestSignInBanner message="Sign in to deposit liquidity and start earning" />
+                  )}
                   <LendingPoolSection />
                 </TabsContent>
                 <TabsContent value="swap">
+                  {!isLoggedIn && (
+                    <GuestSignInBanner message="Sign in to add liquidity to swap pools and earn rewards" />
+                  )}
                   <SwapPoolsSection />
                 </TabsContent>
                 <TabsContent value="safety">
+                  {!isLoggedIn && (
+                    <GuestSignInBanner message="Sign in to stake USDST in the Safety Module" />
+                  )}
                   <SafetyModuleSection />
                 </TabsContent>
                 <TabsContent value="liquidations">
+                  {!isLoggedIn && (
+                    <GuestSignInBanner message="Sign in to view and liquidate unhealthy positions" />
+                  )}
                   <LiquidationsSection />
                 </TabsContent>
               </Tabs>

@@ -6,21 +6,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Plus, XCircle, Copy, CopyCheck, LogIn, Gift, Users, Clock, CheckCircle } from "lucide-react";
+import { Loader2, Plus, XCircle, Copy, CopyCheck, Gift, Users, Clock, CheckCircle } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/axios";
 import { useNavigate } from "react-router-dom";
 import { formatUnits } from "@/utils/numberUtils";
 import { useTokenContext } from "@/context/TokenContext";
+import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 
 // Guest View Component - Static informational page for non-logged-in users
 const GuestReferralsView = () => {
-  const handleLogin = () => {
-    const theme = localStorage.getItem('theme') || 'light';
-    window.location.href = `/login?theme=${theme}`;
-  };
-
   return (
     <div className="min-h-screen bg-background pb-16 md:pb-0">
       <DashboardSidebar />
@@ -29,6 +25,7 @@ const GuestReferralsView = () => {
         <DashboardHeader title="My Referrals" />
         <main className="p-4 md:p-6">
           <div className="max-w-4xl mx-auto space-y-6">
+            <GuestSignInBanner message="Sign in to create referral deposits and gift tokens to friends" />
             {/* Hero Section */}
             <Card className="border-2 border-dashed bg-gradient-to-br from-pink-50/50 to-purple-50/50 dark:from-pink-950/20 dark:to-purple-950/20">
               <CardHeader className="text-center pb-2">
@@ -59,16 +56,6 @@ const GuestReferralsView = () => {
                     <span className="font-medium">Expiry Control</span>
                     <span className="text-sm text-muted-foreground">Set expiration dates</span>
                   </div>
-                </div>
-
-                <div className="flex justify-center">
-                  <Button 
-                    onClick={handleLogin} 
-                    className="w-full sm:w-auto bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white px-6 sm:px-8 py-3 text-base sm:text-lg flex items-center justify-center"
-                  >
-                    <LogIn className="mr-2 h-5 w-5 flex-shrink-0" />
-                    <span className="whitespace-nowrap">Sign In to Create Referrals</span>
-                  </Button>
                 </div>
               </CardContent>
             </Card>

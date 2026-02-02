@@ -17,7 +17,6 @@ import {
 } from "@/components/ui/table";
 import { ChevronDown, ChevronRight, PauseCircle } from "lucide-react";
 import { useUser } from "@/context/UserContext";
-import { useTheme } from "next-themes";
 const shorten = (addr: string) => addr.slice(0, 6) + "..." + addr.slice(-4);
 const weiToEther = (v?: string) => {
   if (!v) return 0;
@@ -31,7 +30,6 @@ const weiToEther = (v?: string) => {
 const LiquidationsSection: React.FC = () => {
   const { liquidatable, loading, error, refreshData } = useLiquidationContext();
   const { userAddress, isLoggedIn } = useUser();
-  const { resolvedTheme } = useTheme();
 
   const [modalData, setModalData] = React.useState<{
     loan: LiquidationEntry;
@@ -47,30 +45,6 @@ const LiquidationsSection: React.FC = () => {
       refreshData();
     }
   }, [refreshData, isLoggedIn]);
-
-  // Guest view - show static UI
-  if (!isLoggedIn) {
-    const handleLogin = () => {
-      const theme = resolvedTheme || 'light';
-      window.location.href = `/login?theme=${theme}`;
-    };
-
-    return (
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg md:text-xl">Lending Pool Liquidations</CardTitle>
-        </CardHeader>
-        <CardContent className="px-3 md:px-6">
-          <div className="text-center py-12">
-            <h3 className="text-xl md:text-2xl font-semibold mb-4">Liquidate Unhealthy Positions</h3>
-            <Button size="lg" onClick={handleLogin}>
-              Sign In to View Positions
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
 
   const openModal = (loan: LiquidationEntry, collateral: CollateralData) => setModalData({ loan, collateral });
   const closeModal = () => setModalData(null);

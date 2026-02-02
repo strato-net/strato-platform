@@ -17,6 +17,7 @@ import { useUser } from "@/context/UserContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { LogIn, Gift } from "lucide-react";
+import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 
 const Rewards = () => {
   const [searchParams] = useSearchParams();
@@ -130,6 +131,9 @@ const Rewards = () => {
         <DashboardHeader title="Rewards" />
 
         <main className="p-4 md:p-6">
+          {!isLoggedIn && (
+            <GuestSignInBanner message="Sign in to start earning CATA tokens and track your rewards" />
+          )}
           {/* Global Overview - visible to all */}
           <div className="mb-6">
             <RewardsOverview state={state} loading={stateLoading} onRefresh={handleRefresh} />
