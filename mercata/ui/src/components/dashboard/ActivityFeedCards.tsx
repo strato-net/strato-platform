@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/pagination";
 import type { Event } from "@mercata/shared-types";
 import { api } from "@/lib/axios";
+import { ActivityCard, type ActivityCardData } from "./ActivityCard";
 
 interface ActivityFeedCardsProps {
   isMyActivity: boolean;
@@ -29,7 +30,7 @@ interface ActivityFeedCardsProps {
 
 const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
   const { userAddress } = useUser();
-  const [cards, setCards] = useState<React.ReactNode[]>([]);
+  const [cardData, setCardData] = useState<ActivityCardData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -116,7 +117,7 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
         }
 
         // Route each event to the appropriate handler
-        const allCards: React.ReactNode[] = [];
+        const allCardData: ActivityCardData[] = [];
         for (const event of response.events) {
           // Find matching activity type by contract_name and event_name
           const matchingType = Object.entries(activityTypes).find(
@@ -138,12 +139,12 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
                 }
               });
             }
-            const card = config.handler(event, tokenSymbolsMap, userAddress);
-            allCards.push(card);
+            const cardData = config.handler(event, tokenSymbolsMap, userAddress);
+            allCardData.push(cardData);
           }
         }
 
-      setCards(allCards);
+      setCardData(allCardData);
       setTotalPages(Math.ceil((response.total || 0) / itemsPerPage));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch activities");
@@ -260,7 +261,7 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
       </div>
 
       {/* Content Area */}
-      {loading && cards.length === 0 ? (
+      {loading && cardData.length === 0 ? (
         <div className="flex items-center justify-center py-8">
           <div className="flex items-center gap-2 text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -273,7 +274,7 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
             {error}
           </CardContent>
         </Card>
-      ) : cards.length === 0 ? (
+      ) : cardData.length === 0 ? (
         <Card>
           <CardContent className="p-6 text-center text-muted-foreground">
             No activities found
@@ -289,7 +290,9 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
               </div>
             </div>
           )}
-          {cards}
+          {cardData.map((data, index) => (
+            <ActivityCard key={data.eventId || index} data={data} />
+          ))}
         </div>
       )}
 
