@@ -10,9 +10,11 @@
 
 import BlockApps.Init
 import BlockApps.Logging
+import Blockchain.Slipstream.Data.CirrusTables
 import Blockchain.Slipstream.MessageConsumer
 import Blockchain.Slipstream.Options
 import Blockchain.Slipstream.OutputData
+import Blockchain.Slipstream.SQL (cirrusConnStr)
 import Control.Concurrent
 import Control.Monad
 import Control.Monad.Composable.Kafka
@@ -21,14 +23,12 @@ import Control.Monad.IO.Class
 import Control.Monad.Trans.Resource
 import Data.String
 import Data.Text.Encoding (encodeUtf8)
+import Database.Persist.Postgresql
 import Blockchain.Slipstream.PostgresqlTypedShim
 import HFlags
 import Instrumentation
 import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Prometheus
-
-connectToCirrus :: MonadIO m => m PGConnection
-connectToCirrus = liftIO $ pgConnect cirrusInfo
 
 main :: IO ()
 main = do
@@ -44,7 +44,9 @@ main = do
       void . liftIO . forkIO . run 10777 $ metricsApp
       $logInfoS "main" "Serving metrics on port 10777"
 
-      conn <- connectToCirrus
+      conn <- createPostgresqlPool cirrusConnStr 10
+      liftIO $ runSqlPersistMPool (runMigration migrateAll) conn
+
       _ <- traverse (liftIO . pgQuery conn . encodeUtf8 . slipstreamQueryPostgres) initialSlipstreamQueries
 
       -- There are two permanent connections/pools to postgres:

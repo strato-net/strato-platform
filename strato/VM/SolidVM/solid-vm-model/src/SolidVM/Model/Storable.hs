@@ -60,7 +60,7 @@ instance IsString BasicValue where
   fromString s = BString $ C8.pack s
 
 instance PersistField BasicValue where
-  toPersistValue = toPersistValue . format
+  toPersistValue = toPersistValue . formatBasicValue
   fromPersistValue v =
     case fromPersistValue v of
       Left e -> Left e
@@ -75,7 +75,7 @@ instance PersistFieldSql BasicValue where
 instance E.SqlString BasicValue where
 
 instance ToHttpApiData BasicValue where
-  toUrlPiece = T.pack . format
+  toUrlPiece = T.pack . formatBasicValue
 
 instance FromHttpApiData BasicValue where
   parseUrlPiece v =
@@ -98,7 +98,7 @@ instance SWAGGER.ToSchema BasicValue where
 
 instance JSON.ToJSON BasicValue where
   toJSON v = JSON.toJSON $ format v
-  
+
 instance JSON.FromJSON BasicValue where
   parseJSON v =
     fmap readOrError $ JSON.parseJSON v
@@ -151,16 +151,20 @@ isDefault (BEnumVal _ _ w) = w == 0
 isDefault (BContract _ a) = a == 0x0
 isDefault BDefault = True
 
+formatBasicValue :: BasicValue -> String
+formatBasicValue (BInteger i) = show i
+formatBasicValue (BString s) = show $ UTF8.toString s
+formatBasicValue (BDecimal v) = show v
+formatBasicValue (BBool True) = "true"
+formatBasicValue (BBool False) = "false"
+formatBasicValue (BAddress a) = "address(" ++ show a ++ ")"
+formatBasicValue (BEnumVal n1 n2 w) = labelToString n1 ++ "." ++ labelToString n2 ++ "." ++ show w
+formatBasicValue (BContract n a) = labelToString n ++ "(" ++ show a ++ ")"
+formatBasicValue BDefault = "<unknown>"
+
 instance Format BasicValue where
-  format (BInteger i) = show i
   format (BString s) = ('"' :) . (++ "\"") $ UTF8.toString s
-  format (BDecimal v) = show v
-  format (BBool True) = "true"
-  format (BBool False) = "false"
-  format (BAddress a) = "address(" ++ show a ++ ")"
-  format (BEnumVal n1 n2 w) = labelToString n1 ++ "." ++ labelToString n2 ++ "." ++ show w
-  format (BContract n a) = labelToString n ++ "(" ++ show a ++ ")"
-  format BDefault = "<unknown>"
+  format bv          = formatBasicValue bv
 
 formatBasicValueForSQL :: BasicValue -> Text
 formatBasicValueForSQL (BInteger i) = T.pack $ show i
@@ -296,9 +300,6 @@ pathParser = do
       n <- Atto.takeWhile1 (inClass "_a-zA-Z0-9")
       (Field n :) <$> pathParser'
     )
-    <|> ((string ":creator") *> pathParser')
-    <|> ((string ":creatorAddress") *> pathParser')
-    <|> ((string ":originAddress") *> pathParser')
     <|> endOfInput *> return []
 
 pathParser' :: Parser [StoragePathPiece]
@@ -333,9 +334,6 @@ parseField = do
       n <- Atto.takeWhile1 (inClass "_a-zA-Z0-9")
       (Field n :) <$> pathParser'
     )
-    <|> ((string ":creator") *> pathParser')
-    <|> ((string ":creatorAddress") *> pathParser')
-    <|> ((string ":originAddress") *> pathParser')
 
 parsePath :: B.ByteString -> Either String StoragePath
 parsePath = fmap StoragePath . parseOnly pathParser
@@ -399,7 +397,7 @@ unparsePath (StoragePath (Field p : rest)) =
     go (Field q) = [".", q]
     go (Index i) = ["[", escapeKey i, "]"]
 unparsePath v = error $ "StoragePath must always start with a Field: " ++ show v
-    
+
 instance RLPSerializable BasicValue where
   rlpEncode = \case
     BDefault -> RLPString ""

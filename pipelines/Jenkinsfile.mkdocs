@@ -1,0 +1,269 @@
+pipeline {
+  agent {
+    label "test"
+  }
+
+  options {
+    disableConcurrentBuilds()
+    buildDiscarder(logRotator(numToKeepStr: '20'))
+    timeout(time: 30, unit: 'MINUTES')
+  }
+
+  parameters {
+    string(
+      name: 'GIT_REV',
+      defaultValue: 'develop',
+      description: 'Branch name, tag, or commit hash to build docs from'
+    )
+    choice(
+      name: 'DEPLOY_ENV',
+      choices: ['staging', 'prod'],
+      description: 'Deploy to staging (gh-pages/staging/) or prod (gh-pages root)'
+    )
+  }
+
+  environment {
+    // Virtual environment path in workspace
+    VENV_PATH = "${env.WORKSPACE}/venv"
+  }
+
+  stages {
+    stage('Prepare') {
+      steps {
+        // Clean workspace at start of build
+        cleanWs()
+        wrap([$class: 'BuildUser']) {
+          script {
+            BUILD_USER = ''
+            try {
+              BUILD_USER = "${BUILD_USER_FIRST_NAME}"
+            } catch (Exception e) {
+              BUILD_USER = "github"
+            }
+            MAIN_AGENT_NAME = "${env.NODE_NAME}"
+            currentBuild.description = "${MAIN_AGENT_NAME} // ${BUILD_USER} // ${params.GIT_REV} -> ${params.DEPLOY_ENV}"
+          }
+        }
+      }
+    }
+
+    stage('Prerequisites') {
+      steps {
+        sh '''#!/bin/bash -le
+          set -ex
+
+          # On Debian/Ubuntu, always ensure required packages are installed
+          if command -v apt-get &> /dev/null; then
+            # Check if python3.12-venv is installed (dpkg returns 0 if installed)
+            if ! dpkg -s python3.12-venv &> /dev/null; then
+              echo "Installing Python 3.12 venv package..."
+              sudo apt-get update
+              sudo apt-get install -y python3.12 python3.12-venv
+            fi
+          elif command -v yum &> /dev/null; then
+            if ! command -v python3.12 &> /dev/null; then
+              sudo yum install -y python3.12 python3.12-pip
+            fi
+          elif command -v dnf &> /dev/null; then
+            if ! command -v python3.12 &> /dev/null; then
+              sudo dnf install -y python3.12 python3.12-pip
+            fi
+          fi
+
+          # Verify Python 3.12 is available
+          if ! command -v python3.12 &> /dev/null; then
+            echo "ERROR: Python 3.12 is not installed and could not be installed automatically"
+            exit 1
+          fi
+
+          echo "Python version: $(python3.12 --version)"
+
+          # Create virtual environment
+          echo "Creating virtual environment at ${VENV_PATH}..."
+          python3.12 -m venv "${VENV_PATH}"
+
+          # Activate venv and install tools
+          source "${VENV_PATH}/bin/activate"
+
+          echo "pip version: $(pip --version)"
+
+          # Upgrade pip
+          pip install --upgrade pip
+
+          # Install mkdocs and ghp-import
+          pip install mkdocs ghp-import
+
+          echo "mkdocs version: $(mkdocs --version)"
+          echo "ghp-import installed: $(pip show ghp-import | grep Version)"
+        '''
+      }
+    }
+
+    stage('Checkout') {
+      steps {
+        // Use Jenkins git step with credentials for the main checkout
+        checkout([
+          $class: 'GitSCM',
+          branches: [[name: "${params.GIT_REV}"]],
+          extensions: [
+            [$class: 'RelativeTargetDirectory', relativeTargetDir: 'strato-platform'],
+            [$class: 'CloneOption', depth: 0, noTags: false, shallow: false]
+          ],
+          userRemoteConfigs: [[
+            url: 'https://github.com/blockapps/strato-platform.git',
+            credentialsId: 'blockapps-cd-github'
+          ]]
+        ])
+        dir("strato-platform") {
+          sh "git log -1 --oneline"
+        }
+      }
+    }
+
+    stage('Install Dependencies') {
+      steps {
+        dir("strato-platform") {
+          sh '''#!/bin/bash -le
+            set -ex
+            # Activate virtual environment
+            source "${VENV_PATH}/bin/activate"
+            # Install mkdocs dependencies from mkdocs.yml
+            pip install $(mkdocs get-deps)
+          '''
+        }
+      }
+    }
+
+    stage('Build and Deploy') {
+      steps {
+        dir("strato-platform") {
+          // Use withCredentials for git push operations
+          withCredentials([usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME')]) {
+            script {
+              if (params.DEPLOY_ENV == 'prod') {
+                // Production deployment: deploy to gh-pages root, preserving staging/
+                sh '''#!/bin/bash -le
+                  set -ex
+                  # Activate virtual environment
+                  source "${VENV_PATH}/bin/activate"
+
+                  # Configure git identity via environment variables (more reliable than git config)
+                  export GIT_AUTHOR_NAME="blockapps-ci"
+                  export GIT_AUTHOR_EMAIL="sre@blockapps.net"
+                  export GIT_COMMITTER_NAME="blockapps-ci"
+                  export GIT_COMMITTER_EMAIL="sre@blockapps.net"
+
+                  # Set up authenticated remote URL
+                  REMOTE_URL="https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-platform.git"
+
+                  # Clean up any leftover directories from previous failed runs
+                  rm -rf gh-pages-temp staging-backup
+
+                  # Build the docs
+                  mkdocs build --clean
+
+                  # Clone gh-pages branch to preserve staging/
+                  git clone --branch gh-pages --single-branch "${REMOTE_URL}" gh-pages-temp 2>/dev/null || {
+                    echo "gh-pages branch does not exist yet, creating fresh deployment"
+                    mkdir -p gh-pages-temp
+                  }
+
+                  # Backup staging directory if it exists
+                  if [ -d "gh-pages-temp/staging" ]; then
+                    cp -r gh-pages-temp/staging staging-backup
+                    echo "Backed up staging directory"
+                  fi
+
+                  # Clean up the temp clone
+                  rm -rf gh-pages-temp
+
+                  # Use ghp-import to create gh-pages branch with new content
+                  ghp-import -n -f -b gh-pages site
+
+                  # Switch to gh-pages branch
+                  git checkout gh-pages
+
+                  # If staging backup exists, restore it and amend the commit
+                  if [ -d "staging-backup" ]; then
+                    cp -r staging-backup staging
+                    git add staging
+                    git commit --amend --no-edit
+                    echo "Restored staging directory"
+                  fi
+
+                  # Push to remote with credentials
+                  git push "${REMOTE_URL}" gh-pages --force
+
+                  # Switch back to original branch to leave repo in clean state
+                  git checkout -
+
+                  # Clean up
+                  rm -rf staging-backup
+                '''
+              } else {
+                // Staging deployment: deploy to gh-pages/staging/
+                sh '''#!/bin/bash -le
+                  set -ex
+                  # Activate virtual environment
+                  source "${VENV_PATH}/bin/activate"
+
+                  # Configure git identity via environment variables (more reliable than git config)
+                  export GIT_AUTHOR_NAME="blockapps-ci"
+                  export GIT_AUTHOR_EMAIL="sre@blockapps.net"
+                  export GIT_COMMITTER_NAME="blockapps-ci"
+                  export GIT_COMMITTER_EMAIL="sre@blockapps.net"
+
+                  # Set up authenticated remote URL
+                  REMOTE_URL="https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-platform.git"
+
+                  # Build the docs
+                  mkdocs build --clean
+
+                  # Deploy to staging subdirectory on gh-pages branch
+                  # Using ghp-import without -p flag, then push manually with credentials
+                  ghp-import -n -f -b gh-pages -x staging site
+
+                  # Push to remote with credentials
+                  git push "${REMOTE_URL}" gh-pages --force
+                '''
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      // Clean workspace after build to free disk space
+      cleanWs(deleteDirs: true, disableDeferredWipeout: true)
+    }
+
+    success {
+      slackSend(
+        color: 'good',
+        message: "Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' - Deployed ${params.GIT_REV} to ${params.DEPLOY_ENV} (${env.BUILD_URL}) on node ${env.NODE_NAME}"
+      )
+
+      slackSend(
+        channel: '#engineering',
+        color: 'good',
+        message: "MkDocs ${params.DEPLOY_ENV} deployment succeeded from ${params.GIT_REV}. Review at ${params.DEPLOY_ENV == 'prod' ? 'https://docs.strato.nexus' : 'https://docs.strato.nexus/staging/'}"
+      )
+    }
+
+    failure {
+      slackSend(
+        color: 'danger',
+        message: "Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL}) on node ${env.NODE_NAME}"
+      )
+
+      slackSend(
+        channel: '#engineering',
+        color: 'danger',
+        message: "MkDocs ${params.DEPLOY_ENV} deployment failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' - ${params.GIT_REV} to ${params.DEPLOY_ENV} (${env.BUILD_URL}) on node ${env.NODE_NAME}"
+      )
+    }
+  }
+}

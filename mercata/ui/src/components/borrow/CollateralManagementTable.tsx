@@ -8,8 +8,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { HelpCircle, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { HelpCircle, ArrowUpCircle, ArrowDownCircle, PauseCircle } from "lucide-react";
 import { formatBalance } from "@/utils/numberUtils";
 import { CollateralData, NewLoanData } from "@/interface";
 import { getMaxSafeWithdrawAmount } from "@/utils/lendingUtils";
@@ -40,7 +40,7 @@ const InfoTooltip = ({ children, content }: { children: React.ReactNode; content
           onClick={handleToggle}
         >
           {children}
-          <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+          <HelpCircle className="h-4 w-4 text-muted-foreground hover:text-foreground" />
         </div>
         {showTooltip && (
           <div className="absolute top-full left-0 mt-2 z-50 bg-popover border rounded-md px-3 py-1.5 text-sm text-popover-foreground shadow-md max-w-xs">
@@ -56,7 +56,7 @@ const InfoTooltip = ({ children, content }: { children: React.ReactNode; content
       <TooltipTrigger asChild>
         <div className="inline-flex items-center gap-1 cursor-help">
           {children}
-          <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+          <HelpCircle className="h-4 w-4 text-muted-foreground hover:text-foreground" />
         </div>
       </TooltipTrigger>
       <TooltipContent className="max-w-xs">
@@ -64,6 +64,37 @@ const InfoTooltip = ({ children, content }: { children: React.ReactNode; content
       </TooltipContent>
     </Tooltip>
   );
+};
+
+// Helper function to format token amount with tooltip
+const TokenAmountDisplay = ({ amount, decimals }: { amount: bigint; decimals: number }) => {
+  if (amount <= 1n) {
+    return <div className="font-medium">0</div>;
+  }
+  
+  const fullAmount = formatBalance(amount, undefined, decimals, 2);
+  const displayAmount = formatBalance(amount, undefined, decimals, 0, 4);
+  
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="font-medium cursor-help">{displayAmount}</div>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>{fullAmount}</p>
+      </TooltipContent>
+    </Tooltip>
+  );
+};
+
+// Helper function to format USD value (no tooltip, 2 decimals)
+const USDValueDisplay = ({ value }: { value: bigint }) => {
+  if (value <= 1n) {
+    return <div className="text-xs text-muted-foreground">$0.00</div>;
+  }
+  
+  const displayValue = formatBalance(value, undefined, 18, 0, 2, true);
+  return <div className="text-xs text-muted-foreground">{displayValue}</div>;
 };
 
 const CollateralManagementTable = ({
@@ -75,32 +106,36 @@ const CollateralManagementTable = ({
 }: CollateralManagementTableProps) => {
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>
+      <CardHeader className="px-3 md:px-6 pb-2 md:pb-4">
+        <CardTitle className="text-base md:text-lg">
           <InfoTooltip content="Manage your collateral assets. Supply tokens from your wallet or withdraw supplied collateral.">
             Collateral Management
           </InfoTooltip>
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Asset</TableHead>
-              <TableHead>
+      <CardContent className="px-0 md:px-6">
+        <TooltipProvider>
+          <Table>
+            <TableHeader>
+              <TableRow>
+              <TableHead className="pl-3 md:pl-4">Asset</TableHead>
+              <TableHead className="px-2 md:px-4">
                 <InfoTooltip content="Loan-to-Value ratio: Maximum percentage of collateral value you can borrow against. Higher LTV means more borrowing power but higher risk.">
                   LTV
                 </InfoTooltip>
               </TableHead>
-              <TableHead>
+              <TableHead className="px-2 md:px-4">
                 <InfoTooltip content="Liquidation Threshold: If your position value falls below this percentage, your collateral may be liquidated to repay your debt. Keep your position above this threshold.">
                   LT
                 </InfoTooltip>
               </TableHead>
-              <TableHead className="text-right">Supply</TableHead>
-              <TableHead className="text-right">Withdraw</TableHead>
-            </TableRow>
-          </TableHeader>
+                <TableHead className="text-right px-2 md:px-4 hidden md:table-cell">Supply</TableHead>
+                <TableHead className="text-right pr-3 md:pr-4">
+                  <span className="hidden md:inline">Withdraw</span>
+                  <span className="md:hidden">Balance</span>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
           <TableBody>
             {loadingCollateral ? (
               <TableRow>
@@ -118,41 +153,46 @@ const CollateralManagementTable = ({
                 
                 return (
                   <TableRow key={asset?.address}>
-                    <TableCell>
+                    {/* Asset */}
+                    <TableCell className="pl-3 md:pl-4 py-2 md:py-4">
                       <div className="flex items-center gap-2">
                         {asset?.images?.[0] ? (
                           <img
                             src={asset.images[0].value}
                             alt={asset._name}
-                            className="w-8 h-8 rounded-full object-cover"
+                            className="w-7 h-7 md:w-8 md:h-8 rounded-full object-cover"
                           />
                         ) : (
                           <div
-                            className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs"
+                            className="w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-white text-xs"
                             style={{ backgroundColor: "red" }}
                           >
                             {asset?._symbol.slice(0, 2)}
                           </div>
                         )}
                         <div>
-                          <div className="font-medium">{asset?._name}</div>
-                          <div className="text-xs text-gray-500">{asset?._symbol}</div>
+                          <div className="font-medium text-sm md:text-base">{asset?._symbol}</div>
+                          <div className="text-xs text-muted-foreground hidden md:block">{asset?._name}</div>
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell>
+                    {/* LTV */}
+                    <TableCell className="px-2 md:px-4 text-sm">
                       {asset?.ltv ? (Number(asset.ltv) / 100) : 0}%
                     </TableCell>
-                    <TableCell>
+                    {/* LT */}
+                    <TableCell className="px-2 md:px-4 text-sm">
                       {asset?.liquidationThreshold ? (Number(asset.liquidationThreshold) / 100) : 0}%
                     </TableCell>
-                    <TableCell>
+                    {/* Supply - hidden on mobile */}
+                    <TableCell className="hidden md:table-cell">
                       <div className="flex items-center justify-end gap-4">
                         <div className="text-right">
-                          <div className="font-medium">{(() => { try { const v = BigInt(asset?.userBalance || 0); return formatBalance(v <= 1n ? 0n : v, undefined, asset?.customDecimals ?? 18, 2); } catch { return formatBalance(0n, undefined, asset?.customDecimals ?? 18, 2); } })()}</div>
-                          <div className="text-xs text-gray-500">
-                            ${(() => { try { const v = BigInt(asset?.userBalanceValue || 0); return formatBalance(v <= 1n ? 0n : v, undefined, 18, 1, 2); } catch { return formatBalance(0n, undefined, 18, 1, 2); } })()}
-                          </div>
+                          <TokenAmountDisplay 
+                            amount={BigInt(asset?.userBalance || 0)} 
+                            decimals={asset?.customDecimals ?? 18} 
+                          />
+                          <USDValueDisplay value={BigInt(asset?.userBalanceValue || 0)} />
                         </div>
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -171,48 +211,59 @@ const CollateralManagementTable = ({
                         </Tooltip>
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <div className="flex items-center justify-end gap-4">
+                    {/* Withdraw / Balance */}
+                    <TableCell className="pr-3 md:pr-4">
+                      <div className="flex items-center justify-end gap-2 md:gap-4">
                         <div className="text-right">
-                          <div className="font-medium">
-                            {(() => { try { const v = BigInt(asset?.collateralizedAmount || 0); return formatBalance(v <= 1n ? 0n : v, undefined, asset?.customDecimals ?? 18, 2); } catch { return formatBalance(0n, undefined, asset?.customDecimals ?? 18, 2); } })()}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {(() => { try { const v = BigInt(asset?.collateralizedAmountValue || 0); return formatBalance(v <= 1n ? 0n : v, undefined, 18, 1, 2, true); } catch { return formatBalance(0n, undefined, 18, 1, 2, true); } })()}
-                          </div>
+                          <TokenAmountDisplay 
+                            amount={BigInt(asset?.collateralizedAmount || 0)} 
+                            decimals={asset?.customDecimals ?? 18} 
+                          />
+                          <USDValueDisplay value={BigInt(asset?.collateralizedAmountValue || 0)} />
                         </div>
-                        {(() => {
-                          const maxWithdrawAmount = getMaxSafeWithdrawAmount(asset, loans);
-                          const hasCollateral = BigInt(asset?.collateralizedAmount || 0) > 0n;
-                          const canWithdraw = maxWithdrawAmount > 0n;
+                        {/* Withdraw button - hidden on mobile */}
+                        <div className="hidden md:block">
+                          {(() => {
+                            const maxWithdrawAmount = getMaxSafeWithdrawAmount(asset, loans);
+                            const hasCollateral = BigInt(asset?.collateralizedAmount || 0) > 0n;
+                            const canWithdraw = maxWithdrawAmount > 0n;
+                            const isPaused = asset?.isPaused;
 
-                          let tooltipMessage = "";
-                          if (canWithdraw) {
-                            tooltipMessage = "Withdraw collateral.\nReduces borrowing power.";
-                          } else if (!hasCollateral) {
-                            tooltipMessage = "Cannot withdraw.\nNo collateral supplied for this asset.";
-                          } else {
-                            tooltipMessage = "Cannot withdraw.\nNo available borrowing power.";
-                          }
+                            let tooltipMessage = "";
+                            if (isPaused) {
+                              tooltipMessage = "Lending Pool is on pause. Action currently disabled.";
+                            } else if (canWithdraw) {
+                              tooltipMessage = "Withdraw collateral.\nReduces borrowing power.";
+                            } else if (!hasCollateral) {
+                              tooltipMessage = "Cannot withdraw.\nNo collateral supplied for this asset.";
+                            } else {
+                              tooltipMessage = "Cannot withdraw.\nNo available borrowing power.";
+                            }
 
-                          return (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="cursor-help">
-                                  <Button
-                                    onClick={() => onWithdraw(asset)}
-                                    disabled={!canWithdraw || !hasCollateral}
-                                  >
-                                    Withdraw
-                                  </Button>
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <span>{tooltipMessage}</span>
-                              </TooltipContent>
-                            </Tooltip>
-                          );
-                        })()}
+                            return (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="cursor-help">
+                                    <Button
+                                      onClick={() => onWithdraw(asset)}
+                                      disabled={!canWithdraw || !hasCollateral || isPaused}
+                                    >
+                                      {isPaused ? (
+                                        <PauseCircle className="h-4 w-4 mr-1" />
+                                      ) : (
+                                        <ArrowUpCircle className="h-4 w-4 mr-1" />
+                                      )}
+                                      Withdraw
+                                    </Button>
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent className={isPaused ? "bg-amber-50 border-amber-300 text-amber-900" : ""}>
+                                  <span>{tooltipMessage}</span>
+                                </TooltipContent>
+                              </Tooltip>
+                            );
+                          })()}
+                        </div>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -227,8 +278,9 @@ const CollateralManagementTable = ({
                 </TableCell>
               </TableRow>
             )}
-          </TableBody>
-        </Table>
+            </TableBody>
+          </Table>
+        </TooltipProvider>
       </CardContent>
     </Card>
   );

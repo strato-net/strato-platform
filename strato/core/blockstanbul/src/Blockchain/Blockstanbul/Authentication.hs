@@ -23,7 +23,6 @@ module Blockchain.Blockstanbul.Authentication (
 where
 
 import BlockApps.Logging
-import BlockApps.X509.Certificate
 import Blockchain.Blockstanbul.Messages hiding (sequence)
 import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.Blockstanbul.Options (flags_strictBlockstanbul)
@@ -38,7 +37,6 @@ import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Validator
 import Control.Lens as L
 import Control.Monad (unless)
-import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Except
 import Data.Either.Extra
 import Data.List
@@ -68,7 +66,7 @@ signMessage tm = do
 blockstanbulError :: (MonadError String m) => String -> m a
 blockstanbulError = if flags_strictBlockstanbul then error else throwError
 
-authenticate :: (A.Selectable Address X509CertInfoState m) => InEvent -> m Bool
+authenticate :: (Monad m) => InEvent -> m Bool
 authenticate (IMsg (MsgAuth cm sig) tm) = do
   let msgHash = getHash tm
       mKey = recoverPub sig msgHash --recover pub key
@@ -84,9 +82,9 @@ replayHistoricBlock realValidators seqNo blk = do
       blockNo = fromIntegral . number . blockBlockData $ blk
 
   signers <- sequence $ map (verifyCommitmentSeal (blockHash blk)) _commitment
-      
+
   let signerRes = S.fromList $ map Validator signers
-  
+
   unless (seqNo + 1 == blockNo) $
     throwError $ printf "unexpected block number: have %d, wanted %d" blockNo (seqNo + 1)
 
@@ -106,7 +104,7 @@ replayHistoricBlock realValidators seqNo blk = do
       "real validator list doesn't match expected validator list for block #" ++ show (number . blockBlockData $ blk)
       ++ "\nreal validator list: " ++ show (map format $ S.toList realValidators)
       ++ "\nblock validator list: " ++ show (map format $ S.toList expectedValidatorList)
-        
+
   unless (signerRes `S.isSubsetOf` realValidators) $ do
         let unexplained = intercalate "," . map format . S.toList $ signerRes S.\\ realValidators
         blockstanbulError $
@@ -120,7 +118,7 @@ replayHistoricBlock realValidators seqNo blk = do
       printf "not enough commit seals (have %d out of %d)" (S.size signerRes) (S.size realValidators)
       ++ ": signerRes = " ++ show signerRes
       ++ ", realValidators = " ++ show realValidators
-        
+
   return (fromIntegral $ seqNo + 1, propValidator)
 
 isHistoricBlock :: Block -> Bool

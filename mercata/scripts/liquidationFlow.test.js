@@ -99,11 +99,11 @@ require("dotenv").config();
     return data;
   };
 
-  // Read ERC-20 balance via BlockApps-Mercata-Token-_balances view
+  // Read ERC-20 balance via BlockApps-Token-_balances view
   const getBalance = async (tokenAddr, holderAddr) => {
     const token = tokenAddr.replace(/^0x/, "").toLowerCase();
     const holder = holderAddr.replace(/^0x/, "").toLowerCase();
-    const data = await cirrusGet("/BlockApps-Mercata-Token-_balances", {
+    const data = await cirrusGet("/BlockApps-Token-_balances", {
       key: `eq.${holder}`,
       address: `eq.${token}`,
       select: "balance:value::text",
@@ -153,7 +153,7 @@ require("dotenv").config();
   // --- Borrower loan helper (principal + interest) via Cirrus ---
   const getUserDebt = async () => {
     try {
-      const rows = await cirrusGet("/BlockApps-Mercata-LendingPool-userLoan", {
+      const rows = await cirrusGet("/BlockApps-LendingPool-userLoan", {
         address: `eq.${cfg.LENDING_POOL.toLowerCase()}`,
         key: `eq.${USER_ADDRESS}`,
         select: "*",
@@ -237,7 +237,7 @@ require("dotenv").config();
     // 2c) Ensure GOLD asset configuration (incl. liquidation bonus) is set
     let currBonus = 0n;
     try {
-      const bonusCheck = await cirrusGet("/BlockApps-Mercata-LendingPool-assetLiquidationBonus", {
+      const bonusCheck = await cirrusGet("/BlockApps-LendingPool-assetLiquidationBonus", {
         address: `eq.${cfg.LENDING_POOL.toLowerCase()}`,
         key: `eq.${cfg.GOLDST.toLowerCase()}`,
         select: "value,value_fkey,bonus",
@@ -294,7 +294,7 @@ require("dotenv").config();
     // Fetch liquidation bonus for GOLDST; tolerate view unavailability
     let bonusBP = 10500n;
     try {
-      const bonusArr = await cirrusGet("/BlockApps-Mercata-LendingPool-assetLiquidationBonus", {
+      const bonusArr = await cirrusGet("/BlockApps-LendingPool-assetLiquidationBonus", {
         address: `eq.${cfg.LENDING_POOL.toLowerCase()}`,
         key: `eq.${cfg.GOLDST.toLowerCase()}`,
         select: "value,value_fkey,bonus",

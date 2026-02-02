@@ -19,9 +19,6 @@ import           SolidVM.Model.Storable
 blockappsAddress :: Address
 blockappsAddress = 0x1b7dc206ef2fe3aab27404b88c36470ccf16c0ce -- 0x0dbb9131d99c8317aa69a70909e124f2e02446e8
 
-mercataAddress :: Address
-mercataAddress = 0x1000
-
 -- | Inserts the 0xDEC1DE and contract 0xDEC1DE02 into the genesis block with the BlockApps root cert as owner
 insertDecideContract :: GenesisInfo -> GenesisInfo
 insertDecideContract gi =
@@ -44,10 +41,7 @@ insertDecideContract gi =
         0xDEC1DE02
         0
         (SolidVMCode "DeciderState" $ KECCAK256.hash dec1deStateContract)
-        [ (":creator", BString $ encodeUtf8 "BlockApps"),
-          (":creatorAddress", BAddress blockappsAddress),
-          (":originAddress", BAddress mercataAddress),
-          ("owner", BAddress blockappsAddress),
+        [ ("owner", BAddress blockappsAddress),
           ("currentFeeContract", BAddress 0xDEC1DE02)
         ]
 

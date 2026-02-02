@@ -132,7 +132,7 @@ tFormTypeToType = \case
   (SolidType.Int maybeBool maybeBytes) -> (XabiType.Int maybeBool maybeBytes)
   (SolidType.String maybeBool) -> (XabiType.String maybeBool)
   (SolidType.Bytes maybeBool maybeBytes) -> (XabiType.Bytes maybeBool maybeBytes)
-  (SolidType.UnknownLabel a _) -> (XabiType.UnknownLabel a)
+  (SolidType.UnknownLabel a) -> (XabiType.UnknownLabel a)
   (SolidType.Struct maybeInt typeD) -> (XabiType.Struct maybeInt $ T.pack typeD)
   (SolidType.Enum maybeInt typeD nams) -> (XabiType.Enum maybeInt (T.pack typeD) ((map T.pack) <$> nams))
   (SolidType.Array typ len) -> (XabiType.Array (tFormTypeToType typ) len)

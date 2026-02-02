@@ -1,62 +1,60 @@
-name:                core-api2
-license:             Apache-2.0
+name: core-api2
+license: Apache-2.0
 
 dependencies:
-- base
-- persistent-postgresql
-- servant-server
-- strato-conf
-
+  - base
+  - persistent-postgresql
+  - servant-server
+  - strato-conf
+  - time
 
 library:
   source-dirs: src
   dependencies:
-  - aeson
-  - aeson-casing
-  - base64-bytestring
-  - binary
-  - blockapps-data
-  - blockapps-datadefs
-  - blockDB
-  - bytestring
-  - clock
-  - common-log
-  - conduit
-  - containers
-  - deepseq
-  - directory
-  - esqueleto
-  - ethereum-discovery
-  - extra
-  - filepath
-  - format
-  - hflags
-  - http-types
-  - labeled-error
-  - lens
-  - monad-alter
-  - mtl
-  - process
-  - QuickCheck
-  - seqevents
-  - servant-client
-  - servant-multipart
-  - servant-multipart-client  
-#  - servant-swagger-tags
-  - solid-vm-model
-  - source-tools
-  - sql-monad
-  - strato-model
-  - swagger2
-  - template-haskell
-  - text
-  - transformers
-  - unliftio
-  - unordered-containers
-  - blockapps-vault-wrapper-api
-  - blockapps-vault-wrapper-client
-  - blockapps-identity-provider-client
-  - vault-monad
-  - identity-monad
-  - strato-redis-blockdb
-  - evm-solidity
+    - aeson
+    - aeson-casing
+    - base64-bytestring
+    - binary
+    - blockapps-data
+    - blockapps-datadefs
+    - blockDB
+    - bytestring
+    - clock
+    - common-log
+    - conduit
+    - containers
+    - deepseq
+    - directory
+    - esqueleto
+    - ethereum-discovery
+    - extra
+    - filepath
+    - format
+    - hflags
+    - http-types
+    - labeled-error
+    - lens
+    - monad-alter
+    - mtl
+    - process
+    - QuickCheck
+    - seqevents
+    - servant-client
+    - servant-multipart
+    - servant-multipart-client
+    #  - servant-swagger-tags
+    - solid-vm-model
+    - source-tools
+    - sql-monad
+    - strato-model
+    - swagger2
+    - template-haskell
+    - text
+    - transformers
+    - unliftio
+    - unordered-containers
+    - blockapps-vault-wrapper-api
+    - blockapps-vault-wrapper-client
+    - vault-monad
+    - strato-redis-blockdb
+    - evm-solidity

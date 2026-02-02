@@ -1,97 +1,87 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { formatUnits } from 'viem';
-import { Token } from '@/interface';
+import { Token, EarningAsset } from '@mercata/shared-types';
 
 interface UseNetBalanceProps {
-  tokens: Token[];
+  tokens: EarningAsset[];
   cataToken?: Token | null;
   loans: any;
-  liquidityInfo: any;
-  totalCDPDebt: string;
-  safetyInfo?: any;
+  totalCDPDebt: string | undefined;
 }
 
 interface NetBalanceResult {
   netBalance: number;
   cataBalance: number;
   totalBorrowed: number;
+  isLoading: boolean;
 }
 
 export const useNetBalance = ({
   tokens,
   cataToken,
   loans,
-  liquidityInfo,
   totalCDPDebt,
-  safetyInfo
 }: UseNetBalanceProps): NetBalanceResult => {
   const [result, setResult] = useState<NetBalanceResult>({
     netBalance: 0,
     cataBalance: 0,
-    totalBorrowed: 0
+    totalBorrowed: 0,
+    isLoading: true
   });
 
+  const hasSeenTokensWithData = useRef(false);
+  const calculationAttempted = useRef(false);
+
   useEffect(() => {
-    if (!tokens || tokens.length === 0) {
+    const isTokensLoaded = Array.isArray(tokens);
+    const isLoansLoaded = loans !== undefined;
+    const isTotalCDPDebtLoaded = totalCDPDebt !== undefined;
+
+    // Track if we've seen tokens with data
+    if (tokens?.length > 0) {
+      hasSeenTokensWithData.current = true;
+    }
+
+    const hasLendingPoolDebt = loans?.totalAmountOwed && BigInt(loans.totalAmountOwed) > 1n;
+    const hasCDPDebt = totalCDPDebt && BigInt(totalCDPDebt) > 1n;
+    const hasAnyDebt = hasLendingPoolDebt || hasCDPDebt;
+
+    const tokensIsEmpty = !tokens || tokens.length === 0;
+    const shouldWaitForTokens = tokensIsEmpty && hasAnyDebt && !hasSeenTokensWithData.current && !calculationAttempted.current;
+
+    const allDataLoaded = isTokensLoaded && isLoansLoaded && isTotalCDPDebtLoaded;
+
+    if (!allDataLoaded || shouldWaitForTokens) {
+      setResult({
+        netBalance: 0,
+        cataBalance: 0,
+        totalBorrowed: 0,
+        isLoading: true
+      });
       return;
     }
+
+    calculationAttempted.current = true;
 
     let total = 0;
     let cataTotal = 0;
 
-    // Calculate token deposit values (includes LP tokens and CDP collateral)
-
+    // Sum token values from earning assets (value is already calculated on backend)
     for (let i = 0; i < tokens.length; i++) {
-      const token = tokens[i];
-      const rawPrice = token?.price || "0";
-      const rawBalance = token?.balance || "0";
-      const rawCollateralBalance = token?.collateralBalance || "0";
-
-      // Only process tokens with price AND (balance OR collateral)
-      if (rawPrice && (rawBalance || rawCollateralBalance)) {
-        const price = parseFloat(formatUnits(BigInt(rawPrice), 18));
-        const balance = parseFloat(formatUnits(BigInt(rawBalance || 0), 18));
-        const collateralBalance = parseFloat(formatUnits(BigInt(rawCollateralBalance || 0), 18));
-
-        // Calculate: price * (balance + collateralBalance)
-        const totalTokenValue = price * (balance + collateralBalance);
-        total += totalTokenValue;
-      }
+      const tokenValue = parseFloat(tokens[i]?.value || "0");
+      total += tokenValue;
     }
 
-    // Calculate CATA balance from the provided cataToken (if it exists)
+    // Calculate CATA token balance (not added to total)
     if (cataToken) {
       const rawBalance = cataToken?.balance || "0";
-      const rawCollateralBalance = cataToken?.collateralBalance || "0";
 
-      if (rawBalance || rawCollateralBalance) {
-        const balance = parseFloat(formatUnits(BigInt(rawBalance || 0), 18));
-        const collateralBalance = parseFloat(formatUnits(BigInt(rawCollateralBalance || 0), 18));
-
-        // For CATA, track the actual token balance, not USD value
-        cataTotal = balance + collateralBalance;
+      if (rawBalance) {
+        cataTotal = parseFloat(formatUnits(BigInt(rawBalance), 18));
       }
     }
 
-    // Add lending pool value (mUSDST deposits)
-    if ((liquidityInfo?.withdrawable as any)?.withdrawValue) {
-      const lendingPoolValue = parseFloat(formatUnits(BigInt((liquidityInfo.withdrawable as any).withdrawValue), 18));
-      total += lendingPoolValue;
-    }
-
-    // Add sUSDST (Safety Module) value  
-    if (safetyInfo?.userShares && safetyInfo?.exchangeRate) {
-      const userShares = parseFloat(formatUnits(BigInt(safetyInfo.userShares), 18));
-      const exchangeRate = parseFloat(formatUnits(BigInt(safetyInfo.exchangeRate), 18));
-      
-      const sUsdstValue = userShares * exchangeRate;
-      total += sUsdstValue;
-    }
-
-    // Note: LP tokens are already included in the tokens list above
-    // No need to add them separately from userPools to avoid double counting
-
-    // Calculate total debt (BOTH lending pool debt AND CDP vault debt)
+    // Calculate total debt
     const lendingPoolDebt = loans?.totalAmountOwed 
       ? parseFloat(formatUnits((() => { 
           try { 
@@ -114,17 +104,17 @@ export const useNetBalance = ({
         })(), 18))
       : 0;
 
-    // Net balance calculation includes both debt types
     const totalDebt = lendingPoolDebt + cdpDebt;
     const netBalance = total - totalDebt;
-
+    
     setResult({
       netBalance,
       cataBalance: cataTotal,
-      totalBorrowed: totalDebt
+      totalBorrowed: totalDebt,
+      isLoading: false
     });
 
-  }, [tokens, cataToken, loans, liquidityInfo, totalCDPDebt, safetyInfo]);
+  }, [tokens, cataToken, loans, totalCDPDebt]);
 
   return result;
 };

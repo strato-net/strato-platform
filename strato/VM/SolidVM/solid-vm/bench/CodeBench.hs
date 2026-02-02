@@ -51,7 +51,7 @@ wingsCC = do
   case compiled of
     Left err -> error $ show err
     Right cc -> cc
-   
+
 strBench :: Benchmark
 strBench =
   bench "time to pack the wings contract" $

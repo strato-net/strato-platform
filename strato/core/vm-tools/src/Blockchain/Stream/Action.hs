@@ -14,23 +14,15 @@ module Blockchain.Stream.Action (
   blockHash,
   blockTimestamp,
   blockNumber,
-  transactionHash,
   transactionSender,
   actionData,
-  src,
-  name,
+  newCodeCollections,
   events,
   delegatecalls,
 
   ActionData(..),
-  actionDataCodeHash,
-  actionDataCodeCollection,
-  actionDataCreator,
-  actionDataCCCreator,
-  actionDataRoot,
-  actionDataApplication,
   actionDataStorageDiffs,
-  
+
   DataDiff(..),
   Delegatecall(..),
 
@@ -46,8 +38,6 @@ module Blockchain.Stream.Action (
 
 import Blockchain.MiscJSON ()
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Code
-import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Keccak256
 import Control.DeepSeq
@@ -148,13 +138,7 @@ parseDiffSolidVM (Object obs) =
 parseDiffSolidVM x = typeMismatch "SolidVMDiff" x
 
 data ActionData = ActionData
-  { _actionDataCodeHash :: CodePtr,
-    _actionDataCodeCollection :: CodeCollection,
-    _actionDataCreator :: Text,
-    _actionDataCCCreator :: Maybe Text,
-    _actionDataRoot :: Text,
-    _actionDataApplication :: Text,
-    _actionDataStorageDiffs :: DataDiff
+  { _actionDataStorageDiffs :: DataDiff
   }
   deriving (Eq, Show, Generic, NFData)
 
@@ -162,21 +146,7 @@ makeLenses ''ActionData
 
 instance Format ActionData where
   format ActionData {..} =
-    "actionDataCodeHash: " ++ format _actionDataCodeHash ++ "\n"
-      ++ "actionDataCreator: "
-      ++ T.unpack _actionDataCreator
-      ++ "\n"
-      ++ "actionDataCCCreator: "
-      ++ maybe "Nothing" T.unpack _actionDataCCCreator
-      ++ "\n"
-      ++ "actionDataRoot: "
-      ++ T.unpack _actionDataRoot
-      ++ "\n"
-      ++ "actionDataApplication: "
-      ++ T.unpack _actionDataApplication
-      ++ "\n"
-      ++ "actionDataStorageDiffs: "
-      ++ format _actionDataStorageDiffs
+    "actionDataStorageDiffs: " ++ format _actionDataStorageDiffs
 
 instance Binary ActionData
 
@@ -185,12 +155,6 @@ mergeActionData newData oldData =
   let SolidVMDiff n = _actionDataStorageDiffs newData
       SolidVMDiff o = _actionDataStorageDiffs oldData
    in ActionData
-          (_actionDataCodeHash oldData)
-          (_actionDataCodeCollection oldData <> _actionDataCodeCollection newData)
-          (_actionDataCreator newData)
-          (_actionDataCCCreator newData)
-          (_actionDataRoot newData)
-          (_actionDataApplication newData)
           (SolidVMDiff $ n <> o)
 
 mergeActionDataStorageDiffs :: ActionData -> ActionData -> ActionData
@@ -206,35 +170,22 @@ instance Semigroup ActionData where
 instance ToJSON ActionData where
   toJSON ActionData {..} =
     object
-      [ "codeHash" .= _actionDataCodeHash,
-        "codeCollection" .= _actionDataCodeCollection,
-        "creator" .= _actionDataCreator,
-        "cc_creator" .= _actionDataCCCreator,
-        "root" .= _actionDataRoot,
-        "application" .= _actionDataApplication,
-        "diff" .= _actionDataStorageDiffs
+      [ "diff" .= _actionDataStorageDiffs
       ]
 
 instance FromJSON ActionData where
   parseJSON (Object o) = do
-    ch <- o .: "codeHash"
-    cc <- o .: "codeCollection"
-    cr <- o .: "creator"
-    ccr <- o .: "cc_creator"
-    rt <- o .: "root"
-    ap <- o .: "application"
     df <- explicitParseField parseDiffSolidVM o "diff"
-    return $ ActionData ch cc cr ccr rt ap df
+    return $ ActionData df
   parseJSON o = fail $ "parseJSON ActionData: Expected object, got: " ++ show o
 
 data Delegatecall = Delegatecall
   { _delegatecallStorageAddress :: Address,
     _delegatecallCodeAddress :: Address,
-    _delegatecallOrganization :: Text,
-    _delegatecallApplication :: Text,
+    _delegatecallOrganization :: Maybe Text,
     _delegatecallContractName :: Text
   }
-  deriving (Eq, Show, Read, Generic, NFData)
+  deriving (Eq, Ord, Show, Read, Generic, NFData)
 
 --makeLenses ''Delegatecall
 
@@ -245,10 +196,7 @@ instance Format Delegatecall where
       ++ format _delegatecallCodeAddress
       ++ "\n"
       ++ "delegatecallOrganization: "
-      ++ T.unpack _delegatecallOrganization
-      ++ "\n"
-      ++ "delegatecallApplication: "
-      ++ T.unpack _delegatecallApplication
+      ++ T.unpack (fromMaybe "<none>" _delegatecallOrganization)
       ++ "\n"
       ++ "delegatecallContractName: "
       ++ T.unpack _delegatecallContractName
@@ -261,7 +209,6 @@ instance ToJSON Delegatecall where
       [ "storageAddress" .= _delegatecallStorageAddress,
         "codeAddress" .= _delegatecallCodeAddress,
         "organization" .= _delegatecallOrganization,
-        "application" .= _delegatecallApplication,
         "contractName" .= _delegatecallContractName
       ]
 
@@ -270,20 +217,17 @@ instance FromJSON Delegatecall where
     s <- o .: "storageAddress"
     c <- o .: "codeAddress"
     r <- o .: "organization"
-    a <- o .: "application"
     n <- o .: "contractName"
-    pure $ Delegatecall s c r a n
+    pure $ Delegatecall s c r n
   parseJSON o = fail $ "parseJSON Delegatecall: Expected object, got: " ++ show o
 
 data Action = Action
   { _blockHash :: Keccak256,
     _blockTimestamp :: UTCTime,
     _blockNumber :: Integer,
-    _transactionHash :: Keccak256,
     _transactionSender :: Address,
     _actionData :: OMap.OMap Address ActionData,
-    _src :: Maybe Code,
-    _name :: Maybe Text,
+    _newCodeCollections :: OMap.OMap (Text, Keccak256) CodeCollection,
     _events :: S.Seq Event,
     _delegatecalls :: S.Seq Delegatecall
   }
@@ -304,20 +248,11 @@ instance Format Action where
       ++ "actionBlockNumber: "
       ++ show _blockNumber
       ++ "\n"
-      ++ "actionTransactionHash: "
-      ++ format _transactionHash
-      ++ "\n"
       ++ "actionTransactionSender: "
       ++ format _transactionSender
       ++ "\n"
       ++ "actionData:\n"
       ++ unlines (map (\(k, v) -> tab $ format k ++ ":\n" ++ (tab $ format v)) $ OMap.assocs _actionData)
-      ++ "\n"
-      ++ "src: "
-      ++ format _src
-      ++ "\n"
-      ++ "name: "
-      ++ format _name
       ++ "\n"
       ++ "actionEvents: "
       ++ unlines (map show $ toList _events)
@@ -348,11 +283,9 @@ instance ToJSON Action where
       [ "blockHash" .= _blockHash,
         "blockTimestamp" .= _blockTimestamp,
         "blockNumber" .= _blockNumber,
-        "transactionHash" .= _transactionHash,
         "sender" .= _transactionSender,
         "data" .= _actionData,
-        "src" .= _src,
-        "name" .= _name,
+        "newCodeCollections" .= _newCodeCollections,
         "events" .= _events,
         "delegatecalls" .= _delegatecalls
       ]
@@ -363,11 +296,9 @@ instance FromJSON Action where
       <$> (o .: "blockHash")
       <*> (o .: "blockTimestamp")
       <*> (o .: "blockNumber")
-      <*> (o .: "transactionHash")
       <*> (o .: "sender")
       <*> (o .: "data")
-      <*> (o .: "src")
-      <*> (o .: "name")
+      <*> (o .: "newCodeCollections")
       <*> (o .: "events")
       <*> (fromMaybe S.empty <$> (o .:? "delegatecalls"))
   parseJSON o = fail $ "parseJSON Action: Expected object, got: " ++ show o

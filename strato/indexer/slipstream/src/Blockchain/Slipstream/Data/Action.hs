@@ -13,8 +13,6 @@
 module Blockchain.Slipstream.Data.Action where
 
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Code
-import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Stream.Action (Action)
@@ -30,23 +28,14 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time
 import GHC.Generics
-import SolidVM.Model.CodeCollection hiding (Event)
 
 data AggregateAction = AggregateAction
   { actionBlockHash :: Keccak256,
     actionBlockTimestamp :: UTCTime,
     actionBlockNumber :: Integer,
-    actionTxHash :: Keccak256,
     actionTxSender :: Address,
-    actionCreator :: Text,
-    actionCCCreator :: Maybe Text,
-    actionRoot :: Text,
-    actionApplication :: Text,
     actionAddress :: Address,
-    actionCodeHash :: CodePtr,
-    actionCodeCollection :: CodeCollection,
-    actionStorage :: Action.DataDiff,
-    actionSrc :: Maybe Code
+    actionStorage :: Action.DataDiff
   }
   deriving (Show, Generic, NFData)
 
@@ -54,7 +43,6 @@ data AggregateEvent = AggregateEvent
   { eventBlockHash :: Keccak256,
     eventBlockTimestamp :: UTCTime,
     eventBlockNumber :: Integer,
-    eventTxHash :: Keccak256,
     eventTxSender :: Address,
     eventIndex :: Int,
     eventEvent :: Event
@@ -80,17 +68,9 @@ flatten Action.Action {..} = flip map (OMap.assocs _actionData) $
           { actionBlockHash = _blockHash,
             actionBlockTimestamp = _blockTimestamp,
             actionBlockNumber = _blockNumber,
-            actionTxHash = _transactionHash,
             actionTxSender = _transactionSender,
-            actionCreator = _actionDataCreator,
-            actionCCCreator = _actionDataCCCreator,
-            actionRoot = _actionDataRoot,
-            actionApplication = _actionDataApplication,
             actionAddress = address,
-            actionCodeHash = _actionDataCodeHash,
-            actionCodeCollection = _actionDataCodeCollection,
-            actionStorage = _actionDataStorageDiffs,
-            actionSrc = _src
+            actionStorage = _actionDataStorageDiffs
           }
 
 formatAction :: AggregateAction -> Text
@@ -102,16 +82,11 @@ formatAction AggregateAction {..} =
       tshow actionBlockTimestamp,
       ", blockNumber: ",
       tshow actionBlockNumber,
-      ", transactionHash: ",
-      tshow actionTxHash,
-      ", ",
-      " with account: ",
+      ", with account: ",
       tshow actionAddress,
       " with ",
       tshow (numberOfDiffs actionStorage),
-      " items\n",
-      "    codeHash = ",
-      tshow actionCodeHash
+      " items"
     ]
   where
     tshow :: Show a => a -> Text

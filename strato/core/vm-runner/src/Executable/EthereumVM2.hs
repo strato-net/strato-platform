@@ -43,7 +43,6 @@ import Blockchain.VMContext
 import Blockchain.VMMetrics
 import Conduit hiding (Flush)
 import Control.Arrow ((&&&), (***))
-import Control.Lens hiding (Context)
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
@@ -95,18 +94,18 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
             -- private txs don't affect stateroot we compute
             otxs = catMaybes $ wrapIngestBlockTransaction  bHash <$> [t | t <- blockReceiptTransactions block]
         mSumm <- A.lookup (A.Proxy @BlockSummary) (parentHash bHeader)
-        case mSumm of 
+        case mSumm of
           Nothing -> pure Nothing
           Just summ -> do
             let bHeader' = case bHeader of
                             -- imitate parent block as closely as possible (most important is the stateroot)
-                            BlockHeader {} -> bHeader { 
+                            BlockHeader {} -> bHeader {
                               parentHash = bSumParentHash summ,
                               stateRoot = bSumStateRoot summ,
                               number = bSumNumber summ,
                               gasLimit = bSumGasLimit summ
                             }
-                            BlockHeaderV2 {} -> bHeader { 
+                            BlockHeaderV2 {} -> bHeader {
                               parentHash = bSumParentHash summ,
                               stateRoot = bSumStateRoot summ,
                               number = bSumNumber summ
@@ -121,19 +120,19 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
                                   Just addr ->  return addr
                                   Nothing -> error "no proposer"
                             Nothing -> error "no proposer"
-            res <- Bagger.runFromStateRoot 
+            res <- Bagger.runFromStateRoot
               --account
-              mineTransactions 
-              (bSumGasLimit summ) 
+              mineTransactions
+              (bSumGasLimit summ)
               bHeader'
-              otxs 
+              otxs
               proposer
-            case res of 
-              Right (sr, trrs, _) -> do 
+            case res of
+              Right (sr, trrs, _) -> do
                 $logDebugS "handleVmEvents/preprepareBlock" . T.pack $ "Stateroot we got: " <> format sr
                 $logDebugS "handleVmEvents/preprepareBlock" . T.pack $ "Stateroot in block: " <> format (stateRoot bHeader)
                 blockFailures <- verifyBlock block (trrs, Just sr) summ
-                case blockFailures of 
+                case blockFailures of
                   [] -> pure . Just $ AcceptPreprepare bHash
                   _  -> do
                     $logDebugS "handleVmEvents/preprepareBlock" . T.pack $ show blockFailures
@@ -144,20 +143,12 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
 
   mSelfAddress <- _selfAddress <$> Mod.get (Mod.Proxy @ContextState)
   mNewBlock <- lift $ do
-    Mod.modify_ (Mod.Proxy @ContextState) $ pure . (blockRequested ||~ createBlock)
     -- todo: perhaps we shouldnt even add TXs to the mempool, it might make for a VERY large checkpoint
     -- todo: which may fail
     bState <- Bagger.getBaggerState
-    pbft <- _hasBlockstanbul <$> Mod.get (Mod.Proxy @ContextState)
-    reqd <- _blockRequested <$> Mod.get (Mod.Proxy @ContextState)
-    let makeLazyBlocks = False --lazyBlocks $ quarryConfig ethConf -- TODO?: Remove reference to ethConf
-        pending = B.pending bState
-        priv = toList . B.privateHashes $ B.miningCache bState
-        hasTxs = (numPoolable > 0) || not (M.null pending) || not (null priv)
-        shouldOutputBlocks =
-          if pbft
-            then reqd && hasTxs
-            else not makeLazyBlocks || hasTxs
+    let pending = B.pending bState
+        hasTxs = (numPoolable > 0) || not (M.null pending)
+        shouldOutputBlocks = hasTxs
     $logInfoS "evm/loop/newBlock" . T.pack $
       printf
         "Num poolable: %d, num pending: %d"
@@ -166,14 +157,9 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
     multilineLog "evm/loop/newBlock" $
       boringBox
         [ CL.yellow "Decision making for block creation:",
-          "pbft: " ++ formatBool pbft,
-          "reqd: " ++ formatBool reqd,
           "hasTxs: " ++ formatBool hasTxs,
-          "makeLazyBlocks: " ++ formatBool makeLazyBlocks,
           "shouldOutputBlocks: " ++ formatBool shouldOutputBlocks
         ]
-    when (pbft && shouldOutputBlocks) $
-      Mod.modify_ (Mod.Proxy @ContextState) $ pure . (blockRequested .~ False)
     $logDebugS "evm/loop/newBlock" $ T.pack $ "Queued: " ++ show numPoolable
     $logDebugS "evm/loop/newBlock" $ T.pack $ "Pending: " ++ show (length pending)
     $logInfoS "evm/loop/newBlock" "about to evaluate shouldOutputBlocks"
@@ -181,10 +167,12 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
       then do
         $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"
         newBlock <- Bagger.makeNewBlock mineTransactions mSelfAddress
-        pure $ Just newBlock 
+        if not . null $ obReceiptTransactions newBlock
+          then pure $ Just newBlock
+          else pure Nothing
       else pure Nothing
-    
-  for_ mNewBlock $ yield . OutBlock 
+
+  for_ mNewBlock $ yield . OutBlock
 
 processBlocks ::
   (MonadFail m, Bagger.MonadBagger m, MonadMonitor m) =>

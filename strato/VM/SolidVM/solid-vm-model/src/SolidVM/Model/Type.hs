@@ -28,7 +28,7 @@ data Type
   | Decimal
   | Bool
   | Address {isPayable :: Bool}
-  | UnknownLabel SolidString (Maybe SolidString)
+  | UnknownLabel SolidString
   | Struct {bytes :: Maybe Int32, typedef :: SolidString}
   | UserDefined {alias :: SolidString, actual :: Type}
   | Enum {bytes :: Maybe Int32, typedef :: SolidString, names :: Maybe [SolidString]}

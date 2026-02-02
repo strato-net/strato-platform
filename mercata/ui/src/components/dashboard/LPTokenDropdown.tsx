@@ -14,9 +14,9 @@ export default function LPTokenDropdown({ lpToken, className = "", isExpanded }:
   return (
     <div className={`${className}`}>
       {isExpanded && (
-        <div className="p-3 bg-white border border-gray-200 rounded-md mb-2">
+        <div className="p-3 bg-card border border-border rounded-md mb-2">
           <div className="space-y-3">
-            <div className="text-sm font-medium text-gray-700 mb-2">
+            <div className="text-sm font-medium text-foreground mb-2">
               Your Position Breakdown ({userShare < 0.01 ? '<0.01' : userShare.toFixed(2)}% share):
             </div>
             
@@ -30,21 +30,21 @@ export default function LPTokenDropdown({ lpToken, className = "", isExpanded }:
                     className="w-6 h-6 rounded-full"
                   />
                 ) : (
-                  <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
-                    <span className="text-xs font-medium text-blue-600">
+                  <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center">
+                    <span className="text-xs font-medium text-blue-500">
                       {lpToken.tokenA._symbol?.slice(0, 2)}
                     </span>
                   </div>
                 )}
-                <span className="text-sm font-medium text-gray-700">
+                <span className="text-sm font-medium text-foreground">
                   {lpToken.tokenA._name} ({lpToken.tokenA._symbol})
                 </span>
               </div>
               <div className="text-right">
-                <div className="text-sm font-medium text-gray-900">
+                <div className="text-sm font-medium text-foreground">
                   {formatBalance(tokenQuantities.tokenA, lpToken.tokenA._symbol, 18, 6, 12)}
                 </div>
-                <div className="text-xs text-gray-500">
+                <div className="text-xs text-muted-foreground">
                   {formatBalance(
                     (BigInt(tokenQuantities.tokenA) * BigInt(lpToken.tokenA.price || "0")) / BigInt(10 ** 18),
                     undefined, 18, 2, 2, true
@@ -63,21 +63,21 @@ export default function LPTokenDropdown({ lpToken, className = "", isExpanded }:
                     className="w-6 h-6 rounded-full"
                   />
                 ) : (
-                  <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center">
-                    <span className="text-xs font-medium text-green-600">
+                  <div className="w-6 h-6 rounded-full bg-green-500/20 flex items-center justify-center">
+                    <span className="text-xs font-medium text-green-500">
                       {lpToken.tokenB._symbol?.slice(0, 2)}
                     </span>
                   </div>
                 )}
-                <span className="text-sm font-medium text-gray-700">
+                <span className="text-sm font-medium text-foreground">
                   {lpToken.tokenB._name} ({lpToken.tokenB._symbol})
                 </span>
               </div>
               <div className="text-right">
-                <div className="text-sm font-medium text-gray-900">
+                <div className="text-sm font-medium text-foreground">
                   {formatBalance(tokenQuantities.tokenB, lpToken.tokenB._symbol, 18, 6, 12)}
                 </div>
-                <div className="text-xs text-gray-500">
+                <div className="text-xs text-muted-foreground">
                   {formatBalance(
                     (BigInt(tokenQuantities.tokenB) * BigInt(lpToken.tokenB.price || "0")) / BigInt(10 ** 18),
                     undefined, 18, 2, 2, true

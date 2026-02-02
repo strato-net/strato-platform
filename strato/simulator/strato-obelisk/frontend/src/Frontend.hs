@@ -57,7 +57,7 @@ app
 app route = do
   rec
     _ <- networkWidget nodesDyn
-    let 
+    let
       nodesEv = fmapMaybe isNodesEv msgRecEv
     nodesDyn <- holdDyn M.empty nodesEv
     msgRecEv <- wsEv route never
@@ -188,7 +188,7 @@ wsEv route msgSendEv = case checkEncoder fullRouteEncoder of
       Just uri -> do
         ws <- webSocket (render uri) $ def & webSocketConfig_send .~ sendEv
         let mS2c = fromStrict <$> _webSocket_recv ws
-        pure $ fmapMaybe Aeson.decode mS2c 
+        pure $ fmapMaybe Aeson.decode mS2c
 
 dynButton :: MonadWidget t m => Text -> m (Event t ())
 dynButton s = do

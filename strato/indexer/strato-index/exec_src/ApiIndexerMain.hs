@@ -19,5 +19,5 @@ main = do
 
   runLoggingT $
     runKafkaMConfigured "strato-api-indexer" $
-    runSQLM $ 
+    runSQLM $
       apiIndexerMainLoop

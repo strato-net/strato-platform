@@ -42,7 +42,7 @@ export interface Token {
   collateralBalance?: string;
   key?: string;
   value?: string;
-  "BlockApps-Mercata-ERC20"?: {
+  "BlockApps-ERC20"?: {
     data: {
       token: string;
       oracle: string;
@@ -197,7 +197,9 @@ export interface CollateralData {
   isCollateralized: boolean;
   liquidationThreshold: string; // Possibly in basis points (e.g., "8000" = 80%)
   ltv: string; // Loan-to-Value ratio (e.g., "7500" = 75%)
-  maxBorrowingPower: string; // Usually a percent string
+  maxBorrowingPower: string; // Borrowing power from supplied collateral (collateralizedAmount * price * ltv)
+  unsuppliedBorrowingPower: string; // Potential borrowing power from user balance (userBalance * price * ltv)
+  unsuppliedLTCollateralValue: string; // LT-weighted value of unsupplied balance (userBalance * price * lt)
   userBalance: string;
   userBalanceValue: string;
   _name: string;
@@ -213,6 +215,7 @@ export interface CollateralData {
   liquidationBonus?: string;
   bonus?: string;
   expectedProfit?: string;
+  isPaused: boolean;              // LendingPool pause status
 }
 
 export interface TokenInfo {
@@ -226,6 +229,8 @@ export interface TokenInfo {
   _totalSupply: string;
   exchangeRate?: string;
   maxWithdrawableUSDST?: string;
+  userBalanceStaked?: string; // Staked balance from RewardsChef
+  userBalanceTotal?: string; // Total = wallet + staked
 }
 
 export interface LiquidityData {
@@ -247,6 +252,7 @@ export interface LiquidityData {
   // new (optional)
   totalAmountOwed?: string;
   totalAmountOwedPreview?: string;
+  isPaused: boolean;              // LendingPool pause status
 }
 
 export interface CollateralRatioItem {
@@ -308,7 +314,8 @@ export type NewLoanData = {
   healthFactor: number;
   healthFactorRaw: string;
   totalBorrowingPowerUSD: string;
-  totalCollateralValueUSD: string;
+  totalCollateralValueUSD: string;      // risk-adjusted by LT (for health factor)
+  totalCollateralValueSupplied: string; // full supplied collat $ value (for display)
   maxAvailableToBorrowUSD: string;
   interestRate: number;                // bps
   isAboveLiquidationThreshold: boolean;
@@ -358,8 +365,7 @@ export interface PoolPollingConfig {
   fromAsset: any;
   toAsset: any;
   getPoolByTokenPair: (tokenA: string, tokenB: string, signal?: AbortSignal) => Promise<any>;
-  fetchUsdstBalance: (userAddress: string) => Promise<void>;
-  userAddress: string;
+  fetchUsdstBalance: () => Promise<void>;
   interval?: number;
 }
 

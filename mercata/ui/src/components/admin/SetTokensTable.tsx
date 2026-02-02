@@ -148,14 +148,14 @@ const AllTokensTable = () => {
               <SelectItem value="unknown">UNKNOWN</SelectItem>
             </SelectContent>
           </Select>
-          <span className="text-sm text-gray-500">
+          <span className="text-sm text-muted-foreground">
             Showing {filteredTokens.length} of {tokens.length} tokens
           </span>
         </div>
         
         {filteredTokens.length === 0 ? (
           <div className="text-center py-8">
-            <p className="text-gray-500">
+            <p className="text-muted-foreground">
               {tokens.length === 0 ? "No tokens found" : `No tokens with ${statusFilter === 'all' ? 'any' : getStatusLabel(statusFilter).label} status`}
             </p>
           </div>
@@ -176,9 +176,9 @@ const AllTokensTable = () => {
               <TableBody>
                 {filteredTokens.map((token, index) => {
                   const tokenData = token as Token;
-                  const name = tokenData.name || token._name || token.token?._name || token["BlockApps-Mercata-ERC20"]?._name || 'Unknown';
-                  const symbol = tokenData.symbol || token._symbol || token.token?._symbol || token["BlockApps-Mercata-ERC20"]?._symbol || 'Unknown';
-                  const address = tokenData.address || token.address || token.token?.address || token["BlockApps-Mercata-ERC20"]?.address || 'Unknown';
+                  const name = tokenData.name || token._name || token.token?._name || token["BlockApps-ERC20"]?._name || 'Unknown';
+                  const symbol = tokenData.symbol || token._symbol || token.token?._symbol || token["BlockApps-ERC20"]?._symbol || 'Unknown';
+                  const address = tokenData.address || token.address || token.token?.address || token["BlockApps-ERC20"]?.address || 'Unknown';
                   const status = getStatusLabel(tokenData.status);
 
                   return (

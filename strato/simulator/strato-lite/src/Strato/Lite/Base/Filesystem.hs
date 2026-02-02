@@ -22,13 +22,11 @@ module Strato.Lite.Base.Filesystem where
 
 import BlockApps.Logging
 import BlockApps.Solidity.Value as V
-import BlockApps.X509.Certificate
 import Blockchain.Context hiding (actionTimestamp, blockHeaders, remainingBlockHeaders)
 import Blockchain.Data.Block
 import Blockchain.Data.BlockDB
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
-import Blockchain.Data.CirrusDefs
 import qualified Blockchain.Data.DataDefs as DataDefs
 import Blockchain.Data.Transaction
 import Blockchain.Data.TransactionResult
@@ -50,7 +48,6 @@ import Blockchain.Strato.Indexer.IContext (API (..), IndexerException (..), P2P 
 import Blockchain.Strato.Discovery.ContextLite (UDPPacket(..))
 import Blockchain.Strato.Discovery.Data.MemPeerDB
 import Blockchain.Strato.Discovery.Data.Peer
-import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Host
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
@@ -98,7 +95,6 @@ data FilesystemDBs = FilesystemDBs
   , _codeDB :: CodeDB
   , _blockSummaryDB :: BlockSummaryDB
   , _dependentBlockDB :: DBDB.DependentBlockDB
-  , _x509DB :: LDB.DB
   , _canonicalDB :: LDB.DB
   , _blockDB :: LDB.DB
   , _kvDB :: LDB.DB
@@ -160,8 +156,8 @@ instance {-# OVERLAPPING #-} MonadIO m => RunsServer (FilesystemT m) where
 instance {-# OVERLAPPING #-} MonadIO m => A.Replaceable SockAddr B.ByteString (FilesystemT m) where
   replace _ addr packet = do
     sock' <- asks _filesystemPeerUDPSocket
-    liftIO $ catch 
-      (void $ NB.sendTo sock' packet addr) 
+    liftIO $ catch
+      (void $ NB.sendTo sock' packet addr)
       (\(err :: IOError) -> runLoggingT . $logErrorS "NB.sendTo" . T.pack $ "Could not send data to " <> show addr <> "; got error: " <> show err)
 
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Awaitable UDPPacket (FilesystemT m) where
@@ -216,11 +212,12 @@ instance {-# OVERLAPPING #-} (MonadUnliftIO m, MonadLogger m) => (FilesystemT m)
       )
 
 sqlTypeSQLite :: SqlType -> T.Text
-sqlTypeSQLite SqlBool    = "bool"
-sqlTypeSQLite SqlDecimal = "decimal"
-sqlTypeSQLite SqlText    = "text"
-sqlTypeSQLite SqlJsonb   = "jsonb"
-sqlTypeSQLite SqlSerial  = ""
+sqlTypeSQLite SqlBool      = "bool"
+sqlTypeSQLite SqlDecimal   = "decimal"
+sqlTypeSQLite SqlText      = "text"
+sqlTypeSQLite SqlJsonb     = "jsonb"
+sqlTypeSQLite SqlTimestamp = "text"
+sqlTypeSQLite SqlSerial    = ""
 
 slipstreamQuerySQLite :: SlipstreamQuery -> Maybe T.Text
 slipstreamQuerySQLite (CreateTable tableName cols pk mTC) = Just $ T.concat
@@ -299,9 +296,6 @@ instance {-# OVERLAPPING #-} MonadIO m => AccessibleEnv SQLDB (FilesystemT m) wh
 instance {-# OVERLAPPING #-} MonadIO m => AccessibleEnv CirrusDB (FilesystemT m) where
   accessEnv = asks $ CirrusDB . _cirrusSqlPool . _filesystemDBs
 
-instance {-# OVERLAPPING #-} MonadUnliftIO m => A.Selectable Address Certificate (FilesystemT m) where
-  select _ = getX509CertForAccount
-
 instance {-# OVERLAPPING #-} MonadUnliftIO m => (Keccak256 `A.Selectable` SourceMap) (FilesystemT m) where
   select _ = getCodeFromPostgres
 
@@ -338,11 +332,6 @@ instance {-# OVERLAPPING #-} MonadIO m => (Keccak256 `A.Alters` P2P OutputBlock)
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Modifiable (P2P BestBlock) (FilesystemT m) where
   get _ = liftIO . throwIO $ Lookup "P2P" "()" "BestBlock"
   put _ = insertLDB (_kvDB . _filesystemDBs) (encodeUtf8 "best_block") . unP2P
-
-instance {-# OVERLAPPING #-} MonadIO m => (Address `A.Alters` X509CertInfoState) (FilesystemT m) where
-  lookup _ = lookupLDB $ _x509DB . _filesystemDBs
-  insert _ = insertLDB $ _x509DB . _filesystemDBs
-  delete _ = deleteLDB $ _x509DB . _filesystemDBs
 
 instance {-# OVERLAPPING #-} MonadIO m => (Keccak256 `A.Alters` DBDB.DependentBlockEntry) (FilesystemT m) where
   lookup _ = lookupLDB $ DBDB.getDependentBlockDB . _dependentBlockDB . _filesystemDBs
@@ -406,7 +395,7 @@ instance {-# OVERLAPPING #-} MonadIO m => A.Replaceable Integer (Canonical Block
 --     hashes :: [Keccak256] <- catMaybes <$> traverse (lookupLDB $ _canonicalDB . _filesystemDBs) [(max 0 (i-n))..i]
 --     obs <- A.lookupMany (A.Proxy @OutputBlock) hashes
 --     pure . map (outputBlockToBlock . snd) . sortOn (Down . fst) $ M.toList obs
--- 
+--
 -- instance {-# OVERLAPPING #-} MonadIO m => GetLastTransactions (FilesystemT m) where
 --   getLastTransactions _ n = do
 --     BestBlock _ i <- Mod.get (Mod.Proxy @BestBlock)

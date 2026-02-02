@@ -51,6 +51,7 @@ export interface RemoveLiquidityParams {
 export interface CreatePoolParams {
   tokenA: string;
   tokenB: string;
+  isStable?: boolean;
 }
 
 /**
@@ -86,14 +87,6 @@ export interface SwapHistoryEntry {
 export interface SwapHistoryResponse {
   data: SwapHistoryEntry[];
   totalCount: number;
-}
-
-/**
- * Generic transaction response
- */
-export interface TransactionResponse {
-  status: string;
-  hash: string;
 }
 
 // ============================================================================
@@ -150,6 +143,7 @@ export interface Pool {
   apy: string;
   oracleAToBRatio: string;
   oracleBToARatio: string;
+  isStable: boolean;
 }
 
 /**
@@ -209,6 +203,7 @@ export interface RawGetPool {
   bToARatio: string;
   swapFeeRate: number;
   lpSharePercent: number;
+  isStable: boolean;
 }
 
 /**
@@ -285,5 +280,6 @@ export interface RawSwapEvent {
       address: string;
       symbol: string;
     };
+    isStable: boolean;
   };
 }

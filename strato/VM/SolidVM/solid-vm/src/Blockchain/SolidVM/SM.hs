@@ -40,30 +40,27 @@ module Blockchain.SolidVM.SM
     getVariableOfName,
     pushSender,
     initializeAction,
-    -- lookupX509AddrFromCBHash,
     markDiffForAction,
     getBlockHashWithNumber,
     getBSum,
     addEvent,
     addDelegatecall,
+    addNewCodeCollection,
     getContractNameAndHash,
     getCodeAndCollection,
     getContractsForParents,
     getAbstractParentsFromContract,
     getMapNamesFromContract,
-    getArrayNamesFromContract,
-    resolveNameParts
+    getArrayNamesFromContract
   )
 where
 
 --import           Data.IORef
 
 import BlockApps.Logging
-import BlockApps.X509.Certificate
 import Blockchain.DB.CodeDB
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.RawStorageDB
-import Blockchain.DB.SolidStorageDB
 import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockSummary
@@ -102,8 +99,10 @@ import qualified Data.NibbleString as N
 import qualified Data.Sequence as Q
 import qualified Data.Set as S
 import Data.Source
+import Data.Text (Text)
 import qualified Data.Text as T
 import Debugger
+import SolidVM.Model.CodeCollection (CodeCollection)
 import qualified SolidVM.Model.CodeCollection as CC
 import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Storable as MS
@@ -170,7 +169,6 @@ type MonadSM m =
     HasStateDB m,
     HasCodeDB m,
     (Keccak256 `A.Alters` BlockSummary) m,
-    HasSelectX509CertDB m,
     HasRawStorageDB m,
     HasMemAddressStateDB m,
     HasMemRawStorageDB m,
@@ -185,6 +183,7 @@ type MonadSM m =
     Mod.Modifiable Action m,
     Mod.Modifiable (Q.Seq Event) m,
     Mod.Modifiable (Q.Seq Action.Delegatecall) m,
+    Mod.Modifiable (OMap.OMap (Text, Keccak256) CodeCollection) m,
     Mod.Modifiable (Maybe DebugSettings) m,
     MonadUnliftIO m, --todo: remove
     MonadCatch m,
@@ -378,9 +377,6 @@ instance (Keccak256 `A.Alters` DBCode) m => (Keccak256 `A.Alters` DBCode) (SM m)
   insert p k = lift . A.insert p k
   delete p = lift . A.delete p
 
-instance (Address `A.Selectable` X509Certificate) m => (Address `A.Selectable` X509Certificate) (SM m) where
-  select p k = lift $ A.select p k
-
 instance (N.NibbleString `A.Alters` N.NibbleString) m => (N.NibbleString `A.Alters` N.NibbleString) (SM m) where
   lookup p = lift . A.lookup p
   insert p k = lift . A.insert p k
@@ -428,6 +424,10 @@ instance MonadUnliftIO m => Mod.Modifiable (Q.Seq Action.Delegatecall) (SM m) wh
   get _ = gets (Action._delegatecalls . _action)
   put _ q = modify $ action . Action.delegatecalls .~ q
 
+instance MonadUnliftIO m => Mod.Modifiable (OMap.OMap (Text, Keccak256) CodeCollection) (SM m) where
+  get _ = gets (Action._newCodeCollections . _action)
+  put _ q = modify $ action . Action.newCodeCollections .~ q
+
 variableSet :: VMBase m => SM m VariableSet
 variableSet = do
   cis <- Mod.get (Mod.Proxy @[CallInfo])
@@ -470,7 +470,7 @@ runSM maybeCode envBefore gi f = do
           { env = envBefore,
             callStack = [],
             _ssMemDBs = csMemDBs,
-            _action = startingAction maybeCode envBefore,
+            _action = startingAction envBefore,
             _gasInfo = gi {_gasLeft = min (_gasLeft gi) gasCap} -- capping the transaction gas limit
           }
   startingStateRef <- newIORef startingState
@@ -504,21 +504,15 @@ pushSender newSender mv = do
   Mod.put (Mod.Proxy @Env.Sender) oldSender
   return $ ret
 
-startingAction :: Maybe Code -> Env.Environment -> Action
-startingAction maybeCode env' =
+startingAction :: Env.Environment -> Action
+startingAction env' =
   Action.Action
     { _blockHash = blockHeaderHash $ Env.blockHeader env',
       _blockTimestamp = blockHeaderTimestamp $ Env.blockHeader env',
       _blockNumber = blockHeaderBlockNumber $ Env.blockHeader env',
-      _transactionHash = Env.txHash env',
       _transactionSender = Env.sender env',
       _actionData = OMap.empty,
-      _src =
-        case maybeCode of
-          Just theCode ->
-            Just theCode
-          Nothing -> Env.src env',
-      _name = Env.name env',
+      _newCodeCollections = OMap.empty,
       _events = Q.empty,
       _delegatecalls = Q.empty
     }
@@ -567,16 +561,22 @@ getVariableOfName name = do
               else x
       vars = NE.head $ localVariables currentCallInfo
       t s v = ('x' : s, v) `seq` v
+      curContract = currentContract currentCallInfo
 
   -- when (name == "theSixthSense") (internalError "M. Night Shyamalan presents" currentCallInfo)
 
   let maybeLocalValue = M.lookup name vars
 
   let maybeContractFunction :: Maybe Variable
-      maybeContractFunction = fmap (t "constant function" . Constant . SFunction name . Just) $ M.lookup name $ currentContract currentCallInfo ^. CC.functions
+      maybeContractFunction =
+        (t "constant function" . Constant . SFunction name $ Just curContract)
+        <$ (M.lookup name $ curContract ^. CC.functions)
 
       maybeFreeFunction :: Maybe Variable
-      maybeFreeFunction = fmap (t "free function" . Constant . SFunction name . Just) $ M.lookup name $ codeCollection currentCallInfo ^. CC.flFuncs
+      maybeFreeFunction =
+        (\f -> t "free function" . Constant . SFunction name . Just $
+          curContract & CC.functions %~ M.insert name f)
+        <$> (M.lookup name $ codeCollection currentCallInfo ^. CC.flFuncs)
 
       maybeBuiltinFunction :: Maybe Variable
       maybeBuiltinFunction =
@@ -617,11 +617,6 @@ getVariableOfName name = do
                        "bytes32ToString",
                        "create",
                        "create2",
-                       "getUserCert",
-                       "parseCert",
-                       "verifyCert",
-                       "verifyCertSignedBy",
-                       "verifySignature",
                        "fastForward"
                      ]
           )
@@ -831,7 +826,7 @@ getCurrentContract = do
   case cs of
     (currentCallInfo : _) -> return $ currentContract currentCallInfo
     _ -> internalError "getCurrentContract called with an empty stack" ()
-    
+
 getCurrentAddress :: MonadSM m => m Address
 getCurrentAddress = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])
@@ -893,18 +888,10 @@ getCurrentCodeCollection = do
     (currentCallInfo : _) -> return (collectionHash currentCallInfo, codeCollection currentCallInfo)
     _ -> internalError "getCurrentCodeCollection called with an empty stack" ()
 
-initializeAction :: MonadSM m
-                 => Address
-                 -> String
-                 -> String
-                 -> Maybe String
-                 -> String
-                 -> String
-                 -> Keccak256
-                 -> CC.CodeCollection
-                 -> m ()
-initializeAction acct name crtr cc_crtr root appName hsh cc = do
-  let newData = Action.ActionData (SolidVMCode name hsh) cc (T.pack crtr) (fmap T.pack cc_crtr) (T.pack root) (T.pack appName) (Action.SolidVMDiff M.empty)
+initializeAction :: MonadSM m =>
+                    Address -> m ()
+initializeAction acct = do
+  let newData = Action.ActionData (Action.SolidVMDiff M.empty)
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= Action.omapInsertWith Action.mergeActionData acct newData
 
@@ -917,8 +904,11 @@ markDiffForAction owner key' val' = do
 addEvent :: Mod.Modifiable (Q.Seq Event) m => Event -> m ()
 addEvent newEvent = Mod.modify_ (Mod.Proxy @(Q.Seq Event)) $ pure . (Q.|> newEvent)
 
-addDelegatecall :: Mod.Modifiable (Q.Seq Action.Delegatecall) m => Address -> Address -> T.Text -> T.Text -> T.Text -> m ()
-addDelegatecall s c o a n = Mod.modify_ (Mod.Proxy @(Q.Seq Action.Delegatecall)) $ pure . (Q.|> Action.Delegatecall s c o a n)
+addDelegatecall :: Mod.Modifiable (Q.Seq Action.Delegatecall) m => Address -> Address -> Maybe T.Text -> T.Text -> m ()
+addDelegatecall s c o n = Mod.modify_ (Mod.Proxy @(Q.Seq Action.Delegatecall)) $ pure . (Q.|> Action.Delegatecall s c o n)
+
+addNewCodeCollection :: Mod.Modifiable (OMap.OMap (Text, Keccak256) CodeCollection) m => Text -> Keccak256 -> CodeCollection -> m ()
+addNewCodeCollection userName ch cc = Mod.modify_ (Mod.Proxy @(OMap.OMap (Text, Keccak256) CodeCollection)) $ pure . (OMap.|> ((userName, ch), cc))
 
 getBlockHashWithNumber :: MonadSM m => Integer -> Keccak256 -> m (Maybe Keccak256)
 getBlockHashWithNumber num h = do
@@ -974,35 +964,3 @@ getArrayNamesFromContract c =
       storageDefsList = M.toList storageDefs'
       listOfArrays = filter (\(_, vd) -> case (CC._varType vd) of SVMType.Array _ _ -> True; _ -> False) storageDefsList
    in T.pack . fst <$> listOfArrays -- we need to change this to filter on _isRecord on testnet3
-
-resolveNameParts ::
-  ( MonadLogger m
-  , A.Selectable Address AddressState m
-  , HasSolidStorageDB m
-  ) =>
-  Address ->
-  T.Text ->
-  T.Text ->
-  CC.Contract ->
-  m ((Address, T.Text), (T.Text, T.Text, [T.Text]))
-resolveNameParts to' crtr app c = do
-  let tName = T.pack . CC._contractName
-  case c ^. CC.importedFrom of
-    Nothing -> pure ((to', tName c), (crtr, app, (map T.pack (M.keys $ CC._storageDefs c))))
-    Just address -> do
-      A.select (A.Proxy @AddressState) address >>= \case
-        Nothing -> do
-          $logWarnS "processTheMessages/resolveNameParts" . T.pack $
-            "Could not find address state for address " ++ show address
-          pure ((address, tName c), (crtr, app, (map T.pack (M.keys $ CC._storageDefs c))))
-        Just s ->
-          case addressStateCodeHash s of
-            SolidVMCode appName _ -> do
-              appCreator <- getSolidStorageKeyVal' address $ MS.StoragePath [MS.Field ":creator"]
-              case appCreator of
-                MS.BString cn' -> pure ((address, tName c), (T.pack $ BC.unpack cn', T.pack appName, (map T.pack (M.keys $ CC._storageDefs c))))
-                _ -> pure ((address, tName c), (crtr, T.pack appName, (map T.pack (M.keys $ CC._storageDefs c))))
-            _ -> do
-              $logWarnS "resolveNameParts" . T.pack $
-                "Could not resolve code for address " ++ show address
-              pure ((address, tName c), (crtr, app, (map T.pack (M.keys $ CC._storageDefs c))))

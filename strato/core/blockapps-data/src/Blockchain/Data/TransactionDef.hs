@@ -143,7 +143,7 @@ instance RLPSerializable Transaction where
   rlpEncode t =
     case partialRLPEncode t of
       RLPArray items ->
-        RLPArray $ items ++ 
+        RLPArray $ items ++
         [
           rlpEncode $ toInteger (transactionV t),
           rlpEncode (transactionR t),

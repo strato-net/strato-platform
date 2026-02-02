@@ -7,15 +7,18 @@ import { formatDate, getChainName, BRIDGE_STATUS_OPTIONS, handleCopyToClipboard,
 import { renderTruncatedAddressWithCopy } from "@/lib/bridge/components";
 import { DepositTransaction } from "@/lib/bridge/types";
 import { ITEMS_PER_PAGE } from "@/lib/bridge/constants";
-import { formatWeiAmount } from "@/utils/numberUtils";
+import { formatWeiToDecimalHP } from "@/utils/numberUtils";
 import { ensureHexPrefix } from "@/utils/numberUtils";
 import { usdstAddress } from "@/lib/constants";
+import { useIsMobile } from "@/hooks/use-mobile";
 
-const DepositTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean }) => {
+const DepositTransactionDetails = ({ context }: { context?: string }) => {
+  const isMobile = useIsMobile();
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
-  const [depositStatus, setDepositStatus] = useState<number | null>(null);
-  const [selectedChainId, setSelectedChainId] = useState<number | null>(null);
+  const [depositStatus, setDepositStatus] = useState<number>(0);
+  const [selectedChainId, setSelectedChainId] = useState<number>(0);
+  const [selectedType, setSelectedType] = useState<'bridge' | 'saving' | ''>('');
   const [transactions, setTransactions] = useState<DepositTransaction[]>([]);
   const DEPOSIT_STATUS_OPTIONS = BRIDGE_STATUS_OPTIONS.filter((o) => o.value !== 4);
 
@@ -23,6 +26,7 @@ const DepositTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean 
     loading: isLoading,
     fetchDepositTransactions,
     availableNetworks,
+    depositRefreshKey,
   } = useBridgeContext();
 
   useEffect(() => {
@@ -33,20 +37,42 @@ const DepositTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean 
           offset: ((currentPage - 1) * ITEMS_PER_PAGE).toString(),
           order: 'block_timestamp.desc',
         };
-        console.log('mintUSDST', mintUSDST);
-        (params as any)["value->>stratoToken"] = mintUSDST ? `eq.${usdstAddress}` : `neq.${usdstAddress}`;
         
-        if (depositStatus !== null) {
+        if (selectedType === 'saving') {
+          (params as any)["value->>stratoToken"] = `eq.${usdstAddress}`;
+        } else if (selectedType === 'bridge') {
+          (params as any)["value->>stratoToken"] = `neq.${usdstAddress}`;
+        }
+        
+        if (depositStatus !== 0) {
           (params as any)["value->>bridgeStatus"] = `eq.${depositStatus}`;
         }
         
-        if (selectedChainId !== null) {
+        if (selectedChainId !== 0) {
           (params as any)["key"] = `eq.${selectedChainId}`;
         }
         
-        const result = await fetchDepositTransactions(params);
-        setTransactions(result.data);
-        setTotalCount(result.totalCount);
+        const result = await fetchDepositTransactions(params, context);
+        const apiTransactions = result.data;
+        
+        const pendingDeposits = JSON.parse(localStorage.getItem('pendingDeposits') || '[]');
+        const apiTxHashes = new Set(apiTransactions.map((tx: any) => tx?.externalTxHash));
+        const remainingPending = pendingDeposits.filter((p: any) => 
+          !apiTxHashes.has(p?.externalTxHash)
+        );
+        
+        const filteredPending = remainingPending.filter((p: any) => {
+          if (selectedType && p?.type !== selectedType) return false;
+          if (depositStatus !== 0 && parseInt(p?.DepositInfo?.bridgeStatus || '0') !== depositStatus) return false;
+          if (selectedChainId !== 0 && p?.externalChainId !== selectedChainId) return false;
+          return true;
+        });
+        
+        localStorage.setItem('pendingDeposits', JSON.stringify(remainingPending));
+        
+        const merged = currentPage === 1 ? [...filteredPending, ...apiTransactions] : apiTransactions;
+        setTransactions(merged);
+        setTotalCount(result.totalCount + filteredPending.length);
       } catch (error) {
         console.error("Error loading transactions:", error);
         setTransactions([]);
@@ -55,7 +81,7 @@ const DepositTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean 
     };
 
     loadTransactions();
-  }, [currentPage, depositStatus, selectedChainId, fetchDepositTransactions]);
+  }, [currentPage, depositStatus, selectedChainId, fetchDepositTransactions, context, selectedType, depositRefreshKey]);
 
   
 
@@ -72,7 +98,7 @@ const DepositTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean 
         const addressUrl = addr ? `${base}/address/${addr}` : '';
         return (
           <div>
-            <div className="text-xs text-gray-500 mb-1">{chainName}</div>
+            <div className="text-xs text-muted-foreground mb-1">{chainName}</div>
             {addr ? (
               <div className="group relative flex items-center gap-2">
                 <a
@@ -84,7 +110,7 @@ const DepositTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean 
                   {`${addr.slice(0, 6)}...${addr.slice(-4)}`}
                 </a>
                 <CopyOutlined
-                  className="text-gray-400 hover:text-blue-500 cursor-pointer transition-colors"
+                  className="text-muted-foreground hover:text-blue-500 cursor-pointer transition-colors"
                   onClick={() => handleCopyToClipboard(addr)}
                 />
               </div>
@@ -109,7 +135,7 @@ const DepositTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean 
       key: "ethTokenSymbol",
       render: (_: any, record: any) => (
         <div className="flex flex-col gap-1">
-          <span className="text-sm text-gray-700">{
+          <span className="text-sm text-foreground">{
             record.externalSymbol ||
             (record.externalName === 'Ether' ? 'ETH' : record.externalName) ||
             '-'
@@ -123,7 +149,7 @@ const DepositTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean 
       key: "token",
       render: (_: any, record: any) => (
         <div className="flex flex-col gap-1">
-          <span className="text-sm text-gray-700">{mintUSDST ? 'USDST' : record.stratoTokenSymbol || '-'}</span>
+          <span className="text-sm text-foreground">{record.stratoTokenSymbol || '-'}</span>
         </div>
       ),
       width: 150,
@@ -132,7 +158,7 @@ const DepositTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean 
       title: "Amount",
       key: "amount",
       render: (_: any, record: any) =>
-        formatWeiAmount(record?.DepositInfo?.stratoTokenAmount || '0'),
+        formatWeiToDecimalHP(record?.DepositInfo?.stratoTokenAmount || '0', 18),
       width: 80,
     },
     {
@@ -164,7 +190,7 @@ const DepositTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean 
           );
         }
         return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-foreground">
             <AlertCircle className="h-3 w-3 mr-1" />
             Unknown
           </span>
@@ -182,36 +208,59 @@ const DepositTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean 
   ];
 
   return (
-    <div className="space-y-4">
-      <Card className="bg-white/80 rounded-xl shadow-sm border border-gray-200">
-        <Space size="large">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+    <div className="space-y-4 ant-table-themed">
+      <Card className="bg-card rounded-xl shadow-sm border border-border">
+        <Space 
+          size="large" 
+          direction={isMobile ? "vertical" : "horizontal"} 
+          className={isMobile ? "w-full" : ""}
+          style={isMobile ? { width: '100%' } : {}}
+        >
+          <div className={isMobile ? "w-full" : ""}>
+            <label className="block text-sm font-medium text-foreground mb-1">
+              Type
+            </label>
+            <Select
+              value={selectedType || ''}
+              onChange={(v) => {
+                setSelectedType(v === '' ? '' : v as 'bridge' | 'saving');
+                setCurrentPage(1);
+              }}
+              style={{ width: isMobile ? '100%' : 150 }}
+              options={[
+                { value: '', label: 'All Types' },
+                { value: 'bridge', label: 'Bridge' },
+                { value: 'saving', label: 'Saving' },
+              ]}
+            />
+          </div>
+          <div className={isMobile ? "w-full" : ""}>
+            <label className="block text-sm font-medium text-foreground mb-1">
               Status Filter
             </label>
             <Select
-              value={depositStatus}
+              value={depositStatus || 0}
               onChange={(v) => {
-                setDepositStatus(v);
+                setDepositStatus(v || 0);
                 setCurrentPage(1);
               }}
-              style={{ width: 150 }}
+              style={{ width: isMobile ? '100%' : 150 }}
               options={DEPOSIT_STATUS_OPTIONS}
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+          <div className={isMobile ? "w-full" : ""}>
+            <label className="block text-sm font-medium text-foreground mb-1">
               Chain Filter
             </label>
             <Select
-              value={selectedChainId}
+              value={selectedChainId || 0}
               onChange={(v) => {
-                setSelectedChainId(v);
+                setSelectedChainId(v || 0);
                 setCurrentPage(1);
               }}
-              style={{ width: 150 }}
+              style={{ width: isMobile ? '100%' : 150 }}
               options={[
-                { value: null, label: "All Chains" },
+                  { value: 0, label: "All Chains" },
                 ...availableNetworks.map((n) => ({ value: parseInt(n.chainId), label: n.chainName }))
               ]}
             />
@@ -219,11 +268,12 @@ const DepositTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean 
         </Space>
       </Card>
       
-      <div className="bg-white/80 rounded-xl shadow-sm border border-gray-200">
+      <div className="bg-card rounded-xl shadow-sm border border-border overflow-x-auto">
         <Table
           columns={columns}
           dataSource={transactions}
           loading={isLoading}
+          scroll={isMobile ? { x: 'max-content' } : undefined}
           pagination={{
             current: currentPage,
             total: totalCount,
@@ -232,20 +282,21 @@ const DepositTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean 
             showSizeChanger: false,
             showTotal: (total, range) =>
               `${range[0]}-${range[1]} of ${total} items`,
+            simple: isMobile,
           }}
           locale={{
             emptyText: (
-              <div className="py-12 text-center text-gray-500">
+              <div className="py-12 text-center text-muted-foreground">
                 <div className="flex flex-col items-center justify-center gap-2">
-                  <FrownOutlined style={{ fontSize: 48, color: "#bdbdbd" }} />
-                  <span className="text-lg font-semibold text-gray-400">
+                  <FrownOutlined style={{ fontSize: 48, color: "currentColor" }} />
+                  <span className="text-lg font-semibold text-muted-foreground">
                     Sorry, no data found
                   </span>
                 </div>
               </div>
             ),
           }}
-          rowKey={(record, index) => `${record.transaction_hash}-${record.block_timestamp || ''}-${index}`}
+          rowKey={(_, index) => index}
         />
       </div>
     </div>

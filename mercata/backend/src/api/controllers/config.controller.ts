@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { networkId } from "../../config/config";
 
 class ConfigController {
   static async getConfig(req: Request, res: Response) {
@@ -8,6 +9,7 @@ class ConfigController {
         success: true,
         data: {
           projectId: process.env.WAGMI_PROJECT_ID || 'PROJECT_ID_UNSET',
+          networkId: networkId,
         }
       });
     } catch (error) {

@@ -33,7 +33,7 @@ spec = do
 
     it "converts hostnames" $ do
       stringToIAddr "hotdogs.com" `shouldBe` HostName "hotdogs.com"
-  
+
   describe "IAddr RLP Serialization" $ do
     it "parses ipv6 addresses" $ do
       let addr = rlpDecode . rlpEncode $ stringToIAddr "2001:0db8:85a3:0000:0000:8a2e:0370:7334"

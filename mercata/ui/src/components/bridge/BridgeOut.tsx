@@ -1,34 +1,44 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
-import { Modal } from "antd";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import BridgeConfirmationModal from "./BridgeConfirmationModal";
 import { useAccount } from "wagmi";
 import { useBridgeContext } from "@/context/BridgeContext";
 import PercentageButtons from "@/components/ui/PercentageButtons";
-import {
-  roundToDecimals,
-  safeParseUnits,
-} from "@/utils/numberUtils";
+import { formatBalance, formatUnits, safeParseUnits } from "@/utils/numberUtils";
 import BridgeWalletStatus from "./BridgeWalletStatus";
-import { BRIDGE_OUT_FEE, usdstAddress } from "@/lib/constants";
-import { handleAmountInputChange, computeMaxTransferable } from "@/utils/transferValidation";
-import { useUserTokens } from "@/context/UserTokensContext";
-import { NATIVE_TOKEN_ADDRESS } from "@/lib/bridge/constants";
+import NetworkSelector from "./NetworkSelector";
+import TokenSelector from "./TokenSelector";
+import TransactionSummary from "./TransactionSummary";
+import { BRIDGE_OUT_FEE, usdstAddress, DECIMAL, MIN_USDST_WITHDRAWAL } from "@/lib/constants";
+import {
+  handleAmountInputChange,
+  computeMaxTransferable,
+} from "@/utils/transferValidation";
+import { useTokenContext } from "@/context/TokenContext";
+import {
+  NATIVE_TOKEN_ADDRESS,
+  BRIDGE_MODE_LABELS,
+} from "@/lib/bridge/constants";
+import { useUser } from "@/context/UserContext";
+import AdvancedOptionsDropdown from "./AdvancedOptionsDropdown";
 
-const BridgeOut: React.FC = () => {
+// Constants
+const FEE_WEI = safeParseUnits(BRIDGE_OUT_FEE).toString();
+
+interface BridgeOutProps {
+  isSaving?: boolean; // true for saving mode, false (default) for bridge mode
+}
+
+const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false }) => {
+  // Hooks & Context
   const { address, isConnected } = useAccount();
   const { toast } = useToast();
-  const { usdstBalance, voucherBalance, fetchUsdstBalance } = useUserTokens();
+  const { usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
+  const { userAddress } = useUser();
 
   const {
     requestWithdrawal: bridgeOutAPI,
@@ -39,101 +49,253 @@ const BridgeOut: React.FC = () => {
     setSelectedNetwork,
     selectedToken,
     setSelectedToken,
+    fetchWithdrawalSummary,
   } = useBridgeContext();
 
+  // State
   const [amount, setAmount] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [amountError, setAmountError] = useState<string>("");
+  const [amountError, setAmountError] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [feeError, setFeeError] = useState<string>("");
+  const [feeError, setFeeError] = useState("");
 
-  // Use the useBalance hook from context
+  // Computed values
+  const modeLabels = BRIDGE_MODE_LABELS[isSaving ? "convert" : "bridge"];
+
+  const currentTokens = useMemo(() => {
+    return bridgeableTokens.filter((token) =>
+      isSaving ? !token.bridgeable : token.bridgeable
+    );
+  }, [bridgeableTokens, isSaving]);
+
+  const currentNetwork = useMemo(() => {
+    return (
+      availableNetworks.find((n) => n.chainName === selectedNetwork) || null
+    );
+  }, [availableNetworks, selectedNetwork]);
+
+  const balancePollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
   const {
     data: balanceData,
     isLoading: isBalanceLoading,
     refetch: refetchBalance,
   } = useBalance(selectedToken?.stratoToken || null);
 
-  const tokenBalance = balanceData?.formatted || "0";
-
   const maxAmount = useMemo(() => {
     const tokenBalanceWei = balanceData?.balance?.toString() || "0";
-    return computeMaxTransferable(tokenBalanceWei, selectedToken?.stratoToken === usdstAddress, voucherBalance, usdstBalance, safeParseUnits(BRIDGE_OUT_FEE).toString(), setFeeError);
-  }, [balanceData?.balance, selectedToken?.stratoToken, voucherBalance, usdstBalance]);
 
-  // Set initial network selection
+    const maxTransferable = computeMaxTransferable(
+      tokenBalanceWei,
+      selectedToken?.stratoToken === usdstAddress,
+      voucherBalance,
+      usdstBalance,
+      FEE_WEI,
+      setFeeError
+    );
+
+    if (!selectedToken?.maxPerWithdrawal) return maxTransferable;
+
+    const perWithdrawal = BigInt(selectedToken.maxPerWithdrawal);
+    if (perWithdrawal <= 0n) return maxTransferable;
+
+    const transferable = BigInt(maxTransferable);
+    return (
+      transferable < perWithdrawal ? transferable : perWithdrawal
+    ).toString();
+  }, [
+    balanceData?.balance,
+    selectedToken?.stratoToken,
+    selectedToken?.maxPerWithdrawal,
+    usdstBalance,
+    voucherBalance,
+  ]);
+
+  const balanceImpact = useMemo(() => {
+    try {
+      const maxAmountWei = BigInt(maxAmount || "0");
+      const amountWei = safeParseUnits(amount || "0", DECIMAL);
+      const afterWei = maxAmountWei > amountWei ? maxAmountWei - amountWei : 0n;
+      return { before: maxAmountWei.toString(), after: afterWei.toString() };
+    } catch {
+      return { before: "0", after: "0" };
+    }
+  }, [maxAmount, amount]);
+
+  const hasValidAmount = !!amount && !amountError && !feeError;
+
+  const formatBalanceDisplay = useCallback(
+    (valueWei: string) => {
+      const num = Number(formatUnits(valueWei, DECIMAL));
+      return num.toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    },
+    []
+  );
+
+  const isButtonDisabled = useMemo(
+    () =>
+      isLoading ||
+      !hasValidAmount ||
+      !selectedToken ||
+      !isConnected ||
+      !currentNetwork ||
+      isBalanceLoading,
+    [
+      isLoading,
+      hasValidAmount,
+      selectedToken,
+      isConnected,
+      currentNetwork,
+      isBalanceLoading,
+    ]
+  );
+
+  // Effects
   useEffect(() => {
     if (!selectedNetwork && availableNetworks.length) {
       setSelectedNetwork(availableNetworks[0].chainName);
     }
-  }, [availableNetworks, selectedNetwork]);
-
-  // Fetch USDST balance on mount
-  useEffect(() => {
-    if (isConnected && address) {
-      fetchUsdstBalance(address);
+    if (!selectedToken && currentTokens.length) {
+      setSelectedToken(currentTokens[0]);
+    } else if (
+      selectedToken &&
+      !currentTokens.some((t) => t.id === selectedToken.id)
+    ) {
+      setSelectedToken(currentTokens[0] || null);
     }
-  }, [isConnected, address, fetchUsdstBalance]);
+    setAmount("");
+    setAmountError("");
+    setFeeError("");
+  }, [
+    availableNetworks,
+    currentTokens,
+    selectedNetwork,
+    selectedToken,
+    setSelectedNetwork,
+    setSelectedToken,
+  ]);
+
+  // Balance polling (15s interval)
+  useEffect(() => {
+    if (!selectedToken?.stratoToken) {
+      if (balancePollingIntervalRef.current) {
+        clearInterval(balancePollingIntervalRef.current);
+        balancePollingIntervalRef.current = null;
+      }
+      return;
+    }
+
+    refetchBalance();
+
+    balancePollingIntervalRef.current = setInterval(() => {
+      refetchBalance();
+    }, 15000);
+
+    return () => {
+      if (balancePollingIntervalRef.current) {
+        clearInterval(balancePollingIntervalRef.current);
+        balancePollingIntervalRef.current = null;
+      }
+    };
+  }, [selectedToken?.stratoToken, refetchBalance]);
+
+  // Handlers
+  const handleAmountChange = useCallback(
+    (value: string) => {
+      handleAmountInputChange(
+        value,
+        setAmount,
+        setAmountError,
+        maxAmount,
+        DECIMAL
+      );
+
+      // Additional minimum validation for "From Savings" (USDST withdrawal)
+      if (isSaving && value) {
+        const numValue = parseFloat(value.replace(/,/g, ""));
+        const minAmount = parseFloat(MIN_USDST_WITHDRAWAL);
+        if (!isNaN(numValue) && numValue > 0 && numValue < minAmount) {
+          setAmountError(`Amount must be at least ${MIN_USDST_WITHDRAWAL} USDST`);
+        }
+      }
+    },
+    [maxAmount, isSaving]
+  );
 
   const showConfirmModal = () => {
-    if (!selectedToken?.stratoToken || !address) {
+    if (!selectedToken?.stratoToken || !address || !selectedNetwork) {
       toast({
         title: "Error",
-        description: "Invalid configuration",
+        description: "Please select network and asset.",
         variant: "destructive",
       });
       return;
     }
-    if (!selectedNetwork) {
+
+    if (!hasValidAmount) {
       toast({
-        title: "Select Network",
-        description: "Please choose a destination network.",
+        title: "Invalid Amount",
+        description: "Please enter a valid amount.",
         variant: "destructive",
       });
       return;
     }
+
     setIsModalOpen(true);
   };
 
   const handleModalCancel = () => setIsModalOpen(false);
 
   const handleBridgeOut = async () => {
-    if (!selectedToken || !address || !selectedNetwork) return;
     setIsModalOpen(false);
+
+    if (!hasValidAmount || !selectedToken || !address || !currentNetwork) {
+      return;
+    }
+
+    const stratoTokenAmount = safeParseUnits(amount || "0", DECIMAL).toString();
+
     setIsLoading(true);
+
+    if (!isSaving) {
     toast({
       title: "Preparing transaction...",
       description: "Please wait while we prepare your transaction",
     });
+    }
 
     try {
-      const amountInSmallestUnit = safeParseUnits(amount || "0", 18).toString();
-      const selectedNetworkConfig = availableNetworks.find(
-        (n) => n.chainName === selectedNetwork,
-      );
-      const externalChainId = selectedNetworkConfig?.chainId || "";
+      const externalToken = !selectedToken.externalToken
+        ? NATIVE_TOKEN_ADDRESS
+        : selectedToken.externalToken;
 
-      const response = await bridgeOutAPI({
-        externalChainId: String(externalChainId),
+      const res = await bridgeOutAPI({
+        externalChainId: currentNetwork.chainId,
         externalRecipient: address,
-        externalToken: selectedToken.externalToken? selectedToken.externalToken : NATIVE_TOKEN_ADDRESS,
+        externalToken,
         stratoToken: selectedToken.stratoToken,
-        stratoTokenAmount: amountInSmallestUnit,
+        stratoTokenAmount,
       });
 
-      if (response?.success) {
-        toast({
-          title: "Transaction Proposed Successfully",
-          description: `Your tokens have been burned and ${amount} ${selectedToken.stratoTokenSymbol} will be transferred to ${address}. Withdrawal is pending approval.`,
-        });
-        await refetchBalance();
-        await fetchUsdstBalance(address);
-        setAmount("");
-      } else {
-        throw new Error("Failed to initiate transfer");
+      if (!res?.success) {
+        throw new Error("Failed to request withdrawal");
       }
-    } catch (error) {
-      console.error("Bridge transaction failed:", error);
+
+        toast({
+        title: "Withdrawal requested",
+          description: `Your withdrawal request is pending approval. The approved amount of ${selectedToken.externalSymbol} will be transferred to ${address}.`,
+        });
+
+        setAmount("");
+
+      await Promise.all([
+        fetchUsdstBalance(),
+        refetchBalance(),
+        fetchWithdrawalSummary(false),
+      ]);
     } finally {
       setIsLoading(false);
     }
@@ -141,222 +303,114 @@ const BridgeOut: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <BridgeWalletStatus />
-
-      <div className="flex items-center gap-4">
-        <div className="flex-1 space-y-1.5">
-          <Label htmlFor="from">From Network</Label>
-          <Input
-            id="from-chain"
-            value="STRATO"
-            disabled
-            className="bg-gray-50"
-          />
-        </div>
-
-        <div className="flex-1 space-y-1.5">
-          <Label htmlFor="to">To Network</Label>
-          <Select
-            value={selectedNetwork || ""}
-            onValueChange={setSelectedNetwork}
-          >
-            <SelectTrigger id="to-network">
-              <SelectValue placeholder="Select network" />
-            </SelectTrigger>
-            <SelectContent>
-              {availableNetworks.map((n) => (
-                <SelectItem key={n.chainId} value={n.chainName}>
-                  {n.chainName}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      <div className="space-y-2 text-center">
+        <h3 className="text-lg font-semibold text-foreground">
+          {modeLabels.title}
+        </h3>
+        <p className="text-sm text-muted-foreground">{modeLabels.description}</p>
       </div>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="asset">Select Asset</Label>
-        <Select
-          value={selectedToken?.externalSymbol || ""}
-          onValueChange={(v) => {
-            const newToken = bridgeableTokens.find((t) => t.externalSymbol === v) || null;
-            setSelectedToken(newToken);
-          }}
-          disabled={bridgeableTokens.length === 0}
-        >
-          <SelectTrigger id="from-token">
-            <SelectValue>
-              {selectedToken
-                ? `${selectedToken.stratoTokenName} (${selectedToken.stratoTokenSymbol})`
-                : "Select asset"}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {bridgeableTokens.map((t) => (
-              <SelectItem key={t.id} value={t.externalSymbol}>
-                {t.stratoTokenName} ({t.stratoTokenSymbol})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="w-full">
+        <BridgeWalletStatus />
       </div>
 
+      <TokenSelector
+        selectedToken={selectedToken}
+        tokens={currentTokens}
+        onTokenChange={setSelectedToken}
+        disabled={isLoading}
+      />
+
       <div className="space-y-1.5">
-        <Label htmlFor="amount">Amount</Label>
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-1">
+          <Label htmlFor="amount" className="text-sm">{modeLabels.amountLabel}</Label>
+          {!maxAmount && isBalanceLoading ? (
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+              <p className="text-xs md:text-sm text-muted-foreground">Fetching balance...</p>
+            </div>
+          ) : (
+            maxAmount && (
+              <div className="flex items-center gap-3">
+                <p className="text-xs md:text-sm text-muted-foreground">
+                  Max: {formatBalance(
+                    maxAmount,
+                    undefined,
+                    DECIMAL,
+                    2,
+                    6
+                  )}
+                </p>
+                <p className="text-xs md:text-sm text-muted-foreground">
+                  Min: {isSaving ? MIN_USDST_WITHDRAWAL : "0"}
+                </p>
+              </div>
+            )
+          )}
+        </div>
         <Input
           id="amount"
           type="text"
           inputMode="decimal"
           pattern="[0-9]*\.?[0-9]*"
           placeholder={isConnected ? "0.00" : "Connect wallet to enter amount"}
-          className={`w-full ${amountError ? "border-red-500 focus:ring-red-400" : ""}`}
+          className={`w-full ${
+            amountError ? "border-red-500 focus:ring-red-400" : ""
+          }`}
           value={amount}
-          onChange={(e) => {
-            handleAmountInputChange(e.target.value, setAmount, setAmountError, maxAmount, 18);
-          }}
-          disabled={!isConnected}
+          onChange={(e) => handleAmountChange(e.target.value)}
+          disabled={!isConnected || isLoading}
         />
         {amountError && <p className="text-sm text-red-500">{amountError}</p>}
         {feeError && <p className="text-sm text-yellow-600">{feeError}</p>}
+
         {isConnected && (
           <PercentageButtons
             value={amount}
             maxValue={maxAmount}
-            onChange={(value) => handleAmountInputChange(value, setAmount, setAmountError, maxAmount, 18)}
+            onChange={handleAmountChange}
             className="mt-2"
+            disabled={isLoading}
           />
         )}
-        {amount && selectedToken && (
-          <p className="text-sm text-gray-500">
-            Amount will be rounded down to {selectedToken.externalDecimals} decimal places
-          </p>
-        )}
-        
-          <div className="flex items-center gap-2 mt-1">
-            {isBalanceLoading ? (
-              <div className="flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-                <p className="text-sm text-gray-500">Fetching balance...</p>
-              </div>
-            ) : (
-              tokenBalance && (
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <p className="text-sm text-gray-500">
-                      Balance: {tokenBalance} {selectedToken?.stratoTokenSymbol}
-                    </p>
-                    {selectedToken && (
-                      <div className="flex items-center gap-1">
-                        {isBalanceLoading ? (
-                          <Loader2 className="h-3 w-3 animate-spin text-blue-500" />
-                        ) : (
-                          <span className="text-xs text-gray-500">
-                            { `Max: ${selectedToken.maxPerWithdrawal} ${selectedToken.stratoTokenSymbol}`}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  {selectedToken?.externalSymbol && (
-                    <div className="text-sm">
-                      <p className="bg-blue-50 p-2 rounded-md border border-blue-100">
-                        You will receive{" "}
-                        {amount
-                          ? `${selectedToken ? roundToDecimals(amount, parseInt(selectedToken.externalDecimals)) : amount} `
-                          : ""}
-                        {selectedToken?.externalName} ({selectedToken?.externalSymbol}) on{" "}
-                        {selectedNetwork || "selected"} network
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )
-            )}
-          </div>
-        
       </div>
 
-      <div className="text-sm text-gray-500 space-y-1">
-        {[
-          "Transaction time varies by network congestion",
-        ].map((text, i) => (
-          <p key={i}>• {text}</p>
-        ))}
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg space-y-2">
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600">Transaction Fee</span>
-          <span className="font-medium">{BRIDGE_OUT_FEE} USDST ({parseFloat(BRIDGE_OUT_FEE) * 100} voucher)</span>
-        </div>
-      </div>
+      <TransactionSummary
+        selectedToken={selectedToken}
+        amount={amount}
+        selectedNetwork={selectedNetwork}
+        amountError={amountError}
+        balanceImpact={balanceImpact}
+        formatBalanceDisplay={formatBalanceDisplay}
+      />
 
-      <div className="flex justify-end gap-4">
         <Button
           onClick={showConfirmModal}
-          disabled={Boolean(
-            isLoading ||
-              !amount ||
-              !selectedToken ||
-              !isConnected ||
-              amountError ||
-              !selectedNetwork ||
-              isBalanceLoading,
-          )}
-          className="bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
+        disabled={isButtonDisabled}
+        className="w-full bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
         >
-          {isLoading ? "Processing..." : "Bridge Assets"}
+        {isLoading ? "Processing..." : "Withdraw"}
         </Button>
-      </div>
-      {!isConnected && (
-        <div className="text-center">
-          <p className="text-sm text-red-500">
-            Connect your wallet to bridge assets. Use the wallet where you'd
-            like to receive funds.
-          </p>
-        </div>
-      )}
 
-      <Modal
-        title="Confirm Bridge Transaction"
+      <AdvancedOptionsDropdown
+        selectedNetwork={selectedNetwork}
+        availableNetworks={availableNetworks}
+        onNetworkChange={setSelectedNetwork}
+        disabled={isLoading}
+      />
+
+      <BridgeConfirmationModal
         open={isModalOpen}
         onOk={handleBridgeOut}
         onCancel={handleModalCancel}
+        title="Confirm Bridge Transaction"
         okText="Yes, Bridge Assets"
         cancelText="Cancel"
-      >
-        <div className="space-y-4">
-          <p>Are you sure you want to bridge your assets?</p>
-          <div className="bg-gray-50 p-4 rounded-md">
-            <p className="font-medium">Transaction Details:</p>
-            <div className="mt-2 space-y-2">
-              <p>From: STRATO</p>
-              <p>To: {selectedNetwork || "Not selected"}</p>
-              <p>
-                Amount: {selectedToken ? roundToDecimals(amount, parseInt(selectedToken.externalDecimals)) : amount}{" "}
-                {selectedToken?.stratoTokenSymbol}
-              </p>
-              {selectedToken?.externalSymbol && (
-                <p className="text-blue-600">
-                  You will receive{" "}
-                  {selectedToken
-                    ? roundToDecimals(
-                        amount,
-                        parseInt(selectedToken.externalDecimals),
-                      )
-                    : amount}{" "}
-                  {selectedToken?.externalName} ({selectedToken?.externalSymbol}) on{" "}
-                  {selectedNetwork || "selected"} network
-                </p>
-              )}
-              {!selectedToken?.maxPerWithdrawal &&  (
-                <p className="text-orange-600 text-sm">
-                  Transfer limit: {selectedToken?.maxPerWithdrawal} {selectedToken?.externalSymbol}
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      </Modal>
+        fromNetwork="STRATO"
+        toNetwork={selectedNetwork || "Not selected"}
+        amount={amount}
+        selectedToken={selectedToken}
+      />
     </div>
   );
 };

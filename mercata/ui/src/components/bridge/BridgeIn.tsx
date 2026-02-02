@@ -1,51 +1,61 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
-import { ensureHexPrefix } from "@/utils/numberUtils";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   useAccount,
   useChainId,
   useBalance,
+  useReadContract,
   useWriteContract,
   useSwitchChain,
   useSignTypedData,
 } from "wagmi";
-import { createPublicClient, http } from "viem";
 import {
   NATIVE_TOKEN_ADDRESS,
   resolveViemChain,
   DEPOSIT_ROUTER_ABI,
   ERC20_ABI,
   PERMIT2_ADDRESS,
+  BRIDGE_IN_MODE_LABELS,
 } from "@/lib/bridge/constants";
-import { bridgeContractService } from "@/lib/bridge/contractService";
-import { safeParseUnits, formatBalance } from "@/utils/numberUtils";
-import { useBridgeContext } from "@/context/BridgeContext";
-import { useUser } from "@/context/UserContext";
-import BridgeWalletStatus from "./BridgeWalletStatus";
-import PercentageButtons from "@/components/ui/PercentageButtons";
-import { BridgeContext } from "@/lib/bridge/types";
+import {
+  getTokenConfig,
+  checkPermit2Approval,
+  waitForTransaction,
+  getPermit2Nonce,
+  createPermit2Message,
+  getPermit2Domain,
+  getPermit2Types,
+  simulateDeposit,
+  validateRouterContract,
+} from "@/lib/bridge/contractService";
 import {
   normalizeError,
   formatTxHash,
   getExplorerUrl,
 } from "@/lib/bridge/utils";
-import { DECIMAL_PATTERN } from "@/lib/constants";
+import { ensureHexPrefix, formatBalance, safeParseUnits, formatUnits } from "@/utils/numberUtils";
+import { handleAmountInputChange } from "@/utils/transferValidation";
+import { useBridgeContext } from "@/context/BridgeContext";
+import { useUser } from "@/context/UserContext";
+import { useTokenContext } from "@/context/TokenContext";
+import { useLendingContext } from "@/context/LendingContext";
+import BridgeWalletStatus from "./BridgeWalletStatus";
+import NetworkSelector from "./NetworkSelector";
+import TokenSelector from "./TokenSelector";
+import PercentageButtons from "@/components/ui/PercentageButtons";
+import DepositTransactionSummary from "./DepositTransactionSummary";
+import AdvancedOptionsDropdown from "./AdvancedOptionsDropdown";
+import DepositProgressModal, { DepositStep } from "./DepositProgressModal";
 
-const BridgeIn: React.FC = () => {
-  // ============================================
+interface BridgeInProps {
+  isSaving?: boolean;
+}
+
+const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false }) => {
   // Hooks & Context
-  // ============================================
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const { writeContractAsync } = useWriteContract();
@@ -53,6 +63,8 @@ const BridgeIn: React.FC = () => {
   const { signTypedDataAsync } = useSignTypedData();
   const { toast } = useToast();
   const { userAddress } = useUser();
+  const { fetchUsdstBalance } = useTokenContext();
+  const { liquidityInfo } = useLendingContext();
   const {
     availableNetworks,
     bridgeableTokens,
@@ -60,19 +72,15 @@ const BridgeIn: React.FC = () => {
     setSelectedNetwork,
     selectedToken,
     setSelectedToken,
+    requestAutoSave,
+    triggerDepositRefresh,
   } = useBridgeContext();
 
-  // ============================================
-  // State Management
-  // ============================================
+  // State
   const [amount, setAmount] = useState("");
-  const [tokenBalance, setTokenBalance] = useState("0");
   const [isLoading, setIsLoading] = useState(false);
-  const [approvalState, setApprovalState] = useState<"idle" | "approving" | "approved">("idle");
-  const [errors, setErrors] = useState({ amount: "", network: "" });
-  const inFlightRef = useRef(false);
-
-  // State for minimum deposit amount
+  const [amountError, setAmountError] = useState("");
+  const [networkError, setNetworkError] = useState("");
   const [minDepositInfo, setMinDepositInfo] = useState<{ 
     amount: string; 
     amountWei: bigint; 
@@ -82,45 +90,53 @@ const BridgeIn: React.FC = () => {
     amountWei: 0n,
     loading: false
   });
-  
-  // State for token permission status
   const [isTokenPermitted, setIsTokenPermitted] = useState(true);
+  const [autoDeposit, setAutoDeposit] = useState(isSaving);
+  const [progressModalOpen, setProgressModalOpen] = useState(false);
+  const [currentStep, setCurrentStep] = useState<DepositStep>("confirm_tx");
+  const [progressTxHash, setProgressTxHash] = useState<string>();
+  const [progressError, setProgressError] = useState<string>();
+  const [progressIsNative, setProgressIsNative] = useState(true);
 
-  // ============================================
-  // Derived State & Computed Values
-  // ============================================
-  const selectedNetworkConfig = availableNetworks.find(
-    (n) => n.chainName === selectedNetwork,
-  );
-  const activeChainId = selectedNetworkConfig?.chainId;
-  const expectedChainId = activeChainId ? parseInt(activeChainId) : null;
+  // Computed values
+  const modeLabels = BRIDGE_IN_MODE_LABELS[isSaving ? "easy-savings" : "bridge"];
+
+  const currentTokens = useMemo(() => {
+    return bridgeableTokens.filter((token) =>
+      isSaving ? !token.bridgeable : token.bridgeable
+    );
+  }, [bridgeableTokens, isSaving]);
+
+  const currentNetwork = useMemo(() => {
+    return availableNetworks.find((n) => n.chainName === selectedNetwork) || null;
+  }, [availableNetworks, selectedNetwork]);
+
+  const expectedChainId = currentNetwork?.chainId ? parseInt(currentNetwork.chainId) : null;
   const isCorrectNetwork = isConnected && chainId && expectedChainId && chainId === expectedChainId;
-  const isNativeToken = selectedToken?.externalToken? false : true;
+  const isNativeToken = BigInt(selectedToken?.externalToken || "0") === 0n;
 
-  // ============================================
-  // Balance Hooks
-  // ============================================
   const {
     data: nativeBalance,
     refetch: refetchNative,
-    isError: nativeError,
     isLoading: nativeLoading,
   } = useBalance({
     address,
     chainId: expectedChainId || undefined,
     query: {
       enabled: isConnected && !!address && !!expectedChainId && isNativeToken,
+      refetchInterval: 15000,
     },
   });
 
   const {
-    data: tokenBalanceData,
+    data: tokenRawBalance,
     refetch: refetchToken,
-    isError: tokenError,
     isLoading: tokenLoading,
-  } = useBalance({
-    address,
-    token: ensureHexPrefix(selectedToken?.externalToken),
+  } = useReadContract({
+    address: ensureHexPrefix(selectedToken?.externalToken) as `0x${string}`,
+    abi: ERC20_ABI,
+    functionName: 'balanceOf',
+    args: address ? [address] : undefined,
     chainId: expectedChainId || undefined,
     query: {
       enabled:
@@ -129,35 +145,144 @@ const BridgeIn: React.FC = () => {
         !!expectedChainId &&
         !!selectedToken &&
         !isNativeToken,
+      refetchInterval: 15000,
     },
   });
 
-  const isBalanceLoading =
-    isConnected &&
-    !!address &&
-    !!expectedChainId &&
-    (nativeLoading || tokenLoading);
+  const isBalanceLoading = isConnected && !!address && !!expectedChainId && (nativeLoading || tokenLoading);
 
-  // ============================================
-  // Utility Functions
-  // ============================================
-  
-  /**
-   * Fetches minimum deposit amount from router contract
-   */
+  const maxAmount = useMemo(() => {
+    if (isNativeToken) {
+      if (!nativeBalance?.value) return "0";
+      return nativeBalance.value.toString();
+    } else {
+      if (!tokenRawBalance) return "0";
+      return tokenRawBalance.toString();
+    }
+  }, [isNativeToken, nativeBalance?.value, tokenRawBalance]);
+
+  const hasValidAmount = !!amount && !amountError;
+
+  const balanceImpact = useMemo(() => {
+    try {
+      const maxAmountWei = BigInt(maxAmount || "0");
+      const decimals = parseInt(selectedToken?.externalDecimals || "18");
+      const amountWei = safeParseUnits(amount || "0", decimals);
+      const afterWei = maxAmountWei > amountWei ? maxAmountWei - amountWei : 0n;
+      return { before: maxAmountWei.toString(), after: afterWei.toString() };
+    } catch {
+      return { before: "0", after: "0" };
+    }
+  }, [maxAmount, amount, selectedToken?.externalDecimals]);
+
+  const formatBalanceDisplay = useCallback(
+    (valueWei: string) => {
+      const decimals = parseInt(selectedToken?.externalDecimals || "18");
+      const num = Number(formatUnits(valueWei, decimals));
+      return num.toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    },
+    [selectedToken?.externalDecimals]
+  );
+
+  const isButtonDisabled = useMemo(
+    () =>
+      isLoading ||
+      !hasValidAmount ||
+      !selectedToken ||
+      !isConnected ||
+      !currentNetwork ||
+      !isCorrectNetwork ||
+      isBalanceLoading ||
+      !isTokenPermitted,
+    [
+      isLoading,
+      hasValidAmount,
+      selectedToken,
+      isConnected,
+      currentNetwork,
+      isCorrectNetwork,
+      isBalanceLoading,
+      isTokenPermitted,
+    ]
+  );
+
+  // Effects
+  useEffect(() => {
+    if (!selectedNetwork && availableNetworks.length) {
+      setSelectedNetwork(availableNetworks[0].chainName);
+    }
+    if (!selectedToken && currentTokens.length) {
+      setSelectedToken(currentTokens[0]);
+    } else if (
+      selectedToken &&
+      !currentTokens.some((t) => t.id === selectedToken.id)
+    ) {
+      setSelectedToken(currentTokens[0] || null);
+    }
+    setAmount("");
+    setAmountError("");
+  }, [
+    availableNetworks,
+    currentTokens,
+    selectedNetwork,
+    selectedToken,
+    setSelectedNetwork,
+    setSelectedToken,
+  ]);
+
+  useEffect(() => {
+    if (selectedToken && currentNetwork) {
+      fetchMinDepositAmount(selectedToken.externalToken, parseInt(selectedToken.externalDecimals || "18"));
+    }
+  }, [selectedToken]);
+
+  useEffect(() => {
+    setAmount("");
+    setAmountError("");
+    setMinDepositInfo({ 
+      amount: "", 
+      amountWei: 0n,
+      loading: false
+    });
+    setAutoDeposit(isSaving);
+  }, [isSaving]);
+
+  useEffect(() => {
+    const handleNetworkSwitch = async () => {
+      if (!selectedNetwork || !isConnected || !expectedChainId) {
+        setNetworkError("");
+        return;
+      }
+      if (chainId !== expectedChainId) {
+        setNetworkError(`Switching to ${selectedNetwork} network...`);
+        try {
+          await switchChain({ chainId: expectedChainId });
+        } catch {
+          setNetworkError(`Please switch to ${selectedNetwork}`);
+        }
+      } else {
+        setNetworkError("");
+      }
+    };
+    handleNetworkSwitch();
+  }, [chainId, isConnected, selectedNetwork, expectedChainId, switchChain]);
+
+  // Handlers
   const fetchMinDepositAmount = async (tokenAddress: string, decimals: number) => {
-    if (!tokenAddress || !selectedNetworkConfig) return;
+    if (!tokenAddress || !currentNetwork) return;
     
     setMinDepositInfo(prev => ({ ...prev, loading: true }));
     
     try {
-      const tokenConfig = await bridgeContractService.getTokenConfig({
+      const tokenConfig = await getTokenConfig({
         tokenAddress,
-        chainId: parseInt(selectedNetworkConfig.chainId),
-        depositRouterAddress: selectedNetworkConfig.depositRouter,
+        chainId: parseInt(currentNetwork.chainId),
+        depositRouterAddress: currentNetwork.depositRouter,
       });
 
-      // Store both formatted amount and wei value
       const minAmountWei = tokenConfig.minAmount ? BigInt(tokenConfig.minAmount) : 0n;
       const formattedMinAmount = minAmountWei > 0n ? 
         formatBalance(minAmountWei, undefined, decimals) : "0";
@@ -168,8 +293,7 @@ const BridgeIn: React.FC = () => {
         loading: false
       });
       setIsTokenPermitted(tokenConfig.isPermitted);
-    } catch (error) {
-      console.error("Error fetching min deposit amount:", error);
+    } catch {
       setMinDepositInfo({ 
         amount: "0", 
         amountWei: 0n,
@@ -179,609 +303,448 @@ const BridgeIn: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    setAmount("");
-    setErrors((e) => ({ ...e, amount: "" }));
-    setApprovalState("idle");
-    
-    // Fetch minimum deposit amount for selected token
-    if (selectedToken && selectedNetworkConfig) {
-      fetchMinDepositAmount(selectedToken.externalToken, parseInt(selectedToken.externalDecimals || "18"));
-    }
-  }, [selectedToken, selectedNetworkConfig]);
-
-  useEffect(() => {
-    const handleNetworkSwitch = async () => {
-      if (
-        isConnected &&
-        selectedNetwork &&
-        expectedChainId &&
-        chainId !== expectedChainId
-      ) {
-        setErrors((e) => ({
-          ...e,
-          network: `Switching to ${selectedNetwork} network...`,
-        }));
-        try {
-          await switchChain({ chainId: expectedChainId });
-        } catch {
-          setErrors((e) => ({
-            ...e,
-            network: `Please manually switch to ${selectedNetwork} network`,
-          }));
-        }
-      } else {
-        setErrors((e) => ({
-          ...e,
-          network:
-            isConnected && !selectedNetwork ? "Please select a network" : "",
-        }));
-      }
-    };
-    handleNetworkSwitch();
-  }, [chainId, isConnected, selectedNetwork, expectedChainId, switchChain]);
-
-  useEffect(() => {
-    const balance = isNativeToken ? nativeBalance : tokenBalanceData;
-
-    if (balance) {
-      setTokenBalance(
-        formatBalance(balance.value, undefined, balance.decimals),
+  const handleAmountChange = useCallback(
+    (value: string) => {
+      const tokenDecimals = parseInt(selectedToken?.externalDecimals || "18");
+      handleAmountInputChange(
+        value,
+        setAmount,
+        setAmountError,
+        maxAmount,
+        tokenDecimals
       );
-    }
-  }, [isNativeToken, nativeBalance, tokenBalanceData]);
-
-  /**
-   * Validates user input amount against balance and minimum requirements
-   */
-  const validateAmount = (value: string): boolean => {
-    if (!value) {
-      setErrors((e) => ({ ...e, amount: "" }));
-      return true;
-    }
-
-    const num = parseFloat(value);
-    if (isNaN(num) || num <= 0) {
-      setErrors((e) => ({
-        ...e,
-        amount:
-          num <= 0
-            ? "Amount must be greater than 0"
-            : "Please enter a valid number",
-      }));
-      return false;
-    }
-
-    // Check minimum amount using stored wei value
-    if (minDepositInfo.amountWei > 0n) {
-      const inputAmountWei = safeParseUnits(value, parseInt(selectedToken?.externalDecimals || "18"));
       
+      if (value && minDepositInfo.amountWei > 0n) {
+        const inputAmountWei = safeParseUnits(value, tokenDecimals);
       if (inputAmountWei < minDepositInfo.amountWei) {
-        setErrors((e) => ({
-          ...e,
-          amount: `Amount must be at least ${minDepositInfo.amount} ${selectedToken?.externalSymbol}`,
-        }));
-        return false;
+          setAmountError(`Amount must be at least ${minDepositInfo.amount} ${selectedToken?.externalSymbol}`);
+        }
       }
-    }
+    },
+    [maxAmount, selectedToken?.externalDecimals, selectedToken?.externalSymbol, minDepositInfo.amountWei, minDepositInfo.amount]
+  );
 
-    const balanceMatch = tokenBalance.match(/^([\d,]+\.?\d*)/);
-    const bal = balanceMatch
-      ? parseFloat(balanceMatch[1].replace(/,/g, ""))
-      : 0;
-
-    if (num > bal) {
-      setErrors((e) => ({
-        ...e,
-        amount: `Insufficient balance. Maximum: ${tokenBalance} ${selectedToken?.externalSymbol}`,
-      }));
-      return false;
-    }
-
-    setErrors((e) => ({ ...e, amount: "" }));
-    return true;
-  };
-
-  // ============================================
-  // Event Handlers
-  // ============================================
-  
-  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    if (DECIMAL_PATTERN.test(value)) {
-      setAmount(value);
-      validateAmount(value);
-    }
-  };
-
-  // ============================================
-  // Bridge Flow Functions
-  // ============================================
-  
-  /**
-   * Validates configuration and prepares bridge context
-   */
-  const preflight = (): BridgeContext => {
-    if (
-      !selectedToken ||
-      !amount ||
-      !isConnected ||
-      !isCorrectNetwork ||
-      !address ||
-      !userAddress
-    ) {
-      throw new Error(
-        !userAddress ? "User address not available" : "Invalid configuration",
-      );
-    }
-
-    if (!selectedNetworkConfig) {
-      throw new Error("Selected network configuration not found");
-    }
-
-    const depositAmount = safeParseUnits(
+  const ensureAllowanceOrPermit = async ({
+    tokenAddress,
+    owner,
       amount,
-      parseInt(selectedToken.externalDecimals || "18"),
-    );
-    const isNative = selectedToken.externalToken? false : true;
-
-    return {
-      selectedToken,
-      selectedNetwork,
+    chainId,
+  }: {
+    tokenAddress: string;
+    owner: string;
+    amount: bigint;
+    chainId: string;
+  }) => {
+    const approval = await checkPermit2Approval({
+      token: tokenAddress,
+      owner,
       amount,
-      userAddress,
-      address,
-      activeChainId,
-      depositRouter: selectedNetworkConfig.depositRouter,
-      depositAmount,
-      isNative,
-    };
-  };
-
-  const validateOnChain = async (ctx: BridgeContext) => {
-    const validation = await bridgeContractService.validateRouterContract({
-      depositRouterAddress: ctx.depositRouter,
-      amount: ctx.amount,
-      decimals: ctx.selectedToken.externalDecimals,
-      chainId: ctx.activeChainId,
-      tokenAddress: ctx.selectedToken.externalToken? ctx.selectedToken.externalToken : NATIVE_TOKEN_ADDRESS
-    });
-
-    if (!validation.isValid) {
-      throw new Error(validation.error || "Validation failed");
-    }
-  };
-
-  const ensureAllowanceOrPermit = async (ctx: BridgeContext) => {
-    const approval = await bridgeContractService.checkPermit2Approval({
-      token: ctx.selectedToken.externalToken,
-      owner: ctx.address,
-      amount: ctx.depositAmount,
-      chainId: ctx.activeChainId,
+      chainId,
     });
 
     if (!approval.isApproved) {
-      setApprovalState("approving");
       toast({
         title: "Approval Required",
         description: "Approving Permit2 to spend your tokens...",
       });
 
-      try {
         const approveTx = await writeContractAsync({
-          address: ensureHexPrefix(ctx.selectedToken.externalToken),
+        address: ensureHexPrefix(tokenAddress),
           abi: ERC20_ABI,
           functionName: "approve",
-          args: [
-            PERMIT2_ADDRESS as `0x${string}`,
-            BigInt(2) ** BigInt(256) - BigInt(1),
-          ],
-          chain: await resolveViemChain(ctx.activeChainId),
-          account: ctx.address as `0x${string}`,
+        args: [PERMIT2_ADDRESS as `0x${string}`, BigInt(2) ** BigInt(256) - BigInt(1)],
+        chain: await resolveViemChain(chainId),
+        account: owner as `0x${string}`,
         });
 
-        await bridgeContractService.waitForTransaction(
-          approveTx,
-          ctx.activeChainId,
-        );
-
-        setApprovalState("approved");
-        const approvalExplorerUrl = getExplorerUrl(
-          ctx.activeChainId,
-          approveTx,
-        );
+      await waitForTransaction(approveTx, chainId);
         toast({
           title: "Approval Successful",
-          description: (
-            <div>
-              <p>Now processing your bridge transaction...</p>
-              <a
-                href={approvalExplorerUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 hover:text-blue-800 underline text-sm"
-              >
-                View Approval on Explorer →
-              </a>
-            </div>
-          ),
-        });
-      } catch (error) {
-        setApprovalState("idle");
-        throw error;
-      }
+        description: "Approval confirmed. Processing transaction...",
+      });
     }
   };
 
-  const buildPermit = async (ctx: BridgeContext) => {
-    const deadline = BigInt(Math.floor(Date.now() / 1000) + 900); // 15 minutes
-    const nonce = bridgeContractService.getPermit2Nonce();
-    const permitMessage = bridgeContractService.createPermit2Message({
-      token: ctx.selectedToken.externalToken,
-      amount: ctx.depositAmount,
-      spender: ctx.depositRouter,
-      nonce,
-      deadline,
-    });
+  const buildPermit = async ({
+    tokenAddress,
+    amount,
+    spender,
+    chainId,
+    owner,
+  }: {
+    tokenAddress: string;
+    amount: bigint;
+    spender: string;
+    chainId: string;
+    owner: string;
+  }) => {
+    const deadline = BigInt(Math.floor(Date.now() / 1000) + 900);
+    const nonce = getPermit2Nonce();
 
     const signature = await signTypedDataAsync({
-      domain: bridgeContractService.getPermit2Domain(ctx.activeChainId),
-      types: bridgeContractService.getPermit2Types(),
+      domain: getPermit2Domain(chainId),
+      types: getPermit2Types(),
       primaryType: "PermitTransferFrom",
-      message: permitMessage,
-      account: ctx.address as `0x${string}`,
+      message: createPermit2Message({
+        token: tokenAddress,
+        amount,
+        spender,
+        nonce,
+        deadline,
+      }),
+      account: owner as `0x${string}`,
     });
 
     return { signature, nonce, deadline };
   };
 
-  const simulateAndSend = async (
-    ctx: BridgeContext,
-    permitData?: { signature: string; nonce: bigint; deadline: bigint },
-  ): Promise<`0x${string}`> => {
-    const chain = await resolveViemChain(ctx.activeChainId);
-    const client = createPublicClient({ chain, transport: http() });
+  const handleBridge = async () => {
+    if (isLoading) return;
 
-    if (ctx.isNative) {
-      // Simulate ETH deposit
-      await client.simulateContract({
-        address: ctx.depositRouter as `0x${string}`,
-        abi: DEPOSIT_ROUTER_ABI,
-        functionName: "depositETH",
-        args: [ensureHexPrefix(ctx.userAddress)],
-        value: ctx.depositAmount,
-        account: ctx.address as `0x${string}`,
+    if (!selectedToken || !amount || !isConnected || !isCorrectNetwork || !address || !userAddress || !currentNetwork) {
+      toast({
+        title: "Invalid configuration",
+        description: "Please check your network, wallet connection, and token selection.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    setProgressError(undefined);
+    
+    // Determine if native token before opening modal
+    const isNative = BigInt(selectedToken.externalToken || "0") === 0n;
+    setProgressIsNative(isNative);
+    
+    setProgressModalOpen(true);
+
+    try {
+      const activeChainId = currentNetwork.chainId;
+      const depositRouter = currentNetwork.depositRouter;
+      
+      // Set initial step based on whether it's Easy Savings or Bridge In, and if it needs approval
+      if (!isNative) {
+        // ERC20 tokens need approval for both Easy Savings and Bridge In
+        setCurrentStep("approve");
+      } else {
+        // Native tokens (ETH) go straight to confirm
+        setCurrentStep("confirm_tx");
+      }
+      const depositAmount = safeParseUnits(
+        amount,
+        parseInt(selectedToken.externalDecimals || "18"),
+      );
+
+      const validation = await validateRouterContract({
+        depositRouterAddress: depositRouter,
+        amount,
+        decimals: selectedToken.externalDecimals,
+        chainId: activeChainId,
+        tokenAddress: isNative ? NATIVE_TOKEN_ADDRESS : ensureHexPrefix(selectedToken.externalToken),
       });
 
-      // Send ETH deposit
-      const txHash = await writeContractAsync({
-        address: ctx.depositRouter as `0x${string}`,
+      if (!validation.isValid) {
+        throw new Error(validation.error || "Validation failed");
+      }
+
+      let permitData:
+        | { signature: string; nonce: bigint; deadline: bigint }
+        | undefined;
+      if (!isNative) {
+        // Step: Approve Token (for both Easy Savings and Bridge In with ERC20 tokens)
+        setCurrentStep("approve");
+        
+        const approval = await checkPermit2Approval({
+          token: selectedToken.externalToken,
+          owner: address,
+          amount: depositAmount,
+          chainId: activeChainId,
+        });
+
+        if (!approval.isApproved) {
+          toast({
+            title: "Approval Required",
+            description: "Approving Permit2 to spend your tokens...",
+          });
+
+          const approveTx = await writeContractAsync({
+            address: ensureHexPrefix(selectedToken.externalToken),
+            abi: ERC20_ABI,
+            functionName: "approve",
+            args: [PERMIT2_ADDRESS as `0x${string}`, BigInt(2) ** BigInt(256) - BigInt(1)],
+            chain: await resolveViemChain(activeChainId),
+            account: address as `0x${string}`,
+          });
+
+          await waitForTransaction(approveTx, activeChainId);
+          
+          toast({
+            title: "Approval Successful",
+            description: "Approval confirmed. Processing transaction...",
+          });
+        }
+        
+        // Move to sign_permit step after approval completes (or if already approved)
+        // This ensures the "approve" step shows as completed (green) before moving to sign_permit
+        setCurrentStep("sign_permit");
+        
+        // Build permit (this involves message signing, not a transaction)
+        permitData = await buildPermit({
+          tokenAddress: selectedToken.externalToken,
+          amount: depositAmount,
+          spender: depositRouter,
+          chainId: activeChainId,
+          owner: address,
+        });
+        
+        // Move to confirm_tx step after permit is signed
+        setCurrentStep("confirm_tx");
+      }
+
+      await simulateDeposit({
+        depositRouter,
+        isNative,
+        tokenAddress: isNative ? undefined : selectedToken.externalToken,
+        amount: depositAmount,
+        userAddress,
+        account: address,
+        chainId: activeChainId,
+        permitData,
+      });
+
+      // Step: Confirm Transaction (for native tokens, this is already set above)
+      if (isNative && currentStep !== "confirm_tx") {
+        setCurrentStep("confirm_tx");
+      }
+      const chain = await resolveViemChain(activeChainId);
+
+      let txHash: `0x${string}`;
+      if (isNative) {
+        txHash = await writeContractAsync({
+          address: depositRouter as `0x${string}`,
         abi: DEPOSIT_ROUTER_ABI,
         functionName: "depositETH",
-        args: [ensureHexPrefix(ctx.userAddress)],
-        value: ctx.depositAmount,
+          args: [ensureHexPrefix(userAddress)],
+          value: depositAmount,
         chain,
-        account: ctx.address as `0x${string}`,
+          account: address as `0x${string}`,
       });
-      return txHash as `0x${string}`;
     } else {
       if (!permitData) {
         throw new Error("Permit data is required for ERC20 deposits");
       }
 
-      // Simulate ERC20 deposit
-      await client.simulateContract({
-        address: ctx.depositRouter as `0x${string}`,
+        txHash = await writeContractAsync({
+          address: depositRouter as `0x${string}`,
         abi: DEPOSIT_ROUTER_ABI,
         functionName: "deposit",
         args: [
-          ensureHexPrefix(ctx.selectedToken.externalToken),  
-          ctx.depositAmount,
-          ensureHexPrefix(ctx.userAddress),
-          permitData!.nonce,
-          permitData!.deadline,
-          permitData!.signature as `0x${string}`
-        ],
-        account: ctx.address as `0x${string}`,
-      });
-
-      // Send ERC20 deposit
-      const txHash = await writeContractAsync({
-        address: ctx.depositRouter as `0x${string}`,
-        abi: DEPOSIT_ROUTER_ABI,
-        functionName: "deposit",
-        args: [
-          ensureHexPrefix(ctx.selectedToken.externalToken),
-          ctx.depositAmount,
-          ensureHexPrefix(ctx.userAddress),
-          permitData!.nonce,
-          permitData!.deadline,
-          permitData!.signature as `0x${string}`
+            ensureHexPrefix(selectedToken.externalToken),
+            depositAmount,
+            ensureHexPrefix(userAddress),
+            permitData.nonce,
+            permitData.deadline,
+            permitData.signature as `0x${string}`,
         ],
         chain,
-        account: ctx.address as `0x${string}`,
+          account: address as `0x${string}`,
       });
-      return txHash as `0x${string}`;
-    }
-  };
-
-  const waitAndFinalize = async (ctx: BridgeContext, txHash: `0x${string}`) => {
-    const success = await bridgeContractService.waitForTransaction(
-      txHash,
-      ctx.activeChainId,
-    );
-    if (!success) {
-      throw new Error("Transaction reverted");
-    }
-  };
-
-  // ============================================
-  // Main Bridge Handler
-  // ============================================
-  
-  const handleBridge = async () => {
-    if (inFlightRef.current) return;
-    inFlightRef.current = true;
-    setIsLoading(true);
-    toast({ title: "Preparing transaction...", description: "Please wait" });
-
-    try {
-      // Validate
-      const ctx = preflight();
-      await validateOnChain(ctx);
-      let permitData:
-        | { signature: string; nonce: bigint; deadline: bigint }
-        | undefined;
-      if (!ctx.isNative) {
-        await ensureAllowanceOrPermit(ctx);
-        permitData = await buildPermit(ctx);
       }
 
-      const txHash = await simulateAndSend(ctx, permitData);
-      const explorerUrl = getExplorerUrl(ctx.activeChainId, txHash);
-      toast({
-        title: "Transaction Sent",
-        description: (
-          <div>
-            <p>Transaction submitted: {formatTxHash(txHash)}</p>
-            <a
-              href={explorerUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 hover:text-blue-800 underline text-sm"
-            >
-              View on Explorer →
-            </a>
-          </div>
-        ),
-      });
-
-      await waitAndFinalize(ctx, txHash);
-
-      toast({
-        title: "Bridge Initiated",
-        description:
-          "Your deposit has been submitted successfully. The relayer will process it shortly.",
-      });
-
-      // Trigger wagmi balance refetch
-      if (ctx.isNative) {
-        refetchNative();
-      } else {
-        refetchToken();
+      setProgressTxHash(txHash);
+      
+      // Step: Waiting for Transaction
+      setCurrentStep("waiting_tx");
+      const success = await waitForTransaction(txHash, activeChainId);
+      if (!success) {
+        throw new Error("Transaction reverted");
       }
+
+      const externalDecimals = parseInt(selectedToken.externalDecimals || "18");
+      const decimalDiff = 18 - externalDecimals;
+      const amount18Decimals = decimalDiff >= 0 
+        ? (depositAmount * BigInt(10 ** decimalDiff)).toString()
+        : depositAmount.toString();
+
+      const existing = JSON.parse(localStorage.getItem('pendingDeposits') || '[]');
+      existing.push({
+        externalChainId: parseInt(activeChainId),
+        externalTxHash: txHash,
+        type: isSaving ? 'saving' : 'bridge',
+        DepositInfo: {
+          externalSender: address,
+          stratoRecipient: userAddress,
+          stratoToken: selectedToken.stratoToken,
+          stratoTokenAmount: amount18Decimals,
+          bridgeStatus: "1",
+        },
+        block_timestamp: new Date().toISOString(),
+        stratoTokenSymbol: selectedToken.stratoTokenSymbol,
+        externalName: selectedToken.externalName,
+        externalSymbol: selectedToken.externalSymbol,
+      });
+      localStorage.setItem('pendingDeposits', JSON.stringify(existing));
+      triggerDepositRefresh();
+
+      // Step: Waiting for Autosave (if Easy Savings) or Complete
+      if (autoDeposit) {
+        setCurrentStep("waiting_autosave");
+        await requestAutoSave({
+          externalChainId: activeChainId,
+          externalTxHash: txHash,
+        });
+      }
+
+      // Step: Complete
+      setCurrentStep("complete");
+      setAmount("");
+
+      await Promise.all([
+        isNative ? refetchNative() : refetchToken(),
+        fetchUsdstBalance(),
+      ]);
     } catch (error: any) {
       const bridgeError = normalizeError(error);
+      setCurrentStep("error");
+      setProgressError(bridgeError.userMessage);
       toast({
         title: "Transaction Failed",
         description: bridgeError.userMessage,
         variant: "destructive",
+        duration: 3000,
       });
     } finally {
-      inFlightRef.current = false;
       setIsLoading(false);
-      setApprovalState("idle");
     }
   };
-
-  // ============================================
-  // Render
-  // ============================================
   
   return (
     <div className="space-y-6">
-      <BridgeWalletStatus />
-
-      <div className="flex items-center gap-4">
-        <div className="flex-1 space-y-1.5">
-          <Label>From Network</Label>
-          <Select
-            value={selectedNetwork || ""}
-            onValueChange={(v) => {
-              setSelectedNetwork(v);
-              setSelectedToken(null);
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select network" />
-            </SelectTrigger>
-            <SelectContent>
-              {availableNetworks.map((n) => (
-                <SelectItem key={n.chainId} value={n.chainName}>
-                  {n.chainName}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex-1 space-y-1.5">
-          <Label>To Network</Label>
-          <Input value="STRATO" disabled className="bg-gray-50" />
-        </div>
+      <div className="space-y-2 text-center">
+        <h3 className="text-lg font-semibold text-foreground">
+          {modeLabels.title}
+        </h3>
+        <p className="text-sm text-muted-foreground">{modeLabels.description}</p>
       </div>
 
-      <div className="space-y-1.5">
-        <Label>Select Asset</Label>
-        <Select
-          value={selectedToken?.externalSymbol || ""}
-          onValueChange={(v) =>
-            setSelectedToken(
-              bridgeableTokens.find((t) => t.externalSymbol === v) || null,
-            )
-          }
-          disabled={bridgeableTokens.length === 0}
-        >
-          <SelectTrigger>
-            <SelectValue>
-              {selectedToken
-                ? `${selectedToken.externalName} (${selectedToken.externalSymbol})`
-                : "Select asset"}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {bridgeableTokens.map((t) => (
-              <SelectItem key={t.id} value={t.externalSymbol}>
-                {t.externalName} ({t.externalSymbol})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="w-full">
+        <BridgeWalletStatus />
       </div>
 
+      <TokenSelector
+        selectedToken={selectedToken}
+        tokens={currentTokens}
+        onTokenChange={setSelectedToken}
+        disabled={isLoading}
+      />
+
       <div className="space-y-1.5">
+        <div className="flex justify-between items-center">
         <Label>Amount</Label>
+          {maxAmount && (
+            <div className="flex items-center gap-3">
+              <p className="text-sm text-muted-foreground">
+                Max: {formatBalance(
+                  maxAmount,
+                  undefined,
+                  parseInt(selectedToken?.externalDecimals || "18"),
+                  2,
+                  parseInt(selectedToken?.externalDecimals || "18")
+                )}
+              </p>
+              {selectedToken && currentNetwork && (
+                <p className="text-sm text-muted-foreground">
+                  Min: {minDepositInfo.amount || "0"}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
         <Input
           type="text"
           inputMode="decimal"
           pattern="[0-9]*\.?[0-9]*"
-          placeholder={
-            isConnected
-              ? isBalanceLoading
-                ? "Loading..."
-                : "0.00"
-              : "Connect wallet"
-          }
-          className={errors.amount ? "border-red-500" : ""}
+          placeholder={isConnected ? "0.00" : "Connect wallet to enter amount"}
+          className={`w-full ${
+            amountError ? "border-red-500 focus:ring-red-400" : ""
+          }`}
           value={amount}
-          onChange={handleAmountChange}
-          disabled={!isConnected || isBalanceLoading}
+          onChange={(e) => handleAmountChange(e.target.value)}
+          disabled={!isConnected || isLoading}
         />
+        {amountError && <p className="text-sm text-red-500">{amountError}</p>}
         
-        {errors.amount && (
-          <p className="text-sm text-red-500">{errors.amount}</p>
-        )}
-        {isConnected && !isBalanceLoading && tokenBalance !== "0" && (
+        {isConnected && (
           <PercentageButtons
             value={amount}
-            maxValue={safeParseUnits(
-              tokenBalance,
-              parseInt(selectedToken?.externalDecimals || "18"),
-            ).toString()}
-            onChange={(v) => {
-              setAmount(v);
-              validateAmount(v);
-            }}
-            className="mt-2"
+            maxValue={maxAmount}
+            onChange={handleAmountChange}
             decimals={parseInt(selectedToken?.externalDecimals || "18")}
+            className="mt-2"
+            disabled={isLoading}
           />
-        )}
-
-        {isConnected &&
-          (isBalanceLoading ? (
-            <div className="flex items-center gap-2 mt-1">
-              <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-              <span className="text-sm text-gray-500">Fetching balance...</span>
-            </div>
-          ) : tokenBalance ? (
-            <div className="space-y-2 mt-1">
-              <div className="flex justify-between items-center">
-                <p className="text-sm text-gray-500">
-                  Balance: {tokenBalance} {selectedToken?.externalSymbol}
-                </p>
-                {selectedToken && selectedNetworkConfig && (
-                  <div className="flex items-center gap-1">
-                    {minDepositInfo.loading ? (
-                      <Loader2 className="h-3 w-3 animate-spin text-blue-500" />
-                    ) : (
-                      <span className="text-xs text-gray-500">
-                        Min: {minDepositInfo.amount} {selectedToken.externalSymbol}
-                      </span>
                     )}
-                  </div>
-                )}
-              </div>
-              {selectedToken?.stratoTokenSymbol && amount && (
-                <p className="text-sm bg-blue-50 p-2 rounded-md border border-blue-100">
-                  You will receive ≈ {amount} {selectedToken.stratoTokenName} (
-                  {selectedToken.stratoTokenSymbol}) on STRATO
-                </p>
-              )}
-            </div>
-          ) : null)}
       </div>
 
-      <div className="text-sm text-gray-500 space-y-1">
-        {[
-          "Transaction time varies by network congestion",
-        ].map((text, i) => (
-          <p key={i}>• {text}</p>
-        ))}
-      </div>
+      <DepositTransactionSummary
+        selectedToken={selectedToken}
+        amount={amount}
+        amountError={amountError}
+        balanceImpact={balanceImpact}
+        formatBalanceDisplay={formatBalanceDisplay}
+        savingRate={liquidityInfo?.supplyAPY}
+        isSaving={isSaving}
+        autoDeposit={autoDeposit}
+      />
 
-      <div className="flex justify-end">
+      {isSaving && (
+        <label className="flex items-center gap-2 text-sm text-muted-foreground">
+          <input 
+            type="checkbox" 
+            className="accent-blue-600" 
+            checked={autoDeposit} 
+            onChange={e => setAutoDeposit(e.target.checked)} 
+          />
+          Earn saving rate by offering USDST for lending
+        </label>
+      )}
+
         <Button
           onClick={handleBridge}
-          disabled={
-            isLoading ||
-            !amount ||
-            !selectedToken ||
-            !isConnected ||
-            !isCorrectNetwork ||
-            !isTokenPermitted
-          }
-          className="bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
+        disabled={isButtonDisabled}
+        className="w-full bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
         >
-          {isLoading && approvalState === "approving" && "Approving..."}
-          {isLoading && approvalState === "approved" && "Bridging..."}
-          {isLoading && approvalState === "idle" && "Processing..."}
-          {!isLoading && !isConnected && "Connect Wallet"}
-          {!isLoading && isConnected && !selectedNetwork && "Select Network"}
-          {!isLoading &&
-            isConnected &&
-            selectedNetwork &&
-            !selectedToken &&
-            "Select Asset"}
-          {!isLoading &&
-            isConnected &&
-            selectedToken &&
-            !amount &&
-            "Enter Amount"}
-          {!isLoading &&
-            isConnected &&
-            selectedToken &&
-            amount &&
-            !isCorrectNetwork &&
-            `Switch to ${selectedNetwork}`}
-          {!isLoading &&
-            isConnected &&
-            selectedToken &&
-            amount &&
-            isCorrectNetwork &&
-            !isTokenPermitted &&
-            "Token Not Permitted"}
-          {!isLoading &&
-            isConnected &&
-            selectedToken &&
-            amount &&
-            isCorrectNetwork &&
-            isTokenPermitted &&
-            "Bridge Assets"}
+        {isLoading ? "Processing..." : isSaving && autoDeposit ? "Deposit and Earn" : "Deposit"}
         </Button>
-      </div>
 
-      {errors.network && (
-        <p className="text-sm text-red-500">{errors.network}</p>
+      <AdvancedOptionsDropdown
+        selectedNetwork={selectedNetwork}
+        availableNetworks={availableNetworks}
+        onNetworkChange={setSelectedNetwork}
+        direction="in"
+        disabled={isLoading}
+      />
+
+      {networkError && (
+        <p className="text-sm text-red-500">{networkError}</p>
       )}
+
+      <DepositProgressModal
+        open={progressModalOpen}
+        currentStep={currentStep}
+        txHash={progressTxHash}
+        chainId={currentNetwork?.chainId ? parseInt(currentNetwork.chainId) : undefined}
+        isEasySavings={isSaving && autoDeposit}
+        isNative={progressIsNative}
+        error={progressError}
+        onClose={() => {
+          setProgressModalOpen(false);
+          setCurrentStep("confirm_tx");
+          setProgressTxHash(undefined);
+          setProgressError(undefined);
+        }}
+      />
     </div>
   );
 };

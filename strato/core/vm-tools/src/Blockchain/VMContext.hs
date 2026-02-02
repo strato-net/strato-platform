@@ -11,7 +11,6 @@
 
 module Blockchain.VMContext
   ( CurrentBlockHash (..),
-    IsBlockstanbul (..),
     withCurrentBlockHash,
     VMBase,
     ContextDBs (..),
@@ -38,9 +37,7 @@ module Blockchain.VMContext
     baggerState,
     bestBlockInfo,
     vmGasCap,
-    hasBlockstanbul,
     selfAddress,
-    blockRequested,
     runningTests,
     txRunResultsCache,
     debugSettings,
@@ -62,7 +59,6 @@ module Blockchain.VMContext
     getContextBestBlockInfo,
     putContextBestBlockInfo,
     checkIfRunningTests,
-    lookupX509AddrFromCBHash,
     knownFailedTxs,
     knownExpensiveTxs,
   )
@@ -70,7 +66,6 @@ where
 
 import BlockApps.Init ()
 import BlockApps.Logging
-import BlockApps.X509.Certificate
 import Blockchain.Bagger.BaggerState (BaggerState, defaultBaggerState)
 import Blockchain.Constants
 import Blockchain.DB.BlockSummaryDB
@@ -113,7 +108,6 @@ import Data.Default
 import qualified Data.Map as M
 import qualified Data.NibbleString as N
 import qualified Data.Set as S
-import Data.String
 import qualified Data.Text as T
 import qualified Database.LevelDB as DB
 import qualified Database.Persist.Sqlite as Lite
@@ -207,9 +201,6 @@ knownExpensiveTxs =
 newtype CurrentBlockHash = CurrentBlockHash {unCurrentBlockHash :: Keccak256}
   deriving (Generic, NFData, Show)
 
-newtype IsBlockstanbul = IsBlockstanbul {unIsBlockstanbul :: Bool}
-  deriving (Generic, NFData, Show, Eq)
-
 newtype GasCap = GasCap {unVmGasCap :: Gas}
   deriving (Generic, NFData, Show, Eq)
 
@@ -261,8 +252,6 @@ data ContextState = ContextState
     _baggerState :: !BaggerState,
     _bestBlockInfo :: !ContextBestBlockInfo,
     _vmGasCap :: !Gas,
-    _hasBlockstanbul :: !Bool,
-    _blockRequested :: !Bool,
     _runningTests :: !Bool,
     _txRunResultsCache :: TRC.Cache,
     _debugSettings :: !(Maybe DebugSettings),
@@ -279,8 +268,6 @@ instance Default ContextState where
         _baggerState = defaultBaggerState,
         _bestBlockInfo = Unspecified,
         _vmGasCap = Gas flags_gasLimit,
-        _hasBlockstanbul = True,
-        _blockRequested = False,
         _runningTests = False,
         _txRunResultsCache = error "Default ContextState: accessing uninitialized txRunResultsCache",
         _debugSettings = Nothing,
@@ -329,8 +316,7 @@ type VMBase m =
     HasMemRawStorageDB m,
     (RawStorageKey `A.Alters` RawStorageValue) m,
     (Keccak256 `A.Alters` BlockSummary) m,
-    Mod.Accessible (Maybe WorldBestBlock) m,
-    (A.Selectable Address X509Certificate) m
+    Mod.Accessible (Maybe WorldBestBlock) m
   )
 
 withCurrentBlockHash ::
@@ -352,7 +338,9 @@ withCurrentBlockHash bh f = do
   cbh <- Mod.get (Mod.Proxy @CurrentBlockHash)
   Mod.put (Mod.Proxy @CurrentBlockHash) (CurrentBlockHash bh)
   a <- f
+  flushMemStorageTxDBToBlockDB
   flushMemStorageDB
+  flushMemAddressStateTxToBlockDB
   flushMemAddressStateDB
   Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ stateRoots .= M.empty
   Mod.put (Mod.Proxy @CurrentBlockHash) cbh
@@ -361,19 +349,6 @@ withCurrentBlockHash bh f = do
 
 instance Show Context where
   show = const "<context>"
-
-lookupX509AddrFromCBHash ::
-  ( MonadLogger m,
-    (A.Alters (Address, StoragePath) BasicValue) m
-  ) =>
-  Address ->
-  m (Maybe Address)
-lookupX509AddrFromCBHash k = do
-  mAccount <- A.lookup (A.Proxy) (Address 0x509,  fromString $ ".addressToCertMap<a:" ++ show k ++ ">" :: StoragePath)
-  $logDebugS "lookupX509AddrFromCBHash" $ T.pack $ "Looking up certificate for address: " ++ (show mAccount)
-  case mAccount of
-    Just (BAddress a) -> pure . Just $ a
-    _ -> pure Nothing
 
 runTestContextM ::
   ( MonadUnliftIO m,
@@ -431,9 +406,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
             { _memDBs = cmemDBs,
               _baggerState = defaultBaggerState,
               _bestBlockInfo = Unspecified,
-              _hasBlockstanbul = False,
               _vmGasCap = 100000,
-              _blockRequested = False,
               _runningTests = True,
               _txRunResultsCache = cache,
               _debugSettings = Nothing,
@@ -488,7 +461,6 @@ initContext dSettings = do
       def
         & txRunResultsCache .~ cache
         & debugSettings .~ dSettings
-        & hasBlockstanbul .~ flags_blockstanbul
   que <- newTQueueIO
   pure
     Context
@@ -558,7 +530,7 @@ getNewAddress address = do
   incrementNonce address
   return newAddress
 
-getNewAddressWithSalt :: (MonadIO m, MonadLogger m, (Address `A.Alters` AddressState) m) => Address -> Value -> Keccak256 -> String -> m Address
+getNewAddressWithSalt :: (MonadIO m, MonadLogger m, (Address `A.Alters` AddressState) m) => Address -> Value -> Keccak256 -> [Value] -> m Address
 getNewAddressWithSalt address salt hsh args = do
   nonce' <- addressStateNonce <$> A.lookupWithDefault Mod.Proxy address
   when flags_debug $ liftIO $ putStrLn $ "Creating new address: owner=" ++ format address ++ ", nonce=" ++ show nonce'
@@ -566,7 +538,7 @@ getNewAddressWithSalt address salt hsh args = do
         (SString s) -> s
         _ -> invalidArguments "big major bad" salt
   let newAddress = getNewAddressWithSalt_unsafe address saltAsString (keccak256ToByteString hsh) args
-  $logDebugS "getNewAddressWithSalt" $ T.pack $ show address ++ " " ++ saltAsString ++ " " ++ (show $ keccak256ToByteString hsh) ++ " " ++ args
+  $logDebugS "getNewAddressWithSalt" $ T.pack $ show address ++ " " ++ saltAsString ++ " " ++ (show $ keccak256ToByteString hsh) ++ " " ++ show args
   doesAddressAlreadyExist <- A.lookup (Mod.Proxy @AddressState) newAddress
   case doesAddressAlreadyExist of
     Just _ -> duplicateContract $ "The address " ++ show newAddress ++ " already exists. Try using a different salt or constructor arguments."

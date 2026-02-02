@@ -35,6 +35,24 @@ const {
   RewardsChef,
 } = constants;
 
+// Extract constants for consistency with CDP service
+const RAY = BigInt(10) ** BigInt(27);
+
+
+// Helper function for fixed-point exponentiation (matches contract's _rpow)
+const rpow = (x: bigint, n: bigint, ray: bigint): bigint => {
+  let z = n % 2n !== 0n ? x : ray;
+  let xCopy = x;
+  let nCopy = n;
+  for (nCopy = nCopy / 2n; nCopy !== 0n; nCopy = nCopy / 2n) {
+    xCopy = (xCopy * xCopy) / ray;
+    if (nCopy % 2n !== 0n) {
+      z = (z * xCopy) / ray;
+    }
+  }
+  return z;
+};
+
 /**
  * Get the latest exchange rate for the lending pool from Cirrus events
  */
@@ -64,12 +82,18 @@ export const getExchangeRateFromCirrus = async (
     const latestEvent = events[0];
     const exchangeRate = latestEvent?.newRate || oneToOne;
 
-    return exchangeRate;
+    return getMTokenExchangeRate(latestEvent).toString();
   } catch (error) {
     console.error(`Error fetching exchange rate from Cirrus for lending pool: `, error);
     return oneToOne;
   }
 };
+
+export const getMTokenExchangeRate = (
+  event: any
+): bigint => {
+  return event?.newRate || (10n ** 18n);
+}
 
 
 /**
@@ -202,71 +226,14 @@ export const depositLiquidity = async (
 export const withdrawLiquidity = async (
   accessToken: string,
   userAddress: string,
-  amount: string,
-  includeStakedMToken: boolean = false
+  amount: string
 ) => {
   const { lendingPool } = await getPool(accessToken, { select: "lendingPool" });
   if (!lendingPool) {
     throw new Error("Lending pool address not found");
   }
 
-  // If includeStakedMToken is enabled, we might need to unstake first
-  if (includeStakedMToken) {
-    // Get mToken address first
-    const { mToken: { mToken } } = await getPool(accessToken, {
-      select: "mToken:lendingPool_fkey(mToken)"
-    });
-    if (!mToken) {
-      throw new Error("mToken address not found");
-    }
-
-    // Get current mUSDST balance in wallet
-    const unstakedMTokenBalance = await getTokenBalanceForUser(accessToken, mToken, userAddress);
-
-    // Get exchange rate to convert withdrawal amount (USDST) to required mTokens
-    const exchangeRateResponse = await getExchangeRateFromCirrus(accessToken);
-    const exchangeRate = exchangeRateResponse || "1000000000000000000"; // Default 1:1 if not available
-
-    // Convert withdrawal amount (USDST) to required mTokens
-    // Use ceiling division to ensure we unstake enough mTokens to cover the withdrawal
-    const amountWei = BigInt(amount);
-    const exchangeRateWei = BigInt(exchangeRate);
-    const numerator = amountWei * (10n ** 18n);
-    const requiredMTokenWei = (numerator + exchangeRateWei - 1n) / exchangeRateWei; // Ceiling division
-
-    // Check if we need to unstake
-    const unstakedMTokenWei = BigInt(unstakedMTokenBalance);
-
-    if (requiredMTokenWei > unstakedMTokenWei) {
-      // We need to unstake some mTokens first
-      const amountToUnstake = requiredMTokenWei - unstakedMTokenWei;
-
-      // Find the pool for this mToken
-      const rewardsPool = await findPoolByLpToken(accessToken, config.rewardsChef, mToken);
-
-      if (!rewardsPool) {
-        throw new Error(`No RewardsChef pool found for mToken ${mToken}. Cannot unstake before withdrawal.`);
-      }
-
-      // Build unstaking transaction
-      const unstakeTx = await buildFunctionTx({
-        contractName: extractContractName(RewardsChef),
-        contractAddress: config.rewardsChef,
-        method: "withdraw",
-        args: {
-          _pid: rewardsPool.poolIdx,
-          _amount: amountToUnstake.toString()
-        }
-      }, userAddress, accessToken);
-
-      // Execute unstaking transaction first
-      await postAndWaitForTx(accessToken, () =>
-        strato.post(accessToken, StratoPaths.transactionParallel, unstakeTx)
-      );
-    }
-  }
-
-  // Now proceed with the normal withdrawal
+  // Build withdrawal transaction
   const builtTx = await buildFunctionTx({
     contractName: extractContractName(LendingPool),
     contractAddress: lendingPool,
@@ -442,7 +409,7 @@ export const collateralAndBalance = async (
     select:
       `lendingPool:lendingPool_fkey(` +
         `assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value),` +
-        `borrowableAsset` +
+        `borrowableAsset,_paused` +
       `),` +
       `collateralVault:collateralVault_fkey(` +
         `userCollaterals:${CollateralVault}-userCollaterals(user:key,asset:key2,amount:value::text)` +
@@ -455,6 +422,8 @@ export const collateralAndBalance = async (
   if (!registry.lendingPool || !registry.collateralVault) {
     throw new Error("Lending pool or collateral vault not found");
   }
+
+  const isPaused = registry.lendingPool._paused;
 
   const assets = registry.lendingPool.assetConfigs?.map((a: any) => a.asset).filter((asset: string) => asset !== registry.lendingPool.borrowableAsset) || [];
   const userCollaterals = (registry.collateralVault.userCollaterals || []).filter((c: any) => c.user === userAddress);
@@ -496,11 +465,12 @@ export const collateralAndBalance = async (
       const liquidationThreshold = assetConfig?.liquidationThreshold || 0;
 
       // Calculate metrics using the helper function
-      const {userBalanceValue, collateralizedAmountValue, maxBorrowingPower} = calculateCollateralMetrics(
+      const {userBalanceValue, collateralizedAmountValue, maxBorrowingPower, unsuppliedBorrowingPower, unsuppliedLTCollateralValue} = calculateCollateralMetrics(
         userBalance,
         collateralizedAmount,
         assetPrice,
-        ltv
+        ltv,
+        liquidationThreshold
       );
 
       return {
@@ -513,9 +483,12 @@ export const collateralAndBalance = async (
         isCollateralized: collateral?.amount > 0,
         canSupply: BigInt(userBalance) > 0n,
         maxBorrowingPower,
+        unsuppliedBorrowingPower,
+        unsuppliedLTCollateralValue,
         assetPrice,
         ltv,
         liquidationThreshold,
+        isPaused,
       };
     });
 };
@@ -524,11 +497,11 @@ export const liquidityAndBalance = async (
   accessToken: string,
   userAddress: string,
 ) => {
-  // Fetch pool data with explicit select (index fields + userLoan + prices)
+  // Fetch pool data with explicit select (index fields + userLoan + prices + pause status)
   const registry = await getPool(accessToken, {
     select:
       `lendingPool:lendingPool_fkey(` +
-        `address,borrowableAsset,mToken,` +
+        `address,borrowableAsset,mToken,_paused,` +
         `borrowIndex::text,totalScaledDebt::text,reservesAccrued::text,lastAccrual::text,badDebt::text,` +
         `assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value),` +
         `userLoan:${LendingPool}-userLoan(user:key,LoanInfo:value)` +
@@ -544,8 +517,9 @@ export const liquidityAndBalance = async (
     "lendingPool.userLoan.key": `eq.${userAddress}`
   });
 
-  const { borrowableAsset, mToken, assetConfigs } = registry.lendingPool || {};
+  const { borrowableAsset, mToken, assetConfigs, _paused } = registry.lendingPool || {};
   const allCollaterals = registry.collateralVault?.userCollaterals || [];
+  const isPaused = _paused;
 
   if (!borrowableAsset || !mToken) {
     throw new Error("Lending pool, borrowable asset, or mToken not found");
@@ -630,13 +604,11 @@ export const liquidityAndBalance = async (
   const supplyAPY = apyData.supplyAPY * (utilizationRate / 100);
 
   // Total collateral value across all users (USD 1e18)
-  const totalCollateralValue = await Promise.resolve(
-    calculateTotalCollateralValue(
-      registry.lendingPool?.assetConfigs || [],
-      allCollaterals,
-      priceMap,
-      borrowableAsset
-    )
+  const totalCollateralValue = calculateTotalCollateralValue(
+    registry.lendingPool?.assetConfigs || [],
+    allCollaterals,
+    priceMap,
+    borrowableAsset
   );
 
   // Get user's staked balance from RewardsChef
@@ -696,6 +668,8 @@ export const liquidityAndBalance = async (
     totalAmountOwedPreview: totalAmountOwedPreviewClamped,
     // Compat:
     totalBorrowPrincipal,
+    // Pause status
+    isPaused,
   };
 };
 
@@ -1136,6 +1110,7 @@ export const listLoansForLiquidation = async (
       `address,` +
       `borrowableAsset,` +
       `borrowIndex::text,` +
+      `_paused,` +
       `assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value),` +
       `loans:${LendingPool}-userLoan(user:key,LoanInfo:value)` +
     `),` +
@@ -1150,6 +1125,7 @@ export const listLoansForLiquidation = async (
 
   const borrowableAsset: string = registry.lendingPool?.borrowableAsset;
   const borrowIndexStr = registry.lendingPool?.borrowIndex || "0";
+  const isPaused = registry.lendingPool?._paused;
   const assetConfigsArr = registry.lendingPool?.assetConfigs || [];
   const loansArr = registry.lendingPool?.loans || [];
   const collateralsArr = registry.collateralVault?.userCollaterals || [];
@@ -1248,6 +1224,7 @@ export const listLoansForLiquidation = async (
         expectedProfit: expectedProfit.toString(),
         maxRepay: effectiveMaxRepay.toString(),
         liquidationBonus,
+        isPaused,
       };
     })
     // Filter out zero-amount or zero-USD-value collaterals
@@ -1281,6 +1258,159 @@ export const listLoansForLiquidation = async (
   return results;
 };
 
+/**
+ * Get interest accrued for lending pool
+ * Uses compound interest formula matching contract's _accrue() function
+ */
+/**
+ * Get estimated protocol revenue from lending pool interest.
+ * 
+ * Revenue calculation:
+ * - Total interest accrues on borrowed debt
+ * - Only `reserveFactor` portion of interest goes to `reservesAccrued`
+ * - Of `reservesAccrued`, only `(10000 - safetyShareBps)` portion goes to FeeCollector as revenue
+ * 
+ * Formula: revenue = interest × (reserveFactor / 10000) × ((10000 - safetyShareBps) / 10000)
+ */
+export const getLendingInterestAccrued = async (
+  accessToken: string,
+): Promise<{
+  totalDailyRevenueUSD: string;
+  totalWeeklyRevenueUSD: string;
+  totalMonthlyRevenueUSD: string;
+  totalYtdRevenueUSD: string;
+  totalAllTimeRevenueUSD: string;
+  borrowableAsset: {
+    asset: string;
+    symbol: string;
+    totalDebtUSD: string;
+    annualRatePercent: number;
+    dailyRevenueUSD: string;
+    weeklyRevenueUSD: string;
+    monthlyRevenueUSD: string;
+    ytdRevenueUSD: string;
+    allTimeRevenueUSD: string;
+  };
+}> => {
+  const registry = await getPool(accessToken, {
+    select:
+      `lendingPool:lendingPool_fkey(` +
+        `address,borrowableAsset,safetyShareBps,` +
+        `borrowIndex::text,totalScaledDebt::text,` +
+        `assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value)` +
+      `)`
+  });
+
+  if (!registry?.lendingPool?.borrowableAsset) {
+    throw new Error("Lending pool or borrowable asset not found");
+  }
+
+  const { borrowableAsset, borrowIndex: borrowIndexStr, totalScaledDebt: totalScaledDebtStr, safetyShareBps: safetyShareBpsNum } = registry.lendingPool;
+  const totalScaledDebt = BigInt(totalScaledDebtStr || "0");
+  const borrowIndex = BigInt(borrowIndexStr || RAY.toString());
+  const safetyShareBps = BigInt(safetyShareBpsNum || 0);
+
+  // Get asset config
+  const borrowableAssetConfig = registry.lendingPool.assetConfigs
+    ?.find((cfg: any) => cfg.asset?.toLowerCase() === borrowableAsset.toLowerCase())
+    ?.AssetConfig;
+
+  if (!borrowableAssetConfig?.perSecondFactorRAY) {
+    throw new Error("Borrowable asset configuration not found");
+  }
+
+  const perSecondFactorRAY = BigInt(borrowableAssetConfig.perSecondFactorRAY);
+  if (perSecondFactorRAY === 0n || perSecondFactorRAY === RAY) {
+    throw new Error("perSecondFactorRAY not set or invalid");
+  }
+
+  const reserveFactorBps = BigInt(borrowableAssetConfig.reserveFactor || 0);
+
+  // Get token symbol
+  const tokenRows = await getTokens(accessToken, {
+    address: `eq.${borrowableAsset}`,
+    select: "address,_symbol"
+  });
+  const symbol = tokenRows?.[0]?._symbol || "UNKNOWN";
+
+  // Calculate actual debt and annual rate
+  const actualDebtUSD = (totalScaledDebt * borrowIndex) / RAY;
+  const annualRatePercent = (borrowableAssetConfig.interestRate || 0) / 100;
+
+  // Helper: Calculate compound interest for a time period
+  // Formula: idx1 = (idx0 * rpow(perSec, dt, RAY)) / RAY, Interest = (totalScaledDebt * (idx1 - idx0)) / RAY
+  const calculateCompoundInterest = (seconds: bigint): bigint => {
+    if (totalScaledDebt === 0n || seconds === 0n) return 0n;
+    const idx1 = (borrowIndex * rpow(perSecondFactorRAY, seconds, RAY)) / RAY;
+    return (totalScaledDebt * (idx1 - borrowIndex)) / RAY;
+  };
+
+  // Helper: Convert interest to protocol revenue (FeeCollector portion)
+  // revenue = interest × (reserveFactor / 10000) × ((10000 - safetyShareBps) / 10000)
+  const interestToRevenue = (interest: bigint): bigint => {
+    if (interest === 0n) return 0n;
+    const treasuryShareBps = 10000n - safetyShareBps;
+    // revenue = interest * reserveFactorBps * treasuryShareBps / 100_000_000
+    return (interest * reserveFactorBps * treasuryShareBps) / 100_000_000n;
+  };
+
+  // Calculate time periods
+  const secondsPerDay = 86400n;
+  const secondsPerWeek = 604800n;
+  const secondsPerMonth = 2592000n;
+  const now = Math.floor(Date.now() / 1000);
+  const startOfYearTimestamp = Math.floor(new Date(new Date().getFullYear(), 0, 1).getTime() / 1000);
+  const secondsElapsedYTD = BigInt(now - startOfYearTimestamp);
+
+  // Calculate interest for each period, then convert to revenue
+  const dailyInterest = calculateCompoundInterest(secondsPerDay);
+  const weeklyInterest = calculateCompoundInterest(secondsPerWeek);
+  const monthlyInterest = calculateCompoundInterest(secondsPerMonth);
+  
+  // YTD: Work backwards to find borrowIndex at start of year
+  const ytdInterest = totalScaledDebt > 0n && secondsElapsedYTD > 0n
+    ? (() => {
+        const rpowResult = rpow(perSecondFactorRAY, secondsElapsedYTD, RAY);
+        const borrowIndexAtStartOfYear = (borrowIndex * RAY) / rpowResult;
+        return (totalScaledDebt * (borrowIndex - borrowIndexAtStartOfYear)) / RAY;
+      })()
+    : 0n;
+
+  // All-time interest (actual accrued)
+  const allTimeInterest = totalScaledDebt > 0n 
+    ? (totalScaledDebt * (borrowIndex - RAY)) / RAY
+    : 0n;
+
+  // Convert interest to revenue
+  const dailyRevenueUSD = interestToRevenue(dailyInterest);
+  const weeklyRevenueUSD = interestToRevenue(weeklyInterest);
+  const monthlyRevenueUSD = interestToRevenue(monthlyInterest);
+  const ytdRevenueUSD = interestToRevenue(ytdInterest);
+  const allTimeRevenueUSD = interestToRevenue(allTimeInterest);
+
+  // Format values as strings
+  const formatValue = (val: bigint) => val.toString();
+
+  return {
+    totalDailyRevenueUSD: formatValue(dailyRevenueUSD),
+    totalWeeklyRevenueUSD: formatValue(weeklyRevenueUSD),
+    totalMonthlyRevenueUSD: formatValue(monthlyRevenueUSD),
+    totalYtdRevenueUSD: formatValue(ytdRevenueUSD),
+    totalAllTimeRevenueUSD: formatValue(allTimeRevenueUSD),
+    borrowableAsset: {
+      asset: borrowableAsset,
+      symbol,
+      totalDebtUSD: formatValue(actualDebtUSD),
+      annualRatePercent,
+      dailyRevenueUSD: formatValue(dailyRevenueUSD),
+      weeklyRevenueUSD: formatValue(weeklyRevenueUSD),
+      monthlyRevenueUSD: formatValue(monthlyRevenueUSD),
+      ytdRevenueUSD: formatValue(ytdRevenueUSD),
+      allTimeRevenueUSD: formatValue(allTimeRevenueUSD)
+    }
+  };
+};
+
 export const listLiquidatableLoans = async (accessToken: string): Promise<LiquidationEntry[]> => {
   return listLoansForLiquidation(accessToken);
 };
@@ -1308,3 +1438,42 @@ export const withdrawCollateralMax = async (
     strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
+
+export const pauseLendingPool = async (
+  accessToken: string,
+  userAddress: string,
+) => {
+  const { lendingPool } = await getPool(accessToken, { select: "lendingPool" });
+  if (!lendingPool) {
+    throw new Error("Lending pool address not found");
+  }
+  const builtTx = await buildFunctionTx({
+    contractName: extractContractName(LendingPool),
+    contractAddress: lendingPool,
+    method: "pause",
+    args: {},
+  }, userAddress, accessToken);
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
+  );
+};
+
+export const unpauseLendingPool = async (
+  accessToken: string,
+  userAddress: string,
+) => {
+  const { lendingPool } = await getPool(accessToken, { select: "lendingPool" });
+  if (!lendingPool) {
+    throw new Error("Lending pool address not found");
+  }
+  const builtTx = await buildFunctionTx({
+    contractName: extractContractName(LendingPool),
+    contractAddress: lendingPool,
+    method: "unpause",
+    args: {},
+  }, userAddress, accessToken);
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
+  );
+};
+

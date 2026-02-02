@@ -57,7 +57,7 @@ functionHelper Func {..} = do
   contract <- gets (\(_,_,c) -> c)
   modifierAnns <- fmap concat . for _funcModifiers $ \(n, es) -> do
     argAnns <- concat <$> traverse expressionHelper es
-    modAnns <- fmap concat . for (M.lookup n $ _modifiers contract) $ maybe (pure []) statementsHelper . _modifierContents 
+    modAnns <- fmap concat . for (M.lookup n $ _modifiers contract) $ maybe (pure []) statementsHelper . _modifierContents
     pure $ argAnns ++ modAnns
   funcAnns <- maybe (pure []) statementsHelper _funcContents
   pure $ modifierAnns ++ funcAnns
@@ -212,7 +212,7 @@ expressionHelper (PlusPlus _ e) = expressionHelper e
 expressionHelper (MinusMinus y (Variable x name)) =
   stateVarWriteHelper name (x <> y)
 expressionHelper (MinusMinus _ e) = expressionHelper e
-expressionHelper (NewExpression _ _) = pure []
+expressionHelper (NewExpression _ _ mSalt) = maybe (pure []) expressionHelper mSalt
 expressionHelper (IndexAccess _ a b) = do
   as <- expressionHelper a
   bs <- maybe (pure []) expressionHelper b

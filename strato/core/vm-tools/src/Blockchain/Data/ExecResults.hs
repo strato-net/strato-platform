@@ -9,11 +9,9 @@ module Blockchain.Data.ExecResults
   )
 where
 
-import BlockApps.X509.Certificate
 import Blockchain.Data.Log
 import Blockchain.Data.Transaction
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Validator
 import Blockchain.Stream.Action (Action)
@@ -35,12 +33,8 @@ data ExecResults = ExecResults
     erAction :: Maybe Action,
     erException :: Maybe (Either SolidException VMException),
     erPragmas :: [(String, String)],
-    erCreator :: String,
-    erAppName :: String,
     erNewValidators :: [Validator],
-    erRemovedValidators :: [Validator],
-    erNewCerts :: [X509Certificate],
-    erRevokedCerts :: [DummyCertRevocation]
+    erRemovedValidators :: [Validator]
   }
   deriving (Eq, Show, Generic)
 
@@ -57,6 +51,8 @@ evmErrorResults remainingGas e = errorResults remainingGas (Right e)
 solidvmErrorResults :: SolidException -> ExecResults
 solidvmErrorResults e = errorResults 0 (Left e)
 
+
+
 errorResults :: Integer -> Either SolidException VMException -> ExecResults
 errorResults remainingGas e =
   ExecResults
@@ -72,10 +68,6 @@ errorResults remainingGas e =
       erException = Just e,
       -- , erNewX509Certs = M.empty
       erPragmas = [],
-      erCreator = "",
-      erAppName = "",
       erNewValidators = [],
-      erRemovedValidators = [],
-      erNewCerts = [],
-      erRevokedCerts = []
+      erRemovedValidators = []
     }

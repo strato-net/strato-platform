@@ -23,7 +23,6 @@ import BlockApps.Logging
 import Blockchain.DB.CodeDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.AddressStateRef
-import Blockchain.Data.CirrusDefs
 import Blockchain.Data.DataDefs
 import Blockchain.EthConf
 import Blockchain.Model.JsonBlock
@@ -38,7 +37,6 @@ import Blockchain.SyncDB
 import Control.Lens.Operators
 import Control.Monad.Change.Alter
 import Control.Monad.Change.Modify
-import Control.Monad.Composable.Identity
 import Control.Monad.Composable.SQL
 import Control.Monad.Composable.Vault hiding (httpManager)
 import Control.Monad.Trans.Class
@@ -52,7 +50,7 @@ import qualified Data.ByteString.Lazy.Char8 as BLC
 import qualified Data.Cache as Cache
 import qualified Data.HashMap.Strict.InsOrd as H
 import Data.Map (fromList, traverseWithKey)
-import Data.Maybe (fromJust, isJust, listToMaybe)
+import Data.Maybe (listToMaybe)
 import Data.Source.Map
 import Data.Swagger hiding (Header, Http, delete)
 import Data.Text (Text)
@@ -68,17 +66,14 @@ import Data.String (fromString)
 import Network.Wai.Middleware.Cors
 import Network.Wai.Middleware.Prometheus
 import Network.Wai.Middleware.RequestLogger
-import Options
 import SQLM
 import Servant
-import Servant.Client.Core hiding (requestMethod)
 import Servant.Multipart
 import Servant.Swagger
 import Servant.Swagger.UI
 import qualified Strato.Strato23.API.Types as V
 import Strato.Strato23.Client
 import System.Clock
-import Text.Regex
 import Text.Tools
 import UnliftIO hiding (Handler)
 import Prelude hiding (lookup)
@@ -117,12 +112,6 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Address AddressState 
         (Just 0)
 
 instance {-# OVERLAPPING #-} Selectable Address AddressState m => Selectable Address AddressState (ReaderT a m) where
-  select p = lift . select p
-
-instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Address Certificate (CirrusM m) where
-  select _ = getX509CertForAccount
-
-instance {-# OVERLAPPING #-} Selectable Address Certificate m => Selectable Address Certificate (ReaderT a m) where
   select p = lift . select p
 
 instance {-# OVERLAPPING #-} MonadUnliftIO m => Accessible V.PublicKey (ReaderT BlocEnv m) where
@@ -169,9 +158,9 @@ fullServer jwtToken = hoistServer (Proxy :: Proxy CoreAPI) (flip runReaderT (Acc
 hoistCoreServer :: BlocEnv -> UrlMap -> Server FullAPI
 hoistCoreServer blocEnv urlMap = hoistServer (Proxy :: Proxy FullAPI) convertErrors fullServer
   where
-    convertErrors :: IdentityM (VaultM (ReaderT UrlMap (ReaderT BlocEnv (CirrusM (SQLM (LoggingT IO)))))) a -> Handler a
+    convertErrors :: VaultM (ReaderT UrlMap (ReaderT BlocEnv (CirrusM (SQLM (LoggingT IO))))) a -> Handler a
     convertErrors x = Handler $ do
-      y <- liftIO 
+      y <- liftIO
         . try
         . runLoggingT
         . runSQLM
@@ -179,7 +168,6 @@ hoistCoreServer blocEnv urlMap = hoistServer (Proxy :: Proxy FullAPI) convertErr
         . flip runReaderT blocEnv
         . flip runReaderT urlMap
         . runVaultM ("http://localhost:8013/strato/v2.3")
-        . runIdentitytM getIdentityServerUrl
         $ x `catch` handleRuntimeError `catch` handleApiError
       case y of
         Right a -> pure a
@@ -191,14 +179,6 @@ fullAPI = Proxy
 main :: IO ()
 main = do
   _ <- $initHFlags "Core API"
-
-  -- check if id server connection is valid; only run if using https (unless using localhost)
-  identityUrl <- parseBaseUrl getIdentityServerUrl
-  let allowedIPAddressRegex = "^172.17.((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\\.){1}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
-  let matches = matchRegex (mkRegex allowedIPAddressRegex) (baseUrlHost identityUrl)
-  if baseUrlScheme identityUrl == Http && not (isJust matches || baseUrlHost identityUrl == "docker.for.mac.localhost")
-    then error $ "Will not communicate with the identity server over http unless it is with localhost. Update the idServerUrl: " <> getIdentityServerUrl
-    else putStrLn "Identity server url is valid to connect to"
 
   -- check that all urls are derivable (or else crash and fail in a flaming disaster)
   let urlMap = fromList
@@ -219,8 +199,8 @@ main = do
             case flags_network of
               "mercata-hydrogen" -> "https://monitor.mercata-testnet2.blockapps.net:18080"
               "mercata" -> "https://monitor.mercata.blockapps.net:18080"
-              "helium" -> "https://monitor.testnet.stratomercata.com"
-              "upquark" -> "https://monitor.stratomercata.com"
+              "helium" -> "https://monitor.testnet.strato.nexus"
+              "upquark" -> "https://monitor.strato.nexus"
               _ -> ""
           )
         ]
@@ -255,9 +235,6 @@ main = do
             gasLimit = flags_gasLimit,
             stateFetchLimit = stateFetchLimit',
             globalNonceCounter = nonceCache,
-            userRegistryAddress = fromJust $ stringAddress flags_userRegistryAddress,
-            userRegistryCodeHash = if flags_useBuiltinUserRegistry then Nothing else stringKeccak256 flags_userRegistryCodeHash,
-            useWalletsByDefault = flags_useWalletsByDefault,
             nodePubKey = pubKey
           }
   runSettings (setPort 3000 $ setHost (fromString $ ipAddress $ apiConfig ethConf) defaultSettings) $ app env theDoc urlMap

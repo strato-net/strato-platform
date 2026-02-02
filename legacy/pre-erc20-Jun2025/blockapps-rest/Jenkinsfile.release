@@ -56,7 +56,6 @@ pipeline {
                 OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \
                 VAULT_URL=http://\$(</host):8093 \
                 FILE_SERVER_URL='dummy' \
-                idServerUrl='dummy' \
                 ./strato --single
               docker ps
               counter=0

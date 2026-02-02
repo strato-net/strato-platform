@@ -102,8 +102,8 @@ const InvoiceComponent = ({ invoice, decimals }) => {
     settotalTax(tax);
     setSubtotal((invoice.order.totalPrice - tax).toFixed(2));
   }, [invoice]);
-  const orderQuantities = invoice.order['BlockApps-Mercata-Order-quantities']
-    ? invoice.order['BlockApps-Mercata-Order-quantities'].map(
+  const orderQuantities = invoice.order['BlockApps-Order-quantities']
+    ? invoice.order['BlockApps-Order-quantities'].map(
         (item) => item.value
       )
     : invoice.order.quantities;

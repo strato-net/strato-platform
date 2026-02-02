@@ -41,6 +41,17 @@ export const validateAddressField = (label: string) =>
       "any.required": `"${label}" is required`,
     });
 
+export const validateHashField = (label: string) =>
+  Joi.string()
+    .trim()
+    .pattern(/^(0x)?[a-fA-F0-9]{64}$/)
+    .required()
+    .messages({
+      "string.base": `"${label}" must be a string`,
+      "string.empty": `"${label}" is required`,
+      "string.pattern.base": `"${label}" must be a valid hexadecimal transaction hash with or without the "0x" prefix (64 hexadecimal characters)`,
+    });
+
 export const numericStringField = (label: string, { allowZero = false } = {}) =>
   Joi.string()
     .trim()

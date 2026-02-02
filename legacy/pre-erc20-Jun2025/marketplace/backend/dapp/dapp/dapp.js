@@ -1425,8 +1425,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       if (item?.saleAddresses?.length) {
         saleAddressArr.push(item?.saleAddresses[0]);
         return { ...item, saleAddress: item?.saleAddresses[0] };
-      } else if (item['BlockApps-Mercata-Order-saleAddresses']) {
-        const address = item['BlockApps-Mercata-Order-saleAddresses'][0]?.value;
+      } else if (item['BlockApps-Order-saleAddresses']) {
+        const address = item['BlockApps-Order-saleAddresses'][0]?.value;
         saleAddressArr.push(address);
         return { ...item, saleAddress: address };
       } else {
@@ -1484,7 +1484,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       // Extracting the sale addresses
       const saleAddresses = order.saleAddresses
         ? order.saleAddresses
-        : order['BlockApps-Mercata-Order-saleAddresses'].map(
+        : order['BlockApps-Order-saleAddresses'].map(
             (item) => item.value
           );
       const sales = await saleJs.getAll(
@@ -1575,10 +1575,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
       orders.orders.forEach((order) => {
         if (
-          order['BlockApps-Mercata-Order-saleAddresses'] &&
-          Array.isArray(order['BlockApps-Mercata-Order-saleAddresses'])
+          order['BlockApps-Order-saleAddresses'] &&
+          Array.isArray(order['BlockApps-Order-saleAddresses'])
         ) {
-          order['BlockApps-Mercata-Order-saleAddresses'].forEach(
+          order['BlockApps-Order-saleAddresses'].forEach(
             (saleAddress) => {
               if (saleAddress.value) {
                 saleAddresses.push(saleAddress.value);
@@ -1957,7 +1957,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     ) {
       const orderEvent = await rest.searchUntil(
         rawAdmin,
-        { name: 'BlockApps-Mercata-PaymentService.Order' },
+        { name: 'BlockApps-PaymentService.Order' },
         (r) => r.length === 1,
         {
           ...options,
@@ -1978,7 +1978,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     // Search until we find the order event
     const orderEvent = await rest.searchUntil(
       rawAdmin,
-      { name: 'BlockApps-Mercata-PaymentService.Order' },
+      { name: 'BlockApps-PaymentService.Order' },
       (r) => r.length === 1,
       {
         ...options,
@@ -2192,7 +2192,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getEscrowForAsset = async function (args, options = defaultOptions) {
     const { assetRootAddress } = args;
     const queryArgs = {
-      select: '*,BlockApps-Mercata-Escrow-assets(*)',
+      select: '*,BlockApps-Escrow-assets(*)',
       assetRootAddress: `like.${assetRootAddress}*`,
       borrowerCommonName: `eq.${userCommonName}`,
       isActive: 'eq.true',
@@ -2308,7 +2308,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
     const reserves = await rest.search(
       rawAdmin,
-      { name: 'BlockApps-Mercata-Reserve' },
+      { name: 'BlockApps-Reserve' },
       reserveSearchOptions
     );
     if (!reserves || reserves.length === 0) {

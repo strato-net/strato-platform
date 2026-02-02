@@ -17,14 +17,15 @@ import { secureFetch } from '../../../../lib/csrf';
 
 export function postMethodCall(payload) {
   const isModeOauth = isOauthEnabled();
-  const options = isModeOauth ? { query: { resolve: true, chainid: payload.chainId, use_wallet: payload.useWallet } } :
+  const walletUsername = payload.useWallet ? payload.username : '';
+  const options = isModeOauth ? { query: { resolve: true, chainid: payload.chainId, username: walletUsername } } :
     {
       params: {
         username: payload.username,
         userAddress: payload.userAddress,
         contractName: payload.contractName,
         contractAddress: payload.contractAddress
-      }, query: { resolve: true, chainid: payload.chainId }
+      }, query: { resolve: true, chainid: payload.chainId, username: walletUsername }
     };
 
   const prefix = isModeOauth ? env.STRATO_URL_V23 : env.BLOC_URL;

@@ -55,15 +55,6 @@ main = do
 --
 --senderAddress :: Address
 --senderAddress = fromPrivateKey private
---
---sender :: ChainMemberParsedSet
---sender = CommonName "BlockApps" "Engineering" "Admin" True
---
---recipient :: ChainMemberParsedSet
---recipient = CommonName "BlockApps" "Engineering" "James Hormuzdiar" True
---
---recipient2 :: ChainMemberParsedSet
---recipient2 = CommonName "BlockApps" "Engineering" "Nikita Mendelbaum" True
 
 spec :: Spec
 spec = describe "VMContext" $ pure ()

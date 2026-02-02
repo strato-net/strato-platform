@@ -1306,7 +1306,7 @@ def spinUpPaymentServer() {
         POSTGRES_USER='${AWS_RDS_PAYMENT_SERVER_CREDENTIALS_DEV_USER}' \\
         POSTGRES_PASSWORD='${AWS_RDS_PAYMENT_SERVER_CREDENTIALS_DEV_PASSWORD}' \\
         POSTGRES_DBNAME=payments_dev \\
-        TABLE_PREFIX="Test-Mercata-" \\
+        TABLE_PREFIX="Test-" \\
         SKIP_CONTRACT_VALIDATION="true" \\
         SKIP_DEPLOYMENT="true" \\
         USDST_ADDRESS=f19d88d5b88d4948def06fcc12852d4b9e45caf2 \\
@@ -1339,56 +1339,6 @@ def spinUpPaymentServer() {
   '''
   sh 'chmod +x check_availability_payment.sh'
   sh './check_availability_payment.sh'
-}
-
-def spinUpIdentityServer(rootCert, rootPriv) {
-  sh "cp ${rootCert} identity-provider/certs/."
-  sh "cp ${rootPriv} identity-provider/certs/."
-  withCredentials([
-    string(credentialsId: 'SENDGRID_APIKEY_TESTNET2', variable:'SENDGRID_APIKEY_TESTNET2'),
-    usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID')
-  ]) {
-  def hostname=sh(returnStdout: true, script: "cat </host")
-  writeFile file: "identity-provider/idconf.yaml", text: """
-    - realmName: strato-devel
-      discoveryUrl: https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration
-      clientId: ${KEYCLOAK_STRATODEVEL_DEV_ID}
-      clientSecret: ${KEYCLOAK_STRATODEVEL_DEV_SECRET}
-      nodeUrl: https://${hostname}
-  """
-  writeFile file: "run-identity.sh", text: """#!/bin/bash
-    sudo \\
-      ssl=true \\
-      VAULT_URL=https://\$(</host):8093 \\
-      SENDGRID_APIKEY='${SENDGRID_APIKEY_TESTNET2}' \\
-      HTTPS_PORT=8001 \\
-      ./identity
-  """
-  }
-
-  sh 'chmod +x run-identity.sh'
-  sh './run-identity.sh'
-  sh 'docker ps'
-  writeFile file: "check_availability_identity.sh", text: '''#!/bin/bash -le
-    check_availability_identity() {
-      counter=0
-      until curl --silent --fail --location https://$(</host):8001/_ping | grep pong
-      do
-        if [[ "$counter" -gt 120 ]]; then
-          echo "Identity server took longer than 2 minutes to initialize! aborting."
-          exit 73
-        fi
-        echo "waiting for identity server health endpoint to be available through nginx"
-        counter=$((counter+1))
-        sleep 1
-      done
-      echo "Identity server health endpoint is available through nginx - node is running"
-    }
-
-    check_availability_identity
-  '''
-  sh 'chmod +x check_availability_identity.sh'
-  sh './check_availability_identity.sh'
 }
 
 def replaceServerPortsDocker() {

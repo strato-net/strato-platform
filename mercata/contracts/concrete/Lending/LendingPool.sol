@@ -22,6 +22,7 @@ contract record LendingPool is Ownable, Pausable {
     // ═══════════════════════════════════════════════════════════════════════════════
 
     event Deposited(address indexed user, address indexed asset, uint amount);
+    event DepositedOnBehalfOf(address indexed depositor, address indexed recipient, address indexed borrowableAsset, uint amount);
     event Withdrawn(address indexed user, address indexed asset, uint amount);
     event Borrowed(address indexed user, address indexed asset, uint amount);
     event Repaid(address indexed user, address indexed asset, uint amount);
@@ -216,6 +217,35 @@ contract record LendingPool is Ownable, Pausable {
         // cash ↑ (after deposit)
         emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
         emit Deposited(msg.sender, borrowableAsset, amount);
+    }
+
+    /**
+     * @notice Deposit liquidity on another's behalf
+     * @param user The user for whom to deposit; will receive the mTokens
+     * @param amount The amount of the underlying asset to deposit
+     */
+    function depositLiquidityOnBehalfOf(address user, uint amount) external onlyTokenFactory(borrowableAsset) {
+        require(mToken != address(0), "mToken not set");
+        require(amount > 0, "Invalid amount");
+        require(user != address(0), "Invalid user address");
+        require(user != msg.sender, "Please call depositLiquidity instead");
+
+        // 1) bring index & reserves current
+        _accrue();
+
+        // 2) compute mTokens to mint from exchange rate
+        uint exchangeRate = getExchangeRate();
+        require(exchangeRate > 0, "Invalid rate");
+        uint mTokenAmount = (amount * 1e18) / exchangeRate;
+        require(mTokenAmount > 0, "Mint calc");
+
+        // 3) move funds & mint
+        LiquidityPool(_liquidityPool()).depositOnBehalfOf(user, amount, mTokenAmount, msg.sender);
+
+        // cash ↑ (after deposit)
+        emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
+        emit DepositedOnBehalfOf(msg.sender, user, borrowableAsset, amount);
+        emit Deposited(user, borrowableAsset, amount); // Recipient gets credit for the deposit
     }
 
     /**
@@ -977,11 +1007,14 @@ contract record LendingPool is Ownable, Pausable {
         uint toSafety = (toSend * safetyShareBps) / 10000;
         uint toTreas  = toSend - toSafety;
 
-        // Pay SM directly from LiquidityPool
+        // Pay SM directly from LiquidityPool and update its managed assets
         if (toSafety > 0 && address(safetyModule) != address(0)) {
+            uint256 smBalBefore = IERC20(borrowableAsset).balanceOf(address(safetyModule));
+
             LiquidityPool(_liquidityPool()).transferReserve(toSafety, address(safetyModule));
-            // Optional: if you want a log inside SM, you could later have governance call SM.notifyReward(toSafety).
-            // Not required for accounting; SM.totalAssets() reads its balance directly.
+
+            // Update SafetyModule's internal state by passing balanceBefore for validation
+            safetyModule.recordTransfer(toSafety, smBalBefore);
         }
 
         // Pay treasury/feeCollector as usual

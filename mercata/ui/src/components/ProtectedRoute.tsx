@@ -12,24 +12,17 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     // Only redirect if not loading and not authenticated
     if (!loading && !isLoggedIn) {
       // Redirect to login page if not authenticated
-      window.location.href = '/login';
+      const theme = localStorage.getItem('theme') || 'light';
+      window.location.href = `/login?theme=${theme}`;
     }
   }, [isLoggedIn, loading]);
 
-  // Show loading state while checking authentication
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-lg">Loading...</div>
-      </div>
-    );
-  }
-
   // Don't render anything if not authenticated (will redirect)
-  if (!isLoggedIn) {
+  if (!loading && !isLoggedIn) {
     return null;
   }
 
+  // Render children even while loading - let them handle their own loading states
   return <>{children}</>;
 };
 

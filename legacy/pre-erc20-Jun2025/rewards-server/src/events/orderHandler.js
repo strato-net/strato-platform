@@ -52,7 +52,7 @@ async function handleOrderRewards(event, token) {
 
   // Check if the purchaser has made a first order before
   const checkFirstPurchase = await axios.get(
-    `https://${baseUrl}/cirrus/search/BlockApps-Mercata-PaymentService.Order`,
+    `https://${baseUrl}/cirrus/search/BlockApps-PaymentService.Order`,
     {
       params: {
         purchaser: `eq.${purchaser.purchaserAddress}`,

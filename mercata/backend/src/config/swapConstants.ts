@@ -5,7 +5,7 @@
 /**
  * Contract name constants for swap-related contracts
  */
-const CONTRACT_PREFIX = "BlockApps-Mercata-";
+const CONTRACT_PREFIX = "BlockApps-";
 
 export const SWAP_CONTRACTS = {
   Token: `${CONTRACT_PREFIX}Token`,
@@ -45,6 +45,7 @@ export const SWAP_POOL_SELECT_FIELDS = [
   `tokenB:tokenB_fkey(${SWAP_TOKEN_SELECT_FIELDS.join(',')})`,
   "tokenBBalance::text",
   `lpToken:lpToken_fkey(${SWAP_TOKEN_SELECT_FIELDS.join(',')})`,
+  "isStable",
 ] as const;
 
 /**
@@ -59,5 +60,5 @@ export const SWAP_HISTORY_SELECT_FIELDS = [
   "tokenOut", 
   "amountIn::text",
   "amountOut::text",
-  "pool:BlockApps-Mercata-Pool(tokenA:tokenA_fkey(address,symbol:_symbol),tokenB:tokenB_fkey(address,symbol:_symbol))"
+  "pool:BlockApps-Pool(tokenA:tokenA_fkey(address,symbol:_symbol),tokenB:tokenB_fkey(address,symbol:_symbol),isStable)"
 ] as const;

@@ -14,7 +14,7 @@ contract User {
 
 /**
  * Comprehensive state verification utilities for CDP liquidation tests.
- * 
+ *
  * This contract provides helper functions to verify that liquidations:
  * 1. Actually burn USDST tokens from the liquidator
  * 2. Actually transfer collateral tokens from vault to liquidator
@@ -23,7 +23,7 @@ contract User {
  * 5. Handle bad debt correctly
  */
 contract LiquidationStateVerification {
-    
+
     struct LiquidationSnapshot {
         // Pre-liquidation state
         uint borrowerCollateralBefore;
@@ -33,7 +33,7 @@ contract LiquidationStateVerification {
         uint vaultTokenBalanceBefore;
         uint totalScaledDebtBefore;
         uint badDebtBefore;
-        
+
         // Post-liquidation state
         uint borrowerCollateralAfter;
         uint borrowerDebtAfter;
@@ -42,14 +42,14 @@ contract LiquidationStateVerification {
         uint vaultTokenBalanceAfter;
         uint totalScaledDebtAfter;
         uint badDebtAfter;
-        
+
         // Calculated deltas
         uint collateralSeized;
         uint USDSTBurned;
         uint debtExtinguished;
         uint badDebtIncrease;
     }
-    
+
     /**
      * @notice Capture complete state snapshot before liquidation
      */
@@ -63,10 +63,10 @@ contract LiquidationStateVerification {
         CDPVault vault = m.cdpVault();
         Token assetToken = Token(asset);
         Token usdstToken = Token(m.cdpRegistry().usdst());
-        
+
         (uint rate,, uint totalScaledDebt) = cdp.collateralGlobalStates(asset);
         (uint collateral, uint scaledDebt) = cdp.vaults(borrower, asset);
-        
+
         snapshot.borrowerCollateralBefore = collateral;
         snapshot.borrowerDebtBefore = (scaledDebt * rate) / 1e27;
         snapshot.liquidatorUSDSTBefore = usdstToken.balanceOf(liquidator);
@@ -75,7 +75,7 @@ contract LiquidationStateVerification {
         snapshot.totalScaledDebtBefore = totalScaledDebt;
         snapshot.badDebtBefore = cdp.badDebtUSDST(asset);
     }
-    
+
     /**
      * @notice Capture complete state snapshot after liquidation
      */
@@ -89,10 +89,10 @@ contract LiquidationStateVerification {
         CDPVault vault = m.cdpVault();
         Token assetToken = Token(asset);
         Token usdstToken = Token(m.cdpRegistry().usdst());
-        
+
         (uint rate,, uint totalScaledDebt) = cdp.collateralGlobalStates(asset);
         (uint collateral, uint scaledDebt) = cdp.vaults(borrower, asset);
-        
+
         snapshot.borrowerCollateralAfter = collateral;
         snapshot.borrowerDebtAfter = (scaledDebt * rate) / 1e27;
         snapshot.liquidatorUSDSTAfter = usdstToken.balanceOf(liquidator);
@@ -101,7 +101,7 @@ contract LiquidationStateVerification {
         snapshot.totalScaledDebtAfter = totalScaledDebt;
         snapshot.badDebtAfter = cdp.badDebtUSDST(asset);
     }
-    
+
     /**
      * @notice Complete state verification for liquidation
      * Verifies all aspects of liquidation including token transfers and burns
@@ -115,10 +115,10 @@ contract LiquidationStateVerification {
         uint expectedPenalty,
         bool expectCapBound
     ) public view returns (bool success, string memory error) {
-        
+
         LiquidationSnapshot memory pre = capturePreLiquidationState(m, asset, borrower, liquidator);
         LiquidationSnapshot memory post = capturePostLiquidationState(m, asset, borrower, liquidator);
-        
+
         return _verifyLiquidationDeltas(m, asset, borrower, liquidator, pre, post, expectedRepay, expectedPenalty, expectCapBound);
     }
 
@@ -136,9 +136,9 @@ contract LiquidationStateVerification {
         uint expectedPenalty,
         bool expectCapBound
     ) public view returns (bool success, string memory error) {
-        
+
         LiquidationSnapshot memory post = capturePostLiquidationState(m, asset, borrower, liquidator);
-        
+
         return _verifyLiquidationDeltas(m, asset, borrower, liquidator, preSnapshot, post, expectedRepay, expectedPenalty, expectCapBound);
     }
 
@@ -156,35 +156,35 @@ contract LiquidationStateVerification {
         uint expectedPenalty,
         bool expectCapBound
     ) internal view returns (bool success, string memory error) {
-        
+
         // Calculate deltas
         uint collateralSeized = pre.borrowerCollateralBefore - post.borrowerCollateralAfter;
         uint USDSTBurned = pre.liquidatorUSDSTBefore - post.liquidatorUSDSTAfter;
         uint debtExtinguished = pre.borrowerDebtBefore - post.borrowerDebtAfter;
         uint badDebtIncrease = post.badDebtAfter - pre.badDebtBefore;
-        
+
         // 1. Verify USDST burning
         if (USDSTBurned == 0) {
             return (false, "USDST: No tokens burned from liquidator");
         }
-        
+
         // 2. Verify collateral transfer
         uint collateralReceived = post.liquidatorCollateralAfter - pre.liquidatorCollateralBefore;
         if (collateralReceived != collateralSeized) {
             return (false, "COLLATERAL: Liquidator did not receive seized collateral");
         }
-        
+
         // 3. Verify vault token balance decrease
         uint vaultBalanceDecrease = pre.vaultTokenBalanceBefore - post.vaultTokenBalanceAfter;
         if (vaultBalanceDecrease != collateralSeized) {
             return (false, "VAULT: Token balance did not decrease by seized amount");
         }
-        
+
         // 4. Verify debt extinguishment
         if (debtExtinguished == 0) {
             return (false, "DEBT: No debt was extinguished");
         }
-        
+
         // 5. Verify cap-bound behavior
         if (expectCapBound) {
             if (post.borrowerCollateralAfter > 0) {
@@ -194,19 +194,19 @@ contract LiquidationStateVerification {
                 return (false, "CAP_BOUND: Should realize bad debt when debt remains");
             }
         }
-        
+
         // 6. Verify vault mapping consistency
         if (post.borrowerCollateralAfter != m.cdpVault().userCollaterals(borrower, asset)) {
             return (false, "VAULT_MAPPING: Inconsistent collateral mapping");
         }
-        
+
         // 7. Verify global debt consistency
         (uint rate,,) = m.cdpEngine().collateralGlobalStates(asset);
         uint globalDebtUSD = (post.totalScaledDebtAfter * rate) / 1e27;
         if (globalDebtUSD != post.borrowerDebtAfter) {
             return (false, "GLOBAL_DEBT: Global debt does not match borrower debt");
         }
-        
+
         return (true, "All verifications passed");
     }
 }
@@ -332,21 +332,21 @@ contract Describe_CDPEngine_Liquidations is Authorizable {
 
     function _liqWithFullVerification(address borrower_, uint amountUSD, uint priceAtLiq) internal returns (uint seized, uint leftover, bool verificationPassed, string memory error) {
         oracle.setAssetPrice(ASSET, priceAtLiq);
-        
+
         // Capture pre-liquidation state for comprehensive verification
         LiquidationStateVerification verifier = new LiquidationStateVerification();
         LiquidationStateVerification.LiquidationSnapshot memory preSnapshot = verifier.capturePreLiquidationState(m, ASSET, borrower_, address(liq));
-        
+
         liq.callFunction(USDST, "approve", address(cdp), amountUSD);
         uint beforeBal = vault.userCollaterals(borrower_, ASSET);
         liq.callFunction(address(cdp), "liquidate", ASSET, borrower_, amountUSD);
         uint afterBal  = vault.userCollaterals(borrower_, ASSET);
         seized   = beforeBal - afterBal;
         leftover = afterBal;
-        
+
         // Perform comprehensive verification with captured pre-state
         (verificationPassed, error) = verifier.verifyLiquidationStateWithSnapshots(m, ASSET, borrower_, address(liq), preSnapshot, amountUSD, 0, false);
-        
+
         return (seized, leftover, verificationPassed, error);
     }
 
@@ -417,11 +417,11 @@ contract Describe_CDPEngine_Liquidations is Authorizable {
         _open(1000e18, 100e18, OPEN_P);
         // set price to 0 → oracle will cause a revert the engine catches as require
         bool reverted = false;
-        try oracle.setAssetPrice(ASSET, 0) { 
-            revert("expected revert on set zero price"); 
+        try oracle.setAssetPrice(ASSET, 0) {
+            revert("expected revert on set zero price");
         } catch { reverted = true; }
         require(reverted, "should revert");
-        
+
         try cdp.liquidate(ASSET, address(borrower), 1e18) {
             revert("expected revert on zero price");
         } catch { reverted = true; }
@@ -457,26 +457,26 @@ contract Describe_CDPEngine_Liquidations is Authorizable {
     function it_comprehensive_state_verification_close_factor_binds() public {
         // Same setup as above
         _open(2000e18, 6000e18, OPEN_P);
-        
+
         // Capture comprehensive state verification
         (uint seized, uint leftover, bool verificationPassed, string memory error) = _liqWithFullVerification(address(borrower), 1e36, MID_P);
-        
+
         // Verify that comprehensive verification passed
         require(verificationPassed, string("Comprehensive verification failed: ") + error);
-        
+
         // Additional explicit checks for transparency
         uint repay = 3000e18;
         uint penalty = (repay * PEN) / 10000;
         uint expectedSeized = ((repay + penalty) * UNIT) / MID_P;
-        
+
         require(seized == expectedSeized, "CF comprehensive: seized mismatch");
         require(leftover > 0, "CF comprehensive: should have leftover collateral");
-        
+
         // Verify token balances changed correctly
         uint liquidatorUSDSTAfter = usdstT.balanceOf(address(liq));
         uint liquidatorCollateralAfter = assetT.balanceOf(address(liq));
         uint vaultTokenBalanceAfter = assetT.balanceOf(address(vault));
-        
+
         // Liquidator should have spent USDST and received collateral
         require(liquidatorUSDSTAfter < 1e36, "CF comprehensive: liquidator should have spent USDST");
         require(liquidatorCollateralAfter >= seized, "CF comprehensive: liquidator should receive seized collateral");
@@ -557,32 +557,32 @@ contract Describe_CDPEngine_Liquidations is Authorizable {
     /// Comprehensive state verification for cap-bound liquidation
     function it_comprehensive_state_verification_cap_bound_CF_50() public {
         _open(2000e18, 6000e18, OPEN_P);
-        
+
         // Capture comprehensive state verification for cap-bound liquidation
         (uint seized, uint leftover, bool verificationPassed, string memory error) = _liqWithFullVerification(address(borrower), 1e36, LOW_P);
-        
+
         // Verify that comprehensive verification passed
         require(verificationPassed, string("Cap-bound comprehensive verification failed: ") + error);
-        
+
         // Cap-bound specific verifications
         require(seized == 2000e18, "Cap comprehensive: must seize all collateral");
         require(leftover == 0, "Cap comprehensive: no leftover expected");
-        
+
         // Verify bad debt was realized
         uint badAfter = cdp.badDebtUSDST(ASSET);
         require(badAfter > 0, "Cap comprehensive: bad debt should be realized");
-        
+
         // Verify borrower debt is zero
         (, uint scaledAfter) = _state(address(borrower));
         require(scaledAfter == 0, "Cap comprehensive: borrower debt should be zero");
-        
+
         // Verify token transfers occurred correctly
         uint liquidatorCollateralAfter = assetT.balanceOf(address(liq));
         uint vaultTokenBalanceAfter = assetT.balanceOf(address(vault));
-        
+
         require(liquidatorCollateralAfter >= seized, "Cap comprehensive: liquidator should receive all collateral");
         require(vaultTokenBalanceAfter == 0, "Cap comprehensive: vault should have no collateral");
-        
+
         // Verify USDST burning occurred
         uint liquidatorUSDSTAfter = usdstT.balanceOf(address(liq));
         require(liquidatorUSDSTAfter < 1e36, "Cap comprehensive: liquidator should have spent USDST");
@@ -912,7 +912,7 @@ contract Describe_CDPEngine_Liquidations is Authorizable {
         uint reserve0 = usdstT.balanceOf(address(reg.cdpReserve()));
 
         fastForward(3600); // 1 hour
-        
+
         // Update price to make it fresh again
         oracle.setAssetPrice(ASSET, LOW_P);
 

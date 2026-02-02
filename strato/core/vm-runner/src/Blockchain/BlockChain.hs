@@ -14,21 +14,12 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 
 {-# OPTIONS -fno-warn-orphans      #-}
-{-# OPTIONS -fno-warn-unused-top-binds #-}
 
 module Blockchain.BlockChain
-  ( addBlock,
-    addBlocks,
+  ( addBlocks,
     verifyBlock,
     mineTransactions,
-    addTransaction,
-    addTransactions,
-    outputTransactionResult,
-    runCodeForTransaction,
 --    calculateIntrinsicGas',
-    compactDiffs, -- For testing
-    mkLogEntry,
-    mkEventEntry,
   )
 where
 
@@ -61,7 +52,6 @@ import qualified Blockchain.SolidVM as SolidVM
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
-import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.Delta
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.ExtendedWord
@@ -75,7 +65,6 @@ import Blockchain.Stream.VMEvent
 import Blockchain.TheDAOFork
 import Blockchain.Timing
 import Blockchain.VM.SolidException (SolidException(PaymentError, TooMuchGas))
-import Blockchain.VMConstants
 import Blockchain.VMContext
 import Blockchain.VMMetrics
 import Blockchain.Blockstanbul.Model.Authentication
@@ -96,6 +85,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.DList as DL
 import Data.List
+import Data.Map (Map)
 import qualified Data.Map as M
 import qualified Data.Map.Ordered as O
 import Data.Maybe
@@ -103,7 +93,6 @@ import Data.Proxy
 import qualified Data.Sequence as Seq
 import qualified Data.Set as S
 import qualified Data.Text as T
-import Data.Text.Encoding (encodeUtf8)
 import Data.Time.Clock
 import Prometheus as P
 import SolidVM.Model.CodeCollection hiding (Event, Block, events, _events)
@@ -256,7 +245,7 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
 
         postRewardSR <- A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
         verifyBlockResult <- verifyBlock (outputBlockToBlock b) (trrs, postRewardSR) bSum
-        case verifyBlockResult of 
+        case verifyBlockResult of
           failures@(_:_) -> do
             lift $ P.incCounter vmBlocksInvalid
             pure $ map (\r -> BlockVerificationFailure (bSumNumber bSum) (bSumParentHash bSum) r) failures
@@ -276,10 +265,10 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
             pure []
 
 -- TODO: If we add more verifications, refactor tuple into a proper data type
-verifyBlock :: 
+verifyBlock ::
   HasStateDB m =>
-  Block -> 
-  ([TxRunResult], Maybe MP.StateRoot) -> 
+  Block ->
+  ([TxRunResult], Maybe MP.StateRoot) ->
   BlockSummary ->
   m [BlockVerificationFailureDetails]
 verifyBlock b@Block{blockBlockData = bh} (trrs, derivedSR) parentBSum = do
@@ -301,13 +290,49 @@ verifyBlock b@Block{blockBlockData = bh} (trrs, derivedSR) parentBSum = do
         v -> [VersionMismatch $ BlockDelta v 2]
 
 addBlockTransactions :: (Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> Address -> ConduitT a VmOutEvent m [TxRunResult]
-addBlockTransactions OutputBlock {obBlockData = bd, obReceiptTransactions = transactions} proposer = do
+addBlockTransactions b@OutputBlock {obBlockData = bd, obReceiptTransactions = transactions} proposer = do
   $logDebugS "addBlockTransactions" . T.pack $ "All transactions: " ++ show transactions
   trrs <- addTransactions bd transactions proposer
 
+  flushMemStorageTxDBToBlockDB
+
+  yield . OutVMEvents =<< sendNewActionMessage b trrs
+
   lift $ timeit "flushMemStorageDB" (Just vmBlockInsertionMined) flushMemStorageDB
+  flushMemAddressStateTxToBlockDB
+  flushMemAddressStateTxToBlockDB
   lift $ timeit "flushMemAddressStateDB" (Just vmBlockInsertionMined) flushMemAddressStateDB
   pure trrs
+
+sendNewActionMessage :: (HasMemRawStorageDB m) =>
+                        OutputBlock -> [TxRunResult] -> m [VMEvent]
+sendNewActionMessage b trrs = do
+  let bd = obBlockData b
+  theMap <- getMemRawStorageBlockDB
+
+  let recombined :: Map Address ActionData
+      recombined =
+        fmap (ActionData . SolidVMDiff)
+        $ M.fromListWith M.union
+        [ (addr, M.singleton path val)
+        | ((addr, path), val) <- M.toList theMap
+        ]
+
+      action :: Action
+      action = Action {
+        _blockHash=blockHash b,
+        _blockTimestamp=blockHeaderTimestamp bd,
+        _blockNumber=blockHeaderBlockNumber bd,
+        _transactionSender=0x0,
+        _actionData=O.fromList $ M.toList recombined,
+        _newCodeCollections=O.empty,
+        _events=Seq.fromList $ concat $ map (either (const []) erEvents . trrResult) trrs,
+        _delegatecalls=mconcat $ map (either (const Seq.empty) (fromMaybe Seq.empty . fmap _delegatecalls . erAction) . trrResult) trrs
+        }
+
+  pure [NewAction action]
+
+
 
 addTransactions ::
   (VMBase m, MonadMonitor m) =>
@@ -327,9 +352,10 @@ addTransactions blockData txs proposer =
     go _ [] trrs = return $ DL.toList trrs
     go blockGas (t : rest) trrs = do
       let bt = otBaseTx t
+      beforeMap <- getAddressStateTxDBMap
       flushMemAddressStateTxToBlockDB
       flushMemStorageTxDBToBlockDB
-      beforeMap <- getAddressStateTxDBMap
+
       (!deltaT, !result) <- timeIt $ runExceptT $ addTransaction blockData blockGas t proposer
 
       afterMap <- getAddressStateTxDBMap
@@ -367,7 +393,7 @@ mineTransactions' header remGas ran unran@(tx : txs) mSelfAddress = do
               putAddressStateTxDBMap M.empty
               putMemRawStorageTxMap M.empty
               return $ Bagger.TxMiningResult (Just $ TFInvalidPragma invalidPragmas tx) (DL.toList ran) unran remGas -- use invalidPragmasUsed here
-            else do 
+            else do
               case erException execResult of
                 Just (Left (TooMuchGas limit actual)) -> do
                   putAddressStateTxDBMap M.empty
@@ -385,15 +411,12 @@ mineTransactions' header remGas ran unran@(tx : txs) mSelfAddress = do
     Left failure -> do
       return $ Bagger.TxMiningResult (Just failure) (DL.toList ran) unran remGas
 
-blockIsHomestead :: Integer -> Bool
-blockIsHomestead blockNum = blockNum >= fromIntegral gHomesteadFirstBlock
-
 addTransaction ::
   (VMBase m, MonadMonitor m) =>
   BlockHeader ->
   Integer ->
   OutputTx ->
-  Address -> 
+  Address ->
   ExceptT TransactionFailureCause m ExecResults
 addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
   nonceValid <- lift $ isNonceValid t
@@ -413,9 +436,8 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
       adjustedTxGasLimit = bool (transactionGasLimit bt) (flags_strictGasLimit) (flags_strictGas && not isKnownToBeSlow)
       availableGas = fromInteger adjustedTxGasLimit
 
-  feeResult' <- payFees b availableGas tAddr t proposer
-  let feeResult = feeResult'{ erAction = (actionData %~ (O.fromList . map (fmap $ actionDataCodeCollection .~ emptyCodeCollection) . O.assocs)) <$> erAction feeResult' }
-      combineA f x y = liftA2 f x y <|> x <|> y
+  feeResult <- payFees b availableGas tAddr t proposer
+  let combineA f x y = liftA2 f x y <|> x <|> y
       attachFeeResult er = er
         { erAction = combineA (\era ->
               (actionData %~ (O.unionWithL (const $ flip mergeActionDataStorageDiffs) $ _actionData era))
@@ -601,14 +623,14 @@ outputTransactionResult ::
   ConduitT a VmOutEvent m ()
 outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHash} result deltaT beforeMap afterMap newAddresses) = do
   let t = otBaseTx ot
-      (txrStatus, message, gasRemaining, creator, appName) =
+      (txrStatus, message, gasRemaining) =
         case result of
-          Left err -> let fmt = format err in (Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt), fmt, 0, "", "") -- TODO Also include the trace
+          Left err -> let fmt = format err in (Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt), fmt, 0) -- TODO Also include the trace
           Right r -> case erException r of
-            Nothing -> (Success, "Success!", erRemainingTxGas r, erCreator r, erAppName r)
+            Nothing -> (Success, "Success!", erRemainingTxGas r)
             Just ex ->
               let fmt = either show show ex
-               in (Failure "Execution" Nothing (ExecutionFailure $ show ex) Nothing Nothing (Just fmt), fmt, 0, "", "")
+               in (Failure "Execution" Nothing (ExecutionFailure $ show ex) Nothing Nothing (Just fmt), fmt, 0)
       gasUsed = fromInteger $ transactionGasLimit t - gasRemaining
       etherUsed = gasUsed
 
@@ -639,46 +661,22 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
           transactionResultTime = realToFrac deltaT,
           transactionResultNewStorage = "",
           transactionResultDeletedStorage = "",
-          transactionResultStatus = Just txrStatus,
-          transactionResultCreator = creator,
-          transactionResultAppName = appName
+          transactionResultStatus = Just txrStatus
         }
   yield . OutVMEvents . (txr:) $ if not flags_diffPublish
     then []
     else case erAction <$> result of
-      Right (Just act) ->
-        let ccEvents = maybeToList $ extractCodeCollectionAddedMessages act
-            act' = act { Action._actionData = Action.omapMap (Action.actionDataCodeCollection .~ mempty) (Action._actionData act) }
-            actionEvents = [NewAction act']
-         in ccEvents ++ actionEvents
+      Right (Just act) -> extractCodeCollectionAddedMessages act
       _ -> []
 
-extractCodeCollectionAddedMessages :: Action.Action -> Maybe VMEvent
+extractCodeCollectionAddedMessages :: Action.Action -> [VMEvent]
 extractCodeCollectionAddedMessages a =
-  case ( a ^. Action.src,
-         a ^. Action.name,
-         O.assocs $ a ^. Action.actionData
-       ) of
-    (Just (Code c), Just n, actionDatas) ->
-      let cp = SolidVMCode (T.unpack n) . hash $ encodeUtf8 c
-          cn = fromMaybe "" . listToMaybe . catMaybes . flip map actionDatas $ \(_, Action.ActionData {..}) ->
-            if _actionDataCodeHash == cp
-              then Just _actionDataCreator
-              else Nothing
-          cc = foldr (\ad b -> Action._actionDataCodeCollection ad <> b) mempty $ snd <$> actionDatas
-          contracts' = (cc ^. contracts) <&> ( (functions .~ M.empty)
-                                            --  . (constructor .~ Nothing)
-                                             . (modifiers .~ M.empty)
-                                             )
-          cc' = emptyCodeCollection & contracts .~ contracts'
-       in Just $
-            CodeCollectionAdded
-              { codeCollection = const () <$> cc',
-                codePtr = cp,
-                creator = cn,
-                application = n
+  let mkCCAnouncement ((userName, _), cc) =
+        CodeCollectionAdded
+              { codeCollection = const () <$> cc,
+                creator = userName
               }
-    _ -> Nothing
+  in map mkCCAnouncement . O.assocs $ _newCodeCollections a
 
 printTransactionMessage ::
   MonadLogger m =>
@@ -776,32 +774,6 @@ calculateAndEmitStateDiffs Nothing _ = pure ()
 calculateAndEmitStateDiffs (Just (next, hsh, num)) oldHeader =
   let base = MP.StateRoot $ blockHeaderStateRoot oldHeader
    in completeDiff base next hsh num
-
-diffMaxCost :: Int
-diffMaxCost = 500
-
-type PreDiff = (MP.StateRoot, Keccak256, Integer, Int)
-
-type ToDiff = (MP.StateRoot, MP.StateRoot, Keccak256, Integer)
-
-promote :: MP.StateRoot -> PreDiff -> ToDiff
-promote base (next, hsh, num, _) = (base, next, hsh, num)
-
-cost :: PreDiff -> Int
-cost (_, _, _, c) = c
-
-compactDiffs :: MP.StateRoot -> [PreDiff] -> [ToDiff]
-compactDiffs _ [] = error "should not be called on an empty list"
-compactDiffs base (p : ps) = go (cost p) (promote base p) ps
-  where
-    go :: Int -> ToDiff -> [PreDiff] -> [ToDiff]
-    go _ lastPending [] = [lastPending]
-    go pendingCost pending@(pendingBase, pendingNext, _, _) (c : cs) =
-      -- If we can fit this PreDiff in, we augment it to the pending ToDiff.
-      -- Otherwise, we emit and create a new ToDiff
-      if pendingCost + cost c > diffMaxCost
-        then pending : go (cost c) (promote pendingNext c) cs
-        else go (pendingCost + cost c) (promote pendingBase c) cs
 
 completeDiff ::
   ( MonadLogger m,

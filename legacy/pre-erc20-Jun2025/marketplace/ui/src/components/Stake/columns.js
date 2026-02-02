@@ -52,9 +52,9 @@ export const aggregateStakeColumns = (
               <div className="mr-2 w-[74px] h-[52px] flex items-center justify-center">
                 <img
                   src={
-                    record['BlockApps-Mercata-Asset-images'] &&
-                    record['BlockApps-Mercata-Asset-images'].length > 0
-                      ? record['BlockApps-Mercata-Asset-images'][0].value
+                    record['BlockApps-Asset-images'] &&
+                    record['BlockApps-Asset-images'].length > 0
+                      ? record['BlockApps-Asset-images'][0].value
                       : image_placeholder
                   }
                   alt={'Asset image...'}
@@ -153,11 +153,11 @@ export const aggregateStakeColumns = (
       title: 'CATA Rewards Earned',
       align: 'center',
       render: (_, record) => {
-        // Function to sum CATA rewards from BlockApps-Mercata-Escrow-assets
+        // Function to sum CATA rewards from BlockApps-Escrow-assets
         const sumCataRewardsFromAssets = (assets) => {
           if (!Array.isArray(assets)) return 0;
           return assets.reduce((sum, asset) => {
-            const escrow = asset['BlockApps-Mercata-Escrow'];
+            const escrow = asset['BlockApps-Escrow'];
             const cataReward = escrow?.totalCataReward || 0;
             return sum + cataReward;
           }, 0);
@@ -171,7 +171,7 @@ export const aggregateStakeColumns = (
           const uniqueEscrowAssetsMap = new Map();
 
           record.inventories.forEach((item) => {
-            const escrowAssets = item['BlockApps-Mercata-Escrow-assets'];
+            const escrowAssets = item['BlockApps-Escrow-assets'];
             if (Array.isArray(escrowAssets)) {
               escrowAssets.forEach((asset) => {
                 // Only add the asset if it has an address and hasn't been added yet
@@ -191,7 +191,7 @@ export const aggregateStakeColumns = (
           );
         } else {
           // If no inventories exist, process record assets similarly
-          const recordAssets = record['BlockApps-Mercata-Escrow-assets'];
+          const recordAssets = record['BlockApps-Escrow-assets'];
           const uniqueRecordAssetsMap = new Map();
 
           if (Array.isArray(recordAssets)) {
@@ -300,9 +300,9 @@ export const stakeColumns = (
               <div className="mr-2 w-[74px] h-[52px] flex items-center justify-center">
                 <img
                   src={
-                    record['BlockApps-Mercata-Asset-images'] &&
-                    record['BlockApps-Mercata-Asset-images'].length > 0
-                      ? record['BlockApps-Mercata-Asset-images'][0].value
+                    record['BlockApps-Asset-images'] &&
+                    record['BlockApps-Asset-images'].length > 0
+                      ? record['BlockApps-Asset-images'][0].value
                       : image_placeholder
                   }
                   alt={'Asset image...'}
@@ -356,7 +356,7 @@ export const stakeColumns = (
         const displayedQuantity = parsedQuantity / Math.pow(10, decimals);
 
         // Extract escrow assets array safely
-        const escrowAssets = record?.['BlockApps-Mercata-Escrow-assets'] || [];
+        const escrowAssets = record?.['BlockApps-Escrow-assets'] || [];
 
         // Determine if there is a matching escrow asset
         const hasMatchingEscrow = escrowAssets.some(
@@ -383,7 +383,7 @@ export const stakeColumns = (
       align: 'center',
       render: (_, record) => {
         const matchingQuantity = record?.[
-          'BlockApps-Mercata-Escrow-assets'
+          'BlockApps-Escrow-assets'
         ]?.find((item) => item.value === record.address)
           ? record.quantity
           : 0;
@@ -399,11 +399,11 @@ export const stakeColumns = (
       title: 'CATA Rewards Earned',
       align: 'center',
       render: (_, record) => {
-        // Function to sum CATA rewards from BlockApps-Mercata-Escrow-assets
+        // Function to sum CATA rewards from BlockApps-Escrow-assets
         const sumCataRewardsFromAssets = (assets) => {
           if (!Array.isArray(assets)) return 0;
           return assets.reduce((sum, asset) => {
-            const escrow = asset['BlockApps-Mercata-Escrow'];
+            const escrow = asset['BlockApps-Escrow'];
             const cataReward = escrow?.totalCataReward || 0;
             return sum + cataReward;
           }, 0);
@@ -414,12 +414,12 @@ export const stakeColumns = (
 
         if (record?.inventories) {
           totalCataRewardsIssued = record.inventories.reduce((sum, item) => {
-            const escrowAssets = item['BlockApps-Mercata-Escrow-assets'];
+            const escrowAssets = item['BlockApps-Escrow-assets'];
             return sum + sumCataRewardsFromAssets(escrowAssets);
           }, 0);
         } else {
-          // If no inventories, check record['BlockApps-Mercata-Escrow-assets']
-          const recordAssets = record['BlockApps-Mercata-Escrow-assets'];
+          // If no inventories, check record['BlockApps-Escrow-assets']
+          const recordAssets = record['BlockApps-Escrow-assets'];
           totalCataRewardsIssued = sumCataRewardsFromAssets(recordAssets);
         }
 
@@ -456,7 +456,7 @@ export const stakeColumns = (
       align: 'center',
       render: (text, record) => {
         const matchingQuantity = record?.[
-          'BlockApps-Mercata-Escrow-assets'
+          'BlockApps-Escrow-assets'
         ]?.find((item) => item.value === record.address)
           ? record.quantity
           : 0;

@@ -1,6 +1,6 @@
-![logo](https://www.stratomercata.com/lovable-uploads/3f84e7ae-d3e1-4921-8478-2ce97ef95cad.png)
+[![STRATO Mercata logo](https://strato.nexus/images/strato.nexus/2025.10.11/strato-logo.png)](https://strato.nexus)
 
-# STRATO Mercata Platform
+# STRATO Platform
 
 ***NOTE:** README is WIP*
 
@@ -72,7 +72,7 @@
 - Start:
   - `cp docker-compose.allDocker.yml bootstrap-docker/docker-compose.yml`
   - `cd bootstrap-docker`
-  - Update `strato-run.sh` with your credentials, e.g. for testnet:
+  - Update `strato-run.sh` with your credentials:
     ```
     NODE_HOST='localhost' \
     network='helium' \
@@ -80,8 +80,8 @@
     OAUTH_CLIENT_SECRET='client-secret-here' \
     ./strato
     ```
-    (for mainnet use `network=upquark`)
-  - `chmod +x strato-run.sh`
+    - Use `network='helium'` for testnet
+    - Use `network='upquark'` for mainnet
   - `sudo ./strato-run.sh`
 
 - Wipe:
@@ -89,3 +89,19 @@
   cd bootstrap-docker
   sudo ./strato --wipe
   ```
+
+## Git Hooks
+
+### Pre-commit: Trailing Whitespace Removal
+
+A pre-commit hook is available to automatically remove trailing whitespaces before committing.
+
+**Installation:**
+
+```bash
+cp scripts/hooks/pre-commit .git/hooks/pre-commit
+chmod +x .git/hooks/pre-commit
+```
+
+The hook uses `scripts/delete-trailing-whitespaces.sh --staged` to process only
+staged files and automatically re-stages them after cleaning.

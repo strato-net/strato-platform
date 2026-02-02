@@ -4,14 +4,14 @@ import { Button } from "@/components/ui/button";
 import { CircleArrowDown, CircleArrowUp, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useUser } from '@/context/UserContext';
-import { useUserTokens } from '@/context/UserTokensContext';
+import { useTokenContext } from '@/context/TokenContext';
 import { formatBalance } from '@/utils/numberUtils';
 import { useSwapContext } from '@/context/SwapContext';
 import { Pool } from '@/interface';
 import { rewardsEnabled } from '@/lib/constants';
 import LiquidityDepositModal from './LiquidityDepositModal';
 import LiquidityWithdrawModal from './LiquidityWithdrawModal';
-
+import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 
 const SwapPoolsSection = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -24,18 +24,17 @@ const SwapPoolsSection = () => {
   const operationInProgressRef = useRef(false);
 
   const { fetchPools, getPoolByAddress } = useSwapContext();
-  const { fetchUsdstBalance, usdstBalance, voucherBalance } = useUserTokens();
+  const { fetchUsdstBalance, usdstBalance, voucherBalance } = useTokenContext();
   const { userAddress } = useUser();
+  const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
   useEffect(() => {
     fetchAndEnrichPools();
   }, [fetchPools]);
 
   useEffect(() => {
-    if (userAddress) {
-      fetchUsdstBalance(userAddress);
-    }
-  }, [userAddress, fetchUsdstBalance]);
+    fetchUsdstBalance();
+  }, [fetchUsdstBalance]);
 
   useEffect(() => {
     if (selectedPool && isDepositModalOpen) {
@@ -45,7 +44,7 @@ const SwapPoolsSection = () => {
           if (updatedPool) {
             setSelectedPool(updatedPool);
           }
-          await fetchUsdstBalance(userAddress);
+          await fetchUsdstBalance();
         } catch (error) {
           console.error('Error polling pool:', error);
         }
@@ -104,23 +103,27 @@ const SwapPoolsSection = () => {
   const handleDepositSuccess = async () => {
     // Refresh all data after successful deposit
     await fetchAndEnrichPools();
-    if (userAddress) {
-      await fetchUsdstBalance(userAddress);
-    }
+    await fetchUsdstBalance();
   };
 
   const handleWithdrawSuccess = async () => {
     // Refresh all data after successful withdrawal
     await fetchAndEnrichPools();
-    if (userAddress) {
-      await fetchUsdstBalance(userAddress);
-    }
+    await fetchUsdstBalance();
   };
 
 
   const filteredPools = pools.filter(pool => 
     pool.poolName?.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const formatYourLiquidityValue = (pool: Pool): string => {
+    const totalBalance = BigInt(pool.lpToken.totalBalance || "0");
+    const price = BigInt(pool.lpToken.price || "0");
+    if (price === 0n || totalBalance === 0n) return "$0.00";
+    const valueInWei = (totalBalance * price) / BigInt(10**18);
+    return formatBalance(valueInWei, undefined, 18, 2, 2, true);
+  };
 
   useEffect(() => {
     return () => {
@@ -134,7 +137,7 @@ const SwapPoolsSection = () => {
     <div>
       <div className="mb-4">
         <div className="relative">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search pairs..."
             value={searchQuery}
@@ -191,18 +194,18 @@ const SwapPoolsSection = () => {
                     </div>
                     <div>
                       <h3 className="font-medium">{pool.poolName}</h3>
-                      <div className="flex items-center text-xs text-gray-500 mt-1">
-                        <span>Liquidity: {formatBalance(pool.lpToken._totalSupply, undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
+                      <div className="flex items-center text-xs text-muted-foreground mt-1">
+                        <span>TVL: {formatBalance(pool.totalLiquidityUSD, undefined, 18, 0, 0, true)}</span>
                       </div>
-                      <div className="flex items-center text-xs text-gray-500 mt-1">
-                        <span>Your Liquidity (Total): {formatBalance(pool.lpToken.totalBalance || "0", undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
+                      <div className="flex items-center text-xs text-muted-foreground mt-1">
+                        <span>Your Liquidity: {formatYourLiquidityValue(pool)}</span>
                       </div>
                       {rewardsEnabled && pool.lpToken.stakedBalance !== undefined && (
                         <>
-                          <div className="flex items-center text-xs text-gray-400 mt-1 ml-2">
+                          <div className="flex items-center text-xs text-muted-foreground mt-1 ml-2">
                             <span>• Staked: {formatBalance(pool.lpToken.stakedBalance || "0", undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
                           </div>
-                          <div className="flex items-center text-xs text-gray-400 mt-1 ml-2">
+                          <div className="flex items-center text-xs text-muted-foreground mt-1 ml-2">
                             <span>• Unstaked: {formatBalance(pool.lpToken.balance || "0", undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
                           </div>
                         </>
@@ -211,9 +214,10 @@ const SwapPoolsSection = () => {
                   </div>
                   <div className="flex items-center justify-between sm:justify-end space-x-4">
                     <div className="text-left sm:text-right">
-                      <div className="text-sm text-gray-500">APY</div>
+                      <div className="text-sm text-muted-foreground">APY</div>
                       <div className="font-medium">{pool.apy ? `${pool.apy}%` : "N/A"}</div>
                     </div>
+               
                     <div className="flex space-x-2">
                       <Button
                         size="sm"
@@ -227,7 +231,7 @@ const SwapPoolsSection = () => {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="border-strato-blue text-strato-blue hover:bg-strato-blue/10"
+                        className="border-strato-blue text-strato-blue hover:bg-strato-blue/10 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-400/10 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-auto disabled:border-muted disabled:text-muted-foreground disabled:hover:bg-transparent disabled:dark:border-muted disabled:dark:text-muted-foreground"
                         onClick={() => handleOpenWithdrawModal(pool)}
                         disabled={BigInt(pool.lpToken.totalBalance || "0") === BigInt(0)}
                         title={BigInt(pool.lpToken.totalBalance || "0") === BigInt(0) ? "No LP tokens to withdraw" : "Withdraw"}

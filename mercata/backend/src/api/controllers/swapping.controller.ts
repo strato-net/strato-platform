@@ -10,7 +10,7 @@ import {
   removeLiquidity,
   swap,
   getSwapHistory,
-  setPoolRates,
+  setPoolRates
 } from "../services/swapping.service";
 import { getBalance } from "../services/tokens.service";
 import {
@@ -26,6 +26,7 @@ import {
   validateSwapHistoryArgs,
   validateSetPoolRatesArgs,
 } from "../validators/swapping.validator";
+import { validateAddressField } from "../validators/common.validators";
 
 class SwappingController {
   // Getters
@@ -244,7 +245,12 @@ class SwappingController {
 
       const page = query.page ? parseInt(query.page as string, 10) : 1;
       const limit = query.limit ? parseInt(query.limit as string, 10) : 10;
-      const swapHistory = await getSwapHistory(accessToken, params.poolAddress, page, limit);
+      const sender = query.sender as string | undefined;
+      if (sender) {
+        const { error } = validateAddressField("sender").validate(sender);
+        if (error) throw new Error("sender Validation Error: " + error.message);
+      }
+      const swapHistory = await getSwapHistory(accessToken, params.poolAddress, page, limit, sender);
       res.status(RestStatus.OK).json(swapHistory);
     } catch (error) {
       next(error);
@@ -267,6 +273,7 @@ class SwappingController {
       next(error);
     }
   }
+
 }
 
 export default SwappingController;

@@ -35,21 +35,21 @@ pieChart config = do
       centerX = radius
       centerY = radius
       -- colors :: [String] = cycle ["#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF"]
-  
+
   elAttr "div" (Map.singleton "class" "pie-chart") $ do
     -- Chart title
     el "h3" $ text (pcTitle config)
-    
+
     -- Chart container
     elSvgAttr "svg" (Map.fromList
       [ ("width", T.pack $ show (radius * 2))
       , ("height", T.pack $ show (radius * 2))
       ]) $ do
-      
+
       -- Draw pie slices
       let slices = calculateSlices (pcData config) total
       sequence_ $ zipWith (drawSlice centerX centerY radius) [0..] slices
-      
+
       -- Add legend
       drawLegend (zip (pcData config) slices)
 
@@ -58,7 +58,7 @@ elSvgAttr elTag attrs = fmap snd . elDynAttrNS' (Just "http://www.w3.org/2000/sv
 
 -- Calculate slice angles and percentages
 calculateSlices :: [PieData] -> Double -> [(Double, Double)]
-calculateSlices dataPoints total = 
+calculateSlices dataPoints total =
   let percentages = map (\pd -> pdValue pd / total) dataPoints
       angles = scanl (+) 0 $ map (* 360) percentages
   in zip angles percentages
@@ -80,7 +80,7 @@ drawSlice centerX centerY radius index (startAngle, percentage) = do
       endX = centerX + radius * cos endRad
       endY = centerY + radius * sin endRad
       largeArc = if endAngle - startAngle > 180 then (1 :: Integer) else 0
-  
+
   elSvgAttr "path" (Map.fromList
     [ ("d", T.pack $ concat
         [ "M ", show centerX, ",", show centerY
@@ -110,4 +110,4 @@ drawLegendItem (PieData _ label _, (_, percentage)) = do
       , " ("
       , T.pack $ show $ (round (percentage * 100) :: Integer)
       , "%)"
-      ] 
+      ]

@@ -10,6 +10,7 @@ import {
   setTokenStatus,
   getVoucherBalance,
   getTransferableTokens,
+  getTokenStats,
 } from "../services/tokens.service";
 import {
   validateAddressArgs,
@@ -52,25 +53,6 @@ class TokensController {
       const tokens = await getTokens(
         accessToken,
         query as Record<string, string | undefined>
-      );
-      res.status(RestStatus.OK).json(tokens);
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  static async getActive(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { accessToken, query } = req;
-      validateQueryParams(query);
-
-      const tokens = await getTokens(
-        accessToken,
-        { ...query, status: "eq.2" } as Record<string, string | undefined>
       );
       res.status(RestStatus.OK).json(tokens);
     } catch (error) {
@@ -194,6 +176,21 @@ class TokensController {
 
       const balance = await getVoucherBalance(accessToken, userAddress);
       res.status(RestStatus.OK).json({ balance });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getStats(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken } = req;
+
+      const stats = await getTokenStats(accessToken);
+      res.status(RestStatus.OK).json(stats);
     } catch (error) {
       next(error);
     }

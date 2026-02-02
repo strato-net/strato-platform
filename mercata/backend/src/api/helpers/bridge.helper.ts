@@ -11,19 +11,19 @@ interface QueryConfig {
 const QUERY_CONFIGS: Record<string, QueryConfig> = {
   withdrawal: {
     tableName: `${constants.MercataBridge}-withdrawals`,
-    selectFields: "withdrawalId:key,WithdrawalInfo:value,block_timestamp,transaction_hash",
+    selectFields: "withdrawalId:key,WithdrawalInfo:value,block_timestamp",
     countField: "count()",
   },
   deposit: {
     tableName: `${constants.MercataBridge}-deposits`,
-    selectFields: "externalChainId:key,externalTxHash:key2,DepositInfo:value,block_timestamp,transaction_hash",
+    selectFields: "externalChainId:key,externalTxHash:key2,DepositInfo:value,block_timestamp",
     countField: "count()",
   }
 };
 
 export function buildQueryParams(
   rawParams: Record<string, string | undefined>,
-  userAddress: string,
+  userAddress: string | undefined,
   excludeFields: string[],
   queryType: 'withdrawal' | 'deposit'
 ): Record<string, string> {
@@ -33,12 +33,12 @@ export function buildQueryParams(
       Object.entries(rawParams).filter(([key, v]) => 
         v !== undefined && !excludeFields.includes(key)
       )
-    )
+    ),
+    ...(userAddress && {
+      [`value->>${queryType === 'deposit' ? 'stratoRecipient' : 'stratoSender'}`]:
+        `eq.${userAddress}`
+    })
   };
-
-  // For withdrawals, use stratoSender; for deposits, use stratoRecipient
-  const userField = queryType === 'deposit' ? 'stratoRecipient' : 'stratoSender';
-  baseParams[`value->>${userField}`] = `eq.${userAddress}`;
 
   return baseParams;
 }

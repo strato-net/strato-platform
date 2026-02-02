@@ -59,6 +59,11 @@ function extractApiErrorMessage(error: any): string {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Skip error handling for aborted/canceled requests
+    if (error.name === 'AbortError' || error.name === 'CanceledError' || error.code === 'ERR_CANCELED') {
+      return Promise.reject(error);
+    }
+    
     const url = error?.config?.url || "";
     
     // Handle CSRF validation errors (403 with CSRF message)
@@ -94,7 +99,8 @@ api.interceptors.response.use(
         variant: "destructive",
       });
       setTimeout(() => {
-        window.location.href = "/login";
+        const theme = localStorage.getItem('theme') || 'light';
+        window.location.href = `/login?theme=${theme}`;
       }, 1500);
     }
     return Promise.reject(error);

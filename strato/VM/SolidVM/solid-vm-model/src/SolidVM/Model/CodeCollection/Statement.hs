@@ -164,7 +164,7 @@ instance Arbitrary InlineAssembly where
 data ExpressionF a
   = PlusPlus a (ExpressionF a)
   | MinusMinus a (ExpressionF a)
-  | NewExpression a Type
+  | NewExpression a Type (Maybe (ExpressionF a)) -- Maybe salt expression
   | IndexAccess a (ExpressionF a) (Maybe (ExpressionF a))
   | MemberAccess a (ExpressionF a) SolidString -- ie- "x.y"
   | FunctionCall a (ExpressionF a) (ArgListF a)
@@ -190,7 +190,7 @@ data ExpressionF a
 extractExpression :: ExpressionF a -> a
 extractExpression (PlusPlus a _) = a
 extractExpression (MinusMinus a _) = a
-extractExpression (NewExpression a _) = a
+extractExpression (NewExpression a _ _) = a
 extractExpression (IndexAccess a _ _) = a
 extractExpression (MemberAccess a _ _) = a
 extractExpression (FunctionCall a _ _) = a
@@ -271,7 +271,7 @@ instance Binary WrappedDecimal where
     put (WrappedDecimal (Decimal places mantissa)) = do
         put places
         put mantissa
-    
+
     get = do
         places <- get
         mantissa <- get

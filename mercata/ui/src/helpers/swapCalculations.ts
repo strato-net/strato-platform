@@ -29,8 +29,9 @@ export const calculateSwapOutput = (
   }
 
   // AMM formula: (inputAmount * outputReserve) / (inputReserve + inputAmount)
-  const numerator = netInput * outputReserve;
-  const denominator = inputReserve + netInput;
+  const ratio = isAToB ? pool.aToBRatio : pool.bToARatio;
+  const numerator = pool.isStable ? netInput * BigInt(Math.round(parseFloat(ratio) * 1e18)) : netInput * outputReserve;
+  const denominator = pool.isStable ? BigInt(1e18) : inputReserve + netInput;
 
   return (numerator / denominator).toString();
 };
@@ -64,8 +65,10 @@ export const calculateSwapInput = (
   }
 
   // Reverse AMM formula: (inputReserve * outputAmount) / (outputReserve - outputAmount)
-  const numerator = inputReserve * outputAmountBigInt;
-  const denominator = outputReserve - outputAmountBigInt;
+  const ratio = isAToB ? pool.aToBRatio : pool.bToARatio;
+  const ratioBigInt = BigInt(Math.round(parseFloat(ratio) * 1e18));
+  const numerator = pool.isStable ? outputAmountBigInt * BigInt(1e18) : inputReserve * outputAmountBigInt;
+  const denominator = pool.isStable ? ratioBigInt : outputReserve - outputAmountBigInt;
   
   // Ceil to beat on-chain floor
   // a=11, b=5: ceil(11/5)=3. (11+5-1)/5 = 15/5 = 3.
@@ -103,4 +106,36 @@ export const hasSufficientLiquidity = (
     : [BigInt(pool.tokenB.poolBalance || "0"), BigInt(pool.tokenA.poolBalance || "0")];
 
   return inputReserve > 0n && outputReserve > 0n && amountBigInt <= inputReserve;
+};
+
+/**
+ * Calculate price impact
+ * Price impact: I_user = (P_eff - P_before) / P_before
+ * @param currentPoolPrice Current pool exchange rate (as string)
+ * @param fromAmount Amount being swapped in (as string, in human-readable format)
+ * @param toAmount Amount being received out (as string, in human-readable format)
+ * @returns Price impact as percentage, or null if calculation not possible
+ */
+export const calculateImpact = (
+  currentPoolPrice: string,
+  fromAmount: string,
+  toAmount: string
+): number | null => {
+  if (!currentPoolPrice || !fromAmount || !toAmount || 
+      currentPoolPrice === "0" || fromAmount === "0" || toAmount === "0") {
+    return null;
+  }
+
+  const poolPrice = Number(currentPoolPrice);
+  const from = Number(fromAmount);
+  const to = Number(toAmount);
+
+  if (!Number.isFinite(poolPrice) || !Number.isFinite(from) || !Number.isFinite(to) || poolPrice === 0 || from === 0) {
+    return null;
+  }
+
+  const effectivePrice = to / from;
+  const priceImpact = Math.abs((effectivePrice - poolPrice) / poolPrice) * 100;
+  
+  return priceImpact;
 };

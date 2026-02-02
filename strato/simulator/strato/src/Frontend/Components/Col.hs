@@ -56,7 +56,7 @@ colPropsAttrs (ColProps pc ColSize{..} st cn) = M.fromList
                        ])
   , ("style", st)
   ]
-  where prefix x = "col-" <> maybe "" (<> "-") pc <> x 
+  where prefix x = "col-" <> maybe "" (<> "-") pc <> x
         preE = prefix . either (T.pack . show) id
 
 col' :: MonadWidget t m => Dynamic t ColProps -> m a -> m (Element EventResult (DomBuilderSpace m) t, a)

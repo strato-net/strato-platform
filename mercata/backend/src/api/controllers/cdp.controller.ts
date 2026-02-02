@@ -17,10 +17,12 @@ import {
   getMaxLiquidatable,
   getAssetConfig,
   getSupportedAssets,
+  getAllCollateralAssets,
   getAssetDebtInfo,
   setCollateralConfig,
   setAssetPaused,
   setGlobalPaused,
+  setAssetSupported,
   getGlobalPaused,
   getAllCollateralConfigs,
   getBadDebt,
@@ -28,6 +30,9 @@ import {
   openJuniorNote,
   topUpJuniorNote,
   claimJuniorNote,
+  getCDPStats,
+  getInterestAccrued,
+  getVaultCandidates,
 } from "../services/cdp.service";
 import {
   validateDepositArgs,
@@ -53,6 +58,20 @@ class CDPController {
       const { accessToken, address: userAddress } = req;
       const vaults = await getVaults(accessToken, userAddress as string);
       res.status(RestStatus.OK).json(vaults);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getVaultCandidates(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress } = req;
+      const result = await getVaultCandidates(accessToken, userAddress as string);
+      res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
     }
@@ -266,14 +285,20 @@ class CDPController {
     }
   }
 
-  static async getSupportedAssets(
+  static async getAssets(
     req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, address: userAddress } = req;
-      const assets = await getSupportedAssets(accessToken, userAddress as string);
+      const { accessToken, query } = req;
+      // Check for optional 'supported' query parameter
+      // If true, return only supported assets. If false or omitted, return all assets.
+      const supportedOnly = query.supported === 'true';
+      
+      const assets = supportedOnly
+        ? await getSupportedAssets(accessToken)
+        : await getAllCollateralAssets(accessToken);
       res.status(RestStatus.OK).json(assets);
     } catch (error) {
       next(error);
@@ -341,6 +366,20 @@ class CDPController {
     }
   }
 
+  static async setAssetSupported(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress, body } = req;
+      const result = await setAssetSupported(accessToken, userAddress as string, body);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async getGlobalPaused(
     req: Request,
     res: Response,
@@ -361,8 +400,8 @@ class CDPController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, address: userAddress } = req;
-      const result = await getAllCollateralConfigs(accessToken, userAddress as string);
+      const { accessToken } = req;
+      const result = await getAllCollateralAssets(accessToken);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
@@ -441,6 +480,35 @@ class CDPController {
       next(error);
     }
   }
+
+  static async getCDPStats(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress } = req;
+      const stats = await getCDPStats(accessToken, userAddress as string);
+      res.status(RestStatus.OK).json(stats);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getInterestAccrued(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress } = req;
+      const result = await getInterestAccrued(accessToken, userAddress as string);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
 }
 
 export default CDPController;

@@ -81,23 +81,23 @@ data ContractF a = Contract
 
 instance (Show a) => Show (ContractF a) where
   show (Contract {..}) =
-    (CL.underline "\nContractF") 
-    ++ CL.cyan "\n_contractName\t" ++ show _contractName 
-    ++ CL.cyan "\n_parents\t" ++ show _parents 
-    ++ CL.cyan "\n_constants\t" ++ show _constants 
-    ++ CL.cyan "\n_storageDefs\t" ++ show _storageDefs 
-    ++ CL.cyan "\n_userDefined\t" ++ show _userDefined 
-    ++ CL.cyan "\n_enums\t" ++ show _enums 
-    ++ CL.cyan "\n_structs\t" ++ show _structs 
-    ++ CL.cyan "\n_errors\t" ++ show _errors 
-    ++ CL.cyan "\n_events\t" ++ show _events 
-    ++ CL.cyan "\n_functions\t" ++ show _functions 
-    ++ CL.cyan "\n_constructor\t" ++ show _constructor 
-    ++ CL.cyan "\n_modifiers\t" ++ show _modifiers 
-    ++ CL.cyan "\n_usings\t" ++ show _usings 
-    ++ CL.cyan "\n_contractType\t" ++ show _contractType 
-    ++ CL.cyan "\n_importedFrom\t" ++ show _importedFrom 
-    ++ CL.cyan "\n_isContractRecord\t" ++ show _isContractRecord 
+    (CL.underline "\nContractF")
+    ++ CL.cyan "\n_contractName\t" ++ show _contractName
+    ++ CL.cyan "\n_parents\t" ++ show _parents
+    ++ CL.cyan "\n_constants\t" ++ show _constants
+    ++ CL.cyan "\n_storageDefs\t" ++ show _storageDefs
+    ++ CL.cyan "\n_userDefined\t" ++ show _userDefined
+    ++ CL.cyan "\n_enums\t" ++ show _enums
+    ++ CL.cyan "\n_structs\t" ++ show _structs
+    ++ CL.cyan "\n_errors\t" ++ show _errors
+    ++ CL.cyan "\n_events\t" ++ show _events
+    ++ CL.cyan "\n_functions\t" ++ show _functions
+    ++ CL.cyan "\n_constructor\t" ++ show _constructor
+    ++ CL.cyan "\n_modifiers\t" ++ show _modifiers
+    ++ CL.cyan "\n_usings\t" ++ show _usings
+    ++ CL.cyan "\n_contractType\t" ++ show _contractType
+    ++ CL.cyan "\n_importedFrom\t" ++ show _importedFrom
+    ++ CL.cyan "\n_isContractRecord\t" ++ show _isContractRecord
     ++ CL.cyan "\n_contractContext\t" ++ show _contractContext
 
 instance Semigroup (ContractF a) where

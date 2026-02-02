@@ -2,8 +2,8 @@ import { util, rest } from '/blockapps-rest-plus';
 import constants, { DECIMAL_FACTOR_18 } from '../../helpers/constants';
 import { searchAllWithQueryArgs } from '/helpers/utils';
 
-const contractName = 'BlockApps-Mercata-Escrow';
-const assetsArrayName = 'BlockApps-Mercata-Escrow-assets';
+const contractName = 'BlockApps-Escrow';
+const assetsArrayName = 'BlockApps-Escrow-assets';
 
 /**
  * Augment contract arguments before they are used to post a contract.
@@ -79,7 +79,7 @@ async function get(user, address, options) {
 
   const asset = await rest.search(
     user,
-    { name: 'BlockApps-Mercata-Asset' },
+    { name: 'BlockApps-Asset' },
     {
       ...options,
       query: {
@@ -129,7 +129,7 @@ async function getAll(user, options) {
     escrows.map(async (escrow) => {
       const asset = await rest.search(
         user,
-        { name: 'BlockApps-Mercata-Asset' },
+        { name: 'BlockApps-Asset' },
         {
           ...options,
           query: {
@@ -273,7 +273,7 @@ async function userCataRewards(user, userCommonName, options) {
 
   const reserves = await rest.search(
     user,
-    { name: 'BlockApps-Mercata-Reserve' },
+    { name: 'BlockApps-Reserve' },
     searchOptions
   );
 

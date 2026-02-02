@@ -81,7 +81,7 @@ function newnode {
   echo 'Waiting for vault-proxy to rise and shine at http://localhost:8013...'
   started=$(date +%s)
   timeout=30
-  while ! curl --silent --output /dev/null --fail --max-time 0.5 --location http://localhost:8013; do
+  while ! curl --silent --output /dev/null --fail --max-time 1 --location http://localhost:8013; do
     if [[ $(date +%s) -ge ${started}+${timeout} ]]; then
       echo -e "\n tail -n40 logs/vault-proxy"
       tail -n40 logs/vault-proxy
@@ -163,7 +163,6 @@ function newnode {
 
   echo "Starting strato-sequencer"
   runBackgroundProcess strato-sequencer \
-    --blockstanbul=true \
     --blockstanbul_block_period_ms=${blockstanbulBlockPeriodMs:-1000} \
     --blockstanbul_round_period_s=${blockstanbulRoundPeriodS:-120} \
     --minLogLevel=$seqMinLogLevel \
@@ -189,21 +188,6 @@ function newnode {
   if [ -n "${gasLimit}" ]; then
       gasFlag="--gasLimit=${gasLimit}"
   fi
-  if [ -n "${idServerUrl}" ]; then
-      idServer="--identityServerUrl=${idServerUrl}"
-  fi
-  if [ -n "${userRegistryAddress}" ]; then
-      urFlag="--userRegistryAddress=${userRegistryAddress}"
-  fi
-  if [ -n "${userRegistryCodeHash}" ]; then
-      ucFlag="--userRegistryCodeHash=${userRegistryCodeHash}"
-  fi
-  if [ -n "${useBuiltinUserRegistry}" ]; then
-      ubFlag="--useBuiltinUserRegistry=${useBuiltinUserRegistry}"
-  fi
-  if [ -n "${useWalletsByDefault}" ]; then
-      udFlag="--useWalletsByDefault=${useWalletsByDefault}"
-  fi
   if [ -n "${FILE_SERVER_URL}" ]; then
       fsFlag="--fileServerUrl=${FILE_SERVER_URL}"
   fi
@@ -219,7 +203,6 @@ function newnode {
 
   echo "Starting vm-runner"
   runBackgroundProcess vm-runner \
-    --blockstanbul=true \
     --debug=${evmDebugMode:-false} \
     --debugEnabled=${VM_DEBUGGER:-false} \
     --debugPort=${debugPort:-8051} \
@@ -252,11 +235,6 @@ function newnode {
     "${networkFlag}" \
     "${txsFlag}" \
     "${gasFlag}" \
-    "${idServer}" \
-    "${urFlag}" \
-    "${ucFlag}" \
-    "${ubFlag}" \
-    "${udFlag}" \
     "${fsFlag}" \
     "${nsFlag}" \
     "${iFlag}" +RTS -N1 >> logs/strato-api 2>&1

@@ -37,7 +37,6 @@ import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.Event (IngestEvent (IETx), Timestamp)
 import Blockchain.Sequencer.Kafka (writeUnseqEvents)
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256 hiding (hash)
 import Blockchain.Strato.Model.MicroTime (getCurrentMicrotime)
 import Control.DeepSeq
@@ -56,10 +55,10 @@ import Data.Conduit
 import Data.Conduit.Combinators (yieldMany)
 import Data.List
 import Data.Maybe
+import Data.Time.Clock (UTCTime)
 import qualified Data.Text as T
 import qualified Database.Esqueleto.Internal.Internal as E
 import qualified Database.Esqueleto.Legacy as E
-import MaybeNamed
 import Numeric.Natural
 import SQLM
 import Servant
@@ -86,8 +85,8 @@ type API =
     :> QueryParam "blocknumber" Natural
     :> QueryParam "minblocknumber" Natural
     :> QueryParam "maxblocknumber" Natural
-    :> QueryParam "chainid" (MaybeNamed ChainId)
-    :> QueryParams "chainids" ChainId
+    :> QueryParam "mintimestamp" UTCTime
+    :> QueryParam "maxtimestamp" UTCTime
     :> QueryParam "limit" Natural
     :> QueryParam "offset" Natural
     :> QueryParam "search" T.Text
@@ -114,8 +113,8 @@ data TxsFilterParams = TxsFilterParams
     qtBlockNumber :: Maybe Natural,
     qtMinBlockNumber :: Maybe Natural,
     qtMaxBlockNumber :: Maybe Natural,
-    qtChainId :: Maybe (MaybeNamed ChainId),
-    qtChainIds :: [ChainId],
+    qtMinTimestamp :: Maybe UTCTime,
+    qtMaxTimestamp :: Maybe UTCTime,
     qtLimit :: Maybe Natural,
     qtOffset :: Maybe Natural,
     qtSearch :: Maybe T.Text,
@@ -143,7 +142,7 @@ txsFilterParams =
     Nothing
     Nothing
     Nothing
-    []
+    Nothing
     Nothing
     Nothing
     Nothing
@@ -178,6 +177,8 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable TxsFilterParams [RawT
                       fmap (\v -> rawTx E.^. RawTransactionBlockNumber E.==. E.val v) (fromIntegral <$> qtBlockNumber),
                       fmap (\v -> rawTx E.^. RawTransactionBlockNumber E.>=. E.val v) (fromIntegral <$> qtMinBlockNumber),
                       fmap (\v -> rawTx E.^. RawTransactionBlockNumber E.<=. E.val v) (fromIntegral <$> qtMaxBlockNumber),
+                      fmap (\v -> rawTx E.^. RawTransactionTimestamp E.>=. E.val v) qtMinTimestamp,
+                      fmap (\v -> rawTx E.^. RawTransactionTimestamp E.<=. E.val v) qtMaxTimestamp,
                       fmap (\search ->
                           let isWhiteSpace c = c `elem` [' ', '\n', '\t']
                               searches = filter (not . T.null) $ T.dropAround isWhiteSpace <$> T.split (==',') search
@@ -306,8 +307,8 @@ getTransaction ::
   Maybe Natural ->
   Maybe Natural ->
   Maybe Natural ->
-  Maybe (MaybeNamed ChainId) ->
-  [ChainId] ->
+  Maybe UTCTime ->
+  Maybe UTCTime ->
   Maybe Natural ->
   Maybe Natural ->
   Maybe T.Text ->
@@ -340,10 +341,10 @@ transactionQueryParams =
     "blocknumber",
     "minblocknumber",
     "maxblocknumber",
+    "mintimestamp",
+    "maxtimestamp",
     -- "index",
     --"rejected",
-    "[chainids]",
-    "chainid",
     "limit",
     "offset",
     "search"

@@ -26,6 +26,10 @@ services:
       - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
       - NODE_URL=http://nginx  # no TLS required within the docker network
       - BASE_URL=https://${NODE_HOST}  # todo: protocol to depend on ssl=true|false
+      - RPC_URL_MAINNET=${RPC_URL_MAINNET}
+      - RPC_URL_MAINNET_FALLBACK=${RPC_URL_MAINNET_FALLBACK}
+      - RPC_URL_SEPOLIA=${RPC_URL_SEPOLIA}
+      - RPC_URL_SEPOLIA_FALLBACK=${RPC_URL_SEPOLIA_FALLBACK}
       - POOL_FACTORY=${POOL_FACTORY}
       - LENDING_REGISTRY=${LENDING_REGISTRY}
       - TOKEN_FACTORY=${TOKEN_FACTORY}
@@ -43,6 +47,9 @@ services:
       - mercata-backend
     build: ./mercata/ui
     image: ${MERCATAUI_IMAGE:-<REPO_URL>mercata-ui:<VERSION>}
+    environment:
+      - LUCKY_ORANGE_SITE_ID=${LUCKY_ORANGE_SITE_ID}
+      - GOOGLE_ANALYTICS_ID=${GOOGLE_ANALYTICS_ID}
     restart: unless-stopped
     logging:
       driver: "json-file"

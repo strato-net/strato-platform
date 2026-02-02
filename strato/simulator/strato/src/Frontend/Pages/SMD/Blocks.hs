@@ -13,7 +13,7 @@ blocksWidget :: (MonadWidget t m) => Dynamic t TS.AppState -> m ()
 blocksWidget stateDyn = do
   el "div" $ do
     el "h1" $ text "Blocks"
-    
+
     -- Block statistics
     el "div" $ do
       el "h2" $ text "Block Statistics"
@@ -25,14 +25,14 @@ blocksWidget stateDyn = do
             , iconClass = "block"
             , mode = "primary"
             }
-          
+
           numberCard $ NumberCardConfig
             { number = "0"  -- TODO: Add average block time
             , description = "Average Block Time"
             , iconClass = "time"
             , mode = "secondary"
             }
-    
+
     -- Block size distribution
     el "div" $ do
       el "h2" $ text "Block Size Distribution"
@@ -43,7 +43,7 @@ blocksWidget stateDyn = do
           , bgIdentifier = "block-sizes"
           , bgUnits = Just "KB"
           }
-    
+
     -- Recent blocks
     el "div" $ do
       el "h2" $ text "Recent Blocks"
@@ -58,4 +58,4 @@ blocksWidget stateDyn = do
           el "tbody" $ do
             el "tr" $ do
               el "td" $ text "No blocks available"
-            -- TODO: Add recent blocks data 
+            -- TODO: Add recent blocks data

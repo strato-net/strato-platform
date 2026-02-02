@@ -229,14 +229,14 @@ const TokenConfigTable = () => {
       </CardHeader>
       <CardContent>
         <div className="mb-4">
-          <span className="text-sm text-gray-500">
+          <span className="text-sm text-muted-foreground">
             Showing {activeTokens?.length || 0} active tokens
           </span>
         </div>
         
         {(activeTokens?.length || 0) === 0 ? (
           <div className="text-center py-8">
-            <p className="text-gray-500">No active tokens found</p>
+            <p className="text-muted-foreground">No active tokens found</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -258,9 +258,9 @@ const TokenConfigTable = () => {
               <TableBody>
                 {(activeTokens || []).map((token, index) => {
                   const tokenData = token as Token;
-                  const name = tokenData.name || token._name || token.token?._name || token["BlockApps-Mercata-ERC20"]?._name || 'Unknown';
-                  const symbol = tokenData.symbol || token._symbol || token.token?._symbol || token["BlockApps-Mercata-ERC20"]?._symbol || 'Unknown';
-                  const address = tokenData.address || token.address || token.token?.address || token["BlockApps-Mercata-ERC20"]?.address || 'Unknown';
+                  const name = tokenData.name || token._name || token.token?._name || token["BlockApps-ERC20"]?._name || 'Unknown';
+                  const symbol = tokenData.symbol || token._symbol || token.token?._symbol || token["BlockApps-ERC20"]?._symbol || 'Unknown';
+                  const address = tokenData.address || token.address || token.token?.address || token["BlockApps-ERC20"]?.address || 'Unknown';
 
                   return (
                     <TableRow key={`${address}-${index}`}>

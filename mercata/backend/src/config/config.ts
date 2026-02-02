@@ -1,4 +1,4 @@
-import { fetchOpenIdConfig } from "../utils/authHelper";
+import { fetchOpenIdConfig, getServiceToken } from "../utils/authHelper";
 import { JSONWebKeySet } from "jose";
 
 // Load local .env files when not in production
@@ -31,10 +31,13 @@ export async function initOpenIdConfig() {
   openIdTokenEndpoint = tokenEndpoint;
   openIdJwks = jwks;
 }
+
 export const clientId = process.env.OAUTH_CLIENT_ID;
 export const clientSecret = process.env.OAUTH_CLIENT_SECRET;
 export const nodeUrl = process.env.NODE_URL;
 export const baseUrl = process.env.BASE_URL || "http://localhost";
+
+// Smart contract addresses
 export const poolConfigurator = process.env.POOL_CONFIGURATOR || "0000000000000000000000000000000000001006";
 export const lendingRegistry = process.env.LENDING_REGISTRY || "0000000000000000000000000000000000001007";
 export const mercataBridge = process.env.MERCATA_BRIDGE || "0000000000000000000000000000000000001008";
@@ -44,3 +47,78 @@ export const adminRegistry = process.env.ADMIN_REGISTRY || "00000000000000000000
 export const voucher = process.env.VOUCHER_CONTRACT_ADDRESS || "000000000000000000000000000000000000100e";
 export const cdpRegistry = process.env.CDP_REGISTRY || "0000000000000000000000000000000000001012";
 export const rewardsChef = process.env.REWARDS_CHEF || "000000000000000000000000000000000000101f";
+
+// Hidden swap pools - these pools are filtered out from API responses
+export const hiddenSwapPools: Set<string> = new Set([
+  "9c75280f9e2368005d2b7342f19c59f9176b5962", // sUSDST-USDST swap pool - This is a hot fix to hide the pool from the user 
+]);
+
+/*
+   Network-specific defaults;
+   These are used to set bridge URL and rewards address based on network ID.
+*/
+export const defaultBridgeServiceFor: Record<string, string> = {
+  "114784819836269":"https://bridge.testnet.strato.nexus", // Helium testnet
+  "33056204878082667":"https://bridge.strato.nexus",       // Upquark mainnet
+};
+export const defaultRewardsAddressFor: Record<string, string> = {
+  "114784819836269": "170147f58738c9f46112a874030420b823901f3b", // Helium testnet
+  "33056204878082667": "4a116cf8cb056036632aef08f7c0df27c720f1c0", // Upquark mainnet
+};
+export const defaultEscrowAddressFor: Record<string, string> = {
+  "114784819836269": "7fa32d329b5f61a1808418304eea249b1b0b28fc", // Helium testnet
+  "33056204878082667": "4b4a14095077946c20fb680980db511932b7cf4b", // Upquark mainnet
+}
+export const defaultReferralServiceFor: Record<string, string> = {
+  "114784819836269": "http://ec2-54-89-36-118.compute-1.amazonaws.com", // Helium testnet
+  "33056204878082667": "http://ec2-18-218-166-133.us-east-2.compute.amazonaws.com", // Upquark mainnet
+};
+
+export let bridgeUrl: string | undefined;
+export let rewards: string | undefined;
+export let networkId: string | undefined;
+export let referralUrl: string | undefined;
+export let escrow: string = '';
+
+export function setBridgeConfig(networkId: string) {
+  if (process.env.BRIDGE_SERVICE_URL) {
+    bridgeUrl = process.env.BRIDGE_SERVICE_URL;
+  } else {
+    bridgeUrl = defaultBridgeServiceFor[networkId];
+  }
+}
+
+export function setRewardsConfig(networkId: string) {
+  if (process.env.REWARDS) {
+    rewards = process.env.REWARDS;
+  } else {
+    rewards = defaultRewardsAddressFor[networkId];
+  }
+}
+
+export function setReferralConfig(networkId: string) {
+  if (process.env.ESCROW_ADDRESS) {
+    escrow = process.env.ESCROW_ADDRESS;
+  } else {
+    escrow = defaultEscrowAddressFor[networkId];
+  }
+  if (process.env.REDEMPTION_SERVER_URL) {
+    referralUrl = process.env.REDEMPTION_SERVER_URL;
+  } else {
+    referralUrl = defaultReferralServiceFor[networkId];
+  }
+}
+
+export async function initNetworkConfig() {
+  // Import eth here to avoid circular dependency (eth depends on nodeUrl)
+  const { eth } = await import("../utils/mercataApiHelper");
+  const accessToken = await getServiceToken();
+  const { data } = await eth.get(accessToken, `/metadata`);
+  networkId = data.networkID;
+  if (!networkId) {
+    throw new Error("Network ID not found in metadata");
+  }
+  setBridgeConfig(networkId);
+  setRewardsConfig(networkId);
+  setReferralConfig(networkId);
+}

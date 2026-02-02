@@ -144,7 +144,7 @@ async function addHash(user, args, options) {
 
   const ethBridge = await rest.search(
     user,
-    { name: 'BlockApps-Mercata-MercataETHBridge' },
+    { name: 'BlockApps-MercataETHBridge' },
     mercataETHBridgeSearchOptions
   );
 
@@ -180,7 +180,7 @@ async function getBridge(user, args, options) {
 
   const ethBridge = await rest.search(
     user,
-    { name: 'BlockApps-Mercata-MercataETHBridge' },
+    { name: 'BlockApps-MercataETHBridge' },
     mercataETHBridgeSearchOptions
   );
 

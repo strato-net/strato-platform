@@ -9,6 +9,7 @@ import { Loader2, Info, Droplets } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useSwapContext } from '@/context/SwapContext';
 import { useTokenContext } from '@/context/TokenContext';
+import { Switch } from "@/components/ui/switch";
 
 const CreatePoolForm = () => {
   const { createPool, loading: swapLoading } = useSwapContext();
@@ -21,6 +22,7 @@ const CreatePoolForm = () => {
     defaultValues: {
       tokenA: '',
       tokenB: '',
+      isStable: false,
       // initialLiquidityA: '',
       // initialLiquidityB: '',
       // poolName: '',
@@ -45,6 +47,7 @@ const CreatePoolForm = () => {
       await createPool({
         tokenA: data.tokenA,
         tokenB: data.tokenB,
+        isStable: data.isStable,
       });
 
       // After creating the pool, add initial liquidity if provided
@@ -65,7 +68,7 @@ const CreatePoolForm = () => {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <FormField
             control={form.control}
             name="tokenA"
@@ -188,6 +191,24 @@ const CreatePoolForm = () => {
               </FormItem>
             )}
           /> */}
+
+          <FormField
+            control={form.control}
+            name="isStable"
+            rules={{}}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Is Stable Pool</FormLabel>
+                <div className="w-80" />
+                <Switch className="dark:bg-input" onCheckedChange={field.onChange} defaultChecked={field.value} />
+                <FormDescription>
+                  Toggling this field on will result in a stable swap pool being created,
+                  rather than a traditional pool using the constant product formula.
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
         </div>
 
         <Alert>
@@ -199,7 +220,7 @@ const CreatePoolForm = () => {
           </AlertDescription>
         </Alert>
 
-        <div className="flex items-center space-x-2 text-sm text-gray-600">
+        <div className="flex items-center space-x-2 text-sm text-muted-foreground">
           <Droplets className="h-4 w-4" />
           <span>
             The initial exchange rate will be determined by the ratio of initial liquidity amounts.

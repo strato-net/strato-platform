@@ -71,7 +71,7 @@ async function main() {
 
     const oldReserveResults = await rest.search(
       token,
-      { name: 'BlockApps-Mercata-Reserve' },
+      { name: 'BlockApps-Reserve' },
       oldReserveQuery
     );
 

@@ -9,6 +9,7 @@ import authHandler from "./middleware/authHandler";
 import TokensController from "./controllers/tokens.controller";
 import userRoutes from "./routes/user.routes";
 import tokensRoutes from "./routes/tokens.routes";
+import tokensV2Routes from "./routes/tokens.v2.routes";
 import configRoutes from "./routes/config.routes";
 import oracleRoutes from "./routes/oracle.routes";
 import swapRoutes from "./routes/swap.routes";
@@ -17,6 +18,9 @@ import eventsRoutes from "./routes/events.routes";
 import bridgeRoutes from "./routes/bridge.routes";
 import cdpRoutes from "./routes/cdp.routes";
 import rewardsRoutes from "./routes/rewards.routes";
+import protocolFeeRoutes from "./routes/protocolFee.routes";
+import rpcRoutes from "./routes/rpc.routes";
+import referRoutes from "./routes/refer.routes";
 
 const router = Router();
 
@@ -24,6 +28,9 @@ const router = Router();
 
 // ----- User Routes -----
 router.use("/user", userRoutes);
+
+// ----- Token V2 Routes (must be before v1 routes to avoid /:address matching) -----
+router.use("/tokens/v2", tokensV2Routes);
 
 // ----- Token Routes -----
 router.use("/tokens", tokensRoutes);
@@ -48,6 +55,9 @@ router.get("/vouchers/balance", authHandler.authorizeRequest(), TokensController
 // ----- Configuration Routes -----
 router.use("/config", configRoutes);
 
+// ----- RPC Proxy Routes -----
+router.use("/rpc", rpcRoutes);
+
 // ----- Oracle Routes -----
 router.use("/oracle", oracleRoutes);
 
@@ -70,6 +80,12 @@ router.use("/cdp", cdpRoutes);
 
 // ----- Rewards Routes -----
 router.use("/rewards", rewardsRoutes);
+
+// ----- Protocol Fee Routes -----
+router.use("/protocol-fees", protocolFeeRoutes);
+
+// ----- Refer Routes -----
+router.use("/refer", referRoutes);
 
 // ----- Documentation Routes -----
 // Serve static files for Swagger customizations

@@ -78,7 +78,7 @@ contract Describe_BadDebt_Basic is Authorizable {
         sUSDST = m.tokenFactory().createToken("sUSDST", "sUSDST Token", [], [], [], "msSDST", 0, 18);
         require(address(mUSDST) != address(0), "Failed to create mUSDST token");
         require(address(sUSDST) != address(0), "Failed to create sUSDST token");
-        
+
         // Create test tokens for collateral
         GOLDST = m.tokenFactory().createToken("GOLDST", "GOLDST Token", [], [], [], "GOLDST", 0, 18);
         SILVST= m.tokenFactory().createToken("SILVST", "SILVST Token", [], [], [], "SILVST", 0, 18);
@@ -94,7 +94,7 @@ contract Describe_BadDebt_Basic is Authorizable {
         Token(sUSDST).setStatus(2);
         Token(GOLDST).setStatus(2);
         Token(SILVST).setStatus(2);
-        
+
         // Basic checks - tokens activated successfully
         require(Token(USDST).status() == TokenStatus.ACTIVE, "USDST token not activated");
         require(Token(mUSDST).status() == TokenStatus.ACTIVE, "mUSDST token not activated");
@@ -125,52 +125,52 @@ contract Describe_BadDebt_Basic is Authorizable {
         require(address(pool) != address(0), "LendingPool not found");
         require(address(configurator) != address(0), "PoolConfigurator not found");
         require(address(oracle) != address(0), "PriceOracle not found");
-        
+
         // === STEP 1: Configure borrowable asset and mToken ===
-        
-        // Set the borrowable asset (USD) 
+
+        // Set the borrowable asset (USD)
         configurator.setBorrowableAsset(USDST);
         require(pool.borrowableAsset() == USDST, "Borrowable asset not set correctly");
-        
+
         // Set the corresponding mToken
         configurator.setMToken(mUSDST);
         require(pool.mToken() == mUSDST, "mToken not set correctly");
-        
+
         // === STEP 2: Set debt ceilings and safety parameters ===
-        
+
         uint debtCeilingAssetUnits = 10000000e18; // 10M USDST
-        uint debtCeilingUSD = 10000000e18;        // 10M USD value 
+        uint debtCeilingUSD = 10000000e18;        // 10M USD value
         uint safetyShareBps = 1000;              // 10% to safety module
-        
+
         configurator.setDebtCeilings(debtCeilingAssetUnits, debtCeilingUSD);
         configurator.setSafetyShareBps(safetyShareBps);
-        
+
         // Verify debt ceiling configuration
         require(pool.debtCeilingAsset() == debtCeilingAssetUnits, "Asset debt ceiling not set");
         require(pool.debtCeilingUSD() == debtCeilingUSD, "USD debt ceiling not set");
         require(pool.safetyShareBps() == safetyShareBps, "Safety share not set");
-        
+
         // === STEP 3: Configure USD borrowable asset parameters ===
-        
+
         uint usdLtv = 0; // USDST can't be used as collateral for borrowing USDST
         uint usdLiquidationThreshold = 0;
         uint usdLiquidationBonus = 11000; // 110%
         uint usdInterestRate = 500;       // completely irrelevant, plucked from smd
         uint usdReserveFactor = 1000;     // 10%
         uint usdPerSecondFactorRAY = 1000000001547125956666413085; // plucked from smd
-        
+
         configurator.configureAsset(
             USDST,
             usdLtv,
-            usdLiquidationThreshold, 
+            usdLiquidationThreshold,
             usdLiquidationBonus,
             usdInterestRate,
             usdReserveFactor,
             usdPerSecondFactorRAY
         );
-        
+
         // === STEP 4: Configure collateral assets (Gold and Silver) ===
-        
+
         // Gold configuration - high value collateral
         uint goldLtv = 7500;              // 75% LTV
         uint goldLiquidationThreshold = 8000; // 80% liquidation threshold
@@ -178,37 +178,37 @@ contract Describe_BadDebt_Basic is Authorizable {
         uint goldInterestRate = 0;        // No interest for collateral
         uint goldReserveFactor = 0;       // No reserves for collateral
         uint goldPerSecondFactorRAY = 1e27; // No compounding for collateral
-        
+
         configurator.configureAsset(
             GOLDST,
             goldLtv,
             goldLiquidationThreshold,
-            goldLiquidationBonus, 
+            goldLiquidationBonus,
             goldInterestRate,
             goldReserveFactor,
             goldPerSecondFactorRAY
         );
-        
+
         // Silver configuration - medium value collateral
         uint silverLtv = 6000;            // 60% LTV (more conservative)
         uint silverLiquidationThreshold = 7000; // 70% liquidation threshold
         uint silverLiquidationBonus = 11000;    // 110% liquidation bonus
         uint silverInterestRate = 0;      // No interest for collateral
-        uint silverReserveFactor = 0;     // No reserves for collateral  
+        uint silverReserveFactor = 0;     // No reserves for collateral
         uint silverPerSecondFactorRAY = 1e27; // No compounding for collateral
-        
+
         configurator.configureAsset(
             SILVST,
             silverLtv,
             silverLiquidationThreshold,
             silverLiquidationBonus,
-            silverInterestRate, 
+            silverInterestRate,
             silverReserveFactor,
             silverPerSecondFactorRAY
         );
-        
+
         // === STEP 5: Verify complete asset configurations ===
-        
+
         // Verify USD configuration
         (uint usdLtvRet, uint usdLiqThreshRet, uint usdLiqBonusRet, uint usdIntRateRet, uint usdReserveFactorRet, uint usdPerSecRet) = pool.getAssetConfig(USDST);
         require(usdLtvRet == usdLtv, "USD LTV not configured correctly");
@@ -217,7 +217,7 @@ contract Describe_BadDebt_Basic is Authorizable {
         require(usdIntRateRet == usdInterestRate, "USD interest rate not configured correctly");
         require(usdReserveFactorRet == usdReserveFactor, "USD reserve factor not configured correctly");
         require(usdPerSecRet == usdPerSecondFactorRAY, "USD per-second factor not configured correctly");
-        
+
         // Verify Gold configuration
         (uint goldLtvRet, uint goldLiqThreshRet, uint goldLiqBonusRet, uint goldIntRateRet, uint goldReserveFactorRet, uint goldPerSecRet) = pool.getAssetConfig(GOLDST);
         require(goldLtvRet == goldLtv, "Gold LTV not configured correctly");
@@ -226,7 +226,7 @@ contract Describe_BadDebt_Basic is Authorizable {
         require(goldIntRateRet == goldInterestRate, "Gold interest rate not configured correctly");
         require(goldReserveFactorRet == goldReserveFactor, "Gold reserve factor not configured correctly");
         require(goldPerSecRet == goldPerSecondFactorRAY, "Gold per-second factor not configured correctly");
-        
+
         // Verify Silver configuration
         (uint silverLtvRet, uint silverLiqThreshRet, uint silverLiqBonusRet, uint silverIntRateRet, uint silverReserveFactorRet, uint silverPerSecRet) = pool.getAssetConfig(SILVST);
         require(silverLtvRet == silverLtv, "Silver LTV not configured correctly");
@@ -235,31 +235,31 @@ contract Describe_BadDebt_Basic is Authorizable {
         require(silverIntRateRet == silverInterestRate, "Silver interest rate not configured correctly");
         require(silverReserveFactorRet == silverReserveFactor, "Silver reserve factor not configured correctly");
         require(silverPerSecRet == silverPerSecondFactorRAY, "Silver per-second factor not configured correctly");
-        
+
         // === STEP 6: Verify registry and infrastructure connections ===
-        
+
         require(address(pool.registry()) != address(0), "Pool registry not set");
         require(address(pool.tokenFactory()) != address(0), "Pool token factory not set");
         require(address(pool.poolConfigurator()) != address(0), "Pool configurator not set");
         require(address(pool.feeCollector()) != address(0), "Fee collector not set");
-        
+
         // === STEP 7: Verify pool is ready for lending operations ===
-        
+
         // Check that pool has borrowable asset configured
         require(pool.borrowableAsset() != address(0), "No borrowable asset configured");
         require(pool.mToken() != address(0), "No mToken configured");
-        
+
         // Verify that assets are properly configured in the pool
         require(pool.configuredAssets(0) == USDST, "USDST not correctly configured in configured assets");
         require(pool.configuredAssets(1) == GOLDST, "GOLDST not correctly configured in configured assets");
         require(pool.configuredAssets(2) == SILVST, "SILVST not correctly configured in configured assets");
-        
+
         // Verify bad debt tracking is initialized
         uint badDebt = pool.badDebt();
         require(badDebt == 0, "Initial bad debt should be zero");
-        
+
         // === STEP 8: Test that configuration parameters are within valid bounds ===
-        
+
         // Verify LTV <= liquidation threshold for collateral assets
         require(goldLtv <= goldLiquidationThreshold, "Gold LTV exceeds liquidation threshold");
         require(silverLtv <= silverLiquidationThreshold, "Silver LTV exceeds liquidation threshold");
@@ -279,12 +279,12 @@ contract Describe_BadDebt_Basic is Authorizable {
 
     function it_ai_can_set_oracle_prices() public {
         PriceOracle oracle = m.priceOracle();
-        
+
         oracle.setAssetPrice(USDST, 1e18);      // $1 USD
         oracle.setAssetPrice(GOLDST, 2000e18);  // $2000 Gold
         oracle.setAssetPrice(SILVST, 25e18);  // $25 Silver
-        
-        // Verify oracle prices  
+
+        // Verify oracle prices
         require(oracle.getAssetPrice(USDST) == 1e18, "USD price not set correctly");
         require(oracle.getAssetPrice(GOLDST) == 2000e18, "Gold price not set correctly");
         require(oracle.getAssetPrice(SILVST) == 25e18, "Silver price not set correctly");
@@ -364,7 +364,7 @@ contract Describe_BadDebt_Basic is Authorizable {
         // Mint USDST
         Token(USDST).mint(address(this), amount);
         require(IERC20(USDST).balanceOf(address(this)) == amount, "USDST balance should be 1000e18 after mint");
-        
+
         // Stake USDST in SafetyModule
         IERC20(USDST).approve(address(sm), amount);
         sm.stake(amount, 0);
@@ -378,7 +378,7 @@ contract Describe_BadDebt_Basic is Authorizable {
 
         Token(GOLDST).mint(address(user1), 1e18);
         require(IERC20(GOLDST).balanceOf(address(user1)) == 1e18, "GOLDST balance should be 1e18 after mint");
-        
+
         user1.do(GOLDST, "approve", address(cv), 1e18);
         user1.do(address(pool), "supplyCollateral", GOLDST, 1e18);
 
@@ -392,7 +392,7 @@ contract Describe_BadDebt_Basic is Authorizable {
         uint price = m.priceOracle().getAssetPrice(GOLDST);
 
         uint amount = price * ltv / (1e18 * 10000); // 1500
-        
+
         user1.do(address(pool), "borrow", amount * 1e18);
     }
 
@@ -459,7 +459,7 @@ contract Describe_BadDebt_Basic is Authorizable {
         require(pool.badDebt() == 0, "Bad debt should be 0 after cover shortfall");
 
         log("at exchangeRate after: "+string(pool.getExchangeRate()));
-        
+
         // Note: These initial values for comparison should be taken separetly if you reorder the tests
         require(pool.getExchangeRate() == 1e18, "Lending Exchange rate should be unaffected 1e18 after cover shortfall");
         require(sm.exchangeRate() < 1e18, "SM Exchange rate should fall to less than 1e18 after cover shortfall");

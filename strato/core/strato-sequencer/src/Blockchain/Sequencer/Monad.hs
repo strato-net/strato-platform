@@ -9,7 +9,6 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE UndecidableInstances #-}
 
 {-# OPTIONS -fno-warn-orphans #-}
 
@@ -25,18 +24,21 @@ module Blockchain.Sequencer.Monad
     pairToVmTx,
     createFirstTimer,
     createNewTimer,
+    createNewViewTimer,
+    updateViewTimer,
     fuseChannels,
     seenTransactionDB,
     blockstanbulContext,
-    latestRoundNumber
+    latestViewAndProposal
   )
 where
 
 import BlockApps.Logging
-import BlockApps.X509.Certificate
 import Blockchain.Blockstanbul
 import Blockchain.Constants
 import Blockchain.Model.SyncState
+import Blockchain.Data.Block
+import Blockchain.Data.BlockHeader
 import Blockchain.EthConf
 import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.CablePackage
@@ -45,7 +47,6 @@ import Blockchain.Sequencer.DB.SeenTransactionDB
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
 import Blockchain.SyncDB
-import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
@@ -55,16 +56,13 @@ import Control.Concurrent (threadDelay)
 import Control.Concurrent.AlarmClock
 import Control.Concurrent.STM.TMChan
 import Control.Lens
-import Control.Monad (unless)
+import Control.Monad (unless, when)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Kafka
 import Control.Monad.Reader
 import Control.Monad.State
-import Data.Binary
-import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C8
-import qualified Data.ByteString.Lazy as BL
 import Data.Conduit.TMChan
 import Data.IORef
 import Data.Maybe
@@ -84,8 +82,8 @@ data Modification a = Modification a | Deletion deriving (Show)
 
 data SequencerContext = SequencerContext
   { _seenTransactionDB :: !SeenTransactionDB,
-    _blockstanbulContext :: Maybe BlockstanbulContext,
-    _latestRoundNumber :: IORef RoundNumber
+    _blockstanbulContext :: BlockstanbulContext,
+    _latestViewAndProposal :: IORef (View, Maybe Block)
   }
 
 makeLenses ''SequencerContext
@@ -93,13 +91,11 @@ makeLenses ''SequencerContext
 type MonadBlockstanbul m =
   ( MonadIO m,
     HasBlockstanbulContext m,
-    Mod.Accessible (IORef RoundNumber) m,
+    Mod.Accessible (IORef (View, Maybe Block)) m,
     Mod.Accessible (TMChan RoundNumber) m,
     Mod.Accessible BlockPeriod m,
     Mod.Accessible RoundPeriod m,
     Mod.Modifiable BestSequencedBlock m,
-    (Address `A.Alters` X509CertInfoState) m,
-    (Address `A.Selectable` X509CertInfoState) m,
     HasVault m
   )
 
@@ -130,70 +126,21 @@ instance {-# OVERLAPPING #-} Monad m => Mod.Accessible DependentBlockDB (ReaderT
 
 instance {-# OVERLAPPING #-} Monad m => Mod.Accessible LDB.DB (ReaderT SequencerConfig m) where
   access _ = getDependentBlockDB <$> Mod.access (Mod.Proxy @DependentBlockDB)
-
+{-
 class HasNamespace a where
   type NSKey a
-  namespace :: Mod.Proxy a -> BL.ByteString
 
-  namespaced :: Mod.Proxy a -> NSKey a -> B.ByteString
-  default namespaced :: Binary (NSKey a) => Mod.Proxy a -> NSKey a -> B.ByteString
-  namespaced p = BL.toStrict . BL.append (namespace p) . encode
-
-instance HasNamespace X509CertInfoState where
-  type NSKey X509CertInfoState = Address
-  namespace _ = "cis:" -- make a namespace instance for new mapping
 
 instance HasNamespace Checkpoint where
   type NSKey Checkpoint = ()
   namespace _ = "chkpt"
-
-lookupInLDB ::
-  (Binary a, HasNamespace a, MonadIO m, Mod.Accessible LDB.DB m) =>
-  Mod.Proxy a ->
-  NSKey a ->
-  m (Maybe a)
-lookupInLDB p k = do
-  db <- Mod.access Mod.Proxy
-  fmap (decode . BL.fromStrict) <$> LDB.get db LDB.defaultReadOptions (namespaced p k)
-
-insertInLDB ::
-  (Binary a, HasNamespace a, MonadIO m, Mod.Accessible LDB.DB m) =>
-  Mod.Proxy a ->
-  NSKey a ->
-  a ->
-  m ()
-insertInLDB p k v = do
-  db <- Mod.access Mod.Proxy
-  LDB.put db LDB.defaultWriteOptions (namespaced p k) $ BL.toStrict $ encode v
-
-deleteInLDB ::
-  (HasNamespace a, MonadIO m, Mod.Accessible LDB.DB m) =>
-  Mod.Proxy a ->
-  NSKey a ->
-  m ()
-deleteInLDB p k = do
-  db <- Mod.access Mod.Proxy
-  LDB.delete db LDB.defaultWriteOptions (namespaced p k)
-
-instance (MonadIO m, Mod.Accessible LDB.DB m) => (Address `A.Alters` X509CertInfoState) m where
-  lookup = lookupInLDB
-  insert p k v = insertInLDB p k v
-  delete p k = deleteInLDB p k
-
-instance {-# OVERLAPPING #-} A.Selectable Address X509CertInfoState SequencerM where
-  select = A.lookup
-
-instance (MonadIO m, Mod.Accessible DependentBlockDB m) => (Keccak256 `A.Alters` DependentBlockEntry) m where
-  lookup _ k = lookupDependentBlockDB k
-  insert _ k v = insertDependentBlockDB k v
-  delete _ k = deleteDependentBlockDB k
-
+-}
 instance Monad m => Mod.Modifiable SeenTransactionDB (StateT SequencerContext m) where
   get _ = use seenTransactionDB
   put _ = modify' . (.~) seenTransactionDB
 
-instance {-# OVERLAPPING #-} Monad m => Mod.Accessible (IORef RoundNumber) (StateT SequencerContext m) where
-  access _ = use latestRoundNumber
+instance {-# OVERLAPPING #-} Monad m => Mod.Accessible (IORef (View, Maybe Block)) (StateT SequencerContext m) where
+  access _ = use latestViewAndProposal
 
 instance {-# OVERLAPPING #-} Monad m => Mod.Accessible (TMChan RoundNumber) (ReaderT SequencerConfig m) where
   access _ = asks blockstanbulTimeouts
@@ -217,7 +164,7 @@ instance Monad m => (Keccak256 `A.Alters` ()) (StateT SequencerContext m) where
 
 instance Monad m => HasBlockstanbulContext (StateT SequencerContext m) where
   getBlockstanbulContext = use blockstanbulContext
-  putBlockstanbulContext = modify' . (.~) (blockstanbulContext . _Just)
+  putBlockstanbulContext = modify' . (.~) blockstanbulContext
 
 instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestSequencedBlock (ReaderT SequencerConfig m) where
   get _ =
@@ -267,20 +214,20 @@ waitOnVault action = do
       $logInfoS "HasVault" "Got a signature from vault"
       return val
 
-runSequencerM :: SequencerConfig -> Maybe BlockstanbulContext -> SequencerM a -> (LoggingT IO) a
-runSequencerM c mbc m = do
+runSequencerM :: SequencerConfig -> BlockstanbulContext -> SequencerM a -> (LoggingT IO) a
+runSequencerM c bc m = do
   liftIO $ createDirectoryIfMissing False $ dbDir "h"
   a <- runResourceT . runKafkaMConfigured (kafkaClientId c) $ do
     let dbCS = depBlockDBCacheSize c
         dbPath = depBlockDBPath c
         stxSize = seenTransactionDBSize c
     depBlock <- DependentBlockDB <$> LDB.open dbPath LDB.defaultOptions {LDB.createIfMissing = True, LDB.cacheSize = dbCS}
-    latestRound <- liftIO $ newIORef 0
+    latestVandP <- liftIO $ newIORef (View 0 0, Nothing)
     flip runReaderT c{dependentBlockDB = depBlock} $ runStateT m
       SequencerContext
         { _seenTransactionDB = mkSeenTxDB stxSize,
-          _blockstanbulContext = mbc,
-          _latestRoundNumber = latestRound
+          _blockstanbulContext = bc,
+          _latestViewAndProposal = latestVandP
         }
 
   return $ fst a
@@ -302,8 +249,8 @@ createNewTimer ::
   RoundNumber ->
   m ()
 createNewTimer rn = do
-  rnref <- Mod.access (Mod.Proxy @(IORef RoundNumber))
-  liftIO $ atomicModifyIORef' rnref (\x -> (max rn x, ()))
+  rnref <- Mod.access (Mod.Proxy @(IORef (View, Maybe Block)))
+  liftIO $ atomicModifyIORef' rnref (\(View r s, mb) -> ((View (max rn r) s, mb), ()))
   ch <- Mod.access (Mod.Proxy @(TMChan RoundNumber))
   dt <- unRoundPeriod <$> Mod.access (Mod.Proxy @(RoundPeriod))
   let act :: AlarmClock UTCTime -> IO ()
@@ -313,12 +260,37 @@ createNewTimer rn = do
         -- The first RoundChange for this message may have not
         -- been seen, so we keep firing at the same interval
         -- until an alarm lands and the round changes
-        unless (globalRN > rn) $ do
+        unless (_round (fst globalRN) > rn) $ do
           next <- addUTCTime dt <$> getCurrentTime
           setAlarm this' next
   alarm <- liftIO $ newAlarmClock act
   next <- addUTCTime dt <$> liftIO getCurrentTime
   liftIO $ setAlarm alarm next
+
+createNewViewTimer :: MonadBlockstanbul m => Block -> m ()
+createNewViewTimer b = do
+  updateViewTimer
+  vpref <- Mod.access (Mod.Proxy @(IORef (View, Maybe Block)))
+  vCur <- fst <$> liftIO (readIORef vpref)
+  let v = vCur{ _sequence = max 1 $ fromIntegral (number $ blockBlockData b) - 1 }
+  ch <- Mod.access (Mod.Proxy @(TMChan RoundNumber))
+  let act :: AlarmClock UTCTime -> IO ()
+      act this' = do
+        (v', p) <- readIORef vpref
+        when (v >= v' && isNothing p) $ do
+          atomically . writeTMChan ch $ _round v'
+          next <- addUTCTime 5 <$> getCurrentTime
+          setAlarm this' next
+  alarm <- liftIO $ newAlarmClock act
+  next <- addUTCTime 2 <$> liftIO getCurrentTime
+  liftIO $ setAlarm alarm next
+
+updateViewTimer :: MonadBlockstanbul m => m ()
+updateViewTimer = do
+  v <- currentView
+  p <- _proposal <$> getBlockstanbulContext
+  vpref <- Mod.access (Mod.Proxy @(IORef (View, Maybe Block)))
+  liftIO $ atomicModifyIORef' vpref (\_ -> ((v, p), ()))
 
 fuseChannels :: (MonadIO m, MonadReader SequencerConfig m) =>
                 m (ConduitM () SeqLoopEvent SequencerM ())

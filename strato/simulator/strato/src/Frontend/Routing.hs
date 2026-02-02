@@ -37,7 +37,7 @@ router currentRoute stateDyn = do
   el "div" $ do
     -- Navigation bar
     navBar currentRoute
-    
+
     -- Main content area
     el "main" $ do
       dyn_ $ ffor currentRoute $ \route -> case route of
@@ -63,7 +63,7 @@ navItem currentRoute path label = do
         case Map.lookup path routeConfig of
           Just r -> r == route
           Nothing -> False
-  
+
   elDynAttr "li" (ffor isActive $ \active ->
     if active
       then Map.singleton "class" "active"
@@ -80,7 +80,7 @@ dashboardWidget stateDyn = do
       dyn_ $ ffor stateDyn $ \state -> do
         -- Node card
         nodeCard $ TS.nodeState state
-        
+
         -- System metrics
         el "div" $ do
           numberCard $ NumberCardConfig
@@ -89,21 +89,21 @@ dashboardWidget stateDyn = do
             , iconClass = "cpu"
             , mode = "primary"
             }
-          
+
           numberCard $ NumberCardConfig
             { number = T.pack $ show $ TS.memoryUsage (TS.systemMetrics state)
             , description = "Memory Usage"
             , iconClass = "memory"
             , mode = "primary"
             }
-          
+
           numberCard $ NumberCardConfig
             { number = T.pack $ show $ TS.diskUsage (TS.systemMetrics state)
             , description = "Disk Usage"
             , iconClass = "disk"
             , mode = "primary"
             }
-  
+
   -- Network stats section
   el "div" $ do
     el "h2" $ text "Network Stats"
@@ -117,14 +117,14 @@ dashboardWidget stateDyn = do
             , iconClass = "nodes"
             , mode = "primary"
             }
-          
+
           numberCard $ NumberCardConfig
             { number = T.pack $ show $ TS.connectedNodes (TS.networkStats state)
             , description = "Connected Nodes"
             , iconClass = "connected"
             , mode = "primary"
             }
-        
+
         -- Network graphs
         el "div" $ do
           barGraph $ BarGraphConfig
@@ -133,7 +133,7 @@ dashboardWidget stateDyn = do
             , bgIdentifier = "latency"
             , bgUnits = Just "ms"
             }
-  
+
   -- Validators section
   el "div" $ do
     el "h2" $ text "Validators"
@@ -143,7 +143,7 @@ dashboardWidget stateDyn = do
           { vcValidators = []  -- TODO: Add validator data
           , vcTotalStake = 0   -- TODO: Add total stake
           }
-  
+
   -- Transactions section
   el "div" $ do
     el "h2" $ text "Recent Transactions"
@@ -152,14 +152,14 @@ dashboardWidget stateDyn = do
         transactionList $ TransactionListConfig
           { tlcTransactions = []  -- TODO: Add transaction data
           , tlcLimit = 10
-          } 
+          }
 
 -- Accounts page widget
 accountsWidget :: (MonadWidget t m) => Dynamic t TS.AppState -> m ()
 accountsWidget stateDyn = do
   el "div" $ do
     el "h1" $ text "Accounts"
-    
+
     -- Account statistics
     el "div" $ do
       el "h2" $ text "Account Statistics"
@@ -171,14 +171,14 @@ accountsWidget stateDyn = do
             , iconClass = "account"
             , mode = "primary"
             }
-          
+
           numberCard $ NumberCardConfig
             { number = "0"  -- TODO: Add active accounts count
             , description = "Active Accounts"
             , iconClass = "active"
             , mode = "secondary"
             }
-    
+
     -- Account distribution
     el "div" $ do
       el "h2" $ text "Account Distribution"
@@ -189,7 +189,7 @@ accountsWidget stateDyn = do
                      , PieData 10 "System" "#6c757d"]
           , pcTitle = "Account Types"
           }
-    
+
     -- Recent account activity
     el "div" $ do
       el "h2" $ text "Recent Account Activity"
@@ -204,7 +204,7 @@ contractsWidget :: (MonadWidget t m) => Dynamic t TS.AppState -> m ()
 contractsWidget stateDyn = do
   el "div" $ do
     el "h1" $ text "Contracts"
-    
+
     -- Contract statistics
     el "div" $ do
       el "h2" $ text "Contract Statistics"
@@ -216,14 +216,14 @@ contractsWidget stateDyn = do
             , iconClass = "contract"
             , mode = "primary"
             }
-          
+
           numberCard $ NumberCardConfig
             { number = "0"  -- TODO: Add active contracts count
             , description = "Active Contracts"
             , iconClass = "active"
             , mode = "secondary"
             }
-    
+
     -- Contract usage
     el "div" $ do
       el "h2" $ text "Contract Usage"
@@ -234,7 +234,7 @@ contractsWidget stateDyn = do
           , bgIdentifier = "contract-usage"
           , bgUnits = Just "calls"
           }
-    
+
     -- Recent contract activity
     el "div" $ do
       el "h2" $ text "Recent Contract Activity"
@@ -249,7 +249,7 @@ blocksWidget :: (MonadWidget t m) => Dynamic t TS.AppState -> m ()
 blocksWidget stateDyn = do
   el "div" $ do
     el "h1" $ text "Blocks"
-    
+
     -- Block statistics
     el "div" $ do
       el "h2" $ text "Block Statistics"
@@ -261,14 +261,14 @@ blocksWidget stateDyn = do
             , iconClass = "block"
             , mode = "primary"
             }
-          
+
           numberCard $ NumberCardConfig
             { number = "0"  -- TODO: Add average block time
             , description = "Average Block Time"
             , iconClass = "time"
             , mode = "secondary"
             }
-    
+
     -- Block size distribution
     el "div" $ do
       el "h2" $ text "Block Size Distribution"
@@ -279,7 +279,7 @@ blocksWidget stateDyn = do
           , bgIdentifier = "block-sizes"
           , bgUnits = Just "KB"
           }
-    
+
     -- Recent blocks
     el "div" $ do
       el "h2" $ text "Recent Blocks"
@@ -294,4 +294,4 @@ blocksWidget stateDyn = do
           el "tbody" $ do
             el "tr" $ do
               el "td" $ text "No blocks available"
-            -- TODO: Add recent blocks data 
+            -- TODO: Add recent blocks data

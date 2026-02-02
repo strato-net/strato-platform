@@ -20,6 +20,9 @@ import {
   setDebtCeilings as setDebtCeilingsService,
   borrowMax,
   withdrawCollateralMax,
+  pauseLendingPool,
+  unpauseLendingPool,
+  getLendingInterestAccrued,
 } from "../services/lending.service";
 import {
   validateDepositLiquidityArgs,
@@ -80,7 +83,7 @@ class LendingController {
       const { accessToken, body, address: userAddress } = req;
       validateWithdrawLiquidityArgs(body);
 
-      const result = await withdrawLiquidity(accessToken, userAddress as string, body.amount, body.includeStakedMToken);
+      const result = await withdrawLiquidity(accessToken, userAddress as string, body.amount);
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (error) {
@@ -359,6 +362,55 @@ class LendingController {
       next(error);
     }
   }
+
+  static async pausePool(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress } = req;
+      validateUserAddress(userAddress);
+
+      const result = await pauseLendingPool(accessToken, userAddress as string);
+      res.status(RestStatus.OK).json(result);
+      return next();
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async unpausePool(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress } = req;
+      validateUserAddress(userAddress);
+
+      const result = await unpauseLendingPool(accessToken, userAddress as string);
+      res.status(RestStatus.OK).json(result);
+      return next();
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async getInterestAccrued(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken } = req;
+      const result = await getLendingInterestAccrued(accessToken);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
 }
 
 export default LendingController;

@@ -5,6 +5,7 @@ import React, {
   useMemo,
   useEffect,
   useCallback,
+  useRef,
 } from "react";
 import { safeParseUnits } from "@/utils/numberUtils";
 import { api } from "@/lib/axios";
@@ -15,7 +16,7 @@ import { useUser } from "@/context/UserContext";
 type LendingContextType = {
   loans: NewLoanData;
   loadingLoans: boolean;
-  refreshLoans: (signal?: AbortSignal) => Promise<NewLoanData[] | undefined>;
+  refreshLoans: (showLoading?: boolean) => Promise<NewLoanData[] | undefined>;
   liquidityInfo: LiquidityData;
   refreshLiquidity: (signal?: AbortSignal) => void;
   loadingLiquidity: boolean;
@@ -71,7 +72,12 @@ export const LendingProvider = ({
   // Access authentication status
   const { isLoggedIn } = useUser();
 
+  // ========== REFS ==========
+  const loansIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const loansAbortControllerRef = useRef<AbortController | null>(null);
+
   const fetchLiquidityInfo = useCallback(async (signal?: AbortSignal) => {
+    if (!isLoggedIn) return;
     setLoadingLiquidity(true);
     try {
       const res = await api.get<LiquidityData>("/lending/liquidity", {
@@ -85,9 +91,10 @@ export const LendingProvider = ({
     } finally {
       setLoadingLiquidity(false);
     }
-  }, []);
+  }, [isLoggedIn]);
 
   const fetchCollateralInfo = useCallback(async (signal?: AbortSignal) => {
+    if (!isLoggedIn) return;
     try {
       setLoadingCollateral(true);
       const res = await api.get<CollateralData[]>("/lending/collateral", {
@@ -101,19 +108,37 @@ export const LendingProvider = ({
     } finally {
       setLoadingCollateral(false);
     }
-  }, []); 
+  }, [isLoggedIn]); 
 
-  const fetchLoans = useCallback(async (signal?: AbortSignal) => {
+  const fetchLoans = useCallback(async (showLoading: boolean = false) => {
+    if (loansAbortControllerRef.current) {
+      loansAbortControllerRef.current.abort();
+    }
+
+    loansAbortControllerRef.current = new AbortController();
+
+    if (showLoading) {
     setLoadingLoans(true);
+    }
+
     try {
-      const res = await api.get("/lending/loans", { signal });
+      const res = await api.get("/lending/loans", { 
+        signal: loansAbortControllerRef.current.signal 
+      });
+      
+      if (!loansAbortControllerRef.current.signal.aborted) {
       setLoans(res.data);
+      }
       return res.data;
-    } catch (err) {
-      if (err.name === "CanceledError" || err.name === "AbortError") return;
+    } catch (err: any) {
+      if (err.name === "AbortError" || err.code === "ERR_CANCELED" || err.name === "CanceledError") {
+        return;
+      }
       return [];
     } finally {
+      if (showLoading && !loansAbortControllerRef.current?.signal.aborted) {
       setLoadingLoans(false);
+      }
     }
   }, []);
 
@@ -201,25 +226,42 @@ export const LendingProvider = ({
   };
 
   const refreshLendingData = async (): Promise<void> => {
-    // Refresh all lending-related data
-    await fetchLoans();
+    // Refresh all lending-related data (silent refresh)
+    await fetchLoans(false);
     await fetchLiquidityInfo()
     await fetchCollateralInfo()
   };
 
 
-  const initialize = () => {
-    fetchLoans();
-    fetchLiquidityInfo();
-    fetchCollateralInfo();
-  };
-
   // Run initialization only when the user is logged in
   useEffect(() => {
     if (isLoggedIn) {
-      initialize();
+      fetchLiquidityInfo();
+      fetchCollateralInfo();
     }
-  }, [isLoggedIn]);
+  }, [isLoggedIn, fetchLiquidityInfo, fetchCollateralInfo]);
+
+  // ========== POLLING EFFECTS ==========
+  // Loans polling (60s interval)
+  useEffect(() => {
+    if (!isLoggedIn) return;
+
+    fetchLoans(true);
+
+    loansIntervalRef.current = setInterval(() => {
+      fetchLoans(false);
+    }, 60000);
+
+    return () => {
+      if (loansIntervalRef.current) {
+        clearInterval(loansIntervalRef.current);
+        loansIntervalRef.current = null;
+      }
+      if (loansAbortControllerRef.current) {
+        loansAbortControllerRef.current.abort();
+      }
+    };
+  }, [fetchLoans, isLoggedIn]);
 
   const contextValue = useMemo(
     () => ({

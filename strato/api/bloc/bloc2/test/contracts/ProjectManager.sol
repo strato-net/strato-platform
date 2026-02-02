@@ -188,7 +188,7 @@ contract ProjectManager is ErrorCodes, Util, ProjectState, ProjectEvent, BidStat
     uint price,
     uint created,
     uint targetDelivery
-  ) returns (ErrorCodes) 
+  ) returns (ErrorCodes)
   {
     if (bytes(name).length > 32)
       return ErrorCodes.ERROR;

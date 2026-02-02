@@ -21,7 +21,6 @@
 module Strato.Lite.Core where
 
 import BlockApps.Logging
-import BlockApps.X509.Certificate as X509
 import Blockchain.Bagger
 import Blockchain.Bagger.BaggerState
 import Blockchain.Blockstanbul
@@ -71,7 +70,7 @@ import Blockchain.Strato.Model.Validator
 import Blockchain.Stream.VMEvent
 import Blockchain.SyncDB
 import qualified Blockchain.TxRunResultCache as TRC
-import Blockchain.VMContext (ContextBestBlockInfo (..), GasCap (..), IsBlockstanbul (..), baggerState, lookupX509AddrFromCBHash, putContextBestBlockInfo, vmGasCap, withCurrentBlockHash)
+import Blockchain.VMContext (ContextBestBlockInfo (..), GasCap (..), baggerState, putContextBestBlockInfo, vmGasCap, withCurrentBlockHash)
 import Conduit
 import Control.Concurrent.STM.TMChan
 import Control.Lens hiding (Context, view)
@@ -79,7 +78,6 @@ import qualified Control.Lens as Lens
 import Control.Monad (forever, join, when)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
-import Control.Monad.Composable.Identity
 import Control.Monad.Reader
 import qualified Control.Monad.State as State
 import qualified Control.Monad.Trans.State as StateT
@@ -87,7 +85,6 @@ import qualified Control.Monad.Trans.State as StateT
 import Data.Conduit.TMChan
 import Data.Conduit.TQueue hiding (newTQueueIO)
 import Data.Default
-import Data.Either.Extra (eitherToMaybe)
 import Data.Foldable (for_, toList, traverse_)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
@@ -97,15 +94,12 @@ import qualified Data.Set as Set
 import qualified Data.Set.Ordered as S
 import Data.Text (Text)
 import qualified Data.Text as T
-import qualified Data.Text.Encoding as Text
 import Data.Time.Clock (UTCTime (..), diffUTCTime, getCurrentTime)
-import Data.Traversable (for)
 import Debugger (DebugSettings)
 import Executable.EthereumDiscovery
 import Executable.EthereumVM2
 import Executable.StratoP2P
 import GHC.Conc (ThreadId, myThreadId)
-import SolidVM.Model.Storable hiding (toList)
 import Strato.Lite.Base
 import Text.Format
 import UnliftIO
@@ -299,14 +293,6 @@ instance {-# OVERLAPPING #-} MonadIO m => Mod.Modifiable SequencerContext (CoreT
   get _   = asks (_sequencerContext . _corePeerContext) >>= readTVarIO
   put _ s = asks (_sequencerContext . _corePeerContext) >>= atomically . flip writeTVar s
 
-instance {-# OVERLAPPING #-} MonadBase m => (Address `A.Alters` X509CertInfoState) (CoreT m) where
-  lookup p k = lift $ A.lookup p k
-  insert p k v = lift $ A.insert p k v
-  delete p k = lift $ A.delete p k
-
-instance {-# OVERLAPPING #-} MonadBase m => A.Selectable Address X509CertInfoState (CoreT m) where
-  select = A.lookup
-
 instance {-# OVERLAPPING #-} MonadBase m => (Keccak256 `A.Alters` DBDB.DependentBlockEntry) (CoreT m) where
   lookup p k = lift $ A.lookup p k
   insert p k v = lift $ A.insert p k v
@@ -316,8 +302,8 @@ instance {-# OVERLAPPING #-} MonadIO m => Mod.Modifiable SeenTransactionDB (Core
   get _   = asks (_sequencerContext . _corePeerContext) >>= fmap _seenTransactionDB . readTVarIO
   put _ s = asks (_sequencerContext . _corePeerContext) >>= atomically . flip modifyTVar' (seenTransactionDB .~ s)
 
-instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible (IORef RoundNumber) (CoreT m) where
-  access _   = asks (_sequencerContext . _corePeerContext) >>= fmap _latestRoundNumber . readTVarIO
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible (IORef (View, Maybe Block)) (CoreT m) where
+  access _   = asks (_sequencerContext . _corePeerContext) >>= fmap _latestViewAndProposal . readTVarIO
 
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible (TMChan RoundNumber) (CoreT m) where
   access _ = asks _corePeerTimerChan
@@ -342,7 +328,7 @@ instance {-# OVERLAPPING #-} MonadIO m => HasBlockstanbulContext (CoreT m) where
     liftIO $ _blockstanbulContext <$> readTVarIO i
   putBlockstanbulContext s = do
     i <- asks $ _sequencerContext . _corePeerContext
-    liftIO $ atomically $ modifyTVar' i (blockstanbulContext ?~ s)
+    liftIO $ atomically $ modifyTVar' i (blockstanbulContext .~ s)
 
 instance {-# OVERLAPPING #-} HasVault m => HasVault (CoreT m) where
   sign bs = lift $ sign bs
@@ -469,15 +455,6 @@ instance {-# OVERLAPPING #-} MonadBase m => (Maybe Word256 `A.Alters` MP.StateRo
     modify $ memDBs . stateRoots %~ M.delete (bh, chainId)
     deleteChainStateRoot chainId bh
 
-instance {-# OVERLAPPING #-} MonadBase m => (Address `A.Selectable` X509.X509Certificate) (CoreT m) where
-  select _ k = do
-    mCertAddress <- lookupX509AddrFromCBHash k
-    fmap join . for mCertAddress $ \certAddress -> do
-      mBString <- A.lookup (A.Proxy) (certAddress, "certificateString" :: StoragePath)
-      case mBString of
-        Just (BString bs) -> pure . eitherToMaybe $ bytesToCert bs
-        _ -> pure Nothing
-
 instance {-# OVERLAPPING #-} MonadIO m => HasMemRawStorageDB (CoreT m) where
   getMemRawStorageTxDB = gets $ Lens.view $ memDBs . storageTxMap
   putMemRawStorageTxMap theMap = modify $ memDBs . storageTxMap .~ theMap
@@ -558,9 +535,6 @@ instance {-# OVERLAPPING #-} MonadBase m => (Keccak256 `A.Alters` BlockSummary) 
   lookup p k   = lift $ A.lookup p k
   insert p k v = lift $ A.insert p k v
   delete p k   = lift $ A.delete p k
-
-instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible IsBlockstanbul (CoreT m) where
-  access _ = IsBlockstanbul <$> contextGets _hasBlockstanbul
 
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Modifiable BaggerState (CoreT m) where
   get _ = contextGets _baggerState
@@ -645,9 +619,6 @@ instance {-# OVERLAPPING #-} MonadIO m => ((Host, Keccak256) `A.Alters` (A.Proxy
   insert _ _ _ = pure ()
   delete _ _   = pure ()
 
-instance {-# OVERLAPPING #-} Mod.Accessible IdentityData (CoreT m) where
-  access _ = error "strato-lite: Accessing IdentityData"
-
 startingCheckpoint :: [Validator] -> Checkpoint
 startingCheckpoint as = def {checkpointValidators = as}
 
@@ -658,12 +629,12 @@ newBlockstanbulContext network' as valBehav =
 
 newSequencerContext :: MonadIO m => BlockstanbulContext -> m SequencerContext
 newSequencerContext bc = do
-  latestRound <- newIORef 0
+  latestVAndP <- newIORef (View 0 0, Nothing)
   pure $
     SequencerContext
       { _seenTransactionDB = mkSeenTxDB 1024,
-        _blockstanbulContext = Just bc,
-        _latestRoundNumber = latestRound
+        _blockstanbulContext = bc,
+        _latestViewAndProposal = latestVAndP
       }
 
 -- coreContext is useful for testing because it doesn't require
@@ -809,7 +780,7 @@ corePeerSetup = do
   MP.initializeBlank
   genesisInfo <- asks _corePeerGenesisInfo
   let validators' = readValidatorsFromGenesisInfo genesisInfo
-  (srcInfo, gb) <- genesisInfoToGenesisBlock validators' genesisInfo
+  gb <- genesisInfoToGenesisBlock validators' genesisInfo
   let genHash = rlpHash $ blockBlockData gb
   asks (_genesisBlock . _corePeerContext) >>= atomically . flip writeTVar gb
   asks (_genesisBlockHash . _corePeerContext) >>= atomically . flip writeTVar (GenesisBlockHash genHash)
@@ -817,8 +788,9 @@ corePeerSetup = do
   if bestSequencedBlockNumber bsb' > 0
     then do
       bCtx <- getBlockstanbulContext
-      for_ bCtx $ putBlockstanbulContext . (view . sequence .~ fromIntegral (bestSequencedBlockNumber bsb'))
-                                         . (validators .~ (Set.fromList $ bestSequencedBlockValidators bsb'))
+      putBlockstanbulContext $ (view . sequence .~ fromIntegral (bestSequencedBlockNumber bsb'))
+                             . (validators .~ (Set.fromList $ bestSequencedBlockValidators bsb'))
+                             $ bCtx
       let bh = bestSequencedBlockHash bsb'
       mOB <- A.lookup (A.Proxy @OutputBlock) bh
       case mOB of
@@ -853,22 +825,12 @@ corePeerSetup = do
       writeBlockSummary genesisOutputBlock
       -- for_ (M.toList mpMap) $ \(k, v) -> A.insert (A.Proxy @MP.NodeData) k v
       -- for_ (genesisInfoCodeInfo genesisInfo) $ \(CodeInfo _ src _) -> addCode SolidVM $ Text.encodeUtf8 src
-  
-      let hashAndMd (_, CodeInfo src name) =
-            ( hash $ Text.encodeUtf8 src,
-              M.fromList $
-                [("src", src)]
-                  ++ case name of
-                    Nothing -> []
-                    Just n -> [("name", n)]
-            )
-          metadatas = M.fromList $ hashAndMd <$> srcInfo
-          findMetadata = flip M.lookup metadatas
+
       slip <- asks _corePeerSlipstreamSource
       let pub sd vmes = do
             traverse_ Mod.output sd
             atomically $ writeTQueue slip vmes
-      withCurrentBlockHash genHash $ populateStorageDBs' findMetadata genesisInfo gb Nothing (stateRoot genHeader) pub
+      withCurrentBlockHash genHash $ populateStorageDBs' genesisInfo gb Nothing (stateRoot genHeader) pub
 
 -- | A simple wrapper around a "TQueue". As data is pushed into the queue, the
 --   source will read it and pass it down the conduit pipeline.
@@ -880,7 +842,6 @@ corePeerSequencer = do
   unseqSource <- asks _corePeerUnseqSource
   seqVmSource <- asks _corePeerSeqVmSource
   seqP2pSource <- asks _corePeerSeqP2pSource
-  atomically $ writeTQueue seqVmSource [VmCreateBlockCommand]
   createFirstTimer
   runConduit $
     sourceTQueue unseqSource

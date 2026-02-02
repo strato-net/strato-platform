@@ -35,12 +35,13 @@ const config = {
     address: process.env.SAFE_ADDRESS,
     safeProposerAddress: process.env.SAFE_PROPOSER_ADDRESS,
     safeProposerPrivateKey: process.env.SAFE_PROPOSER_PRIVATE_KEY,
+    apiKey: process.env.SAFE_API_KEY,
   },
   voucher: {
     contractAddress:
       process.env.VOUCHER_CONTRACT_ADDRESS ||
       "000000000000000000000000000000000000100e",
-    mintCount: 10,
+    mintCount: 25,
   },
   polling: {
     bridgeInInterval: 1 * 60 * 1000, // 5 minutes (was 100 seconds)

@@ -14,12 +14,14 @@ import "Admin/AdminRegistry.sol";
 //Swap
 import "./Pools/Pool.sol";
 import "./Pools/PoolFactory.sol";
+import "./Pools/StablePool.sol";
 
 //Admin
 // import "Admin/FeeCollector.sol";
 
 //Rewards
 import "./Rewards/RewardsChef.sol";
+import "./Rewards/Rewards.sol";
 
 //Lending
 import "Lending/CollateralVault.sol";
@@ -39,6 +41,9 @@ import "CDP/CDPRegistry.sol";
 import "CDP/CDPEngine.sol";
 import "CDP/CDPVault.sol";
 import "CDP/CDPReserve.sol";
+
+//Escrow
+import "Escrow/Escrow.sol";
 
 //Proxy
 import "Proxy/Proxy.sol";
@@ -63,11 +68,14 @@ contract record Mercata is Authorizable {
     CDPReserve public cdpReserve;
     SafetyModule public safetyModule;
     RewardsChef public rewardsChef;
+    Rewards public rewards;
+    Token public cataToken;
+    Escrow public escrow;
 
     constructor() public {
         // The owner of the implementation contract is ignored in favor of the proxy owner
         address implOwnerIgnored = address("deadbeef");
-        
+
         // Create AdminRegistry first
         address adminRegistryImpl = address(new AdminRegistry());
         adminRegistry = AdminRegistry(address(new Proxy(adminRegistryImpl, this)));
@@ -140,13 +148,22 @@ contract record Mercata is Authorizable {
         // Create Services
         address mercataBridgeImpl = address(new MercataBridge(implOwnerIgnored));
         mercataBridge = MercataBridge(address(new Proxy(mercataBridgeImpl, this)));
-        mercataBridge.initialize(address(tokenFactory));
+        mercataBridge.initialize(address(tokenFactory), address(lendingRegistry));
         Ownable(mercataBridge).transferOwnership(address(adminRegistry));
 
         // Create RewardsChef (without initialization - to be initialized in tests)
         address rewardsChefImpl = address(new RewardsChef(implOwnerIgnored));
         rewardsChef = RewardsChef(address(new Proxy(rewardsChefImpl, this)));
         Ownable(rewardsChef).transferOwnership(address(adminRegistry));
+
+        // Use existing CATA reward token
+        cataToken = Token(address(0x2680dc6693021cd3fefb84351570874fbef8332a));
+
+        // Create Rewards contract and initialize with CATA token
+        address rewardsImpl = address(new Rewards(implOwnerIgnored));
+        rewards = Rewards(address(new Proxy(rewardsImpl, this)));
+        rewards.initialize(address(cataToken));
+        Ownable(rewards).transferOwnership(address(0x000000000000000000000000000000000000100c));
 
         // Deploy CDP registry, vault, and engine
         address cdpRegistryImpl = address(new CDPRegistry(implOwnerIgnored));
@@ -169,6 +186,10 @@ contract record Mercata is Authorizable {
 
         cdpRegistry.setAllComponents(address(cdpVault), address(cdpEngine), address(priceOracle), address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010), address(tokenFactory), address(feeCollector), address(cdpReserve));
         Ownable(cdpRegistry).transferOwnership(address(adminRegistry));
+
+        address escrowImpl = address(new Escrow(implOwnerIgnored));
+        escrow = Escrow(address(new Proxy(escrowImpl, this)));
+        Ownable(escrow).transferOwnership(address(adminRegistry));
 
         adminRegistry.swapAdmin(this, msg.sender);
     }

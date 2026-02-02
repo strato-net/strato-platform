@@ -5,12 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { MoreVertical } from "lucide-react";
-import { cdpService, VaultData, TransactionResponse } from "@/services/cdpService";
+import { MoreVertical, Loader2 } from "lucide-react";
+import { cdpService, Vault, TransactionResponse } from "@/services/cdpService";
 import { useToast } from "@/hooks/use-toast";
 import { useUserTokens } from "@/context/UserTokensContext";
+import { useTokenContext } from "@/context/TokenContext";
 import { useOracleContext } from "@/context/OracleContext";
-import { formatWeiToDecimalHP, formatNumber, formatDecimalToWeiHP } from "@/utils/numberUtils";
+import { formatWeiToDecimalHP, formatNumber, formatDecimalToWeiHP, formatNumberWithCommas, parseCommaNumber } from "@/utils/numberUtils";
+import { getAssetColor } from "@/components/cdp/v2/cdpUtils";
 import { usdstAddress } from "@/lib/constants";
 
 // Calculate Health Factor: CR / LT (Liquidation Threshold)
@@ -20,9 +22,9 @@ const calculateHealthFactor = (cr: number, lt: number): number => {
 
 // Get health factor color based on value
 const getHealthFactorColor = (healthFactor: number): string => {
-  if (healthFactor >= 1.5) return "text-black"; // Healthy - black
-  if (healthFactor >= 1.0) return "text-yellow-600"; // Warning - yellow
-  return "text-red-600"; // Danger - red
+  if (healthFactor >= 1.5) return "text-foreground"; // Healthy - standard text color
+  if (healthFactor >= 1.0) return "text-yellow-600 dark:text-yellow-500"; // Warning - yellow
+  return "text-red-600 dark:text-red-400"; // Danger - red
 };
 
 // Format percentage with reasonable precision
@@ -42,19 +44,23 @@ interface VaultsListProps {
  * Connected to backend API for real-time data
  */
 const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSuccess }) => {
-  const [positions, setPositions] = useState<VaultData[]>([]);
+  const [positions, setPositions] = useState<Vault[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-  const { activeTokens } = useUserTokens();
+  const { activeTokens, fetchTokens } = useUserTokens();
+  const { fetchUsdstBalance, earningAssets, inactiveTokens } = useTokenContext();
   const { getPrice } = useOracleContext();
   
   // State for active action and input amounts for each position
-  const [activeActions, setActiveActions] = useState<Record<string, 'deposit' | 'withdraw' | 'borrow' | 'repay' | null>>({});
+  const [activeActions, setActiveActions] = useState<Record<string, 'deposit' | 'withdraw' | 'mint' | 'repay' | null>>({});
   const [inputAmounts, setInputAmounts] = useState<Record<string, string>>({});
   const [maxStates, setMaxStates] = useState<Record<string, boolean>>({});
   const [maxValues, setMaxValues] = useState<Record<string, number>>({});  // Store max values for comparison
+  const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});  // Track loading state per asset
   const [isGlobalPaused, setIsGlobalPaused] = useState<boolean>(false);
   const [assetPauseStates, setAssetPauseStates] = useState<Record<string, boolean>>({});
+  const [assetSupportedStates, setAssetSupportedStates] = useState<Record<string, boolean>>({});
+  const [processingActions, setProcessingActions] = useState<Record<string, boolean>>({});
 
   // Fetch positions from backend
   useEffect(() => {
@@ -73,13 +79,14 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
           setIsGlobalPaused(true); // Default to paused if we can't fetch
         }
         
-        // Initialize state for each position and check asset pause status
+        // Initialize state for each position and check asset pause/support status
         const initialActiveActions: Record<string, null> = {};
         const initialAmounts: Record<string, string> = {};
         const initialMaxStates: Record<string, boolean> = {};
         const initialAssetPauseStates: Record<string, boolean> = {};
+        const initialAssetSupportedStates: Record<string, boolean> = {};
         
-        // Check pause status for each asset
+        // Check pause and support status for each asset
         for (const position of fetchedPositions) {
           initialActiveActions[position.asset] = null;
           initialAmounts[position.asset] = "";
@@ -88,9 +95,11 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
           try {
             const assetConfig = await cdpService.getAssetConfig(position.asset);
             initialAssetPauseStates[position.asset] = assetConfig?.isPaused || false;
+            initialAssetSupportedStates[position.asset] = assetConfig?.isSupported !== false; // Default to true if not found
           } catch (error) {
-            console.error(`Failed to fetch pause status for ${position.symbol}:`, error);
+            console.error(`Failed to fetch asset config for ${position.symbol}:`, error);
             initialAssetPauseStates[position.asset] = true; // Default to paused if we can't fetch
+            initialAssetSupportedStates[position.asset] = false; // Default to unsupported if we can't fetch
           }
         }
         
@@ -98,6 +107,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
         setInputAmounts(initialAmounts);
         setMaxStates(initialMaxStates);
         setAssetPauseStates(initialAssetPauseStates);
+        setAssetSupportedStates(initialAssetSupportedStates);
       } catch (error) {
         console.error("Failed to fetch positions:", error);
         toast({
@@ -114,7 +124,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
   }, [toast, refreshTrigger]);
 
   // Handle dropdown action selection
-  const handleActionSelect = (asset: string, action: 'deposit' | 'withdraw' | 'borrow' | 'repay') => {
+  const handleActionSelect = (asset: string, action: 'deposit' | 'withdraw' | 'mint' | 'repay') => {
     const currentAction = activeActions[asset];
     
     if (currentAction === action) {
@@ -132,7 +142,8 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
 
   // Check if amount is above maximum for the given action (synchronous)
   const isAmountAboveMax = (asset: string, inputAmount: string): boolean => {
-    const currentAmount = parseFloat(inputAmount || "0");
+    const parsed = parseCommaNumber(inputAmount || "0");
+    const currentAmount = parseFloat(parsed);
     if (currentAmount <= 0) return false;
     
     const maxAmount = maxValues[asset] || 0;
@@ -145,17 +156,44 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
     const cursorPosition = event?.target.selectionStart || 0;
     const inputElement = event?.target;
     
-    const currentAmount = parseFloat(value || "0");
+    // Get the part before cursor (without commas) to track position in unformatted string
+    const beforeCursor = value.substring(0, cursorPosition);
+    const beforeCursorNoCommas = parseCommaNumber(beforeCursor);
+    
+    // Remove commas and validate format
+    const parsed = parseCommaNumber(value);
+    
+    // Allow: empty, numbers, single decimal point, or number with decimal
+    if (parsed !== "" && parsed !== "." && !/^\d*\.?\d*$/.test(parsed)) {
+      // Invalid format, don't update (prevents invalid input)
+      return;
+    }
+    
+    // Format with commas for display
+    const formatted = formatNumberWithCommas(parsed);
+    
+    const currentAmount = parseFloat(parsed || "0");
     const position = positions.find(p => p.asset === asset);
     const currentAction = activeActions[asset];
     
     // Always update the input amount first to prevent cursor jumping
-    setInputAmounts(prev => ({ ...prev, [asset]: value }));
+    setInputAmounts(prev => ({ ...prev, [asset]: formatted }));
     
-    // Restore cursor position after state update
+    // Restore cursor position after state update, adjusting for added/removed commas
     if (inputElement) {
       setTimeout(() => {
-        inputElement.setSelectionRange(cursorPosition, cursorPosition);
+        // Find position in formatted string matching the unformatted cursor position
+        let unformattedPos = 0;
+        let formattedPos = 0;
+        
+        while (formattedPos < formatted.length && unformattedPos < beforeCursorNoCommas.length) {
+          if (formatted[formattedPos] !== ',') {
+            unformattedPos++;
+          }
+          formattedPos++;
+        }
+        
+        inputElement.setSelectionRange(formattedPos, formattedPos);
       }, 0);
     }
     
@@ -191,7 +229,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
   };
 
   // Calculate maximum allowed value for each action
-  const calculateMaxValue = async (position: VaultData, action: 'deposit' | 'withdraw' | 'borrow' | 'repay'): Promise<string> => {
+  const calculateMaxValue = async (position: Vault, action: 'deposit' | 'withdraw' | 'mint' | 'repay'): Promise<string> => {
     switch (action) {
       case 'deposit': {
         // Find the user's balance for this token
@@ -220,14 +258,14 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
         }
       }
       
-      case 'borrow': {
+      case 'mint': {
         try {
-          // Use the backend endpoint that calculates max borrowable amount (now without safety buffer)
+          // Use the backend endpoint that calculates max mintable amount (now without safety buffer)
           const result = await cdpService.getMaxMint(position.asset);
           // Convert from wei to decimal format (USDST is 18 decimals)
           return formatWeiToDecimalHP(result.maxAmount, 18);
         } catch (error) {
-          console.error("Failed to get max borrow amount:", error);
+          console.error("Failed to get max mint amount:", error);
           return "0";
         }
       }
@@ -249,7 +287,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
   };
 
   // Handle MAX button click
-  const handleMaxClick = async (asset: string, action: 'deposit' | 'withdraw' | 'borrow' | 'repay') => {
+  const handleMaxClick = async (asset: string, action: 'deposit' | 'withdraw' | 'mint' | 'repay') => {
     const position = positions.find(p => p.asset === asset);
     if (!position) return;
 
@@ -268,7 +306,9 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
         // Store the max value for comparison
         setMaxValues(prev => ({ ...prev, [asset]: maxAmount }));
         setMaxStates(prev => ({ ...prev, [asset]: true }));
-        setInputAmounts(prev => ({ ...prev, [asset]: maxValue }));
+        // Format max value with commas for display
+        const formattedMaxValue = formatNumberWithCommas(maxValue);
+        setInputAmounts(prev => ({ ...prev, [asset]: formattedMaxValue }));
       } catch (error) {
         console.error("Failed to calculate max value:", error);
         toast({
@@ -281,15 +321,16 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
   };
 
   // Calculate preview values based on input
-  const calculatePreviewValues = (position: VaultData, action: 'deposit' | 'withdraw' | 'borrow' | 'repay', inputAmount: string) => {
-    const amount = parseFloat(inputAmount);
+  const calculatePreviewValues = (position: Vault, action: 'deposit' | 'withdraw' | 'mint' | 'repay', inputAmount: string) => {
+    const parsed = parseCommaNumber(inputAmount);
+    const amount = parseFloat(parsed);
     if (isNaN(amount) || amount <= 0) return null;
 
     // Convert wei strings to decimal numbers for calculations
     const currentCollateral = parseFloat(formatWeiToDecimalHP(position.collateralAmount, position.collateralAmountDecimals));
     const currentDebt = parseFloat(formatWeiToDecimalHP(position.debtAmount, 18));
     const currentCollateralUSD = parseFloat(formatWeiToDecimalHP(position.collateralValueUSD, 18));
-    const currentDebtUSD = parseFloat(formatWeiToDecimalHP(position.debtValueUSD, 18));
+    const currentDebtUSD = currentDebt; // USDST is 1:1 with USD
     
     // Get the actual token price from oracle
     const priceWei = getPrice(position.asset);
@@ -319,7 +360,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
         newCollateral = Math.max(0, currentCollateral - amount);
         newCollateralUSD = newCollateral * pricePerUnit;
         break;
-      case 'borrow':
+      case 'mint':
         newDebt = currentDebt + amount;
         newDebtUSD = newDebt; // Assuming 1:1 USD peg for USDST
         break;
@@ -342,14 +383,13 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
       collateralAmount: formatNumber(newCollateral),
       collateralValueUSD: formatNumber(newCollateralUSD),
       debtAmount: formatNumber(newDebt),
-      debtValueUSD: formatNumber(newDebtUSD),
       healthFactor: newHealthFactor
     };
   };
 
-  // Validate debt floor and ceiling constraints for borrow actions
-  const validateDebtConstraints = async (asset: string, borrowAmountDecimal: number): Promise<boolean> => {
-    if (borrowAmountDecimal <= 0) return true;
+  // Validate debt floor and ceiling constraints for mint actions
+  const validateDebtConstraints = async (asset: string, mintAmountDecimal: number): Promise<boolean> => {
+    if (mintAmountDecimal <= 0) return true;
 
     try {
       // Get current asset debt info
@@ -360,12 +400,12 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
       const debtFloorWei = BigInt(debtInfo.debtFloor);
       const debtCeilingWei = BigInt(debtInfo.debtCeiling);
       
-      // Convert borrow amount to wei (18 decimals) with exact precision
-      const borrowAmountWei = BigInt(formatDecimalToWeiHP(borrowAmountDecimal.toString(), 18));
+      // Convert mint amount to wei (18 decimals) with exact precision
+      const mintAmountWei = BigInt(formatDecimalToWeiHP(mintAmountDecimal.toString(), 18));
 
       // Check debt ceiling constraint (total debt for this asset across all users)
       if (debtCeilingWei > 0n) {
-        const newAssetTotalDebtWei = currentAssetTotalDebtWei + borrowAmountWei;
+        const newAssetTotalDebtWei = currentAssetTotalDebtWei + mintAmountWei;
         if (newAssetTotalDebtWei > debtCeilingWei) {
           const availableRoomWei = debtCeilingWei > currentAssetTotalDebtWei ? debtCeilingWei - currentAssetTotalDebtWei : 0n;
           const availableRoom = parseFloat(formatWeiToDecimalHP(availableRoomWei.toString(), 18));
@@ -373,7 +413,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
           
           toast({
             title: "Debt Ceiling Exceeded",
-            description: `Cannot borrow ${borrowAmountDecimal.toFixed(2)} USDST. Maximum available: ${availableRoom.toFixed(2)} USDST (asset debt ceiling: ${debtCeilingDecimal.toFixed(2)} USDST)`,
+            description: `Cannot mint ${mintAmountDecimal.toFixed(2)} USDST. Maximum available: ${availableRoom.toFixed(2)} USDST (asset debt ceiling: ${debtCeilingDecimal.toFixed(2)} USDST)`,
             variant: "destructive",
           });
           return false;
@@ -386,7 +426,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
         const position = positions.find(p => p.asset === asset);
         if (position) {
           // Simulate the exact contract calculation:
-          // 1. Convert borrow amount to scaled debt: scaledAdd = (amountUSD * RAY) / rateAccumulator
+          // 1. Convert mint amount to scaled debt: scaledAdd = (amountUSD * RAY) / rateAccumulator
           // 2. Add to existing scaled debt: newScaledDebt = scaledDebt + scaledAdd  
           // 3. Convert back to debt: totalDebtAfter = (newScaledDebt * rateAccumulator) / RAY
           
@@ -394,8 +434,8 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
           const existingScaledDebtWei = BigInt(position.scaledDebt || "0");
           const rateAccumulatorWei = BigInt(position.rateAccumulator || "1000000000000000000000000000");
           
-          // Step 1: Convert borrow amount to scaled debt (same as contract)
-          const scaledAddWei = (borrowAmountWei * RAY + rateAccumulatorWei - 1n) / rateAccumulatorWei;
+          // Step 1: Convert mint amount to scaled debt (same as contract)
+          const scaledAddWei = (mintAmountWei * RAY + rateAccumulatorWei - 1n) / rateAccumulatorWei;
           
           // Step 2: Add to existing scaled debt (same as contract)
           const newScaledDebtWei = existingScaledDebtWei + scaledAddWei;
@@ -407,7 +447,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
           if (totalDebtAfterWei > 0n && totalDebtAfterWei < debtFloorWei) {
             toast({
               title: "Below Debt Floor",
-              description: `Borrow more USDST to reach the minimum debt floor`,
+              description: `Mint more USDST to reach the minimum debt floor`,
               variant: "destructive",
             });
             return false;
@@ -424,8 +464,10 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
   };
 
   // Handle action button clicks
-  const handleAction = async (asset: string, action: 'deposit' | 'withdraw' | 'borrow' | 'repay', amount: string) => {
-    if (!amount || parseFloat(amount) <= 0) {
+  const handleAction = async (asset: string, action: 'deposit' | 'withdraw' | 'mint' | 'repay', amount: string) => {
+    // Parse commas from input
+    const parsedAmount = parseCommaNumber(amount);
+    if (!parsedAmount || parseFloat(parsedAmount) <= 0) {
       toast({
         title: "Invalid Amount",
         description: "Please enter a valid amount greater than 0",
@@ -434,36 +476,40 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
       return;
     }
 
-    // Validate debt constraints for borrow actions
-    if (action === 'borrow') {
-      const borrowAmountDecimal = parseFloat(amount);
-      const isValid = await validateDebtConstraints(asset, borrowAmountDecimal);
+    // Validate debt constraints for mint actions
+    if (action === 'mint') {
+      const mintAmountDecimal = parseFloat(parsedAmount);
+      const isValid = await validateDebtConstraints(asset, mintAmountDecimal);
       if (!isValid) {
         return; // Validation failed, error already shown
       }
     }
+
+    // Set processing state
+    const actionKey = `${asset}-${action}`;
+    setProcessingActions(prev => ({ ...prev, [actionKey]: true }));
 
     try {
       let result;
       
       switch (action) {
         case 'deposit':
-          result = await cdpService.deposit(asset, amount);
+          result = await cdpService.deposit(asset, parsedAmount);
           break;
         case 'withdraw':
           // If user is in max state, use withdrawMax endpoint
           if (maxStates[asset]) {
             result = await cdpService.withdrawMax(asset);
           } else {
-            result = await cdpService.withdraw(asset, amount);
+            result = await cdpService.withdraw(asset, parsedAmount);
           }
           break;
-        case 'borrow':
+        case 'mint':
           // If user is in max state, use mintMax endpoint
           if (maxStates[asset]) {
             result = await cdpService.mintMax(asset);
           } else {
-            result = await cdpService.mint(asset, amount);
+            result = await cdpService.mint(asset, parsedAmount);
           }
           break;
         case 'repay':
@@ -481,13 +527,13 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                 result = await cdpService.repayAll(asset);
               } else {
                 // Use regular repay with the limited amount they can afford
-                result = await cdpService.repay(asset, amount);
+                result = await cdpService.repay(asset, parsedAmount);
               }
             } else {
-              result = await cdpService.repay(asset, amount);
+              result = await cdpService.repay(asset, parsedAmount);
             }
           } else {
-            result = await cdpService.repay(asset, amount);
+            result = await cdpService.repay(asset, parsedAmount);
           }
           break;
         default:
@@ -505,8 +551,12 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
         setMaxStates(prev => ({ ...prev, [asset]: false }));
         setActiveActions(prev => ({ ...prev, [asset]: null }));
         
-        // Refresh positions data
-        const updatedPositions = await cdpService.getVaults();
+        // Refresh positions data and balances
+        const [updatedPositions] = await Promise.all([
+          cdpService.getVaults(),
+          fetchUsdstBalance(),
+          fetchTokens()
+        ]);
         setPositions(updatedPositions);
         
         // Call the callback to refresh other components (like deposits)
@@ -550,6 +600,9 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
         description: errorMessage,
         variant: "destructive",
       });
+    } finally {
+      // Clear processing state
+      setProcessingActions(prev => ({ ...prev, [actionKey]: false }));
     }
   };
 
@@ -561,7 +614,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-8">
-            <div className="text-gray-500">Loading positions...</div>
+            <div className="text-muted-foreground">Loading positions...</div>
           </div>
         </CardContent>
       </Card>
@@ -582,8 +635,8 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center justify-center py-8 text-center">
-            <div className="text-gray-500 mb-4">No positions found</div>
-            <div className="text-sm text-gray-400">Create your first position by depositing collateral and borrowing USDST above</div>
+            <div className="text-muted-foreground mb-4">No positions found</div>
+            <div className="text-sm text-muted-foreground/70">Create your first position by depositing collateral and minting USDST above</div>
           </div>
         </CardContent>
       </Card>
@@ -622,65 +675,129 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
             return (
             <div
               key={`${position.asset}-${index}`}
-              className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
+              className="border border-border rounded-lg p-4 hover:bg-muted/50 transition-colors"
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-xs font-semibold">
-                    {position.symbol.slice(0, 2)}
-                  </div>
+                  {(() => {
+                    const token = [...earningAssets, ...inactiveTokens].find(
+                      t => t.address?.toLowerCase() === position.asset?.toLowerCase()
+                    );
+                    const tokenImage = token?.images?.[0]?.value;
+                    
+                    return tokenImage ? (
+                      <img src={tokenImage} alt={position.symbol} className="w-8 h-8 rounded-full object-cover" />
+                    ) : (
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold text-white"
+                        style={{ backgroundColor: getAssetColor(position.symbol) }}
+                      >
+                        {position.symbol.slice(0, 2)}
+                      </div>
+                    );
+                  })()}
                   <div>
                     <h4 className="font-semibold">{position.symbol}</h4>
                   </div>
                 </div>
                 
-                {/* 3-dot options menu */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => handleActionSelect(position.asset, 'deposit')}>
-                      Deposit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleActionSelect(position.asset, 'withdraw')}>
-                      Withdraw
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleActionSelect(position.asset, 'borrow')}>
-                      Borrow
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleActionSelect(position.asset, 'repay')}>
-                      Repay
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                {/* 3-dot options menu - only render if asset is supported */}
+                {assetSupportedStates[position.asset] !== false && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-8 w-8 p-0"
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem 
+                        onClick={() => handleActionSelect(position.asset, 'deposit')}
+                      >
+                        Deposit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => handleActionSelect(position.asset, 'withdraw')}
+                      >
+                        Withdraw
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => handleActionSelect(position.asset, 'mint')}
+                      >
+                        Mint
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => handleActionSelect(position.asset, 'repay')}
+                      >
+                        Repay
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
               </div>
 
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                 <div>
-                  <p className="text-xs text-gray-500 mb-1">Collateral</p>
-                  <p className="font-semibold">{formatNumber(parseFloat(formatWeiToDecimalHP(position.collateralAmount, position.collateralAmountDecimals)))} {position.symbol}</p>
-                  <p className="text-xs text-gray-400">${formatNumber(parseFloat(formatWeiToDecimalHP(position.collateralValueUSD, 18)))}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Debt</p>
-                  <p className="font-semibold">{formatNumber(parseFloat(formatWeiToDecimalHP(position.debtAmount, 18)))} USDST</p>
-                  <p className="text-xs text-gray-400">${formatNumber(parseFloat(formatWeiToDecimalHP(position.debtValueUSD, 18)))}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Health Factor</p>
+                  <p className="text-xs text-muted-foreground mb-1">Collateral</p>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <p className={`font-semibold cursor-help ${hasDebt ? getHealthFactorColor(healthFactor) : 'text-green-600'}`}>
+                      <p className="font-semibold cursor-help">{formatNumber(parseFloat(formatWeiToDecimalHP(position.collateralAmount, position.collateralAmountDecimals)))} {position.symbol}</p>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <div className="text-xs">
+                        {formatNumberWithCommas(formatWeiToDecimalHP(position.collateralAmount, position.collateralAmountDecimals))} {position.symbol}
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <p className="text-xs text-muted-foreground cursor-help">${formatNumber(parseFloat(formatWeiToDecimalHP(position.collateralValueUSD, 18)))}</p>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <div className="text-xs">
+                        ${formatNumberWithCommas(formatWeiToDecimalHP(position.collateralValueUSD, 18))}
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Debt</p>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <p className="font-semibold cursor-help">{formatNumber(parseFloat(formatWeiToDecimalHP(position.debtAmount, 18)))} USDST</p>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <div className="text-xs">
+                        {formatNumberWithCommas(formatWeiToDecimalHP(position.debtAmount, 18))} USDST
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <p className="text-xs text-muted-foreground cursor-help">${formatNumber(parseFloat(formatWeiToDecimalHP(position.debtAmount, 18)))}</p>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <div className="text-xs">
+                        ${formatNumberWithCommas(formatWeiToDecimalHP(position.debtAmount, 18))}
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Health Factor</p>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <p className={`font-semibold cursor-help ${hasDebt ? getHealthFactorColor(healthFactor) : 'text-green-600 dark:text-green-400'}`}>
                         {hasDebt ? formatNumber(healthFactor) : '∞'}
                       </p>
                     </TooltipTrigger>
                     <TooltipContent>
                       <div className="whitespace-pre-line text-center">
                         {hasDebt 
-                          ? `Health Factor = CR ÷ Liquidation Threshold\n${formatNumber(position.collateralizationRatio)}% ÷ ${formatNumber(position.liquidationRatio)}% = ${formatNumber(healthFactor)}`
+                          ? `Full precision: ${formatNumberWithCommas(healthFactor.toString())}\n\nHealth Factor = CR ÷ Liquidation Threshold\n${formatNumber(position.collateralizationRatio)}% ÷ ${formatNumber(position.liquidationRatio)}% = ${formatNumber(healthFactor)}`
                           : 'Health Factor = CR ÷ Liquidation Threshold'
                         }
                       </div>
@@ -688,31 +805,85 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                   </Tooltip>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 mb-1">Stability Fee</p>
-                  <p className="font-semibold">{formatPercentage(position.stabilityFeeRate)}</p>
+                  <p className="text-xs text-muted-foreground mb-1">Stability Fee</p>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <p className="font-semibold cursor-help">{formatPercentage(position.stabilityFeeRate)}</p>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <div className="text-xs">
+                        {formatNumberWithCommas(position.stabilityFeeRate.toString())}%
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
               </div>
 
+              {/* Warning for disabled/unsupported assets */}
+              {assetSupportedStates[position.asset] === false && (
+                <div className="mb-4 p-3 bg-destructive/10 border border-destructive/50 rounded-lg">
+                  <p className="text-sm text-destructive font-medium text-center">
+                    ⚠️ Admin has disabled {position.symbol} at this time. All operations are disabled.
+                  </p>
+                </div>
+              )}
+
               {/* Preview Values */}
               {previewValues && (
-                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <h5 className="text-sm font-medium text-blue-900 mb-2">New Values After {activeAction}:</h5>
+                <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <h5 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">New Values After {activeAction}:</h5>
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     <div>
-                      <p className="text-xs text-blue-600 mb-1">Collateral</p>
-                      <p className="font-semibold text-blue-900">{previewValues.collateralAmount} {position.symbol}</p>
-                      <p className="text-xs text-blue-500">${previewValues.collateralValueUSD}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-blue-600 mb-1">Debt</p>
-                      <p className="font-semibold text-blue-900">{previewValues.debtAmount} USDST</p>
-                      <p className="text-xs text-blue-500">${previewValues.debtValueUSD}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-blue-600 mb-1">Health Factor</p>
+                      <p className="text-xs text-blue-600 dark:text-blue-400 mb-1">Collateral</p>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <p className={`font-semibold cursor-help ${previewValues.healthFactor === Infinity ? 'text-green-600' : getHealthFactorColor(previewValues.healthFactor)}`}>
+                          <p className="font-semibold text-blue-900 dark:text-blue-100 cursor-help">{previewValues.collateralAmount} {position.symbol}</p>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <div className="text-xs">
+                            {formatNumberWithCommas(parseCommaNumber(previewValues.collateralAmount))} {position.symbol}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <p className="text-xs text-blue-500 dark:text-blue-400 cursor-help">${previewValues.collateralValueUSD}</p>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <div className="text-xs">
+                            ${formatNumberWithCommas(parseCommaNumber(previewValues.collateralValueUSD))}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <div>
+                      <p className="text-xs text-blue-600 dark:text-blue-400 mb-1">Debt</p>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <p className="font-semibold text-blue-900 dark:text-blue-100 cursor-help">{previewValues.debtAmount} USDST</p>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <div className="text-xs">
+                            {formatNumberWithCommas(parseCommaNumber(previewValues.debtAmount))} USDST
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <p className="text-xs text-blue-500 dark:text-blue-400 cursor-help">${previewValues.debtAmount}</p>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <div className="text-xs">
+                            ${formatNumberWithCommas(parseCommaNumber(previewValues.debtAmount))}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <div>
+                      <p className="text-xs text-blue-600 dark:text-blue-400 mb-1">Health Factor</p>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <p className={`font-semibold cursor-help ${previewValues.healthFactor === Infinity ? 'text-green-600 dark:text-green-400' : getHealthFactorColor(previewValues.healthFactor)}`}>
                             {previewValues.healthFactor === Infinity ? '∞' : formatNumber(previewValues.healthFactor)}
                           </p>
                         </TooltipTrigger>
@@ -720,15 +891,24 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                           <div className="whitespace-pre-line text-center">
                             {previewValues.healthFactor === Infinity 
                               ? 'Health Factor = CR ÷ Liquidation Threshold'
-                              : `Health Factor = CR ÷ Liquidation Threshold\n${formatNumber((parseFloat(previewValues.collateralValueUSD) / parseFloat(previewValues.debtValueUSD)) * 100)}% ÷ ${formatNumber(position.liquidationRatio)}% = ${formatNumber(previewValues.healthFactor)}`
+                              : `Full precision: ${formatNumberWithCommas(previewValues.healthFactor.toString())}\n\nHealth Factor = CR ÷ Liquidation Threshold\n${formatNumber((parseFloat(previewValues.collateralValueUSD) / parseFloat(previewValues.debtAmount)) * 100)}% ÷ ${formatNumber(position.liquidationRatio)}% = ${formatNumber(previewValues.healthFactor)}`
                             }
                           </div>
                         </TooltipContent>
                       </Tooltip>
                     </div>
                     <div>
-                      <p className="text-xs text-blue-600 mb-1">Stability Fee</p>
-                      <p className="font-semibold text-blue-900">{formatPercentage(position.stabilityFeeRate)}</p>
+                      <p className="text-xs text-blue-600 dark:text-blue-400 mb-1">Stability Fee</p>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <p className="font-semibold text-blue-900 dark:text-blue-100 cursor-help">{formatPercentage(position.stabilityFeeRate)}</p>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <div className="text-xs">
+                            {formatNumberWithCommas(position.stabilityFeeRate.toString())}%
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
                     </div>
                   </div>
                 </div>
@@ -737,21 +917,26 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
               {/* Conditional Action Input/Button */}
               {activeActions[position.asset] && (
                 <div className="mt-4">
-                  {/* Show pause message only for borrow/withdraw when paused */}
-                  {/* Note: deposit and repay are NOT affected by pause (no whenNotPaused modifier) */}
-                  {(isGlobalPaused || assetPauseStates[position.asset]) && (activeActions[position.asset] === 'borrow' || activeActions[position.asset] === 'withdraw') ? (
-                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-center">
-                      <p className="text-sm text-yellow-700 font-medium">
+                  {/* Show unsupported message for all actions when asset is unsupported */}
+                  {assetSupportedStates[position.asset] === false ? (
+                    <div className="p-3 bg-destructive/10 border border-destructive/50 rounded-lg text-center">
+                      <p className="text-sm text-destructive font-medium">
+                        {activeActions[position.asset]!.charAt(0).toUpperCase() + activeActions[position.asset]!.slice(1)} disabled - {position.symbol} is not supported
+                      </p>
+                    </div>
+                  ) : (isGlobalPaused || assetPauseStates[position.asset]) && (activeActions[position.asset] === 'mint' || activeActions[position.asset] === 'withdraw') ? (
+                    <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg text-center">
+                      <p className="text-sm text-yellow-800 dark:text-yellow-200 font-medium">
                         {isGlobalPaused 
-                          ? `${activeActions[position.asset] === 'borrow' ? 'Borrow' : 'Withdraw'} paused by admin at this time`
-                          : `${activeActions[position.asset] === 'borrow' ? 'Borrow' : 'Withdraw'} for ${position.symbol} paused by admin at this time`
+                          ? `${activeActions[position.asset] === 'mint' ? 'Mint' : 'Withdraw'} paused by admin at this time`
+                          : `${activeActions[position.asset] === 'mint' ? 'Mint' : 'Withdraw'} for ${position.symbol} paused by admin at this time`
                         }
                       </p>
                     </div>
                   ) : (
                     <>
                       <div className="mb-2">
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-muted-foreground">
                           Transaction Fee: {activeActions[position.asset] === 'deposit' || activeActions[position.asset] === 'repay' ? '0.02' : '0.01'} USDST
                         </p>
                       </div>
@@ -762,18 +947,17 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                           onChange={(e) => handleInputChange(position.asset, e.target.value, e)}
                           className={`flex-1 ${
                             maxStates[position.asset] 
-                              ? 'text-blue-600 bg-blue-50 border-blue-300' 
+                              ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 border-blue-300 dark:border-blue-800' 
                               : isAmountAboveMax(position.asset, inputAmounts[position.asset] || "")
-                                ? 'text-red-600 bg-red-50 border-red-300'
+                                ? 'text-destructive bg-destructive/10 border-destructive/50'
                                 : ''
                           }`}
-                          type="number"
-                          step="any"
+                          inputMode="decimal"
                         />
                       <Button 
                         variant={maxStates[position.asset] ? "default" : "outline"}
                         size="sm" 
-                        className={`min-w-[50px] ${maxStates[position.asset] ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}`}
+                        className={`min-w-[50px] ${maxStates[position.asset] ? 'bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600 text-white' : ''}`}
                         onClick={() => handleMaxClick(position.asset, activeActions[position.asset]!)}
                       >
                         MAX
@@ -783,11 +967,13 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                         size="sm" 
                         className="min-w-[80px]"
                         onClick={() => handleAction(position.asset, activeActions[position.asset]!, inputAmounts[position.asset] || "")}
-                        disabled={isAmountAboveMax(position.asset, inputAmounts[position.asset] || "")}
+                        disabled={isAmountAboveMax(position.asset, inputAmounts[position.asset] || "") || processingActions[`${position.asset}-${activeActions[position.asset]}`]}
                       >
-                        {isAmountAboveMax(position.asset, inputAmounts[position.asset] || "") 
-                          ? "Amount exceeds maximum"
-                          : activeActions[position.asset]!.charAt(0).toUpperCase() + activeActions[position.asset]!.slice(1)
+                        {processingActions[`${position.asset}-${activeActions[position.asset]}`]
+                          ? "Processing..."
+                          : isAmountAboveMax(position.asset, inputAmounts[position.asset] || "") 
+                            ? "Amount exceeds maximum"
+                            : activeActions[position.asset]!.charAt(0).toUpperCase() + activeActions[position.asset]!.slice(1)
                         }
                       </Button>
                       </div>

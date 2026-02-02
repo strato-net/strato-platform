@@ -13,11 +13,13 @@ import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { SAFETY_STAKE_FEE, SAFETY_REDEEM_FEE, usdstAddress, safetyModuleAddress, rewardsEnabled } from "@/lib/constants";
 import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
+import { RewardsWidget } from "@/components/rewards/RewardsWidget";
+import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 
 const SafetyModuleSection = () => {
   const { userAddress } = useUser();
-  const { activeTokens: tokens, loading: tokensLoading, fetchTokens, fetchUsdstBalance, usdstBalance } = useUserTokens();
-  const { approveToken } = useTokenContext();
+  const { activeTokens: tokens, loading: tokensLoading, fetchTokens } = useUserTokens();
+  const { fetchUsdstBalance, usdstBalance, approveToken } = useTokenContext();
   const {
     safetyInfo,
     loading,
@@ -33,24 +35,23 @@ const SafetyModuleSection = () => {
   const [stakeSUSDST, setStakeSUSDST] = useState<boolean>(rewardsEnabled);
   const [includeStakedSUSDST, setIncludeStakedSUSDST] = useState<boolean>(false);
   const { toast } = useToast();
+  const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
 
   const refreshData = (signal?: AbortSignal) => {
-    if (!userAddress) return;
     fetchTokens(signal);
     refreshSafetyInfo(signal);
-    fetchUsdstBalance(userAddress);
+    fetchUsdstBalance();
   };
 
-  // Fetch on userAddress change only, with abort controller
+  // Fetch on mount, with abort controller
   useEffect(() => {
-    if (!userAddress) return;
     const abortController = new AbortController();
     refreshData(abortController.signal);
     return () => {
       abortController.abort();
     };
-  }, [userAddress]);
+  }, []);
 
   // usdstBalance is now coming directly from useUserTokens() context
 
@@ -133,7 +134,7 @@ const SafetyModuleSection = () => {
         title: stakeSUSDST ? "Rewards Staking Successful" : "Stake Successful",
         description: stakeSUSDST
           ? `Successfully deposited ${stakeAmount} USDST and staked sUSDST to rewards program.`
-          : `You have successfully staked ${stakeAmount} USDST for sUSDST.`,
+          : `You have successfully staked ${stakeAmount} USDST for safetyUSDST.`,
         variant: "success",
       });
 
@@ -188,7 +189,7 @@ const SafetyModuleSection = () => {
 
       toast({
         title: "Redeem Successful",
-        description: `You have successfully redeemed sUSDST for USDST.`,
+        description: `You have successfully redeemed safetyUSDST for USDST.`,
         variant: "success",
       });
 
@@ -231,7 +232,7 @@ const SafetyModuleSection = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div>
               <div className="flex flex-col space-y-4">
-                <div className="bg-white rounded-lg p-4 border">
+                <div className="bg-card rounded-lg p-4 border border-border">
                   <h3 className="font-medium mb-3">Stake</h3>
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-start space-y-2 sm:space-y-0 sm:space-x-2">
                     <div className="relative flex-1">
@@ -242,7 +243,7 @@ const SafetyModuleSection = () => {
                         onChange={(e) => setStakeAmount(e.target.value)}
                         className={`pl-16 ${!isStakeAmountValid() ? 'text-red-600' : ''}`}
                       />
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-medium">USDST</span>
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-medium">USDST</span>
                     </div>
                     <Button
                       onClick={handleStakeAction}
@@ -259,7 +260,7 @@ const SafetyModuleSection = () => {
                       )}
                     </Button>
                   </div>
-                  <div className="text-sm text-gray-500 mt-1">
+                  <div className="text-sm text-muted-foreground mt-1">
                     <button
                       type="button"
                       onClick={() => {
@@ -279,7 +280,7 @@ const SafetyModuleSection = () => {
                     </button>
                     Available:{" "}
                     {tokensLoading ?
-                      <span className="text-gray-400 animate-pulse">
+                      <span className="text-muted-foreground animate-pulse">
                         Loading...
                       </span>
                       : usdstBalance
@@ -288,9 +289,16 @@ const SafetyModuleSection = () => {
                     USDST
                   </div>
                   {/* Fee Display */}
-                  <div className="text-sm text-gray-500 mt-1">
+                  <div className="text-sm text-muted-foreground mt-1">
                     Transaction Fee: {SAFETY_STAKE_FEE} USDST
                   </div>
+                  {/* Estimated Rewards */}
+                  <RewardsWidget
+                    userRewards={userRewards}
+                    activityName="Safety Module"
+                    inputAmount={stakeAmount}
+                    actionLabel="Stake"
+                  />
                   {/* Stake sUSDST Checkbox - only show if rewards are enabled */}
                   {rewardsEnabled && (
                     <div className="flex items-center space-x-2 mt-3">
@@ -307,7 +315,7 @@ const SafetyModuleSection = () => {
                       </label>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                          <HelpCircle className="h-4 w-4 text-muted-foreground hover:text-foreground cursor-help" />
                         </TooltipTrigger>
                         <TooltipContent>
                           <p className="max-w-xs text-sm">
@@ -366,7 +374,7 @@ const SafetyModuleSection = () => {
 
                 {/* Cooldown Section */}
                 {safetyInfo && BigInt(safetyInfo.userSharesTotal) > 0n && (
-                  <div className="bg-white rounded-lg p-4 border">
+                  <div className="bg-card rounded-lg p-4 border border-border">
                     <h3 className="font-medium mb-3 flex items-center gap-2">
                       <Clock className="h-4 w-4" />
                       Unstaking
@@ -374,13 +382,13 @@ const SafetyModuleSection = () => {
                     
                     {!safetyInfo.cooldownActive ? (
                       <div className="space-y-3">
-                        <p className="text-sm text-gray-600">
-                          Start your cooldown period to begin unstaking your sUSDST.
+                        <p className="text-sm text-muted-foreground">
+                          Start your cooldown period to begin unstaking your safetyUSDST.
                         </p>
                         <Button
                           onClick={handleStartCooldown}
                           variant="outline"
-                          className="border-orange-500 text-orange-600 hover:bg-orange-50 w-full"
+                          className="border-orange-500 text-orange-500 hover:bg-orange-500/10 w-full"
                           disabled={isProcessing}
                         >
                           {isProcessing ? "Processing..." : "Start Cooldown"}
@@ -389,31 +397,31 @@ const SafetyModuleSection = () => {
                     ) : (
                       <div className="space-y-3">
                         {safetyInfo.cooldownTimeRemaining !== "0" ? (
-                          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                            <div className="flex items-center gap-2 text-yellow-800">
+                          <div className="bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-900 rounded-lg p-3">
+                            <div className="flex items-center gap-2 text-yellow-800 dark:text-yellow-200">
                               <Clock className="h-4 w-4" />
                               <span className="font-medium">Cooldown Active</span>
                             </div>
-                            <p className="text-sm text-yellow-700 mt-1">
+                            <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
                               Time remaining: {formatTimeRemaining(safetyInfo.cooldownTimeRemaining)}
                             </p>
                           </div>
                         ) : safetyInfo.unstakeWindowTimeRemaining !== "0" ? (
-                          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                            <div className="flex items-center gap-2 text-green-800">
+                          <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-900 rounded-lg p-3">
+                            <div className="flex items-center gap-2 text-green-800 dark:text-green-200">
                               <CircleArrowUp className="h-4 w-4" />
                               <span className="font-medium">Unstake Window Open</span>
                             </div>
-                            <p className="text-sm text-green-700 mt-1">
+                            <p className="text-sm text-green-700 dark:text-green-300 mt-1">
                               Window closes in: {formatTimeRemaining(safetyInfo.unstakeWindowTimeRemaining)}
                             </p>
                           </div>
                         ) : (
-                          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                            <div className="flex items-center gap-2 text-red-800">
+                          <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-lg p-3">
+                            <div className="flex items-center gap-2 text-red-800 dark:text-red-200">
                               <span className="font-medium">Unstake Window Closed</span>
                             </div>
-                            <p className="text-sm text-red-700 mt-1">
+                            <p className="text-sm text-red-700 dark:text-red-300 mt-1">
                               You need to start a new cooldown period.
                             </p>
                             <Button
@@ -432,21 +440,21 @@ const SafetyModuleSection = () => {
                 )}
 
                 {/* Redeem Section */}
-                <div className="bg-white rounded-lg p-4 border">
+                <div className="bg-card rounded-lg p-4 border border-border">
                   <h3 className="font-medium mb-3">Redeem</h3>
                   
                   {/* Show redemption status */}
                   {safetyInfo && BigInt(safetyInfo.userSharesTotal) === 0n ? (
-                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-3">
-                      <p className="text-sm text-gray-600">
-                        No sUSDST shares to redeem. Stake USDST first to receive sUSDST shares.
+                    <div className="bg-muted/50 border border-border rounded-lg p-3 mb-3">
+                      <p className="text-sm text-muted-foreground">
+                        No safetyUSDST shares to redeem. Stake USDST first to receive safetyUSDST shares.
                       </p>
                     </div>
                   ) : !safetyInfo?.canRedeem ? (
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-3">
-                      <p className="text-sm text-yellow-800">
+                    <div className="bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-900 rounded-lg p-3 mb-3">
+                      <p className="text-sm text-yellow-800 dark:text-yellow-200">
                         {!safetyInfo?.cooldownActive 
-                          ? "Start cooldown period before you can redeem your sUSDST."
+                          ? "Start cooldown period before you can redeem your safetyUSDST."
                           : safetyInfo.cooldownTimeRemaining !== "0"
                           ? "Cooldown in progress. You can redeem after the cooldown completes."
                           : "Unstake window has expired. Start a new cooldown to redeem."
@@ -454,9 +462,9 @@ const SafetyModuleSection = () => {
                       </p>
                     </div>
                   ) : (
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
-                      <p className="text-sm text-green-800">
-                        ✓ Unstake window is open. You can now redeem your sUSDST for USDST.
+                    <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-900 rounded-lg p-3 mb-3">
+                      <p className="text-sm text-green-800 dark:text-green-200">
+                        ✓ Unstake window is open. You can now redeem your safetyUSDST for USDST.
                       </p>
                     </div>
                   )}
@@ -470,10 +478,10 @@ const SafetyModuleSection = () => {
                             placeholder="0.00"
                             value={redeemAmount}
                             onChange={(e) => setRedeemAmount(e.target.value)}
-                            className={`pl-16 ${!isRedeemAmountValid() ? 'text-red-600' : ''}`}
+                            className={`pl-24 ${!isRedeemAmountValid() ? 'text-red-600' : ''}`}
                             disabled={!safetyInfo?.canRedeem || (includeStakedSUSDST ? BigInt(safetyInfo?.userSharesTotal || "0") === 0n : BigInt(safetyInfo?.userShares || "0") === 0n)}
                           />
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-medium">sUSDST</span>
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-medium">safetyUSDST</span>
                         </div>
                         <Button
                           onClick={() => handleRedeemAction("redeem")}
@@ -491,7 +499,7 @@ const SafetyModuleSection = () => {
                           )}
                         </Button>
                       </div>
-                      <div className="text-sm text-gray-500 mt-1">
+                      <div className="text-sm text-muted-foreground mt-1">
                       <button
                         type="button"
                         onClick={() => {
@@ -509,23 +517,23 @@ const SafetyModuleSection = () => {
                         }}
                         className={`mr-2 ${safetyInfo?.canRedeem && (includeStakedSUSDST ? BigInt(safetyInfo?.userSharesTotal || "0") > 0n : BigInt(safetyInfo?.userShares || "0") > 0n)
                           ? "text-blue-600 hover:underline cursor-pointer"
-                          : "text-gray-400 cursor-not-allowed"}`}
+                          : "text-muted-foreground cursor-not-allowed"}`}
                         disabled={!safetyInfo?.canRedeem || (includeStakedSUSDST ? BigInt(safetyInfo?.userSharesTotal || "0") === 0n : BigInt(safetyInfo?.userShares || "0") === 0n)}
                       >
                         Max
                       </button>
                       Available:{" "}
                       {loading ?
-                        <span className="text-gray-400 animate-pulse">
+                        <span className="text-muted-foreground animate-pulse">
                           Loading...
                         </span>
                         : includeStakedSUSDST
                           ? formatBalance(safetyInfo?.userSharesTotal || 0n, undefined, 18, 2)
                           : formatBalance(safetyInfo?.userShares || 0n, undefined, 18, 2)}{" "}
-                      sUSDST
+                      safetyUSDST
                     </div>
                     {/* Fee Display */}
-                    <div className="text-sm text-gray-500 mt-1">
+                    <div className="text-sm text-muted-foreground mt-1">
                       Transaction Fee: {SAFETY_REDEEM_FEE} USDST
                     </div>
                     {/* Include Staked sUSDST Checkbox - only show if rewards are enabled */}
@@ -544,7 +552,7 @@ const SafetyModuleSection = () => {
                         </label>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                            <HelpCircle className="h-4 w-4 text-muted-foreground hover:text-foreground cursor-help" />
                           </TooltipTrigger>
                           <TooltipContent>
                             <p className="max-w-xs text-sm">
@@ -578,16 +586,16 @@ const SafetyModuleSection = () => {
               </div>
             </div>
 
-            <div className="bg-white rounded-lg p-4 border">
+            <div className="bg-card rounded-lg p-4 border border-border">
               <div className="flex justify-between mb-4">
                 <h3 className="font-medium">Safety Module Stats</h3>
               </div>
               <div className="space-y-3">
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-gray-500 text-sm sm:text-base">Total USDST Staked</span>
+                  <span className="text-muted-foreground text-sm sm:text-base">Total USDST Staked</span>
                   <span className="font-medium text-sm sm:text-base sm:text-right">
                     {loading ? (
-                      <span className="text-gray-400 animate-pulse">
+                      <span className="text-muted-foreground animate-pulse">
                         Loading...
                       </span>
                     ) : safetyInfo ? (
@@ -598,10 +606,10 @@ const SafetyModuleSection = () => {
                   </span>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-gray-500 text-sm sm:text-base">Total sUSDST Shares</span>
+                  <span className="text-muted-foreground text-sm sm:text-base">Total safetyUSDST Shares</span>
                   <span className="font-medium text-sm sm:text-base sm:text-right">
                     {loading ? (
-                      <span className="text-gray-400 animate-pulse">
+                      <span className="text-muted-foreground animate-pulse">
                         Loading...
                       </span>
                     ) : safetyInfo?.totalShares ? (
@@ -612,22 +620,22 @@ const SafetyModuleSection = () => {
                   </span>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-gray-500 text-sm sm:text-base">Exchange Rate</span>
+                  <span className="text-muted-foreground text-sm sm:text-base">Exchange Rate</span>
                   <span className="font-medium text-sm sm:text-base sm:text-right">
                     {loading ? (
-                      <span className="text-gray-400 animate-pulse">Loading...</span>
+                      <span className="text-muted-foreground animate-pulse">Loading...</span>
                     ) : safetyInfo?.exchangeRate ? (
-                      "1 sUSDST ≈ " + formatUnits(safetyInfo?.exchangeRate || 0, 18) + " USDST"
+                      "1 safetyUSDST ≈ " + formatUnits(safetyInfo?.exchangeRate || 0, 18) + " USDST"
                     ) : (
-                      "1 sUSDST = 1 USDST"
+                      "1 safetyUSDST = 1 USDST"
                     )}
                   </span>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-gray-500 text-sm sm:text-base">Your sUSDST (Total)</span>
+                  <span className="text-muted-foreground text-sm sm:text-base">Your safetyUSDST (Total)</span>
                   <span className="font-medium text-sm sm:text-base sm:text-right">
                     {loading ? (
-                      <span className="text-gray-400 animate-pulse">
+                      <span className="text-muted-foreground animate-pulse">
                         Loading...
                       </span>
                     ) : safetyInfo?.userSharesTotal ? (
@@ -640,10 +648,10 @@ const SafetyModuleSection = () => {
                 {rewardsEnabled && (
                   <>
                     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start pl-4">
-                      <span className="text-gray-400 text-xs sm:text-sm">• Staked</span>
+                      <span className="text-muted-foreground text-xs sm:text-sm">• Staked</span>
                       <span className="font-medium text-xs sm:text-sm sm:text-right">
                         {loading ? (
-                          <span className="text-gray-400 animate-pulse">
+                          <span className="text-muted-foreground animate-pulse">
                             Loading...
                           </span>
                         ) : safetyInfo?.userSharesStaked ? (
@@ -654,10 +662,10 @@ const SafetyModuleSection = () => {
                       </span>
                     </div>
                     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start pl-4">
-                      <span className="text-gray-400 text-xs sm:text-sm">• Unstaked</span>
+                      <span className="text-muted-foreground text-xs sm:text-sm">• Unstaked</span>
                       <span className="font-medium text-xs sm:text-sm sm:text-right">
                         {loading ? (
-                          <span className="text-gray-400 animate-pulse">
+                          <span className="text-muted-foreground animate-pulse">
                             Loading...
                           </span>
                         ) : safetyInfo?.userShares ? (
@@ -670,7 +678,7 @@ const SafetyModuleSection = () => {
                   </>
                 )}
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-gray-500 text-sm sm:text-base">Cooldown Period</span>
+                  <span className="text-muted-foreground text-sm sm:text-base">Cooldown Period</span>
                   <span className="font-medium text-sm sm:text-base">
                     {safetyInfo?.cooldownSeconds ? 
                       formatTimeRemaining(safetyInfo.cooldownSeconds) : 
@@ -679,7 +687,7 @@ const SafetyModuleSection = () => {
                   </span>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-gray-500 text-sm sm:text-base">Unstake Window</span>
+                  <span className="text-muted-foreground text-sm sm:text-base">Unstake Window</span>
                   <span className="font-medium text-sm sm:text-base">
                     {safetyInfo?.unstakeWindow ? 
                       formatTimeRemaining(safetyInfo.unstakeWindow) : 
@@ -689,7 +697,7 @@ const SafetyModuleSection = () => {
                 </div>
                 {safetyInfo?.cooldownActive && (
                   <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                    <span className="text-gray-500 text-sm sm:text-base">Cooldown Status</span>
+                    <span className="text-muted-foreground text-sm sm:text-base">Cooldown Status</span>
                     <span className="font-medium text-sm sm:text-base sm:text-right">
                       {safetyInfo.cooldownTimeRemaining !== "0" ? (
                         <span className="text-yellow-600">

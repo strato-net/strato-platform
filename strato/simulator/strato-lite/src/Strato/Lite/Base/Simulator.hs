@@ -22,12 +22,10 @@
 module Strato.Lite.Base.Simulator where
 
 import BlockApps.Logging
-import BlockApps.X509.Certificate as X509
 import Blockchain.Context hiding (actionTimestamp, blockHeaders, remainingBlockHeaders)
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
-import Blockchain.Data.CirrusDefs
 import qualified Blockchain.Data.DataDefs as DataDefs
 import Blockchain.Data.PubKey
 import Blockchain.Data.Transaction
@@ -111,7 +109,6 @@ data SimulatorContext = SimulatorContext
   , _simulatorContextCanonicalBlockHashMap :: Map Integer (Canonical Keccak256)
   , _simulatorContextBlockRegistry         :: Map Keccak256 OutputBlock
   , _simulatorContextDBERegistry           :: Map Keccak256 DBDB.DependentBlockEntry
-  , _simulatorContextX509CertMap           :: Map Address X509CertInfoState
   , _simulatorContextPeerMap               :: MemPeerDBEnv
   , _simulatorContextTransactionResults    :: [DataDefs.TransactionResult]
   , _simulatorContextSyncStatus            :: SyncStatus
@@ -255,7 +252,7 @@ instance {-# OVERLAPPING #-} MonadIO m => (MonadSimulator m) `Mod.Yields` DataDe
   yield txr = simulatorContextTransactionResults %= (txr:)
 
 instance {-# OVERLAPPING #-} Monad m => (MonadSimulator m) `Mod.Outputs` StateDiff where
-  output _ = pure () 
+  output _ = pure ()
 
 instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m) => (MonadSimulator m) `Mod.Outputs` SlipstreamQuery where
   output = traverse_ ($logInfoS ("slipstream/cmds") . T.pack) . lines . show
@@ -280,38 +277,6 @@ instance {-# OVERLAPPING #-} MonadIO m => (Keccak256 `A.Alters` P2P OutputBlock)
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Modifiable (P2P BestBlock) (MonadSimulator m) where
   get _ = liftIO . throwIO $ Lookup "P2P" "()" "BestBlock"
   put _ (P2P bb) = simulatorContextBestBlock .= bb
-
-instance {-# OVERLAPPING #-} MonadIO m => (Address `A.Alters` X509CertInfoState) (MonadSimulator m) where
-  lookup _ k = do
-    ctx <- asks _simulatorPeerContext
-    M.lookup k . _simulatorContextX509CertMap <$> atomically (readTVar ctx)
-  lookupMany _ ks = do
-    ctx <- asks _simulatorPeerContext
-    atomically $ do
-      m <- _simulatorContextX509CertMap <$> readTVar ctx
-      pure . M.fromList . catMaybes $ (\k -> (k,) <$> M.lookup k m) <$> ks
-  insert _ k v = do
-    ctx <- asks _simulatorPeerContext
-    atomically . modifyTVar ctx $ simulatorContextX509CertMap . at k ?~ v
-  insertMany _ kvs = do
-    ctx <- asks _simulatorPeerContext
-    atomically . modifyTVar ctx $ simulatorContextX509CertMap %~ M.union kvs
-  delete _ k = do
-    ctx <- asks _simulatorPeerContext
-    atomically . modifyTVar ctx $ simulatorContextX509CertMap . at k .~ Nothing
-  deleteMany _ ks = do
-    ctx <- asks _simulatorPeerContext
-    atomically . modifyTVar ctx $ simulatorContextX509CertMap %~ flip M.difference (M.fromList . zip ks $ repeat ())
-
-instance {-# OVERLAPPING #-} MonadIO m => A.Selectable Validator X509CertInfoState (MonadSimulator m) where
-  select _ (Validator k) = do
-    ctx <- asks _simulatorPeerContext
-    atomically $ M.lookup k . _simulatorContextX509CertMap <$> readTVar ctx
-  selectMany _ ks = do
-    ctx <- asks _simulatorPeerContext
-    atomically $ do
-      m <- M.fromList . map (\(a,v) -> (Validator a, v)) . M.toList . _simulatorContextX509CertMap <$> readTVar ctx
-      pure . M.fromList . catMaybes $ (\k -> (k,) <$> M.lookup k m) <$> ks
 
 instance {-# OVERLAPPING #-} MonadIO m => (Keccak256 `A.Alters` DBDB.DependentBlockEntry) (MonadSimulator m) where
   lookup _ k = do
@@ -503,7 +468,7 @@ instance {-# OVERLAPPING #-} MonadIO m => A.Selectable Address Integer (MonadSim
   select _ _ = pure $ Just 0
 
 instance {-# OVERLAPPING #-} MonadIO m => A.Selectable Keccak256 SourceMap (MonadSimulator m) where
-  select _ ch = A.lookup (A.Proxy @DBCode) ch >>= \case 
+  select _ ch = A.lookup (A.Proxy @DBCode) ch >>= \case
     Nothing -> pure Nothing
     Just codeBS -> case Aeson.decode' $ BL.fromStrict codeBS of
       Just codeMap -> pure . Just . SourceMap $ M.toList codeMap
@@ -529,9 +494,6 @@ instance {-# OVERLAPPING #-} MonadIO m => A.Selectable BlocksFilterParams [Block
 instance {-# OVERLAPPING #-} MonadIO m => A.Selectable StorageFilterParams [StorageAddress] (MonadSimulator m) where
   select _ _ = pure Nothing
 
-instance {-# OVERLAPPING #-} Monad m => A.Selectable Address Certificate (MonadSimulator m) where
-  select _ _ = pure Nothing
-
 preAlGoreInternet :: Internet
 preAlGoreInternet = Internet M.empty M.empty
 
@@ -544,7 +506,6 @@ emptySimulatorContext memPeerDBEnv =
     , _simulatorContextCanonicalBlockHashMap = M.empty
     , _simulatorContextBlockRegistry = M.empty
     , _simulatorContextDBERegistry = M.empty
-    , _simulatorContextX509CertMap = M.empty
     , _simulatorContextPeerMap = memPeerDBEnv
     , _simulatorContextTransactionResults = []
     , _simulatorContextSyncStatus = SyncStatus True

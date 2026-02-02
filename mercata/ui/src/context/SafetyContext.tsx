@@ -25,11 +25,11 @@ const SafetyContext = createContext<SafetyContextType | undefined>(undefined);
 export const SafetyProvider = ({ children }: { children: React.ReactNode }) => {
   const [safetyInfo, setSafetyInfo] = useState<SafetyModuleData | null>(null);
   const [loading, setLoading] = useState(false);
-  const { userAddress } = useUser();
+  const { isLoggedIn } = useUser();
 
   const refreshSafetyInfo = useCallback(
     async (signal?: AbortSignal) => {
-      if (!userAddress) return;
+      if (!isLoggedIn) return;
 
       try {
         setLoading(true);
@@ -43,56 +43,56 @@ export const SafetyProvider = ({ children }: { children: React.ReactNode }) => {
         setLoading(false);
       }
     },
-    [userAddress]
+    [isLoggedIn]
   );
 
   const stakeSafety = useCallback(
     async ({ amount, stakeSToken }: { amount: string; stakeSToken: boolean }) => {
-      if (!userAddress) throw new Error("User not connected");
+      if (!isLoggedIn) throw new Error("User not connected");
 
       const response = await api.post("/lending/safety/stake", { amount, stakeSToken });
       refreshSafetyInfo();
       return response.data;
     },
-    [userAddress, refreshSafetyInfo]
+    [isLoggedIn, refreshSafetyInfo]
   );
 
   const startCooldown = useCallback(async () => {
-    if (!userAddress) throw new Error("User not connected");
+    if (!isLoggedIn) throw new Error("User not connected");
 
     const response = await api.post("/lending/safety/cooldown");
     refreshSafetyInfo();
     return response.data;
-  }, [userAddress, refreshSafetyInfo]);
+  }, [isLoggedIn, refreshSafetyInfo]);
 
   const redeemSafety = useCallback(
     async ({ sharesAmount, includeStakedSToken }: { sharesAmount: string; includeStakedSToken: boolean }) => {
-      if (!userAddress) throw new Error("User not connected");
+      if (!isLoggedIn) throw new Error("User not connected");
 
       const response = await api.post("/lending/safety/redeem", { sharesAmount, includeStakedSToken });
       refreshSafetyInfo();
       return response.data;
     },
-    [userAddress, refreshSafetyInfo]
+    [isLoggedIn, refreshSafetyInfo]
   );
 
   const redeemAllSafety = useCallback(async () => {
-    if (!userAddress) throw new Error("User not connected");
+    if (!isLoggedIn) throw new Error("User not connected");
 
     const response = await api.post("/lending/safety/redeem-all");
     refreshSafetyInfo();
     return response.data;
-  }, [userAddress, refreshSafetyInfo]);
+  }, [isLoggedIn, refreshSafetyInfo]);
 
-  // Auto-refresh on user address change
+  // Auto-refresh when logged in
   useEffect(() => {
-    if (!userAddress) return;
+    if (!isLoggedIn) return;
     const abortController = new AbortController();
     refreshSafetyInfo(abortController.signal);
     return () => {
       abortController.abort();
     };
-  }, [userAddress, refreshSafetyInfo]);
+  }, [isLoggedIn, refreshSafetyInfo]);
 
   // Auto-refresh timer for cooldown/window status
   useEffect(() => {

@@ -62,14 +62,14 @@ export const useBalancePolling = (userAddress: string, fetchBalance: (address: s
 // Optimized focused hooks
 
 // Hook for managing pool data fetching and state
-export const usePoolPolling = ({ fromAsset, toAsset, getPoolByTokenPair, fetchUsdstBalance, userAddress, interval = 10000 }: PoolPollingConfig) =>
+export const usePoolPolling = ({ fromAsset, toAsset, getPoolByTokenPair, fetchUsdstBalance, interval = 10000 }: PoolPollingConfig) =>
   useSmartPolling({
     fetchFn: async () => {
       if (!fromAsset?.address || !toAsset?.address) return null;
       const poolData = await getPoolByTokenPair(fromAsset.address, toAsset.address);
       // Also fetch USDST balance to keep it updated
-      if (userAddress && fetchUsdstBalance) {
-        await fetchUsdstBalance(userAddress);
+      if (fetchUsdstBalance) {
+        await fetchUsdstBalance();
       }
       return poolData;
     },

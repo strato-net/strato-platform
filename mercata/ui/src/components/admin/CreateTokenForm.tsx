@@ -201,8 +201,8 @@ const CreateTokenForm = () => {
             rules={{ 
               required: 'Token symbol is required',
               pattern: {
-                value: /^[A-Z]+$/,
-                message: 'Symbol must be uppercase letters only'
+                value: /^[A-Za-z]+$/,
+                message: 'Symbol must be letters only'
               },
               maxLength: {
                 value: 10,
@@ -216,10 +216,6 @@ const CreateTokenForm = () => {
                   <Input 
                     placeholder="GOLD" 
                     {...field}
-                    onChange={(e) => {
-                      const uppercaseValue = e.target.value.toUpperCase();
-                      field.onChange(uppercaseValue);
-                    }}
                   />
                 </FormControl>
                 <FormDescription>
@@ -317,10 +313,10 @@ const CreateTokenForm = () => {
                 />
                 {uploadedFiles.length > 0 && (
                   <div className="space-y-2">
-                    <p className="text-sm text-gray-600">Uploaded files:</p>
+                    <p className="text-sm text-muted-foreground">Uploaded files:</p>
                     <div className="grid grid-cols-1 gap-2">
                       {uploadedFiles.map((file, index) => (
-                        <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded-md">
+                        <div key={index} className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
                           <span className="text-sm truncate">{file.name}</span>
                           <Button
                             type="button"

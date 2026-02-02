@@ -91,7 +91,7 @@ postSendToMultisig (PostSendToMultisigArgs funcName amt) = liftIO $ do
                               functionpayloadMetadata = Just $ M.fromList [("VM", "SolidVM")]
                             }
                           pbtr = PostBlocTransactionRequest Nothing [payload] Nothing Nothing
-                      result <- runClientM (postBlocTransaction (Just False) True pbtr) (mkClientEnv mgr blocBaseUrl)
+                      result <- runClientM (postBlocTransaction Nothing True pbtr) (mkClientEnv mgr blocBaseUrl)
                       pure . T.pack $ show result
     else do
       mgr <- newManager defaultManagerSettings -- tlsManagerSettings
@@ -103,7 +103,7 @@ postSendToMultisig (PostSendToMultisigArgs funcName amt) = liftIO $ do
               functionpayloadMetadata = Just $ M.fromList [("VM", "SolidVM")]
             }
           pbtr = PostBlocTransactionRequest Nothing [payload] Nothing Nothing
-      result <- runClientM (postBlocTransaction (Just False) True pbtr) (mkClientEnv mgr blocBaseUrl)
+      result <- runClientM (postBlocTransaction Nothing True pbtr) (mkClientEnv mgr blocBaseUrl)
       pure . T.pack $ show result
   -- callBitcoinRPC (Proxy @GetNewAddress) HNil >>= \case
   --   Left e -> throwIO . BackendException $ T.pack e
@@ -156,7 +156,7 @@ callCirrus t = liftIO $ do
 
 getUserMe :: Handler Value
 getUserMe = do
-  result <- callCirrus "BlockApps-Mercata-AdminRegistry"
+  result <- callCirrus "BlockApps-AdminRegistry"
   pure result
 
 getUserAdmin :: Handler Value

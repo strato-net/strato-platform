@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/axios';
-import { Loader2, Shield, Info, ArrowUpRight } from 'lucide-react';
+import { Loader2, Shield, Info, ArrowUpRight, AlertTriangle, Pause, Play } from 'lucide-react';
+import { ExclamationCircleOutlined, CheckCircleOutlined } from '@ant-design/icons';
 
 interface DebtCeilingFormValues {
   assetUnits: string;
@@ -21,6 +22,8 @@ interface SweepReservesFormValues {
 const LendingPoolOverview = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [isPaused, setIsPaused] = useState<boolean>(false);
+  const [pauseLoading, setPauseLoading] = useState(false);
 
   const debtCeilingForm = useForm<DebtCeilingFormValues>({
     defaultValues: {
@@ -34,6 +37,23 @@ const LendingPoolOverview = () => {
       amount: '',
     },
   });
+
+  // Load pause status on mount
+  useEffect(() => {
+    const loadPauseStatus = async () => {
+      try {
+        const response = await api.get('/lend/pools', {
+          params: {
+            select: 'lendingPool:lendingPool_fkey(_paused)',
+          },
+        });
+        setIsPaused(response.data?.lendingPool?._paused || false);
+      } catch (error) {
+        console.error('Failed to load pause status:', error);
+      }
+    };
+    loadPauseStatus();
+  }, []);
 
   const onSubmitDebtCeiling = async (data: DebtCeilingFormValues) => {
     setLoading(true);
@@ -66,7 +86,7 @@ const LendingPoolOverview = () => {
       await api.post('/lend/admin/sweep-reserves', {
         amount: data.amount,
       });
-      
+
       toast({
         title: 'Reserves Swept Successfully',
         description: `${data.amount} units swept to fee collector.`,
@@ -84,8 +104,71 @@ const LendingPoolOverview = () => {
     }
   };
 
+  const handleTogglePause = async () => {
+    setPauseLoading(true);
+    try {
+      const endpoint = isPaused ? '/lend/admin/unpause' : '/lend/admin/pause';
+      await api.post(endpoint);
+
+      setIsPaused(!isPaused);
+      toast({
+        title: `Lending Pool ${isPaused ? 'Unpaused' : 'Paused'}`,
+        description: `The lending pool has been ${isPaused ? 'unpaused' : 'paused'} successfully.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error Toggling Pause',
+        description: error?.response?.data?.message || error?.message || 'Failed to toggle pause status.',
+        variant: 'destructive',
+      });
+    } finally {
+      setPauseLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
+      {/* System Control */}
+      <Card>
+        <CardHeader className="px-4 md:px-6">
+          <CardTitle className="flex items-center justify-between gap-2">
+            <span className="flex items-center gap-1.5 md:space-x-2 shrink-0">
+              <AlertTriangle className="h-4 w-4 md:h-5 md:w-5" />
+              <span className="text-base md:text-xl whitespace-nowrap">System Control</span>
+            </span>
+            <Button
+              onClick={handleTogglePause}
+              disabled={pauseLoading}
+              variant={isPaused ? "destructive" : "default"}
+              size="sm"
+              className={`flex items-center gap-1 md:space-x-2 text-xs md:text-sm ${!isPaused ? 'bg-orange-500 hover:bg-orange-600' : ''}`}
+            >
+              {pauseLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : isPaused ? (
+                <Play className="h-4 w-4" />
+              ) : (
+                <Pause className="h-4 w-4" />
+              )}
+              <span className="whitespace-nowrap">{isPaused ? 'Unpause System' : 'Pause System'}</span>
+            </Button>
+          </CardTitle>
+          <CardDescription>
+            {isPaused ? (
+              <span className="text-red-600 font-medium flex items-center space-x-2">
+                <ExclamationCircleOutlined />
+                <span>Lending Pool is paused - Certain operations are blocked</span>
+              </span>
+            ) : (
+              <span className="text-green-600 font-medium flex items-center space-x-2">
+                <CheckCircleOutlined />
+                <span>Lending Pool is active - All operations are allowed</span>
+              </span>
+            )}
+          </CardDescription>
+        </CardHeader>
+      </Card>
+
       {/* Set Debt Ceilings */}
       <Card>
         <CardHeader>

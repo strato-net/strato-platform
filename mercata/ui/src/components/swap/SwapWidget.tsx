@@ -5,10 +5,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { ArrowDownUp, Check, ChevronDown } from "lucide-react";
+import { ArrowDownUp, Check, ChevronDown, HelpCircle } from "lucide-react";
 import { Pool, SwapToken } from "@/interface";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
+import { useTokenContext } from "@/context/TokenContext";
 import { useLendingContext } from "@/context/LendingContext";
 import { useToast } from '@/hooks/use-toast';
 import { useSwapContext } from "@/context/SwapContext";
@@ -24,8 +25,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { usePoolPolling } from "@/hooks/useSmartPolling";
-import { calculateSwapOutput, calculateSwapInput } from "@/helpers/swapCalculations";
+import { calculateSwapOutput, calculateSwapInput, calculateImpact } from "@/helpers/swapCalculations";
 import { computeMaxTransferable, handleAmountInputChange } from "@/utils/transferValidation";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { RewardsWidget } from "@/components/rewards/RewardsWidget";
+import { UserRewardsData } from "@/services/rewardsService";
 
 // ============================================================================
 // CONSTANTS
@@ -42,15 +46,40 @@ const isValidInputAmount = (amount: string): boolean => {
 };
 
 const calculateExchangeRates = (pool: Pool | null, fromAsset: SwapToken | null) => {
-  if (!pool || !fromAsset?.address) return { exchangeRate: "0", oracleExchangeRate: "0" };
+  if (!pool || !fromAsset?.address) return { 
+    exchangeRateRaw: undefined, 
+    exchangeRate: undefined, 
+    oracleExchangeRate: undefined,
+    invertedExchangeRate: undefined,
+    invertedOracleExchangeRate: undefined,
+    isFractionalRate: false,
+    isFractionalOracleRate: false
+  };
   
   const isAToB = pool.tokenA?.address === fromAsset.address;
   const poolRate = isAToB ? pool.aToBRatio : pool.bToARatio;
   const oracleRate = isAToB ? pool.oracleAToBRatio : pool.oracleBToARatio;
   
+  // Strip commas from raw rate in case backend sends pre-formatted data
+  const cleanRate = poolRate && poolRate !== "0" ? String(poolRate).replace(/,/g, '') : undefined;
+  const cleanOracleRate = oracleRate && oracleRate !== "0" ? String(oracleRate).replace(/,/g, '') : undefined;
+  
+  // Get inverted rates for display when rate is fractional
+  const invertedPoolRate = isAToB ? pool.bToARatio : pool.aToBRatio;
+  const invertedOracleRate = isAToB ? pool.oracleBToARatio : pool.oracleAToBRatio;
+  
+  // Check if rates are fractional (less than 1) - these are harder to understand
+  const isFractionalRate = cleanRate ? parseFloat(cleanRate) < 1 : false;
+  const isFractionalOracleRate = cleanOracleRate ? parseFloat(cleanOracleRate) < 1 : false;
+  
   return {
-    exchangeRate: poolRate && poolRate !== "0" ? formatAmount(poolRate) : "0",
-    oracleExchangeRate: oracleRate && oracleRate !== "0" ? formatAmount(oracleRate) : "0"
+    exchangeRateRaw: cleanRate,
+    exchangeRate: poolRate && poolRate !== "0" ? formatAmount(poolRate) : undefined,
+    oracleExchangeRate: oracleRate && oracleRate !== "0" ? formatAmount(oracleRate) : undefined,
+    invertedExchangeRate: invertedPoolRate && invertedPoolRate !== "0" ? formatAmount(invertedPoolRate) : undefined,
+    invertedOracleExchangeRate: invertedOracleRate && invertedOracleRate !== "0" ? formatAmount(invertedOracleRate) : undefined,
+    isFractionalRate,
+    isFractionalOracleRate
   };
 };
 
@@ -58,16 +87,16 @@ const calculateExchangeRates = (pool: Pool | null, fromAsset: SwapToken | null) 
 // UI COMPONENTS
 // ============================================================================
 const LoadingSpinner = () => (
-  <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary" />
+  <span className="inline-flex items-center animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary" />
 );
 
-const AnimatedNumber = ({ value, isLoading }: { value: string; isLoading: boolean }) => {
+const AnimatedNumber = ({ value, isLoading }: { value: string | undefined; isLoading: boolean }) => {
   const [displayValue, setDisplayValue] = useState(value);
   const [isChanging, setIsChanging] = useState(false);
 
   useEffect(() => {
-    if (isLoading) {
-      // Don't fade out during loading, just keep showing current value
+    if (isLoading || value === undefined) {
+      // Don't fade out during loading or when value is undefined
       return;
     }
     
@@ -82,13 +111,12 @@ const AnimatedNumber = ({ value, isLoading }: { value: string; isLoading: boolea
     }
   }, [value, isLoading, displayValue]);
 
-  return (
-    <span 
-      className={`transition-opacity duration-200 ${isChanging ? 'opacity-70' : 'opacity-100'}`}
-    >
-      {displayValue}
-    </span>
-  );
+  // Show spinner when value is undefined
+  if (value === undefined) {
+    return <LoadingSpinner />;
+  }
+
+  return <>{displayValue}</>;
 };
 
 // ============================================================================
@@ -130,15 +158,15 @@ const TokenAvatar = ({ token, size = "w-4 h-4" }: TokenAvatarProps) => {
 const TokenSelectorComponent = ({ asset, onSelect, tokens, isOpen, onOpenChange }: TokenSelectorProps) => (
   <Popover open={isOpen} onOpenChange={onOpenChange}>
     <PopoverTrigger asChild>
-      <Button variant="outline" className="flex items-center gap-2 justify-between text-sm px-3 py-2">
-        <div className="flex items-center gap-2">
-          {asset ? <TokenAvatar token={asset} /> : null}
-          <span className="whitespace-nowrap">{asset?._symbol || "Select Token"}</span>
+      <Button variant="outline" className="flex items-center gap-1 md:gap-2 justify-between text-xs md:text-sm px-1.5 md:px-3 py-1.5 md:py-2 h-8 md:h-10">
+        <div className="flex items-center gap-1 md:gap-2">
+          {asset ? <TokenAvatar token={asset} size="w-3.5 h-3.5 md:w-4 md:h-4" /> : null}
+          <span className="whitespace-nowrap text-[11px] md:text-sm">{asset?._symbol || "Select"}</span>
         </div>
-        <ChevronDown className="h-4 w-4 flex-shrink-0" />
+        <ChevronDown className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0" />
       </Button>
     </PopoverTrigger>
-    <PopoverContent className="w-56 max-w-[calc(100vw-2rem)] p-0" align="end">
+    <PopoverContent className="w-56 max-w-[calc(100vw-2rem)] p-0 z-50" align="end" sideOffset={5}>
       <div className="flex flex-col">
         {tokens.length > 0 ? (
           tokens.map((token) => (
@@ -209,30 +237,12 @@ const TokenInput = ({
   loading,
 }: TokenInputProps) => {      
   return (
-    <div className="bg-gray-50 p-4 rounded-lg">
+    <div className="bg-muted/50 p-3 md:p-4 rounded-lg border border-border">
       <div className="flex flex-col sm:flex-row sm:justify-between mb-2">
-        <label className="text-sm text-gray-600 font-semibold">{label}</label>
-        {isFromInput && (
-          <span className={`text-sm mt-1 sm:mt-0 flex gap-1 ${
-            toWei(maxAmountWei) === 0n ? "text-red-600" : "text-gray-600"
-          }`}>
-            Available for swap: <AnimatedNumber 
-              value={maxAmountWei !== "0" ? formatBalance(maxAmountWei, asset?._symbol || "", undefined, 2, 6) : "0"} 
-              isLoading={loading} 
-            />
-            <button
-              type="button"
-              className={`text-blue-600 text-xs ml-2 underline ${toWei(maxAmountWei) === 0n ? "opacity-50 cursor-not-allowed" : ""}`}
-              onClick={onMaxClick}
-              disabled={toWei(maxAmountWei) === 0n}
-            >
-              Max
-            </button>
-          </span>
-        )}
+        <label className="text-sm text-muted-foreground font-semibold">{label}</label>
       </div>
       <div className="flex items-center gap-2">
-        <div className="flex-1 min-w-0 flex flex-col">
+        <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
           <input
             type="text"
             value={amount}
@@ -241,12 +251,12 @@ const TokenInput = ({
             placeholder="0.00"
             inputMode="decimal"
             disabled={toWei(maxAmountWei) === 0n && isFromInput}
-            className={`p-2 bg-transparent border-none text-lg font-medium focus:outline-none${
+            className={`p-1 md:p-2 bg-transparent border-none text-sm md:text-lg font-medium focus:outline-none text-foreground placeholder:text-muted-foreground w-full ${
               amountError ? " border border-red-500 rounded-md" : ""
               } ${(toWei(maxAmountWei) === 0n && isFromInput) ? "opacity-50 cursor-not-allowed" : ""}`}
           />
           {amountError && (
-            <p className="text-red-600 text-sm mt-1">{amountError}</p>
+            <p className="text-red-600 text-xs md:text-sm mt-1">{amountError}</p>
           )}
         </div>
         <div className="flex-shrink-0">
@@ -260,18 +270,46 @@ const TokenInput = ({
         </div>
       </div>
       {asset && (
-        <div className="mt-2 flex justify-between">
-          <span className="text-sm text-gray-500">
-            User Balance: <AnimatedNumber 
-              value={userBalanceWei !== "0" ? formatBalance(userBalanceWei, asset._symbol || "", undefined, 2, 6) : "0"} 
-              isLoading={loading} 
-            />
-          </span>
-          <span className="text-sm text-gray-500">
-            Pool Balance: <AnimatedNumber 
-              value={poolBalanceWei !== "0" ? formatBalance(poolBalanceWei, asset._symbol || "", undefined, 2, 6) : "0"} 
-              isLoading={loading} 
-            />
+        <div className="mt-2 flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-2">
+          {isFromInput ? (
+            <span className={`text-xs md:text-sm flex flex-wrap items-center gap-1 ${
+              toWei(maxAmountWei) === 0n ? "text-red-600" : "text-muted-foreground"
+            }`}>
+              <span className="whitespace-nowrap">Your Balance:</span>
+              <span className="whitespace-nowrap">
+                <AnimatedNumber 
+                  value={maxAmountWei !== "0" ? formatBalance(maxAmountWei, asset._symbol || "", undefined, 2, 6) : "0"} 
+                  isLoading={loading} 
+                />
+              </span>
+              <button
+                type="button"
+                className={`text-blue-600 text-xs underline ${toWei(maxAmountWei) === 0n ? "opacity-50 cursor-not-allowed" : ""}`}
+                onClick={onMaxClick}
+                disabled={toWei(maxAmountWei) === 0n}
+              >
+                Max
+              </button>
+            </span>
+          ) : (
+            <span className="text-xs md:text-sm text-muted-foreground flex flex-wrap items-center gap-1">
+              <span className="whitespace-nowrap">Your Balance:</span>
+              <span className="whitespace-nowrap">
+                <AnimatedNumber 
+                  value={userBalanceWei !== "0" ? formatBalance(userBalanceWei, asset._symbol || "", undefined, 2, 6) : "0"} 
+                  isLoading={loading} 
+                />
+              </span>
+            </span>
+          )}
+          <span className="text-xs md:text-sm text-muted-foreground flex flex-wrap items-center gap-1">
+            <span className="whitespace-nowrap">Pool Balance:</span>
+            <span className="whitespace-nowrap">
+              <AnimatedNumber 
+                value={poolBalanceWei !== "0" ? formatBalance(poolBalanceWei, asset._symbol || "", undefined, 2, 6) : "0"} 
+                isLoading={loading} 
+              />
+            </span>
           </span>
         </div>
       )}
@@ -289,7 +327,11 @@ interface SwapDialogProps {
   toAmount: string;
   fromAsset?: SwapToken;
   toAsset?: SwapToken;
-  exchangeRate: string;
+  exchangeRate?: string;
+  invertedExchangeRate?: string;
+  isFractionalRate: boolean;
+  isHighPriceImpact: boolean;
+  toAmountMin: string;
   onConfirm: () => void;
   isLoading: boolean;
 }
@@ -302,6 +344,10 @@ const SwapDialog = ({
   fromAsset,
   toAsset,
   exchangeRate,
+  invertedExchangeRate,
+  isFractionalRate,
+  isHighPriceImpact,
+  toAmountMin,
   onConfirm,
   isLoading
 }: SwapDialogProps) => (
@@ -310,28 +356,42 @@ const SwapDialog = ({
       <DialogHeader>
         <DialogTitle>Confirm Swap</DialogTitle>
         <DialogDescription>
-          Please review your transaction details before confirming.
+          Please review the details below. Slippage tolerance and fees have already been applied.
         </DialogDescription>
       </DialogHeader>
       <div className="py-4 space-y-4">
         <div className="flex justify-between">
-          <span className="text-gray-600">You pay:</span>
+          <span className="text-muted-foreground">You pay:</span>
           <span className="font-semibold">
             {fromAmount} {fromAsset?._symbol || ""}
           </span>
         </div>
         <div className="flex justify-between">
-          <span className="text-gray-600">You receive:</span>
+          <span className="text-muted-foreground">You receive:</span>
           <span className="font-semibold">
             {toAmount} {toAsset?._symbol || ""}
           </span>
         </div>
         <div className="flex justify-between">
-          <span className="text-gray-600">Exchange rate:</span>
-          <span>
-            1 {fromAsset?._symbol || ""} ≈ {exchangeRate} {toAsset?._symbol || ""}
+          <span className="text-muted-foreground">Minimum received (after slippage):</span>
+          <span className="font-semibold">
+            {toAmountMin} {toAsset?._symbol || ""}
           </span>
         </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Exchange rate:</span>
+          <span className="flex flex-col items-end gap-0.5">
+            <span className="font-semibold">1 {fromAsset?._symbol || ""} ≈ {exchangeRate} {toAsset?._symbol || ""}</span>
+            {invertedExchangeRate && (
+              <span className="text-muted-foreground/70">1 {toAsset?._symbol || ""} ≈ {invertedExchangeRate} {fromAsset?._symbol || ""}</span>
+            )}
+          </span>
+        </div>
+        {isHighPriceImpact && (
+          <div className="text-yellow-600 text-sm mt-2">
+            ⚠️ High price impact — you may receive fewer tokens than expected.
+          </div>
+        )}
       </div>
       <DialogFooter>
         <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -360,17 +420,17 @@ const SlippageControl = ({ slippage, autoSlippage, onSlippageChange, onAutoToggl
   const isLowSlippage = slippage < 1;
   const slippageClass = isHighSlippage || isLowSlippage
     ? 'border-yellow-400 text-yellow-600'
-    : 'border-gray-300 text-gray-700';
+    : 'border-border text-foreground';
 
   return (
     <div className="flex flex-col gap-1 mt-2">
-      <div className="flex items-center justify-between text-sm mb-1">
-        <span className="text-gray-600">Max slippage</span>
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 text-sm mb-1">
+        <span className="text-muted-foreground">Max slippage</span>
+        <div className="flex items-center gap-1.5 md:gap-2">
           <button
-            className={`px-3 py-1 rounded-full text-xs font-medium border ${
-              autoSlippage ? 'bg-gray-200 text-gray-700' : 'bg-transparent text-gray-500'
-              } border-gray-300`}
+            className={`px-2 md:px-3 py-1 rounded-full text-xs font-medium border ${
+              autoSlippage ? 'bg-muted text-foreground' : 'bg-transparent text-muted-foreground'
+              } border-border`}
             onClick={() => {
               onAutoToggle(true);
               onSlippageChange(DEFAULT_SLIPPAGE);
@@ -379,14 +439,14 @@ const SlippageControl = ({ slippage, autoSlippage, onSlippageChange, onAutoToggl
             Auto
           </button>
           <button
-            className={`px-3 py-1 rounded-full text-xs font-medium border ${
-              !autoSlippage ? 'bg-gray-200 text-gray-700' : 'bg-transparent text-gray-500'
-              } border-gray-300`}
+            className={`px-2 md:px-3 py-1 rounded-full text-xs font-medium border ${
+              !autoSlippage ? 'bg-muted text-foreground' : 'bg-transparent text-muted-foreground'
+              } border-border`}
             onClick={() => onAutoToggle(false)}
           >
             Manual
           </button>
-          <span className={`ml-2 px-3 py-1 rounded-full border text-xs font-semibold ${slippageClass}`}>
+          <span className={`ml-1 md:ml-2 px-2 md:px-3 py-1 rounded-full border text-xs font-semibold ${slippageClass}`}>
             {slippage}%
           </span>
         </div>
@@ -416,11 +476,16 @@ const SlippageControl = ({ slippage, autoSlippage, onSlippageChange, onAutoToggl
 // ============================================================================
 // MAIN SWAP WIDGET COMPONENT
 // ============================================================================
-const SwapWidget = () => {
+interface SwapWidgetProps {
+  userRewards?: UserRewardsData | null;
+  rewardsLoading?: boolean;
+}
+
+const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
   // ========================================================================
   // CONTEXT & HOOKS
   // ========================================================================
-  const { swappableTokens, pairableTokens, fetchPairableTokens, swap, getPoolByTokenPair, fromAsset, toAsset, pool, poolLoading, loading: swapLoading, setFromAsset, setToAsset, refreshSwapHistory } = useSwapContext();
+  const { swappableTokens, pairableTokens, pairablesLoading, fetchPairableTokens, swap, getPoolByTokenPair, fromAsset, toAsset, pool, poolLoading, loading: swapLoading, setFromAsset, setToAsset, refreshSwapHistory } = useSwapContext();
 
   // ========================================================================
   // DERIVED STATE
@@ -435,7 +500,8 @@ const SwapWidget = () => {
     [pairableTokens, fromAsset?.address]
   );
   const { userAddress } = useUser();
-  const { usdstBalance, voucherBalance, fetchUsdstBalance, fetchTokens } = useUserTokens();
+  const { fetchTokens } = useUserTokens();
+  const { usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
   const { refreshLoans, refreshCollateral } = useLendingContext();
   const { toast } = useToast();
 
@@ -459,7 +525,26 @@ const SwapWidget = () => {
   // ========================================================================
   
   // Exchange rates (both pool and oracle)
-  const { exchangeRate, oracleExchangeRate } = calculateExchangeRates(pool, fromAsset);
+  const { exchangeRateRaw, exchangeRate, oracleExchangeRate, invertedExchangeRate, invertedOracleExchangeRate, isFractionalRate, isFractionalOracleRate } = calculateExchangeRates(pool, fromAsset);
+
+  // Price impact calculation - use raw rate for calculations
+  const priceImpact = useMemo(() => {
+    return calculateImpact(exchangeRateRaw, fromAmount, toAmount);
+  }, [exchangeRateRaw, fromAmount, toAmount]);
+
+  // Minimum received calculation (after slippage)
+  const toAmountMinWei = useMemo(() => {
+    if (!toAmount || isNaN(Number(toAmount))) {
+      return 0n;
+    }
+    try {
+      const toAmountInWei = safeParseUnits(toAmount);
+      const slippageBps = Math.round(slippage * 100);
+      return (toAmountInWei * BigInt(10000 - slippageBps)) / 10000n;
+    } catch {
+      return 0n;
+    }
+  }, [toAmount, slippage]);
 
   // Memoized available balance for fromAsset (similar to Transfer.tsx pattern)
   const fromAssetAvailableBalance = useMemo(() => {
@@ -483,7 +568,6 @@ const SwapWidget = () => {
     toAsset,
     getPoolByTokenPair,
     fetchUsdstBalance,
-    userAddress,
     interval: POLL_INTERVAL
   });
 
@@ -517,11 +601,11 @@ const SwapWidget = () => {
 
   // Initial setup and user-dependent effects
   useEffect(() => {
-    if (userAddress) fetchUsdstBalance(userAddress);
+    fetchUsdstBalance();
     if (swappableTokens.length > 0) {
       initialTokenSetup();
     }
-  }, [userAddress, fetchUsdstBalance, swappableTokens.length]);
+  }, [fetchUsdstBalance, swappableTokens.length]);
 
   // Fetch pairable tokens when fromAsset changes
   useEffect(() => {
@@ -541,9 +625,11 @@ const SwapWidget = () => {
   // Safe auto-select after pairables change
   useEffect(() => {
     if (!fromAsset?.address) return;
+    // Don't auto-select while pairables are loading - data may be stale
+    if (pairablesLoading) return;
     if (toAsset && toOptions.some(t => t.address === toAsset.address)) return;
     if (toOptions.length) setToAsset(toOptions[0]);
-  }, [fromAsset?.address, toOptions, toAsset?.address]);
+  }, [fromAsset?.address, toOptions, toAsset?.address, pairablesLoading]);
 
   // Fetch pool immediately when both assets are selected
   useEffect(() => {
@@ -675,8 +761,11 @@ const SwapWidget = () => {
     if (!newFrom?.address) return;
 
     const nextPairables = await fetchPairableTokens(newFrom.address); // <-- fresh list
-    if (nextPairables.length > 0 && !nextPairables.some(t => t.address === newTo?.address)) {
-      setToAsset(nextPairables[0]); // or undefined
+    // Always re-set toAsset after fetch to override any stale effect that ran during the await
+    if (nextPairables.length > 0) {
+      const newToAddress = newTo?.address?.toLowerCase();
+      const validNewTo = nextPairables.find(t => t.address?.toLowerCase() === newToAddress);
+      setToAsset(validNewTo || nextPairables[0]);
     }
   };
 
@@ -686,20 +775,15 @@ const SwapWidget = () => {
     try {
       const isAToB = pool.tokenA?.address === fromAsset.address;
 
-      // Validate amounts before parsing
-      if (!fromAmount || !toAmount || isNaN(Number(fromAmount)) || isNaN(Number(toAmount))) {
+      if (!fromAmount || isNaN(Number(fromAmount)) || toAmountMinWei === 0n) {
         throw new Error("Invalid amount values");
       }
-
-      const toAmountInWei = safeParseUnits(toAmount);
-      const slippageBps = Math.round(slippage * 100);
-      const minTokens = (toAmountInWei * BigInt(10000 - slippageBps)) / 10000n;
 
       await swap({
         poolAddress: pool.address,
         isAToB,
         amountIn: safeParseUnits(fromAmount).toString(),
-        minAmountOut: minTokens.toString(),
+        minAmountOut: toAmountMinWei.toString(),
       });
 
       toast({
@@ -720,7 +804,7 @@ const SwapWidget = () => {
       await refreshSwapHistory()
       // Refresh all contexts to ensure borrow page shows updated balances
       await Promise.all([
-        fetchUsdstBalance(userAddress),
+        fetchUsdstBalance(),
         fetchTokens(),           // Refresh UserTokensContext
         refreshLoans(),          // Refresh LendingContext
         refreshCollateral(),     // Refresh LendingContext
@@ -794,7 +878,7 @@ const SwapWidget = () => {
           onClick={handleSwapAssets}
           variant="outline"
           size="icon"
-          className="rounded-full bg-gray-100"
+          className="rounded-full bg-muted hover:bg-muted/80 border-border"
         >
           <ArrowDownUp className="h-4 w-4" />
         </Button>
@@ -818,29 +902,86 @@ const SwapWidget = () => {
         amountError={toAmountError}
         loading={poolLoading}
       />
+      {(() => {
+        // Find activity by pool address (OneTime swap rewards)
+        const activity = userRewards?.activities?.find(
+          (a) => a.activity.sourceContract?.toLowerCase() === pool?.address?.toLowerCase()
+        );
+        if (!activity) return null;
 
-      <div className="flex flex-col gap-2 bg-gray-50 p-4 rounded-lg">
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600 decoration-2">Exchange Rate</span>
-          <span className="font-medium">
-            1 {fromAsset?._symbol || ""} ≈ <AnimatedNumber value={exchangeRate} isLoading={poolLoading} /> {toAsset?._symbol || ""}
-          </span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-400">Exchange Rate (Spot)</span>
-          <span className="font-medium text-gray-400">
-            {oracleExchangeRate === "0" ? (
-              "Price data unavailable"
+        // Swap rewards are tracked in USD-notional terms via tokenIn price conversion
+        // Pass fromAmount (amountIn) and fromAsset address for USD conversion
+        return (
+          <RewardsWidget
+            userRewards={userRewards}
+            activityName={activity.activity.name}
+            inputAmount={fromAmount}
+            swapTokenInAddress={fromAsset?.address}
+            actionLabel="Swap"
+          />
+        );
+      })()}
+
+      <div className="flex flex-col gap-3 bg-muted/50 p-3 md:p-4 rounded-lg border border-border">
+        {/* Exchange Rate */}
+        <div className="flex flex-col gap-1 text-sm">
+          <div className="flex flex-col md:flex-row md:justify-between gap-1">
+            <span className="text-muted-foreground">Exchange Rate</span>
+            {!exchangeRate ? (
+              <LoadingSpinner />
             ) : (
-              <>1 {fromAsset?._symbol || ""} ≈ <AnimatedNumber value={oracleExchangeRate} isLoading={poolLoading} /> {toAsset?._symbol || ""}</>
+              <span className="font-medium text-foreground text-xs md:text-sm">
+                1 {fromAsset?._symbol || ""} ≈ {exchangeRate} ({oracleExchangeRate}*) {toAsset?._symbol || ""}
+              </span>
             )}
+          </div>
+          {exchangeRate && (
+            <>
+              <div className="md:text-right">
+                <span className="text-muted-foreground/70 text-xs md:text-sm">
+                  1 {toAsset?._symbol || ""} ≈ {invertedExchangeRate} ({invertedOracleExchangeRate}*) {fromAsset?._symbol || ""}
+                </span>
+              </div>
+              <div className="md:text-right">
+                <span className="text-xs text-muted-foreground/70">* spot price</span>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Transaction Fee */}
+        <div className="flex flex-col md:flex-row md:justify-between gap-1 text-sm">
+          <span className="text-muted-foreground">Transaction Fee</span>
+          <span className="font-medium text-xs md:text-sm">{SWAP_FEE} USDST ({parseFloat(SWAP_FEE) * 100} voucher)</span>
+        </div>
+
+        {/* Price Impact */}
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-1 text-sm">
+          <div className="flex items-center gap-1">
+            <span className="text-muted-foreground">Price Impact</span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <HelpCircle className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                <p>Difference between the current pool price and your average trade price. Larger trades cause higher impact.</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+          <span className={`font-medium text-xs md:text-sm ${
+            priceImpact === null ? 'text-muted-foreground' :
+            priceImpact < 1 ? 'text-foreground' :
+            priceImpact < 5 ? 'text-yellow-600' :
+            'text-red-600'
+          }`}>
+            {priceImpact === null ? '—' : `${priceImpact.toFixed(2)}% ${priceImpact < 1 ? '(Low)' : priceImpact < 5 ? '(Medium)' : '(High)'}`}
           </span>
         </div>
-        <div className="my-1"></div>
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600">Transaction Fee</span>
-          <span className="font-medium">{SWAP_FEE} USDST ({parseFloat(SWAP_FEE) * 100} voucher)</span>
-        </div>
+        {priceImpact !== null && priceImpact >= 5 && (
+          <p className="text-yellow-600 text-sm mt-1">
+            ⚠️ High price impact — you may receive fewer tokens than expected.
+          </p>
+        )}
         
         {/* Fee Warnings */}
         {maxTransferableError && (
@@ -878,6 +1019,10 @@ const SwapWidget = () => {
         fromAsset={fromAsset}
         toAsset={toAsset}
         exchangeRate={exchangeRate}
+        invertedExchangeRate={invertedExchangeRate}
+        isFractionalRate={isFractionalRate}
+        isHighPriceImpact={(priceImpact ?? 0) >= 5}
+        toAmountMin={formatAmount(formatUnits(toAmountMinWei))}
         onConfirm={handleSwap}
         isLoading={swapLoading}
       />
@@ -888,4 +1033,4 @@ const SwapWidget = () => {
 // ============================================================================
 // EXPORT
 // ============================================================================
-export default SwapWidget; 
+export default SwapWidget;
