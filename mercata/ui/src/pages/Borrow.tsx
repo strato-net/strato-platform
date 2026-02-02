@@ -264,7 +264,7 @@ const Borrow = () => {
                       onBorrow={executeEmbeddedBorrow}
                       usdstBalance={usdstBalance}
                       voucherBalance={voucherBalance}
-                      collateralInfo={eligibleCollateral}
+                      collateralInfo={collateralInfo}
                       startPolling={startPolling}
                       stopPolling={stopPolling}
                       userRewards={userRewards}

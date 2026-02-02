@@ -254,7 +254,7 @@ const CollateralConfigManager = () => {
     const num = parseFloat(value);
     switch (type) {
       case 'percentage': return `${num.toFixed(2)}%`;
-      case 'usd': return `$${(num / 1e18).toFixed(2)}`;
+      case 'usd': return `$${(num / 1e18).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
       case 'bps': return `${(num / 100).toFixed(2)}%`;
       default: return value;
     }
@@ -653,26 +653,38 @@ const CollateralConfigManager = () => {
                           </div>
                         </div>
                         
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 md:gap-4 mt-3 md:mt-4">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
                           <div>
-                            <p className="text-xs md:text-sm text-muted-foreground">Liquidation Ratio</p>
-                            <p className="font-semibold text-xs md:text-sm">{formatValue(asset.liquidationRatio.toString(), 'percentage')}</p>
+                            <p className="text-sm text-muted-foreground">Liquidation Ratio</p>
+                            <p className="font-semibold">{formatValue(asset.liquidationRatio.toString(), 'percentage')}</p>
                           </div>
                           <div>
-                            <p className="text-xs md:text-sm text-muted-foreground">Min CR</p>
-                            <p className="font-semibold text-xs md:text-sm">{formatValue((asset.minCR || asset.liquidationRatio).toString(), 'percentage')}</p>
+                            <p className="text-sm text-muted-foreground">Min CR</p>
+                            <p className="font-semibold">{formatValue((asset.minCR || asset.liquidationRatio).toString(), 'percentage')}</p>
                           </div>
                           <div>
-                            <p className="text-xs md:text-sm text-muted-foreground">Penalty</p>
-                            <p className="font-semibold text-xs md:text-sm">{formatValue(asset.liquidationPenaltyBps.toString(), 'bps')}</p>
+                            <p className="text-sm text-muted-foreground">Stability Fee Rate</p>
+                            <p className="font-semibold">{asset.stabilityFeeRate.toFixed(2)}%</p>
                           </div>
                           <div>
-                            <p className="text-xs md:text-sm text-muted-foreground">Close Factor</p>
-                            <p className="font-semibold text-xs md:text-sm">{formatValue(asset.closeFactorBps.toString(), 'bps')}</p>
+                            <p className="text-sm text-muted-foreground">Penalty</p>
+                            <p className="font-semibold">{formatValue(asset.liquidationPenaltyBps.toString(), 'bps')}</p>
                           </div>
                           <div>
-                            <p className="text-xs md:text-sm text-muted-foreground">Debt Floor</p>
-                            <p className="font-semibold text-xs md:text-sm">{formatValue(asset.debtFloor, 'usd')}</p>
+                            <p className="text-sm text-muted-foreground">Close Factor</p>
+                            <p className="font-semibold">{formatValue(asset.closeFactorBps.toString(), 'bps')}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Debt Floor</p>
+                            <p className="font-semibold">{formatValue(asset.debtFloor, 'usd')}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Debt Ceiling</p>
+                            <p className="font-semibold">{formatValue(asset.debtCeiling, 'usd')}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Token Decimals</p>
+                            <p className="font-semibold">{Math.log10(Number(asset.unitScale))}</p>
                           </div>
                         </div>
                       </CardContent>
