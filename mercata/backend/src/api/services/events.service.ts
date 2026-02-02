@@ -198,7 +198,7 @@ const activityFilters: Record<string, ActivityFilter> = {
 
     const fromTotal = fromCountResponse.data?.[0]?.count || 0;
     const toTotal = toCountResponse.data?.[0]?.count || 0;
-    
+
     const fromEvents = (fromEventsResponse.data || []).map((event: any) => {
       const { storage, ...eventWithoutStorage } = event;
       return {
@@ -206,7 +206,7 @@ const activityFilters: Record<string, ActivityFilter> = {
         contract_name: event.storage?.contract?.[0]?.contract_name || "",
       };
     });
-    
+
     const toEvents = (toEventsResponse.data || []).map((event: any) => {
       const { storage, ...eventWithoutStorage } = event;
       return {
@@ -514,7 +514,7 @@ const activityFilters: Record<string, ActivityFilter> = {
 
     const senderTotal = senderCountResponse.data?.[0]?.count || 0;
     const recipientTotal = recipientCountResponse.data?.[0]?.count || 0;
-    
+
     const senderEvents = (senderEventsResponse.data || []).map((event: any) => {
       const { storage, ...eventWithoutStorage } = event;
       return {
@@ -522,7 +522,7 @@ const activityFilters: Record<string, ActivityFilter> = {
         contract_name: event.storage?.contract?.[0]?.contract_name || "",
       };
     });
-    
+
     const recipientEvents = (recipientEventsResponse.data || []).map((event: any) => {
       const { storage, ...eventWithoutStorage } = event;
       return {
@@ -601,15 +601,15 @@ export const getActivitiesByTypes = async (
   timeRange?: string
 ): Promise<EventResponse> => {
   const storageSelect = "storage!inner(contract!inner(contract_name))";
-  
+
   // Query each pair separately to get accurate counts
   // We fetch enough events to cover offset + limit for accurate pagination
   // Note: For very high offsets, this will fetch many events and be slower
   // Consider implementing cursor-based pagination for better performance at scale
   const fetchLimit = limit + offset;
-  
+
   const timeFilter = getTimeRangeFilter(timeRange);
-  
+
   const pairQueries = activityTypePairs.map(async (pair) => {
     // If no userAddress, fetch all events without filtering
     if (!userAddress) {
@@ -652,12 +652,12 @@ export const getActivitiesByTypes = async (
     // Use the filter function for this activity type, or default filter
     const filterKey = `${pair.contract_name}:${pair.event_name}`;
     const filter = activityFilters[filterKey] || defaultFilter;
-    
+
     return await filter(userAddress, pair.contract_name, pair.event_name, storageSelect, fetchLimit, accessToken, timeRange);
   });
 
   const pairResults = await Promise.all(pairQueries);
-  
+
   // Combine all events and sort by block_timestamp descending
   const allEvents = pairResults.flatMap(r => r.events);
   allEvents.sort((a, b) => {

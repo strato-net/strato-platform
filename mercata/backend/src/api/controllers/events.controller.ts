@@ -39,7 +39,7 @@ class EventsController {
   ): Promise<void> {
     try {
       const { accessToken, address, query } = req;
-      
+
       // Parse activity type pairs from query
       // Format: activity_types=contract1:event1,contract2:event2
       const activityTypesParam = query.activity_types as string;

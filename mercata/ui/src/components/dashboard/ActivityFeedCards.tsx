@@ -43,16 +43,16 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
   const fetchAllActivities = useCallback(async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const offset = (currentPage - 1) * itemsPerPage;
-      
+
       // Build activity type pairs - filter by selected type if not "all"
       let activityTypePairs = Object.values(activityTypes).map((config) => ({
         contract_name: config.contract_name,
         event_name: config.event_name,
       }));
-      
+
       // Filter by selected activity type if not "all"
       if (selectedActivityType !== "all") {
         const selectedConfig = activityTypes[selectedActivityType];
@@ -63,7 +63,7 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
           }];
         }
       }
-      
+
       // Use the backend endpoint that handles exact pair matching
       const response = await activityFeedApi.getActivities(activityTypePairs, {
         limit: itemsPerPage,
@@ -82,7 +82,7 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
                   config.contract_name === event.contract_name &&
                   config.event_name === event.event_name
               );
-              
+
               // Extract token addresses using the config's getTokenAddress function
               if (matchingType && matchingType[1].getTokenAddress) {
                 return matchingType[1].getTokenAddress(event);
@@ -92,7 +92,7 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
         )];
         const tokenSymbolMap = new Map<string, string>();
         const tokenImageMap = new Map<string, string>();
-        
+
         if (allTokenAddresses.length > 0) {
           try {
             // Fetch token metadata (symbols and images) in batch
@@ -189,15 +189,15 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
 
   const paginationItems = (() => {
     if (totalPages <= 1) return [];
-    
+
     const pages = [];
     const isMobile = window.innerWidth < 640;
     const maxVisiblePages = isMobile ? 3 : 7;
     const halfVisible = Math.floor(maxVisiblePages / 2);
-    
+
     let startPage = Math.max(1, currentPage - halfVisible);
     let endPage = Math.min(totalPages, currentPage + halfVisible);
-    
+
     // Adjust if we're near the edges
     if (endPage - startPage + 1 < maxVisiblePages) {
       if (startPage === 1) {
@@ -206,7 +206,7 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
         startPage = Math.max(1, endPage - maxVisiblePages + 1);
       }
     }
-    
+
     // Always show first page
     if (startPage > 1) {
       pages.push({ type: 'page', number: 1 });
@@ -214,12 +214,12 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
         pages.push({ type: 'ellipsis' });
       }
     }
-    
+
     // Show visible pages
     for (let i = startPage; i <= endPage; i++) {
       pages.push({ type: 'page', number: i });
     }
-    
+
     // Always show last page
     if (endPage < totalPages) {
       if (endPage < totalPages - 1) {
@@ -227,7 +227,7 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
       }
       pages.push({ type: 'page', number: totalPages });
     }
-    
+
     return pages;
   })();
 
@@ -257,7 +257,7 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
             ))}
         </SelectContent>
         </Select>
-        
+
         <Select value={selectedTimeRange} onValueChange={setSelectedTimeRange}>
         <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Select time range" />
@@ -312,12 +312,12 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
           <Pagination>
             <PaginationContent className="flex flex-wrap sm:flex-nowrap justify-center gap-0 sm:gap-1">
               <PaginationItem>
-                <PaginationPrevious 
+                <PaginationPrevious
                   onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                   className={currentPage === 1 || loading ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                 />
               </PaginationItem>
-              
+
               {paginationItems.map((item, index) => {
                 if (item.type === 'ellipsis') {
                   return (
@@ -326,7 +326,7 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
                     </PaginationItem>
                   );
                 }
-                
+
                 return (
                   <PaginationItem key={item.number}>
                     <PaginationLink
@@ -339,9 +339,9 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
                   </PaginationItem>
                 );
               })}
-              
+
               <PaginationItem>
-                <PaginationNext 
+                <PaginationNext
                   onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                   className={currentPage === totalPages || loading ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                 />

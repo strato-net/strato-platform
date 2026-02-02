@@ -40,13 +40,13 @@ export const activityFeedApi = {
     } = {}
   ): Promise<EventResponse> => {
     const params = new URLSearchParams();
-    
+
     // Format: "contract1:event1,contract2:event2"
     const activityTypesStr = activityTypePairs
       .map(p => `${p.contract_name}:${p.event_name}`)
       .join(',');
     params.append('activity_types', activityTypesStr);
-    
+
     if (options.limit) params.append('limit', options.limit.toString());
     if (options.offset) params.append('offset', options.offset.toString());
     if (options.myActivity) params.append('my_activity', 'true');

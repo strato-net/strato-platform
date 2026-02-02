@@ -1,10 +1,9 @@
 import { ReactNode, useState } from "react";
 import { Card, CardContent } from "../ui/card";
-import { 
-  ArrowUpRight, 
-  ArrowDownLeft, 
+import {
+  ArrowUpRight,
+  ArrowDownLeft,
   ArrowDown,
-  ArrowUp,
   ArrowRightLeft,
   ArrowLeftRight,
   Download,
@@ -65,9 +64,9 @@ const formatEventDate = (timestamp: string | undefined): string => {
   try {
     const normalizedTimestamp = timestamp.replace(' UTC', 'Z').replace(' ', 'T');
     const date = new Date(normalizedTimestamp);
-    
+
     if (isNaN(date.getTime())) return 'N/A';
-    
+
     return date.toLocaleString('en-US', {
       year: 'numeric',
       month: 'short',
@@ -124,14 +123,14 @@ const getActivityTypeIcon = (type?: ActivityTypeIcon): { icon: LucideIcon; color
 /**
  * Asset image display component with fallback
  */
-const AssetImageDisplay = ({ 
-  image, 
-  fallback, 
+const AssetImageDisplay = ({
+  image,
+  fallback,
   isUserAddress,
   showTooltip = false
-}: { 
-  image: string; 
-  fallback: string; 
+}: {
+  image: string;
+  fallback: string;
   isUserAddress?: boolean;
   showTooltip?: boolean;
 }) => {
@@ -171,7 +170,7 @@ export const ActivityCard = ({ data }: { data: ActivityCardData }) => {
   // Render a single field value
   const renderFieldValue = (field: ActivityField): ReactNode => {
     const tooltipValue = field.tooltip || (field.type === "address" ? field.value : undefined);
-    
+
     if (field.type === "address") {
       if (field.image) {
         // For token images, only show tooltip if there's a meaningful value (not just the address)
@@ -185,7 +184,7 @@ export const ActivityCard = ({ data }: { data: ActivityCardData }) => {
             showTooltip={!!hasTooltip}
           />
         );
-        
+
         // Only show tooltip for token images if tooltip is explicitly provided and not empty
         if (hasTooltip) {
           return (
@@ -209,7 +208,7 @@ export const ActivityCard = ({ data }: { data: ActivityCardData }) => {
             {displayValue}
           </code>
         );
-        
+
         const addressContent = tooltipValue ? (
           <TooltipProvider>
             <Tooltip>
@@ -222,7 +221,7 @@ export const ActivityCard = ({ data }: { data: ActivityCardData }) => {
             </Tooltip>
           </TooltipProvider>
         ) : codeEl;
-        
+
         return (
           <>
             {addressContent}
@@ -264,9 +263,9 @@ export const ActivityCard = ({ data }: { data: ActivityCardData }) => {
     if (index > 0) {
       descriptionParts.push(<span key={`sep-${index}`}> • </span>);
     }
-    
+
     const fieldIcon = field.icon ? getIcon(field.icon) : null;
-    
+
     descriptionParts.push(
       <span key={index} className="inline-flex items-center gap-1">
         {fieldIcon}
