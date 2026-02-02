@@ -1,4 +1,4 @@
-import { Wallet, TrendingUp, AlertTriangle, Pause } from "lucide-react";
+import { Wallet, TrendingUp, AlertTriangle, Pause, Coins } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import AssetSummary from "@/components/dashboard/AssetSummary";
 import { useVaultContext } from "@/context/VaultContext";
@@ -30,10 +30,23 @@ const formatApy = (value: string): string => {
   }
 };
 
+const formatShares = (value: string): string => {
+  try {
+    const num = parseFloat(formatUnits(value, 18));
+    return num.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  } catch {
+    return "0.00";
+  }
+};
+
 const VaultOverview = () => {
   const { vaultState } = useVaultContext();
   const {
     totalEquity,
+    totalShares,
     apy,
     paused,
     assets,
@@ -55,7 +68,7 @@ const VaultOverview = () => {
 
 
       {/* Metrics Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
         <AssetSummary
           title="TVL"
           value={`$${formatUsd(totalEquity)}`}
@@ -63,6 +76,15 @@ const VaultOverview = () => {
           color="bg-blue-500"
           isLoading={loading}
           tooltip="Total Net Asset Value of all tokens held in the vault"
+        />
+
+        <AssetSummary
+          title="Total Shares"
+          value={formatShares(totalShares)}
+          icon={<Coins className="text-white" size={18} />}
+          color="bg-purple-500"
+          isLoading={loading}
+          tooltip="Total number of vault shares in circulation"
         />
 
         <AssetSummary
