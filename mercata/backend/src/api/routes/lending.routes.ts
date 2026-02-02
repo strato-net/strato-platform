@@ -637,7 +637,7 @@ router.post("/admin/unpause", authHandler.authorizeRequest(), LendingController.
  *               type: object
  *               additionalProperties: true
  */
-router.get("/safety/info", authHandler.authorizeRequest(true), SafetyController.getInfo);
+router.get("/safety/info", authHandler.authorizeRequest(), SafetyController.getInfo);
 
 /**
  * @openapi
