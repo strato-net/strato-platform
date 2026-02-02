@@ -12,11 +12,9 @@ import {
 } from 'lucide-react';
 import heroBackground from '../../assets/home/hero-background.png';
 import darkThemeBackground from '../../assets/home/darktheme-hero-bg.png';
-import { useUser } from '@/context/UserContext';
 
 const Hero = () => {
   const { resolvedTheme } = useTheme();
-  const { isLoggedIn } = useUser();
   const backgroundImage = resolvedTheme === 'dark' ? darkThemeBackground : heroBackground;
 
   return (
