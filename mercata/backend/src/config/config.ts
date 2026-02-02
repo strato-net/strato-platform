@@ -139,7 +139,7 @@ export async function initProtocolContractAddresses() {
       {
         params: {
           address: `eq.${cdpRegistry}`,
-          select: `cdpEngine:cdpEngine_fkey(address),cdpVault:cdpVault_fkey(address)`,
+          select: `cdpEngine:cdpEngine_fkey(address),cdpVault:cdpVault_fkey(address),feeCollector`,
         },
       }
     );
@@ -148,12 +148,16 @@ export async function initProtocolContractAddresses() {
       const registry = cdpRegistryData[0];
       const cdpEngineAddress = registry.cdpEngine?.address || registry.cdpEngine;
       const cdpVaultAddress = registry.cdpVault?.address || registry.cdpVault;
+      const feeCollectorAddress = registry.feeCollector;
 
       if (cdpEngineAddress) {
         addresses.add(cdpEngineAddress.toLowerCase());
       }
       if (cdpVaultAddress) {
         addresses.add(cdpVaultAddress.toLowerCase());
+      }
+      if (feeCollectorAddress) {
+        addresses.add(feeCollectorAddress.toLowerCase());
       }
     }
 
