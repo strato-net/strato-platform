@@ -151,6 +151,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
+        activityTypeIcon: "transfer",
       };
     },
   },
@@ -223,6 +224,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
+        activityTypeIcon: "deposit",
       };
     },
   },
@@ -271,6 +273,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
+        activityTypeIcon: "cdp-mint",
       };
     },
   },
@@ -370,6 +373,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
+        activityTypeIcon: "rewards",
       };
     },
   },
@@ -549,6 +553,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
+        activityTypeIcon: "referral",
       };
     },
   },
