@@ -100,16 +100,17 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
           Just summ -> do
             let bHeader' = case bHeader of
                             -- imitate parent block as closely as possible (most important is the stateroot)
+                            -- NOTE: Do NOT override `number` - transactions must see the actual block number
+                            -- they're in, otherwise contracts that store block.number will produce different
+                            -- state roots during validation vs creation.
                             BlockHeader {} -> bHeader {
                               parentHash = bSumParentHash summ,
                               stateRoot = bSumStateRoot summ,
-                              number = bSumNumber summ,
                               gasLimit = bSumGasLimit summ
                             }
                             BlockHeaderV2 {} -> bHeader {
                               parentHash = bSumParentHash summ,
-                              stateRoot = bSumStateRoot summ,
-                              number = bSumNumber summ
+                              stateRoot = bSumStateRoot summ
                             }
             let pHash = proposalHash bHeader
                 mSig = getProposerSeal bHeader  -- Signature is Maybe type
