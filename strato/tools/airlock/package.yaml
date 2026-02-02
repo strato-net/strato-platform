@@ -1,0 +1,49 @@
+name: airlock
+version: 0.1.0
+build-type: Simple
+author: BlockApps
+maintainer: engineering@blockapps.net
+synopsis: Railgun privacy wallet CLI for STRATO
+category: Blockchain
+description: |
+  Airlock is a command line wallet for Railgun privacy transactions on STRATO.
+  Supports shielding, unshielding, and managing private token balances.
+license: Apache-2.0
+
+dependencies:
+  - base
+
+library:
+  source-dirs: src/
+  exposed-modules:
+    - Railgun.Keys
+    - Railgun.Shield
+    - Railgun.Unshield
+    - Railgun.Crypto
+    - Railgun.Types
+    - Railgun.API
+    - Railgun.Scan
+  dependencies:
+    - aeson
+    - base16-bytestring
+    - poseidon-hash
+    - base64-bytestring
+    - bytestring
+    - cryptonite
+    - http-client
+    - http-client-tls
+    - http-types
+    - memory
+    - text
+    - transformers
+
+executables:
+  airlock:
+    source-dirs: exec_src/
+    main: Main.hs
+    other-modules: []
+    dependencies:
+      - airlock
+      - bytestring
+      - cmdargs
+      - text
