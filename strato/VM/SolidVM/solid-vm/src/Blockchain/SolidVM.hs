@@ -2051,13 +2051,14 @@ intBuiltin _ _ [SString hex] = integerToValue $ parseBaseInt hex 16
 intBuiltin _ _ [SString hex, SInteger 16] = integerToValue $ parseBaseInt hex 16
 intBuiltin _ _ [SString dec, SInteger 10] = integerToValue $ parseBaseInt dec 10
 intBuiltin _ _ [SBytes bs] = SInteger $ byteString2Integer bs  -- bytes32 -> uint256 cast
+intBuiltin _ _ [SAddress a _] = SInteger $ fromIntegral $ unAddress a  -- address -> int cast
 intBuiltin _ _ [SNULL] = SInteger 0
 intBuiltin _ _ [SReference{}] = SInteger 0
 intBuiltin signed mSize [] = typeError (funcName ++ " called with no arguments") ""
   where
     funcName = (if signed then "int" else "uint") ++ maybe "" show mSize
 intBuiltin signed mSize (arg:_) = typeError (funcName ++ " cannot convert " ++ valueTypeName arg) $
-  "expected integer, decimal, enum, string, or bytes; got " ++ format arg
+  "expected integer, decimal, enum, string, bytes, or address; got " ++ format arg
   where
     funcName = (if signed then "int" else "uint") ++ maybe "" show mSize
 
