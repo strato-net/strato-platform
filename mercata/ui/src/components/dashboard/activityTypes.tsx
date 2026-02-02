@@ -1,7 +1,7 @@
 import type { Event } from "@mercata/shared-types";
 import { formatUnits } from "viem";
-import { getChainName } from "@/lib/bridge/utils";
-import { ActivityCardData, ActivityField, ActivityTypeIcon } from "./ActivityCard";
+import { getChainName, getExplorerUrl } from "@/lib/bridge/utils";
+import { ActivityCardData, ActivityField, ActivityTypeIcon, LayoutConfig } from "./ActivityCard";
 import {
   Tooltip,
   TooltipContent,
@@ -18,11 +18,39 @@ import {
   Send,
   LucideIcon
 } from "lucide-react";
+import { usdstAddress } from "@/lib/constants";
 
 /**
- * Format value (assuming 18 decimals for ERC20 tokens)
+ * Format value with consistent decimals (2 for USDST, 4 for others)
+ * @param val - The raw value as string or number
+ * @param tokenAddress - Optional token address to determine decimals
+ * @returns Formatted value string
  */
-const formatValue = (val: string | number): string => {
+const formatValue = (val: string | number, tokenAddress?: string): string => {
+  try {
+    const valStr = String(val);
+    if (!valStr || valStr === "0" || valStr === "null" || valStr === "undefined") {
+      return "0";
+    }
+    const formatted = formatUnits(BigInt(valStr), 18);
+    const numValue = parseFloat(formatted);
+
+    // Determine decimal places: 2 for USDST, 4 for others
+    const decimals = tokenAddress?.toLowerCase() === usdstAddress.toLowerCase() ? 2 : 4;
+
+    return numValue.toLocaleString(undefined, {
+      maximumFractionDigits: decimals,
+      minimumFractionDigits: decimals
+    });
+  } catch {
+    return String(val);
+  }
+};
+
+/**
+ * Get the full formatted amount for tooltip display
+ */
+const getFullAmount = (val: string | number): string => {
   try {
     const valStr = String(val);
     if (!valStr || valStr === "0" || valStr === "null" || valStr === "undefined") {
@@ -30,7 +58,7 @@ const formatValue = (val: string | number): string => {
     }
     const formatted = formatUnits(BigInt(valStr), 18);
     return parseFloat(formatted).toLocaleString(undefined, {
-      maximumFractionDigits: 6,
+      maximumFractionDigits: 18,
       minimumFractionDigits: 0
     });
   } catch {
@@ -154,36 +182,29 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const to = event.attributes.to || event.attributes.To || "";
       const value = event.attributes.value || event.attributes.Value || "0";
 
+      const tokenImage = tokenImages?.get(tokenAddress);
+
       const fields: ActivityField[] = [
         {
-          label: "To",
-          value: to,
-          type: "address",
-          icon: "arrow-up-right",
-          isUserAddress: isUserAddress(to, userAddress),
+          label: "Amount",
+          value: formatValue(value, tokenAddress),
+          type: "amount",
+          badge: tokenSymbol,
+          image: tokenImage,
+          imageFallback: tokenSymbol || tokenAddress,
+          rawAmount: getFullAmount(value),
         },
         {
           label: "From",
           value: from,
           type: "address",
-          icon: "arrow-down-left",
           isUserAddress: isUserAddress(from, userAddress),
         },
-        addImageToField(
-          {
-            label: "Token",
-            value: tokenAddress,
-            type: "address",
-            badge: tokenSymbol,
-          },
-          tokenAddress,
-          tokenImages,
-          tokenSymbols
-        ),
         {
-          label: "Amount",
-          value: formatValue(value),
-          type: "amount",
+          label: "To",
+          value: to,
+          type: "address",
+          isUserAddress: isUserAddress(to, userAddress),
         },
       ];
 
@@ -193,6 +214,17 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
         activityTypeIcon: "transfer",
+        layout: {
+          type: "two-line",
+          line1: {
+            fieldLabels: ["Amount"],
+            renderer: "amount-with-token",
+          },
+          line2: {
+            fieldLabels: ["From", "To"],
+            renderer: "addresses-with-arrow",
+          },
+        },
       };
     },
   },
@@ -218,14 +250,20 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
 
       const chainName = externalChainId ? getChainName(parseInt(externalChainId)) : "Unknown Chain";
 
+      const stratoTokenImage = stratoToken ? tokenImages?.get(stratoToken) : undefined;
+
       const fields: ActivityField[] = [
-        {
-          label: "To",
-          value: stratoRecipient,
-          type: "address",
-          icon: "arrow-down",
-          isUserAddress: isUserAddress(stratoRecipient, userAddress),
-        },
+        // Amount first (for line 1)
+        stratoToken ? {
+          label: "Amount",
+          value: formatValue(stratoTokenAmount, stratoToken),
+          type: "amount",
+          badge: tokenSymbol,
+          image: stratoTokenImage,
+          imageFallback: tokenSymbol || stratoToken,
+          rawAmount: getFullAmount(stratoTokenAmount),
+        } : null,
+        // From, To, Tx for line 2
         {
           label: "From",
           value: externalSender,
@@ -234,34 +272,23 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
           isUserAddress: isUserAddress(externalSender, userAddress),
           additionalContent: <span className="text-xs text-muted-foreground">({chainName})</span>,
         },
-        stratoToken ? addImageToField(
-          {
-            label: "Token",
-            value: stratoToken,
-            type: "address",
-            badge: tokenSymbol,
-          },
-          stratoToken,
-          tokenImages,
-          tokenSymbols
-        ) : null,
         {
-          label: "Amount",
-          value: formatValue(stratoTokenAmount),
-          type: "amount",
+          label: "To",
+          value: stratoRecipient,
+          type: "address",
+          icon: "arrow-down",
+          isUserAddress: isUserAddress(stratoRecipient, userAddress),
         },
-      ].filter(Boolean) as ActivityField[];
-
-      // Add external transaction hash as a separate field if present
-      if (externalTxHash) {
-        fields.push({
+        // Tx hash if present
+        externalTxHash ? {
           label: "Tx",
           value: `${externalTxHash.slice(0, 10)}...${externalTxHash.slice(-8)}`,
           type: "text",
           tooltip: externalTxHash,
           size: "xs",
-        });
-      }
+          explorerUrl: externalChainId ? getExplorerUrl(externalChainId, externalTxHash): undefined,
+        } : null,
+      ].filter(Boolean) as ActivityField[];
 
       return {
         title: "Deposit",
@@ -269,13 +296,24 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
         activityTypeIcon: "deposit",
+        layout: {
+          type: "two-line",
+          line1: {
+            fieldLabels: ["Amount"],
+            renderer: "amount-with-token",
+          },
+          line2: {
+            fieldLabels: externalTxHash ? ["From", "To", "Tx"] : ["From", "To"],
+            renderer: externalTxHash ? "addresses-with-arrow-and-text" : "addresses-with-arrow",
+          },
+        },
       };
     },
   },
   "Withdraw": {
     contract_name: "MercataBridge",
     event_name: "WithdrawalRequested",
-    displayName: "Withdraw",
+    displayName: "Withdrawal",
     filterConfig: { type: "single", attribute: "user" },
     iconConfig: { icon: Upload, color: "bg-red-500" },
     iconType: "withdraw",
@@ -300,7 +338,21 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
 
       const chainName = destChainId ? getChainName(parseInt(destChainId)) : "Unknown Chain";
 
+      const tokenImage = token ? tokenImages?.get(token) : undefined;
+      const externalTokenImage = externalToken ? tokenImages?.get(externalToken) : undefined;
+
       const fields: ActivityField[] = [
+        // Amount first (for line 1)
+        token ? {
+          label: "Amount",
+          value: formatValue(stratoTokenAmount, token),
+          type: "amount",
+          badge: tokenSymbol,
+          image: tokenImage,
+          imageFallback: tokenSymbol || token,
+          rawAmount: getFullAmount(stratoTokenAmount),
+        } : null,
+        // From, To, External Token for line 2
         {
           label: "From",
           value: user,
@@ -316,41 +368,40 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
           isUserAddress: isUserAddress(dest, userAddress),
           additionalContent: <span className="text-xs text-muted-foreground">({chainName})</span>,
         },
-        externalToken ? addImageToField(
-          {
-            label: "External Token",
-            value: externalToken,
-            type: "address",
-            badge: externalTokenSymbol,
-          },
-          externalToken,
-          tokenImages,
-          tokenSymbols
-        ) : null,
-        token ? addImageToField(
-          {
-            label: "Token",
-            value: token,
-            type: "address",
-            badge: tokenSymbol,
-          },
-          token,
-          tokenImages,
-          tokenSymbols
-        ) : null,
-        {
-          label: "Amount",
-          value: formatValue(stratoTokenAmount),
-          type: "amount",
-        },
+        // External Token if present
+        externalToken ? {
+          label: "External Token",
+          value: externalToken,
+          type: "address",
+          badge: externalTokenSymbol,
+          image: externalTokenImage,
+          imageFallback: externalTokenSymbol || externalToken,
+        } : null,
       ].filter(Boolean) as ActivityField[];
 
+      // Build line2 field labels based on what's present
+      const line2FieldLabels = ["From", "To"];
+      if (externalToken) {
+        line2FieldLabels.push("External Token");
+      }
+
       return {
-        title: "Withdraw",
+        title: "Withdrawal",
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
         activityTypeIcon: "withdraw",
+        layout: {
+          type: "two-line",
+          line1: {
+            fieldLabels: ["Amount"],
+            renderer: "amount-with-token",
+          },
+          line2: {
+            fieldLabels: line2FieldLabels,
+            renderer: externalToken ? "addresses-with-arrow-and-text" : "addresses-with-arrow",
+          },
+        },
       };
     },
   },
@@ -363,37 +414,43 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     iconType: "cdp-mint",
     getTokenAddress: (event: Event) => {
       const asset = event.attributes.asset || event.attributes.Asset;
-      return asset ? [asset] : [];
+      // Include USDST since the minted amount is always USDST
+      return asset ? [asset, usdstAddress] : [usdstAddress];
     },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
       const owner = event.attributes.owner || event.attributes.Owner || "";
-      const asset = event.attributes.asset || event.attributes.Asset || "";
+      const asset = (event.attributes.asset || event.attributes.Asset || "").toLowerCase();
       const amountUSD = event.attributes.amountUSD || event.attributes.amount_usd || "0";
       const tokenSymbol = asset ? tokenSymbols.get(asset) : undefined;
 
+      const usdstImage = tokenImages?.get(usdstAddress.toLowerCase());
+      const usdstSymbol = tokenSymbols.get(usdstAddress.toLowerCase()) || "USDST";
+
+      const assetImage = asset ? tokenImages?.get(asset) : undefined;
+
       const fields: ActivityField[] = [
+        {
+          label: "Amount Minted",
+          value: formatValue(amountUSD, usdstAddress),
+          type: "amount",
+          badge: usdstSymbol,
+          image: usdstImage,
+          imageFallback: usdstSymbol,
+          rawAmount: getFullAmount(amountUSD),
+        },
         {
           label: "Borrower",
           value: owner,
           type: "address",
-          icon: "arrow-up-right",
           isUserAddress: isUserAddress(owner, userAddress),
         },
-        addImageToField(
-          {
-            label: "Collateral Asset",
-            value: asset,
-            type: "address",
-            badge: tokenSymbol,
-          },
-          asset,
-          tokenImages,
-          tokenSymbols
-        ),
         {
-          label: "Amount Minted",
-          value: `${formatValue(amountUSD)} USDST`,
-          type: "amount",
+          label: "Collateral Asset",
+          value: asset,
+          type: "address",
+          badge: tokenSymbol,
+          image: assetImage,
+          imageFallback: tokenSymbol || asset,
         },
       ];
 
@@ -403,6 +460,17 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
         activityTypeIcon: "cdp-mint",
+        layout: {
+          type: "two-line",
+          line1: {
+            fieldLabels: ["Amount Minted"],
+            renderer: "amount-with-token",
+          },
+          line2: {
+            fieldLabels: ["Borrower", "Collateral Asset"],
+            renderer: "addresses-with-bullet",
+          },
+        },
       };
     },
   },
@@ -427,40 +495,37 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
 
       const tokenInSymbol = tokenSymbols.get(tokenIn);
       const tokenOutSymbol = tokenSymbols.get(tokenOut);
+      const tokenInImage = tokenImages?.get(tokenIn);
+      const tokenOutImage = tokenImages?.get(tokenOut);
 
       const fields: ActivityField[] = [
+        // Amount In (for line 1)
         {
-          label: "Sender",
+          label: "Amount In",
+          value: formatValue(amountIn, tokenIn),
+          type: "amount",
+          badge: tokenInSymbol,
+          image: tokenInImage,
+          imageFallback: tokenInSymbol || tokenIn,
+          rawAmount: getFullAmount(amountIn),
+        },
+        // Amount Out (for line 1)
+        {
+          label: "Amount Out",
+          value: formatValue(amountOut, tokenOut),
+          type: "amount",
+          badge: tokenOutSymbol,
+          image: tokenOutImage,
+          imageFallback: tokenOutSymbol || tokenOut,
+          rawAmount: getFullAmount(amountOut),
+        },
+        // By (for line 2)
+        {
+          label: "By",
           value: sender,
           type: "address",
           isUserAddress: isUserAddress(sender, userAddress),
         },
-        addImageToField(
-          {
-            label: "In",
-            value: tokenIn,
-            type: "address",
-            icon: "arrow-down-left",
-            badge: tokenInSymbol,
-            additionalContent: <span className="text-muted-foreground">({formatValue(amountIn)})</span>,
-          },
-          tokenIn,
-          tokenImages,
-          tokenSymbols
-        ),
-        addImageToField(
-          {
-            label: "Out",
-            value: tokenOut,
-            type: "address",
-            icon: "arrow-up-right",
-            badge: tokenOutSymbol,
-            additionalContent: <span className="text-muted-foreground">({formatValue(amountOut)})</span>,
-          },
-          tokenOut,
-          tokenImages,
-          tokenSymbols
-        ),
       ];
 
       return {
@@ -469,6 +534,17 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
         activityTypeIcon: "swap",
+        layout: {
+          type: "two-line",
+          line1: {
+            fieldLabels: ["Amount In", "Amount Out"],
+            renderer: "amounts-with-arrow",
+          },
+          line2: {
+            fieldLabels: ["By"],
+            renderer: "addresses-with-bullet",
+          },
+        },
       };
     },
   },
@@ -477,7 +553,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     event_name: "RewardsClaimed",
     displayName: "Rewards Claimed",
     filterConfig: { type: "single", attribute: "user" },
-    iconConfig: { icon: Gift, color: "bg-yellow-500" },
+    iconConfig: { icon: Gift, color: "bg-gradient-to-br from-emerald-400 to-teal-500" },
     iconType: "rewards",
     getTokenAddress: (event: Event) => {
       // The reward token address is stored in the Rewards contract, not in the event
@@ -490,17 +566,21 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const amount = event.attributes.amount || event.attributes.Amount || "0";
 
       const fields: ActivityField[] = [
+        // Amount first (for line 1)
         {
-          label: "User",
+          label: "Amount",
+          value: formatValue(amount),
+          type: "amount",
+          badge: "points",
+          rawAmount: getFullAmount(amount),
+        },
+        // Claimed By for line 2
+        {
+          label: "Claimed By",
           value: user,
           type: "address",
           icon: "arrow-down",
           isUserAddress: isUserAddress(user, userAddress),
-        },
-        {
-          label: "Amount",
-          value: `${formatValue(amount)} CATA`,
-          type: "amount",
         },
       ];
 
@@ -510,6 +590,17 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
         activityTypeIcon: "rewards",
+        layout: {
+          type: "two-line",
+          line1: {
+            fieldLabels: ["Amount"],
+            renderer: "amount-with-token",
+          },
+          line2: {
+            fieldLabels: ["Claimed By"],
+            renderer: "addresses-with-bullet",
+          },
+        },
       };
     },
   },
@@ -530,30 +621,23 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const amount = event.attributes.amount || event.attributes.Amount || "0";
       const tokenSymbol = asset ? tokenSymbols.get(asset) : undefined;
 
+      const tokenImage = asset ? tokenImages?.get(asset) : undefined;
+
       const fields: ActivityField[] = [
+        {
+          label: "Amount",
+          value: formatValue(amount, asset),
+          type: "amount",
+          badge: tokenSymbol,
+          image: tokenImage,
+          imageFallback: tokenSymbol || asset,
+          rawAmount: getFullAmount(amount),
+        },
         {
           label: "Borrower",
           value: user,
           type: "address",
-          icon: "arrow-up-right",
           isUserAddress: isUserAddress(user, userAddress),
-        },
-        addImageToField(
-          {
-            label: "Asset",
-            value: asset,
-            type: "address",
-            badge: tokenSymbol,
-          },
-          asset,
-          tokenImages,
-          tokenSymbols
-        ),
-        {
-          label: "Amount",
-          value: formatValue(amount),
-          type: "amount",
-          badge: tokenSymbol,
         },
       ];
 
@@ -563,6 +647,17 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
         activityTypeIcon: "borrow",
+        layout: {
+          type: "two-line",
+          line1: {
+            fieldLabels: ["Amount"],
+            renderer: "amount-with-token",
+          },
+          line2: {
+            fieldLabels: ["Borrower"],
+            renderer: "addresses-with-bullet",
+          },
+        },
       };
     },
   },
@@ -655,17 +750,19 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       }
 
       const tokenSymbol = firstToken ? tokenSymbols.get(String(firstToken)) : undefined;
-      const displayAmount = firstAmount ? formatValue(firstAmount) : "0";
+      const displayAmount = firstAmount ? formatValue(firstAmount, String(firstToken)) : "0";
       const hasMultipleTokens = tokenArray.length > 1;
 
       // Build list of all token amounts for tooltip
       const allTokenAmounts = tokenArray.map((token, index) => {
         const amount = amountArray[index];
         const symbol = token ? tokenSymbols.get(String(token)) : undefined;
-        const formattedAmount = amount ? formatValue(amount) : "0";
+        const formattedAmount = amount ? formatValue(amount, String(token)) : "0";
+        const fullAmount = amount ? getFullAmount(amount) : "0";
         return {
           token,
           amount: formattedAmount,
+          fullAmount,
           symbol: symbol || "TOKEN"
         };
       });
@@ -676,11 +773,8 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
         return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
       };
 
-      const amountDisplay = tokenSymbol
-        ? `${displayAmount} ${tokenSymbol}`
-        : firstToken
-        ? `${displayAmount} (${formatAddress(firstToken)})`
-        : displayAmount;
+      // displayAmount already includes formatting with token address, just use it directly
+      const amountDisplay = displayAmount;
 
       const additionalContent = hasMultipleTokens ? (
         <TooltipProvider>
@@ -696,7 +790,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
                 {allTokenAmounts.map((item, index) => (
                   <div key={index} className="text-xs">
                     <span className="font-medium">
-                      {item.amount} {item.symbol !== "TOKEN" ? item.symbol : `(${formatAddress(item.token)})`}
+                      {item.fullAmount} {item.symbol !== "TOKEN" ? item.symbol : `(${formatAddress(item.token)})`}
                     </span>
                   </div>
                 ))}
@@ -707,6 +801,18 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       ) : undefined;
 
       const fields: ActivityField[] = [
+        // Amount first (for line 1)
+        firstToken ? {
+          label: "Amount",
+          value: displayAmount,
+          type: "amount",
+          badge: tokenSymbol,
+          image: tokenImages?.get(String(firstToken)),
+          imageFallback: tokenSymbol || String(firstToken),
+          rawAmount: firstAmount ? getFullAmount(firstAmount) : undefined,
+          additionalContent,
+        } : null,
+        // Referred By and Referred User for line 2
         {
           label: "Referred By",
           value: sender,
@@ -721,23 +827,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
           icon: "arrow-up-right",
           isUserAddress: isUserAddress(recipient, userAddress),
         },
-        firstToken ? addImageToField(
-          {
-            label: "Token",
-            value: String(firstToken),
-            type: "address",
-            badge: tokenSymbol,
-          },
-          String(firstToken),
-          tokenImages,
-          tokenSymbols
-        ) : null,
-        {
-          label: "Amount",
-          value: displayAmount,
-          type: "amount",
-          additionalContent,
-        },
       ].filter(Boolean) as ActivityField[];
 
       return {
@@ -746,6 +835,17 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
         activityTypeIcon: "referral",
+        layout: {
+          type: "two-line",
+          line1: {
+            fieldLabels: ["Amount"],
+            renderer: "amount-with-token",
+          },
+          line2: {
+            fieldLabels: ["Referred By", "Referred User"],
+            renderer: "addresses-with-arrow",
+          },
+        },
       };
     },
   },

@@ -13,6 +13,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import CopyButton from "@/components/ui/copy";
+import ExplorerButton from "@/components/ui/explorer";
 import { Badge } from "@/components/ui/badge";
 import { getActivityIconConfig } from "./activityTypes";
 
@@ -24,15 +25,34 @@ export interface ActivityField {
   type?: "address" | "text" | "amount";
   icon?: FieldIcon;
   badge?: string; // For token symbols, chain names, etc.
-  tooltip?: string; // Full value for tooltip (usually full address)
+  tooltip?: string; // Full value for tooltip (usually full address or full amount)
   isUserAddress?: boolean;
   additionalContent?: ReactNode; // For things like "+X more" tooltip
   size?: "sm" | "xs"; // Text size - defaults to "sm"
   image?: string; // Image URL for asset addresses
   imageFallback?: string; // Fallback text (e.g., symbol) when no image
+  rawAmount?: string; // Raw amount value for tooltip (for amount fields)
+  explorerUrl?: string; // Explorer URL for transaction hashes
 }
 
 export type ActivityTypeIcon = "transfer" | "deposit" | "cdp-mint" | "swap" | "rewards" | "referral" | "borrow" | "withdraw";
+
+/**
+ * Layout configuration for activity cards
+ */
+export type LayoutConfig =
+  | { type: "standard" } // Default: all fields in a single line with bullets
+  | {
+      type: "two-line";
+      line1: {
+        fieldLabels: string[]; // Which field labels go on line 1
+        renderer?: "amount-with-token" | "amounts-with-arrow"; // Special renderer for line 1
+      };
+      line2: {
+        fieldLabels: string[]; // Which field labels go on line 2
+        renderer?: "addresses-with-arrow" | "addresses-with-bullet" | "addresses-with-arrow-and-text"; // Special renderer for line 2
+      };
+    };
 
 export interface ActivityCardData {
   title: string;
@@ -40,6 +60,7 @@ export interface ActivityCardData {
   timestamp: string;
   eventId?: string; // For React key
   activityTypeIcon?: ActivityTypeIcon; // Icon type for the activity
+  layout?: LayoutConfig; // Layout configuration for rendering
 }
 
 /**
@@ -208,61 +229,313 @@ export const ActivityCard = ({ data }: { data: ActivityCardData }) => {
         );
       }
     } else if (field.type === "amount") {
-      return (
-        <span className="font-semibold">
-          {field.value} {field.badge && field.badge}
+      const amountContent = (
+        <span className="font-semibold inline-flex items-center gap-1">
+          {field.value}
+          {field.badge && <span>{field.badge}</span>}
+          {field.image && (
+            <AssetImageDisplay
+              image={field.image}
+              fallback={field.imageFallback || field.badge || ""}
+              isUserAddress={false}
+              showTooltip={false}
+            />
+          )}
         </span>
       );
-    } else {
-      // text type
-      if (tooltipValue) {
+
+      // Show tooltip with full amount if rawAmount is provided
+      const tooltipText = field.tooltip || (field.rawAmount ? `${field.rawAmount} ${field.badge || ""}`.trim() : undefined);
+
+      if (tooltipText && tooltipText.trim()) {
         return (
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <code className="text-xs bg-muted px-2 py-1 rounded cursor-help">
-                  {field.value}
-                </code>
+                <span className="cursor-help">{amountContent}</span>
               </TooltipTrigger>
               <TooltipContent>
-                <p className="font-mono text-xs">{tooltipValue}</p>
+                <p className="font-mono text-xs">{tooltipText}</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
         );
       }
-      return <span>{field.value}</span>;
+
+      return amountContent;
+    } else {
+      // text type
+      const textContent = tooltipValue ? (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <code className="text-xs bg-muted px-2 py-1 rounded cursor-help">
+                {field.value}
+              </code>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="font-mono text-xs">{tooltipValue}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      ) : (
+        <span>{field.value}</span>
+      );
+
+      return (
+        <>
+          {textContent}
+          {field.explorerUrl && <ExplorerButton url={field.explorerUrl} />}
+        </>
+      );
     }
   };
 
-  // Build description from all fields
-  const descriptionParts: ReactNode[] = [];
-  data.fields.forEach((field, index) => {
-    if (index > 0) {
-      descriptionParts.push(<span key={`sep-${index}`}> • </span>);
-    }
+  // Helper to find a field by label
+  const findFieldByLabel = (label: string): ActivityField | undefined => {
+    return data.fields.find(f => f.label === label);
+  };
 
-    const fieldIcon = field.icon ? getIcon(field.icon) : null;
-
-    descriptionParts.push(
-      <span key={index} className="inline-flex items-center gap-1">
-        {fieldIcon}
-        <span className="text-muted-foreground">{field.label}:</span>
-        {renderFieldValue(field)}
-        {field.badge && (
-          <Badge variant="secondary" className="text-xs">
-            {field.badge}
-          </Badge>
-        )}
-        {field.isUserAddress && (
-          <Badge variant="default" className="bg-primary text-primary-foreground text-xs">
-            You
-          </Badge>
-        )}
-        {field.additionalContent}
+  // Helper to render an amount field with token image
+  const renderAmountWithToken = (field: ActivityField): ReactNode => {
+    const amountContent = (
+      <span className="font-semibold inline-flex items-center gap-1">
+        {field.value}
+        {field.badge && <span>{field.badge}</span>}
       </span>
     );
-  });
+
+    return (
+      <div className="inline-flex items-center gap-2">
+        {field.image && (
+          <AssetImageDisplay
+            image={field.image}
+            fallback={field.imageFallback || field.badge || ""}
+            isUserAddress={false}
+            showTooltip={false}
+          />
+        )}
+        {field.rawAmount ? (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="cursor-help">{amountContent}</span>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="font-mono text-xs">{field.rawAmount} {field.badge || ""}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        ) : (
+          amountContent
+        )}
+      </div>
+    );
+  };
+
+  // Helper to render an address field
+  const renderAddressField = (field: ActivityField, showLabel: boolean = true): ReactNode => {
+    const addressValue = formatAddress(field.value);
+    const addressTooltip = field.tooltip || field.value;
+
+    return (
+      <div className="inline-flex items-center gap-1">
+        {showLabel && <span className="text-muted-foreground">{field.label}:</span>}
+        {field.image ? (
+          <>
+            <AssetImageDisplay
+              image={field.image}
+              fallback={field.imageFallback || field.badge || field.value}
+              isUserAddress={field.isUserAddress}
+              showTooltip={!!(field.tooltip && field.tooltip.trim())}
+            />
+            {field.badge && (
+              <Badge variant="secondary" className="text-xs">
+                {field.badge}
+              </Badge>
+            )}
+            {field.isUserAddress && (
+              <Badge variant="default" className="bg-primary text-primary-foreground text-xs">
+                You
+              </Badge>
+            )}
+            {field.additionalContent}
+          </>
+        ) : (
+          <>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <code className={`text-xs bg-muted px-2 py-1 rounded cursor-help ${field.isUserAddress ? "ring-2 ring-primary" : ""}`}>
+                    {addressValue}
+                  </code>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="font-mono text-xs">{addressTooltip}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <CopyButton address={field.value} />
+            {field.badge && (
+              <Badge variant="secondary" className="text-xs">
+                {field.badge}
+              </Badge>
+            )}
+            {field.isUserAddress && (
+              <Badge variant="default" className="bg-primary text-primary-foreground text-xs">
+                You
+              </Badge>
+            )}
+            {field.additionalContent}
+          </>
+        )}
+      </div>
+    );
+  };
+
+  // Build description based on layout config
+  let descriptionParts: ReactNode[];
+  const layout = data.layout || { type: "standard" };
+
+  if (layout.type === "two-line") {
+    // Render line 1
+    const line1Fields = layout.line1.fieldLabels
+      .map(label => findFieldByLabel(label))
+      .filter((f): f is ActivityField => f !== undefined);
+
+    let line1: ReactNode;
+    if (layout.line1.renderer === "amount-with-token" && line1Fields.length > 0) {
+      line1 = renderAmountWithToken(line1Fields[0]);
+    } else if (layout.line1.renderer === "amounts-with-arrow" && line1Fields.length === 2) {
+      // Special renderer for Amount In --> Amount Out pattern
+      const [amountInField, amountOutField] = line1Fields;
+      line1 = (
+        <div className="inline-flex items-center gap-2">
+          {renderAmountWithToken(amountInField)}
+          <span className="text-muted-foreground">→</span>
+          {renderAmountWithToken(amountOutField)}
+        </div>
+      );
+    } else {
+      // Default: render fields normally
+      line1 = (
+        <div className="inline-flex items-center gap-2 flex-wrap">
+          {line1Fields.map((field, idx) => (
+            <span key={idx} className="inline-flex items-center gap-1">
+              {idx > 0 && <span className="text-muted-foreground">•</span>}
+              <span className="text-muted-foreground">{field.label}:</span>
+              {renderFieldValue(field)}
+              {field.badge && (
+                <Badge variant="secondary" className="text-xs">
+                  {field.badge}
+                </Badge>
+              )}
+            </span>
+          ))}
+        </div>
+      );
+    }
+
+    // Render line 2
+    const line2Fields = layout.line2.fieldLabels
+      .map(label => findFieldByLabel(label))
+      .filter((f): f is ActivityField => f !== undefined);
+
+    let line2: ReactNode;
+    if (layout.line2.renderer === "addresses-with-arrow" && line2Fields.length === 2) {
+      // Special renderer for From --> To pattern
+      const [fromField, toField] = line2Fields;
+      line2 = (
+        <div className="flex items-center gap-2 text-sm flex-wrap">
+          {renderAddressField(fromField, true)}
+          <span className="text-muted-foreground">→</span>
+          {renderAddressField(toField, true)}
+        </div>
+      );
+    } else if (layout.line2.renderer === "addresses-with-arrow-and-text" && line2Fields.length >= 2) {
+      // Special renderer for From --> To --> additional text fields
+      const [fromField, toField, ...textFields] = line2Fields;
+      line2 = (
+        <div className="flex items-center gap-2 text-sm flex-wrap">
+          {renderAddressField(fromField, true)}
+          <span className="text-muted-foreground">→</span>
+          {renderAddressField(toField, true)}
+          {textFields.length > 0 && <span className="text-muted-foreground">•</span>}
+          {textFields.map((field, idx) => (
+            <span key={idx} className="inline-flex items-center gap-1">
+              {idx > 0 && <span className="text-muted-foreground">•</span>}
+              <span className="text-muted-foreground">{field.label}:</span>
+              {renderFieldValue(field)}
+            </span>
+          ))}
+        </div>
+      );
+    } else if (layout.line2.renderer === "addresses-with-bullet") {
+      // Special renderer for multiple addresses with bullet separator
+      line2 = (
+        <div className="flex items-center gap-2 text-sm flex-wrap">
+          {line2Fields.map((field, idx) => (
+            <span key={idx} className="inline-flex items-center gap-1">
+              {idx > 0 && <span className="text-muted-foreground">•</span>}
+              {renderAddressField(field, true)}
+            </span>
+          ))}
+        </div>
+      );
+    } else {
+      // Default: render fields normally
+      line2 = (
+        <div className="flex items-center gap-2 text-sm flex-wrap">
+          {line2Fields.map((field, idx) => (
+            <span key={idx} className="inline-flex items-center gap-1">
+              {idx > 0 && <span className="text-muted-foreground">•</span>}
+              <span className="text-muted-foreground">{field.label}:</span>
+              {renderFieldValue(field)}
+              {field.badge && (
+                <Badge variant="secondary" className="text-xs">
+                  {field.badge}
+                </Badge>
+              )}
+            </span>
+          ))}
+        </div>
+      );
+    }
+
+    descriptionParts = [
+      <div key="line1">{line1}</div>,
+      <div key="line2">{line2}</div>
+    ];
+  } else {
+    // Standard layout: all fields with bullets
+    descriptionParts = [];
+    data.fields.forEach((field, index) => {
+      if (index > 0) {
+        descriptionParts.push(<span key={`sep-${index}`}> • </span>);
+      }
+
+      const fieldIcon = field.icon ? getIcon(field.icon) : null;
+
+      descriptionParts.push(
+        <span key={index} className="inline-flex items-center gap-1">
+          {fieldIcon}
+          <span className="text-muted-foreground">{field.label}:</span>
+          {renderFieldValue(field)}
+          {field.badge && (
+            <Badge variant="secondary" className="text-xs">
+              {field.badge}
+            </Badge>
+          )}
+          {field.isUserAddress && (
+            <Badge variant="default" className="bg-primary text-primary-foreground text-xs">
+              You
+            </Badge>
+          )}
+          {field.additionalContent}
+        </span>
+      );
+    });
+  }
 
   return (
     <Card key={data.eventId} className="hover:bg-muted/50 transition-colors">
@@ -276,9 +549,15 @@ export const ActivityCard = ({ data }: { data: ActivityCardData }) => {
           {/* Middle: Title and Description */}
           <div className="flex-1 min-w-0">
             <h3 className="font-medium text-sm mb-1">{data.title}</h3>
-            <div className="text-xs flex flex-wrap items-center gap-1">
-              {descriptionParts}
-            </div>
+            {layout.type === "two-line" ? (
+              <div className="text-xs space-y-1">
+                {descriptionParts}
+              </div>
+            ) : (
+              <div className="text-xs flex flex-wrap items-center gap-1">
+                {descriptionParts}
+              </div>
+            )}
           </div>
 
           {/* Right: Timestamp */}
