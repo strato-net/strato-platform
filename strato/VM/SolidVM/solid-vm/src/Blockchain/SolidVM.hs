@@ -2220,6 +2220,22 @@ callBuiltin "ecPairing" xs =
    in case go xs of
         Right points -> pure . SBool $ Builtins.ecPairing points
         Left xs' -> typeError "invalid args passed to ecPairing" $ show xs'
+callBuiltin "poseidon" [SVariadic xs] =
+  let go (SInteger x : xs') = (x:) <$> go xs'
+      go []   = Right []
+      go xs' = Left xs'
+   in case go xs of
+        Right inputs -> pure . SInteger $ Builtins.poseidonHash inputs
+        Left xs' -> typeError "invalid args passed to poseidon" $ show xs'
+callBuiltin "poseidon" [SArray xs] =
+  SInteger . Builtins.poseidonHash <$> traverse getInt (V.toList xs)
+callBuiltin "poseidon" xs =
+  let go (SInteger x : xs') = (x:) <$> go xs'
+      go []   = Right []
+      go xs' = Left xs'
+   in case go xs of
+        Right inputs -> pure . SInteger $ Builtins.poseidonHash inputs
+        Left xs' -> typeError "invalid args passed to poseidon" $ show xs'
 callBuiltin ("payable") [SAddress a _] = return $ SAddress a True
 callBuiltin "require" (SBool cond : msg) = do
   case msg of

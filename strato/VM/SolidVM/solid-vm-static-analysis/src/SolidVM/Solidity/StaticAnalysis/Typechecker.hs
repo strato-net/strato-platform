@@ -1457,6 +1457,13 @@ ecPairingArgs x = Sum
                   , MultiVariate (intType' x) x
                   ]
 
+poseidonArgs :: SourceAnnotation Text -> Type'
+poseidonArgs x = Sum
+               $ (Static (SVMType.Array (SVMType.Int Nothing Nothing) Nothing) x)
+              :| [ Static SVMType.Variadic x
+                 , MultiVariate (intType' x) x
+                 ]
+
 --This function should have multivariate type that represents any amount of string types
 stringConcatArgs :: SourceAnnotation Text -> Type'
 stringConcatArgs x = MultiVariate (stringType' x) x
@@ -1550,6 +1557,7 @@ getVarType' "modExp" ctx = pure $ Function (modexpArgs ctx) (intType' ctx) ctx [
 getVarType' "ecAdd" ctx = pure $ Function (ecAddArgs ctx) (Product [intType' ctx, intType' ctx] ctx) ctx [] [] False
 getVarType' "ecMul" ctx = pure $ Function (ecMulArgs ctx) (Product [intType' ctx, intType' ctx] ctx) ctx [] [] False
 getVarType' "ecPairing" ctx = pure $ Function (ecPairingArgs ctx) (boolType' ctx) ctx [] [] False
+getVarType' "poseidon" ctx = pure $ Function (poseidonArgs ctx) (intType' ctx) ctx [] [] False
 getVarType' "selfdestruct" ctx = pure $ Function (selfdestructArgs ctx) (boolType' ctx) ctx [] [] False
 getVarType' "require" ctx = pure $ Function (requireArgs ctx) (Product [] ctx) ctx [] [] False
 getVarType' "assert" ctx = pure $ Function (assertArgs ctx) (Product [] ctx) ctx [] [] False
