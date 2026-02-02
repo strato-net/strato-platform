@@ -178,13 +178,13 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
     setCurrentPage(1); // Reset to first page on refresh
   }, []);
 
-  // Get activity type display names from config
+  // Get activity type display names from config, sorted alphabetically
   const activityTypeOptions = [
     { value: "all", label: "All types" },
     ...Object.entries(activityTypes).map(([key, config]) => ({
       value: key,
       label: config.displayName || key,
-    })),
+    })).sort((a, b) => a.label.localeCompare(b.label)),
   ];
 
   const paginationItems = (() => {
