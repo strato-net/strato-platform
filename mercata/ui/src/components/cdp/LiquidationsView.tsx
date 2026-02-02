@@ -43,6 +43,15 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ guestMode = false }
     const fetchData = async () => {
       setLoading(true);
       try {
+        // Skip API calls for non-logged-in users - they can't liquidate anyway
+        if (guestMode) {
+          setLiquidatableVaults([]);
+          setAssetConfigs({});
+          setIsGlobalPaused(false);
+          setLoading(false);
+          return;
+        }
+
         // Fetch global pause status
         let globalPaused = false;
         try {
@@ -135,11 +144,18 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ guestMode = false }
         }
       } catch (error) {
         console.error("Error fetching data:", error);
-        toast({
-          title: "Error",
-          description: "Failed to fetch liquidatable positions",
-          variant: "destructive",
-        });
+        // Don't show error toast for non-logged-in users - it's expected that API calls will fail
+        if (!guestMode) {
+          toast({
+            title: "Error",
+            description: "Failed to fetch liquidatable positions",
+            variant: "destructive",
+          });
+        }
+        // Set empty array for guests so they see "No liquidatable positions found" instead of error
+        if (guestMode) {
+          setLiquidatableVaults([]);
+        }
       } finally {
         setLoading(false);
       }
