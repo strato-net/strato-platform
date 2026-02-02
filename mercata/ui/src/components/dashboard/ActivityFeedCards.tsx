@@ -47,10 +47,11 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
     try {
       const offset = (currentPage - 1) * itemsPerPage;
 
-      // Build activity type pairs - filter by selected type if not "all"
-      let activityTypePairs = Object.values(activityTypes).map((config) => ({
+      // Build activity type pairs with filter configs - filter by selected type if not "all"
+      let activityTypePairs = Object.entries(activityTypes).map(([key, config]) => ({
         contract_name: config.contract_name,
         event_name: config.event_name,
+        filterConfig: config.filterConfig,
       }));
 
       // Filter by selected activity type if not "all"
@@ -60,6 +61,7 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
           activityTypePairs = [{
             contract_name: selectedConfig.contract_name,
             event_name: selectedConfig.event_name,
+            filterConfig: selectedConfig.filterConfig,
           }];
         }
       }

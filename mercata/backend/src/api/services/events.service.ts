@@ -1,5 +1,6 @@
 import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
+import { protocolContractAddresses } from "../../config/config";
 import type {
   EventData,
   EventResponse,
@@ -83,9 +84,17 @@ export const getContractInfo = async (
   };
 };
 
+export interface FilterConfig {
+  type: "single" | "or";
+  attribute?: string;
+  attributes?: string[];
+  excludeProtocolContracts?: boolean;
+}
+
 export interface ActivityTypePair {
   contract_name: string;
   event_name: string;
+  filterConfig?: FilterConfig;
 }
 
 /**
@@ -107,7 +116,8 @@ type ActivityFilter = (
   storageSelect: string,
   fetchLimit: number,
   accessToken: string,
-  timeRange?: string
+  timeRange?: string,
+  filterConfig?: FilterConfig
 ) => Promise<FilterQueryResult>;
 
 /**
@@ -146,455 +156,28 @@ const getTimeRangeFilter = (timeRange?: string): Record<string, string> => {
 };
 
 /**
- * Mapping from (contract_name, event_name) to filter functions
- * Defines how to filter events for "my activity" for each activity type
+ * Generic filter for single attribute filtering
  */
-const activityFilters: Record<string, ActivityFilter> = {
-  // Transfer events: filter by from OR to
-  "Token:Transfer": async (userAddress, contractName, eventName, storageSelect, fetchLimit, accessToken, timeRange) => {
-    const timeFilter = getTimeRangeFilter(timeRange);
-    const baseParams = {
-      order: "block_timestamp.desc",
-      select: `*,${storageSelect}`,
-      "storage.contract.contract_name": `eq.${contractName}`,
-      event_name: `eq.${eventName}`,
-      limit: fetchLimit.toString(),
-      offset: "0",
-      ...timeFilter,
-    };
-
-    const fromParams = {
-      ...baseParams,
-      "attributes->>from": `eq.${userAddress}`,
-    };
-
-    const toParams = {
-      ...baseParams,
-      "attributes->>to": `eq.${userAddress}`,
-    };
-
-    const fromCountParams: Record<string, string> = {
-      "storage.contract.contract_name": `eq.${contractName}`,
-      event_name: `eq.${eventName}`,
-      "attributes->>from": `eq.${userAddress}`,
-      select: `${storageSelect},count()`,
-      ...timeFilter,
-    };
-
-    const toCountParams: Record<string, string> = {
-      "storage.contract.contract_name": `eq.${contractName}`,
-      event_name: `eq.${eventName}`,
-      "attributes->>to": `eq.${userAddress}`,
-      select: `${storageSelect},count()`,
-      ...timeFilter,
-    };
-
-    const [fromCountResponse, fromEventsResponse, toCountResponse, toEventsResponse] = await Promise.all([
-      cirrus.get(accessToken, `/${constants.Event}`, { params: fromCountParams }),
-      cirrus.get(accessToken, `/${constants.Event}`, { params: fromParams }),
-      cirrus.get(accessToken, `/${constants.Event}`, { params: toCountParams }),
-      cirrus.get(accessToken, `/${constants.Event}`, { params: toParams }),
-    ]);
-
-    const fromTotal = fromCountResponse.data?.[0]?.count || 0;
-    const toTotal = toCountResponse.data?.[0]?.count || 0;
-
-    const fromEvents = (fromEventsResponse.data || []).map((event: any) => {
-      const { storage, ...eventWithoutStorage } = event;
-      return {
-        ...eventWithoutStorage,
-        contract_name: event.storage?.contract?.[0]?.contract_name || "",
-      };
-    });
-
-    const toEvents = (toEventsResponse.data || []).map((event: any) => {
-      const { storage, ...eventWithoutStorage } = event;
-      return {
-        ...eventWithoutStorage,
-        contract_name: event.storage?.contract?.[0]?.contract_name || "",
-      };
-    });
-
-    // Deduplicate by id
-    const eventMap = new Map<number, any>();
-    [...fromEvents, ...toEvents].forEach(event => {
-      eventMap.set(event.id, event);
-    });
-
-    const total = Math.max(fromTotal, toTotal); // Conservative estimate
-
-    return { events: Array.from(eventMap.values()), total };
-  },
-
-  // DepositCompleted events: filter by stratoRecipient
-  "MercataBridge:DepositCompleted": async (userAddress, contractName, eventName, storageSelect, fetchLimit, accessToken, timeRange) => {
-    const timeFilter = getTimeRangeFilter(timeRange);
-    const params: Record<string, string> = {
-      order: "block_timestamp.desc",
-      select: `*,${storageSelect}`,
-      "storage.contract.contract_name": `eq.${contractName}`,
-      event_name: `eq.${eventName}`,
-      limit: fetchLimit.toString(),
-      offset: "0",
-      ...timeFilter,
-    };
-
-    if (userAddress) {
-      params["attributes->>stratoRecipient"] = `eq.${userAddress}`;
-    }
-
-    const countParams: Record<string, string> = {
-      "storage.contract.contract_name": `eq.${contractName}`,
-      event_name: `eq.${eventName}`,
-      select: `${storageSelect},count()`,
-      ...timeFilter,
-    };
-
-    if (userAddress) {
-      countParams["attributes->>stratoRecipient"] = `eq.${userAddress}`;
-    }
-
-    const [countResponse, eventsResponse] = await Promise.all([
-      cirrus.get(accessToken, `/${constants.Event}`, { params: countParams }),
-      cirrus.get(accessToken, `/${constants.Event}`, { params }),
-    ]);
-
-    const total = countResponse.data?.[0]?.count || 0;
-    const data = eventsResponse.data || [];
-
-    const events = (data as any[]).map((event: any) => {
-      const { storage, ...eventWithoutStorage } = event;
-      return {
-        ...eventWithoutStorage,
-        contract_name: event.storage?.contract?.[0]?.contract_name || "",
-      };
-    });
-
-    return { events, total };
-  },
-
-  // USDSTMinted events: filter by owner
-  "CDPEngine:USDSTMinted": async (userAddress, contractName, eventName, storageSelect, fetchLimit, accessToken, timeRange) => {
-    const timeFilter = getTimeRangeFilter(timeRange);
-    const params: Record<string, string> = {
-      order: "block_timestamp.desc",
-      select: `*,${storageSelect}`,
-      "storage.contract.contract_name": `eq.${contractName}`,
-      event_name: `eq.${eventName}`,
-      limit: fetchLimit.toString(),
-      offset: "0",
-      ...timeFilter,
-    };
-
-    if (userAddress) {
-      params["attributes->>owner"] = `eq.${userAddress}`;
-    }
-
-    const countParams: Record<string, string> = {
-      "storage.contract.contract_name": `eq.${contractName}`,
-      event_name: `eq.${eventName}`,
-      select: `${storageSelect},count()`,
-      ...timeFilter,
-    };
-
-    if (userAddress) {
-      countParams["attributes->>owner"] = `eq.${userAddress}`;
-    }
-
-    const [countResponse, eventsResponse] = await Promise.all([
-      cirrus.get(accessToken, `/${constants.Event}`, { params: countParams }),
-      cirrus.get(accessToken, `/${constants.Event}`, { params }),
-    ]);
-
-    const total = countResponse.data?.[0]?.count || 0;
-    const data = eventsResponse.data || [];
-
-    const events = (data as any[]).map((event: any) => {
-      const { storage, ...eventWithoutStorage } = event;
-      return {
-        ...eventWithoutStorage,
-        contract_name: event.storage?.contract?.[0]?.contract_name || "",
-      };
-    });
-
-    return { events, total };
-  },
-
-  // Swap events: filter by sender
-  "Pool:Swap": async (userAddress, contractName, eventName, storageSelect, fetchLimit, accessToken, timeRange) => {
-    const timeFilter = getTimeRangeFilter(timeRange);
-    const params: Record<string, string> = {
-      order: "block_timestamp.desc",
-      select: `*,${storageSelect}`,
-      "storage.contract.contract_name": `eq.${contractName}`,
-      event_name: `eq.${eventName}`,
-      limit: fetchLimit.toString(),
-      offset: "0",
-      ...timeFilter,
-    };
-
-    if (userAddress) {
-      params["attributes->>sender"] = `eq.${userAddress}`;
-    }
-
-    const countParams: Record<string, string> = {
-      "storage.contract.contract_name": `eq.${contractName}`,
-      event_name: `eq.${eventName}`,
-      select: `${storageSelect},count()`,
-      ...timeFilter,
-    };
-
-    if (userAddress) {
-      countParams["attributes->>sender"] = `eq.${userAddress}`;
-    }
-
-    const [countResponse, eventsResponse] = await Promise.all([
-      cirrus.get(accessToken, `/${constants.Event}`, { params: countParams }),
-      cirrus.get(accessToken, `/${constants.Event}`, { params }),
-    ]);
-
-    const total = countResponse.data?.[0]?.count || 0;
-    const data = eventsResponse.data || [];
-
-    const events = (data as any[]).map((event: any) => {
-      const { storage, ...eventWithoutStorage } = event;
-      return {
-        ...eventWithoutStorage,
-        contract_name: event.storage?.contract?.[0]?.contract_name || "",
-      };
-    });
-
-    return { events, total };
-  },
-
-  // Borrowed events: filter by user
-  "LendingPool:Borrowed": async (userAddress, contractName, eventName, storageSelect, fetchLimit, accessToken, timeRange) => {
-    const timeFilter = getTimeRangeFilter(timeRange);
-    const params: Record<string, string> = {
-      order: "block_timestamp.desc",
-      select: `*,${storageSelect}`,
-      "storage.contract.contract_name": `eq.${contractName}`,
-      event_name: `eq.${eventName}`,
-      limit: fetchLimit.toString(),
-      offset: "0",
-      ...timeFilter,
-    };
-
-    if (userAddress) {
-      params["attributes->>user"] = `eq.${userAddress}`;
-    }
-
-    const countParams: Record<string, string> = {
-      "storage.contract.contract_name": `eq.${contractName}`,
-      event_name: `eq.${eventName}`,
-      select: `${storageSelect},count()`,
-      ...timeFilter,
-    };
-
-    if (userAddress) {
-      countParams["attributes->>user"] = `eq.${userAddress}`;
-    }
-
-    const [countResponse, eventsResponse] = await Promise.all([
-      cirrus.get(accessToken, `/${constants.Event}`, { params: countParams }),
-      cirrus.get(accessToken, `/${constants.Event}`, { params }),
-    ]);
-
-    const total = countResponse.data?.[0]?.count || 0;
-    const data = eventsResponse.data || [];
-
-    const events = (data as any[]).map((event: any) => {
-      const { storage, ...eventWithoutStorage } = event;
-      return {
-        ...eventWithoutStorage,
-        contract_name: event.storage?.contract?.[0]?.contract_name || "",
-      };
-    });
-
-    return { events, total };
-  },
-
-  // RewardsClaimed events: filter by user
-  "Rewards:RewardsClaimed": async (userAddress, contractName, eventName, storageSelect, fetchLimit, accessToken, timeRange) => {
-    const timeFilter = getTimeRangeFilter(timeRange);
-    const params: Record<string, string> = {
-      order: "block_timestamp.desc",
-      select: `*,${storageSelect}`,
-      "storage.contract.contract_name": `eq.${contractName}`,
-      event_name: `eq.${eventName}`,
-      limit: fetchLimit.toString(),
-      offset: "0",
-      ...timeFilter,
-    };
-
-    if (userAddress) {
-      params["attributes->>user"] = `eq.${userAddress}`;
-    }
-
-    const countParams: Record<string, string> = {
-      "storage.contract.contract_name": `eq.${contractName}`,
-      event_name: `eq.${eventName}`,
-      select: `${storageSelect},count()`,
-      ...timeFilter,
-    };
-
-    if (userAddress) {
-      countParams["attributes->>user"] = `eq.${userAddress}`;
-    }
-
-    const [countResponse, eventsResponse] = await Promise.all([
-      cirrus.get(accessToken, `/${constants.Event}`, { params: countParams }),
-      cirrus.get(accessToken, `/${constants.Event}`, { params }),
-    ]);
-
-    const total = countResponse.data?.[0]?.count || 0;
-    const data = eventsResponse.data || [];
-
-    const events = (data as any[]).map((event: any) => {
-      const { storage, ...eventWithoutStorage } = event;
-      return {
-        ...eventWithoutStorage,
-        contract_name: event.storage?.contract?.[0]?.contract_name || "",
-      };
-    });
-
-    return { events, total };
-  },
-
-  // WithdrawalRequested events: filter by user
-  "MercataBridge:WithdrawalRequested": async (userAddress, contractName, eventName, storageSelect, fetchLimit, accessToken, timeRange) => {
-    const timeFilter = getTimeRangeFilter(timeRange);
-    const params: Record<string, string> = {
-      order: "block_timestamp.desc",
-      select: `*,${storageSelect}`,
-      "storage.contract.contract_name": `eq.${contractName}`,
-      event_name: `eq.${eventName}`,
-      limit: fetchLimit.toString(),
-      offset: "0",
-      ...timeFilter,
-    };
-
-    if (userAddress) {
-      params["attributes->>user"] = `eq.${userAddress}`;
-    }
-
-    const countParams: Record<string, string> = {
-      "storage.contract.contract_name": `eq.${contractName}`,
-      event_name: `eq.${eventName}`,
-      select: `${storageSelect},count()`,
-      ...timeFilter,
-    };
-
-    if (userAddress) {
-      countParams["attributes->>user"] = `eq.${userAddress}`;
-    }
-
-    const [countResponse, eventsResponse] = await Promise.all([
-      cirrus.get(accessToken, `/${constants.Event}`, { params: countParams }),
-      cirrus.get(accessToken, `/${constants.Event}`, { params }),
-    ]);
-
-    const total = countResponse.data?.[0]?.count || 0;
-    const data = eventsResponse.data || [];
-
-    const events = (data as any[]).map((event: any) => {
-      const { storage, ...eventWithoutStorage } = event;
-      return {
-        ...eventWithoutStorage,
-        contract_name: event.storage?.contract?.[0]?.contract_name || "",
-      };
-    });
-
-    return { events, total };
-  },
-
-  // Referral Redeemed events: filter by sender OR recipient
-  "Escrow:Redeemed": async (userAddress, contractName, eventName, storageSelect, fetchLimit, accessToken, timeRange) => {
-    if (!userAddress) {
-      // If no userAddress, use default filter (no user-specific filtering)
-      return defaultFilter(userAddress, contractName, eventName, storageSelect, fetchLimit, accessToken, timeRange);
-    }
-
-    const timeFilter = getTimeRangeFilter(timeRange);
-    const baseParams = {
-      order: "block_timestamp.desc",
-      select: `*,${storageSelect}`,
-      "storage.contract.contract_name": `eq.${contractName}`,
-      event_name: `eq.${eventName}`,
-      limit: fetchLimit.toString(),
-      offset: "0",
-      ...timeFilter,
-    };
-
-    const senderParams = {
-      ...baseParams,
-      "attributes->>sender": `eq.${userAddress}`,
-    };
-
-    const recipientParams = {
-      ...baseParams,
-      "attributes->>recipient": `eq.${userAddress}`,
-    };
-
-    const senderCountParams: Record<string, string> = {
-      "storage.contract.contract_name": `eq.${contractName}`,
-      event_name: `eq.${eventName}`,
-      "attributes->>sender": `eq.${userAddress}`,
-      select: `${storageSelect},count()`,
-      ...timeFilter,
-    };
-
-    const recipientCountParams: Record<string, string> = {
-      "storage.contract.contract_name": `eq.${contractName}`,
-      event_name: `eq.${eventName}`,
-      "attributes->>recipient": `eq.${userAddress}`,
-      select: `${storageSelect},count()`,
-      ...timeFilter,
-    };
-
-    const [senderCountResponse, senderEventsResponse, recipientCountResponse, recipientEventsResponse] = await Promise.all([
-      cirrus.get(accessToken, `/${constants.Event}`, { params: senderCountParams }),
-      cirrus.get(accessToken, `/${constants.Event}`, { params: senderParams }),
-      cirrus.get(accessToken, `/${constants.Event}`, { params: recipientCountParams }),
-      cirrus.get(accessToken, `/${constants.Event}`, { params: recipientParams }),
-    ]);
-
-    const senderTotal = senderCountResponse.data?.[0]?.count || 0;
-    const recipientTotal = recipientCountResponse.data?.[0]?.count || 0;
-
-    const senderEvents = (senderEventsResponse.data || []).map((event: any) => {
-      const { storage, ...eventWithoutStorage } = event;
-      return {
-        ...eventWithoutStorage,
-        contract_name: event.storage?.contract?.[0]?.contract_name || "",
-      };
-    });
-
-    const recipientEvents = (recipientEventsResponse.data || []).map((event: any) => {
-      const { storage, ...eventWithoutStorage } = event;
-      return {
-        ...eventWithoutStorage,
-        contract_name: event.storage?.contract?.[0]?.contract_name || "",
-      };
-    });
-
-    // Deduplicate by id
-    const eventMap = new Map<number, any>();
-    [...senderEvents, ...recipientEvents].forEach(event => {
-      eventMap.set(event.id, event);
-    });
-
-    const total = Math.max(senderTotal, recipientTotal); // Conservative estimate
-
-    return { events: Array.from(eventMap.values()), total };
-  },
-};
-
-/**
- * Default filter: filter by transaction_sender
- */
-const defaultFilter: ActivityFilter = async (userAddress, contractName, eventName, storageSelect, fetchLimit, accessToken, timeRange) => {
+const singleAttributeFilter: ActivityFilter = async (
+  userAddress,
+  contractName,
+  eventName,
+  storageSelect,
+  fetchLimit,
+  accessToken,
+  timeRange,
+  filterConfig?: FilterConfig
+) => {
   const timeFilter = getTimeRangeFilter(timeRange);
+  const attribute = filterConfig?.type === "single" ? filterConfig.attribute : undefined;
+  
+  // Build exclusion filter for protocol contracts if needed
+  const excludeProtocolFilter: Record<string, string> = {};
+  if (filterConfig?.excludeProtocolContracts && protocolContractAddresses.size > 0) {
+    const addressList = Array.from(protocolContractAddresses).join(",");
+    excludeProtocolFilter["transaction_sender"] = `not.in.(${addressList})`;
+  }
+
   const params: Record<string, string> = {
     order: "block_timestamp.desc",
     select: `*,${storageSelect}`,
@@ -603,10 +186,11 @@ const defaultFilter: ActivityFilter = async (userAddress, contractName, eventNam
     limit: fetchLimit.toString(),
     offset: "0",
     ...timeFilter,
+    ...excludeProtocolFilter,
   };
 
-  if (userAddress) {
-    params["transaction_sender"] = `eq.${userAddress}`;
+  if (userAddress && attribute) {
+    params[`attributes->>${attribute}`] = `eq.${userAddress}`;
   }
 
   const countParams: Record<string, string> = {
@@ -614,10 +198,11 @@ const defaultFilter: ActivityFilter = async (userAddress, contractName, eventNam
     event_name: `eq.${eventName}`,
     select: `${storageSelect},count()`,
     ...timeFilter,
+    ...excludeProtocolFilter,
   };
 
-  if (userAddress) {
-    countParams["transaction_sender"] = `eq.${userAddress}`;
+  if (userAddress && attribute) {
+    countParams[`attributes->>${attribute}`] = `eq.${userAddress}`;
   }
 
   const [countResponse, eventsResponse] = await Promise.all([
@@ -638,6 +223,156 @@ const defaultFilter: ActivityFilter = async (userAddress, contractName, eventNam
 
   return { events, total };
 };
+
+/**
+ * Generic filter for OR attribute filtering (e.g., from OR to)
+ */
+const orAttributeFilter: ActivityFilter = async (
+  userAddress,
+  contractName,
+  eventName,
+  storageSelect,
+  fetchLimit,
+  accessToken,
+  timeRange,
+  filterConfig?: FilterConfig
+) => {
+  if (!userAddress) {
+    // If no userAddress, fetch all events without filtering
+    const timeFilter = getTimeRangeFilter(timeRange);
+    const params: Record<string, string> = {
+      order: "block_timestamp.desc",
+      select: `*,${storageSelect}`,
+      "storage.contract.contract_name": `eq.${contractName}`,
+      event_name: `eq.${eventName}`,
+      limit: fetchLimit.toString(),
+      offset: "0",
+      ...timeFilter,
+    };
+
+    const countParams: Record<string, string> = {
+      "storage.contract.contract_name": `eq.${contractName}`,
+      event_name: `eq.${eventName}`,
+      select: `${storageSelect},count()`,
+      ...timeFilter,
+    };
+
+    const [countResponse, eventsResponse] = await Promise.all([
+      cirrus.get(accessToken, `/${constants.Event}`, { params: countParams }),
+      cirrus.get(accessToken, `/${constants.Event}`, { params }),
+    ]);
+
+    const total = countResponse.data?.[0]?.count || 0;
+    const data = eventsResponse.data || [];
+
+    const events = (data as any[]).map((event: any) => {
+      const { storage, ...eventWithoutStorage } = event;
+      return {
+        ...eventWithoutStorage,
+        contract_name: event.storage?.contract?.[0]?.contract_name || "",
+      };
+    });
+
+    return { events, total };
+  }
+
+  const timeFilter = getTimeRangeFilter(timeRange);
+  const attributes = filterConfig?.type === "or" ? (filterConfig.attributes || []) : [];
+  
+  if (attributes.length === 0) {
+    throw new Error("OR filter requires at least one attribute");
+  }
+  
+  // Build exclusion filter for protocol contracts if needed
+  const excludeProtocolFilter: Record<string, string> = {};
+  if (filterConfig?.excludeProtocolContracts && protocolContractAddresses.size > 0) {
+    const addressList = Array.from(protocolContractAddresses).join(",");
+    excludeProtocolFilter["transaction_sender"] = `not.in.(${addressList})`;
+  }
+
+  const baseParams = {
+    order: "block_timestamp.desc",
+    select: `*,${storageSelect}`,
+    "storage.contract.contract_name": `eq.${contractName}`,
+    event_name: `eq.${eventName}`,
+    limit: fetchLimit.toString(),
+    offset: "0",
+    ...timeFilter,
+    ...excludeProtocolFilter,
+  };
+
+  // Create params for each attribute
+  const attributeParams = attributes.map(attr => ({
+    ...baseParams,
+    [`attributes->>${attr}`]: `eq.${userAddress}`,
+  }));
+
+  const attributeCountParams = attributes.map(attr => ({
+    "storage.contract.contract_name": `eq.${contractName}`,
+    event_name: `eq.${eventName}`,
+    [`attributes->>${attr}`]: `eq.${userAddress}`,
+    select: `${storageSelect},count()`,
+    ...timeFilter,
+    ...excludeProtocolFilter,
+  }));
+
+  // Execute all queries in parallel
+  const allPromises: Promise<any>[] = [];
+  attributeCountParams.forEach(params => {
+    allPromises.push(cirrus.get(accessToken, `/${constants.Event}`, { params }));
+  });
+  attributeParams.forEach(params => {
+    allPromises.push(cirrus.get(accessToken, `/${constants.Event}`, { params }));
+  });
+  
+  if (allPromises.length === 0) {
+    return { events: [], total: 0 };
+  }
+
+  const responses = await Promise.all(allPromises);
+  const countResponses = responses.slice(0, attributes.length);
+  const eventResponses = responses.slice(attributes.length);
+
+  // Combine totals (conservative estimate)
+  const totals = countResponses.map(r => r.data?.[0]?.count || 0);
+  const total = Math.max(...totals);
+
+  // Combine and deduplicate events
+  const allEvents = eventResponses.flatMap((response: any) => {
+    return (response.data || []).map((event: any) => {
+      const { storage, ...eventWithoutStorage } = event;
+      return {
+        ...eventWithoutStorage,
+        contract_name: event.storage?.contract?.[0]?.contract_name || "",
+      };
+    });
+  });
+
+  // Deduplicate by id
+  const eventMap = new Map<number, any>();
+  allEvents.forEach(event => {
+    eventMap.set(event.id, event);
+  });
+
+  return { events: Array.from(eventMap.values()), total };
+};
+
+/**
+ * Get filter function based on filter config
+ */
+const getFilter = (filterConfig?: FilterConfig): ActivityFilter => {
+  if (!filterConfig) {
+    throw new Error("Filter config is required");
+  }
+
+  if (filterConfig.type === "or") {
+    return orAttributeFilter;
+  } else {
+    return singleAttributeFilter;
+  }
+};
+
+
 
 export const getActivitiesByTypes = async (
   accessToken: string,
@@ -696,11 +431,13 @@ export const getActivitiesByTypes = async (
       return { events, total };
     }
 
-    // Use the filter function for this activity type, or default filter
-    const filterKey = `${pair.contract_name}:${pair.event_name}`;
-    const filter = activityFilters[filterKey] || defaultFilter;
+    // Use generic filter based on filterConfig
+    if (!pair.filterConfig) {
+      throw new Error(`No filter config provided for activity type: ${pair.contract_name}:${pair.event_name}`);
+    }
 
-    return await filter(userAddress, pair.contract_name, pair.event_name, storageSelect, fetchLimit, accessToken, timeRange);
+    const filter = getFilter(pair.filterConfig);
+    return await filter(userAddress, pair.contract_name, pair.event_name, storageSelect, fetchLimit, accessToken, timeRange, pair.filterConfig);
   });
 
   const pairResults = await Promise.all(pairQueries);

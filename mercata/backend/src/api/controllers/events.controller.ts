@@ -48,9 +48,33 @@ class EventsController {
         return;
       }
 
+      // Parse filter configs from query (JSON string)
+      let filterConfigsMap: Map<string, ActivityTypePair["filterConfig"]> = new Map();
+      if (query.filter_configs) {
+        try {
+          const filterConfigs = JSON.parse(query.filter_configs as string) as Array<{
+            contract_name: string;
+            event_name: string;
+            filterConfig: ActivityTypePair["filterConfig"];
+          }>;
+          filterConfigs.forEach(config => {
+            const key = `${config.contract_name}:${config.event_name}`;
+            filterConfigsMap.set(key, config.filterConfig);
+          });
+        } catch (error) {
+          // If parsing fails, continue without filter configs (will use defaults)
+          console.warn("Failed to parse filter_configs:", error);
+        }
+      }
+
       const activityTypePairs: ActivityTypePair[] = activityTypesParam.split(',').map((pair) => {
         const [contract_name, event_name] = pair.split(':');
-        return { contract_name, event_name };
+        const key = `${contract_name}:${event_name}`;
+        return { 
+          contract_name, 
+          event_name,
+          filterConfig: filterConfigsMap.get(key)
+        };
       });
 
       const limit = parseInt(query.limit as string || "10");

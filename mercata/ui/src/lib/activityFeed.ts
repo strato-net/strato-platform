@@ -1,5 +1,6 @@
 import { api } from './axios';
 import type { EventResponse, ContractInfoResponse } from '@mercata/shared-types';
+import type { FilterConfig } from '@/components/dashboard/activityTypes';
 
 export interface EventsFilters {
   limit?: number;
@@ -31,7 +32,7 @@ export const activityFeedApi = {
    * Fetch activities filtered by exact (contract_name, event_name) pairs
    */
   getActivities: async (
-    activityTypePairs: Array<{ contract_name: string; event_name: string }>,
+    activityTypePairs: Array<{ contract_name: string; event_name: string; filterConfig: FilterConfig }>,
     options: {
       limit?: number;
       offset?: number;
@@ -46,6 +47,14 @@ export const activityFeedApi = {
       .map(p => `${p.contract_name}:${p.event_name}`)
       .join(',');
     params.append('activity_types', activityTypesStr);
+
+    // Send filter configs as JSON in query param
+    const filterConfigs = activityTypePairs.map(p => ({
+      contract_name: p.contract_name,
+      event_name: p.event_name,
+      filterConfig: p.filterConfig,
+    }));
+    params.append('filter_configs', JSON.stringify(filterConfigs));
 
     if (options.limit) params.append('limit', options.limit.toString());
     if (options.offset) params.append('offset', options.offset.toString());

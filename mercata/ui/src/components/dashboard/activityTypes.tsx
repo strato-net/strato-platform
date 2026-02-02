@@ -78,6 +78,13 @@ export type ActivityHandler = (
 export type TokenAddressExtractor = (event: Event) => string[];
 
 /**
+ * Filter configuration for backend event filtering
+ */
+export type FilterConfig = 
+  | { type: "single"; attribute: string; excludeProtocolContracts?: boolean }
+  | { type: "or"; attributes: string[]; excludeProtocolContracts?: boolean };
+
+/**
  * Activity type configuration
  * Defines filters for fetching events and handler for processing them
  */
@@ -95,6 +102,11 @@ export interface ActivityTypeConfig {
    * If not provided, no symbol will be fetched for this activity type
    */
   getTokenAddress?: TokenAddressExtractor;
+  /**
+   * Filter configuration for backend event filtering
+   * Defines how to filter events for "My Activity" view
+   */
+  filterConfig: FilterConfig;
 }
 
 /**
@@ -105,6 +117,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "Token",
     event_name: "Transfer",
     displayName: "Transfer",
+    filterConfig: { type: "or", attributes: ["from", "to"], excludeProtocolContracts: true },
     getTokenAddress: (event: Event) => [event.address].filter(Boolean),
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
       const tokenSymbol = tokenSymbols.get(event.address);
@@ -159,6 +172,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "MercataBridge",
     event_name: "DepositCompleted",
     displayName: "Deposit",
+    filterConfig: { type: "single", attribute: "stratoRecipient" },
     getTokenAddress: (event: Event) => {
       const token = event.attributes.stratoToken || event.attributes.strato_token;
       return token ? [token] : [];
@@ -232,6 +246,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "MercataBridge",
     event_name: "WithdrawalRequested",
     displayName: "Withdraw",
+    filterConfig: { type: "single", attribute: "user" },
     getTokenAddress: (event: Event) => {
       const token = event.attributes.token || event.attributes.Token;
       const externalToken = event.attributes.externalToken || event.attributes.external_token;
@@ -311,6 +326,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "CDPEngine",
     event_name: "USDSTMinted",
     displayName: "CDP Mint",
+    filterConfig: { type: "single", attribute: "owner" },
     getTokenAddress: (event: Event) => {
       const asset = event.attributes.asset || event.attributes.Asset;
       return asset ? [asset] : [];
@@ -360,6 +376,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "Pool",
     event_name: "Swap",
     displayName: "Swap",
+    filterConfig: { type: "single", attribute: "sender" },
     getTokenAddress: (event: Event) => {
       const tokenIn = event.attributes.tokenIn || event.attributes.token_in;
       const tokenOut = event.attributes.tokenOut || event.attributes.token_out;
@@ -422,6 +439,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "Rewards",
     event_name: "RewardsClaimed",
     displayName: "Rewards Claimed",
+    filterConfig: { type: "single", attribute: "user" },
     getTokenAddress: (event: Event) => {
       // The reward token address is stored in the Rewards contract, not in the event
       // We could fetch it from the contract, but for now return empty array
@@ -460,6 +478,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "LendingPool",
     event_name: "Borrowed",
     displayName: "Borrow",
+    filterConfig: { type: "single", attribute: "user" },
     getTokenAddress: (event: Event) => {
       const asset = event.attributes.asset || event.attributes.Asset;
       return asset ? [asset] : [];
@@ -510,6 +529,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "Escrow",
     event_name: "Redeemed",
     displayName: "Referral Redeemed",
+    filterConfig: { type: "or", attributes: ["sender", "recipient"] },
     getTokenAddress: (event: Event) => {
       // Helper to normalize arrays from object format (handles Cirrus/PostgREST JSONB format)
       const normalizeToArray = (value: any): any[] => {
