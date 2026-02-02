@@ -244,7 +244,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
 
       const fields: ActivityField[] = [
         {
-          label: "Owner",
+          label: "Borrower",
           value: owner,
           type: "address",
           icon: "arrow-up-right",
