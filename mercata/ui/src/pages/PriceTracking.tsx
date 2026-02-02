@@ -976,6 +976,32 @@ const PriceTracking = () => {
     }
   }, [filteredAssets]);
 
+  // Fetch current spot price for a pool (tokenA price / tokenB price from oracle)
+  const fetchCurrentSpotPriceForPool = useCallback(async (widget: WidgetConfig): Promise<number | null> => {
+    if (!widget.assetAddress) return null;
+    const asset = filteredAssets.find((a) => a.address === widget.assetAddress);
+    if (!asset || (asset as any).isPool !== true) return null;
+    const tokenA = (asset as any).tokenA;
+    const tokenB = (asset as any).tokenB;
+    const tokenAAddress = tokenA?.address || tokenA?.token?.address;
+    const tokenBAddress = tokenB?.address || tokenB?.token?.address;
+    if (!tokenAAddress || !tokenBAddress) return null;
+    try {
+      const [resA, resB] = await Promise.all([
+        api.get('/oracle/price', { params: { asset: tokenAAddress } }),
+        api.get('/oracle/price', { params: { asset: tokenBAddress } }),
+      ]);
+      const priceA = resA.data?.price != null ? parseFloat(resA.data.price) : NaN;
+      const priceB = resB.data?.price != null ? parseFloat(resB.data.price) : NaN;
+      if (!Number.isFinite(priceA) || !Number.isFinite(priceB) || priceB === 0) return null;
+      const raw = priceA > 1e10 ? priceA / 1e18 : priceA;
+      const den = priceB > 1e10 ? priceB / 1e18 : priceB;
+      return raw / den;
+    } catch {
+      return null;
+    }
+  }, [filteredAssets]);
+
   // Fetch data for a single widget
   const fetchWidgetData = useCallback(async (widget: WidgetConfig, appendNewPrice = false) => {
     if (!widget.assetAddress) return;
@@ -1133,8 +1159,18 @@ const PriceTracking = () => {
       for (const widget of widgets) {
         if (!widget.assetAddress) continue;
 
+        const asset = filteredAssets.find((a) => a.address === widget.assetAddress);
+        const isPool = asset && (asset as any).isPool === true;
+
         const currentPrice = await fetchCurrentPrice(widget);
         if (currentPrice === null) continue;
+
+        // For pools, also fetch current spot price so both lines update
+        let spotPrice: number | undefined;
+        if (isPool) {
+          const sp = await fetchCurrentSpotPriceForPool(widget);
+          if (sp != null) spotPrice = sp;
+        }
 
         const dataKey = `${widget.id}-${widget.assetAddress}-${widget.timeRange}-${widget.interval}`;
         setAssetData((prev) => {
@@ -1145,12 +1181,10 @@ const PriceTracking = () => {
           const lastDataPoint = existing.data[existing.data.length - 1];
 
           // Only append if the new price is different or enough time has passed
-          // Use the interval to determine if we should add a new point
           const intervalMs = getIntervalMs(widget.interval);
           const timeSinceLastPoint = now - lastDataPoint.timestamp;
 
-          // If enough time has passed or price changed significantly, append new point
-          if (timeSinceLastPoint >= intervalMs || Math.abs(currentPrice - lastDataPoint.close) / lastDataPoint.close > 0.001) {
+          if (timeSinceLastPoint >= intervalMs || (lastDataPoint.close > 0 && Math.abs(currentPrice - lastDataPoint.close) / lastDataPoint.close > 0.001)) {
             const updated = new Map(prev);
             const newDataPoint: OHLCData = {
               timestamp: now,
@@ -1158,12 +1192,11 @@ const PriceTracking = () => {
               high: Math.max(lastDataPoint.close, currentPrice),
               low: Math.min(lastDataPoint.close, currentPrice),
               close: currentPrice,
+              ...(spotPrice !== undefined && { spotPrice }),
             };
 
-            // Append new point
             const updatedData = [...existing.data, newDataPoint];
 
-            // Calculate change from first point
             let change24h = 0;
             let changePercent24h = 0;
             if (updatedData.length >= 2) {
@@ -1189,7 +1222,7 @@ const PriceTracking = () => {
     }, 5000); // Poll every 5 seconds
 
     return () => clearInterval(pollInterval);
-  }, [widgets, filteredAssets.length, fetchCurrentPrice, getIntervalMs]);
+  }, [widgets, filteredAssets, fetchCurrentPrice, fetchCurrentSpotPriceForPool, getIntervalMs]);
 
   // Update widget configuration and save to localStorage
   const updateWidget = (widgetId: string, updates: Partial<WidgetConfig>) => {
