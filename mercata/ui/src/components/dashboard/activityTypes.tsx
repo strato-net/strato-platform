@@ -1,13 +1,23 @@
 import type { Event } from "@mercata/shared-types";
 import { formatUnits } from "viem";
 import { getChainName } from "@/lib/bridge/utils";
-import { ActivityCardData, ActivityField } from "./ActivityCard";
+import { ActivityCardData, ActivityField, ActivityTypeIcon } from "./ActivityCard";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  ArrowLeftRight,
+  Download,
+  Upload,
+  Landmark,
+  Gift,
+  UserPlus,
+  Send,
+  LucideIcon
+} from "lucide-react";
 
 /**
  * Format value (assuming 18 decimals for ERC20 tokens)
@@ -85,6 +95,14 @@ export type FilterConfig =
   | { type: "or"; attributes: string[]; excludeProtocolContracts?: boolean };
 
 /**
+ * Icon and color configuration for activity types
+ */
+export interface ActivityIconConfig {
+  icon: LucideIcon;
+  color: string; // Tailwind CSS color class (e.g., "bg-blue-500")
+}
+
+/**
  * Activity type configuration
  * Defines filters for fetching events and handler for processing them
  */
@@ -107,6 +125,14 @@ export interface ActivityTypeConfig {
    * Defines how to filter events for "My Activity" view
    */
   filterConfig: FilterConfig;
+  /**
+   * Icon and color configuration for the activity type
+   */
+  iconConfig: ActivityIconConfig;
+  /**
+   * Activity type icon identifier (used in ActivityCardData)
+   */
+  iconType: ActivityTypeIcon;
 }
 
 /**
@@ -118,6 +144,8 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     event_name: "Transfer",
     displayName: "Transfer",
     filterConfig: { type: "or", attributes: ["from", "to"], excludeProtocolContracts: true },
+    iconConfig: { icon: Send, color: "bg-blue-500" },
+    iconType: "transfer",
     getTokenAddress: (event: Event) => [event.address].filter(Boolean),
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
       const tokenSymbol = tokenSymbols.get(event.address);
@@ -173,6 +201,8 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     event_name: "DepositCompleted",
     displayName: "Deposit",
     filterConfig: { type: "single", attribute: "stratoRecipient" },
+    iconConfig: { icon: Download, color: "bg-green-500" },
+    iconType: "deposit",
     getTokenAddress: (event: Event) => {
       const token = event.attributes.stratoToken || event.attributes.strato_token;
       return token ? [token] : [];
@@ -247,6 +277,8 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     event_name: "WithdrawalRequested",
     displayName: "Withdraw",
     filterConfig: { type: "single", attribute: "user" },
+    iconConfig: { icon: Upload, color: "bg-red-500" },
+    iconType: "withdraw",
     getTokenAddress: (event: Event) => {
       const token = event.attributes.token || event.attributes.Token;
       const externalToken = event.attributes.externalToken || event.attributes.external_token;
@@ -327,6 +359,8 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     event_name: "USDSTMinted",
     displayName: "CDP Mint",
     filterConfig: { type: "single", attribute: "owner" },
+    iconConfig: { icon: Landmark, color: "bg-purple-500" },
+    iconType: "cdp-mint",
     getTokenAddress: (event: Event) => {
       const asset = event.attributes.asset || event.attributes.Asset;
       return asset ? [asset] : [];
@@ -377,6 +411,8 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     event_name: "Swap",
     displayName: "Swap",
     filterConfig: { type: "single", attribute: "sender" },
+    iconConfig: { icon: ArrowLeftRight, color: "bg-orange-500" },
+    iconType: "swap",
     getTokenAddress: (event: Event) => {
       const tokenIn = event.attributes.tokenIn || event.attributes.token_in;
       const tokenOut = event.attributes.tokenOut || event.attributes.token_out;
@@ -432,6 +468,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
+        activityTypeIcon: "swap",
       };
     },
   },
@@ -440,6 +477,8 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     event_name: "RewardsClaimed",
     displayName: "Rewards Claimed",
     filterConfig: { type: "single", attribute: "user" },
+    iconConfig: { icon: Gift, color: "bg-yellow-500" },
+    iconType: "rewards",
     getTokenAddress: (event: Event) => {
       // The reward token address is stored in the Rewards contract, not in the event
       // We could fetch it from the contract, but for now return empty array
@@ -479,6 +518,8 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     event_name: "Borrowed",
     displayName: "Borrow",
     filterConfig: { type: "single", attribute: "user" },
+    iconConfig: { icon: Landmark, color: "bg-indigo-500" },
+    iconType: "borrow",
     getTokenAddress: (event: Event) => {
       const asset = event.attributes.asset || event.attributes.Asset;
       return asset ? [asset] : [];
@@ -530,6 +571,8 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     event_name: "Redeemed",
     displayName: "Referral Redeemed",
     filterConfig: { type: "or", attributes: ["sender", "recipient"] },
+    iconConfig: { icon: UserPlus, color: "bg-pink-500" },
+    iconType: "referral",
     getTokenAddress: (event: Event) => {
       // Helper to normalize arrays from object format (handles Cirrus/PostgREST JSONB format)
       const normalizeToArray = (value: any): any[] => {
@@ -706,4 +749,27 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       };
     },
   },
+};
+
+/**
+ * Get icon and color configuration for an activity type icon
+ * @param iconType - The activity type icon identifier
+ * @returns Icon and color configuration, or default if not found
+ */
+export const getActivityIconConfig = (iconType?: ActivityTypeIcon): ActivityIconConfig => {
+  if (!iconType) {
+    return { icon: ArrowLeftRight, color: "bg-gray-500" };
+  }
+
+  // Find the activity type config that matches this iconType
+  const matchingConfig = Object.values(activityTypes).find(
+    config => config.iconType === iconType
+  );
+
+  if (matchingConfig) {
+    return matchingConfig.iconConfig;
+  }
+
+  // Default fallback
+  return { icon: ArrowLeftRight, color: "bg-gray-500" };
 };

@@ -5,14 +5,6 @@ import {
   ArrowDownLeft,
   ArrowDown,
   ArrowRightLeft,
-  ArrowLeftRight,
-  Download,
-  Upload,
-  Landmark,
-  Gift,
-  UserPlus,
-  Send,
-  LucideIcon
 } from "lucide-react";
 import {
   Tooltip,
@@ -22,6 +14,7 @@ import {
 } from "@/components/ui/tooltip";
 import CopyButton from "@/components/ui/copy";
 import { Badge } from "@/components/ui/badge";
+import { getActivityIconConfig } from "./activityTypes";
 
 export type FieldIcon = "arrow-up-right" | "arrow-down-left" | "arrow-down" | null;
 
@@ -99,28 +92,10 @@ const getIcon = (icon: FieldIcon) => {
 
 /**
  * Get activity type icon component
+ * Uses configuration from activityTypes.tsx
  */
-const getActivityTypeIcon = (type?: ActivityTypeIcon): { icon: LucideIcon; color: string } => {
-  switch (type) {
-    case "transfer":
-      return { icon: Send, color: "bg-blue-500" };
-    case "deposit":
-      return { icon: Download, color: "bg-green-500" };
-    case "cdp-mint":
-      return { icon: Landmark, color: "bg-purple-500" };
-    case "swap":
-      return { icon: ArrowLeftRight, color: "bg-orange-500" };
-    case "rewards":
-      return { icon: Gift, color: "bg-yellow-500" };
-    case "referral":
-      return { icon: UserPlus, color: "bg-pink-500" };
-    case "borrow":
-      return { icon: Landmark, color: "bg-indigo-500" };
-    case "withdraw":
-      return { icon: Upload, color: "bg-red-500" };
-    default:
-      return { icon: ArrowRightLeft, color: "bg-gray-500" };
-  }
+const getActivityTypeIcon = (type?: ActivityTypeIcon) => {
+  return getActivityIconConfig(type);
 };
 
 /**
