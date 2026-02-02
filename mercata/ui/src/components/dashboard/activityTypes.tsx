@@ -36,16 +36,38 @@ const isUserAddress = (addr: string, userAddress?: string | null): boolean => {
 };
 
 /**
+ * Helper to add image to a field if the address has an image
+ */
+const addImageToField = (
+  field: ActivityField,
+  address: string,
+  tokenImages?: Map<string, string>,
+  tokenSymbols?: Map<string, string>
+): ActivityField => {
+  const image = tokenImages?.get(address);
+  if (image) {
+    return {
+      ...field,
+      image,
+      imageFallback: tokenSymbols?.get(address) || address,
+    };
+  }
+  return field;
+};
+
+/**
  * Activity handler function type
  * Processes events and returns ActivityCardData
  * @param event - The event data
  * @param tokenSymbols - Map of token addresses to their symbols
  * @param userAddress - Optional user address for highlighting "You"
+ * @param tokenImages - Map of token addresses to their image URLs
  */
 export type ActivityHandler = (
   event: Event,
   tokenSymbols: Map<string, string>,
-  userAddress?: string | null
+  userAddress?: string | null,
+  tokenImages?: Map<string, string>
 ) => ActivityCardData;
 
 /**
@@ -84,8 +106,9 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     event_name: "Transfer",
     displayName: "Transfer",
     getTokenAddress: (event: Event) => [event.address].filter(Boolean),
-    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
       const tokenSymbol = tokenSymbols.get(event.address);
+      const tokenAddress = event.address;
       const from = event.attributes.from || event.attributes.From || "";
       const to = event.attributes.to || event.attributes.To || "";
       const value = event.attributes.value || event.attributes.Value || "0";
@@ -105,11 +128,21 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
           icon: "arrow-down-left",
           isUserAddress: isUserAddress(from, userAddress),
         },
+        addImageToField(
+          {
+            label: "Token",
+            value: tokenAddress,
+            type: "address",
+            badge: tokenSymbol,
+          },
+          tokenAddress,
+          tokenImages,
+          tokenSymbols
+        ),
         {
           label: "Amount",
           value: formatValue(value),
           type: "amount",
-          badge: tokenSymbol,
         },
       ];
 
@@ -129,7 +162,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const token = event.attributes.stratoToken || event.attributes.strato_token;
       return token ? [token] : [];
     },
-    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
       const stratoToken = event.attributes.stratoToken || event.attributes.strato_token;
       const tokenSymbol = stratoToken ? tokenSymbols.get(stratoToken) : undefined;
       const stratoRecipient = event.attributes.stratoRecipient || event.attributes.strato_recipient || "";
@@ -156,13 +189,23 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
           isUserAddress: isUserAddress(externalSender, userAddress),
           additionalContent: <span className="text-xs text-muted-foreground">({chainName})</span>,
         },
+        stratoToken ? addImageToField(
+          {
+            label: "Token",
+            value: stratoToken,
+            type: "address",
+            badge: tokenSymbol,
+          },
+          stratoToken,
+          tokenImages,
+          tokenSymbols
+        ) : null,
         {
           label: "Amount",
           value: formatValue(stratoTokenAmount),
           type: "amount",
-          badge: tokenSymbol,
         },
-      ];
+      ].filter(Boolean) as ActivityField[];
 
       // Add external transaction hash as a separate field if present
       if (externalTxHash) {
@@ -191,7 +234,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const asset = event.attributes.asset || event.attributes.Asset;
       return asset ? [asset] : [];
     },
-    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
       const owner = event.attributes.owner || event.attributes.Owner || "";
       const asset = event.attributes.asset || event.attributes.Asset || "";
       const amountUSD = event.attributes.amountUSD || event.attributes.amount_usd || "0";
@@ -205,12 +248,17 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
           icon: "arrow-up-right",
           isUserAddress: isUserAddress(owner, userAddress),
         },
-        {
-          label: "Collateral Asset",
-          value: asset,
-          type: "address",
-          badge: tokenSymbol,
-        },
+        addImageToField(
+          {
+            label: "Collateral Asset",
+            value: asset,
+            type: "address",
+            badge: tokenSymbol,
+          },
+          asset,
+          tokenImages,
+          tokenSymbols
+        ),
         {
           label: "Amount Minted",
           value: `${formatValue(amountUSD)} USDST`,
@@ -235,7 +283,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const tokenOut = event.attributes.tokenOut || event.attributes.token_out;
       return [tokenIn, tokenOut].filter(Boolean) as string[];
     },
-    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
       const sender = event.attributes.sender || event.attributes.Sender || "";
       const tokenIn = event.attributes.tokenIn || event.attributes.token_in || "";
       const tokenOut = event.attributes.tokenOut || event.attributes.token_out || "";
@@ -252,22 +300,32 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
           type: "address",
           isUserAddress: isUserAddress(sender, userAddress),
         },
-        {
-          label: "In",
-          value: tokenIn,
-          type: "address",
-          icon: "arrow-down-left",
-          badge: tokenInSymbol,
-          additionalContent: <span className="text-muted-foreground">({formatValue(amountIn)})</span>,
-        },
-        {
-          label: "Out",
-          value: tokenOut,
-          type: "address",
-          icon: "arrow-up-right",
-          badge: tokenOutSymbol,
-          additionalContent: <span className="text-muted-foreground">({formatValue(amountOut)})</span>,
-        },
+        addImageToField(
+          {
+            label: "In",
+            value: tokenIn,
+            type: "address",
+            icon: "arrow-down-left",
+            badge: tokenInSymbol,
+            additionalContent: <span className="text-muted-foreground">({formatValue(amountIn)})</span>,
+          },
+          tokenIn,
+          tokenImages,
+          tokenSymbols
+        ),
+        addImageToField(
+          {
+            label: "Out",
+            value: tokenOut,
+            type: "address",
+            icon: "arrow-up-right",
+            badge: tokenOutSymbol,
+            additionalContent: <span className="text-muted-foreground">({formatValue(amountOut)})</span>,
+          },
+          tokenOut,
+          tokenImages,
+          tokenSymbols
+        ),
       ];
 
       return {
@@ -288,7 +346,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       // The amount will be displayed without a symbol
       return [];
     },
-    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
       const user = event.attributes.user || event.attributes.User || "";
       const amount = event.attributes.amount || event.attributes.Amount || "0";
 
@@ -347,7 +405,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const tokenArray = normalizeToArray(tokens);
       return tokenArray.filter(Boolean) as string[];
     },
-    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
       const sender = event.attributes.sender || event.attributes.Sender || "";
       const recipient = event.attributes.recipient || event.attributes.Recipient || "";
       const tokens = event.attributes.tokens || event.attributes.Tokens || [];
@@ -467,13 +525,24 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
           icon: "arrow-up-right",
           isUserAddress: isUserAddress(recipient, userAddress),
         },
+        firstToken ? addImageToField(
+          {
+            label: "Token",
+            value: String(firstToken),
+            type: "address",
+            badge: tokenSymbol,
+          },
+          String(firstToken),
+          tokenImages,
+          tokenSymbols
+        ) : null,
         {
           label: "Amount",
-          value: amountDisplay,
+          value: displayAmount,
           type: "amount",
           additionalContent,
         },
-      ];
+      ].filter(Boolean) as ActivityField[];
 
       return {
         title: "Referral Redeemed",

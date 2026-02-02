@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode, useState } from "react";
 import { Card, CardTitle, CardHeader, CardContent } from "../ui/card";
 import { ArrowUpRight, ArrowDownLeft, ArrowDown } from "lucide-react";
 import {
@@ -22,6 +22,8 @@ export interface ActivityField {
   isUserAddress?: boolean;
   additionalContent?: ReactNode; // For things like "+X more" tooltip
   size?: "sm" | "xs"; // Text size - defaults to "sm"
+  image?: string; // Image URL for asset addresses
+  imageFallback?: string; // Fallback text (e.g., symbol) when no image
 }
 
 export interface ActivityCardData {
@@ -80,6 +82,43 @@ const getIcon = (icon: FieldIcon) => {
 };
 
 /**
+ * Asset image display component with fallback
+ */
+const AssetImageDisplay = ({ 
+  image, 
+  fallback, 
+  isUserAddress 
+}: { 
+  image: string; 
+  fallback: string; 
+  isUserAddress?: boolean;
+}) => {
+  const [error, setError] = useState(false);
+
+  if (error) {
+    return (
+      <div
+        className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs cursor-help"
+        style={{ backgroundColor: "red" }}
+      >
+        {fallback.slice(0, 2).toUpperCase()}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={image}
+      alt={fallback}
+      className={`w-6 h-6 rounded-full object-cover border cursor-help ${
+        isUserAddress ? "ring-2 ring-primary" : ""
+      }`}
+      onError={() => setError(true)}
+    />
+  );
+};
+
+/**
  * Reusable Activity Card component
  * Renders a standardized card based on ActivityCardData
  */
@@ -97,25 +136,52 @@ export const ActivityCard = ({ data }: { data: ActivityCardData }) => {
         <div className="flex items-center gap-1">
           {field.type === "address" ? (
             <>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <code
-                      className={`text-xs bg-muted px-2 py-1 rounded cursor-help ${
-                        field.isUserAddress ? "ring-2 ring-primary" : ""
-                      }`}
-                    >
-                      {displayValue}
-                    </code>
-                  </TooltipTrigger>
-                  {tooltipValue && (
-                    <TooltipContent>
-                      <p className="font-mono text-xs">{tooltipValue}</p>
-                    </TooltipContent>
-                  )}
-                </Tooltip>
-              </TooltipProvider>
-              <CopyButton address={field.value} />
+              {field.image ? (
+                tooltipValue ? (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <AssetImageDisplay
+                          image={field.image}
+                          fallback={field.imageFallback || field.value}
+                          isUserAddress={field.isUserAddress}
+                        />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="font-mono text-xs">{tooltipValue}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                ) : (
+                  <AssetImageDisplay
+                    image={field.image}
+                    fallback={field.imageFallback || field.value}
+                    isUserAddress={field.isUserAddress}
+                  />
+                )
+              ) : (
+                <>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <code
+                          className={`text-xs bg-muted px-2 py-1 rounded cursor-help ${
+                            field.isUserAddress ? "ring-2 ring-primary" : ""
+                          }`}
+                        >
+                          {displayValue}
+                        </code>
+                      </TooltipTrigger>
+                      {tooltipValue && (
+                        <TooltipContent>
+                          <p className="font-mono text-xs">{tooltipValue}</p>
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  </TooltipProvider>
+                  <CopyButton address={field.value} />
+                </>
+              )}
               {field.isUserAddress && (
                 <Badge variant="default" className="ml-1 bg-primary text-primary-foreground text-xs">
                   You

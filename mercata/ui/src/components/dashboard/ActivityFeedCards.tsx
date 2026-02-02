@@ -91,28 +91,34 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
             })
         )];
         const tokenSymbolMap = new Map<string, string>();
+        const tokenImageMap = new Map<string, string>();
         
         if (allTokenAddresses.length > 0) {
           try {
-            // Fetch token symbols in batch
+            // Fetch token metadata (symbols and images) in batch
             const tokenPromises = allTokenAddresses.map(async (address) => {
               try {
                 const res = await api.get(`/tokens/${address}`);
                 const token = Array.isArray(res.data) ? res.data[0] : res.data;
-                return { address, symbol: token?._symbol || token?.token?._symbol || "" };
+                const symbol = token?._symbol || token?.token?._symbol || "";
+                const image = token?.images?.[0]?.value || token?.token?.images?.[0]?.value || "";
+                return { address, symbol, image };
               } catch {
-                return { address, symbol: "" };
+                return { address, symbol: "", image: "" };
               }
             });
             const tokenResults = await Promise.all(tokenPromises);
-            tokenResults.forEach(({ address, symbol }) => {
+            tokenResults.forEach(({ address, symbol, image }) => {
               if (symbol) {
                 tokenSymbolMap.set(address, symbol);
               }
+              if (image) {
+                tokenImageMap.set(address, image);
+              }
             });
           } catch (err) {
-            // If fetching symbols fails, continue without them
-            console.warn("Failed to fetch token symbols:", err);
+            // If fetching token metadata fails, continue without it
+            console.warn("Failed to fetch token metadata:", err);
           }
         }
 
@@ -128,8 +134,9 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
 
           if (matchingType) {
             const [, config] = matchingType;
-            // Get token symbols using the config's getTokenAddress function
+            // Get token symbols and images using the config's getTokenAddress function
             const tokenSymbolsMap = new Map<string, string>();
+            const tokenImagesMap = new Map<string, string>();
             if (config.getTokenAddress) {
               const tokenAddresses = config.getTokenAddress(event);
               tokenAddresses.forEach(address => {
@@ -137,9 +144,13 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
                 if (symbol) {
                   tokenSymbolsMap.set(address, symbol);
                 }
+                const image = tokenImageMap.get(address);
+                if (image) {
+                  tokenImagesMap.set(address, image);
+                }
               });
             }
-            const cardData = config.handler(event, tokenSymbolsMap, userAddress);
+            const cardData = config.handler(event, tokenSymbolsMap, userAddress, tokenImagesMap);
             allCardData.push(cardData);
           }
         }
