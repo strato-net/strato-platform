@@ -228,6 +228,85 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       };
     },
   },
+  "Withdraw": {
+    contract_name: "MercataBridge",
+    event_name: "WithdrawalRequested",
+    displayName: "Withdraw",
+    getTokenAddress: (event: Event) => {
+      const token = event.attributes.token || event.attributes.Token;
+      const externalToken = event.attributes.externalToken || event.attributes.external_token;
+      const tokens: string[] = [];
+      if (token) tokens.push(token);
+      if (externalToken) tokens.push(externalToken);
+      return tokens;
+    },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+      const token = event.attributes.token || event.attributes.Token || "";
+      const externalToken = event.attributes.externalToken || event.attributes.external_token;
+      const tokenSymbol = token ? tokenSymbols.get(token) : undefined;
+      const externalTokenSymbol = externalToken ? tokenSymbols.get(externalToken) : undefined;
+      const user = event.attributes.user || event.attributes.User || "";
+      const dest = event.attributes.dest || event.attributes.Dest || "";
+      const destChainId = event.attributes.destChainId || event.attributes.dest_chain_id || event.attributes.destChainId || "";
+      const stratoTokenAmount = event.attributes.stratoTokenAmount || event.attributes.strato_token_amount || "0";
+      const externalTokenAmount = event.attributes.externalTokenAmount || event.attributes.external_token_amount || "0";
+
+      const chainName = destChainId ? getChainName(parseInt(destChainId)) : "Unknown Chain";
+
+      const fields: ActivityField[] = [
+        {
+          label: "From",
+          value: user,
+          type: "address",
+          icon: "arrow-up-right",
+          isUserAddress: isUserAddress(user, userAddress),
+        },
+        {
+          label: "To",
+          value: dest,
+          type: "address",
+          icon: "arrow-down",
+          isUserAddress: isUserAddress(dest, userAddress),
+          additionalContent: <span className="text-xs text-muted-foreground">({chainName})</span>,
+        },
+        externalToken ? addImageToField(
+          {
+            label: "External Token",
+            value: externalToken,
+            type: "address",
+            badge: externalTokenSymbol,
+          },
+          externalToken,
+          tokenImages,
+          tokenSymbols
+        ) : null,
+        token ? addImageToField(
+          {
+            label: "Token",
+            value: token,
+            type: "address",
+            badge: tokenSymbol,
+          },
+          token,
+          tokenImages,
+          tokenSymbols
+        ) : null,
+        {
+          label: "Amount",
+          value: formatValue(stratoTokenAmount),
+          type: "amount",
+        },
+      ].filter(Boolean) as ActivityField[];
+
+      return {
+        title: "Withdraw",
+        fields,
+        timestamp: event.block_timestamp || "",
+        eventId: event.id?.toString(),
+        activityTypeIcon: "withdraw",
+      };
+    },
+  },
   "CDPMint": {
     contract_name: "CDPEngine",
     event_name: "USDSTMinted",
