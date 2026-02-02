@@ -110,5 +110,18 @@
     "Burned": {
       "amount": "value"
     }
+  },
+  "72f029994b1003447b4fcae5025ae78fcbec258e": {
+    "Swap": {
+      "amount": "amountIn"
+    }
+  },
+  "2e99b16c78474c437c7003c814ca79a3ba50e5d8": {
+    "Minted": {
+      "amount": "value"
+    },
+    "Burned": {
+      "amount": "value"
+    }
   }
 }

@@ -325,7 +325,7 @@ sendNewActionMessage b trrs = do
         _blockNumber=blockHeaderBlockNumber bd,
         _transactionSender=0x0,
         _actionData=O.fromList $ M.toList recombined,
-        _newCodeCollections=[],
+        _newCodeCollections=O.empty,
         _events=Seq.fromList $ concat $ map (either (const []) erEvents . trrResult) trrs,
         _delegatecalls=mconcat $ map (either (const Seq.empty) (fromMaybe Seq.empty . fmap _delegatecalls . erAction) . trrResult) trrs
         }
@@ -671,12 +671,12 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
 
 extractCodeCollectionAddedMessages :: Action.Action -> [VMEvent]
 extractCodeCollectionAddedMessages a =
-  let mkCCAnouncement (userName, cc) =
+  let mkCCAnouncement ((userName, _), cc) =
         CodeCollectionAdded
               { codeCollection = const () <$> cc,
                 creator = userName
               }
-  in map mkCCAnouncement $ _newCodeCollections a
+  in map mkCCAnouncement . O.assocs $ _newCodeCollections a
 
 printTransactionMessage ::
   MonadLogger m =>

@@ -33,7 +33,6 @@ const LendingPoolSection = () => {
   const [withdrawAmount, setWithdrawAmount] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [stakeMToken, setStakeMToken] = useState<boolean>(rewardsEnabled ? true : false);
-  const [includeStakedMToken, setIncludeStakedMToken] = useState<boolean>(false);
   const { toast } = useToast();
   const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
@@ -44,26 +43,8 @@ const LendingPoolSection = () => {
   };
 
   const getMaxWithdrawableAmount = (): bigint => {
-    if (includeStakedMToken) {
-      // Calculate total value in USDST using total mTokens
-      // Note: userBalanceTotal doesn't exist in TokenInfo, using userBalance instead
-      const totalMTokenWei = BigInt(liquidityInfo?.withdrawable?.userBalance || "0");
-      const exchangeRateWei = BigInt(liquidityInfo?.exchangeRate || "0");
-
-      if (totalMTokenWei === 0n || exchangeRateWei === 0n) {
-        return 0n;
-      }
-
-      // Convert total mTokens to USDST
-      const totalValueUSDST = (totalMTokenWei * exchangeRateWei) / (10n ** 18n);
-
-      // Limit by pool available liquidity
-      const poolLiquidityWei = BigInt(liquidityInfo?.availableLiquidity || "0");
-      return totalValueUSDST < poolLiquidityWei ? totalValueUSDST : poolLiquidityWei;
-    } else {
-      // Use only unstaked mUSDST (original behavior - already includes pool limits)
-      return BigInt(liquidityInfo?.withdrawable?.maxWithdrawableUSDST || "0");
-    }
+    // Use only unstaked mUSDST (already includes pool limits)
+    return BigInt(liquidityInfo?.withdrawable?.maxWithdrawableUSDST || "0");
   };
 
   // 1. Fetch on mount, with abort controller
@@ -399,10 +380,7 @@ const LendingPoolSection = () => {
                     ) : (
                       formatBalance(getMaxWithdrawableAmount(), undefined, 18, 2)
                     )}{" "}
-                    USDST ({includeStakedMToken
-                      ? (liquidityInfo?.withdrawable?.userBalance ? formatBalance(liquidityInfo?.withdrawable?.userBalance || 0n,"mUSDST", 18) : "0.00")
-                      : (liquidityInfo?.withdrawable?.userBalance ? formatBalance(liquidityInfo?.withdrawable?.userBalance || 0n,"mUSDST", 18) : "0.00")
-                    } )
+                    USDST ({liquidityInfo?.withdrawable?.userBalance ? formatBalance(liquidityInfo?.withdrawable?.userBalance || 0n,"mUSDST", 18) : "0.00"})
                   </div>
                   {/* Fee Display */}
                   <div className="text-sm text-muted-foreground mt-1">
@@ -416,34 +394,6 @@ const LendingPoolSection = () => {
                     isWithdrawal={true}
                     actionLabel="Withdraw"
                   />
-                  {/* Include Staked mUSDST Checkbox */}
-                  {rewardsEnabled && (
-                    <div className="flex items-center space-x-2 mt-3">
-                      <Checkbox
-                        id="include-staked-musdst"
-                        checked={includeStakedMToken}
-                        onCheckedChange={(checked) => setIncludeStakedMToken(checked as boolean)}
-                      />
-                      <label
-                        htmlFor="include-staked-musdst"
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        Include staked mUSDST
-                      </label>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <HelpCircle className="h-4 w-4 text-muted-foreground hover:text-foreground cursor-help" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p className="max-w-xs text-sm">
-                            Some of your mUSDST tokens may be staked in the rewards program.
-                            When this option is enabled, you can withdraw assets that were staked as well.
-                            If disabled, only unstaked assets will be eligible for withdrawal.
-                          </p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
-                  )}
                   {/* Withdraw Amount Warning */}
                   {(() => {
                     const withdrawAmountWei = withdrawAmount ? safeParseUnits(withdrawAmount, 18) : 0n;

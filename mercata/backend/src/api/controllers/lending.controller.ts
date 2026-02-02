@@ -83,7 +83,7 @@ class LendingController {
       const { accessToken, body, address: userAddress } = req;
       validateWithdrawLiquidityArgs(body);
 
-      const result = await withdrawLiquidity(accessToken, userAddress as string, body.amount, body.includeStakedMToken);
+      const result = await withdrawLiquidity(accessToken, userAddress as string, body.amount);
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (error) {

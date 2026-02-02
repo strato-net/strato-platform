@@ -43,7 +43,6 @@ import Blockchain.VMContext
 import Blockchain.VMMetrics
 import Conduit hiding (Flush)
 import Control.Arrow ((&&&), (***))
-import Control.Lens hiding (Context)
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
@@ -144,15 +143,12 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
 
   mSelfAddress <- _selfAddress <$> Mod.get (Mod.Proxy @ContextState)
   mNewBlock <- lift $ do
-    Mod.modify_ (Mod.Proxy @ContextState) $ pure . (blockRequested ||~ createBlock)
     -- todo: perhaps we shouldnt even add TXs to the mempool, it might make for a VERY large checkpoint
     -- todo: which may fail
     bState <- Bagger.getBaggerState
-    reqd <- _blockRequested <$> Mod.get (Mod.Proxy @ContextState)
     let pending = B.pending bState
-        priv = toList . B.privateHashes $ B.miningCache bState
-        hasTxs = (numPoolable > 0) || not (M.null pending) || not (null priv)
-        shouldOutputBlocks = reqd && hasTxs
+        hasTxs = (numPoolable > 0) || not (M.null pending)
+        shouldOutputBlocks = hasTxs
     $logInfoS "evm/loop/newBlock" . T.pack $
       printf
         "Num poolable: %d, num pending: %d"
@@ -161,12 +157,9 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
     multilineLog "evm/loop/newBlock" $
       boringBox
         [ CL.yellow "Decision making for block creation:",
-          "reqd: " ++ formatBool reqd,
           "hasTxs: " ++ formatBool hasTxs,
           "shouldOutputBlocks: " ++ formatBool shouldOutputBlocks
         ]
-    when shouldOutputBlocks $
-      Mod.modify_ (Mod.Proxy @ContextState) $ pure . (blockRequested .~ False)
     $logDebugS "evm/loop/newBlock" $ T.pack $ "Queued: " ++ show numPoolable
     $logDebugS "evm/loop/newBlock" $ T.pack $ "Pending: " ++ show (length pending)
     $logInfoS "evm/loop/newBlock" "about to evaluate shouldOutputBlocks"
@@ -174,7 +167,9 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
       then do
         $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"
         newBlock <- Bagger.makeNewBlock mineTransactions mSelfAddress
-        pure $ Just newBlock
+        if not . null $ obReceiptTransactions newBlock
+          then pure $ Just newBlock
+          else pure Nothing
       else pure Nothing
 
   for_ mNewBlock $ yield . OutBlock
