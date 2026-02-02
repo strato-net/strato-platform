@@ -27,6 +27,16 @@ export function logInfo(context: string, message: string): void {
     console.log(`[INFO] ${logTime} | ${context} | ${sanitizedMessage}`);
 }
 
+export function logWarning(context: string, message: string): void {
+    const sanitizedMessage = sanitizeLogMessage(message);
+    const logTime = new Date().toISOString();
+    const warning_message = `[WARNING] ${logTime} | ${context} | ${sanitizedMessage}`;
+    console.warn(`\x1b[33m${warning_message}\x1b[0m`); // Yellow color
+    healthMonitor.appendToWarningFile(warning_message).catch(err => {
+        console.error("Failed to write to warning file:", err);
+    });
+}
+
 export function logError(context: string, error: Error): void {
     const sanitizedMessage = sanitizeLogMessage(error.message);
     const logTime = new Date().toISOString();
