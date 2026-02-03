@@ -31,7 +31,6 @@ const Borrow = () => {
   }>({ isOpen: false, type: null });
   const [modalLoading, setModalLoading] = useState(false);
   const [repayLoading, setRepayLoading] = useState(false);
-  const [eligibleCollateral, setEligibleCollateral] = useState<CollateralData[]>([]);
   const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
   const { toast } = useToast();
@@ -78,16 +77,6 @@ const Borrow = () => {
     };
     refreshData();
   }, [userAddress, refreshLoans, refreshCollateral, fetchUsdstBalance]);
-
-    useEffect(() => {
-    if (collateralInfo && Array.isArray(collateralInfo)) {
-      // Only show assets that have a balance > 0
-      const eligibleWithBalance = collateralInfo.filter((item) => 
-        BigInt(item.userBalance || 0) > 0n
-      );
-      setEligibleCollateral(eligibleWithBalance);
-    }
-  }, [collateralInfo])
 
   const handleSupply = (asset) => {
     setSelectedAsset(asset);
@@ -254,7 +243,7 @@ const Borrow = () => {
                       onBorrow={executeEmbeddedBorrow}
                       usdstBalance={usdstBalance}
                       voucherBalance={voucherBalance}
-                      collateralInfo={eligibleCollateral}
+                      collateralInfo={collateralInfo}
                       startPolling={startPolling}
                       stopPolling={stopPolling}
                       userRewards={userRewards}

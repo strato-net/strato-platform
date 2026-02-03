@@ -150,6 +150,12 @@ contract Describe_Token {
         require(keccak256(TokenMetadata(token).attributes("version")) == keccak256("2.0"), "Version not updated");
     }
 
+    function it_token_can_update_name_and_symbol() {
+        token.setNameAndSymbol("New Name", "NEW");
+        require(keccak256(ERC20(token).name()) == keccak256("New Name"), "Name not updated");
+        require(keccak256(ERC20(token).symbol()) == keccak256("NEW"), "Symbol not updated");
+    }
+
     // ============ TOKEN-SPECIFIC EDGE CASES ============
 
     function it_token_handles_rapid_status_changes() {
