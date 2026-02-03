@@ -149,7 +149,7 @@ export const getSafetyModuleInfo = async (
       cooldownData = response4.data || [];
     } catch (error) {
       console.warn("SafetyModule cooldown data query failed:", error);
-      }
+    }
 
     // Extract data from responses
     const safetyModule = safetyModuleData?.[0] || {};
@@ -167,14 +167,16 @@ export const getSafetyModuleInfo = async (
     // Get user-specific data (nested structure)
     const userShares = userTokenBalance?.[0]?.balance || "0";
     const cooldownStart = cooldownData?.[0]?.value || "0";
-   
+
     // Get user's staked sUSDST balance from RewardsChef
     // Find the pool for this sToken
     const poolForSToken = await findPoolByLpToken(accessToken, config.rewardsChef, sTokenAddress);
+
     // If no pool found, staked balance is 0
     const stakedSTokenBalance = poolForSToken
       ? await getStakedBalance(accessToken, config.rewardsChef, poolForSToken.poolIdx, userAddress)
       : "0";
+
     // Calculate exchange rate (assets per share)
     const exchangeRate = totalShares !== "0" && BigInt(totalShares) > 0n 
       ? (BigInt(totalAssets) * BigInt("1000000000000000000")) / BigInt(totalShares) // 18 decimals
