@@ -387,7 +387,7 @@ const LendingPoolSection = () => {
                     ) : (
                       formatBalance(getMaxWithdrawableAmount(), undefined, 18, 2)
                     )}{" "}
-                    USDST ({liquidityInfo?.withdrawable?.userBalance ? formatBalance(liquidityInfo?.withdrawable?.userBalance || 0n,"mUSDST", 18) : "0.00"})
+                    USDST ({liquidityInfo?.withdrawable?.userBalance ? formatBalance(liquidityInfo?.withdrawable?.userBalance || 0n, liquidityInfo?.withdrawable?._name || "lendUSDST", 18) : "0.00"})
                   </div>
                   {/* Fee Display */}
                   <div className="text-sm text-muted-foreground mt-1">
@@ -593,7 +593,7 @@ const LendingPoolSection = () => {
                 {isLoggedIn && (
                   <>
                     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                      <span className="text-muted-foreground text-sm sm:text-base">Your mUSDST (Total)</span>
+                    <span className="text-muted-foreground text-sm sm:text-base">Your {liquidityInfo?.withdrawable?._name || "lendUSDST"} (Total)</span>
                       <span className="font-medium text-sm sm:text-base sm:text-right">
                         {loadingLiquidity ? (
                           <span className="text-muted-foreground animate-pulse">
@@ -626,7 +626,7 @@ const LendingPoolSection = () => {
                 )}
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
                   <span className="text-muted-foreground text-sm sm:text-base">Conversion Rate</span>
-                  <span className="font-medium text-sm sm:text-base sm:text-right">{liquidityInfo?.exchangeRate ? "1 mUSDST = " + formatUnits(liquidityInfo?.exchangeRate || 0, 18) + " USDST" : "N/A"}</span>
+                  <span className="font-medium text-sm sm:text-base sm:text-right">{liquidityInfo?.exchangeRate ? "1 " + (liquidityInfo?.withdrawable?._name || "lendUSDST") + " = " + formatUnits(liquidityInfo?.exchangeRate || 0, 18) + " USDST" : "N/A"}</span>
                 </div>
               </div>
             </div>
