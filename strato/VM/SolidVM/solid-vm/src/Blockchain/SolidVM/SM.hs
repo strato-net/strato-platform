@@ -45,6 +45,7 @@ module Blockchain.SolidVM.SM
     getBSum,
     addEvent,
     addDelegatecall,
+    getUsername,
     addNewCodeCollection,
     getContractNameAndHash,
     getCodeAndCollection,
@@ -61,6 +62,7 @@ import BlockApps.Logging
 import Blockchain.DB.CodeDB
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.RawStorageDB
+import Blockchain.DB.SolidStorageDB
 import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockSummary
@@ -101,6 +103,7 @@ import qualified Data.Set as S
 import Data.Source
 import Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as DT
 import Debugger
 import SolidVM.Model.CodeCollection (CodeCollection)
 import qualified SolidVM.Model.CodeCollection as CC
@@ -598,6 +601,7 @@ getVariableOfName name = do
                        "ecAdd",
                        "ecMul",
                        "ecPairing",
+                       "poseidon",
                        "payable",
                        "require",
                        "revert",
@@ -635,12 +639,14 @@ getVariableOfName name = do
       maybeConstant :: Maybe Variable
       maybeConstant = fmap (t "constant constant" . Constant) $ do
         let ctract = currentContract currentCallInfo
-        let constMap = (codeCollection currentCallInfo) ^. CC.flConstants
+        let cc = codeCollection currentCallInfo
+        let constMap = cc ^. CC.flConstants
         CC.ConstantDecl {..} <- M.lookup name $ (ctract ^. CC.constants) `M.union` constMap
         return $
-          coerceType ctract _constType $ case _constInitialVal of
+          coerceType ctract cc _constType $ case _constInitialVal of
             CC.NumberLiteral _ x _ -> SInteger x
-            x -> todo "constant initial val" x
+            CC.AddressLiteral _ a -> SAddress a False
+            _ -> SDeferredConstant name  -- Complex expression, evaluate on access
 
       maybeStructDef :: Maybe Variable
       maybeStructDef =
@@ -693,7 +699,7 @@ getVariableOfName name = do
       maybeThis,
       maybeConstant,
       --, maybeUserDefined
-      unknownVariable ("getVariableOfName " ++ (show (currentContract currentCallInfo ^. CC.storageDefs))) name
+      unknownVariable "not found" name
     ]
 
 withCallInfo ::
@@ -907,8 +913,22 @@ addEvent newEvent = Mod.modify_ (Mod.Proxy @(Q.Seq Event)) $ pure . (Q.|> newEve
 addDelegatecall :: Mod.Modifiable (Q.Seq Action.Delegatecall) m => Address -> Address -> Maybe T.Text -> T.Text -> m ()
 addDelegatecall s c o n = Mod.modify_ (Mod.Proxy @(Q.Seq Action.Delegatecall)) $ pure . (Q.|> Action.Delegatecall s c o n)
 
-addNewCodeCollection :: Mod.Modifiable (OMap.OMap (Text, Keccak256) CodeCollection) m => Text -> Keccak256 -> CodeCollection -> m ()
-addNewCodeCollection userName ch cc = Mod.modify_ (Mod.Proxy @(OMap.OMap (Text, Keccak256) CodeCollection)) $ pure . (OMap.|> ((userName, ch), cc))
+getUsername :: MonadSM m => m Text
+getUsername = do
+  let go []     = pure "BlockApps"
+      go (x:xs) = do
+        userNameValue <- getSolidStorageKeyVal' x $ MS.StoragePath [MS.Field "username"]
+        case userNameValue of
+          MS.BString userNameString -> pure $ DT.decodeUtf8 userNameString
+          _ -> go xs
+
+  cs <- Mod.get (Mod.Proxy @[CallInfo])
+  go $ currentAddress <$> cs
+
+addNewCodeCollection :: MonadSM m => Keccak256 -> CodeCollection -> m ()
+addNewCodeCollection ch cc = do
+  username <- getUsername
+  Mod.modify_ (Mod.Proxy @(OMap.OMap (Text, Keccak256) CodeCollection)) $ pure . (OMap.|> ((username, ch), cc))
 
 getBlockHashWithNumber :: MonadSM m => Integer -> Keccak256 -> m (Maybe Keccak256)
 getBlockHashWithNumber num h = do
@@ -930,7 +950,7 @@ getContractNameAndHash address' = do
 
   case codeHash of
     SolidVMCode cn ch' -> return (stringToLabel cn, ch')
-    ch -> internalError ("SolidVM for non-solidvm code at address " ++ formatAddressWithoutColor address') (format ch)
+    _ -> missingCodeCollection ("contract call to address 0x" ++ formatAddressWithoutColor address' ++ " failed") ("no contract deployed at this address" :: String)
 
 getCodeAndCollection :: MonadSM m => Address -> m (CC.Contract, Keccak256, CC.CodeCollection)
 getCodeAndCollection address' = do
