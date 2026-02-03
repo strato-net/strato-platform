@@ -8,6 +8,7 @@
 module SolidVM.Solidity.StaticAnalysis.Typechecker
   ( detector
   , detector'
+  , showType
   )
 where
 
@@ -197,7 +198,9 @@ lookupStruct :: SolidString -> SSS [(SolidString, Type)]
 lookupStruct name = do
   cc <- asks codeCollection
   c <- asks contract
-  let str = fromMaybe [] $ msum [(M.lookup name (_structs c)), (M.lookup name (_flStructs cc))]
+  -- Search current contract, file-level, then all contracts (for nested structs in libraries)
+  let allContractStructs = msum [M.lookup name (_structs c') | c' <- M.elems (_contracts cc)]
+  let str = fromMaybe [] $ msum [(M.lookup name (_structs c)), (M.lookup name (_flStructs cc)), allContractStructs]
   pure $ f <$> str
   where
     f (t, ft, _) = (t, fieldTypeType ft)
@@ -269,6 +272,9 @@ lookupContractFunction :: SourceAnnotation Text -> SolidString -> SolidString ->
 lookupContractFunction x cName fName = do
   cc@CodeCollection {..} <- asks codeCollection
   ctract <- asks contract
+  -- Check if cName is the current contract or an ancestor (for inherited access)
+  let isInherited = cName == ctract ^. contractName || 
+                    cName `elem` maybe [] (map _contractName) (getParentsAnnotated cc ctract)
   case M.lookup cName _contracts of
     Nothing -> pure . bottom $ ("Unknown contract: " <> labelToText cName) <$ x
     Just c' -> local (\r -> r {contract = c'}) . recursively x $ do
@@ -292,7 +298,14 @@ lookupContractFunction x cName fName = do
                     fRets = Static (SVMType.Struct Nothing fName) x
                  in pure $ Function fArgs fRets x [] [] False
             Just VariableDecl {..} -> case _varVisibility of
-              Just Public -> constructGetterType x _varType
+              Just Public
+                -- If accessing from within inheritance hierarchy, return mutable storage
+                | isInherited -> pure . Mutable $ Static _varType x
+                -- Otherwise return getter for external access
+                | otherwise -> constructGetterType x _varType
+              -- Also allow internal storage vars to be accessed (returns mutable for assignment)
+              Just Internal -> pure . Mutable $ Static _varType x
+              Nothing -> pure . Mutable $ Static _varType x  -- default visibility is internal
               _ -> pure . bottom $
                     ( T.concat
                         [ "Unknown contract function: ",
@@ -305,7 +318,10 @@ lookupContractFunction x cName fName = do
           Just ConstantDecl {..} -> pure $ Static _constType x
         Just f -> pure . filterFuncs cc x fName f $
           case filter (\(Using n _ _) -> n == cName) . concat . M.elems $ ctract ^. usings of
-            [] -> [Internal, Private]
+            [] -> case c ^. contractType of
+              LibraryType -> [Private]  -- Library internal functions are callable directly
+              _ | isInherited -> [Private]  -- Inherited internal functions are accessible
+              _ -> [Internal, Private]
             _ -> []
 
   where
@@ -618,9 +634,8 @@ typecheckStatic :: Type -> Type -> Either Text Type
 typecheckStatic (SVMType.Int s1 b1) (SVMType.Int s2 b2) =
   case (s1, s2) of
     (Just a, Just b) | a /= b -> Left "Mismatched signedness between integer values"
-    _ -> case (b1, b2) of
-      (Just a, Just b) | a /= b -> Left "Mismatched length between integer values"
-      _ -> Right $ SVMType.Int (s1 <|> s2) (b1 <|> b2)
+    -- Allow implicit widening: take the larger of the two lengths
+    _ -> Right $ SVMType.Int (s1 <|> s2) (max <$> b1 <*> b2 <|> b1 <|> b2)
 typecheckStatic (SVMType.String d1) (SVMType.String d2) =
   case (d1, d2) of
     (Just a, Just b) | a /= b -> Left "Mismatched dynamicity between string values"
@@ -631,6 +646,9 @@ typecheckStatic (SVMType.Bytes d1 b1) (SVMType.Bytes d2 b2) =
     _ -> case (b1, b2) of
       (Just a, Just b) | a /= b -> Left "Mismatched length between bytes values"
       _ -> Right $ SVMType.Bytes (d1 <|> d2) (b1 <|> b2)
+-- Allow string <-> bytes32 compatibility for keccak256 return values (SolidVM historical behavior)
+typecheckStatic (SVMType.String _) (SVMType.Bytes _ (Just 32)) = Right $ SVMType.String Nothing
+typecheckStatic (SVMType.Bytes _ (Just 32)) (SVMType.String _) = Right $ SVMType.Bytes Nothing (Just 32)
 typecheckStatic SVMType.Decimal SVMType.Decimal = Right $ SVMType.Decimal
 typecheckStatic SVMType.Bool SVMType.Bool = Right SVMType.Bool
 typecheckStatic (SVMType.Address a) (SVMType.Address b) = Right $ SVMType.Address (a && b)
@@ -801,6 +819,7 @@ typecheckMember (Static (SVMType.UnknownLabel "block") x) "number" = pure $ Stat
 typecheckMember (Static (SVMType.UnknownLabel "block") x) "coinbase" = pure $ Static (SVMType.Address True) x
 typecheckMember (Static (SVMType.UnknownLabel "block") x) "difficulty" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.UnknownLabel "block") x) "gaslimit" = pure $ Static (SVMType.Int Nothing Nothing) x
+typecheckMember (Static (SVMType.UnknownLabel "block") x) "chainid" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.UnknownLabel "block") x) "proposer" = pure $ Static (SVMType.Address False) x
 typecheckMember (Static (SVMType.UnknownLabel "type") x) "name" = pure $ (Static (SVMType.String Nothing) x)
 typecheckMember (Static (SVMType.UnknownLabel "type") x) "creationCode" = pure $ (Static (SVMType.String Nothing) x)
@@ -1355,6 +1374,8 @@ intArgs x =
       :| [ intType' x,
            stringType' x,
            decimalType' x,
+           bytesType' x,
+           addressType' x,
            Product [stringType' x, intType' x] x
          ]
 
@@ -1436,6 +1457,13 @@ ecPairingArgs x = Sum
                   , MultiVariate (intType' x) x
                   ]
 
+poseidonArgs :: SourceAnnotation Text -> Type'
+poseidonArgs x = Sum
+               $ (Static (SVMType.Array (SVMType.Int Nothing Nothing) Nothing) x)
+              :| [ Static SVMType.Variadic x
+                 , MultiVariate (intType' x) x
+                 ]
+
 --This function should have multivariate type that represents any amount of string types
 stringConcatArgs :: SourceAnnotation Text -> Type'
 stringConcatArgs x = MultiVariate (stringType' x) x
@@ -1501,12 +1529,12 @@ getVarType' "this" ctx = pure $ Static (SVMType.Address False) ctx
 getVarType' s@('u' : 'i' : 'n' : 't' : n) ctx = case n of
   [] -> pure $ Function (intArgs ctx) (Static (SVMType.Int (Just False) Nothing) ctx) ctx [] [] False
   _ -> case readMaybe n of
-    Just n' -> pure $ Function (intArgs ctx) (Static (SVMType.Int (Just False) (Just n')) ctx) ctx [] [] False
+    Just n' -> pure $ Function (intArgs ctx) (Static (SVMType.Int (Just False) (Just (n' `div` 8))) ctx) ctx [] [] False
     Nothing -> getVarTypeByName' (stringToLabel s) ctx
 getVarType' s@('i' : 'n' : 't' : n) ctx = case n of
   [] -> pure $ Function (intArgs ctx) (Static (SVMType.Int (Just True) Nothing) ctx) ctx [] [] False
   _ -> case readMaybe n of
-    Just n' -> pure $ Function (intArgs ctx) (Static (SVMType.Int (Just True) (Just n')) ctx) ctx [] [] False
+    Just n' -> pure $ Function (intArgs ctx) (Static (SVMType.Int (Just True) (Just (n' `div` 8))) ctx) ctx [] [] False
     Nothing -> getVarTypeByName' (stringToLabel s) ctx
 getVarType' "address" ctx = pure $ Function (addressArgs ctx) (Static (SVMType.Address False) ctx) ctx [] [] False
 --This is either the string() function or the string.member() function
@@ -1521,14 +1549,15 @@ getVarType' s@('b' : 'y' : 't' : 'e' : 's' : n) ctx = case n of
 getVarType' "byte" ctx = pure $ Function (byteArgs ctx) (intType' ctx) ctx [] [] False
 getVarType' "push" ctx = pure $ Function (topType' ctx) (Product [] ctx) ctx [] [] False
 getVarType' "identity" ctx = pure $ Function (topType' ctx) (topType' ctx) ctx [] [] False
-getVarType' "keccak256" ctx = pure $ Function (keccak256Args ctx) (stringType' ctx) ctx [] [] False
+getVarType' "keccak256" ctx = pure $ Function (keccak256Args ctx) (Static (SVMType.Bytes Nothing (Just 32)) ctx) ctx [] [] False
 getVarType' "log" ctx = pure $ Function (logArgs ctx) (Product [] ctx) ctx [] [] False
-getVarType' "sha256" ctx = pure $ Function (sha256Args ctx) (stringType' ctx) ctx [] [] False
-getVarType' "ripemd160" ctx = pure $ Function (ripemd160Args ctx) (stringType' ctx) ctx [] [] False
+getVarType' "sha256" ctx = pure $ Function (sha256Args ctx) (Static (SVMType.Bytes Nothing (Just 32)) ctx) ctx [] [] False
+getVarType' "ripemd160" ctx = pure $ Function (ripemd160Args ctx) (Static (SVMType.Bytes Nothing (Just 20)) ctx) ctx [] [] False
 getVarType' "modExp" ctx = pure $ Function (modexpArgs ctx) (intType' ctx) ctx [] [] False
 getVarType' "ecAdd" ctx = pure $ Function (ecAddArgs ctx) (Product [intType' ctx, intType' ctx] ctx) ctx [] [] False
 getVarType' "ecMul" ctx = pure $ Function (ecMulArgs ctx) (Product [intType' ctx, intType' ctx] ctx) ctx [] [] False
 getVarType' "ecPairing" ctx = pure $ Function (ecPairingArgs ctx) (boolType' ctx) ctx [] [] False
+getVarType' "poseidon" ctx = pure $ Function (poseidonArgs ctx) (intType' ctx) ctx [] [] False
 getVarType' "selfdestruct" ctx = pure $ Function (selfdestructArgs ctx) (boolType' ctx) ctx [] [] False
 getVarType' "require" ctx = pure $ Function (requireArgs ctx) (Product [] ctx) ctx [] [] False
 getVarType' "assert" ctx = pure $ Function (assertArgs ctx) (Product [] ctx) ctx [] [] False
@@ -1539,7 +1568,7 @@ getVarType' "getUserCert" ctx = pure $ Function (getUserCertArgs ctx) (certType'
 getVarType' "addmod" ctx = pure $ Function (addmodArgs ctx) (intType' ctx) ctx [] [] False
 getVarType' "mulmod" ctx = pure $ Function (mulmodArgs ctx) (intType' ctx) ctx [] [] False
 getVarType' "payable" ctx = pure $ Function (payableArgs ctx) (Static (SVMType.Address True) ctx) ctx [] [] False
-getVarType' "blockhash" ctx = pure $ Function (blockhashArgs ctx) (stringType' ctx) ctx [] [] False
+getVarType' "blockhash" ctx = pure $ Function (blockhashArgs ctx) (Static (SVMType.Bytes Nothing (Just 32)) ctx) ctx [] [] False
 getVarType' "ecrecover" ctx = pure $ Function (ecrecoverArgs ctx) (addressType' ctx) ctx [] [] False
 getVarType' "parseCert" ctx = pure $ Function (parseCertArgs ctx) (certType' ctx) ctx [] [] False
 getVarType' "create" ctx = pure $ Function (createFuncArgs ctx) (addressType' ctx) ctx [] [] False
@@ -1764,10 +1793,16 @@ statementHelper (WhileStatement cond body x) = do
   bs <- statementsHelper' x body
   pure $ reduceType' x [cs, bs]
 statementHelper (ForStatement mInit mCond mPost body x) = do
+  -- Push a new scope for the entire for loop (so loop variable is scoped to the loop)
+  modify $ NE.cons (Nothing, M.empty)
   is <- maybe (pure $ topType' x) (simpleStatementHelper x) mInit
   cs <- maybe (pure $ topType' x) tcExpr mCond
   ps <- maybe (pure $ topType' x) tcExpr mPost
   bs <- statementsHelper' x body
+  -- Pop the for loop scope
+  modify $ \case
+    _ :| [] -> error "ForStatement: Stack underflow"
+    _ :| (s : rest) -> s :| rest
   pure $ reduceType' x [is, cs, ps, bs]
 statementHelper (Block x) = pure $ topType' x
 statementHelper (DoWhileStatement body cond x) = do

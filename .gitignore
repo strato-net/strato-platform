@@ -35,6 +35,11 @@ strato/hpc
 *~
 bridge_image_tag*
 
+docker-compose.bridge.ecr.yml
+docker-compose.bridge.push.ecr.yml
+docker-compose.bridge.push.yml
+docker-compose.bridge.yml
+
 # Obsolete services, lines to be removed soon:
 rewards-server/src/config/latestBlock.json
 docker-compose.stripe-ps.yml

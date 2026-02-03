@@ -598,6 +598,7 @@ getVariableOfName name = do
                        "ecAdd",
                        "ecMul",
                        "ecPairing",
+                       "poseidon",
                        "payable",
                        "require",
                        "revert",
@@ -635,12 +636,14 @@ getVariableOfName name = do
       maybeConstant :: Maybe Variable
       maybeConstant = fmap (t "constant constant" . Constant) $ do
         let ctract = currentContract currentCallInfo
-        let constMap = (codeCollection currentCallInfo) ^. CC.flConstants
+        let cc = codeCollection currentCallInfo
+        let constMap = cc ^. CC.flConstants
         CC.ConstantDecl {..} <- M.lookup name $ (ctract ^. CC.constants) `M.union` constMap
         return $
-          coerceType ctract _constType $ case _constInitialVal of
+          coerceType ctract cc _constType $ case _constInitialVal of
             CC.NumberLiteral _ x _ -> SInteger x
-            x -> todo "constant initial val" x
+            CC.AddressLiteral _ a -> SAddress a False
+            _ -> SDeferredConstant name  -- Complex expression, evaluate on access
 
       maybeStructDef :: Maybe Variable
       maybeStructDef =
@@ -693,7 +696,7 @@ getVariableOfName name = do
       maybeThis,
       maybeConstant,
       --, maybeUserDefined
-      unknownVariable ("getVariableOfName " ++ (show (currentContract currentCallInfo ^. CC.storageDefs))) name
+      unknownVariable "not found" name
     ]
 
 withCallInfo ::
@@ -930,7 +933,7 @@ getContractNameAndHash address' = do
 
   case codeHash of
     SolidVMCode cn ch' -> return (stringToLabel cn, ch')
-    ch -> internalError ("SolidVM for non-solidvm code at address " ++ formatAddressWithoutColor address') (format ch)
+    _ -> missingCodeCollection ("contract call to address 0x" ++ formatAddressWithoutColor address' ++ " failed") ("no contract deployed at this address" :: String)
 
 getCodeAndCollection :: MonadSM m => Address -> m (CC.Contract, Keccak256, CC.CodeCollection)
 getCodeAndCollection address' = do
