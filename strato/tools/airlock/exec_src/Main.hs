@@ -9,6 +9,7 @@ import System.IO (hPutStrLn, stderr)
 
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
+import Network.URI (parseURI, uriAuthority, uriRegName, uriPort)
 
 import Railgun.Keys (deriveFromMnemonic, railgunAddress)
 import Railgun.Shield (createERC20ShieldRequest, serializeShieldRequest)
@@ -116,8 +117,11 @@ runShield opts = do
           -- Read auth token (only needed for actual API calls)
           authToken <- T.strip <$> TIO.readFile (authTokenFile opts)
           
-          let config = StratoConfig
-                { stratoBaseUrl = T.pack $ baseUrl opts
+          -- Parse host/port from URL
+          let (host, port) = parseHostPort (baseUrl opts)
+              config = StratoConfig
+                { stratoHost = T.pack host
+                , stratoPort = port
                 , stratoAuthToken = authToken
                 , railgunContractAddress = T.pack $ railgunContractAddr opts
                 }
@@ -130,7 +134,7 @@ runShield opts = do
               Left err -> do
                 TIO.hPutStrLn stderr $ "Approval failed: " <> err
                 exitFailure
-              Right resp -> TIO.putStrLn $ "Approval response: " <> resp
+              Right results -> TIO.putStrLn $ "Approval successful: " <> T.pack (show $ length results) <> " transaction(s)"
           
           -- Send shield transaction
           TIO.putStrLn "Sending shield transaction..."
@@ -139,8 +143,8 @@ runShield opts = do
             Left err -> do
               TIO.hPutStrLn stderr $ "Shield failed: " <> err
               exitFailure
-            Right resp -> do
-              TIO.putStrLn $ "Shield response: " <> resp
+            Right results -> do
+              TIO.putStrLn $ "Shield successful: " <> T.pack (show $ length results) <> " transaction result(s)"
               TIO.putStrLn "Shield successful!"
           
           exitSuccess
@@ -189,8 +193,11 @@ runUnshield opts = do
           -- Read auth token
           authToken <- T.strip <$> TIO.readFile (authTokenFile opts)
           
-          let config = StratoConfig
-                { stratoBaseUrl = T.pack $ baseUrl opts
+          -- Parse host/port from URL
+          let (host, port) = parseHostPort (baseUrl opts)
+              config = StratoConfig
+                { stratoHost = T.pack host
+                , stratoPort = port
                 , stratoAuthToken = authToken
                 , railgunContractAddress = T.pack $ railgunContractAddr opts
                 }
@@ -202,8 +209,8 @@ runUnshield opts = do
             Left err -> do
               TIO.hPutStrLn stderr $ "Unshield failed (expected): " <> err
               exitFailure
-            Right resp -> do
-              TIO.putStrLn $ "Unshield response: " <> resp
+            Right results -> do
+              TIO.putStrLn $ "Unshield response: " <> T.pack (show $ length results) <> " transaction result(s)"
               TIO.putStrLn "Unshield request sent (likely failed verification)."
           
           exitSuccess
@@ -212,3 +219,15 @@ runUnshield opts = do
 myWhen :: Bool -> IO () -> IO ()
 myWhen True action = action
 myWhen False _ = return ()
+
+-- | Parse host and port from a URL string like "http://localhost:8081"
+parseHostPort :: String -> (String, Int)
+parseHostPort url = case parseURI url of
+  Just uri -> case uriAuthority uri of
+    Just auth -> 
+      let host = uriRegName auth
+          portStr = dropWhile (== ':') (uriPort auth)
+          port = if null portStr then 80 else read portStr
+      in (host, port)
+    Nothing -> ("localhost", 8081)
+  Nothing -> ("localhost", 8081)

@@ -28,14 +28,20 @@ library:
     - base16-bytestring
     - poseidon-hash
     - base64-bytestring
+    - bloc2api
+    - bloc2client
     - bytestring
+    - containers
     - cryptonite
+    - evm-solidity
     - http-client
-    - http-client-tls
-    - http-types
     - memory
+    - servant-client
+    - servant-client-core
+    - strato-model
     - text
     - transformers
+    - vector
 
 executables:
   airlock:
@@ -46,4 +52,5 @@ executables:
       - airlock
       - bytestring
       - cmdargs
+      - network-uri
       - text

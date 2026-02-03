@@ -25,6 +25,7 @@ module Railgun.Types
   , serializeNote
   , integerToHex32
   , integerToBytes32
+  , encryptedBundleToHexList
   ) where
 
 import Data.Aeson
