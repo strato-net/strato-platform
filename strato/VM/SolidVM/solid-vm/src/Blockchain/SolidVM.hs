@@ -2384,8 +2384,13 @@ runTheConstructors from to hsh cc contractName' argVals' = do
           vals <- traverse (getVar <=< expToVar) args''
           runTheConstructors from to hsh cc parent vals
         Nothing -> do
-          -- Call parent constructor with no arguments (handles parameterless parent constructors)
-          runTheConstructors from to hsh cc parent []
+          -- Only call parent constructor with empty args if it has no parameters
+          -- (If parent constructor requires args and child doesn't provide them,
+          -- the child is using an initializer pattern - don't auto-call)
+          let parentContract = cc ^. CC.contracts . at parent
+              parentConstructorArgs = fromMaybe [] . fmap CC._funcArgs . (>>= (^. CC.constructor)) $ parentContract
+          when (null parentConstructorArgs) $
+            runTheConstructors from to hsh cc parent []
 
     case contract' ^. CC.constructor of
       Just theFunction -> do
