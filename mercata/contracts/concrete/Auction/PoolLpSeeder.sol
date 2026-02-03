@@ -8,6 +8,11 @@ interface IPool {
     function addLiquidity(uint256 tokenBAmount, uint256 maxTokenAAmount, uint256 deadline) external returns (uint256);
 }
 
+// Seeds liquidity for the auction at TGE and forwards LP tokens to the lock vault.
+// Summary:
+// - Validates pool tokens against USDST/STRATO.
+// - Approves pool to pull both assets.
+// - Adds liquidity and transfers LP tokens to recipient vault.
 contract record PoolLpSeeder is Ownable {
     address public pool;
     address public usdToken;
@@ -15,8 +20,11 @@ contract record PoolLpSeeder is Ownable {
     address public auction;
     bool public initialized;
 
+    // Owner is assigned on deployment (proxy-safe).
     constructor(address initialOwner) Ownable(initialOwner) { }
 
+    // One-time configuration of pool + tokens; called by owner before auction.
+    // Auction address is allowed to call `seedAndLock`.
     function initialize(address pool_, address usdToken_, address stratoToken_, address auction_) external onlyOwner {
         require(!initialized, "Already initialized");
         require(pool_ != address(0), "Invalid pool");
@@ -31,6 +39,7 @@ contract record PoolLpSeeder is Ownable {
         initialized = true;
     }
 
+    // Called by the auction to add liquidity and forward LP tokens to the lock vault.
     function seedAndLock(uint usdAmount, uint stratoAmount, uint price, address lpTokenRecipient) external returns (address lpToken, uint lpTokensMinted) {
         require(initialized, "Not initialized");
         require(msg.sender == auction, "Not auction");
@@ -50,6 +59,7 @@ contract record PoolLpSeeder is Ownable {
 
         uint tokenBAmount;
         uint maxTokenAAmount;
+        // Ensure amounts align with pool token ordering.
         if (tokenB == usdToken) {
             tokenBAmount = usdAmount;
             maxTokenAAmount = stratoAmount;
