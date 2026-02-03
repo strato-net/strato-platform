@@ -16,7 +16,7 @@ class SafetyController {
   ): Promise<void> {
     try {
       const { accessToken, address: userAddress } = req;
-      const info = await getSafetyModuleInfo(accessToken, userAddress);
+      const info = await getSafetyModuleInfo(accessToken, userAddress as string);
       res.status(RestStatus.OK).json(info);
     } catch (error) {
       next(error);

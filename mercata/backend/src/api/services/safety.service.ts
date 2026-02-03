@@ -73,7 +73,7 @@ export const getSafetyModuleInfo = async (
     // Note: We need to query multiple sources for complete SafetyModule data:
     // 1. SafetyModule contract config and _managedAssets (COOLDOWN_SECONDS, UNSTAKE_WINDOW, _managedAssets, etc.)
     // 2. sToken totalSupply (this is totalShares)
-    // 3. User's sToken balance 
+    // 3. User's sToken balance
     // 4. User's cooldown start time
     
     let safetyModuleData: any[] = [];
@@ -114,6 +114,7 @@ export const getSafetyModuleInfo = async (
     } catch (error) {
       console.warn("sToken total supply query failed:", error);
     }
+
     try {
       // Query user's sUSDST token balance using nested relationship pattern
       const response3 = await cirrus.get(
@@ -149,7 +150,6 @@ export const getSafetyModuleInfo = async (
     } catch (error) {
       console.warn("SafetyModule cooldown data query failed:", error);
       }
- 
     // Extract data from responses
     const safetyModule = safetyModuleData?.[0] || {};
     
@@ -168,14 +168,16 @@ export const getSafetyModuleInfo = async (
     const cooldownStart = cooldownData?.[0]?.value || "0";
 
    
+    // Get user's staked sUSDST balance from RewardsChef
+    // Find the pool for this sToken
     const poolForSToken = await findPoolByLpToken(accessToken, config.rewardsChef, sTokenAddress);
+    
     // If no pool found, staked balance is 0
-     const stakedSTokenBalance = poolForSToken
+    const stakedSTokenBalance = poolForSToken
      
       ? await getStakedBalance(accessToken, config.rewardsChef, poolForSToken.poolIdx, userAddress)
       : "0";
     
-
     // Calculate exchange rate (assets per share)
     const exchangeRate = totalShares !== "0" && BigInt(totalShares) > 0n 
       ? (BigInt(totalAssets) * BigInt("1000000000000000000")) / BigInt(totalShares) // 18 decimals
