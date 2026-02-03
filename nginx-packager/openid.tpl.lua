@@ -77,6 +77,34 @@ else
       if (authenticate_err ~= nil) then
         ngx.log(ngx.DEBUG, 'User authentication error: ', authenticate_err)
       end
+
+      -- Check if this is an OAuth callback with state mismatch error (common in multi-tab scenarios
+      -- where one tab logs out/in while another tab initiates OAuth in the background).
+      -- When Tab 1 is idle and Tab 2 logs out then logs in, Tab 1's background API polling
+      -- triggers a new OAuth flow that overwrites Tab 2's state, causing Tab 2's callback to fail.
+      local request_uri = ngx.var.request_uri or ""
+      local is_oauth_callback = string.find(request_uri, "/auth/openidc/return", 1, true)
+
+      if is_oauth_callback and authenticate_err then
+        local err_lower = string.lower(authenticate_err)
+        local is_state_error = string.find(err_lower, "state") or
+                               string.find(err_lower, "does not match") or
+                               string.find(err_lower, "mismatch") or
+                               string.find(err_lower, "csrf")
+
+        if is_state_error then
+          ngx.log(ngx.WARN, 'OAuth state mismatch on callback (likely multi-tab race condition), restarting auth flow: ', authenticate_err)
+          -- Destroy current session to clear stale OAuth state
+          local session = require("resty.session").open()
+          if session then
+            session:destroy()
+          end
+          -- Redirect to /login to trigger a fresh OAuth flow automatically
+          -- (Keycloak will use existing session if valid, so user won't need to re-enter credentials)
+          return ngx.redirect("/login")
+        end
+      end
+
       -- Let client know in the response that client is not (or no longer) authenticated (so that the UI could notify user that he's been signed out)
       ngx.header['WWW-Authenticate'] = string.format('realm="%s"', node_host_with_protocol)
       -- Respond with 401 Unauthorized if the requested endpoint does not allow anonymous access
