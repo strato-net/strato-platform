@@ -94,9 +94,10 @@
     "parse": "{symbol}.price",
     "apiKeyEnvVar": "TWELVEDATA_API_KEY",
     "comment": "Also supports crypto: ETH/USD, BTC/USD, WBTC/USD, PAXG/USD, XAUT/USD. XAG requires Grow plan ($29/mo)",
-    "assets": ["XAU"],
+    "assets": ["XAU", "XAG"],
     "symbolMapping": {
-      "XAU": "XAU/USD"
+      "XAU": "XAU/USD",
+      "XAG": "XAG/USD"
     }
   },
   "OANDA": {
