@@ -16,7 +16,6 @@ class SafetyController {
   ): Promise<void> {
     try {
       const { accessToken, address: userAddress } = req;
-      // userAddress is optional - if not provided, only public stats are returned
       const info = await getSafetyModuleInfo(accessToken, userAddress);
       res.status(RestStatus.OK).json(info);
     } catch (error) {
