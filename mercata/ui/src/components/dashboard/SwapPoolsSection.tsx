@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CircleArrowDown, CircleArrowUp, Search } from "lucide-react";
+import { CircleArrowDown, CircleArrowUp, Search, TrendingUp } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useUser } from '@/context/UserContext';
 import { useTokenContext } from '@/context/TokenContext';
@@ -11,6 +11,7 @@ import { Pool } from '@/interface';
 import { rewardsEnabled } from '@/lib/constants';
 import LiquidityDepositModal from './LiquidityDepositModal';
 import LiquidityWithdrawModal from './LiquidityWithdrawModal';
+import LPProfitChartModal from './LPProfitChartModal';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 
 const SwapPoolsSection = () => {
@@ -18,6 +19,7 @@ const SwapPoolsSection = () => {
   const [selectedPool, setSelectedPool] = useState<Pool | null>(null);
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
+  const [isChartModalOpen, setIsChartModalOpen] = useState(false);
   const [pools, setPools] = useState<Pool[]>([]);
   const [loading, setLoading] = useState(false);
   const poolPollIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -100,6 +102,16 @@ const SwapPoolsSection = () => {
     setSelectedPool(null);
   };
 
+  const handleOpenChartModal = (pool: Pool) => {
+    setSelectedPool(pool);
+    setIsChartModalOpen(true);
+  };
+
+  const handleCloseChartModal = () => {
+    setIsChartModalOpen(false);
+    setSelectedPool(null);
+  };
+
   const handleDepositSuccess = async () => {
     // Refresh all data after successful deposit
     await fetchAndEnrichPools();
@@ -158,7 +170,7 @@ const SwapPoolsSection = () => {
           </div>
         ) : (
           filteredPools.map((pool, id) => (
-            <Card key={id} className="hover:shadow-md transition-shadow">
+            <Card key={id} className="hover:shadow-lg hover:border-primary/50 transition-all cursor-pointer" onClick={() => handleOpenChartModal(pool)}>
               <CardContent className="p-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
                   <div className="flex items-center">
@@ -193,7 +205,10 @@ const SwapPoolsSection = () => {
                       )}
                     </div>
                     <div>
-                      <h3 className="font-medium">{pool.poolName}</h3>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-medium">{pool.poolName}</h3>
+                        <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                      </div>
                       <div className="flex items-center text-xs text-muted-foreground mt-1">
                         <span>TVL: {formatBalance(pool.totalLiquidityUSD, undefined, 18, 0, 0, true)}</span>
                       </div>
@@ -222,7 +237,10 @@ const SwapPoolsSection = () => {
                       <Button
                         size="sm"
                         className="bg-strato-blue hover:bg-strato-blue/90"
-                        onClick={() => handleOpenDepositModal(pool)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenDepositModal(pool);
+                        }}
                       >
                         <CircleArrowDown className="mr-1 h-4 w-4" />
                         <span className="hidden sm:inline">Deposit</span>
@@ -232,7 +250,10 @@ const SwapPoolsSection = () => {
                         size="sm"
                         variant="outline"
                         className="border-strato-blue text-strato-blue hover:bg-strato-blue/10 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-400/10 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-auto disabled:border-muted disabled:text-muted-foreground disabled:hover:bg-transparent disabled:dark:border-muted disabled:dark:text-muted-foreground"
-                        onClick={() => handleOpenWithdrawModal(pool)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenWithdrawModal(pool);
+                        }}
                         disabled={BigInt(pool.lpToken.totalBalance || "0") === BigInt(0)}
                         title={BigInt(pool.lpToken.totalBalance || "0") === BigInt(0) ? "No LP tokens to withdraw" : "Withdraw"}
                       >
@@ -267,6 +288,12 @@ const SwapPoolsSection = () => {
         operationInProgressRef={operationInProgressRef}
         usdstBalance={usdstBalance}
         voucherBalance={voucherBalance}
+      />
+
+      <LPProfitChartModal
+        isOpen={isChartModalOpen}
+        onClose={handleCloseChartModal}
+        selectedPool={selectedPool}
       />
     </div>
   );
