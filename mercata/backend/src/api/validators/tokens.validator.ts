@@ -13,7 +13,7 @@ const createTokensSchema = Joi.object({
   files: Joi.array().items(Joi.string()).required(),
   fileNames: Joi.array().items(Joi.string()).required(),
   symbol: Joi.string().required(),
-  initialSupply: numericStringField("initialSupply"),
+  initialSupply: numericStringField("initialSupply", { allowZero: true }),
   customDecimals: Joi.number().integer().min(0).max(18).required(),
 });
 

@@ -19,6 +19,7 @@ module Blockchain.Blockstanbul
     PreprepareDecision (..),
     currentView,
     view,
+    proposal,
     sequence,
     isHistoricBlock,
     blockstanbulSender,

@@ -42,7 +42,7 @@ type LendingContextType = {
   repayAll: () => Promise<{ status: string; hash: string; amountRequested?: string; estimatedDebtAtRead?: string }>;
   getLend: () => Promise<LendData>;
   depositLiquidity: (args: { amount: string; stakeMToken: boolean }) => Promise<void>;
-  withdrawLiquidity: (args: { amount: string; includeStakedMToken?: boolean }) => Promise<void>;
+  withdrawLiquidity: (args: { amount: string }) => Promise<void>;
   withdrawLiquidityAll: () => Promise<void>;
 
   collateralInfo: CollateralData[];

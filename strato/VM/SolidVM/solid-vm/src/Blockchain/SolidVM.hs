@@ -2414,7 +2414,7 @@ runTheConstructors from to hsh cc contractName' argVals' = do
 
     cs <- Mod.get (Mod.Proxy @[CallInfo])
     userName <- getUsername $ currentAddress <$> cs
-    addNewCodeCollection userName cc
+    addNewCodeCollection userName hsh cc
     addDelegatecall to to (Just userName) $ T.pack contractName'
 
   return ()

@@ -815,11 +815,11 @@ export const findMaxAchievableHF = (
   while (currentHF >= minHF) {
     try {
       const isAtMinHF = Math.abs(currentHF - minHF) < 0.01;
-      const allocations = isAtMinHF
+      const result = isAtMinHF
         ? getAbsoluteMaxAllocations(vaultCandidates)
         : getMaxAllocations(vaultCandidates, currentHF);
       
-      const vaultsWithAllocations = addAllocationsToVaultCandidates(allocations, vaultCandidates);
+      const vaultsWithAllocations = addAllocationsToVaultCandidates(result.allocations, vaultCandidates);
       const totalMaxMint = calculateTotalMaxMint(vaultsWithAllocations);
       
       // If we can mint something at this HF, return it
