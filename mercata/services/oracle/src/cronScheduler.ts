@@ -1,6 +1,7 @@
 import cron from 'node-cron';
 import { logInfo, logError, logFeedUpdate } from './utils/logger';
 import { fetchPrices, generateConstantPrices } from './adapters/genericRestAdapter';
+import { fetchChainlinkPrices } from './adapters/chainlinkPriceFeedRpcAdapter';
 import { pushAssetPrices } from './utils/oraclePusher';
 import { checkBalances } from './utils/balanceChecker';
 import { fetchPreviousPrices } from './utils/priceReader';
@@ -87,9 +88,14 @@ export function getCronSchedule(): string {
 async function fetchSource(sourceName: string, sourceConfig: SourceConfig, configLoader: ConfigLoader): Promise<SourceResult> {
     const startTime = Date.now();
     try {
-        const fetchPromise = sourceName === 'constant'
-            ? Promise.resolve(generateConstantPrices(sourceConfig.assets, configLoader.getAllAssets()))
-            : fetchPrices(sourceConfig);
+        let fetchPromise;
+        if (sourceName === 'constant') {
+            fetchPromise = Promise.resolve(generateConstantPrices(sourceConfig.assets, configLoader.getAllAssets()));
+        } else if (sourceName === 'ChainlinkPriceFeedRPC') {
+            fetchPromise = fetchChainlinkPrices(sourceConfig.assets);
+        } else {
+            fetchPromise = fetchPrices(sourceConfig);
+        }
         const prices = await withTimeout(fetchPromise, TIMEOUTS.FETCH);
         return { sourceName, prices, success: true, duration: Date.now() - startTime };
     } catch (err) {
