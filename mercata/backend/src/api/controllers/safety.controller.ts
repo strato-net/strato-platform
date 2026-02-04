@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
 import {
   getSafetyModuleInfo,
+  getPublicSafetyModuleInfo,
   stakeSafetyModule,
   startCooldownSafetyModule,
   redeemSafetyModule,
@@ -17,6 +18,20 @@ class SafetyController {
     try {
       const { accessToken, address: userAddress } = req;
       const info = await getSafetyModuleInfo(accessToken, userAddress as string);
+      res.status(RestStatus.OK).json(info);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getPublicInfo(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken } = req;
+      const info = await getPublicSafetyModuleInfo(accessToken);
       res.status(RestStatus.OK).json(info);
     } catch (error) {
       next(error);

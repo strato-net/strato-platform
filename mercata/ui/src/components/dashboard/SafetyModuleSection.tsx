@@ -41,8 +41,8 @@ const SafetyModuleSection = () => {
   const refreshData = (signal?: AbortSignal) => {
     refreshSafetyInfo(signal); // Always fetch public safety info
     if (isLoggedIn) {
-      fetchTokens(signal);
-      fetchUsdstBalance();
+    fetchTokens(signal);
+    fetchUsdstBalance();
     }
   };
 
@@ -266,38 +266,38 @@ const SafetyModuleSection = () => {
                   {/* User-specific balance info - only show when logged in */}
                   {isLoggedIn && (
                     <>
-                      <div className="text-sm text-muted-foreground mt-1">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const availableWei = BigInt(usdstBalance);
-                            const feeWei = safeParseUnits(SAFETY_STAKE_FEE, 18);
-                            const maxStakeableWei = availableWei > feeWei ? availableWei - feeWei : 0n;
-                            const formatted = formatUnits(maxStakeableWei, 18);
+                  <div className="text-sm text-muted-foreground mt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const availableWei = BigInt(usdstBalance);
+                        const feeWei = safeParseUnits(SAFETY_STAKE_FEE, 18);
+                        const maxStakeableWei = availableWei > feeWei ? availableWei - feeWei : 0n;
+                        const formatted = formatUnits(maxStakeableWei, 18);
 
-                            // Clamp to 18 decimals
-                            const [whole, frac = ""] = formatted.split(".");
-                            const clamped = `${whole}.${frac.slice(0, 18)}`;
-                            setStakeAmount(clamped);
-                          }}
-                          className="text-blue-600 hover:underline mr-2"
-                        >
-                          Max
-                        </button>
-                        Available:{" "}
-                        {tokensLoading ?
-                          <span className="text-muted-foreground animate-pulse">
-                            Loading...
-                          </span>
-                          : usdstBalance
-                            ? formatBalance(usdstBalance || 0n, undefined, 18, 2)
-                            : "0.00"}{" "}
-                        USDST
-                      </div>
-                      {/* Fee Display */}
-                      <div className="text-sm text-muted-foreground mt-1">
-                        Transaction Fee: {SAFETY_STAKE_FEE} USDST
-                      </div>
+                        // Clamp to 18 decimals
+                        const [whole, frac = ""] = formatted.split(".");
+                        const clamped = `${whole}.${frac.slice(0, 18)}`;
+                        setStakeAmount(clamped);
+                      }}
+                      className="text-blue-600 hover:underline mr-2"
+                    >
+                      Max
+                    </button>
+                    Available:{" "}
+                    {tokensLoading ?
+                      <span className="text-muted-foreground animate-pulse">
+                        Loading...
+                      </span>
+                      : usdstBalance
+                        ? formatBalance(usdstBalance || 0n, undefined, 18, 2)
+                        : "0.00"}{" "}
+                    USDST
+                  </div>
+                  {/* Fee Display */}
+                  <div className="text-sm text-muted-foreground mt-1">
+                    Transaction Fee: {SAFETY_STAKE_FEE} USDST
+                  </div>
                     </>
                   )}
                   {/* Estimated Rewards */}
@@ -381,14 +381,14 @@ const SafetyModuleSection = () => {
                 </div>
 
                 {/* Cooldown Section */}
-                {safetyInfo && BigInt(safetyInfo.userSharesTotal) > 0n && (
+                {safetyInfo && safetyInfo.userSharesTotal && BigInt(safetyInfo.userSharesTotal || "0") > 0n && (
                   <div className="bg-card rounded-lg p-4 border border-border">
                     <h3 className="font-medium mb-3 flex items-center gap-2">
                       <Clock className="h-4 w-4" />
                       Unstaking
                     </h3>
                     
-                    {!safetyInfo.cooldownActive ? (
+                    {!safetyInfo?.cooldownActive ? (
                       <div className="space-y-3">
                         <p className="text-sm text-muted-foreground">
                           Start your cooldown period to begin unstaking your safetyUSDST.
@@ -404,7 +404,7 @@ const SafetyModuleSection = () => {
                       </div>
                     ) : (
                       <div className="space-y-3">
-                        {safetyInfo.cooldownTimeRemaining !== "0" ? (
+                        {safetyInfo?.cooldownTimeRemaining && safetyInfo.cooldownTimeRemaining !== "0" ? (
                           <div className="bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-900 rounded-lg p-3">
                             <div className="flex items-center gap-2 text-yellow-800 dark:text-yellow-200">
                               <Clock className="h-4 w-4" />
@@ -414,7 +414,7 @@ const SafetyModuleSection = () => {
                               Time remaining: {formatTimeRemaining(safetyInfo.cooldownTimeRemaining)}
                             </p>
                           </div>
-                        ) : safetyInfo.unstakeWindowTimeRemaining !== "0" ? (
+                        ) : safetyInfo?.unstakeWindowTimeRemaining && safetyInfo.unstakeWindowTimeRemaining !== "0" ? (
                           <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-900 rounded-lg p-3">
                             <div className="flex items-center gap-2 text-green-800 dark:text-green-200">
                               <CircleArrowUp className="h-4 w-4" />
@@ -452,7 +452,7 @@ const SafetyModuleSection = () => {
                   <h3 className="font-medium mb-3">Redeem</h3>
                   
                   {/* Show redemption status */}
-                  {safetyInfo && BigInt(safetyInfo.userSharesTotal) === 0n ? (
+                  {safetyInfo && (!safetyInfo.userSharesTotal || BigInt(safetyInfo.userSharesTotal || "0") === 0n) ? (
                     <div className="bg-muted/50 border border-border rounded-lg p-3 mb-3">
                       <p className="text-sm text-muted-foreground">
                         No safetyUSDST shares to redeem. Stake USDST first to receive safetyUSDST shares.
@@ -461,9 +461,9 @@ const SafetyModuleSection = () => {
                   ) : !safetyInfo?.canRedeem ? (
                     <div className="bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-900 rounded-lg p-3 mb-3">
                       <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                        {!safetyInfo?.cooldownActive 
+                          {!safetyInfo?.cooldownActive 
                           ? "Start cooldown period before you can redeem your safetyUSDST."
-                          : safetyInfo.cooldownTimeRemaining !== "0"
+                          : safetyInfo?.cooldownTimeRemaining && safetyInfo.cooldownTimeRemaining !== "0"
                           ? "Cooldown in progress. You can redeem after the cooldown completes."
                           : "Unstake window has expired. Start a new cooldown to redeem."
                         }
@@ -477,7 +477,7 @@ const SafetyModuleSection = () => {
                     </div>
                   )}
 
-                  {safetyInfo && BigInt(safetyInfo.userSharesTotal) > 0n && (
+                  {safetyInfo && safetyInfo.userSharesTotal && BigInt(safetyInfo.userSharesTotal || "0") > 0n && (
                     <>
                       <div className="flex flex-col sm:flex-row items-stretch sm:items-start space-y-2 sm:space-y-0 sm:space-x-2">
                         <div className="relative flex-1">
@@ -642,50 +642,50 @@ const SafetyModuleSection = () => {
                 {/* User-specific data - only show when logged in */}
                 {isLoggedIn && (
                   <>
-                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
                     <span className="text-muted-foreground text-sm sm:text-base">Your safetyUSDST (Total)</span>
-                      <span className="font-medium text-sm sm:text-base sm:text-right">
+                  <span className="font-medium text-sm sm:text-base sm:text-right">
+                    {loading ? (
+                      <span className="text-muted-foreground animate-pulse">
+                        Loading...
+                      </span>
+                    ) : safetyInfo?.userSharesTotal ? (
+                      formatBalance(safetyInfo.userSharesTotal || 0n, undefined, 18, 2, 2)
+                    ) : (
+                      "0.00"
+                    )}
+                  </span>
+                </div>
+                {rewardsEnabled && (
+                  <>
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start pl-4">
+                      <span className="text-muted-foreground text-xs sm:text-sm">• Staked</span>
+                      <span className="font-medium text-xs sm:text-sm sm:text-right">
                         {loading ? (
                           <span className="text-muted-foreground animate-pulse">
                             Loading...
                           </span>
-                        ) : safetyInfo?.userSharesTotal ? (
-                          formatBalance(safetyInfo.userSharesTotal || 0n, undefined, 18, 2, 2)
+                        ) : safetyInfo?.userSharesStaked ? (
+                          formatBalance(safetyInfo.userSharesStaked || 0n, undefined, 18, 2, 2)
                         ) : (
                           "0.00"
                         )}
                       </span>
                     </div>
-                    {rewardsEnabled && (
-                      <>
-                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start pl-4">
-                          <span className="text-muted-foreground text-xs sm:text-sm">• Staked</span>
-                          <span className="font-medium text-xs sm:text-sm sm:text-right">
-                            {loading ? (
-                              <span className="text-muted-foreground animate-pulse">
-                                Loading...
-                              </span>
-                            ) : safetyInfo?.userSharesStaked ? (
-                              formatBalance(safetyInfo.userSharesStaked || 0n, undefined, 18, 2, 2)
-                            ) : (
-                              "0.00"
-                            )}
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start pl-4">
+                      <span className="text-muted-foreground text-xs sm:text-sm">• Unstaked</span>
+                      <span className="font-medium text-xs sm:text-sm sm:text-right">
+                        {loading ? (
+                          <span className="text-muted-foreground animate-pulse">
+                            Loading...
                           </span>
-                        </div>
-                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start pl-4">
-                          <span className="text-muted-foreground text-xs sm:text-sm">• Unstaked</span>
-                          <span className="font-medium text-xs sm:text-sm sm:text-right">
-                            {loading ? (
-                              <span className="text-muted-foreground animate-pulse">
-                                Loading...
-                              </span>
-                            ) : safetyInfo?.userShares ? (
-                              formatBalance(safetyInfo.userShares || 0n, undefined, 18, 2, 2)
-                            ) : (
-                              "0.00"
-                            )}
-                          </span>
-                        </div>
+                        ) : safetyInfo?.userShares ? (
+                          formatBalance(safetyInfo.userShares || 0n, undefined, 18, 2, 2)
+                        ) : (
+                          "0.00"
+                        )}
+                      </span>
+                    </div>
                       </>
                     )}
                   </>
@@ -713,11 +713,11 @@ const SafetyModuleSection = () => {
                   <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
                     <span className="text-muted-foreground text-sm sm:text-base">Cooldown Status</span>
                     <span className="font-medium text-sm sm:text-base sm:text-right">
-                      {safetyInfo.cooldownTimeRemaining !== "0" ? (
+                      {safetyInfo?.cooldownTimeRemaining && safetyInfo.cooldownTimeRemaining !== "0" ? (
                         <span className="text-yellow-600">
                           {formatTimeRemaining(safetyInfo.cooldownTimeRemaining)} remaining
                         </span>
-                      ) : safetyInfo.unstakeWindowTimeRemaining !== "0" ? (
+                      ) : safetyInfo?.unstakeWindowTimeRemaining && safetyInfo.unstakeWindowTimeRemaining !== "0" ? (
                         <span className="text-green-600">
                           Window open ({formatTimeRemaining(safetyInfo.unstakeWindowTimeRemaining)} left)
                         </span>
