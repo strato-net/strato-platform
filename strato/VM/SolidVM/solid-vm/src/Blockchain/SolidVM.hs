@@ -1012,8 +1012,8 @@ expToPath x@(CC.IndexAccess _ parent mIndex) = do
   idx <- getVar =<< maybe (typeError "empty index is only valid at type level" $ show x) expToVar mIndex
   currentBlockNum <- BlockHeader.number . Env.blockHeader <$> getEnv
   -- Helium network ID = 114784819836269
-  -- Blocks before 30150 on helium have TXs that relied on the buggy behavior, so preserve it there
-  let isHeliumPreFork = computeNetworkID == 114784819836269 && currentBlockNum < 30150
+  -- Blocks before 25000 on helium have TXs that relied on the buggy behavior, so preserve it there
+  let isHeliumPreFork = computeNetworkID == 114784819836269 && currentBlockNum < 25000
   pure . apSnoc parPath $ case idx of
     SAddress a _ -> MS.Index . BC.pack $ show a
     SInteger i -> MS.Index . BC.pack $ show i
@@ -1458,7 +1458,16 @@ expToVar' (CC.FunctionCall _ (CC.Variable _ name) args)
     ("int" `isPrefixOf` name && all isDigit (drop 3 name)) ||
     ("bytes" `isPrefixOf` name && not (null (drop 5 name)) && all isDigit (drop 5 name)) = do
       argVals <- argsToVals args
-      Constant <$> callBuiltin name argVals
+      case name of
+        "bytes32" -> do
+          currentBlockNum <- BlockHeader.number . Env.blockHeader <$> getEnv
+          -- Helium network ID = 114784819836269
+          -- Blocks before 31000 on helium have TXs that relied on the buggy behavior, so preserve it there
+          let isHeliumPreFork = computeNetworkID == 114784819836269 && currentBlockNum < 31000
+          if isHeliumPreFork
+            then unknownVariable "getVariableOfName" ("bytes32" :: String)
+            else Constant <$> callBuiltin name argVals
+        _ -> Constant <$> callBuiltin name argVals
 
 -- case to catch a using statement function like _x.add(3)
 
