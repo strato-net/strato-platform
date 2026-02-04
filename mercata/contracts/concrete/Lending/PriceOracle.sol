@@ -89,8 +89,7 @@ contract record PriceOracle is Ownable {
             oracleState[asset].observations.length = len + 1;
             indexUpdated = len;
         } else {
-            uint256 next = (index + 1) % maxCardinality;
-            indexUpdated = (next == 0) ? 0 : next;
+            indexUpdated = (index + 1) % maxCardinality;
         }
 
         oracleState[asset].observations[indexUpdated].blockTimestamp = blockTimestamp;
@@ -254,21 +253,22 @@ contract record PriceOracle is Ownable {
      *      TWAP = (cumNow - cumAtTarget) / secondsAgo
      */
     function _consult(address asset, uint256 secondsAgo) internal view returns (uint256) {
-        if (secondsAgo == 0) {
+        uint256 len = oracleState[asset].observations.length;
+        if (secondsAgo == 0 || secondsAgo > block.timestamp || len == 0) {
             return prices[asset];
         }
 
-        if (oracleState[asset].observations.length == 0) {
-            return prices[asset];
+        uint256 target = block.timestamp - secondsAgo;
+        uint256 oldestIdx = (len >= maxCardinality) ? (oracleState[asset].index + 1) % len : 0;
+        if (target < oracleState[asset].observations[oldestIdx].blockTimestamp) {
+            return 0;
         }
 
         uint256 cumNow = _observeSingle(asset, 0);
         uint256 cumAtTarget = _observeSingle(asset, secondsAgo);
-
         if (cumNow <= cumAtTarget) {
             return prices[asset];
         }
-
         return (cumNow - cumAtTarget) / secondsAgo;
     }
 
