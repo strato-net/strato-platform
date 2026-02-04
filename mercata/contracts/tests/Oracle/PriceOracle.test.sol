@@ -587,6 +587,162 @@ contract Describe_PriceOracle {
         require(timestamp2 >= timestamp1, "Timestamp should update on price change");
     }
 
+    // ============ TWAP TESTS ============
+
+    function it_price_oracle_twap_returns_spot_when_seconds_ago_zero() {
+        uint256 price = 100e8;
+        oracle.setAssetPrice(tokenA, price);
+        uint256 twap = oracle.getAssetPriceTwap(tokenA, 0);
+        require(twap == price, "TWAP with secondsAgo 0 should equal spot price");
+    }
+
+    function it_price_oracle_twap_reverts_for_unset_asset() {
+        bool reverted = false;
+        try {
+            oracle.getAssetPriceTwap(tokenA, 3600);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should revert when getting TWAP for unset asset");
+    }
+
+    function it_price_oracle_twap_reverts_for_zero_address() {
+        oracle.setAssetPrice(tokenA, 100e8);
+        bool reverted = false;
+        try {
+            oracle.getAssetPriceTwap(zeroAddress, 3600);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should revert when getting TWAP for zero address");
+    }
+
+    function it_price_oracle_twap_single_observation() {
+        uint256 P = 100e8;
+        oracle.setAssetPrice(tokenA, P);
+        fastForward(60);
+        uint256 twap = oracle.getAssetPriceTwap(tokenA, 60);
+        require(twap == P, "TWAP over single observation should equal that price");
+    }
+
+    function it_price_oracle_twap_two_observations_equal_window() {
+        uint256 P0 = 100e8;
+        uint256 P1 = 200e8;
+        oracle.setAssetPrice(tokenA, P0);
+        fastForward(60);
+        oracle.setAssetPrice(tokenA, P1);
+        fastForward(60);
+        uint256 expectedTwap = (P0 * 60 + P1 * 60) / 120;
+        uint256 twap = oracle.getAssetPriceTwap(tokenA, 120);
+        require(twap == expectedTwap, "TWAP over two equal windows should match (P0+P1)/2");
+    }
+
+    function it_price_oracle_twap_three_observations() {
+        uint256 P0 = 100e8;
+        uint256 P1 = 150e8;
+        uint256 P2 = 200e8;
+        oracle.setAssetPrice(tokenA, P0);
+        fastForward(60);
+        oracle.setAssetPrice(tokenA, P1);
+        fastForward(60);
+        oracle.setAssetPrice(tokenA, P2);
+        fastForward(60);
+        uint256 expectedTwap = (P0 * 60 + P1 * 60 + P2 * 60) / 180;
+        uint256 twap = oracle.getAssetPriceTwap(tokenA, 180);
+        require(twap == expectedTwap, "TWAP over three observations should match (P0+P1+P2)/3");
+    }
+
+    function it_price_oracle_twap_insufficient_history_falls_back_to_spot() {
+        uint256 price = 100e8;
+        oracle.setAssetPrice(tokenA, price);
+        fastForward(120);
+        uint256 twap = oracle.getAssetPriceTwap(tokenA, 3600);
+        require(twap == price, "TWAP with insufficient history should return spot");
+    }
+
+    function it_price_oracle_twap_ring_buffer_after_fill() {
+        oracle.setMaxCardinality(3);
+        uint256 P0 = 100e8;
+        uint256 P1 = 110e8;
+        uint256 P2 = 120e8;
+        uint256 P3 = 130e8;
+        uint256 P4 = 140e8;
+        oracle.setAssetPrice(tokenA, P0);
+        fastForward(60);
+        oracle.setAssetPrice(tokenA, P1);
+        fastForward(60);
+        oracle.setAssetPrice(tokenA, P2);
+        (, , , uint256 s3Index, ) = oracle.getOracleState(tokenA);
+        log(3%3 == 0 ? "3%3 == 0" : "3%3 != 0");
+        log("after 3rd write index", s3Index);
+        fastForward(60);
+        oracle.setAssetPrice(tokenA, P3);
+        (, , , uint256 s4Index, ) = oracle.getOracleState(tokenA);
+        log("after 4th write index", s4Index);
+        fastForward(60);
+        oracle.setAssetPrice(tokenA, P4);
+        fastForward(60);
+        uint256 twap = oracle.getAssetPriceTwap(tokenA, 180);
+        uint256 expectedTwap = (P2 * 60 + P3 * 60 + P4 * 60) / 180;
+        require(twap == expectedTwap, "TWAP over ring should match last 3 observations");
+    }
+
+    function it_price_oracle_twap_ring_buffer_many_overwrites() {
+        oracle.setMaxCardinality(3);
+        oracle.setAssetPrice(tokenA, 100e8);
+        fastForward(60);
+        oracle.setAssetPrice(tokenA, 110e8);
+        fastForward(60);
+        oracle.setAssetPrice(tokenA, 120e8);
+        fastForward(60);
+        oracle.setAssetPrice(tokenA, 130e8);
+        fastForward(60);
+        oracle.setAssetPrice(tokenA, 140e8);
+        fastForward(60);
+        oracle.setAssetPrice(tokenA, 150e8);
+        fastForward(60);
+        oracle.setAssetPrice(tokenA, 160e8);
+        fastForward(60);
+        oracle.setAssetPrice(tokenA, 170e8);
+        fastForward(60);
+        oracle.setAssetPrice(tokenA, 180e8);
+        fastForward(60);
+        oracle.setAssetPrice(tokenA, 190e8);
+        uint256 twap = oracle.getAssetPriceTwap(tokenA, 180);
+        uint256 expectedTwap = (170e8 * 60 + 180e8 * 60 + 190e8 * 60) / 180;
+        require(twap == expectedTwap, "TWAP after many ring overwrites should match last 3 obs");
+    }
+
+    function it_price_oracle_twap_same_block_no_new_observation() {
+        oracle.setAssetPrice(tokenA, 100e8);
+        oracle.setAssetPrice(tokenA, 200e8);
+        fastForward(60);
+        uint256 twap = oracle.getAssetPriceTwap(tokenA, 60);
+        require(twap == 200e8, "TWAP after same-block update should use latest price");
+    }
+
+    function it_price_oracle_twap_with_timestamp_getter() {
+        oracle.setAssetPrice(tokenA, 100e8);
+        fastForward(60);
+        oracle.setAssetPrice(tokenA, 200e8);
+        fastForward(60);
+        uint256 window = 120;
+        (uint256 priceFromGetter, uint256 timestampFromGetter) = oracle.getAssetPriceTwapWithTimestamp(tokenA, window);
+        uint256 priceFromTwap = oracle.getAssetPriceTwap(tokenA, window);
+        require(priceFromGetter == priceFromTwap, "getAssetPriceTwapWithTimestamp price should match getAssetPriceTwap");
+        require(timestampFromGetter == oracle.lastUpdated(tokenA), "timestamp should equal lastUpdated");
+    }
+
+    function it_price_oracle_twap_log_time_and_values() {
+        oracle.setAssetPrice(tokenA, 100e8);
+        fastForward(60);
+        oracle.setAssetPrice(tokenA, 200e8);
+        fastForward(60);
+        uint256 twap = oracle.getAssetPriceTwap(tokenA, 120);
+        uint256 expectedTwap = (100e8 * 60 + 200e8 * 60) / 120;
+        require(twap == expectedTwap, "TWAP should match expected for logging test");
+    }
+
     // ============ COMPREHENSIVE INTEGRATION TESTS ============
 
     function it_price_oracle_comprehensive_workflow() {
