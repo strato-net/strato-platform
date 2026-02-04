@@ -20,7 +20,6 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import type { Event } from "@mercata/shared-types";
 import { api } from "@/lib/axios";
 import { ActivityCard, type ActivityCardData } from "./ActivityCard";
 
@@ -74,163 +73,163 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
         timeRange: selectedTimeRange as 'all' | 'today' | 'week' | 'month',
       });
 
-        // Fetch pool tokens for AddLiquidity events first (needed for token address extraction)
-        const poolAddresses = [...new Set(
-          response.events
-            .filter(event => event.contract_name === "Pool" && event.event_name === "AddLiquidity")
-            .map(event => event.address)
-        )];
-        const poolTokenMap = new Map<string, { tokenA: string; tokenB: string }>();
-        if (poolAddresses.length > 0) {
-          try {
-            const poolPromises = poolAddresses.map(async (poolAddress) => {
-              try {
-                const res = await api.get(`/swap-pools/${poolAddress}`);
-                const pool = Array.isArray(res.data) ? res.data[0] : res.data;
-                // Pool response has tokenA and tokenB objects with address property
-                let tokenA = pool?.tokenA?.address || pool?.tokenA;
-                let tokenB = pool?.tokenB?.address || pool?.tokenB;
-                // Normalize addresses to lowercase for consistent lookup
-                if (tokenA) tokenA = tokenA.toLowerCase();
-                if (tokenB) tokenB = tokenB.toLowerCase();
-                if (tokenA && tokenB) {
-                  return { poolAddress, tokenA, tokenB };
-                }
-                return null;
-              } catch {
-                return null;
+      // Fetch pool tokens for AddLiquidity events first (needed for token address extraction)
+      const poolAddresses = [...new Set(
+        response.events
+          .filter(event => event.contract_name === "Pool" && event.event_name === "AddLiquidity")
+          .map(event => event.address)
+      )];
+      const poolTokenMap = new Map<string, { tokenA: string; tokenB: string }>();
+      if (poolAddresses.length > 0) {
+        try {
+          const poolPromises = poolAddresses.map(async (poolAddress) => {
+            try {
+              const res = await api.get(`/swap-pools/${poolAddress}`);
+              const pool = Array.isArray(res.data) ? res.data[0] : res.data;
+              // Pool response has tokenA and tokenB objects with address property
+              let tokenA = pool?.tokenA?.address || pool?.tokenA;
+              let tokenB = pool?.tokenB?.address || pool?.tokenB;
+              // Normalize addresses to lowercase for consistent lookup
+              if (tokenA) tokenA = tokenA.toLowerCase();
+              if (tokenB) tokenB = tokenB.toLowerCase();
+              if (tokenA && tokenB) {
+                return { poolAddress, tokenA, tokenB };
               }
-            });
-            const poolResults = await Promise.all(poolPromises);
-            poolResults.forEach(result => {
-              if (result) {
-                poolTokenMap.set(result.poolAddress, { tokenA: result.tokenA, tokenB: result.tokenB });
-              }
-            });
-          } catch (err) {
-            console.warn("Failed to fetch pool tokens:", err);
-          }
+              return null;
+            } catch {
+              return null;
+            }
+          });
+          const poolResults = await Promise.all(poolPromises);
+          poolResults.forEach(result => {
+            if (result) {
+              poolTokenMap.set(result.poolAddress, { tokenA: result.tokenA, tokenB: result.tokenB });
+            }
+          });
+        } catch (err) {
+          console.warn("Failed to fetch pool tokens:", err);
         }
+      }
 
-        // Collect token addresses using getTokenAddress from activity type configs
-        const allTokenAddresses = [...new Set(
-          response.events
-            .flatMap(event => {
-              // Find matching activity type
-              const matchingType = Object.entries(activityTypes).find(
-                ([_, config]) =>
-                  config.contract_name === event.contract_name &&
-                  config.event_name === event.event_name
-              );
+      // Collect token addresses using getTokenAddress from activity type configs
+      const allTokenAddresses = [...new Set(
+        response.events
+          .flatMap(event => {
+            // Find matching activity type
+            const matchingType = Object.entries(activityTypes).find(
+              ([_, config]) =>
+                config.contract_name === event.contract_name &&
+                config.event_name === event.event_name
+            );
 
-              // Extract token addresses using the config's getTokenAddress function
-              let addresses: string[] = [];
-              if (matchingType && matchingType[1].getTokenAddress) {
-                addresses = matchingType[1].getTokenAddress(event);
-              }
-              
-              // For AddLiquidity events, also include tokenA and tokenB from pool info
-              if (event.contract_name === "Pool" && event.event_name === "AddLiquidity") {
-                const poolTokens = poolTokenMap.get(event.address);
-                if (poolTokens) {
-                  addresses.push(poolTokens.tokenA, poolTokens.tokenB);
-                }
-              }
-              
-              return addresses;
-            })
-        )];
-        const tokenSymbolMap = new Map<string, string>();
-        const tokenImageMap = new Map<string, string>();
+            // Extract token addresses using the config's getTokenAddress function
+            let addresses: string[] = [];
+            if (matchingType && matchingType[1].getTokenAddress) {
+              addresses = matchingType[1].getTokenAddress(event);
+            }
 
-        if (allTokenAddresses.length > 0) {
-          try {
-            // Fetch token metadata (symbols and images) in batch
-            const tokenPromises = allTokenAddresses.map(async (address) => {
-              try {
-                const res = await api.get(`/tokens/${address}`);
-                const token = Array.isArray(res.data) ? res.data[0] : res.data;
-                const symbol = token?._symbol || token?.token?._symbol || "";
-                const image = token?.images?.[0]?.value || token?.token?.images?.[0]?.value || "";
-                return { address, symbol, image };
-              } catch {
-                return { address, symbol: "", image: "" };
-              }
-            });
-            const tokenResults = await Promise.all(tokenPromises);
-            tokenResults.forEach(({ address, symbol, image }) => {
-              // Normalize address to lowercase for consistent lookup
-              const normalizedAddress = address.toLowerCase();
-              if (symbol) {
-                tokenSymbolMap.set(normalizedAddress, symbol);
-                tokenSymbolMap.set(address, symbol); // Also store original case for lookup
-              }
-              if (image) {
-                tokenImageMap.set(normalizedAddress, image);
-                tokenImageMap.set(address, image); // Also store original case for lookup
-              }
-            });
-          } catch (err) {
-            // If fetching token metadata fails, continue without it
-            console.warn("Failed to fetch token metadata:", err);
-          }
-        }
-
-        // Route each event to the appropriate handler
-        const allCardData: ActivityCardData[] = [];
-        for (const event of response.events) {
-          // Find matching activity type by contract_name and event_name
-          const matchingType = Object.entries(activityTypes).find(
-            ([_, config]) =>
-              config.contract_name === event.contract_name &&
-              config.event_name === event.event_name
-          );
-
-          if (matchingType) {
-            const [, config] = matchingType;
-            
-            // For AddLiquidity events, attach tokenA and tokenB from pool info
+            // For AddLiquidity events, also include tokenA and tokenB from pool info
             if (event.contract_name === "Pool" && event.event_name === "AddLiquidity") {
               const poolTokens = poolTokenMap.get(event.address);
               if (poolTokens) {
-                (event as any).tokenA = poolTokens.tokenA;
-                (event as any).tokenB = poolTokens.tokenB;
+                addresses.push(poolTokens.tokenA, poolTokens.tokenB);
               }
             }
 
-            // Get token symbols and images using the config's getTokenAddress function
-            const tokenSymbolsMap = new Map<string, string>();
-            const tokenImagesMap = new Map<string, string>();
-            if (config.getTokenAddress) {
-              const tokenAddresses = config.getTokenAddress(event);
-              // For AddLiquidity, also include tokenA and tokenB if available
-              if (event.contract_name === "Pool" && event.event_name === "AddLiquidity") {
-                const poolTokens = poolTokenMap.get(event.address);
-                if (poolTokens) {
-                  tokenAddresses.push(poolTokens.tokenA, poolTokens.tokenB);
-                }
-              }
-              tokenAddresses.forEach(address => {
-                // Normalize address to lowercase for lookup
-                const normalizedAddress = address.toLowerCase();
-                const symbol = tokenSymbolMap.get(normalizedAddress) || tokenSymbolMap.get(address);
-                if (symbol) {
-                  tokenSymbolsMap.set(address, symbol);
-                }
-                const image = tokenImageMap.get(normalizedAddress) || tokenImageMap.get(address);
-                if (image) {
-                  tokenImagesMap.set(address, image);
-                }
-              });
+            return addresses;
+          })            
+      )];
+      const tokenSymbolMap = new Map<string, string>();
+      const tokenImageMap = new Map<string, string>();
+
+      if (allTokenAddresses.length > 0) {
+        try {
+          // Fetch token metadata (symbols and images) in batch
+          const tokenPromises = allTokenAddresses.map(async (address) => {
+            try {
+              const res = await api.get(`/tokens/${address}`);
+              const token = Array.isArray(res.data) ? res.data[0] : res.data;
+              const symbol = token?._symbol || token?.token?._symbol || "";
+              const image = token?.images?.[0]?.value || token?.token?.images?.[0]?.value || "";
+              return { address, symbol, image };
+            } catch {
+              return { address, symbol: "", image: "" };
             }
-            const cardData = config.handler(event, tokenSymbolsMap, userAddress, tokenImagesMap);
-            // Add iconConfig from the activity type config
-            allCardData.push({
-              ...cardData,
-              iconConfig: config.iconConfig,
+          });
+          const tokenResults = await Promise.all(tokenPromises);
+          tokenResults.forEach(({ address, symbol, image }) => {
+            // Normalize address to lowercase for consistent lookup
+            const normalizedAddress = address.toLowerCase();
+            if (symbol) {
+              tokenSymbolMap.set(normalizedAddress, symbol);
+              tokenSymbolMap.set(address, symbol); // Also store original case for lookup
+            }
+            if (image) {
+              tokenImageMap.set(normalizedAddress, image);
+              tokenImageMap.set(address, image); // Also store original case for lookup
+            }
+          });
+        } catch (err) {
+          // If fetching token metadata fails, continue without it
+          console.warn("Failed to fetch token metadata:", err);
+        }
+      }
+
+      // Route each event to the appropriate handler
+      const allCardData: ActivityCardData[] = [];
+      for (const event of response.events) {
+        // Find matching activity type by contract_name and event_name
+        const matchingType = Object.entries(activityTypes).find(
+          ([_, config]) =>
+            config.contract_name === event.contract_name &&
+            config.event_name === event.event_name
+        );
+
+        if (matchingType) {
+          const [, config] = matchingType;
+
+          // For AddLiquidity events, attach tokenA and tokenB from pool info
+          if (event.contract_name === "Pool" && event.event_name === "AddLiquidity") {
+            const poolTokens = poolTokenMap.get(event.address);
+            if (poolTokens) {
+              (event as any).tokenA = poolTokens.tokenA;
+              (event as any).tokenB = poolTokens.tokenB;
+            }
+          }
+
+          // Get token symbols and images using the config's getTokenAddress function
+          const tokenSymbolsMap = new Map<string, string>();
+          const tokenImagesMap = new Map<string, string>();
+          if (config.getTokenAddress) {
+            const tokenAddresses = config.getTokenAddress(event);
+            // For AddLiquidity, also include tokenA and tokenB if available
+            if (event.contract_name === "Pool" && event.event_name === "AddLiquidity") {
+              const poolTokens = poolTokenMap.get(event.address);
+              if (poolTokens) {
+                tokenAddresses.push(poolTokens.tokenA, poolTokens.tokenB);
+              }
+            }
+            tokenAddresses.forEach(address => {
+              // Normalize address to lowercase for lookup
+              const normalizedAddress = address.toLowerCase();
+              const symbol = tokenSymbolMap.get(normalizedAddress) || tokenSymbolMap.get(address);
+              if (symbol) {
+                tokenSymbolsMap.set(address, symbol);
+              }
+              const image = tokenImageMap.get(normalizedAddress) || tokenImageMap.get(address);
+              if (image) {
+                tokenImagesMap.set(address, image);
+              }
             });
           }
+          const cardData = config.handler(event, tokenSymbolsMap, userAddress, tokenImagesMap);
+          // Add iconConfig from the activity type config
+          allCardData.push({
+            ...cardData,
+            iconConfig: config.iconConfig,
+          });
         }
+      }
 
       setCardData(allCardData);
       setTotalPages(Math.ceil((response.total || 0) / itemsPerPage));

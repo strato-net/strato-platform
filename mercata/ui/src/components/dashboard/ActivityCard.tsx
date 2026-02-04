@@ -93,22 +93,6 @@ const formatEventDate = (timestamp: string | undefined): string => {
 };
 
 /**
- * Get icon component from icon name
- */
-const getIcon = (icon: FieldIcon) => {
-  switch (icon) {
-    case "arrow-up-right":
-      return <ArrowUpRight className="h-4 w-4 text-muted-foreground" />;
-    case "arrow-down-left":
-      return <ArrowDownLeft className="h-4 w-4 text-muted-foreground" />;
-    case "arrow-down":
-      return <ArrowDown className="h-4 w-4 text-muted-foreground" />;
-    default:
-      return null;
-  }
-};
-
-/**
  * Asset image display component with fallback
  */
 const AssetImageDisplay = ({

@@ -561,7 +561,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const provider = event.attributes.provider || event.attributes.Provider || "";
       const tokenBAmount = event.attributes.tokenBAmount || event.attributes.token_b_amount || event.attributes.tokenB || "0";
       const tokenAAmount = event.attributes.tokenAAmount || event.attributes.token_a_amount || event.attributes.tokenA || "0";
-      
+
       // Get token addresses from event metadata if available (set by ActivityFeedCards)
       const tokenA = (event as any).tokenA || "";
       const tokenB = (event as any).tokenB || "";
@@ -569,7 +569,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       // Normalize addresses for lookup (try both original and lowercase)
       const tokenANormalized = tokenA ? tokenA.toLowerCase() : "";
       const tokenBNormalized = tokenB ? tokenB.toLowerCase() : "";
-      
+
       const tokenASymbol = tokenA ? (tokenSymbols.get(tokenA) || tokenSymbols.get(tokenANormalized)) : undefined;
       const tokenBSymbol = tokenB ? (tokenSymbols.get(tokenB) || tokenSymbols.get(tokenBNormalized)) : undefined;
       const tokenAImage = tokenA ? (tokenImages?.get(tokenA) || tokenImages?.get(tokenANormalized)) : undefined;
