@@ -57,12 +57,3 @@ executables:
       - network-uri
       - text
 
-  decrypt-note:
-    source-dirs: app/
-    main: Decrypt.hs
-    other-modules: []
-    dependencies:
-      - airlock
-      - base16-bytestring
-      - bytestring
-      - text
