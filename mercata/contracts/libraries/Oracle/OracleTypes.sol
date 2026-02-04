@@ -1,18 +1,12 @@
 /**
  * @title OracleTypes
- * @notice Shared struct types for PriceOracle TWAP (append until max, then ring overwrite).
+ * @notice Shared struct types for PriceOracle TWAP (queue of historical points + current).
  */
 library OracleTypes {
-    struct Observation {
-        uint256 blockTimestamp;
-        uint256 priceCumulative;
-    }
-
+    /// @dev Per-asset state: queue of (timestamp, price) entries. When full, writeIndex is next slot to overwrite (oldest). Current price in PriceOracle.prices/lastUpdated.
     struct OracleState {
-        uint256 lastPrice;       // most recent spot price
-        uint256 lastTimestamp;  // timestamp of last price update
-        uint256 priceCumulative;// integral of price over time
-        uint256 index;          // index of most recently written observation (ring mode when full)
-        Observation[] observations;
+        uint256[] timestamps;
+        uint256[] prices;
+        uint256 writeIndex; // ring buffer: oldest slot when at capacity
     }
 }
