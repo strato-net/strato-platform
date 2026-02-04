@@ -54,6 +54,8 @@ executables:
       - airlock
       - bytestring
       - cmdargs
+      - directory
+      - filepath
       - network-uri
       - text
 
