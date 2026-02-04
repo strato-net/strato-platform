@@ -399,6 +399,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
         selectedNetwork={selectedNetwork}
         availableNetworks={availableNetworks}
         onNetworkChange={setSelectedNetwork}
+        direction="out"
         disabled={guestMode || isLoading}
       />
 

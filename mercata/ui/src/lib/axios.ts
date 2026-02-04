@@ -149,6 +149,12 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
     
+    // For 502 (Bad Gateway) and other server errors on guest-safe URLs, silently reject
+    // This prevents error toasts for non-logged-in users when backend services are unavailable
+    if (isGuestSafeUrl(url) && (error.response?.status === 502 || error.response?.status === 503 || error.response?.status === 504)) {
+      return Promise.reject(error);
+    }
+    
     // Show toast for all other API errors
     const errorMessage = extractApiErrorMessage(error);
     const errorTitle = getErrorTitle(url);

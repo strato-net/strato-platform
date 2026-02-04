@@ -211,6 +211,12 @@ const Dashboard = () => {
   }), [getBalanceHistory, getCataBalanceHistory, getBorrowingHistory, setNetBalanceHistoryCache, setRewardsHistoryCache, setBorrowedHistoryCache]);
 
   useEffect(() => {
+    // Only fetch history data for logged-in users
+    if (!isLoggedIn) {
+      setLoadingBalanceHistory(false);
+      return;
+    }
+
     let isMounted = true;
 
     const loadRange = async () => {
@@ -258,7 +264,7 @@ const Dashboard = () => {
     return () => {
       isMounted = false;
     };
-  }, [selectedTimeRange, activeTab, tabConfig, prefetchOtherRanges, setLoadingBalanceHistory]);
+  }, [selectedTimeRange, activeTab, tabConfig, prefetchOtherRanges, setLoadingBalanceHistory, isLoggedIn]);
 
   const onTimeRangeChange = useCallback((duration: string) => {
     setSelectedTimeRange(duration as TimeRange);
@@ -409,9 +415,10 @@ const Dashboard = () => {
                 </div>
                 <Button
                   onClick={() => {
+                    // For non-logged-in users, redirect to My Referrals page (guest accessible)
+                    // For logged-in users, redirect to Refer Friend page
                     if (!isLoggedIn) {
-                      const theme = localStorage.getItem('theme') || 'light';
-                      window.location.href = `/login?theme=${theme}`;
+                      navigate("/dashboard/referrals");
                     } else {
                       navigate("/dashboard/refer");
                     }
