@@ -16,6 +16,7 @@ import {
   Gift,
   UserPlus,
   Send,
+  Coins,
   LucideIcon
 } from "lucide-react";
 import { usdstAddress } from "@/lib/constants";
@@ -213,7 +214,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
-        activityTypeIcon: "transfer",
         layout: {
           type: "two-line",
           line1: {
@@ -295,7 +295,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
-        activityTypeIcon: "deposit",
         layout: {
           type: "two-line",
           line1: {
@@ -390,7 +389,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
-        activityTypeIcon: "withdraw",
         layout: {
           type: "two-line",
           line1: {
@@ -459,7 +457,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
-        activityTypeIcon: "cdp-mint",
         layout: {
           type: "two-line",
           line1: {
@@ -533,7 +530,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
-        activityTypeIcon: "swap",
         layout: {
           type: "two-line",
           line1: {
@@ -589,7 +585,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
-        activityTypeIcon: "rewards",
         layout: {
           type: "two-line",
           line1: {
@@ -646,7 +641,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
-        activityTypeIcon: "borrow",
         layout: {
           type: "two-line",
           line1: {
@@ -655,6 +649,62 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
           },
           line2: {
             fieldLabels: ["Borrower"],
+            renderer: "addresses-with-bullet",
+          },
+        },
+      };
+    },
+  },
+  "LiquidityDeposited": {
+    contract_name: "LendingPool",
+    event_name: "Deposited",
+    displayName: "Savings",
+    filterConfig: { type: "single", attribute: "user" },
+    iconConfig: { icon: Coins, color: "bg-emerald-500" },
+    iconType: "savings",
+    getTokenAddress: (event: Event) => {
+      const asset = event.attributes.asset || event.attributes.Asset;
+      return asset ? [asset] : [];
+    },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+      const user = event.attributes.user || event.attributes.User || "";
+      const asset = event.attributes.asset || event.attributes.Asset || "";
+      const amount = event.attributes.amount || event.attributes.Amount || "0";
+      const tokenSymbol = asset ? tokenSymbols.get(asset) : undefined;
+
+      const tokenImage = asset ? tokenImages?.get(asset) : undefined;
+
+      const fields: ActivityField[] = [
+        {
+          label: "Amount",
+          value: formatValue(amount, asset),
+          type: "amount",
+          badge: tokenSymbol,
+          image: tokenImage,
+          imageFallback: tokenSymbol || asset,
+          rawAmount: getFullAmount(amount),
+        },
+        {
+          label: "Depositor",
+          value: user,
+          type: "address",
+          isUserAddress: isUserAddress(user, userAddress),
+        },
+      ];
+
+      return {
+        title: "Savings",
+        fields,
+        timestamp: event.block_timestamp || "",
+        eventId: event.id?.toString(),
+        layout: {
+          type: "two-line",
+          line1: {
+            fieldLabels: ["Amount"],
+            renderer: "amount-with-token",
+          },
+          line2: {
+            fieldLabels: ["Depositor"],
             renderer: "addresses-with-bullet",
           },
         },
@@ -834,7 +884,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
-        activityTypeIcon: "referral",
         layout: {
           type: "two-line",
           line1: {

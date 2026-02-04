@@ -15,7 +15,7 @@ import {
 import CopyButton from "@/components/ui/copy";
 import ExplorerButton from "@/components/ui/explorer";
 import { Badge } from "@/components/ui/badge";
-import { getActivityIconConfig } from "./activityTypes";
+import { ActivityIconConfig } from "./activityTypes";
 
 export type FieldIcon = "arrow-up-right" | "arrow-down-left" | "arrow-down" | null;
 
@@ -35,7 +35,6 @@ export interface ActivityField {
   explorerUrl?: string; // Explorer URL for transaction hashes
 }
 
-export type ActivityTypeIcon = "transfer" | "deposit" | "cdp-mint" | "swap" | "rewards" | "referral" | "borrow" | "withdraw";
 
 /**
  * Layout configuration for activity cards
@@ -57,7 +56,7 @@ export interface ActivityCardData {
   fields: ActivityField[];
   timestamp: string;
   eventId?: string; // For React key
-  activityTypeIcon?: ActivityTypeIcon; // Icon type for the activity
+  iconConfig?: ActivityIconConfig; // Icon configuration for the activity
   layout: LayoutConfig; // Layout configuration for rendering
 }
 
@@ -110,14 +109,6 @@ const getIcon = (icon: FieldIcon) => {
 };
 
 /**
- * Get activity type icon component
- * Uses configuration from activityTypes.tsx
- */
-const getActivityTypeIcon = (type?: ActivityTypeIcon) => {
-  return getActivityIconConfig(type);
-};
-
-/**
  * Asset image display component with fallback
  */
 const AssetImageDisplay = ({
@@ -161,7 +152,8 @@ const AssetImageDisplay = ({
  * Renders a standardized card based on ActivityCardData
  */
 export const ActivityCard = ({ data }: { data: ActivityCardData }) => {
-  const activityIcon = getActivityTypeIcon(data.activityTypeIcon);
+  // Use provided iconConfig or fallback to default
+  const activityIcon = data.iconConfig || { icon: ArrowRightLeft, color: "bg-gray-500" };
   const IconComponent = activityIcon.icon;
 
   // Render a single field value

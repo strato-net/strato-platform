@@ -153,7 +153,11 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
               });
             }
             const cardData = config.handler(event, tokenSymbolsMap, userAddress, tokenImagesMap);
-            allCardData.push(cardData);
+            // Add iconConfig from the activity type config
+            allCardData.push({
+              ...cardData,
+              iconConfig: config.iconConfig,
+            });
           }
         }
 
