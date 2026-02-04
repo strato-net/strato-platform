@@ -4,19 +4,42 @@ import DashboardHeader from "../components/dashboard/DashboardHeader";
 import MobileBottomNav from "../components/dashboard/MobileBottomNav";
 import ActivityFeedList from "../components/dashboard/ActivityFeedList";
 import ActivityFeedCards from "../components/dashboard/ActivityFeedCards";
-import { Activity } from "lucide-react";
+import { Activity, LogIn } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs";
 import { useUser } from "@/context/UserContext";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 const ActivityFeed = () => {
-  const [activeTab, setActiveTab] = useState("my-activity");
-
   const { isLoggedIn } = useUser();
+  const [activeTab, setActiveTab] = useState(() => isLoggedIn ? "my-activity" : "all-activity");
 
   useEffect(() => {
     document.title = "Activity Feed | STRATO";
   }, []);
+
+  const handleLogin = () => {
+    const theme = localStorage.getItem('theme') || 'light';
+    window.location.href = `/login?theme=${theme}`;
+  };
+
+  const GuestLoginPrompt = () => (
+    <Card className="border-dashed">
+      <CardHeader className="text-center pb-2">
+        <CardTitle className="text-xl">View Your Activity</CardTitle>
+        <CardDescription className="text-base">
+          Sign in to see your personal activity and filter events.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="text-center space-y-4">
+        <Button onClick={handleLogin} className="gap-2" size="lg">
+          <LogIn className="w-4 h-4" />
+          Sign In to Continue
+        </Button>
+      </CardContent>
+    </Card>
+  );
 
   return (
     <div className="min-h-screen bg-background pb-16 md:pb-0 overflow-x-hidden">
@@ -47,7 +70,7 @@ const ActivityFeed = () => {
             </TabsList>
 
             <TabsContent value="my-activity" className="mt-0">
-              <ActivityFeedCards isMyActivity={true} />
+              {isLoggedIn ? <ActivityFeedCards isMyActivity={true} /> : <GuestLoginPrompt />}
             </TabsContent>
 
             <TabsContent value="all-activity" className="mt-0">

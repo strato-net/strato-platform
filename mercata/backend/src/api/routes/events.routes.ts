@@ -122,6 +122,6 @@ router.get("/contracts", authHandler.authorizeRequest(true), EventsController.ge
  *                 total:
  *                   type: integer
  */
-router.get("/activities", authHandler.authorizeRequest(), EventsController.getActivities);
+router.get("/activities", authHandler.authorizeRequest(true), EventsController.getActivities);
 
 export default router;
