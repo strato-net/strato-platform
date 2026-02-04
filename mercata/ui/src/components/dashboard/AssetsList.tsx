@@ -211,7 +211,7 @@ const AssetsList = ({
         </div>
       </div>
 
-      {isDashboard && (
+      {isDashboard && !guestMode && (
         <div>
           <div className="mx-3 md:mx-0 border-t border-border"></div>
           <div className="p-3 md:p-4 text-right flex justify-between items-center">

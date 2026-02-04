@@ -62,6 +62,9 @@ const GUEST_SAFE_URLS = [
   '/tokens/v2/earning-assets/public',
   '/bridge/networkConfigs',
   '/bridge/bridgeableTokens',
+  '/bridge/withdrawalSummary',
+  '/bridge/balance',
+  '/bridge/transactions/withdrawal',
   // Borrow page
   '/lending/collateral/public',
   '/lending/loans',
@@ -83,12 +86,17 @@ const GUEST_SAFE_URLS = [
   '/swap-pools',
   // Advanced page - Safety tab
   '/lending/safety/info',
+  '/lending/safety/info/public',
   // Rewards page
   '/rewards/pending',
   '/rewards/overview',
   '/rewards/activities',
   // ActivityFeed page
   '/events',
+  // Transfer page
+  '/tokens/transferable',
+  '/tokens/balance',
+  '/vouchers/balance',
 ];
 
 // Check if a URL is expected to fail silently for guests

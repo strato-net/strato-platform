@@ -108,8 +108,18 @@ const DepositsPage = () => {
                     <CardTitle className="text-base md:text-xl">Deposit Assets</CardTitle>
                     <Link
                       to="/bridge-transactions?from=deposits"
-                      onClick={() => setTargetTransactionTab('DepositRecorded')}
-                      className="flex items-center gap-1 text-xs md:text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors whitespace-nowrap"
+                      onClick={(e) => {
+                        if (!isLoggedIn) {
+                          e.preventDefault();
+                          return;
+                        }
+                        setTargetTransactionTab('DepositRecorded');
+                      }}
+                      className={`flex items-center gap-1 text-xs md:text-sm font-semibold transition-colors whitespace-nowrap ${
+                        isLoggedIn 
+                          ? "text-blue-600 hover:text-blue-800 cursor-pointer" 
+                          : "text-muted-foreground cursor-not-allowed opacity-50 pointer-events-none"
+                      }`}
                     >
                       <ArrowRight size={14} className="md:w-4 md:h-4" />
                       View Transactions

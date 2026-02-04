@@ -22,6 +22,7 @@ import { api } from "@/lib/axios";
 import { BalanceSnapshot } from "@mercata/shared-types";
 import { useUserLeaderboardRank } from "@/hooks/useUserLeaderboardRank";
 import { Button } from "@/components/ui/button";
+import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 
 const TIME_RANGES = ["1d", "7d", "1m", "3m", "6m", "1y", "all"] as const;
 type TimeRange = typeof TIME_RANGES[number];
@@ -142,10 +143,15 @@ const Dashboard = () => {
     const hasExistingEarningAssets = earningAssets.length > 0;
     const hasExistingInactiveTokens = inactiveTokens.length > 0;
     
+    // Always fetch earning assets (uses public endpoint for guests)
     getEarningAssets(!hasExistingEarningAssets);
-    getInactiveTokens(!hasExistingInactiveTokens);
-    refreshLoans();
-    refreshVaults();
+    
+    // Only fetch inactive tokens for logged-in users (no public endpoint available)
+    if (isLoggedIn) {
+      getInactiveTokens(!hasExistingInactiveTokens);
+      refreshLoans();
+      refreshVaults();
+    }
   }, [location.pathname, userAddress, getEarningAssets, getInactiveTokens, refreshLoans, refreshVaults, isLoggedIn, navigate]);
 
   useEffect(() => {
@@ -306,20 +312,24 @@ const Dashboard = () => {
         <DashboardHeader title="Portfolio" />
 
         <main className="p-4 md:p-6 pb-24 md:pb-6">
-          <div className={`grid grid-cols-1 ${rewardsEnabled ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-3 md:gap-6 mb-4 md:mb-8`}>
+          {!isLoggedIn && (
+            <GuestSignInBanner message="Sign in to view your portfolio, track rewards, and manage your assets" />
+          )}
+          <div className={`grid grid-cols-1 ${rewardsEnabled && isLoggedIn ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-3 md:gap-6 mb-4 md:mb-8`}>
             <AssetSummary
               title="Net Balance"
-              value={`$${totalBalance.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`}
+              value={isLoggedIn ? `$${totalBalance.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 })}` : "-"}
               icon={<Wallet className="text-white" size={18} />}
               color="bg-blue-500"
-              onClick={() => setActiveTab('netBalance')}
-              isActive={activeTab === 'netBalance'}
-              isLoading={isLoadingNetBalance}
+              onClick={isLoggedIn ? () => setActiveTab('netBalance') : undefined}
+              isActive={isLoggedIn && activeTab === 'netBalance'}
+              isLoading={isLoggedIn && isLoadingNetBalance}
             />
 
             <AssetSummary
               title="Rewards (Season)"
               value={(() => {
+                if (!isLoggedIn) return "-";
                 if (rankLoading) return "Loading...";
                 if (!totalEarned) return "0 Reward Points";
                 const totalEarnedNum = parseFloat(totalEarned) / 1e18;
@@ -327,39 +337,41 @@ const Dashboard = () => {
               })()}
               icon={<Coins className="text-white" size={18} />}
               color="bg-purple-500"
-              onClick={() => setActiveTab('rewards')}
-              isActive={activeTab === 'rewards'}
-              isLoading={rankLoading}
+              onClick={isLoggedIn ? () => setActiveTab('rewards') : undefined}
+              isActive={isLoggedIn && activeTab === 'rewards'}
+              isLoading={isLoggedIn && rankLoading}
               additionalContent={
-                <div className="mt-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-xs border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900 hover:border-blue-300 dark:hover:border-blue-700 text-blue-700 dark:text-blue-300 font-medium"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate(`/dashboard/rewards?tab=leaderboard`);
-                    }}
-                  >
-                    {rankLoading ? (
-                      <>
-                        <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
-                        Loading...
-                      </>
-                    ) : userRank !== null ? (
-                      <>
-                        <Trophy className="h-3.5 w-3.5 mr-1.5 text-yellow-500" />
-                        Rank #{userRank} - Leaderboard
-                      </>
-                    ) : (
-                      "View Leaderboard"
-                    )}
-                  </Button>
-                </div>
+                isLoggedIn ? (
+                  <div className="mt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900 hover:border-blue-300 dark:hover:border-blue-700 text-blue-700 dark:text-blue-300 font-medium"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/dashboard/rewards?tab=leaderboard`);
+                      }}
+                    >
+                      {rankLoading ? (
+                        <>
+                          <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                          Loading...
+                        </>
+                      ) : userRank !== null ? (
+                        <>
+                          <Trophy className="h-3.5 w-3.5 mr-1.5 text-yellow-500" />
+                          Rank #{userRank} - Leaderboard
+                        </>
+                      ) : (
+                        "View Leaderboard"
+                      )}
+                    </Button>
+                  </div>
+                ) : null
               }
             />
 
-            {rewardsEnabled && (
+            {rewardsEnabled && isLoggedIn && (
               <AssetSummary
                 title="Pending CATA"
                 value={`${parseFloat(pendingRewards).toLocaleString("en-US", { maximumFractionDigits: 2 })} CATA`}
@@ -372,11 +384,11 @@ const Dashboard = () => {
 
             <AssetSummary
               title="Total Borrowed"
-              value={`${totalBorrowed.toFixed(2)} USDST`}
+              value={isLoggedIn ? `${totalBorrowed.toFixed(2)} USDST` : "-"}
               icon={<Shield className="text-white" size={18} />}
               color="bg-orange-500"
-              onClick={() => setActiveTab('borrowed')}
-              isActive={activeTab === 'borrowed'}
+              onClick={isLoggedIn ? () => setActiveTab('borrowed') : undefined}
+              isActive={isLoggedIn && activeTab === 'borrowed'}
             />
           </div>
 
@@ -396,7 +408,14 @@ const Dashboard = () => {
                   </div>
                 </div>
                 <Button
-                  onClick={() => navigate("/dashboard/refer")}
+                  onClick={() => {
+                    if (!isLoggedIn) {
+                      const theme = localStorage.getItem('theme') || 'light';
+                      window.location.href = `/login?theme=${theme}`;
+                    } else {
+                      navigate("/dashboard/refer");
+                    }
+                  }}
                   className="w-full md:w-auto flex items-center justify-center gap-2"
                 >
                   <UserPlus className="h-4 w-4" />
@@ -406,19 +425,21 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* Portfolio Value Chart - hidden on mobile */}
-          <div className="mb-8 hidden md:block">
-            <PortfolioValueChart 
-              data={chartConfig[activeTab].data || []}
-              onTimeRangeChange={onTimeRangeChange}
-              selectedTimeRange={selectedTimeRange}
-              isLoading={loadingBalanceHistory}
-              tabType={activeTab}
-              title={chartConfig[activeTab].title}
-              subtitle={chartConfig[activeTab].subtitle}
-              currentValue={chartConfig[activeTab].currentValue}
-            />
-          </div>
+          {/* Portfolio Value Chart - hidden on mobile and for guests */}
+          {isLoggedIn && (
+            <div className="mb-8 hidden md:block">
+              <PortfolioValueChart 
+                data={chartConfig[activeTab].data || []}
+                onTimeRangeChange={onTimeRangeChange}
+                selectedTimeRange={selectedTimeRange}
+                isLoading={loadingBalanceHistory}
+                tabType={activeTab}
+                title={chartConfig[activeTab].title}
+                subtitle={chartConfig[activeTab].subtitle}
+                currentValue={chartConfig[activeTab].currentValue}
+              />
+            </div>
+          )}
 
           {/* Quick Action Buttons */}
           <div className="mb-8 grid grid-cols-4 gap-2 md:gap-4">
@@ -456,20 +477,23 @@ const Dashboard = () => {
             <AssetsList 
               loading={loadingEarningAssets || loadingInactiveTokens} 
               tokens={nonPoolTokens} 
-              inActiveTokens={inactiveTokens} 
+              inActiveTokens={isLoggedIn ? inactiveTokens : []} 
+              guestMode={!isLoggedIn}
             />
           </div>
 
           <div className="mb-8">
             <BorrowingSection 
               loanData={loans}
+              guestMode={!isLoggedIn}
             />
           </div>
 
           <div className="mb-8">
             <MyPoolParticipationSection 
               poolTokens={poolTokens}
-              loading={loadingEarningAssets || loadingInactiveTokens}
+              loading={loadingEarningAssets}
+              guestMode={!isLoggedIn}
             />
           </div>
 

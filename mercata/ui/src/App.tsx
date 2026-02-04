@@ -143,17 +143,17 @@ const App = () => {
                                 <Route
                                   path="/dashboard"
                                   element={
-                                    <ProtectedRoute>
+                                    <GuestAccessibleRoute>
                                         <Dashboard />
-                                    </ProtectedRoute>
+                                    </GuestAccessibleRoute>
                                   }
                                 />
                                 <Route
                                   path="/dashboard/swap"
                                   element={
-                                    <ProtectedRoute>
+                                    <GuestAccessibleRoute>
                                         <SwapAsset />
-                                    </ProtectedRoute>
+                                    </GuestAccessibleRoute>
                                   }
                                 />
                                 <Route
@@ -199,9 +199,9 @@ const App = () => {
                                 <Route
                                   path="/dashboard/transfer"
                                   element={
-                                    <ProtectedRoute>
+                                    <GuestAccessibleRoute>
                                         <Transfer />
-                                    </ProtectedRoute>
+                                    </GuestAccessibleRoute>
                                   }
                                 />
                                 <Route
@@ -236,9 +236,9 @@ const App = () => {
                                     <Route
                                       path="/dashboard/withdrawals"
                                       element={
-                                        <ProtectedRoute>
+                                        <GuestAccessibleRoute>
                                           <WithdrawalsPage />
-                                        </ProtectedRoute>
+                                        </GuestAccessibleRoute>
                                       }
                                     />
 

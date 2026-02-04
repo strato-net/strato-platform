@@ -90,7 +90,7 @@ const LoadingSpinner = () => (
   <span className="inline-flex items-center animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary" />
 );
 
-const AnimatedNumber = ({ value, isLoading }: { value: string | undefined; isLoading: boolean }) => {
+const AnimatedNumber = ({ value, isLoading, hideLoader = false }: { value: string | undefined; isLoading: boolean; hideLoader?: boolean }) => {
   const [displayValue, setDisplayValue] = useState(value);
   const [isChanging, setIsChanging] = useState(false);
 
@@ -111,9 +111,14 @@ const AnimatedNumber = ({ value, isLoading }: { value: string | undefined; isLoa
     }
   }, [value, isLoading, displayValue]);
 
-  // Show spinner when value is undefined
-  if (value === undefined) {
+  // Show spinner when value is undefined (unless hideLoader is true)
+  if (value === undefined && !hideLoader) {
     return <LoadingSpinner />;
+  }
+
+  // If hideLoader is true and value is undefined, show "0" or empty
+  if (value === undefined && hideLoader) {
+    return <>0</>;
   }
 
   return <>{displayValue}</>;
@@ -128,6 +133,7 @@ interface TokenSelectorProps {
   tokens: SwapToken[];
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
+  disabled?: boolean;
 }
 
 // ============================================================================
@@ -155,10 +161,10 @@ const TokenAvatar = ({ token, size = "w-4 h-4" }: TokenAvatarProps) => {
   );
 };
 
-const TokenSelectorComponent = ({ asset, onSelect, tokens, isOpen, onOpenChange }: TokenSelectorProps) => (
-  <Popover open={isOpen} onOpenChange={onOpenChange}>
+const TokenSelectorComponent = ({ asset, onSelect, tokens, isOpen, onOpenChange, disabled = false }: TokenSelectorProps) => (
+  <Popover open={isOpen && !disabled} onOpenChange={(open) => { if (!disabled) onOpenChange(open); }}>
     <PopoverTrigger asChild>
-      <Button variant="outline" className="flex items-center gap-1 md:gap-2 justify-between text-xs md:text-sm px-1.5 md:px-3 py-1.5 md:py-2 h-8 md:h-10">
+      <Button variant="outline" className="flex items-center gap-1 md:gap-2 justify-between text-xs md:text-sm px-1.5 md:px-3 py-1.5 md:py-2 h-8 md:h-10" disabled={disabled}>
         <div className="flex items-center gap-1 md:gap-2">
           {asset ? <TokenAvatar token={asset} size="w-3.5 h-3.5 md:w-4 md:h-4" /> : null}
           <span className="whitespace-nowrap text-[11px] md:text-sm">{asset?._symbol || "Select"}</span>
@@ -175,9 +181,11 @@ const TokenSelectorComponent = ({ asset, onSelect, tokens, isOpen, onOpenChange 
               variant="ghost"
               className="justify-start gap-2"
               onClick={() => {
+                if (disabled) return;
                 onOpenChange(false);
                 onSelect(token);
               }}
+              disabled={disabled}
             >
               <div className="flex items-center gap-2">
                 <TokenAvatar token={token} />
@@ -216,6 +224,7 @@ interface TokenInputProps {
   onMaxClick: () => void;
   amountError?: string;
   loading: boolean;
+  disabled?: boolean;
 }
 
 const TokenInput = ({
@@ -235,6 +244,7 @@ const TokenInput = ({
   onMaxClick,
   amountError,
   loading,
+  disabled = false,
 }: TokenInputProps) => {      
   return (
     <div className="bg-muted/50 p-3 md:p-4 rounded-lg border border-border">
@@ -246,14 +256,14 @@ const TokenInput = ({
           <input
             type="text"
             value={amount}
-            onChange={e => onChange(e.target.value)}
+            onChange={e => { if (!disabled) onChange(e.target.value); }}
             onFocus={onFocus}
             placeholder="0.00"
             inputMode="decimal"
-            disabled={toWei(maxAmountWei) === 0n && isFromInput}
+            disabled={disabled || (toWei(maxAmountWei) === 0n && isFromInput)}
             className={`p-1 md:p-2 bg-transparent border-none text-sm md:text-lg font-medium focus:outline-none text-foreground placeholder:text-muted-foreground w-full ${
               amountError ? " border border-red-500 rounded-md" : ""
-              } ${(toWei(maxAmountWei) === 0n && isFromInput) ? "opacity-50 cursor-not-allowed" : ""}`}
+              } ${(disabled || (toWei(maxAmountWei) === 0n && isFromInput)) ? "opacity-50 cursor-not-allowed" : ""}`}
           />
           {amountError && (
             <p className="text-red-600 text-xs md:text-sm mt-1">{amountError}</p>
@@ -266,6 +276,7 @@ const TokenInput = ({
             tokens={tokens}
             isOpen={isOpen}
             onOpenChange={onOpenChange}
+            disabled={disabled}
           />
         </div>
       </div>
@@ -279,14 +290,15 @@ const TokenInput = ({
               <span className="whitespace-nowrap">
                 <AnimatedNumber 
                   value={maxAmountWei !== "0" ? formatBalance(maxAmountWei, asset._symbol || "", undefined, 2, 6) : "0"} 
-                  isLoading={loading} 
+                  isLoading={loading}
+                  hideLoader={disabled}
                 />
               </span>
               <button
                 type="button"
-                className={`text-blue-600 text-xs underline ${toWei(maxAmountWei) === 0n ? "opacity-50 cursor-not-allowed" : ""}`}
-                onClick={onMaxClick}
-                disabled={toWei(maxAmountWei) === 0n}
+                className={`text-blue-600 text-xs underline ${(disabled || toWei(maxAmountWei) === 0n) ? "opacity-50 cursor-not-allowed" : ""}`}
+                onClick={() => { if (!disabled) onMaxClick(); }}
+                disabled={disabled || toWei(maxAmountWei) === 0n}
               >
                 Max
               </button>
@@ -297,19 +309,21 @@ const TokenInput = ({
               <span className="whitespace-nowrap">
                 <AnimatedNumber 
                   value={userBalanceWei !== "0" ? formatBalance(userBalanceWei, asset._symbol || "", undefined, 2, 6) : "0"} 
-                  isLoading={loading} 
+                  isLoading={loading}
+                  hideLoader={disabled}
                 />
               </span>
             </span>
           )}
           <span className="text-xs md:text-sm text-muted-foreground flex flex-wrap items-center gap-1">
             <span className="whitespace-nowrap">Pool Balance:</span>
-            <span className="whitespace-nowrap">
-              <AnimatedNumber 
-                value={poolBalanceWei !== "0" ? formatBalance(poolBalanceWei, asset._symbol || "", undefined, 2, 6) : "0"} 
-                isLoading={loading} 
-              />
-            </span>
+              <span className="whitespace-nowrap">
+                <AnimatedNumber 
+                  value={poolBalanceWei !== "0" ? formatBalance(poolBalanceWei, asset._symbol || "", undefined, 2, 6) : "0"} 
+                  isLoading={loading}
+                  hideLoader={disabled}
+                />
+              </span>
           </span>
         </div>
       )}
@@ -413,9 +427,10 @@ interface SlippageControlProps {
   autoSlippage: boolean;
   onSlippageChange: (value: number) => void;
   onAutoToggle: (auto: boolean) => void;
+  disabled?: boolean;
 }
 
-const SlippageControl = ({ slippage, autoSlippage, onSlippageChange, onAutoToggle }: SlippageControlProps) => {
+const SlippageControl = ({ slippage, autoSlippage, onSlippageChange, onAutoToggle, disabled = false }: SlippageControlProps) => {
   const isHighSlippage = slippage > 5;
   const isLowSlippage = slippage < 1;
   const slippageClass = isHighSlippage || isLowSlippage
@@ -430,19 +445,22 @@ const SlippageControl = ({ slippage, autoSlippage, onSlippageChange, onAutoToggl
           <button
             className={`px-2 md:px-3 py-1 rounded-full text-xs font-medium border ${
               autoSlippage ? 'bg-muted text-foreground' : 'bg-transparent text-muted-foreground'
-              } border-border`}
+              } border-border ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
             onClick={() => {
+              if (disabled) return;
               onAutoToggle(true);
               onSlippageChange(DEFAULT_SLIPPAGE);
             }}
+            disabled={disabled}
           >
             Auto
           </button>
           <button
             className={`px-2 md:px-3 py-1 rounded-full text-xs font-medium border ${
               !autoSlippage ? 'bg-muted text-foreground' : 'bg-transparent text-muted-foreground'
-              } border-border`}
-            onClick={() => onAutoToggle(false)}
+              } border-border ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+            onClick={() => { if (!disabled) onAutoToggle(false); }}
+            disabled={disabled}
           >
             Manual
           </button>
@@ -458,8 +476,9 @@ const SlippageControl = ({ slippage, autoSlippage, onSlippageChange, onAutoToggl
             min={0.1}
             max={10}
             step={0.1}
-            onValueChange={(value) => onSlippageChange(value[0])}
+            onValueChange={(value) => { if (!disabled) onSlippageChange(value[0]); }}
             className="w-full"
+            disabled={disabled}
           />
         </div>
       )}
@@ -479,9 +498,10 @@ const SlippageControl = ({ slippage, autoSlippage, onSlippageChange, onAutoToggl
 interface SwapWidgetProps {
   userRewards?: UserRewardsData | null;
   rewardsLoading?: boolean;
+  guestMode?: boolean;
 }
 
-const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
+const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidgetProps = {}) => {
   // ========================================================================
   // CONTEXT & HOOKS
   // ========================================================================
@@ -871,6 +891,7 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
         onMaxClick={() => handleMaxClick()}
         amountError={fromAmountError}
         loading={poolLoading}
+        disabled={guestMode}
       />
 
       <div className="flex justify-center">
@@ -879,6 +900,7 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
           variant="outline"
           size="icon"
           className="rounded-full bg-muted hover:bg-muted/80 border-border"
+          disabled={guestMode}
         >
           <ArrowDownUp className="h-4 w-4" />
         </Button>
@@ -901,6 +923,7 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
         onMaxClick={() => {}}
         amountError={toAmountError}
         loading={poolLoading}
+        disabled={guestMode}
       />
       {(() => {
         // Find activity by pool address (OneTime swap rewards)
@@ -928,7 +951,11 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
           <div className="flex flex-col md:flex-row md:justify-between gap-1">
             <span className="text-muted-foreground">Exchange Rate</span>
             {!exchangeRate ? (
-              <LoadingSpinner />
+              guestMode ? (
+                <span className="font-medium text-foreground text-xs md:text-sm">-</span>
+              ) : (
+                <LoadingSpinner />
+              )
             ) : (
               <span className="font-medium text-foreground text-xs md:text-sm">
                 1 {fromAsset?._symbol || ""} ≈ {exchangeRate} ({oracleExchangeRate}*) {toAsset?._symbol || ""}
@@ -1000,13 +1027,14 @@ const SwapWidget = ({ userRewards, rewardsLoading }: SwapWidgetProps = {}) => {
           autoSlippage={autoSlippage}
           onSlippageChange={setSlippage}
           onAutoToggle={setAutoSlippage}
+          disabled={guestMode}
         />
       </div>
 
       <Button
         className="w-full bg-strato-blue hover:bg-strato-blue/90"
         onClick={() => setIsDialogOpen(true)}
-        disabled={isSwapDisabled()}
+        disabled={guestMode || isSwapDisabled()}
       >
         Swap Assets
       </Button>

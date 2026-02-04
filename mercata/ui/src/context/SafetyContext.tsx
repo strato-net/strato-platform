@@ -29,10 +29,11 @@ export const SafetyProvider = ({ children }: { children: React.ReactNode }) => {
 
   const refreshSafetyInfo = useCallback(
     async (signal?: AbortSignal) => {
-      // Always fetch - backend handles optional userAddress for public data
+      // Use different API endpoints based on login status
       try {
         setLoading(true);
-        const response = await api.get("/lending/safety/info", { signal });
+        const endpoint = isLoggedIn ? "/lending/safety/info" : "/lending/safety/info/public";
+        const response = await api.get(endpoint, { signal });
         setSafetyInfo(response.data);
       } catch (error) {
         if (signal?.aborted) return;
@@ -42,7 +43,7 @@ export const SafetyProvider = ({ children }: { children: React.ReactNode }) => {
         setLoading(false);
       }
     },
-    []
+    [isLoggedIn]
   );
 
   const stakeSafety = useCallback(

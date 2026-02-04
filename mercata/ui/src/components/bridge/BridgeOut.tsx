@@ -31,9 +31,10 @@ const FEE_WEI = safeParseUnits(BRIDGE_OUT_FEE).toString();
 
 interface BridgeOutProps {
   isSaving?: boolean; // true for saving mode, false (default) for bridge mode
+  guestMode?: boolean;
 }
 
-const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false }) => {
+const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = false }) => {
   // Hooks & Context
   const { address, isConnected } = useAccount();
   const { toast } = useToast();
@@ -137,6 +138,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false }) => {
 
   const isButtonDisabled = useMemo(
     () =>
+      guestMode ||
       isLoading ||
       !hasValidAmount ||
       !selectedToken ||
@@ -144,6 +146,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false }) => {
       !currentNetwork ||
       isBalanceLoading,
     [
+      guestMode,
       isLoading,
       hasValidAmount,
       selectedToken,
@@ -311,14 +314,14 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false }) => {
       </div>
 
       <div className="w-full">
-        <BridgeWalletStatus />
+        <BridgeWalletStatus guestMode={guestMode} />
       </div>
 
       <TokenSelector
         selectedToken={selectedToken}
         tokens={currentTokens}
         onTokenChange={setSelectedToken}
-        disabled={isLoading}
+        disabled={guestMode || isLoading}
       />
 
       <div className="space-y-1.5">
@@ -358,19 +361,19 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false }) => {
             amountError ? "border-red-500 focus:ring-red-400" : ""
           }`}
           value={amount}
-          onChange={(e) => handleAmountChange(e.target.value)}
-          disabled={!isConnected || isLoading}
+          onChange={(e) => { if (!guestMode) handleAmountChange(e.target.value); }}
+          disabled={guestMode || !isConnected || isLoading}
         />
         {amountError && <p className="text-sm text-red-500">{amountError}</p>}
         {feeError && <p className="text-sm text-yellow-600">{feeError}</p>}
 
-        {isConnected && (
+        {isConnected && !guestMode && (
           <PercentageButtons
             value={amount}
             maxValue={maxAmount}
             onChange={handleAmountChange}
             className="mt-2"
-            disabled={isLoading}
+            disabled={guestMode || isLoading}
           />
         )}
       </div>
@@ -396,7 +399,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false }) => {
         selectedNetwork={selectedNetwork}
         availableNetworks={availableNetworks}
         onNetworkChange={setSelectedNetwork}
-        disabled={isLoading}
+        disabled={guestMode || isLoading}
       />
 
       <BridgeConfirmationModal
