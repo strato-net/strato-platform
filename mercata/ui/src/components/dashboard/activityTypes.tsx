@@ -17,6 +17,7 @@ import {
   UserPlus,
   Send,
   Coins,
+  Plus,
   LucideIcon
 } from "lucide-react";
 import { usdstAddress } from "@/lib/constants";
@@ -538,6 +539,85 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
           },
           line2: {
             fieldLabels: ["By"],
+            renderer: "addresses-with-bullet",
+          },
+        },
+      };
+    },
+  },
+  "AddLiquidity": {
+    contract_name: "Pool",
+    event_name: "AddLiquidity",
+    displayName: "Add Liquidity",
+    filterConfig: { type: "single", attribute: "provider" },
+    iconConfig: { icon: Plus, color: "bg-green-700" },
+    iconType: "swap",
+    getTokenAddress: (event: Event) => {
+      // Token addresses aren't in the event, but we'll fetch them from the pool
+      // Return empty array - pool tokens will be fetched separately in ActivityFeedCards
+      return [];
+    },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+      const provider = event.attributes.provider || event.attributes.Provider || "";
+      const tokenBAmount = event.attributes.tokenBAmount || event.attributes.token_b_amount || event.attributes.tokenB || "0";
+      const tokenAAmount = event.attributes.tokenAAmount || event.attributes.token_a_amount || event.attributes.tokenA || "0";
+      
+      // Get token addresses from event metadata if available (set by ActivityFeedCards)
+      const tokenA = (event as any).tokenA || "";
+      const tokenB = (event as any).tokenB || "";
+
+      // Normalize addresses for lookup (try both original and lowercase)
+      const tokenANormalized = tokenA ? tokenA.toLowerCase() : "";
+      const tokenBNormalized = tokenB ? tokenB.toLowerCase() : "";
+      
+      const tokenASymbol = tokenA ? (tokenSymbols.get(tokenA) || tokenSymbols.get(tokenANormalized)) : undefined;
+      const tokenBSymbol = tokenB ? (tokenSymbols.get(tokenB) || tokenSymbols.get(tokenBNormalized)) : undefined;
+      const tokenAImage = tokenA ? (tokenImages?.get(tokenA) || tokenImages?.get(tokenANormalized)) : undefined;
+      const tokenBImage = tokenB ? (tokenImages?.get(tokenB) || tokenImages?.get(tokenBNormalized)) : undefined;
+
+      const fields: ActivityField[] = [
+        // Token A Amount (for line 1)
+        {
+          label: "Token A Amount",
+          value: formatValue(tokenAAmount, tokenA),
+          type: "amount",
+          badge: tokenASymbol,
+          image: tokenAImage,
+          imageFallback: tokenASymbol || tokenA || "Token A",
+          rawAmount: getFullAmount(tokenAAmount),
+        },
+        // Token B Amount (for line 1)
+        {
+          label: "Token B Amount",
+          value: formatValue(tokenBAmount, tokenB),
+          type: "amount",
+          badge: tokenBSymbol,
+          image: tokenBImage,
+          imageFallback: tokenBSymbol || tokenB || "Token B",
+          rawAmount: getFullAmount(tokenBAmount),
+        },
+        // Provider (for line 2)
+        {
+          label: "Provider",
+          value: provider,
+          type: "address",
+          isUserAddress: isUserAddress(provider, userAddress),
+        },
+      ];
+
+      return {
+        title: "Add Liquidity",
+        fields,
+        timestamp: event.block_timestamp || "",
+        eventId: event.id?.toString(),
+        layout: {
+          type: "two-line",
+          line1: {
+            fieldLabels: ["Token A Amount", "Token B Amount"],
+            renderer: "amounts-with-and",
+          },
+          line2: {
+            fieldLabels: ["Provider"],
             renderer: "addresses-with-bullet",
           },
         },

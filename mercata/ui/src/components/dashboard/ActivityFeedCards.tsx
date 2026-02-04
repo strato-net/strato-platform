@@ -74,6 +74,44 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
         timeRange: selectedTimeRange as 'all' | 'today' | 'week' | 'month',
       });
 
+        // Fetch pool tokens for AddLiquidity events first (needed for token address extraction)
+        const poolAddresses = [...new Set(
+          response.events
+            .filter(event => event.contract_name === "Pool" && event.event_name === "AddLiquidity")
+            .map(event => event.address)
+        )];
+        const poolTokenMap = new Map<string, { tokenA: string; tokenB: string }>();
+        if (poolAddresses.length > 0) {
+          try {
+            const poolPromises = poolAddresses.map(async (poolAddress) => {
+              try {
+                const res = await api.get(`/swap-pools/${poolAddress}`);
+                const pool = Array.isArray(res.data) ? res.data[0] : res.data;
+                // Pool response has tokenA and tokenB objects with address property
+                let tokenA = pool?.tokenA?.address || pool?.tokenA;
+                let tokenB = pool?.tokenB?.address || pool?.tokenB;
+                // Normalize addresses to lowercase for consistent lookup
+                if (tokenA) tokenA = tokenA.toLowerCase();
+                if (tokenB) tokenB = tokenB.toLowerCase();
+                if (tokenA && tokenB) {
+                  return { poolAddress, tokenA, tokenB };
+                }
+                return null;
+              } catch {
+                return null;
+              }
+            });
+            const poolResults = await Promise.all(poolPromises);
+            poolResults.forEach(result => {
+              if (result) {
+                poolTokenMap.set(result.poolAddress, { tokenA: result.tokenA, tokenB: result.tokenB });
+              }
+            });
+          } catch (err) {
+            console.warn("Failed to fetch pool tokens:", err);
+          }
+        }
+
         // Collect token addresses using getTokenAddress from activity type configs
         const allTokenAddresses = [...new Set(
           response.events
@@ -86,10 +124,20 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
               );
 
               // Extract token addresses using the config's getTokenAddress function
+              let addresses: string[] = [];
               if (matchingType && matchingType[1].getTokenAddress) {
-                return matchingType[1].getTokenAddress(event);
+                addresses = matchingType[1].getTokenAddress(event);
               }
-              return [];
+              
+              // For AddLiquidity events, also include tokenA and tokenB from pool info
+              if (event.contract_name === "Pool" && event.event_name === "AddLiquidity") {
+                const poolTokens = poolTokenMap.get(event.address);
+                if (poolTokens) {
+                  addresses.push(poolTokens.tokenA, poolTokens.tokenB);
+                }
+              }
+              
+              return addresses;
             })
         )];
         const tokenSymbolMap = new Map<string, string>();
@@ -111,11 +159,15 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
             });
             const tokenResults = await Promise.all(tokenPromises);
             tokenResults.forEach(({ address, symbol, image }) => {
+              // Normalize address to lowercase for consistent lookup
+              const normalizedAddress = address.toLowerCase();
               if (symbol) {
-                tokenSymbolMap.set(address, symbol);
+                tokenSymbolMap.set(normalizedAddress, symbol);
+                tokenSymbolMap.set(address, symbol); // Also store original case for lookup
               }
               if (image) {
-                tokenImageMap.set(address, image);
+                tokenImageMap.set(normalizedAddress, image);
+                tokenImageMap.set(address, image); // Also store original case for lookup
               }
             });
           } catch (err) {
@@ -136,17 +188,36 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
 
           if (matchingType) {
             const [, config] = matchingType;
+            
+            // For AddLiquidity events, attach tokenA and tokenB from pool info
+            if (event.contract_name === "Pool" && event.event_name === "AddLiquidity") {
+              const poolTokens = poolTokenMap.get(event.address);
+              if (poolTokens) {
+                (event as any).tokenA = poolTokens.tokenA;
+                (event as any).tokenB = poolTokens.tokenB;
+              }
+            }
+
             // Get token symbols and images using the config's getTokenAddress function
             const tokenSymbolsMap = new Map<string, string>();
             const tokenImagesMap = new Map<string, string>();
             if (config.getTokenAddress) {
               const tokenAddresses = config.getTokenAddress(event);
+              // For AddLiquidity, also include tokenA and tokenB if available
+              if (event.contract_name === "Pool" && event.event_name === "AddLiquidity") {
+                const poolTokens = poolTokenMap.get(event.address);
+                if (poolTokens) {
+                  tokenAddresses.push(poolTokens.tokenA, poolTokens.tokenB);
+                }
+              }
               tokenAddresses.forEach(address => {
-                const symbol = tokenSymbolMap.get(address);
+                // Normalize address to lowercase for lookup
+                const normalizedAddress = address.toLowerCase();
+                const symbol = tokenSymbolMap.get(normalizedAddress) || tokenSymbolMap.get(address);
                 if (symbol) {
                   tokenSymbolsMap.set(address, symbol);
                 }
-                const image = tokenImageMap.get(address);
+                const image = tokenImageMap.get(normalizedAddress) || tokenImageMap.get(address);
                 if (image) {
                   tokenImagesMap.set(address, image);
                 }

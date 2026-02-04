@@ -43,7 +43,7 @@ export type LayoutConfig = {
   type: "two-line";
   line1: {
     fieldLabels: string[]; // Which field labels go on line 1
-    renderer?: "amount-with-token" | "amounts-with-arrow"; // Special renderer for line 1
+    renderer?: "amount-with-token" | "amounts-with-arrow" | "amounts-with-and"; // Special renderer for line 1
   };
   line2: {
     fieldLabels: string[]; // Which field labels go on line 2
@@ -402,6 +402,16 @@ export const ActivityCard = ({ data }: { data: ActivityCardData }) => {
           {renderAmountWithToken(amountInField)}
           <span className="text-muted-foreground">→</span>
           {renderAmountWithToken(amountOutField)}
+        </div>
+      );
+    } else if (layout.line1.renderer === "amounts-with-and" && line1Fields.length === 2) {
+      // Special renderer for Token A and Token B pattern (e.g., Add Liquidity)
+      const [tokenAField, tokenBField] = line1Fields;
+      line1 = (
+        <div className="inline-flex items-center gap-2">
+          {renderAmountWithToken(tokenAField)}
+          <span className="text-muted-foreground">and</span>
+          {renderAmountWithToken(tokenBField)}
         </div>
       );
     } else {
