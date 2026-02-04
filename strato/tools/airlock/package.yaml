@@ -51,11 +51,16 @@ executables:
     main: Main.hs
     other-modules: []
     dependencies:
+      - aeson
       - airlock
       - bytestring
       - cmdargs
       - directory
       - filepath
+      - http-client
+      - http-client-tls
+      - http-types
       - network-uri
       - text
+      - time
 

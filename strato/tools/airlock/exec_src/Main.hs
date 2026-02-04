@@ -4,15 +4,24 @@
 
 module Main where
 
+import Control.Concurrent (threadDelay)
 import Control.Exception (try, SomeException)
+import Control.Monad (when)
+import Data.Aeson (decode, encode, (.:), (.=), object)
+import Data.Aeson.Types (parseMaybe)
+import qualified Data.ByteString.Lazy as LBS
+import Data.Time.Clock.POSIX (getPOSIXTime)
 import System.Console.CmdArgs
 import System.Directory (doesFileExist, createDirectoryIfMissing, getHomeDirectory)
 import System.Exit (exitFailure, exitSuccess)
 import System.FilePath ((</>))
 import System.IO (hPutStrLn, stderr, hFlush, stdout, hGetEcho, stdin, hSetEcho)
+import Network.HTTP.Client (newManager, httpLbs, parseRequest, urlEncodedBody, responseBody, Manager)
+import Network.HTTP.Client.TLS (tlsManagerSettings)
 
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
+import qualified Data.Text.Encoding as TE
 import Network.URI (parseURI, uriAuthority, uriRegName, uriPort)
 import Text.Printf (printf)
 
@@ -29,6 +38,162 @@ mnemonicFilePath = do
   home <- getHomeDirectory
   return $ home </> ".secrets" </> "railgunMnemonic"
 
+-- | Path to the auth token file
+tokenFilePath :: IO FilePath
+tokenFilePath = do
+  home <- getHomeDirectory
+  return $ home </> ".secrets" </> "stratoToken"
+
+-- | Path to the OAuth config file (shared with other tools)
+oauthConfigFilePath :: IO FilePath
+oauthConfigFilePath = do
+  home <- getHomeDirectory
+  return $ home </> ".secrets" </> "oauth_credentials"
+
+-- | OAuth configuration
+data OAuthConfig = OAuthConfig
+  { oauthTokenUrl :: T.Text
+  , oauthDeviceUrl :: T.Text
+  , oauthClientId :: T.Text
+  , oauthClientSecret :: T.Text
+  } deriving (Show)
+
+-- | Read OAuth config from file
+-- Uses OAUTH_DISCOVERY_URL to derive token and device endpoints
+readOAuthConfig :: IO OAuthConfig
+readOAuthConfig = do
+  configPath <- oauthConfigFilePath
+  exists <- doesFileExist configPath
+  if exists
+    then do
+      content <- TIO.readFile configPath
+      let pairs = map (T.breakOn "=") $ T.lines content
+          getValue key = case lookup key [(T.strip k, T.strip $ T.drop 1 v) | (k, v) <- pairs] of
+            Just val -> val
+            Nothing -> ""
+          discoveryUrl = getValue "OAUTH_DISCOVERY_URL"
+          clientId = getValue "OAUTH_CLIENT_ID"
+          clientSecret = getValue "OAUTH_CLIENT_SECRET"
+          -- Derive token and device URLs from discovery URL
+          -- Discovery URL: https://host/auth/realms/realm/.well-known/openid-configuration
+          -- Token URL: https://host/auth/realms/realm/protocol/openid-connect/token
+          -- Device URL: https://host/auth/realms/realm/protocol/openid-connect/auth/device
+          realmUrl = T.replace "/.well-known/openid-configuration" "" discoveryUrl
+          tokenUrl = realmUrl <> "/protocol/openid-connect/token"
+          deviceUrl = realmUrl <> "/protocol/openid-connect/auth/device"
+      return OAuthConfig
+        { oauthTokenUrl = tokenUrl
+        , oauthDeviceUrl = deviceUrl
+        , oauthClientId = clientId
+        , oauthClientSecret = clientSecret
+        }
+    else do
+      hPutStrLn stderr $ "Error: OAuth config not found at " ++ configPath
+      hPutStrLn stderr ""
+      hPutStrLn stderr "Please create the file with:"
+      hPutStrLn stderr "  OAUTH_DISCOVERY_URL=https://your-keycloak/.well-known/openid-configuration"
+      hPutStrLn stderr "  OAUTH_CLIENT_ID=your_client_id"
+      hPutStrLn stderr "  OAUTH_CLIENT_SECRET=your_client_secret"
+      exitFailure
+
+-- | Token data stored in file
+data StoredToken = StoredToken
+  { storedAccessToken :: T.Text
+  , storedRefreshToken :: T.Text
+  , storedExpiresAt :: Integer  -- Unix timestamp
+  } deriving (Show)
+
+-- | Read auth token from file, auto-refreshing if expired
+readAuthToken :: IO T.Text
+readAuthToken = do
+  path <- tokenFilePath
+  exists <- doesFileExist path
+  if not exists
+    then do
+      hPutStrLn stderr "Not logged in. Please run 'airlock login' first."
+      exitFailure
+    else do
+      content <- LBS.readFile path
+      case decode content of
+        Just tokenJson -> do
+          let getField key = parseMaybe (\obj -> obj .: key) tokenJson :: Maybe T.Text
+              getFieldInt key = parseMaybe (\obj -> obj .: key) tokenJson :: Maybe Integer
+          case (getField "access_token", getField "refresh_token", getFieldInt "expires_at") of
+            (Just accessToken, Just refreshToken, Just expiresAt) -> do
+              now <- round <$> getPOSIXTime
+              -- Refresh if token expires in less than 60 seconds
+              if now >= expiresAt - 60
+                then do
+                  TIO.hPutStrLn stderr "Token expired, refreshing..."
+                  refreshAuthToken refreshToken
+                else return accessToken
+            _ -> do
+              hPutStrLn stderr "Session expired. Please run 'airlock login' again."
+              exitFailure
+        Nothing -> do
+          hPutStrLn stderr "Session expired. Please run 'airlock login' again."
+          exitFailure
+
+-- | Refresh the auth token using refresh_token
+refreshAuthToken :: T.Text -> IO T.Text
+refreshAuthToken refreshToken = do
+  config <- readOAuthConfig
+  manager <- newManager tlsManagerSettings
+  
+  tokenReq <- parseRequest $ T.unpack $ oauthTokenUrl config
+  let tokenReqWithBody = urlEncodedBody
+        [ ("client_id", TE.encodeUtf8 $ oauthClientId config)
+        , ("client_secret", TE.encodeUtf8 $ oauthClientSecret config)
+        , ("grant_type", "refresh_token")
+        , ("refresh_token", TE.encodeUtf8 refreshToken)
+        ] tokenReq
+  
+  tokenResp <- httpLbs tokenReqWithBody manager
+  
+  case decode (responseBody tokenResp) of
+    Nothing -> do
+      hPutStrLn stderr "Session expired. Please run 'airlock login' again."
+      exitFailure
+    Just tokenJson -> do
+      let getField key = parseMaybe (\obj -> obj .: key) tokenJson :: Maybe T.Text
+          getFieldInt key = parseMaybe (\obj -> obj .: key) tokenJson :: Maybe Int
+          getError = getField "error"
+      
+      case getError of
+        Just _ -> do
+          hPutStrLn stderr "Session expired. Please run 'airlock login' again."
+          exitFailure
+        Nothing -> do
+          case (getField "access_token", getFieldInt "expires_in") of
+            (Just newAccessToken, Just expiresIn) -> do
+              -- Get new refresh token if provided, otherwise keep old one
+              let newRefreshToken = case getField "refresh_token" of
+                    Just rt -> rt
+                    Nothing -> refreshToken
+              
+              -- Save new tokens
+              now <- round <$> getPOSIXTime
+              saveTokens newAccessToken newRefreshToken (now + fromIntegral expiresIn)
+              
+              TIO.hPutStrLn stderr "Token refreshed successfully."
+              return newAccessToken
+            _ -> do
+              hPutStrLn stderr "Session expired. Please run 'airlock login' again."
+              exitFailure
+
+-- | Save tokens to file
+saveTokens :: T.Text -> T.Text -> Integer -> IO ()
+saveTokens accessToken refreshToken expiresAt = do
+  path <- tokenFilePath
+  home <- getHomeDirectory
+  createDirectoryIfMissing True (home </> ".secrets")
+  let tokenData = object
+        [ "access_token" .= accessToken
+        , "refresh_token" .= refreshToken
+        , "expires_at" .= expiresAt
+        ]
+  LBS.writeFile path (encode tokenData)
+
 -- | Read mnemonic from file, or fail with instructions
 readMnemonicFromFile :: IO T.Text
 readMnemonicFromFile = do
@@ -39,12 +204,14 @@ readMnemonicFromFile = do
     else do
       hPutStrLn stderr $ "Error: Mnemonic not found at " ++ path
       hPutStrLn stderr ""
-      hPutStrLn stderr "Please run 'airlock init' to set up your wallet."
+      hPutStrLn stderr "Please run 'airlock create_wallet' to set up your wallet."
       exitFailure
 
 -- | Command line modes
 data Command
-  = CreateWallet
+  = Login
+      { }
+  | CreateWallet
       { forceOverwrite :: Bool
       }
   | ListAddresses
@@ -55,7 +222,6 @@ data Command
       { passphrase :: String
       , tokenAddress :: String
       , amount :: Integer
-      , authTokenFile :: FilePath
       , baseUrl :: String
       , railgunContractAddr :: String
       , derivationIndex :: Int
@@ -67,7 +233,6 @@ data Command
       , tokenAddress :: String
       , amount :: Integer
       , recipient :: String
-      , authTokenFile :: FilePath
       , baseUrl :: String
       , railgunContractAddr :: String
       , derivationIndex :: Int
@@ -75,13 +240,16 @@ data Command
       }
   | Balance
       { passphrase :: String
-      , authTokenFile :: FilePath
       , baseUrl :: String
       , railgunContractAddr :: String
       , derivationIndex :: Int
       , showNotes :: Bool
       }
   deriving (Show, Data, Typeable)
+
+loginMode :: Command
+loginMode = Login
+  { } &= help "Authenticate using OAuth device flow"
 
 createWalletMode :: Command
 createWalletMode = CreateWallet
@@ -101,7 +269,6 @@ shieldMode = Shield
   { passphrase = "" &= help "Optional BIP39 passphrase" &= typ "PASSPHRASE"
   , tokenAddress = def &= help "ERC20 token contract address" &= typ "ADDRESS"
   , amount = 1000000000000000000 &= help "Amount to shield (in smallest unit, default 1e18)" &= typ "AMOUNT"
-  , authTokenFile = ".token" &= help "Path to OAuth token file (default .token)" &= typFile
   , baseUrl = "http://localhost:8081" &= help "STRATO base URL" &= typ "URL"
   , railgunContractAddr = "959b55477e53900402fdbb2633b56709d252cadd" &= help "Railgun contract address" &= typ "ADDRESS"
   , derivationIndex = 0 &= help "Wallet derivation index (default 0)" &= typ "INDEX"
@@ -115,7 +282,6 @@ unshieldMode = Unshield
   , tokenAddress = def &= help "ERC20 token contract address" &= typ "ADDRESS"
   , amount = 1000000000000000000 &= help "Amount to unshield (in smallest unit)" &= typ "AMOUNT"
   , recipient = def &= help "Recipient address for unshielded tokens" &= typ "ADDRESS"
-  , authTokenFile = ".token" &= help "Path to OAuth token file (default .token)" &= typFile
   , baseUrl = "http://localhost:8081" &= help "STRATO base URL" &= typ "URL"
   , railgunContractAddr = "959b55477e53900402fdbb2633b56709d252cadd" &= help "Railgun contract address" &= typ "ADDRESS"
   , derivationIndex = 0 &= help "Wallet derivation index (default 0)" &= typ "INDEX"
@@ -125,7 +291,6 @@ unshieldMode = Unshield
 balanceMode :: Command
 balanceMode = Balance
   { passphrase = "" &= help "Optional BIP39 passphrase" &= typ "PASSPHRASE"
-  , authTokenFile = ".token" &= help "Path to OAuth token file (default .token)" &= typFile
   , baseUrl = "http://localhost:8081" &= help "STRATO base URL" &= typ "URL"
   , railgunContractAddr = "959b55477e53900402fdbb2633b56709d252cadd" &= help "Railgun contract address" &= typ "ADDRESS"
   , derivationIndex = 0 &= help "Wallet derivation index (default 0)" &= typ "INDEX"
@@ -134,16 +299,137 @@ balanceMode = Balance
 
 main :: IO ()
 main = do
-  opts <- cmdArgs $ modes [createWalletMode, listAddressesMode, shieldMode, unshieldMode, balanceMode]
+  opts <- cmdArgs $ modes [loginMode, createWalletMode, listAddressesMode, shieldMode, unshieldMode, balanceMode]
     &= summary "airlock - Railgun privacy wallet for STRATO"
     &= program "airlock"
   
   case opts of
+    Login{} -> runLogin
     CreateWallet{} -> runCreateWallet opts
     ListAddresses{} -> runListAddresses opts
     Shield{} -> runShield opts
     Unshield{} -> runUnshield opts
     Balance{} -> runBalance opts
+
+runLogin :: IO ()
+runLogin = do
+  TIO.putStrLn "=== Airlock Login (OAuth Device Flow) ==="
+  TIO.putStrLn ""
+  
+  -- Read OAuth config
+  config <- readOAuthConfig
+  
+  when (T.null $ oauthClientSecret config) $ do
+    hPutStrLn stderr "Error: OAUTH_CLIENT_SECRET not set in config file"
+    exitFailure
+  
+  manager <- newManager tlsManagerSettings
+  
+  -- Step 1: Request device code
+  TIO.putStrLn "Requesting device code..."
+  deviceReq <- parseRequest $ T.unpack $ oauthDeviceUrl config
+  let deviceReqWithBody = urlEncodedBody
+        [ ("client_id", TE.encodeUtf8 $ oauthClientId config)
+        , ("client_secret", TE.encodeUtf8 $ oauthClientSecret config)
+        ] deviceReq
+  
+  deviceResp <- httpLbs deviceReqWithBody manager
+  
+  case decode (responseBody deviceResp) of
+    Nothing -> do
+      hPutStrLn stderr $ "Error: Failed to parse device code response: " ++ show (responseBody deviceResp)
+      exitFailure
+    Just deviceJson -> do
+      let getValue key = parseMaybe (\obj -> obj .: key) deviceJson :: Maybe T.Text
+          getValueInt key = parseMaybe (\obj -> obj .: key) deviceJson :: Maybe Int
+      
+      case (getValue "user_code", getValue "verification_uri", getValue "device_code", getValueInt "interval") of
+        (Just userCode, Just verifyUri, Just deviceCode, Just interval) -> do
+          TIO.putStrLn ""
+          TIO.putStrLn "============================================================"
+          TIO.putStrLn ""
+          TIO.putStrLn $ "  Go to: " <> verifyUri
+          TIO.putStrLn $ "  Enter code: " <> userCode
+          TIO.putStrLn ""
+          TIO.putStrLn "============================================================"
+          TIO.putStrLn ""
+          TIO.putStrLn "Waiting for authentication..."
+          
+          -- Step 2: Poll for token
+          pollForToken manager config deviceCode interval
+        _ -> do
+          hPutStrLn stderr "Error: Invalid device code response"
+          exitFailure
+
+pollForToken :: Manager -> OAuthConfig -> T.Text -> Int -> IO ()
+pollForToken manager config deviceCode interval = do
+  threadDelay (interval * 1000000)  -- Wait interval seconds
+  
+  tokenReq <- parseRequest $ T.unpack $ oauthTokenUrl config
+  let tokenReqWithBody = urlEncodedBody
+        [ ("client_id", TE.encodeUtf8 $ oauthClientId config)
+        , ("client_secret", TE.encodeUtf8 $ oauthClientSecret config)
+        , ("grant_type", "urn:ietf:params:oauth:grant-type:device_code")
+        , ("device_code", TE.encodeUtf8 deviceCode)
+        ] tokenReq
+  
+  tokenResp <- httpLbs tokenReqWithBody manager
+  
+  case decode (responseBody tokenResp) of
+    Nothing -> do
+      hPutStrLn stderr $ "Error: Failed to parse token response"
+      exitFailure
+    Just tokenJson -> do
+      let getError = parseMaybe (\obj -> obj .: "error") tokenJson :: Maybe T.Text
+          getToken = parseMaybe (\obj -> obj .: "access_token") tokenJson :: Maybe T.Text
+      
+      case (getError, getToken) of
+        (Just "authorization_pending", _) -> do
+          TIO.putStr "."
+          hFlush stdout
+          pollForToken manager config deviceCode interval
+        (Just "slow_down", _) -> do
+          TIO.putStr "."
+          hFlush stdout
+          pollForToken manager config deviceCode (interval + 1)
+        (Just err, _) -> do
+          TIO.putStrLn ""
+          TIO.hPutStrLn stderr $ "Authentication failed: " <> err
+          exitFailure
+        (Nothing, Just token) -> do
+          let getRefresh = parseMaybe (\obj -> obj .: "refresh_token") tokenJson :: Maybe T.Text
+              getExpiresIn = parseMaybe (\obj -> obj .: "expires_in") tokenJson :: Maybe Int
+          
+          case (getRefresh, getExpiresIn) of
+            (Just refreshTok, Just expiresIn) -> do
+              TIO.putStrLn ""
+              TIO.putStrLn ""
+              TIO.putStrLn "Login successful!"
+              
+              -- Save tokens with expiry
+              now <- round <$> getPOSIXTime
+              saveTokens token refreshTok (now + fromIntegral expiresIn)
+              
+              path <- tokenFilePath
+              TIO.putStrLn $ "Token saved to: " <> T.pack path
+              TIO.putStrLn "Token will auto-refresh when expired."
+              exitSuccess
+            _ -> do
+              TIO.putStrLn ""
+              TIO.putStrLn ""
+              TIO.putStrLn "Login successful! (no refresh token received)"
+              
+              -- Save without refresh token (will need to re-login when expired)
+              now <- round <$> getPOSIXTime
+              saveTokens token "" (now + 300)  -- Assume 5 min default
+              
+              path <- tokenFilePath
+              TIO.putStrLn $ "Token saved to: " <> T.pack path
+              exitSuccess
+        _ -> do
+          TIO.putStrLn ""
+          hPutStrLn stderr $ "Unexpected response: " ++ show (responseBody tokenResp)
+          exitFailure
 
 runCreateWallet :: Command -> IO ()
 runCreateWallet opts = do
@@ -268,7 +554,7 @@ runShield opts = do
       exitSuccess
     else do
       -- Read auth token
-      authToken <- T.strip <$> TIO.readFile (authTokenFile opts)
+      authToken <- readAuthToken
       
       let (host, port) = parseHostPort (baseUrl opts)
           config = StratoConfig
@@ -335,7 +621,7 @@ runUnshield opts = do
       exitSuccess
     else do
       -- Read auth token
-      authToken <- T.strip <$> TIO.readFile (authTokenFile opts)
+      authToken <- readAuthToken
       
       let (host, port) = parseHostPort (baseUrl opts)
           config = StratoConfig
@@ -369,7 +655,7 @@ runBalance opts = do
   TIO.putStrLn ""
   
   -- Read auth token
-  authToken <- T.strip <$> TIO.readFile (authTokenFile opts)
+  authToken <- readAuthToken
   
   TIO.putStrLn "Scanning Shield events..."
   TIO.putStrLn ""
