@@ -10,12 +10,14 @@ import System.IO (hPutStrLn, stderr)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import Network.URI (parseURI, uriAuthority, uriRegName, uriPort)
+import Text.Printf (printf)
 
 import Railgun.Keys (deriveFromMnemonic, railgunAddress)
 import Railgun.Shield (createERC20ShieldRequest, serializeShieldRequest)
 import Railgun.Unshield (createDummyUnshieldRequest, serializeUnshieldRequest)
 import Railgun.API (StratoConfig(..), callShield, callTransact, approveToken)
-import Railgun.Types (RailgunAddress(..))
+import Railgun.Types (RailgunAddress(..), TokenType(..))
+import Railgun.Balance (scanShieldedBalance, ShieldedNote(..), TokenBalance(..))
 
 -- | Command line modes
 data Command
@@ -42,6 +44,15 @@ data Command
       , railgunContractAddr :: String
       , derivationIndex :: Int
       , dryRun :: Bool
+      }
+  | Balance
+      { mnemonic :: String
+      , passphrase :: String
+      , authTokenFile :: FilePath
+      , baseUrl :: String
+      , railgunContractAddr :: String
+      , derivationIndex :: Int
+      , showNotes :: Bool
       }
   deriving (Show, Data, Typeable)
 
@@ -73,15 +84,27 @@ unshieldMode = Unshield
   , dryRun = False &= help "Show request without sending"
   } &= help "Unshield (withdraw) tokens from Railgun (DUMMY - will fail verification)"
 
+balanceMode :: Command
+balanceMode = Balance
+  { mnemonic = def &= help "BIP39 mnemonic phrase (12-24 words)" &= typ "PHRASE"
+  , passphrase = "" &= help "Optional BIP39 passphrase" &= typ "PASSPHRASE"
+  , authTokenFile = ".token" &= help "Path to OAuth token file (default .token)" &= typFile
+  , baseUrl = "http://localhost:8081" &= help "STRATO base URL" &= typ "URL"
+  , railgunContractAddr = "959b55477e53900402fdbb2633b56709d252cadd" &= help "Railgun contract address" &= typ "ADDRESS"
+  , derivationIndex = 0 &= help "Wallet derivation index (default 0)" &= typ "INDEX"
+  , showNotes = False &= help "Show individual notes (not just totals)"
+  } &= help "Show shielded token balances"
+
 main :: IO ()
 main = do
-  opts <- cmdArgs $ modes [shieldMode, unshieldMode]
+  opts <- cmdArgs $ modes [shieldMode, unshieldMode, balanceMode]
     &= summary "airlock - Railgun privacy wallet for STRATO"
     &= program "airlock"
   
   case opts of
     Shield{} -> runShield opts
     Unshield{} -> runUnshield opts
+    Balance{} -> runBalance opts
 
 runShield :: Command -> IO ()
 runShield opts = do
@@ -214,6 +237,87 @@ runUnshield opts = do
               TIO.putStrLn "Unshield request sent (likely failed verification)."
           
           exitSuccess
+
+runBalance :: Command -> IO ()
+runBalance opts = do
+  -- Validate required arguments
+  myWhen (null $ mnemonic opts) $ do
+    hPutStrLn stderr "Error: --mnemonic is required"
+    exitFailure
+  
+  -- Derive keys from mnemonic
+  TIO.putStrLn "Deriving Railgun keys from mnemonic..."
+  case deriveFromMnemonic (T.pack $ mnemonic opts) (T.pack $ passphrase opts) (derivationIndex opts) of
+    Left err -> do
+      TIO.hPutStrLn stderr $ "Error deriving keys: " <> err
+      exitFailure
+    Right keys -> do
+      let addr = railgunAddress keys
+      TIO.putStrLn $ "Railgun address: " <> unRailgunAddress addr
+      TIO.putStrLn ""
+      
+      -- Read auth token
+      authToken <- T.strip <$> TIO.readFile (authTokenFile opts)
+      
+      TIO.putStrLn "Scanning Shield events..."
+      TIO.putStrLn ""
+      
+      -- Scan for shielded notes
+      result <- scanShieldedBalance keys 
+                  (T.pack $ baseUrl opts) 
+                  authToken 
+                  (T.pack $ railgunContractAddr opts)
+      
+      case result of
+        Left err -> do
+          TIO.hPutStrLn stderr $ "Error scanning events: " <> err
+          exitFailure
+        Right (notes, balances) -> do
+          TIO.putStrLn "============================================================"
+          TIO.putStrLn "               SHIELDED BALANCE SUMMARY"
+          TIO.putStrLn "============================================================"
+          TIO.putStrLn ""
+          
+          if null balances
+            then TIO.putStrLn "  No shielded notes found for this wallet."
+            else do
+              mapM_ printBalance balances
+              TIO.putStrLn ""
+              TIO.putStrLn $ "  Total notes: " <> T.pack (show $ length notes)
+          
+          -- Optionally show individual notes
+          myWhen (showNotes opts && not (null notes)) $ do
+            TIO.putStrLn ""
+            TIO.putStrLn "============================================================"
+            TIO.putStrLn "                   INDIVIDUAL NOTES"
+            TIO.putStrLn "============================================================"
+            TIO.putStrLn ""
+            mapM_ printNote notes
+          
+          TIO.putStrLn ""
+          TIO.putStrLn "============================================================"
+          exitSuccess
+
+printBalance :: TokenBalance -> IO ()
+printBalance tb = do
+  let tokenDisplay = case tbTokenType tb of
+        ERC20 -> "ERC20"
+        ERC721 -> "ERC721"
+        ERC1155 -> "ERC1155"
+      valueInTokens = fromIntegral (tbTotalValue tb) / (1e18 :: Double)
+  TIO.putStrLn $ "  Token: 0x" <> tbTokenAddress tb <> " (" <> tokenDisplay <> ")"
+  TIO.putStrLn $ "  Balance: " <> T.pack (printf "%.18f" valueInTokens) <> " tokens"
+  TIO.putStrLn $ "  Raw wei: " <> T.pack (show $ tbTotalValue tb)
+  TIO.putStrLn $ "  Notes: " <> T.pack (show $ tbNoteCount tb)
+  TIO.putStrLn ""
+
+printNote :: ShieldedNote -> IO ()
+printNote note = do
+  let valueInTokens = fromIntegral (snValue note) / (1e18 :: Double)
+  TIO.putStrLn $ "  Note at tree position " <> T.pack (show $ snTreePosition note) <> " (block " <> snBlockNumber note <> ")"
+  TIO.putStrLn $ "    Token: 0x" <> snTokenAddress note
+  TIO.putStrLn $ "    Value: " <> T.pack (printf "%.18f" valueInTokens) <> " tokens"
+  TIO.putStrLn ""
 
 -- | Helper for when (from Control.Monad, but avoiding import collision)
 myWhen :: Bool -> IO () -> IO ()

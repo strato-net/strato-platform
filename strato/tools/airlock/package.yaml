@@ -23,6 +23,7 @@ library:
     - Railgun.Types
     - Railgun.API
     - Railgun.Scan
+    - Railgun.Balance
   dependencies:
     - aeson
     - base16-bytestring
@@ -35,6 +36,7 @@ library:
     - cryptonite
     - evm-solidity
     - http-client
+    - http-types
     - memory
     - servant-client
     - servant-client-core
@@ -53,4 +55,14 @@ executables:
       - bytestring
       - cmdargs
       - network-uri
+      - text
+
+  decrypt-note:
+    source-dirs: app/
+    main: Decrypt.hs
+    other-modules: []
+    dependencies:
+      - airlock
+      - base16-bytestring
+      - bytestring
       - text
