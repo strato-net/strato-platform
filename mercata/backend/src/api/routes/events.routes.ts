@@ -75,4 +75,53 @@ router.get("/", authHandler.authorizeRequest(true), EventsController.getEvents);
  */
 router.get("/contracts", authHandler.authorizeRequest(true), EventsController.getContractInfo);
 
+/**
+ * @openapi
+ * /events/activities:
+ *   get:
+ *     summary: Get activities filtered by exact (contract_name, event_name) pairs
+ *     tags: [Events]
+ *     parameters:
+ *       - name: activity_types
+ *         in: query
+ *         required: true
+ *         description: Comma-separated list of contract:event pairs, e.g. "Proxy:Transfer,MercataBridge:DepositCompleted"
+ *         schema:
+ *           type: string
+ *       - name: my_activity
+ *         in: query
+ *         required: false
+ *         description: If true, filter by current user's address
+ *         schema:
+ *           type: boolean
+ *       - name: limit
+ *         in: query
+ *         required: false
+ *         description: Maximum number of activities to return
+ *         schema:
+ *           type: string
+ *       - name: offset
+ *         in: query
+ *         required: false
+ *         description: Number of activities to skip for pagination
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Activity list with total count
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 events:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     additionalProperties: true
+ *                 total:
+ *                   type: integer
+ */
+router.get("/activities", authHandler.authorizeRequest(true), EventsController.getActivities);
+
 export default router;
