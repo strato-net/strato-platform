@@ -22,6 +22,8 @@ export interface SourceConfig {
     parse: string; // Price parsing pattern
     apiKeyEnvVar?: string; // Environment variable name for API key
     apiKey?: string; // Resolved API key (populated at load time)
+    accountIdEnvVar?: string; // Environment variable name for account ID (e.g., OANDA)
+    accountId?: string; // Resolved account ID (populated at load time)
     symbolMapping?: Record<string, string>; // Mapping from asset symbols to API-specific keys
     assets: string[]; // Which assets this source supports
 }
