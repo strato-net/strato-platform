@@ -8,19 +8,22 @@ import { BadDebt } from "@/services/cdpService";
 interface JuniorNoteViewProps {
   badDebtData: BadDebt[];
   onBadDebtUpdate?: () => void; // Callback to refresh bad debt data
+  guestMode?: boolean;
 }
 
-const JuniorNoteView: React.FC<JuniorNoteViewProps> = ({ badDebtData, onBadDebtUpdate }) => {
+const JuniorNoteView: React.FC<JuniorNoteViewProps> = ({ badDebtData, onBadDebtUpdate, guestMode = false }) => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Convert BadDebt array to Record<string, string> format for easier lookup
+  // Skip computation in guest mode since badDebtData is empty
   const assetBadDebtMap = React.useMemo(() => {
+    if (guestMode) return {};
     const map: Record<string, string> = {};
     badDebtData.forEach(item => {
       map[item.asset] = item.badDebt;
     });
     return map;
-  }, [badDebtData]);
+  }, [badDebtData, guestMode]);
 
   // Callback to refresh notes list when a note is opened
   const handleNoteOpened = () => {
@@ -58,7 +61,7 @@ const JuniorNoteView: React.FC<JuniorNoteViewProps> = ({ badDebtData, onBadDebtU
         </CardContent>
       </Card>
 
-      {/* Action Tabs */}
+      {/* Action Tabs - Visible for all, guest mode handled in child components */}
       <Tabs defaultValue="claim" className="w-full">
         <TabsList className="grid w-full grid-cols-2 h-auto">
           <TabsTrigger value="claim" className="text-xs md:text-sm py-2">My Junior Note</TabsTrigger>
@@ -69,6 +72,7 @@ const JuniorNoteView: React.FC<JuniorNoteViewProps> = ({ badDebtData, onBadDebtU
           <JuniorNote 
             refreshTrigger={refreshTrigger}
             onNoteActionSuccess={handleNoteActionSuccess}
+            guestMode={guestMode}
           />
         </TabsContent>
         
@@ -77,6 +81,7 @@ const JuniorNoteView: React.FC<JuniorNoteViewProps> = ({ badDebtData, onBadDebtU
             onSuccess={handleNoteOpened} 
             assetBadDebt={assetBadDebtMap}
             onBadDebtCovered={onBadDebtUpdate}
+            guestMode={guestMode}
           />
         </TabsContent>
       </Tabs>

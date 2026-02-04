@@ -7,6 +7,8 @@ module BlockApps.Solidity.ArgValue where
 import BlockApps.Solidity.Type
 import BlockApps.Solidity.TypeDefs
 import BlockApps.Solidity.Value
+import BlockApps.Solidity.Struct (Struct(..))
+import qualified Data.Map.Ordered as OMap
 
 import Blockchain.Strato.Model.Address
 import Control.Applicative ((<|>))
@@ -144,7 +146,7 @@ argValueToValue defs theType argVal = case theType of
         Just x -> return x
     o -> Left . Text.pack $ "argValueToValue: Expected TypeContract to be a string, but got: " ++ show o
   TypeEnum enumName -> case defs of
-    Nothing -> Left $ "argValueToValue: Enum values cannot be parsed without type definitions" -- TODO(dustin): Pass in TypeDefs
+    Nothing -> Left $ "argValueToValue: Enum values cannot be parsed without type definitions"
     Just tds -> case Map.lookup enumName (enumDefs tds) of
       Nothing -> Left $ "argValueToValue: Missing enum name in type definitions: " <> enumName
       Just eSet -> case argVal of
@@ -154,20 +156,28 @@ argValueToValue defs theType argVal = case theType of
                 Nothing -> Left $ "argValueToValue: Missing value '" <> str <> "' in enum definition for " <> enumName
                 Just i -> Right $ ValueEnum enumName str' $ fromIntegral i
         o -> Left . Text.pack $ "argValueToValue: Expected TypeEnum to be a string, but got: " ++ show o
-  TypeStruct _ -> do
+  TypeStruct structName -> do
     case argVal of
       ArgObject hm -> do
+        -- Try to look up struct definition for field types
+        let mStructDef = defs >>= Map.lookup structName . structDefs
+            getFieldType fieldName v = case mStructDef of
+              Just struct -> case OMap.lookup fieldName (fields struct) of
+                Just (_, fieldType) -> fieldType
+                Nothing -> fst $ argValueToType v
+              Nothing -> fst $ argValueToType v
         mp <-
           mapM
-            ( \v -> do
-                let (inferredType, v') = argValueToType v
-                    value = argValueToValue defs inferredType v'
-                return value
+            ( \(k, v) -> do
+                let fieldName = DAK.toText k
+                    fieldType = getFieldType fieldName v
+                    value = argValueToValue defs fieldType v
+                return (fieldName, value)
             )
-            hm
-        when (any isLeft mp) $ do
-          Left "argValueToValue: Could not parse object into a Struct"
-        Right $ ValueStruct $ Map.fromList $ [(k, v) | (k, Right v) <- BF.first DAK.toText <$> KM.toList mp]
+            (KM.toList hm)
+        case [(k, e) | (k, Left e) <- mp] of
+          [] -> Right $ ValueStruct $ Map.fromList $ [(k, v) | (k, Right v) <- mp]
+          errors -> Left $ "argValueToValue: Could not parse struct '" <> structName <> "': " <> Text.intercalate "; " [k <> ": " <> e | (k, e) <- errors]
       a -> Left $ Text.pack $ "argValueToValue: Expected TypeStruct to be a object, but got a" ++ show a
   TypeVariadic -> do
     case argVal of
