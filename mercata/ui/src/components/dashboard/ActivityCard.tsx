@@ -1,9 +1,6 @@
 import { ReactNode, useState } from "react";
 import { Card, CardContent } from "../ui/card";
 import {
-  ArrowUpRight,
-  ArrowDownLeft,
-  ArrowDown,
   ArrowRightLeft,
 } from "lucide-react";
 import {
