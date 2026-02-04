@@ -11,6 +11,7 @@ interface AssetsProps {
   tokens: EarningAsset[];
   isDashboard?: boolean;
   inActiveTokens: TokenType[];
+  guestMode?: boolean;
 }
 
 const AssetsList = ({
@@ -18,6 +19,7 @@ const AssetsList = ({
   tokens,
   inActiveTokens,
   isDashboard = true,
+  guestMode = false,
 }: AssetsProps) => {
   const [showNonEarningAssetsTable, setShowNonEarningAssetsTable] =
     useState(false);
@@ -73,7 +75,7 @@ const AssetsList = ({
             <span className="font-bold text-sm md:text-base">Earning Assets</span>
           </div>
         )}
-        <div className={`w-full ${isDashboard ? 'overflow-x-auto md:overflow-visible px-3 md:px-0' : 'overflow-hidden'}`}>
+        <div className={`w-full ${isDashboard ? 'overflow-x-auto md:overflow-visible px-3 md:px-0' : 'overflow-x-auto'}`}>
           <table className="w-full">
             <thead>
               <tr className="bg-muted/50">
@@ -84,16 +86,16 @@ const AssetsList = ({
                   Price
                 </th>
                 <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
-                  Change
-                </th>
-                <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-1 md:px-4">
-                  Balance
+                  Available
                 </th>
                 <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
                   Collateral
                 </th>
                 <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-1 md:px-4">
                   Value
+                </th>
+                <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-1 md:px-4">
+                  Balance
                 </th>
               </tr>
             </thead>
@@ -162,39 +164,31 @@ const AssetsList = ({
                         </p>
                       </td>
                       <td className="hidden md:table-cell py-4 px-4 whitespace-nowrap text-right">
-                        <div
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                            (asset as any)?.["change"] >= 0
-                            ? "bg-green-500/10 text-green-500"
-                            : "bg-red-500/10 text-red-500"
-                            }`}
-                        >
-                          {(asset as any)?.["change"] !== undefined
-                            ? `${(asset as any)?.["change"] >= 0 ? "+" : ""}${
-                              (asset as any)?.["change"]
-                            }%`
-                            : "-"}
-                        </div>
-                      </td>
-                      <td className="py-3 md:py-4 px-3 md:px-4 whitespace-nowrap text-right">
-                        <p className="font-medium text-sm md:text-base text-foreground">
-                          {!asset?.balance || asset.balance === "0"
+                        <p className="font-medium text-foreground">
+                          {guestMode || !asset?.balance || asset.balance === "0"
                             ? "-"
                             : formatBalance(asset.balance, undefined, 18, 1, 2)}
                         </p>
                       </td>
                       <td className="hidden md:table-cell py-4 px-4 whitespace-nowrap text-right">
                         <p className="font-medium text-foreground">
-                          {!asset?.collateralBalance || asset.collateralBalance === "0"
+                          {guestMode || !asset?.collateralBalance || asset.collateralBalance === "0"
                             ? "-"
                             : formatBalance(asset.collateralBalance, undefined, 18, 1, 4)}
                         </p>
                       </td>
                       <td className="py-3 md:py-4 px-3 md:px-4 whitespace-nowrap text-right">
                         <p className="font-medium text-sm md:text-base text-foreground">
-                          {!asset?.value || asset.value === "0.00" || parseFloat(asset.value) === 0
+                          {guestMode || !asset?.value || asset.value === "0.00" || parseFloat(asset.value) === 0
                             ? "-"
                             : `$${asset.value}`}
+                        </p>
+                      </td>
+                      <td className="py-3 md:py-4 px-3 md:px-4 whitespace-nowrap text-right">
+                        <p className="font-medium text-sm md:text-base text-foreground">
+                          {guestMode || !asset?.totalBalance || asset.totalBalance === "0"
+                            ? "-"
+                            : formatBalance(asset.totalBalance, undefined, 18, 1, 4)}
                         </p>
                       </td>
                     </tr>
@@ -217,7 +211,7 @@ const AssetsList = ({
         </div>
       </div>
 
-      {isDashboard && (
+      {isDashboard && !guestMode && (
         <div>
           <div className="mx-3 md:mx-0 border-t border-border"></div>
           <div className="p-3 md:p-4 text-right flex justify-between items-center">

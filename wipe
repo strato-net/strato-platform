@@ -1,31 +1,26 @@
 #!/usr/bin/env bash
+# Usage: wipe [-y] <node_dir>
 
-if [ "$1" == "" ]
-then
-	echo "You need to specify the node to wipe: ./wipe <node directory>"
-	exit;
-fi
+skip_confirm=false
+[[ "$1" == "-y" || "$1" == "--yes" ]] && skip_confirm=true && shift
+node_dir="$1"
 
-if [ ! -e "$1" -o ! -e "$1/.ethereumH" -o ! -e "$1/.ethereumH/ethconf.yaml" -o ! -e "$1/genesis.json" ]
-then
-	echo "There is no node at $1"
-	exit;
-fi
+[[ -z "$node_dir" ]] && echo "Usage: wipe [-y] <node_dir>" >&2 && exit 1
 
-echo 
-
-
-echo -n -e "Warning!  This script is about to delete everything in the \"$1\" directory, as well as all docker volumes related to STRATO (including postgresql, kafka, and redis data).\nClick "Y" to proceed. [y/N]: " | fold -s -w $(tput cols)
-
-read choice
-
-if [[ "$choice" == "Y" || "$choice" == "y" ]]; then
-    echo "You chose Yes. Continuing..."
-else
-    echo "Exiting script without wiping the node."
+if [[ ! -e "$node_dir" || ! -e "$node_dir/.ethereumH" || ! -e "$node_dir/.ethereumH/ethconf.yaml" || ! -e "$node_dir/genesis.json" ]]; then
+    echo "There is no node at $node_dir"
     exit 1
 fi
 
-docker compose -p strato down -v -t 0 --remove-orphans
+echo
 
-rm -rf $1
+if [[ "$skip_confirm" == false ]]; then
+    echo -n -e "Warning!  This script is about to delete everything in the \"$node_dir\" directory, as well as all docker volumes related to STRATO (including postgresql, kafka, and redis data).\nClick \"Y\" to proceed. [y/N]: " | fold -s -w $(tput cols)
+
+    read choice
+    [[ "$choice" != "Y" && "$choice" != "y" ]] && echo "Exiting script without wiping the node." && exit 1
+    echo "You chose Yes. Continuing..."
+fi
+
+docker compose -p strato down -v -t 0 --remove-orphans
+rm -rf "$node_dir"

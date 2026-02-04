@@ -493,6 +493,98 @@ export const collateralAndBalance = async (
     });
 };
 
+export const getPublicCollateralInfo = async (
+  accessToken: string,
+) => {
+  const registry = await getPool(accessToken, {
+    select:
+      `lendingPool:lendingPool_fkey(` +
+        `assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value),` +
+        `borrowableAsset,_paused` +
+      `),` +
+      `oracle:priceOracle_fkey(` +
+        `prices:${PriceOracle}-prices(asset:key,price:value::text)` +
+      `)`
+  });
+
+  if (!registry.lendingPool) {
+    throw new Error("Lending pool not found");
+  }
+
+  const isPaused = registry.lendingPool._paused;
+  const assets = registry.lendingPool.assetConfigs?.map((a: any) => a.asset).filter((asset: string) => asset !== registry.lendingPool.borrowableAsset) || [];
+  
+  // Fetch token metadata only (no user balances)
+  let tokenMap = new Map();
+  if (assets.length > 0) {
+    const tokens = await getTokens(accessToken, {
+      address: `in.(${assets.join(",")})`,
+      select: `address,_name,_symbol,_owner,_totalSupply::text,customDecimals,images:${Token}-images(value)`
+    });
+    tokenMap = new Map(tokens.map((t: any) => [t.address, { address: t.address, balance: "0", token: t }]));
+  }
+
+  // Create maps for asset configs and prices
+  const assetConfigMap = new Map();
+  const priceMap = new Map();
+
+  // Build asset config map
+  (registry.lendingPool?.assetConfigs || []).forEach((config: any) => {
+    assetConfigMap.set(config.asset, config.AssetConfig);
+  });
+
+  // Build price map
+  (registry.oracle?.prices || []).forEach((price: any) => {
+    priceMap.set(price.asset, price.price);
+  });
+
+  // Filter assets that have token data
+  const filteredAssets = assets.filter((asset: string) => {
+      const token = tokenMap.get(asset) as any;
+      return token;
+  });
+
+  const result = filteredAssets.map((asset: string) => {
+      const token = tokenMap.get(asset) as any;
+      const assetConfig = assetConfigMap.get(asset);
+      const assetPrice = priceMap.get(asset) || "0";
+
+      const userBalance = "0";
+      const collateralizedAmount = "0";
+      const ltv = assetConfig?.ltv || 0;
+      const liquidationThreshold = assetConfig?.liquidationThreshold || 0;
+
+      // Calculate metrics using the helper function (all zeros for guests)
+      const {userBalanceValue, collateralizedAmountValue, maxBorrowingPower, unsuppliedBorrowingPower, unsuppliedLTCollateralValue} = calculateCollateralMetrics(
+        userBalance,
+        collateralizedAmount,
+        assetPrice,
+        ltv,
+        liquidationThreshold
+      );
+
+      return {
+        address: asset,
+        ...token?.token,
+        userBalance,
+        userBalanceValue,
+        collateralizedAmount,
+        collateralizedAmountValue,
+        isCollateralized: false,
+        canSupply: false,
+        maxBorrowingPower,
+        unsuppliedBorrowingPower,
+        unsuppliedLTCollateralValue,
+        assetPrice,
+        ltv,
+        liquidationThreshold,
+        isPaused,
+      };
+    });
+
+  return result;
+};
+
 export const liquidityAndBalance = async (
   accessToken: string,
   userAddress: string,
@@ -512,8 +604,7 @@ export const liquidityAndBalance = async (
       `oracle:priceOracle_fkey(address,` +
         `prices:${PriceOracle}-prices(asset:key,price:value::text)` +
       `),` +
-      `liquidityPool:liquidityPool_fkey(address)`
-  ,
+      `liquidityPool:liquidityPool_fkey(address)`,
     "lendingPool.userLoan.key": `eq.${userAddress}`
   });
 
@@ -664,6 +755,162 @@ export const liquidityAndBalance = async (
     borrowIndex: borrowIndexStr.toString(),
     reservesAccrued: reservesAccruedStr.toString(),
     // New index-based fields for UI:
+    totalAmountOwed: totalAmountOwedClamped,
+    totalAmountOwedPreview: totalAmountOwedPreviewClamped,
+    // Compat:
+    totalBorrowPrincipal,
+    // Pause status
+    isPaused,
+  };
+};
+
+export const getPublicLiquidityInfo = async (
+  accessToken: string,
+) => {
+  // Build query - no userLoan filter for public data
+  const queryParams: Record<string, string> = {
+    select:
+      `lendingPool:lendingPool_fkey(` +
+        `address,borrowableAsset,mToken,_paused,` +
+        `borrowIndex::text,totalScaledDebt::text,reservesAccrued::text,lastAccrual::text,badDebt::text,` +
+        `assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value)` +
+      `),` +
+      `collateralVault:collateralVault_fkey(` +
+        `userCollaterals:${CollateralVault}-userCollaterals(user:key,asset:key2,amount:value::text)` +
+      `),` +
+      `oracle:priceOracle_fkey(address,` +
+        `prices:${PriceOracle}-prices(asset:key,price:value::text)` +
+      `),` +
+      `liquidityPool:liquidityPool_fkey(address)`
+  };
+
+  // Fetch pool data (no userLoan)
+  const registry = await getPool(accessToken, queryParams);
+
+  const { borrowableAsset, mToken, assetConfigs, _paused } = registry.lendingPool || {};
+  const allCollaterals = registry.collateralVault?.userCollaterals || [];
+  const isPaused = _paused;
+
+  if (!borrowableAsset || !mToken) {
+    throw new Error("Lending pool, borrowable asset, or mToken not found");
+  }
+
+  // Fetch token metadata - only pool balances (no user balances)
+  const tokenData = await getTokens(accessToken, {
+    address: `in.(${borrowableAsset},${mToken})`,
+    select: `address,_name,_symbol,_owner,_totalSupply::text,customDecimals,balances:${Token}-_balances(user:key,balance:value::text)`,
+    "balances.key": `eq.${registry.liquidityPool?.address || ''}`
+  });
+
+  // Extract token data
+  const borrowableToken = tokenData.find(token => token.address === borrowableAsset);
+  const mTokenInfo = tokenData.find(token => token.address === mToken);
+
+  // User balances are always "0" for guests
+  const borrowableBalance = "0";
+  const mTokenBalance = "0";
+  const stakedMTokenBalance = "0";
+
+  // Supply/token state
+  const totalMTokenSupply = mTokenInfo?._totalSupply || "0";
+  const availableLiquidity = borrowableToken?.balances?.find((b: any) => b.user === registry.liquidityPool?.address)?.balance || "0";
+
+  // Asset config for borrowable asset
+  const borrowableAssetConfig = assetConfigs?.find((c: any) => c.asset === borrowableAsset)?.AssetConfig || {};
+
+  // Build price map (USD 1e18)
+  const priceMap = new Map<string, string>();
+  (registry.oracle?.prices || []).forEach((p: any) => {
+    priceMap.set(p.asset, p.price);
+  });
+  if (!priceMap.has(borrowableAsset)) {
+    priceMap.set(borrowableAsset, borrowableToken?.price?.toString() || "0");
+  }
+  if (!priceMap.has(mToken)) {
+    priceMap.set(mToken, mTokenInfo?.price?.toString() || "0");
+  }
+
+  // Index/scaled-debt state from Cirrus
+  const borrowIndexStr     = registry.lendingPool?.borrowIndex     || "0";
+  const totalScaledDebtStr = registry.lendingPool?.totalScaledDebt || "0";
+  const reservesAccruedStr = registry.lendingPool?.reservesAccrued || "0";
+  const lastAccrualStr     = registry.lendingPool?.lastAccrual     || "0";
+  const badDebtStr         = registry.lendingPool?.badDebt         || "0";
+
+  const interestRateBps = borrowableAssetConfig?.interestRate || 0;
+
+  // User's scaled debt is always "0" for guests
+  const userScaledDebtStr = "0";
+
+  // Current and projected user debt are always "0" for guests
+  const totalAmountOwed = "0";
+  const totalAmountOwedPreview = "0";
+  const totalAmountOwedClamped = "0";
+  const totalAmountOwedPreviewClamped = "0";
+
+  // System totals and exchange rate
+  const systemTotalDebt = totalDebtFromScaled(totalScaledDebtStr.toString(), borrowIndexStr.toString());
+
+  // Get exchange rate from Cirrus events instead of calculating manually
+  const exchangeRate = await getExchangeRateFromCirrus(accessToken);
+
+  const totalUSDSTSupplied = (BigInt(availableLiquidity) + BigInt(systemTotalDebt)).toString();
+
+  // Utilization rate: U = debt / (cash + debt − reserves)
+  let denom = BigInt(availableLiquidity) + BigInt(systemTotalDebt);
+  denom = BigInt(reservesAccruedStr || "0") < denom ? (denom - BigInt(reservesAccruedStr || "0")) : BigInt(availableLiquidity);
+  const utilizationRate = denom === 0n ? 0 : Number((BigInt(systemTotalDebt) * 10000n) / denom) / 100;
+
+  // APY from flat APR; supply APY scaled by utilization
+  const apyData = calculateAPYs(interestRateBps, (borrowableAssetConfig?.reserveFactor as number) || 1000);
+  const supplyAPY = apyData.supplyAPY * (utilizationRate / 100);
+
+  // Total collateral value across all users (USD 1e18)
+  const totalCollateralValue = calculateTotalCollateralValue(
+    registry.lendingPool?.assetConfigs || [],
+    allCollaterals,
+    priceMap,
+    borrowableAsset
+  );
+
+  // User's withdrawable underlying is always "0" for guests
+  const userMTokenBalance = 0n;
+  const userUSDSTValue = 0n;
+  const maxWithdrawableUSDST = "0";
+
+  // Clean token objects
+  const { balances: _, ...borrowableTokenClean } = borrowableToken || {};
+  const { balances: __, ...mTokenInfoClean } = mTokenInfo || {};
+
+  // Back-compat field
+  const totalBorrowPrincipal = systemTotalDebt;
+
+  return {
+    supplyable: {
+      ...borrowableTokenClean,
+      userBalance: borrowableBalance, // "0" for guests
+    },
+    withdrawable: {
+      ...mTokenInfoClean,
+      userBalance: mTokenBalance, // "0" for guests
+      userBalanceStaked: stakedMTokenBalance, // "0" for guests
+      userBalanceTotal: "0", // "0" for guests
+      maxWithdrawableUSDST, // "0" for guests
+      withdrawValue: "0", // "0" for guests
+    },
+    totalUSDSTSupplied,
+    totalBorrowed: systemTotalDebt,
+    utilizationRate,
+    availableLiquidity,
+    totalCollateralValue,
+    supplyAPY: Math.floor(supplyAPY * 100) / 100,
+    maxSupplyAPY: Math.floor(apyData.supplyAPY * 100) / 100,
+    borrowAPY: Math.floor(apyData.borrowAPY * 100) / 100,
+    exchangeRate,
+    // Additional pool metrics
+    borrowIndex: borrowIndexStr.toString(),
+    reservesAccrued: reservesAccruedStr.toString(),
+    // New index-based fields for UI (always "0" for guests):
     totalAmountOwed: totalAmountOwedClamped,
     totalAmountOwedPreview: totalAmountOwedPreviewClamped,
     // Compat:

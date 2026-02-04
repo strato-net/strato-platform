@@ -10,6 +10,7 @@ import { Info } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Link } from "react-router-dom";
 import { getActivityLink } from "@/lib/rewards/activityLinks";
+import { useMobileTooltip } from "@/hooks/use-mobile-tooltip";
 
 interface ActivitiesTableProps {
   activities: Activity[];
@@ -19,6 +20,54 @@ interface ActivitiesTableProps {
 const truncateActivityName = (name: string, maxLength: number = 30): string => {
   if (!name || name.length <= maxLength) return name;
   return name.substring(0, maxLength) + "...";
+};
+
+// Mobile-friendly Info Tooltip component
+const InfoTooltip = ({ content }: { content: string }) => {
+  const { isMobile, showTooltip, handleToggle } = useMobileTooltip('activities-info-tooltip-container');
+
+  if (isMobile) {
+    return (
+      <div className="relative activities-info-tooltip-container inline-flex">
+        <Info 
+          className="h-3 w-3 text-muted-foreground cursor-pointer" 
+          onClick={handleToggle}
+        />
+        {showTooltip && (
+          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] bg-popover border rounded-lg px-4 py-3 text-sm text-popover-foreground shadow-lg max-w-[85vw] w-[320px]">
+            <p className="text-center whitespace-pre-line">{content}</p>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleToggle(e);
+              }}
+              className="absolute top-2 right-2 text-muted-foreground hover:text-foreground text-lg leading-none"
+            >
+              <span className="sr-only">Close</span>
+              ×
+            </button>
+          </div>
+        )}
+        {showTooltip && (
+          <div 
+            className="fixed inset-0 z-[99] bg-black/20"
+            onClick={handleToggle}
+          />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+      </TooltipTrigger>
+      <TooltipContent>
+        <p className="max-w-xs">{content}</p>
+      </TooltipContent>
+    </Tooltip>
+  );
 };
 
 export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) => {
@@ -71,33 +120,13 @@ export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) =
                 <TableHead>
                   <div className="flex items-center gap-1">
                     Emission Rate
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-3 w-3 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="max-w-xs">
-                          The rate at which rewards are emitted for this activity (points per second). This is the base emission rate before factoring in your stake.
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
+                    <InfoTooltip content="The rate at which rewards are emitted for this activity (points per second). This is the base emission rate before factoring in your stake." />
                   </div>
                 </TableHead>
                 <TableHead>
                   <div className="flex items-center gap-1">
                     Total Stake
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-3 w-3 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="max-w-xs">
-                          The total amount staked across all users in this activity. Your share of rewards is proportional to your stake relative to this total.
-                          <br /><br />
-                          Note: Different activities may use different stake units (token units, USD-notional, or shares).
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
+                    <InfoTooltip content="The total amount staked across all users in this activity. Your share of rewards is proportional to your stake relative to this total.\n\nNote: Different activities may use different stake units (token units, USD-notional, or shares)." />
                   </div>
                 </TableHead>
                 <TableHead>Last Update</TableHead>
