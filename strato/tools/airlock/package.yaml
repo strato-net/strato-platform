@@ -54,13 +54,13 @@ executables:
       - aeson
       - airlock
       - bytestring
-      - cmdargs
       - directory
       - filepath
       - http-client
       - http-client-tls
       - http-types
       - network-uri
+      - optparse-applicative
       - text
       - time
 

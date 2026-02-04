@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -11,7 +10,7 @@ import Data.Aeson (decode, encode, (.:), (.=), object)
 import Data.Aeson.Types (parseMaybe)
 import qualified Data.ByteString.Lazy as LBS
 import Data.Time.Clock.POSIX (getPOSIXTime)
-import System.Console.CmdArgs
+import Options.Applicative
 import System.Directory (doesFileExist, createDirectoryIfMissing, getHomeDirectory)
 import System.Exit (exitFailure, exitSuccess)
 import System.FilePath ((</>))
@@ -207,109 +206,234 @@ readMnemonicFromFile = do
       hPutStrLn stderr "Please run 'airlock create_wallet' to set up your wallet."
       exitFailure
 
--- | Command line modes
+--------------------------------------------------------------------------------
+-- Command line parsing with optparse-applicative
+--------------------------------------------------------------------------------
+
 data Command
   = Login
-      { }
-  | CreateWallet
-      { forceOverwrite :: Bool
-      }
-  | ListAddresses
-      { passphrase :: String
-      , numAddresses :: Int
-      }
-  | Shield
-      { passphrase :: String
-      , tokenAddress :: String
-      , amount :: Integer
-      , baseUrl :: String
-      , railgunContractAddr :: String
-      , derivationIndex :: Int
-      , approveFirst :: Bool
-      , dryRun :: Bool
-      }
-  | Unshield
-      { passphrase :: String
-      , tokenAddress :: String
-      , amount :: Integer
-      , recipient :: String
-      , baseUrl :: String
-      , railgunContractAddr :: String
-      , derivationIndex :: Int
-      , dryRun :: Bool
-      }
-  | Balance
-      { passphrase :: String
-      , baseUrl :: String
-      , railgunContractAddr :: String
-      , derivationIndex :: Int
-      , showNotes :: Bool
-      }
-  deriving (Show, Data, Typeable)
+  | CreateWallet CreateWalletOpts
+  | ListAddresses ListAddressesOpts
+  | Shield ShieldOpts
+  | Unshield UnshieldOpts
+  | Balance BalanceOpts
+  deriving (Show)
 
-loginMode :: Command
-loginMode = Login
-  { } &= help "Authenticate using OAuth device flow"
+data CreateWalletOpts = CreateWalletOpts
+  { cwoForceOverwrite :: Bool
+  } deriving (Show)
 
-createWalletMode :: Command
-createWalletMode = CreateWallet
-  { forceOverwrite = False &= help "Overwrite existing mnemonic (dangerous!)"
-  } &= help "Create wallet by storing a mnemonic phrase"
-    &= name "create_wallet"
+data ListAddressesOpts = ListAddressesOpts
+  { laoPassphrase :: String
+  , laoNumAddresses :: Int
+  } deriving (Show)
 
-listAddressesMode :: Command
-listAddressesMode = ListAddresses
-  { passphrase = "" &= help "Optional BIP39 passphrase" &= typ "PASSPHRASE"
-  , numAddresses = 10 &= help "Number of addresses to display (default 10)" &= typ "NUM"
-  } &= help "List derived addresses from the wallet"
-    &= name "list_addresses"
+data ShieldOpts = ShieldOpts
+  { soPassphrase :: String
+  , soTokenAddress :: String
+  , soAmount :: Integer
+  , soBaseUrl :: String
+  , soRailgunContractAddr :: String
+  , soDerivationIndex :: Int
+  , soApproveFirst :: Bool
+  , soDryRun :: Bool
+  } deriving (Show)
 
-shieldMode :: Command
-shieldMode = Shield
-  { passphrase = "" &= help "Optional BIP39 passphrase" &= typ "PASSPHRASE"
-  , tokenAddress = def &= help "ERC20 token contract address" &= typ "ADDRESS"
-  , amount = 1000000000000000000 &= help "Amount to shield (in smallest unit, default 1e18)" &= typ "AMOUNT"
-  , baseUrl = "http://localhost:8081" &= help "STRATO base URL" &= typ "URL"
-  , railgunContractAddr = "959b55477e53900402fdbb2633b56709d252cadd" &= help "Railgun contract address" &= typ "ADDRESS"
-  , derivationIndex = 0 &= help "Wallet derivation index (default 0)" &= typ "INDEX"
-  , approveFirst = False &= help "Approve tokens before shielding"
-  , dryRun = False &= help "Show request without sending"
-  } &= help "Shield (deposit) tokens into Railgun"
+data UnshieldOpts = UnshieldOpts
+  { uoPassphrase :: String
+  , uoTokenAddress :: String
+  , uoAmount :: Integer
+  , uoRecipient :: String
+  , uoBaseUrl :: String
+  , uoRailgunContractAddr :: String
+  , uoDerivationIndex :: Int
+  , uoDryRun :: Bool
+  } deriving (Show)
 
-unshieldMode :: Command
-unshieldMode = Unshield
-  { passphrase = "" &= help "Optional BIP39 passphrase" &= typ "PASSPHRASE"
-  , tokenAddress = def &= help "ERC20 token contract address" &= typ "ADDRESS"
-  , amount = 1000000000000000000 &= help "Amount to unshield (in smallest unit)" &= typ "AMOUNT"
-  , recipient = def &= help "Recipient address for unshielded tokens" &= typ "ADDRESS"
-  , baseUrl = "http://localhost:8081" &= help "STRATO base URL" &= typ "URL"
-  , railgunContractAddr = "959b55477e53900402fdbb2633b56709d252cadd" &= help "Railgun contract address" &= typ "ADDRESS"
-  , derivationIndex = 0 &= help "Wallet derivation index (default 0)" &= typ "INDEX"
-  , dryRun = False &= help "Show request without sending"
-  } &= help "Unshield (withdraw) tokens from Railgun (DUMMY - will fail verification)"
+data BalanceOpts = BalanceOpts
+  { boPassphrase :: String
+  , boBaseUrl :: String
+  , boRailgunContractAddr :: String
+  , boDerivationIndex :: Int
+  , boShowNotes :: Bool
+  } deriving (Show)
 
-balanceMode :: Command
-balanceMode = Balance
-  { passphrase = "" &= help "Optional BIP39 passphrase" &= typ "PASSPHRASE"
-  , baseUrl = "http://localhost:8081" &= help "STRATO base URL" &= typ "URL"
-  , railgunContractAddr = "959b55477e53900402fdbb2633b56709d252cadd" &= help "Railgun contract address" &= typ "ADDRESS"
-  , derivationIndex = 0 &= help "Wallet derivation index (default 0)" &= typ "INDEX"
-  , showNotes = False &= help "Show individual notes (not just totals)"
-  } &= help "Show shielded token balances"
+-- | Parser for login command
+loginParser :: Parser Command
+loginParser = pure Login
+
+-- | Parser for create_wallet command
+createWalletParser :: Parser Command
+createWalletParser = CreateWallet <$> (CreateWalletOpts
+  <$> switch
+      ( long "force"
+     <> help "Overwrite existing mnemonic (dangerous!)" ))
+
+-- | Parser for list_addresses command
+listAddressesParser :: Parser Command
+listAddressesParser = ListAddresses <$> (ListAddressesOpts
+  <$> strOption
+      ( long "passphrase"
+     <> value ""
+     <> metavar "PASSPHRASE"
+     <> help "Optional BIP39 passphrase" )
+  <*> option auto
+      ( long "num"
+     <> value 10
+     <> metavar "NUM"
+     <> help "Number of addresses to display (default 10)" ))
+
+-- | Parser for shield command
+shieldParser :: Parser Command
+shieldParser = Shield <$> (ShieldOpts
+  <$> strOption
+      ( long "passphrase"
+     <> value ""
+     <> metavar "PASSPHRASE"
+     <> help "Optional BIP39 passphrase" )
+  <*> strOption
+      ( long "tokenaddress"
+     <> value ""
+     <> metavar "ADDRESS"
+     <> help "ERC20 token contract address" )
+  <*> option auto
+      ( long "amount"
+     <> value 1000000000000000000
+     <> metavar "AMOUNT"
+     <> help "Amount to shield (in smallest unit, default 1e18)" )
+  <*> strOption
+      ( long "baseurl"
+     <> value "http://localhost:8081"
+     <> metavar "URL"
+     <> help "STRATO base URL" )
+  <*> strOption
+      ( long "railguncontractaddr"
+     <> value "959b55477e53900402fdbb2633b56709d252cadd"
+     <> metavar "ADDRESS"
+     <> help "Railgun contract address" )
+  <*> option auto
+      ( long "derivationindex"
+     <> value 0
+     <> metavar "INDEX"
+     <> help "Wallet derivation index (default 0)" )
+  <*> switch
+      ( long "approvefirst"
+     <> help "Approve tokens before shielding" )
+  <*> switch
+      ( long "dryrun"
+     <> help "Show request without sending" ))
+
+-- | Parser for unshield command
+unshieldParser :: Parser Command
+unshieldParser = Unshield <$> (UnshieldOpts
+  <$> strOption
+      ( long "passphrase"
+     <> value ""
+     <> metavar "PASSPHRASE"
+     <> help "Optional BIP39 passphrase" )
+  <*> strOption
+      ( long "tokenaddress"
+     <> value ""
+     <> metavar "ADDRESS"
+     <> help "ERC20 token contract address" )
+  <*> option auto
+      ( long "amount"
+     <> value 1000000000000000000
+     <> metavar "AMOUNT"
+     <> help "Amount to unshield (in smallest unit)" )
+  <*> strOption
+      ( long "recipient"
+     <> value ""
+     <> metavar "ADDRESS"
+     <> help "Recipient address for unshielded tokens" )
+  <*> strOption
+      ( long "baseurl"
+     <> value "http://localhost:8081"
+     <> metavar "URL"
+     <> help "STRATO base URL" )
+  <*> strOption
+      ( long "railguncontractaddr"
+     <> value "959b55477e53900402fdbb2633b56709d252cadd"
+     <> metavar "ADDRESS"
+     <> help "Railgun contract address" )
+  <*> option auto
+      ( long "derivationindex"
+     <> value 0
+     <> metavar "INDEX"
+     <> help "Wallet derivation index (default 0)" )
+  <*> switch
+      ( long "dryrun"
+     <> help "Show request without sending" ))
+
+-- | Parser for balance command
+balanceParser :: Parser Command
+balanceParser = Balance <$> (BalanceOpts
+  <$> strOption
+      ( long "passphrase"
+     <> value ""
+     <> metavar "PASSPHRASE"
+     <> help "Optional BIP39 passphrase" )
+  <*> strOption
+      ( long "baseurl"
+     <> value "http://localhost:8081"
+     <> metavar "URL"
+     <> help "STRATO base URL" )
+  <*> strOption
+      ( long "railguncontractaddr"
+     <> value "959b55477e53900402fdbb2633b56709d252cadd"
+     <> metavar "ADDRESS"
+     <> help "Railgun contract address" )
+  <*> option auto
+      ( long "derivationindex"
+     <> value 0
+     <> metavar "INDEX"
+     <> help "Wallet derivation index (default 0)" )
+  <*> switch
+      ( long "shownotes"
+     <> help "Show individual notes (not just totals)" ))
+
+-- | Combined command parser
+commandParser :: Parser Command
+commandParser = hsubparser
+  ( command "login"
+    (info loginParser
+      (progDesc "Authenticate using OAuth device flow"))
+  <> command "create_wallet"
+    (info createWalletParser
+      (progDesc "Create wallet by storing a mnemonic phrase"))
+  <> command "list_addresses"
+    (info listAddressesParser
+      (progDesc "List derived addresses from the wallet"))
+  <> command "shield"
+    (info shieldParser
+      (progDesc "Shield (deposit) tokens into Railgun"))
+  <> command "unshield"
+    (info unshieldParser
+      (progDesc "Unshield (withdraw) tokens from Railgun (DUMMY - will fail verification)"))
+  <> command "balance"
+    (info balanceParser
+      (progDesc "Show shielded token balances"))
+  )
+
+-- | Main parser with info
+opts :: ParserInfo Command
+opts = info (commandParser <**> helper)
+  ( fullDesc
+ <> progDesc "Railgun privacy wallet for STRATO"
+ <> header "airlock - Railgun privacy wallet for STRATO" )
 
 main :: IO ()
 main = do
-  opts <- cmdArgs $ modes [loginMode, createWalletMode, listAddressesMode, shieldMode, unshieldMode, balanceMode]
-    &= summary "airlock - Railgun privacy wallet for STRATO"
-    &= program "airlock"
-  
-  case opts of
-    Login{} -> runLogin
-    CreateWallet{} -> runCreateWallet opts
-    ListAddresses{} -> runListAddresses opts
-    Shield{} -> runShield opts
-    Unshield{} -> runUnshield opts
-    Balance{} -> runBalance opts
+  cmd <- customExecParser prefs' opts
+  case cmd of
+    Login -> runLogin
+    CreateWallet o -> runCreateWallet o
+    ListAddresses o -> runListAddresses o
+    Shield o -> runShield o
+    Unshield o -> runUnshield o
+    Balance o -> runBalance o
+  where
+    prefs' = prefs showHelpOnEmpty
 
 runLogin :: IO ()
 runLogin = do
@@ -431,14 +555,14 @@ pollForToken manager config deviceCode interval = do
           hPutStrLn stderr $ "Unexpected response: " ++ show (responseBody tokenResp)
           exitFailure
 
-runCreateWallet :: Command -> IO ()
-runCreateWallet opts = do
+runCreateWallet :: CreateWalletOpts -> IO ()
+runCreateWallet cwopts = do
   path <- mnemonicFilePath
   exists <- doesFileExist path
   
-  myWhen (exists && not (forceOverwrite opts)) $ do
+  when (exists && not (cwoForceOverwrite cwopts)) $ do
     hPutStrLn stderr $ "Error: Mnemonic already exists at " ++ path
-    hPutStrLn stderr "Use --forceoverwrite to replace it (this will change your wallet!)."
+    hPutStrLn stderr "Use --force to replace it (this will change your wallet!)."
     exitFailure
   
   TIO.putStrLn "=== Airlock Wallet Setup ==="
@@ -457,7 +581,7 @@ runCreateWallet opts = do
       wordCount = length $ T.words mnemonicText
   
   -- Validate word count
-  myWhen (wordCount `notElem` [12, 15, 18, 21, 24]) $ do
+  when (wordCount `notElem` [12, 15, 18, 21, 24]) $ do
     hPutStrLn stderr $ "Error: Invalid mnemonic - expected 12, 15, 18, 21, or 24 words, got " ++ show wordCount
     exitFailure
   
@@ -484,8 +608,8 @@ runCreateWallet opts = do
       TIO.putStrLn "Use 'airlock list_addresses' to see all derived addresses."
       exitSuccess
 
-runListAddresses :: Command -> IO ()
-runListAddresses opts = do
+runListAddresses :: ListAddressesOpts -> IO ()
+runListAddresses laopts = do
   mnemonic <- readMnemonicFromFile
   
   TIO.putStrLn "============================================================"
@@ -493,8 +617,8 @@ runListAddresses opts = do
   TIO.putStrLn "============================================================"
   TIO.putStrLn ""
   
-  let indices = [0 .. numAddresses opts - 1]
-  mapM_ (printAddressAtIndex mnemonic (T.pack $ passphrase opts)) indices
+  let indices = [0 .. laoNumAddresses laopts - 1]
+  mapM_ (printAddressAtIndex mnemonic (T.pack $ laoPassphrase laopts)) indices
   
   TIO.putStrLn "============================================================"
   exitSuccess
@@ -530,24 +654,24 @@ loadKeys passphraseStr idx = do
       exitFailure
     Right keys -> return keys
 
-runShield :: Command -> IO ()
-runShield opts = do
-  myWhen (null $ tokenAddress opts) $ do
+runShield :: ShieldOpts -> IO ()
+runShield sopts = do
+  when (null $ soTokenAddress sopts) $ do
     hPutStrLn stderr "Error: --tokenaddress is required"
     exitFailure
   
   -- Load keys from mnemonic file
   TIO.putStrLn "Loading Railgun keys..."
-  keys <- loadKeys (passphrase opts) (derivationIndex opts)
+  keys <- loadKeys (soPassphrase sopts) (soDerivationIndex sopts)
   
   let addr = railgunAddress keys
   TIO.putStrLn $ "Railgun address: " <> unRailgunAddress addr
   
   -- Create shield request
   TIO.putStrLn "Creating shield request..."
-  shieldReq <- createERC20ShieldRequest keys (T.pack $ tokenAddress opts) (amount opts)
+  shieldReq <- createERC20ShieldRequest keys (T.pack $ soTokenAddress sopts) (soAmount sopts)
   
-  if dryRun opts
+  if soDryRun sopts
     then do
       TIO.putStrLn "\n=== Shield Request (dry run) ==="
       TIO.putStrLn $ serializeShieldRequest shieldReq
@@ -556,18 +680,18 @@ runShield opts = do
       -- Read auth token
       authToken <- readAuthToken
       
-      let (host, port) = parseHostPort (baseUrl opts)
+      let (host, port) = parseHostPort (soBaseUrl sopts)
           config = StratoConfig
             { stratoHost = T.pack host
             , stratoPort = port
             , stratoAuthToken = authToken
-            , railgunContractAddress = T.pack $ railgunContractAddr opts
+            , railgunContractAddress = T.pack $ soRailgunContractAddr sopts
             }
       
       -- Optionally approve tokens first
-      myWhen (approveFirst opts) $ do
-        TIO.putStrLn $ "Approving " <> T.pack (show $ amount opts) <> " tokens..."
-        approveResult <- approveToken config (T.pack $ tokenAddress opts) (amount opts)
+      when (soApproveFirst sopts) $ do
+        TIO.putStrLn $ "Approving " <> T.pack (show $ soAmount sopts) <> " tokens..."
+        approveResult <- approveToken config (T.pack $ soTokenAddress sopts) (soAmount sopts)
         case approveResult of
           Left err -> do
             TIO.hPutStrLn stderr $ "Approval failed: " <> err
@@ -587,19 +711,19 @@ runShield opts = do
       
       exitSuccess
 
-runUnshield :: Command -> IO ()
-runUnshield opts = do
-  myWhen (null $ tokenAddress opts) $ do
+runUnshield :: UnshieldOpts -> IO ()
+runUnshield uopts = do
+  when (null $ uoTokenAddress uopts) $ do
     hPutStrLn stderr "Error: --tokenaddress is required"
     exitFailure
   
-  myWhen (null $ recipient opts) $ do
+  when (null $ uoRecipient uopts) $ do
     hPutStrLn stderr "Error: --recipient is required"
     exitFailure
   
   -- Load keys from mnemonic file
   TIO.putStrLn "Loading Railgun keys..."
-  keys <- loadKeys (passphrase opts) (derivationIndex opts)
+  keys <- loadKeys (uoPassphrase uopts) (uoDerivationIndex uopts)
   
   let addr = railgunAddress keys
   TIO.putStrLn $ "Railgun address: " <> unRailgunAddress addr
@@ -610,11 +734,11 @@ runUnshield opts = do
   TIO.putStrLn "*** This is for testing transaction structure only ***\n"
   
   let unshieldReq = createDummyUnshieldRequest 
-                      (T.pack $ tokenAddress opts)
-                      (amount opts)
-                      (T.pack $ recipient opts)
+                      (T.pack $ uoTokenAddress uopts)
+                      (uoAmount uopts)
+                      (T.pack $ uoRecipient uopts)
   
-  if dryRun opts
+  if uoDryRun uopts
     then do
       TIO.putStrLn "\n=== Unshield Request (dry run) ==="
       TIO.putStrLn $ serializeUnshieldRequest unshieldReq
@@ -623,12 +747,12 @@ runUnshield opts = do
       -- Read auth token
       authToken <- readAuthToken
       
-      let (host, port) = parseHostPort (baseUrl opts)
+      let (host, port) = parseHostPort (uoBaseUrl uopts)
           config = StratoConfig
             { stratoHost = T.pack host
             , stratoPort = port
             , stratoAuthToken = authToken
-            , railgunContractAddress = T.pack $ railgunContractAddr opts
+            , railgunContractAddress = T.pack $ uoRailgunContractAddr uopts
             }
       
       -- Send unshield transaction
@@ -644,11 +768,11 @@ runUnshield opts = do
       
       exitSuccess
 
-runBalance :: Command -> IO ()
-runBalance opts = do
+runBalance :: BalanceOpts -> IO ()
+runBalance bopts = do
   -- Load keys from mnemonic file
   TIO.putStrLn "Loading Railgun keys..."
-  keys <- loadKeys (passphrase opts) (derivationIndex opts)
+  keys <- loadKeys (boPassphrase bopts) (boDerivationIndex bopts)
   
   let addr = railgunAddress keys
   TIO.putStrLn $ "Railgun address: " <> unRailgunAddress addr
@@ -662,9 +786,9 @@ runBalance opts = do
   
   -- Scan for shielded notes
   result <- scanShieldedBalance keys 
-              (T.pack $ baseUrl opts) 
+              (T.pack $ boBaseUrl bopts) 
               authToken 
-              (T.pack $ railgunContractAddr opts)
+              (T.pack $ boRailgunContractAddr bopts)
   
   case result of
     Left err -> do
@@ -684,7 +808,7 @@ runBalance opts = do
           TIO.putStrLn $ "  Total notes: " <> T.pack (show $ length notes)
       
       -- Optionally show individual notes
-      myWhen (showNotes opts && not (null notes)) $ do
+      when (boShowNotes bopts && not (null notes)) $ do
         TIO.putStrLn ""
         TIO.putStrLn "============================================================"
         TIO.putStrLn "                   INDIVIDUAL NOTES"
@@ -716,11 +840,6 @@ printNote note = do
   TIO.putStrLn $ "    Token: 0x" <> snTokenAddress note
   TIO.putStrLn $ "    Value: " <> T.pack (printf "%.18f" valueInTokens) <> " tokens"
   TIO.putStrLn ""
-
--- | Helper for when (from Control.Monad, but avoiding import collision)
-myWhen :: Bool -> IO () -> IO ()
-myWhen True action = action
-myWhen False _ = return ()
 
 -- | Parse host and port from a URL string like "http://localhost:8081"
 parseHostPort :: String -> (String, Int)
