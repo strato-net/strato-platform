@@ -189,6 +189,7 @@ main = do
               ("", "upquark") -> "https://fileserver.mercata.blockapps.net/highway"
               ("", "mercata") -> "https://fileserver.mercata.blockapps.net/highway"
               ("", "uranium") -> "https://fileserver.mercata.blockapps.net/highway"
+              ("", "lithium") -> "https://fileserver.mercata.blockapps.net/highway"
               ("", _) -> error "File server url was not provided and cannot be derived"
               (fileServer, _) -> fileServer
           ),
@@ -198,6 +199,7 @@ main = do
               "mercata" -> "https://monitor.mercata.blockapps.net:18080"
               "helium" -> "https://monitor.testnet.strato.nexus"
               "upquark" -> "https://monitor.strato.nexus"
+              "lithium" -> "" -- local development network
               _ -> ""
           )
         ]
