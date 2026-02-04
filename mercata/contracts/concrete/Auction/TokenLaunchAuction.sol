@@ -93,7 +93,6 @@ contract record TokenLaunchAuction is Ownable {
 
     uint public minRaiseUSDST;
     uint public maxRaiseUSDST;
-    uint public perAddressCapUSDST;
     uint public priceTickUSDST;
     uint public withdrawDelay;
     uint public finalizeRewardUSDST;
@@ -153,13 +152,12 @@ contract record TokenLaunchAuction is Ownable {
 
     Bid[] public record bids;
     mapping(address => uint[]) public record userBidIds;
-    mapping(address => uint) public record activeBudgetUSDST;
     mapping(address => bool) public record allowlisted;
 
     // Owner is assigned on deployment (proxy-safe).
     constructor(address initialOwner) Ownable(initialOwner) { }
 
-    // One-time setup of tokens, wallets, caps, fees, and timing windows.
+    // One-time setup of tokens, wallets, fees, and timing windows.
     // Must be called before any auction actions.
     function initialize(
         address usdToken_,
@@ -174,7 +172,6 @@ contract record TokenLaunchAuction is Ownable {
         uint lpTokenReserve_,
         uint minRaiseUSDST_,
         uint maxRaiseUSDST_,
-        uint perAddressCapUSDST_,
         uint priceTickUSDST_,
         uint withdrawDelay_,
         uint finalizeRewardUSDST_,
@@ -220,7 +217,6 @@ contract record TokenLaunchAuction is Ownable {
         lpTokenReserve = lpTokenReserve_;
         minRaiseUSDST = minRaiseUSDST_;
         maxRaiseUSDST = maxRaiseUSDST_;
-        perAddressCapUSDST = perAddressCapUSDST_;
         priceTickUSDST = priceTickUSDST_;
         withdrawDelay = withdrawDelay_;
         finalizeRewardUSDST = finalizeRewardUSDST_;
@@ -267,7 +263,6 @@ contract record TokenLaunchAuction is Ownable {
         uint lpTokenReserve_,
         uint minRaiseUSDST_,
         uint maxRaiseUSDST_,
-        uint perAddressCapUSDST_,
         uint priceTickUSDST_,
         uint withdrawDelay_,
         uint finalizeRewardUSDST_,
@@ -315,7 +310,6 @@ contract record TokenLaunchAuction is Ownable {
         lpTokenReserve = lpTokenReserve_;
         minRaiseUSDST = minRaiseUSDST_;
         maxRaiseUSDST = maxRaiseUSDST_;
-        perAddressCapUSDST = perAddressCapUSDST_;
         priceTickUSDST = priceTickUSDST_;
         withdrawDelay = withdrawDelay_;
         finalizeRewardUSDST = finalizeRewardUSDST_;
@@ -418,7 +412,6 @@ contract record TokenLaunchAuction is Ownable {
         require(budgetUSDST > 0, "Invalid budget");
         require(maxPriceUSDST > 0, "Invalid price");
         require(maxPriceUSDST % priceTickUSDST == 0, "Invalid price tick");
-        require(activeBudgetUSDST[msg.sender] + budgetUSDST <= perAddressCapUSDST, "Cap exceeded");
         if (allowlistEnabled && block.timestamp < startTime + allowlistDurationSeconds) {
             require(allowlisted[msg.sender], "Allowlist only");
         }
@@ -437,7 +430,6 @@ contract record TokenLaunchAuction is Ownable {
         bids.push(bid);
         uint bidId = bids.length - 1;
         userBidIds[msg.sender].push(bidId);
-        activeBudgetUSDST[msg.sender] = activeBudgetUSDST[msg.sender] + budgetUSDST;
 
         emit BidPlaced(bidId, msg.sender, budgetUSDST, maxPriceUSDST, tier);
     }
@@ -456,7 +448,6 @@ contract record TokenLaunchAuction is Ownable {
 
         bid.state = BidState.CANCELED;
         bid.canceledAt = uint(block.timestamp);
-        activeBudgetUSDST[msg.sender] = activeBudgetUSDST[msg.sender] - bid.budgetUSDST;
         totalCanceledRefundsRemaining = totalCanceledRefundsRemaining + bid.budgetUSDST;
 
         emit BidCanceled(bidId, msg.sender);
@@ -503,7 +494,6 @@ contract record TokenLaunchAuction is Ownable {
         if (bid.state == BidState.ACTIVE) {
             bid.state = BidState.CANCELED;
             bid.canceledAt = cancelTime;
-            activeBudgetUSDST[msg.sender] = activeBudgetUSDST[msg.sender] - bid.budgetUSDST;
             totalCanceledRefundsRemaining = totalCanceledRefundsRemaining + bid.budgetUSDST;
         }
 
@@ -887,7 +877,6 @@ contract record TokenLaunchAuction is Ownable {
         uint i;
         for (i = 0; i < bids.length; i++) {
             Bid storage bid = bids[i];
-            activeBudgetUSDST[bid.bidder] = 0;
             userBidIds[bid.bidder].length = 0;
         }
         bids.length = 0;
@@ -938,7 +927,6 @@ contract record TokenLaunchAuction is Ownable {
                 bid.spentUSDST = 0;
                 bid.refundUSDST = bid.budgetUSDST;
                 totalRefundsRemaining = totalRefundsRemaining + bid.refundUSDST;
-                activeBudgetUSDST[bid.bidder] = activeBudgetUSDST[bid.bidder] - bid.budgetUSDST;
                 emit BidFinalized(i, bid.bidder, 0, 0, bid.refundUSDST);
             }
         }
@@ -1079,7 +1067,6 @@ contract record TokenLaunchAuction is Ownable {
             }
 
             bid.state = BidState.FINALIZED;
-            activeBudgetUSDST[bid.bidder] = activeBudgetUSDST[bid.bidder] - bid.budgetUSDST;
             totalRefundsRemaining = totalRefundsRemaining + bid.refundUSDST;
 
             if (bid.tokensCapped > 0) {
@@ -1108,7 +1095,6 @@ contract record TokenLaunchAuction is Ownable {
             bid.spentUSDST = 0;
             bid.refundUSDST = bid.budgetUSDST;
             totalRefundsRemaining = totalRefundsRemaining + bid.refundUSDST;
-            activeBudgetUSDST[bid.bidder] = activeBudgetUSDST[bid.bidder] - bid.budgetUSDST;
 
             emit BidFinalized(i, bid.bidder, 0, 0, bid.refundUSDST);
         }
