@@ -84,6 +84,11 @@ function buildUrl(sourceConfig: SourceConfig): string {
             }
         });
         
+        // TwelveData: Add exchange=LSE for bCSPX (CSPX on London Stock Exchange)
+        if (url.includes('twelvedata.com') && symbols.includes('bCSPX')) {
+            queryParams.append('exchange', 'LSE');
+        }
+        
         if (queryParams.toString()) {
             url += '?' + queryParams.toString();
         }
