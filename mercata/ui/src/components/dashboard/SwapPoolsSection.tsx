@@ -25,7 +25,7 @@ const SwapPoolsSection = () => {
 
   const { fetchPools, getPoolByAddress } = useSwapContext();
   const { fetchUsdstBalance, usdstBalance, voucherBalance } = useTokenContext();
-  const { userAddress } = useUser();
+  const { isLoggedIn } = useUser();
   const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
   useEffect(() => {
@@ -33,8 +33,11 @@ const SwapPoolsSection = () => {
   }, [fetchPools]);
 
   useEffect(() => {
-    fetchUsdstBalance();
-  }, [fetchUsdstBalance]);
+    // Only fetch user balance when logged in
+    if (isLoggedIn) {
+      fetchUsdstBalance();
+    }
+  }, [fetchUsdstBalance, isLoggedIn]);
 
   useEffect(() => {
     if (selectedPool && isDepositModalOpen) {
@@ -197,17 +200,22 @@ const SwapPoolsSection = () => {
                       <div className="flex items-center text-xs text-muted-foreground mt-1">
                         <span>TVL: {formatBalance(pool.totalLiquidityUSD, undefined, 18, 0, 0, true)}</span>
                       </div>
-                      <div className="flex items-center text-xs text-muted-foreground mt-1">
-                        <span>Your Liquidity: {formatYourLiquidityValue(pool)}</span>
-                      </div>
-                      {rewardsEnabled && pool.lpToken.stakedBalance !== undefined && (
+                      {/* User-specific data - only show when logged in */}
+                      {isLoggedIn && (
                         <>
-                          <div className="flex items-center text-xs text-muted-foreground mt-1 ml-2">
-                            <span>• Staked: {formatBalance(pool.lpToken.stakedBalance || "0", undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
+                          <div className="flex items-center text-xs text-muted-foreground mt-1">
+                            <span>Your Liquidity: {formatYourLiquidityValue(pool)}</span>
                           </div>
-                          <div className="flex items-center text-xs text-muted-foreground mt-1 ml-2">
-                            <span>• Unstaked: {formatBalance(pool.lpToken.balance || "0", undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
-                          </div>
+                          {rewardsEnabled && pool.lpToken.stakedBalance !== undefined && (
+                            <>
+                              <div className="flex items-center text-xs text-muted-foreground mt-1 ml-2">
+                                <span>• Staked: {formatBalance(pool.lpToken.stakedBalance || "0", undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
+                              </div>
+                              <div className="flex items-center text-xs text-muted-foreground mt-1 ml-2">
+                                <span>• Unstaked: {formatBalance(pool.lpToken.balance || "0", undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
+                              </div>
+                            </>
+                          )}
                         </>
                       )}
                     </div>
@@ -223,6 +231,7 @@ const SwapPoolsSection = () => {
                         size="sm"
                         className="bg-strato-blue hover:bg-strato-blue/90"
                         onClick={() => handleOpenDepositModal(pool)}
+                        disabled={!isLoggedIn}
                       >
                         <CircleArrowDown className="mr-1 h-4 w-4" />
                         <span className="hidden sm:inline">Deposit</span>
@@ -233,8 +242,8 @@ const SwapPoolsSection = () => {
                         variant="outline"
                         className="border-strato-blue text-strato-blue hover:bg-strato-blue/10 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-400/10 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-auto disabled:border-muted disabled:text-muted-foreground disabled:hover:bg-transparent disabled:dark:border-muted disabled:dark:text-muted-foreground"
                         onClick={() => handleOpenWithdrawModal(pool)}
-                        disabled={BigInt(pool.lpToken.totalBalance || "0") === BigInt(0)}
-                        title={BigInt(pool.lpToken.totalBalance || "0") === BigInt(0) ? "No LP tokens to withdraw" : "Withdraw"}
+                        disabled={!isLoggedIn || BigInt(pool.lpToken.totalBalance || "0") === BigInt(0)}
+                        title={!isLoggedIn ? "Sign in to withdraw" : BigInt(pool.lpToken.totalBalance || "0") === BigInt(0) ? "No LP tokens to withdraw" : "Withdraw"}
                       >
                         <CircleArrowUp className="mr-1 h-4 w-4" />
                         <span className="hidden sm:inline">Withdraw</span>

@@ -54,6 +54,7 @@ router.get("/", authHandler.authorizeRequest(), TokensV2Controller.getUserTokens
  *                 additionalProperties: true
  */
 router.get("/earning-assets", authHandler.authorizeRequest(), TokensV2Controller.getEarningAssets);
+router.get("/earning-assets/public", authHandler.authorizeRequest(true), TokensV2Controller.getPublicEarningAssets);
 
 /**
  * @openapi

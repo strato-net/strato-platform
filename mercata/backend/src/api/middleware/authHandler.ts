@@ -46,8 +46,10 @@ class AuthHandler {
     return async (req, res, next) => {
       try {
         let token = getTokenFromHeader(req);
+        // if it is service user do not set userAddress and userName
+        const isServiceUser = !token && allowAnonAccess
 
-        if (!token && allowAnonAccess) {
+        if (isServiceUser) {
           // The token obtained from the trusted oauth2 server can be trusted here, but is still always verified further in a resource server.
 
           token = await getServiceToken();
@@ -63,13 +65,14 @@ class AuthHandler {
             return next(err);
           }
 
-          // fetch or create user key in Strato
-          let address = await createOrGetKey(token);
-          let userName:string = payload['preferred_username']
-
-          req.address = address;
+          if (!isServiceUser) {
+            // fetch or create user key in Strato
+            let address = await createOrGetKey(token);
+            let userName: string = payload["preferred_username"];
+            req.address = address;
+            req.userName = userName;
+          }
           req.accessToken = token;
-          req.userName = userName;
           return next();
         } else {
           res.set('WWW-Authenticate', 'Bearer');
