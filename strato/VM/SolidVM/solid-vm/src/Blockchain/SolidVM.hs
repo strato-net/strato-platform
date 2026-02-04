@@ -1012,8 +1012,8 @@ expToPath x@(CC.IndexAccess _ parent mIndex) = do
   idx <- getVar =<< maybe (typeError "empty index is only valid at type level" $ show x) expToVar mIndex
   currentBlockNum <- BlockHeader.number . Env.blockHeader <$> getEnv
   -- Helium network ID = 114784819836269
-  -- Blocks before 25000 on helium have TXs that relied on the buggy behavior, so preserve it there
-  let isHeliumPreFork = computeNetworkID == 114784819836269 && currentBlockNum < 25000
+  -- Blocks before 30150 on helium have TXs that relied on the buggy behavior, so preserve it there
+  let isHeliumPreFork = computeNetworkID == 114784819836269 && currentBlockNum < 30150
   pure . apSnoc parPath $ case idx of
     SAddress a _ -> MS.Index . BC.pack $ show a
     SInteger i -> MS.Index . BC.pack $ show i
