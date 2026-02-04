@@ -6,9 +6,13 @@ import ActivityFeedList from "../components/dashboard/ActivityFeedList";
 import ActivityFeedCards from "../components/dashboard/ActivityFeedCards";
 import { Activity } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs";
+import { useUser } from "@/context/UserContext";
+import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 
 const ActivityFeed = () => {
   const [activeTab, setActiveTab] = useState("my-activity");
+
+  const { isLoggedIn } = useUser();
 
   useEffect(() => {
     document.title = "Activity Feed | STRATO";
@@ -22,6 +26,9 @@ const ActivityFeed = () => {
         <DashboardHeader title="Activity Feed" />
 
         <main className="p-4 md:p-6 overflow-x-hidden">
+          {!isLoggedIn && (
+            <GuestSignInBanner message="Sign in to view detailed activity feed and filter events" />
+          )}
           <div className="mb-6 md:mb-8">
             <div className="flex items-center gap-2 md:gap-3 mb-3 md:mb-4">
               <Activity className="h-5 w-5 md:h-6 md:w-6 text-blue-600 dark:text-blue-400" />

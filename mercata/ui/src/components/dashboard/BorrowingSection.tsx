@@ -9,9 +9,10 @@ import { getTextColor } from "@/utils/lendingUtils";
 
 interface BorrowingSectionProps {
   loanData?: NewLoanData;
+  guestMode?: boolean;
 }
 
-const BorrowingSection = ({ loanData }: BorrowingSectionProps) => {
+const BorrowingSection = ({ loanData, guestMode = false }: BorrowingSectionProps) => {
   const navigate = useNavigate()
 
   // Calculate available borrowing power from loanData
@@ -80,30 +81,32 @@ const BorrowingSection = ({ loanData }: BorrowingSectionProps) => {
               <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
                 <span className="text-muted-foreground text-sm sm:text-base">Available Borrowing Power</span>
                 <span className="font-semibold text-sm sm:text-base">
-                  {availableBorrowingPower.toLocaleString("en-US", {
+                  {guestMode ? "-" : `${availableBorrowingPower.toLocaleString("en-US", {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
-                  })} USDST
+                  })} USDST`}
                 </span>
               </div>
               <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
                 <span className="text-muted-foreground text-sm sm:text-base">Total Amount Owed</span>
                 <span className="font-semibold text-sm sm:text-base">
-                  {currentBorrowed.toLocaleString("en-US", {
+                  {guestMode ? "-" : `${currentBorrowed.toLocaleString("en-US", {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
-                  })} USDST
+                  })} USDST`}
                 </span>
               </div>
               <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
                 <span className="text-muted-foreground text-sm sm:text-base">Interest Rate</span>
-                <span className="font-semibold text-sm sm:text-base">{((Number(loanData?.interestRate) || 0) / 100).toFixed(2)}%</span>
+                <span className="font-semibold text-sm sm:text-base">
+                  {guestMode ? "-" : `${((Number(loanData?.interestRate) || 0) / 100).toFixed(2)}%`}
+                </span>
               </div>
 
               <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
                 <span className="text-muted-foreground text-sm sm:text-base">Health Factor</span>
-                <span className="font-semibold text-sm sm:text-base" style={{ color: getTextColor((loanData?.healthFactor || 0), 3, currentBorrowed === 0) }}>
-                  {(() => {
+                <span className="font-semibold text-sm sm:text-base" style={{ color: guestMode ? undefined : getTextColor((loanData?.healthFactor || 0), 3, currentBorrowed === 0) }}>
+                  {guestMode ? "-" : (() => {
                     // Check if there's no outstanding debt
                     if (currentBorrowed === 0) {
                       return "No Loan";
