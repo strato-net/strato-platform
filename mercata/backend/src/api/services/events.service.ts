@@ -210,7 +210,10 @@ export const getActivitiesByTypes = async (
     cirrus.get(accessToken, `/${constants.Event}`, { params }),
   ]);
 
-  const total = countResponse.data?.[0]?.count || 0;
+  const total = (countResponse.data || []).reduce((sum: number, row: any) => {
+    const count = row?.count ? Number(row.count) : 0;
+    return sum + count;
+  }, 0);
   const data = eventsResponse.data || [];
 
   const events = (data as any[]).map((event: any) => {
