@@ -489,23 +489,28 @@ export const ActivityCard = ({ data }: { data: ActivityCardData }) => {
   return (
     <Card key={data.eventId} className="hover:bg-muted/50 transition-colors">
       <CardContent className="p-4">
-        <div className="flex items-start gap-4">
-          {/* Left: Activity Icon */}
-          <div className={`${activityIcon.color} w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0`}>
-            <IconComponent className="h-5 w-5 text-white" />
+        <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
+            {/* Left: Activity Icon */}
+            <div className={`${activityIcon.color} w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0`}>
+              <IconComponent className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+            </div>
+
+            {/* Mobile title next to icon */}
+            <h3 className="font-medium text-sm sm:text-base sm:hidden">{data.title}</h3>
           </div>
 
-          {/* Middle: Title and Description */}
+          {/* Middle: Title (desktop) and Description */}
           <div className="flex-1 min-w-0">
-            <h3 className="font-medium text-sm mb-1">{data.title}</h3>
-            <div className="text-xs space-y-1">
+            <h3 className="font-medium text-sm sm:text-base mb-1 hidden sm:block">{data.title}</h3>
+            <div className="text-xs sm:text-sm space-y-1">
               {descriptionParts}
             </div>
           </div>
 
           {/* Right: Timestamp */}
-          <div className="text-right flex-shrink-0">
-            <div className="text-xs text-muted-foreground">
+          <div className="text-left sm:text-right flex-shrink-0">
+            <div className="text-xs text-muted-foreground sm:whitespace-nowrap">
               {formatEventDate(data.timestamp)}
             </div>
           </div>
