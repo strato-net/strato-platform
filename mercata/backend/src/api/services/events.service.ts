@@ -96,29 +96,6 @@ export interface ActivityTypePair {
 }
 
 /**
- * Result of a filter query - can be a single query result or multiple queries that need combining
- */
-interface FilterQueryResult {
-  events: any[];
-  total: number;
-}
-
-/**
- * Filter function for "my activity" queries
- * Returns filter parameters and optionally a custom query executor for complex cases
- */
-type ActivityFilter = (
-  userAddress: string | undefined,
-  contractName: string,
-  eventName: string,
-  storageSelect: string,
-  fetchLimit: number,
-  accessToken: string,
-  timeRange?: string,
-  filterConfig?: FilterConfig
-) => Promise<FilterQueryResult>;
-
-/**
  * Helper function to get time range filter for PostgREST
  */
 const getTimeRangeFilter = (timeRange?: string): Record<string, string> => {
@@ -153,45 +130,79 @@ const getTimeRangeFilter = (timeRange?: string): Record<string, string> => {
   };
 };
 
-/**
- * Generic filter for single attribute filtering
- */
-const singleAttributeFilter: ActivityFilter = async (
-  userAddress,
-  contractName,
-  eventName,
-  storageSelect,
-  fetchLimit,
-  accessToken,
-  timeRange,
-  filterConfig?: FilterConfig
-) => {
-  const timeFilter = getTimeRangeFilter(timeRange);
-  const attribute = filterConfig?.type === "single" ? filterConfig.attribute : undefined;
-
-  const params: Record<string, string> = {
-    order: "block_timestamp.desc",
-    select: `*,${storageSelect}`,
-    "storage.contract.contract_name": `eq.${contractName}`,
-    event_name: `eq.${eventName}`,
-    limit: fetchLimit.toString(),
-    offset: "0",
-    ...timeFilter,
-  };
-
-  if (userAddress && attribute) {
-    params[`attributes->>${attribute}`] = `eq.${userAddress}`;
+export const getActivitiesByTypes = async (
+  accessToken: string,
+  activityTypePairs: ActivityTypePair[],
+  userAddress: string | undefined,
+  limit: number,
+  offset: number,
+  timeRange?: string
+): Promise<EventResponse> => {
+  const storageSelect = "storage!inner(contract!inner(contract_name))";
+  if (activityTypePairs.length === 0) {
+    return { events: [], total: 0 };
   }
 
-  const countParams: Record<string, string> = {
-    "storage.contract.contract_name": `eq.${contractName}`,
-    event_name: `eq.${eventName}`,
-    select: `${storageSelect},count()`,
+  const timeFilter = getTimeRangeFilter(timeRange);
+
+  const contractNames = Array.from(
+    new Set(activityTypePairs.map((pair) => pair.contract_name).filter(Boolean))
+  );
+  const eventNames = Array.from(
+    new Set(activityTypePairs.map((pair) => pair.event_name).filter(Boolean))
+  );
+
+  if (contractNames.length === 0 || eventNames.length === 0) {
+    return { events: [], total: 0 };
+  }
+
+  const attributeFilters: string[] = [];
+  if (userAddress) {
+    activityTypePairs.forEach((pair) => {
+      if (!pair.filterConfig) {
+        throw new Error(`No filter config provided for activity type: ${pair.contract_name}:${pair.event_name}`);
+      }
+
+      if (pair.filterConfig.type === "single") {
+        if (!pair.filterConfig.attribute) {
+          throw new Error(`Single filter requires attribute for ${pair.contract_name}:${pair.event_name}`);
+        }
+        attributeFilters.push(`attributes->>${pair.filterConfig.attribute}.eq.${userAddress}`);
+        return;
+      }
+
+      const attributes = pair.filterConfig.attributes || [];
+      if (attributes.length === 0) {
+        throw new Error(`OR filter requires attributes for ${pair.contract_name}:${pair.event_name}`);
+      }
+      attributes.forEach((attr) => {
+        attributeFilters.push(`attributes->>${attr}.eq.${userAddress}`);
+      });
+    });
+  }
+
+  const uniqueAttributeFilters = Array.from(new Set(attributeFilters));
+
+  const params: Record<string, string> = {
+    order: "block_timestamp.desc,id.desc",
+    select: `*,${storageSelect}`,
+    limit: limit.toString(),
+    offset: offset.toString(),
+    "storage.contract.contract_name": `in.(${contractNames.join(",")})`,
+    event_name: `in.(${eventNames.join(",")})`,
     ...timeFilter,
   };
 
-  if (userAddress && attribute) {
-    countParams[`attributes->>${attribute}`] = `eq.${userAddress}`;
+  const countParams: Record<string, string> = {
+    select: `${storageSelect},count()`,
+    "storage.contract.contract_name": `in.(${contractNames.join(",")})`,
+    event_name: `in.(${eventNames.join(",")})`,
+    ...timeFilter,
+  };
+
+  if (uniqueAttributeFilters.length > 0) {
+    params.or = `(${uniqueAttributeFilters.join(",")})`;
+    countParams.or = `(${uniqueAttributeFilters.join(",")})`;
   }
 
   const [countResponse, eventsResponse] = await Promise.all([
@@ -211,233 +222,4 @@ const singleAttributeFilter: ActivityFilter = async (
   });
 
   return { events, total };
-};
-
-/**
- * Generic filter for OR attribute filtering (e.g., from OR to)
- */
-const orAttributeFilter: ActivityFilter = async (
-  userAddress,
-  contractName,
-  eventName,
-  storageSelect,
-  fetchLimit,
-  accessToken,
-  timeRange,
-  filterConfig?: FilterConfig
-) => {
-  if (!userAddress) {
-    // If no userAddress, fetch all events without user filtering
-    const timeFilter = getTimeRangeFilter(timeRange);
-    const params: Record<string, string> = {
-      order: "block_timestamp.desc",
-      select: `*,${storageSelect}`,
-      "storage.contract.contract_name": `eq.${contractName}`,
-      event_name: `eq.${eventName}`,
-      limit: fetchLimit.toString(),
-      offset: "0",
-      ...timeFilter,
-    };
-
-    const countParams: Record<string, string> = {
-      "storage.contract.contract_name": `eq.${contractName}`,
-      event_name: `eq.${eventName}`,
-      select: `${storageSelect},count()`,
-      ...timeFilter,
-    };
-
-    const [countResponse, eventsResponse] = await Promise.all([
-      cirrus.get(accessToken, `/${constants.Event}`, { params: countParams }),
-      cirrus.get(accessToken, `/${constants.Event}`, { params }),
-    ]);
-
-    const total = countResponse.data?.[0]?.count || 0;
-    const data = eventsResponse.data || [];
-
-    const events = (data as any[]).map((event: any) => {
-      const { storage, ...eventWithoutStorage } = event;
-      return {
-        ...eventWithoutStorage,
-        contract_name: event.storage?.contract?.[0]?.contract_name || "",
-      };
-    });
-
-    return { events, total };
-  }
-
-  const timeFilter = getTimeRangeFilter(timeRange);
-  const attributes = filterConfig?.type === "or" ? (filterConfig.attributes || []) : [];
-
-  if (attributes.length === 0) {
-    throw new Error("OR filter requires at least one attribute");
-  }
-
-  const baseParams = {
-    order: "block_timestamp.desc",
-    select: `*,${storageSelect}`,
-    "storage.contract.contract_name": `eq.${contractName}`,
-    event_name: `eq.${eventName}`,
-    limit: fetchLimit.toString(),
-    offset: "0",
-    ...timeFilter,
-  };
-
-  // Create params for each attribute
-  const attributeParams = attributes.map(attr => ({
-    ...baseParams,
-    [`attributes->>${attr}`]: `eq.${userAddress}`,
-  }));
-
-  const attributeCountParams = attributes.map(attr => ({
-    "storage.contract.contract_name": `eq.${contractName}`,
-    event_name: `eq.${eventName}`,
-    [`attributes->>${attr}`]: `eq.${userAddress}`,
-    select: `${storageSelect},count()`,
-    ...timeFilter,
-  }));
-
-  // Execute all queries in parallel
-  const allPromises: Promise<any>[] = [];
-  attributeCountParams.forEach(params => {
-    allPromises.push(cirrus.get(accessToken, `/${constants.Event}`, { params }));
-  });
-  attributeParams.forEach(params => {
-    allPromises.push(cirrus.get(accessToken, `/${constants.Event}`, { params }));
-  });
-
-  if (allPromises.length === 0) {
-    return { events: [], total: 0 };
-  }
-
-  const responses = await Promise.all(allPromises);
-  const countResponses = responses.slice(0, attributes.length);
-  const eventResponses = responses.slice(attributes.length);
-
-  // Combine totals (conservative estimate)
-  const totals = countResponses.map(r => r.data?.[0]?.count || 0);
-  const total = Math.max(...totals);
-
-  // Combine and deduplicate events
-  const allEvents = eventResponses.flatMap((response: any) => {
-    return (response.data || []).map((event: any) => {
-      const { storage, ...eventWithoutStorage } = event;
-      return {
-        ...eventWithoutStorage,
-        contract_name: event.storage?.contract?.[0]?.contract_name || "",
-      };
-    });
-  });
-
-  // Deduplicate by id
-  const eventMap = new Map<number, any>();
-  allEvents.forEach(event => {
-    eventMap.set(event.id, event);
-  });
-
-  return { events: Array.from(eventMap.values()), total };
-};
-
-/**
- * Get filter function based on filter config
- */
-const getFilter = (filterConfig?: FilterConfig): ActivityFilter => {
-  if (!filterConfig) {
-    throw new Error("Filter config is required");
-  }
-
-  if (filterConfig.type === "or") {
-    return orAttributeFilter;
-  } else {
-    return singleAttributeFilter;
-  }
-};
-
-
-
-export const getActivitiesByTypes = async (
-  accessToken: string,
-  activityTypePairs: ActivityTypePair[],
-  userAddress: string | undefined,
-  limit: number,
-  offset: number,
-  timeRange?: string
-): Promise<EventResponse> => {
-  const storageSelect = "storage!inner(contract!inner(contract_name))";
-
-  // Query each pair separately to get accurate counts
-  // We fetch enough events to cover offset + limit for accurate pagination
-  // Note: For very high offsets, this will fetch many events and be slower
-  // Consider implementing cursor-based pagination for better performance at scale
-  const fetchLimit = limit + offset;
-
-  const timeFilter = getTimeRangeFilter(timeRange);
-
-  const pairQueries = activityTypePairs.map(async (pair) => {
-    // If no userAddress, fetch all events without user filtering
-    if (!userAddress) {
-      const params: Record<string, string> = {
-        order: "block_timestamp.desc",
-        select: `*,${storageSelect}`,
-        "storage.contract.contract_name": `eq.${pair.contract_name}`,
-        event_name: `eq.${pair.event_name}`,
-        limit: fetchLimit.toString(),
-        offset: "0",
-        ...timeFilter,
-      };
-
-      const countParams: Record<string, string> = {
-        "storage.contract.contract_name": `eq.${pair.contract_name}`,
-        event_name: `eq.${pair.event_name}`,
-        select: `${storageSelect},count()`,
-        ...timeFilter,
-      };
-
-      const [countResponse, eventsResponse] = await Promise.all([
-        cirrus.get(accessToken, `/${constants.Event}`, { params: countParams }),
-        cirrus.get(accessToken, `/${constants.Event}`, { params }),
-      ]);
-
-      const total = countResponse.data?.[0]?.count || 0;
-      const data = eventsResponse.data || [];
-
-      const events = (data as any[]).map((event: any) => {
-        const { storage, ...eventWithoutStorage } = event;
-        return {
-          ...eventWithoutStorage,
-          contract_name: event.storage?.contract?.[0]?.contract_name || "",
-        };
-      });
-
-      return { events, total };
-    }
-
-    // Use generic filter based on filterConfig
-    if (!pair.filterConfig) {
-      throw new Error(`No filter config provided for activity type: ${pair.contract_name}:${pair.event_name}`);
-    }
-
-    const filter = getFilter(pair.filterConfig);
-    return await filter(userAddress, pair.contract_name, pair.event_name, storageSelect, fetchLimit, accessToken, timeRange, pair.filterConfig);
-  });
-
-  const pairResults = await Promise.all(pairQueries);
-
-  // Combine all events and sort by block_timestamp descending
-  const allEvents = pairResults.flatMap(r => r.events);
-  allEvents.sort((a, b) => {
-    const timestampA = new Date(a.block_timestamp).getTime();
-    const timestampB = new Date(b.block_timestamp).getTime();
-    return timestampB - timestampA;
-  });
-
-  // Sum total counts
-  const total = pairResults.reduce((sum, r) => sum + r.total, 0);
-
-  // Apply pagination
-  const paginatedEvents = allEvents.slice(offset, offset + limit);
-
-  return {
-    events: paginatedEvents,
-    total: total,
-  };
 };
