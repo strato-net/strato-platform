@@ -121,8 +121,8 @@ export type TokenAddressExtractor = (event: Event) => string[];
  * Filter configuration for backend event filtering
  */
 export type FilterConfig =
-  | { type: "single"; attribute: string; excludeProtocolContracts?: boolean }
-  | { type: "or"; attributes: string[]; excludeProtocolContracts?: boolean };
+  | { type: "single"; attribute: string }
+  | { type: "or"; attributes: string[] };
 
 /**
  * Icon and color configuration for activity types
@@ -173,7 +173,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "Token",
     event_name: "Transfer",
     displayName: "Transfer",
-    filterConfig: { type: "or", attributes: ["from", "to"], excludeProtocolContracts: true },
+    filterConfig: { type: "or", attributes: ["from", "to"] },
     iconConfig: { icon: Send, color: "bg-blue-500" },
     iconType: "transfer",
     getTokenAddress: (event: Event) => [event.address].filter(Boolean),

@@ -1,6 +1,5 @@
 import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
-import { protocolContractAddresses } from "../../config/config";
 import type {
   EventData,
   EventResponse,
@@ -88,7 +87,6 @@ export interface FilterConfig {
   type: "single" | "or";
   attribute?: string;
   attributes?: string[];
-  excludeProtocolContracts?: boolean;
 }
 
 export interface ActivityTypePair {
@@ -171,13 +169,6 @@ const singleAttributeFilter: ActivityFilter = async (
   const timeFilter = getTimeRangeFilter(timeRange);
   const attribute = filterConfig?.type === "single" ? filterConfig.attribute : undefined;
 
-  // Build exclusion filter for protocol contracts if needed
-  const excludeProtocolFilter: Record<string, string> = {};
-  if (filterConfig?.excludeProtocolContracts && protocolContractAddresses.size > 0) {
-    const addressList = Array.from(protocolContractAddresses).join(",");
-    excludeProtocolFilter["transaction_sender"] = `not.in.(${addressList})`;
-  }
-
   const params: Record<string, string> = {
     order: "block_timestamp.desc",
     select: `*,${storageSelect}`,
@@ -186,7 +177,6 @@ const singleAttributeFilter: ActivityFilter = async (
     limit: fetchLimit.toString(),
     offset: "0",
     ...timeFilter,
-    ...excludeProtocolFilter,
   };
 
   if (userAddress && attribute) {
@@ -198,7 +188,6 @@ const singleAttributeFilter: ActivityFilter = async (
     event_name: `eq.${eventName}`,
     select: `${storageSelect},count()`,
     ...timeFilter,
-    ...excludeProtocolFilter,
   };
 
   if (userAddress && attribute) {
@@ -213,29 +202,13 @@ const singleAttributeFilter: ActivityFilter = async (
   const total = countResponse.data?.[0]?.count || 0;
   const data = eventsResponse.data || [];
 
-  let events = (data as any[]).map((event: any) => {
+  const events = (data as any[]).map((event: any) => {
     const { storage, ...eventWithoutStorage } = event;
     return {
       ...eventWithoutStorage,
       contract_name: event.storage?.contract?.[0]?.contract_name || "",
     };
   });
-
-  // Filter out events where from or to is a protocol contract
-  if (filterConfig?.excludeProtocolContracts && protocolContractAddresses.size > 0) {
-    events = events.filter((event: any) => {
-      const from = event.attributes?.from || event.attributes?.From;
-      const to = event.attributes?.to || event.attributes?.To;
-      const fromLower = from?.toLowerCase();
-      const toLower = to?.toLowerCase();
-
-      const isFromProtocol = fromLower && protocolContractAddresses.has(fromLower);
-      const isToProtocol = toLower && protocolContractAddresses.has(toLower);
-
-      // Exclude if from or to is a protocol contract
-      return !(isFromProtocol || isToProtocol);
-    });
-  }
 
   return { events, total };
 };
@@ -254,7 +227,7 @@ const orAttributeFilter: ActivityFilter = async (
   filterConfig?: FilterConfig
 ) => {
   if (!userAddress) {
-    // If no userAddress, fetch all events without user filtering, but still apply protocol contract filtering
+    // If no userAddress, fetch all events without user filtering
     const timeFilter = getTimeRangeFilter(timeRange);
     const params: Record<string, string> = {
       order: "block_timestamp.desc",
@@ -281,33 +254,13 @@ const orAttributeFilter: ActivityFilter = async (
     const total = countResponse.data?.[0]?.count || 0;
     const data = eventsResponse.data || [];
 
-    let events = (data as any[]).map((event: any) => {
+    const events = (data as any[]).map((event: any) => {
       const { storage, ...eventWithoutStorage } = event;
       return {
         ...eventWithoutStorage,
         contract_name: event.storage?.contract?.[0]?.contract_name || "",
       };
     });
-
-    // Filter out events where from or to is a protocol contract
-    if (filterConfig?.excludeProtocolContracts && protocolContractAddresses.size > 0) {
-      events = events.filter((event: any) => {
-        const from = event.attributes?.from || event.attributes?.From;
-        const to = event.attributes?.to || event.attributes?.To;
-        const fromLower = from?.toLowerCase();
-        const toLower = to?.toLowerCase();
-
-        const isFromProtocol = fromLower && protocolContractAddresses.has(fromLower);
-        const isToProtocol = toLower && protocolContractAddresses.has(toLower);
-
-        if (isFromProtocol || isToProtocol) {
-          console.log(`Filtering out Transfer: from=${fromLower}, to=${toLower}, isFromProtocol=${isFromProtocol}, isToProtocol=${isToProtocol}`);
-        }
-
-        // Exclude if from or to is a protocol contract
-        return !(isFromProtocol || isToProtocol);
-      });
-    }
 
     return { events, total };
   }
@@ -319,13 +272,6 @@ const orAttributeFilter: ActivityFilter = async (
     throw new Error("OR filter requires at least one attribute");
   }
 
-  // Build exclusion filter for protocol contracts if needed
-  const excludeProtocolFilter: Record<string, string> = {};
-  if (filterConfig?.excludeProtocolContracts && protocolContractAddresses.size > 0) {
-    const addressList = Array.from(protocolContractAddresses).join(",");
-    excludeProtocolFilter["transaction_sender"] = `not.in.(${addressList})`;
-  }
-
   const baseParams = {
     order: "block_timestamp.desc",
     select: `*,${storageSelect}`,
@@ -334,7 +280,6 @@ const orAttributeFilter: ActivityFilter = async (
     limit: fetchLimit.toString(),
     offset: "0",
     ...timeFilter,
-    ...excludeProtocolFilter,
   };
 
   // Create params for each attribute
@@ -349,7 +294,6 @@ const orAttributeFilter: ActivityFilter = async (
     [`attributes->>${attr}`]: `eq.${userAddress}`,
     select: `${storageSelect},count()`,
     ...timeFilter,
-    ...excludeProtocolFilter,
   }));
 
   // Execute all queries in parallel
@@ -384,26 +328,9 @@ const orAttributeFilter: ActivityFilter = async (
     });
   });
 
-  // Filter out events where from or to is a protocol contract
-  let filteredEvents = allEvents;
-  if (filterConfig?.excludeProtocolContracts && protocolContractAddresses.size > 0) {
-    filteredEvents = allEvents.filter((event: any) => {
-      const from = event.attributes?.from || event.attributes?.From;
-      const to = event.attributes?.to || event.attributes?.To;
-      const fromLower = from?.toLowerCase();
-      const toLower = to?.toLowerCase();
-
-      const isFromProtocol = fromLower && protocolContractAddresses.has(fromLower);
-      const isToProtocol = toLower && protocolContractAddresses.has(toLower);
-
-      // Exclude if from or to is a protocol contract
-      return !(isFromProtocol || isToProtocol);
-    });
-  }
-
   // Deduplicate by id
   const eventMap = new Map<number, any>();
-  filteredEvents.forEach(event => {
+  allEvents.forEach(event => {
     eventMap.set(event.id, event);
   });
 
@@ -446,7 +373,7 @@ export const getActivitiesByTypes = async (
   const timeFilter = getTimeRangeFilter(timeRange);
 
   const pairQueries = activityTypePairs.map(async (pair) => {
-    // If no userAddress, fetch all events without user filtering, but still apply protocol contract filtering
+    // If no userAddress, fetch all events without user filtering
     if (!userAddress) {
       const params: Record<string, string> = {
         order: "block_timestamp.desc",
@@ -473,29 +400,13 @@ export const getActivitiesByTypes = async (
       const total = countResponse.data?.[0]?.count || 0;
       const data = eventsResponse.data || [];
 
-      let events = (data as any[]).map((event: any) => {
+      const events = (data as any[]).map((event: any) => {
         const { storage, ...eventWithoutStorage } = event;
         return {
           ...eventWithoutStorage,
           contract_name: event.storage?.contract?.[0]?.contract_name || "",
         };
       });
-
-      // Filter out events where from or to is a protocol contract (if configured)
-      if (pair.filterConfig?.excludeProtocolContracts && protocolContractAddresses.size > 0) {
-        events = events.filter((event: any) => {
-          const from = event.attributes?.from || event.attributes?.From;
-          const to = event.attributes?.to || event.attributes?.To;
-          const fromLower = from?.toLowerCase();
-          const toLower = to?.toLowerCase();
-
-          const isFromProtocol = fromLower && protocolContractAddresses.has(fromLower);
-          const isToProtocol = toLower && protocolContractAddresses.has(toLower);
-
-          // Exclude if from or to is a protocol contract
-          return !(isFromProtocol || isToProtocol);
-        });
-      }
 
       return { events, total };
     }
