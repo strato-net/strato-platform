@@ -303,11 +303,11 @@ export const VaultProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Initialize on mount and when logged in
   useEffect(() => {
+    fetchVaultInfo(true);
+    fetchTransactions(true);
     if (isLoggedIn) {
-      fetchVaultInfo(true);
       fetchUserPosition();
       fetchUserBalances();
-      fetchTransactions(true);
     }
   }, [isLoggedIn, fetchVaultInfo, fetchUserPosition, fetchUserBalances, fetchTransactions]);
 

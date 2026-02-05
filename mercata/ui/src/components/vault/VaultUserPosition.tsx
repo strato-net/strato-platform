@@ -47,9 +47,10 @@ const formatEarnings = (value: string): { formatted: string; isPositive: boolean
 interface VaultUserPositionProps {
   onDeposit: () => void;
   onWithdraw: () => void;
+  guestMode?: boolean;
 }
 
-const VaultUserPosition = ({ onDeposit, onWithdraw }: VaultUserPositionProps) => {
+const VaultUserPosition = ({ onDeposit, onWithdraw, guestMode = false }: VaultUserPositionProps) => {
   const { vaultState } = useVaultContext();
   const {
     userShares,
@@ -59,6 +60,24 @@ const VaultUserPosition = ({ onDeposit, onWithdraw }: VaultUserPositionProps) =>
     loadingUser,
     shareTokenSymbol,
   } = vaultState;
+
+  if (guestMode) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Wallet className="h-5 w-5" />
+            Your Position
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground text-center py-4">
+            Sign in to view your vault position and manage deposits or withdrawals.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const hasPosition = BigInt(userShares || "0") > BigInt(0);
 

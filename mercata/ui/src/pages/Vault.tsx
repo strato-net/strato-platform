@@ -8,6 +8,8 @@ import VaultUserPosition from "@/components/vault/VaultUserPosition";
 import VaultDepositModal from "@/components/vault/VaultDepositModal";
 import VaultWithdrawModal from "@/components/vault/VaultWithdrawModal";
 import { useVaultContext } from "@/context/VaultContext";
+import { useUser } from "@/context/UserContext";
+import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 
 const Vault = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -15,6 +17,8 @@ const Vault = () => {
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
 
   const { refreshVault } = useVaultContext();
+  const { isLoggedIn } = useUser();
+  const guestMode = !isLoggedIn;
 
   useEffect(() => {
     document.title = "STRATO Vault | STRATO";
@@ -46,6 +50,9 @@ const Vault = () => {
         />
 
         <main className="p-6 space-y-8">
+          {guestMode && (
+            <GuestSignInBanner message="Sign in to deposit or withdraw from the vault" />
+          )}
           {/* Global Metrics */}
           <VaultOverview />
 
@@ -53,6 +60,7 @@ const Vault = () => {
           <VaultUserPosition
             onDeposit={() => setIsDepositModalOpen(true)}
             onWithdraw={() => setIsWithdrawModalOpen(true)}
+            guestMode={guestMode}
           />
 
           {/* Recent Transactions */}
@@ -61,17 +69,21 @@ const Vault = () => {
       </div>
 
       {/* Modals */}
-      <VaultDepositModal
-        isOpen={isDepositModalOpen}
-        onClose={() => setIsDepositModalOpen(false)}
-        onSuccess={handleDepositSuccess}
-      />
+      {!guestMode && (
+        <>
+          <VaultDepositModal
+            isOpen={isDepositModalOpen}
+            onClose={() => setIsDepositModalOpen(false)}
+            onSuccess={handleDepositSuccess}
+          />
 
-      <VaultWithdrawModal
-        isOpen={isWithdrawModalOpen}
-        onClose={() => setIsWithdrawModalOpen(false)}
-        onSuccess={handleWithdrawSuccess}
-      />
+          <VaultWithdrawModal
+            isOpen={isWithdrawModalOpen}
+            onClose={() => setIsWithdrawModalOpen(false)}
+            onSuccess={handleWithdrawSuccess}
+          />
+        </>
+      )}
     </div>
   );
 };

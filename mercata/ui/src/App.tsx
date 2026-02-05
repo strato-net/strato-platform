@@ -194,9 +194,9 @@ const App = () => {
                                           <Route
                                             path="/dashboard/vault"
                                             element={
-                                              <ProtectedRoute>
+                                              <GuestAccessibleRoute>
                                                 <Vault />
-                                              </ProtectedRoute>
+                                              </GuestAccessibleRoute>
                                             }
                                           />
                                           <Route
