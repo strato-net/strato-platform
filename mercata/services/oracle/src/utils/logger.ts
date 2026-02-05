@@ -1,4 +1,5 @@
 import { healthMonitor } from "./healthMonitor";
+import { sendWarningToSlack } from "./slackNotifier";
 
 // Utility function to sanitize sensitive data in log messages
 function sanitizeLogMessage(message: string): string {
@@ -34,6 +35,9 @@ export function logWarning(context: string, message: string): void {
     console.warn(`\x1b[33m${warning_message}\x1b[0m`); // Yellow color
     healthMonitor.appendToWarningFile(warning_message).catch(err => {
         console.error("Failed to write to warning file:", err);
+    });
+    sendWarningToSlack(context, sanitizedMessage, logTime).catch(err => {
+        logError('SlackNotifier', err instanceof Error ? err : new Error(String(err)));
     });
 }
 
