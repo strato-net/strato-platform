@@ -24,13 +24,18 @@ contract record PriceOracle is Ownable {
     mapping(address => uint256) public record lastUpdated;
     mapping(address => OracleState) public record oracleState;
 
-    uint256 public queueSize = 2;  // Global queue size, synced to per-asset on push
+    uint256 public queueSize;  // Global queue size, synced to per-asset on push
 
     // Events
     event PriceUpdated(address indexed asset, uint256 price, uint256 timestamp);
     event BatchPricesUpdated(address[] assets, uint256[] priceValues, uint256 timestamp);
 
     constructor(address _owner) Ownable(_owner) {}
+
+    function initialize() external onlyOwner {
+        // @dev important: must be set here for proxied instances; ensure consistency with desired initial values
+        queueSize = 2;
+    }
 
     /**
      * @dev Rotate ring buffer to linear order (oldest at index 0).

@@ -36,7 +36,7 @@ contract Describe_PriceOracle {
     function beforeEach() {
         // Create a fresh oracle instance for each test
         oracle = new PriceOracle(owner);
-        // Global queue size defaults to 2, auto-synced on first push per asset
+        oracle.initialize();
     }
 
     // ============ CONSTRUCTOR TESTS ============
