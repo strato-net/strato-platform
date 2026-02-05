@@ -33,17 +33,18 @@ export async function sendWarningToSlack(context: string, message: string, times
     if (!client) return;
 
     const channel = process.env.SLACK_WARNING_CHANNEL || '#ops-monitoring';
+    const oracleName = process.env.ORACLE_NAME || 'Dev Oracle';
     const emoji = getWarningEmoji(message);
 
     await client.chat.postMessage({
         channel,
-        text: `${emoji} Oracle Warning: ${message.slice(0, 100)}...`,
+        text: `${emoji} ${oracleName} - Warning: ${message.slice(0, 100)}...`,
         blocks: [
             {
                 type: 'header',
                 text: {
                     type: 'plain_text',
-                    text: `${emoji} Oracle Warning`,
+                    text: `${emoji} ${oracleName} - Warning`,
                     emoji: true
                 }
             },
