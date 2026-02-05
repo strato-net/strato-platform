@@ -15,6 +15,7 @@ module Railgun.Unshield
   , serializeUnshieldRequest
   ) where
 
+import Data.Bits ((.&.), shiftR)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as B16
@@ -22,6 +23,7 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import qualified Numeric
+import qualified Crypto.Hash.Poseidon as Poseidon
 
 import Railgun.Types (TokenData(..), TokenType(..), CommitmentPreimage(..))
 
@@ -95,17 +97,48 @@ dummyProof = SnarkProof
   , proofC = dummyG1
   }
 
+-- | Compute commitment hash from preimage
+-- hash = Poseidon(npk, tokenID, value)
+-- For ERC20: tokenID = address as uint256
+hashCommitmentPreimage :: CommitmentPreimage -> ByteString
+hashCommitmentPreimage CommitmentPreimage{..} =
+  let npk = cpNpk
+      -- For ERC20, tokenID is just the address as uint256
+      tokenID = hexToInteger (tokenAddress cpToken)
+      value = cpValue
+      -- Poseidon hash with 3 inputs
+      hashResult = Poseidon.fromF $ Poseidon.poseidon 
+        [Poseidon.toF npk, Poseidon.toF tokenID, Poseidon.toF value]
+  in integerToBytes32 hashResult
+
+-- | Convert hex text to Integer
+hexToInteger :: Text -> Integer
+hexToInteger t =
+  let cleanHex = if "0x" `T.isPrefixOf` T.toLower t then T.drop 2 t else t
+  in case B16.decode (TE.encodeUtf8 cleanHex) of
+       Right bs -> bytesToInteger bs
+       Left _ -> 0
+
+bytesToInteger :: ByteString -> Integer
+bytesToInteger = BS.foldl' (\acc b -> acc * 256 + fromIntegral b) 0
+
+-- | Convert Integer to 32-byte ByteString (big-endian)
+integerToBytes32 :: Integer -> ByteString
+integerToBytes32 n = BS.pack $ reverse $ take 32 $ 
+  map (\i -> fromIntegral $ (n `shiftR` (i * 8)) .&. 0xff) [0..31]
+
 -- | Create a dummy unshield request
 -- This will fail on-chain (invalid proof) but establishes the transaction structure
 createDummyUnshieldRequest 
   :: Text           -- ^ Token address
   -> Integer        -- ^ Amount to unshield
   -> Text           -- ^ Recipient address (for unshield)
+  -> Integer        -- ^ Chain ID
+  -> ByteString     -- ^ Merkle root (32 bytes)
+  -> Int            -- ^ Tree number
   -> UnshieldRequest
-createDummyUnshieldRequest tokenAddr amount _recipient =
-  let 
-    -- Dummy merkle root (would come from on-chain state)
-    dummyMerkleRoot = BS.replicate 32 0x01
+createDummyUnshieldRequest tokenAddr amount recipient chainId merkleRoot treeNum =
+  let
     
     -- Dummy nullifier (would be computed from note + spending key)
     dummyNullifier = BS.replicate 32 0x02
@@ -117,30 +150,37 @@ createDummyUnshieldRequest tokenAddr amount _recipient =
       , tokenSubID = 0
       }
     
-    -- Unshield preimage (the note being spent)
+    -- Recipient address as NPK (for NORMAL unshield, npk = recipient address as uint256)
+    recipientAsNpk = hexToInteger recipient
+    
+    -- Unshield preimage - describes what's being withdrawn
     unshieldPreimage = CommitmentPreimage
-      { cpNpk = 0x0303030303030303030303030303030303030303030303030303030303030303  -- dummy NPK
+      { cpNpk = recipientAsNpk  -- Recipient's public address
       , cpToken = tokenData
       , cpValue = amount
       }
     
+    -- Compute commitment hash for the unshield
+    -- This must be the last element of txCommitments
+    unshieldCommitmentHash = hashCommitmentPreimage unshieldPreimage
+    
     -- Bound params
     boundParams = BoundParams
-      { bpTreeNumber = 0
+      { bpTreeNumber = treeNum
       , bpMinGasPrice = 0
       , bpUnshield = UnshieldNormal
-      , bpChainID = 29952266356487028  -- STRATO jimtest chain ID
+      , bpChainID = chainId
       , bpAdaptContract = "0x0000000000000000000000000000000000000000"
       , bpAdaptParams = BS.replicate 32 0
-      , bpCommitmentCiphertext = []
+      , bpCommitmentCiphertext = []  -- Empty since we have 1 commitment (unshield)
       }
     
     -- The transaction
     tx = Transaction
       { txProof = dummyProof
-      , txMerkleRoot = dummyMerkleRoot
+      , txMerkleRoot = merkleRoot
       , txNullifiers = [dummyNullifier]
-      , txCommitments = []  -- No new commitments for pure unshield
+      , txCommitments = [unshieldCommitmentHash]  -- Hash of unshield preimage
       , txBoundParams = boundParams
       , txUnshieldPreimage = unshieldPreimage
       }
