@@ -53,6 +53,8 @@ executables:
     dependencies:
       - aeson
       - airlock
+      - base16-bytestring
+      - bloc2api
       - bytestring
       - directory
       - filepath
@@ -61,6 +63,7 @@ executables:
       - http-types
       - network-uri
       - optparse-applicative
+      - strato-model
       - text
       - time
 

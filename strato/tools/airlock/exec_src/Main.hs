@@ -8,6 +8,8 @@ import Control.Exception (try, SomeException)
 import Control.Monad (when)
 import Data.Aeson (decode, encode, (.:), (.=), object)
 import Data.Aeson.Types (parseMaybe)
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Lazy as LBS
 import Data.Time.Clock.POSIX (getPOSIXTime)
 import Options.Applicative
@@ -24,10 +26,13 @@ import qualified Data.Text.Encoding as TE
 import Network.URI (parseURI, uriAuthority, uriRegName, uriPort)
 import Text.Printf (printf)
 
+import Bloc.API (BlocTransactionResult(..))
+import qualified Bloc.API as Bloc
+import Blockchain.Strato.Model.Keccak256 (keccak256ToHex)
 import Railgun.Keys (deriveFromMnemonic, railgunAddress)
 import Railgun.Shield (createERC20ShieldRequest, serializeShieldRequest)
 import Railgun.Unshield (createDummyUnshieldRequest, serializeUnshieldRequest)
-import Railgun.API (StratoConfig(..), callShield, callTransact, approveToken)
+import Railgun.API (StratoConfig(..), callShield, callTransact, approveToken, getChainId, getMerkleRoot, getTreeNumber)
 import Railgun.Types (RailgunAddress(..), RailgunKeys, TokenType(..))
 import Railgun.Balance (scanShieldedBalance, ShieldedNote(..), TokenBalance(..))
 
@@ -706,8 +711,8 @@ runShield sopts = do
           TIO.hPutStrLn stderr $ "Shield failed: " <> err
           exitFailure
         Right results -> do
-          TIO.putStrLn $ "Shield successful: " <> T.pack (show $ length results) <> " transaction result(s)"
-          TIO.putStrLn "Shield successful!"
+          TIO.putStrLn $ "Shield response: " <> T.pack (show $ length results) <> " transaction result(s)"
+          mapM_ printTxResult results
       
       exitSuccess
 
@@ -733,13 +738,17 @@ runUnshield uopts = do
   TIO.putStrLn "*** The transaction WILL FAIL on-chain (invalid proof) ***"
   TIO.putStrLn "*** This is for testing transaction structure only ***\n"
   
-  let unshieldReq = createDummyUnshieldRequest 
-                      (T.pack $ uoTokenAddress uopts)
-                      (uoAmount uopts)
-                      (T.pack $ uoRecipient uopts)
-  
   if uoDryRun uopts
     then do
+      -- For dry run, use placeholder values
+      let dummyMerkleRoot = BS.replicate 32 0x01
+          unshieldReq = createDummyUnshieldRequest 
+                          (T.pack $ uoTokenAddress uopts)
+                          (uoAmount uopts)
+                          (T.pack $ uoRecipient uopts)
+                          0  -- Placeholder chain ID
+                          dummyMerkleRoot
+                          0  -- Placeholder tree number
       TIO.putStrLn "\n=== Unshield Request (dry run) ==="
       TIO.putStrLn $ serializeUnshieldRequest unshieldReq
       exitSuccess
@@ -755,16 +764,60 @@ runUnshield uopts = do
             , railgunContractAddress = T.pack $ uoRailgunContractAddr uopts
             }
       
+      -- Get chain ID from network
+      TIO.putStrLn "Fetching chain ID..."
+      chainIdResult <- getChainId config
+      chainId <- case chainIdResult of
+        Left err -> do
+          TIO.hPutStrLn stderr $ "Failed to get chain ID: " <> err
+          exitFailure
+        Right cid -> do
+          TIO.putStrLn $ "Chain ID: " <> T.pack (show cid)
+          return cid
+      
+      -- Get merkle root from contract
+      TIO.putStrLn "Fetching merkle root..."
+      merkleRootResult <- getMerkleRoot config
+      merkleRootHex <- case merkleRootResult of
+        Left err -> do
+          TIO.hPutStrLn stderr $ "Failed to get merkle root: " <> err
+          exitFailure
+        Right root -> do
+          TIO.putStrLn $ "Merkle root: " <> root
+          return root
+      
+      -- Get tree number from contract
+      TIO.putStrLn "Fetching tree number..."
+      treeNumResult <- getTreeNumber config
+      treeNum <- case treeNumResult of
+        Left err -> do
+          TIO.hPutStrLn stderr $ "Failed to get tree number: " <> err
+          exitFailure
+        Right tn -> do
+          TIO.putStrLn $ "Tree number: " <> T.pack (show tn)
+          return tn
+      
+      -- Convert merkle root hex to bytes
+      let merkleRootBytes = hexToBytes merkleRootHex
+      
+      let unshieldReq = createDummyUnshieldRequest 
+                          (T.pack $ uoTokenAddress uopts)
+                          (uoAmount uopts)
+                          (T.pack $ uoRecipient uopts)
+                          chainId
+                          merkleRootBytes
+                          (fromIntegral treeNum)
+      
       -- Send unshield transaction
       TIO.putStrLn "Sending unshield transaction (will fail with invalid proof)..."
       unshieldResult <- callTransact config unshieldReq
       case unshieldResult of
         Left err -> do
-          TIO.hPutStrLn stderr $ "Unshield failed (expected): " <> err
+          TIO.hPutStrLn stderr $ "Unshield failed: " <> err
           exitFailure
         Right results -> do
           TIO.putStrLn $ "Unshield response: " <> T.pack (show $ length results) <> " transaction result(s)"
-          TIO.putStrLn "Unshield request sent (likely failed verification)."
+          mapM_ printTxResult results
       
       exitSuccess
 
@@ -841,6 +894,16 @@ printNote note = do
   TIO.putStrLn $ "    Value: " <> T.pack (printf "%.18f" valueInTokens) <> " tokens"
   TIO.putStrLn ""
 
+-- | Print transaction result with status
+printTxResult :: BlocTransactionResult -> IO ()
+printTxResult result = do
+  let status = blocTransactionStatus result
+      txHash = T.pack $ keccak256ToHex $ blocTransactionHash result
+  case status of
+    Bloc.Success -> TIO.putStrLn $ "  Transaction " <> txHash <> ": SUCCESS"
+    Bloc.Failure -> TIO.putStrLn $ "  Transaction " <> txHash <> ": FAILED"
+    Bloc.Pending -> TIO.putStrLn $ "  Transaction " <> txHash <> ": PENDING"
+
 -- | Parse host and port from a URL string like "http://localhost:8081"
 parseHostPort :: String -> (String, Int)
 parseHostPort url = case parseURI url of
@@ -852,3 +915,11 @@ parseHostPort url = case parseURI url of
       in (host, port)
     Nothing -> ("localhost", 8081)
   Nothing -> ("localhost", 8081)
+
+-- | Convert hex string to ByteString
+hexToBytes :: T.Text -> BS.ByteString
+hexToBytes hex = 
+  let cleanHex = if "0x" `T.isPrefixOf` T.toLower hex then T.drop 2 hex else hex
+  in case B16.decode (TE.encodeUtf8 cleanHex) of
+    Right bs -> bs
+    Left _ -> BS.empty
