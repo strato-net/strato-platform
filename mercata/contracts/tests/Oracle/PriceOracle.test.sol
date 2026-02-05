@@ -36,7 +36,6 @@ contract Describe_PriceOracle {
     function beforeEach() {
         // Create a fresh oracle instance for each test
         oracle = new PriceOracle(owner);
-        oracle.initialize();
     }
 
     // ============ CONSTRUCTOR TESTS ============

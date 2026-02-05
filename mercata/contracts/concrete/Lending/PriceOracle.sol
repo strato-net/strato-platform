@@ -24,7 +24,7 @@ contract record PriceOracle is Ownable {
     mapping(address => uint256) public record lastUpdated;
     mapping(address => OracleState) public record oracleState;
 
-    uint256 public queueSize;  // Global queue size, synced to per-asset on push
+    uint256 public queueSize = 2;  // Global queue size, synced to per-asset on push
 
     // Events
     event PriceUpdated(address indexed asset, uint256 price, uint256 timestamp);
