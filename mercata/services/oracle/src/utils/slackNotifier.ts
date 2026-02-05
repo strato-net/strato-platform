@@ -1,16 +1,24 @@
 import { WebClient } from '@slack/web-api';
 import { logInfo } from './logger';
 
-const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
-const SLACK_CHANNEL = process.env.SLACK_WARNING_CHANNEL || '#ops-monitoring';
-
 let slackClient: WebClient | null = null;
+let initialized = false;
 
-if (SLACK_BOT_TOKEN) {
-    slackClient = new WebClient(SLACK_BOT_TOKEN);
-    console.log(`[SlackNotifier] Initialized - warnings will be sent to ${SLACK_CHANNEL}`);
-} else {
-    console.log('[SlackNotifier] SLACK_BOT_TOKEN not set - Slack notifications disabled');
+function getSlackClient(): WebClient | null {
+    if (initialized) return slackClient;
+
+    initialized = true;
+    const token = process.env.SLACK_BOT_TOKEN;
+
+    if (token) {
+        slackClient = new WebClient(token);
+        const channel = process.env.SLACK_WARNING_CHANNEL || '#ops-monitoring';
+        console.log(`[SlackNotifier] Initialized - warnings will be sent to ${channel}`);
+    } else {
+        console.log('[SlackNotifier] SLACK_BOT_TOKEN not set - Slack notifications disabled');
+    }
+
+    return slackClient;
 }
 
 function getWarningEmoji(message: string): string {
@@ -21,12 +29,14 @@ function getWarningEmoji(message: string): string {
 }
 
 export async function sendWarningToSlack(context: string, message: string, timestamp: string): Promise<void> {
-    if (!slackClient) return;
+    const client = getSlackClient();
+    if (!client) return;
 
+    const channel = process.env.SLACK_WARNING_CHANNEL || '#ops-monitoring';
     const emoji = getWarningEmoji(message);
 
-    await slackClient.chat.postMessage({
-        channel: SLACK_CHANNEL,
+    await client.chat.postMessage({
+        channel,
         text: `${emoji} Oracle Warning: ${message.slice(0, 100)}...`,
         blocks: [
             {
@@ -63,5 +73,5 @@ export async function sendWarningToSlack(context: string, message: string, times
         ]
     });
 
-    logInfo('SlackNotifier', `Warning sent to ${SLACK_CHANNEL}`);
+    logInfo('SlackNotifier', `Warning sent to ${channel}`);
 }
