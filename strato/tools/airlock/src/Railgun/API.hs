@@ -147,7 +147,7 @@ approveToken config tokenAddr amount = do
   let contractAddr = textToAddress tokenAddr
       args = Map.fromList
         [ ("spender", ArgString $ railgunContractAddress config)
-        , ("amount", ArgString $ T.pack $ show amount)
+        , ("value", ArgString $ T.pack $ show amount)
         ]
       
       payload = BlocFunction $ FunctionPayload

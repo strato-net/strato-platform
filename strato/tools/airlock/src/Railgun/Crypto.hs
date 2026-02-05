@@ -10,6 +10,8 @@ module Railgun.Crypto
   , sha256
   , sha512
   , poseidonHash
+    -- * Nullifier computation
+  , computeNullifier
     -- * Encryption (ECIES compatible with noble-ed25519)
   , getSharedSymmetricKey
   , encryptRandom
@@ -78,6 +80,16 @@ sha512 bs = convert (hash bs :: Digest SHA512)
 -- Used by Railgun for computing NPK, commitments, and Merkle tree
 poseidonHash :: [Integer] -> Integer
 poseidonHash inputs = Poseidon.fromF $ Poseidon.poseidon (map Poseidon.toF inputs)
+
+-- | Compute nullifier for spending a note
+-- The nullifier is a unique identifier that prevents double-spending
+-- Formula: nullifier = poseidon(nullifierKey, leafIndex, notePublicKey)
+computeNullifier :: Integer  -- ^ Nullifier key (from RailgunKeys)
+                 -> Integer  -- ^ Leaf index in merkle tree
+                 -> Integer  -- ^ Note public key (npk)
+                 -> Integer
+computeNullifier nullifierKey leafIndex npk =
+  poseidonHash [nullifierKey, leafIndex, npk]
 
 -- ============================================================================
 -- Ed25519 Curve Operations (for Railgun-compatible shared secret)
