@@ -77,7 +77,7 @@ contract record Vault is Ownable, Pausable {
         address _shareToken
     ) external onlyOwner {
         WAD = 1e18;
-        MIN_FIRST_DEPOSIT_USD = 50000 * WAD; // $50,000
+        MIN_FIRST_DEPOSIT_USD = 30000 * WAD; // $30,000
 
         require(_priceOracle != address(0), "Vault: invalid oracle");
         require(_botExecutor != address(0), "Vault: invalid bot executor");
