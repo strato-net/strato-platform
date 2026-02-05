@@ -75,7 +75,8 @@ export const defaultReferralServiceFor: Record<string, string> = {
 };
 
 export const defaultVaultFactoryFor: Record<string, string> = {
-  "114784819836269": "37b446ec53607a0cdae38c820b838baf240a8b74" // Helium testnet
+  "114784819836269": "37b446ec53607a0cdae38c820b838baf240a8b74", // Helium testnet
+  "33056204878082667": "55c77951e9cadc73af24ec18881d01fedff1f1f1" // Upquark mainnet
 };
 
 export let bridgeUrl: string | undefined;

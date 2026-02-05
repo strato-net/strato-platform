@@ -48,6 +48,9 @@ import "Escrow/Escrow.sol";
 //Proxy
 import "Proxy/Proxy.sol";
 
+//Vault
+import "Vault/Vault.sol";
+import "Vault/VaultFactory.sol";
 //TODO
 contract record Mercata is Authorizable {
     RateStrategy public rateStrategy;
