@@ -313,7 +313,7 @@ shieldParser = Shield <$> (ShieldOpts
      <> help "STRATO base URL" )
   <*> strOption
       ( long "railguncontractaddr"
-     <> value "959b55477e53900402fdbb2633b56709d252cadd"
+     <> value "95be101d075f44084ca1cf51d0106c8606773952"
      <> metavar "ADDRESS"
      <> help "Railgun contract address" )
   <*> option auto
@@ -358,7 +358,7 @@ unshieldParser = Unshield <$> (UnshieldOpts
      <> help "STRATO base URL" )
   <*> strOption
       ( long "railguncontractaddr"
-     <> value "959b55477e53900402fdbb2633b56709d252cadd"
+     <> value "95be101d075f44084ca1cf51d0106c8606773952"
      <> metavar "ADDRESS"
      <> help "Railgun contract address" )
   <*> option auto
@@ -385,7 +385,7 @@ balanceParser = Balance <$> (BalanceOpts
      <> help "STRATO base URL" )
   <*> strOption
       ( long "railguncontractaddr"
-     <> value "959b55477e53900402fdbb2633b56709d252cadd"
+     <> value "95be101d075f44084ca1cf51d0106c8606773952"
      <> metavar "ADDRESS"
      <> help "Railgun contract address" )
   <*> option auto

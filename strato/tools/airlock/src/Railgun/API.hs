@@ -27,7 +27,7 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import qualified Data.Vector as V
-import Data.Aeson (decode, eitherDecode, parseJSON, (.:), Value)
+import Data.Aeson (eitherDecode, parseJSON, (.:), Value)
 import Data.Aeson.Types (parseMaybe, Parser)
 import Network.HTTP.Client (newManager, defaultManagerSettings, httpLbs, parseRequest, requestHeaders, responseBody)
 import Servant.Client (BaseUrl(..), Scheme(..), ClientEnv(..), mkClientEnv, runClientM, defaultMakeClientRequest)
@@ -50,7 +50,7 @@ defaultConfig = StratoConfig
   { stratoHost = "localhost"
   , stratoPort = 8081
   , stratoAuthToken = ""  -- Must be set from .token file
-  , railgunContractAddress = "959b55477e53900402fdbb2633b56709d252cadd"
+  , railgunContractAddress = "95be101d075f44084ca1cf51d0106c8606773952"
   }
 
 -- | Create a servant-client environment with custom headers for nginx CSRF bypass
@@ -266,20 +266,18 @@ getChainId config = do
         { requestHeaders = [("Authorization", TE.encodeUtf8 $ "Bearer " <> stratoAuthToken config)]
         }
   response <- httpLbs requestWithAuth manager
-  case decode (responseBody response) of
-    Nothing -> return $ Left "Failed to parse metadata response"
-    Just json -> case parseMaybe (\obj -> obj .: "networkID") json of
+  case eitherDecode (responseBody response) of
+    Left err -> return $ Left $ "Failed to parse metadata response: " <> T.pack err
+    Right json -> case parseMaybe (\obj -> obj .: "networkID") json of
       Nothing -> return $ Left "networkID not found in metadata"
       Just (networkIdStr :: Text) -> case reads (T.unpack networkIdStr) of
         [(n, "")] -> return $ Right n
         _ -> return $ Left $ "Failed to parse networkID: " <> networkIdStr
 
 -- | Get the current merkle root from the Railgun contract
--- Uses Cirrus storage table which is more reliable than bloc state endpoint
 getMerkleRoot :: StratoConfig -> IO (Either Text Text)
 getMerkleRoot config = do
   manager <- newManager defaultManagerSettings
-  -- Use Cirrus storage table instead of bloc state endpoint
   let storageUrl = "http://" ++ T.unpack (stratoHost config) ++ ":" ++ show (stratoPort config) 
             ++ "/cirrus/search/storage?address=eq." 
             ++ T.unpack (railgunContractAddress config) ++ "&limit=1"
@@ -292,7 +290,7 @@ getMerkleRoot config = do
         }
   response <- httpLbs requestWithAuth manager
   case eitherDecode (responseBody response) of
-    Left _ -> return $ Left "Failed to parse Cirrus storage response"
+    Left err -> return $ Left $ "Failed to parse Cirrus storage response: " <> T.pack err
     Right (results :: [Value]) -> 
       case results of
         [] -> return $ Left "No storage found for contract"
@@ -307,11 +305,9 @@ getMerkleRoot config = do
       dataObj .: "merkleRoot"
 
 -- | Get the current tree number from the Railgun contract
--- Uses Cirrus storage table which is more reliable than bloc state endpoint
 getTreeNumber :: StratoConfig -> IO (Either Text Integer)
 getTreeNumber config = do
   manager <- newManager defaultManagerSettings
-  -- Use Cirrus storage table instead of bloc state endpoint
   let storageUrl = "http://" ++ T.unpack (stratoHost config) ++ ":" ++ show (stratoPort config) 
             ++ "/cirrus/search/storage?address=eq." 
             ++ T.unpack (railgunContractAddress config) ++ "&limit=1"
@@ -324,7 +320,7 @@ getTreeNumber config = do
         }
   response <- httpLbs requestWithAuth manager
   case eitherDecode (responseBody response) of
-    Left _ -> return $ Right 0  -- Default to tree 0
+    Left err -> return $ Left $ "Failed to parse Cirrus storage response: " <> T.pack err
     Right (results :: [Value]) -> 
       case results of
         [] -> return $ Right 0
