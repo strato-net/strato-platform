@@ -163,6 +163,7 @@ router.post("/collateral/withdraw-max", authHandler.authorizeRequest(), LendingC
  *               additionalProperties: true
  */
 router.get("/collateral", authHandler.authorizeRequest(), LendingController.getCollateralAndBalance);
+router.get("/collateral/public", authHandler.authorizeRequest(true), LendingController.getPublicCollateralInfo);
 router.post("/collateral", authHandler.authorizeRequest(), LendingController.supplyCollateral);
 router.delete("/collateral", authHandler.authorizeRequest(), LendingController.withdrawCollateral);
 
@@ -182,6 +183,7 @@ router.delete("/collateral", authHandler.authorizeRequest(), LendingController.w
  *               additionalProperties: true
  */
 router.get("/liquidity", authHandler.authorizeRequest(), LendingController.getLiquidityAndBalance);
+router.get("/liquidity/public", authHandler.authorizeRequest(true), LendingController.getPublicLiquidityInfo);
 
 /**
  * @openapi
@@ -291,14 +293,10 @@ router.patch("/loans", authHandler.authorizeRequest(), LendingController.repay);
  *             type: object
  *             required:
  *               - amount
- *               - includeStakedMToken
  *             properties:
  *               amount:
  *                 type: string
  *                 description: Liquidity amount to withdraw (decimal string)
- *               includeStakedMToken:
- *                 type: boolean
- *                 description: Whether to include staked mTokens in the withdrawal
  *     responses:
  *       200:
  *         description: Withdrawal transaction payload
@@ -640,6 +638,7 @@ router.post("/admin/unpause", authHandler.authorizeRequest(), LendingController.
  *               additionalProperties: true
  */
 router.get("/safety/info", authHandler.authorizeRequest(), SafetyController.getInfo);
+router.get("/safety/info/public", authHandler.authorizeRequest(true), SafetyController.getPublicInfo);
 
 /**
  * @openapi

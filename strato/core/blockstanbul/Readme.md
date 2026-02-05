@@ -44,8 +44,7 @@ reaches ethcrypt. If integration becomes a concern, that may need to be fixed.
 There are also some supplementary p2p controls (GapFound/LeadFound) that can be
 used to bring a peer that's behind up to speed.
 
-The protocol between the sequencer and the VM has a MakeBlockCommand for
-PBFT to request a block when this node is the proposer, and the ToCommit
+The protocol between the sequencer and the VM has a ToCommit
 message to finalize a block with the VM. When it receives a PRE_PREPARE, the
 sequencer will decide if it should vote for the block by sending a RunPreprepare
 message to the VM. If the stateroot matches what is expected, the VM will respond

@@ -1,19 +1,57 @@
 import cron from 'node-cron';
-import { logInfo, logError, logFeedUpdate } from './utils/logger';
-import { fetchBatchPrices, generateConstantPrices } from './adapters/genericRestAdapter';
+import { logInfo, logError, logWarning, logFeedUpdate } from './utils/logger';
+import { fetchPrices, generateConstantPrices } from './adapters/genericRestAdapter';
 import { pushAssetPrices } from './utils/oraclePusher';
+import { checkBalances } from './utils/balanceChecker';
+import { fetchPreviousPrices } from './utils/priceReader';
+import { withTimeout } from './utils/apiClient';
 import { ConfigLoader } from './utils/configLoader';
-import { Asset } from './types';
+import { SourceResult, AggregatedPrice, SourceConfig } from './types';
+import { TIMEOUTS, ORACLE_CONFIG } from './utils/constants';
 
-export async function getCronSchedule(): Promise<string> {
-    const schedule = process.env.CRON_SCHEDULE || "0 */15 * * * *";
-    if (!cron.validate(schedule)) {
-        throw new Error(
-            `Invalid CRON_SCHEDULE: ${schedule}. See https://nodecron.com/cron-syntax.html for cron schedule syntax.`
+// ============================================================================
+// Helpers
+// ============================================================================
+
+function calculateMedian(prices: number[]): number {
+    if (prices.length === 0) return 0;
+    const sorted = [...prices].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 !== 0
+        ? sorted[mid]
+        : Math.floor((sorted[mid - 1] + sorted[mid]) / 2);
+}
+
+function checkPriceChange(assetKey: string, newPrice: number, previousPrice: number): void {
+    // Skip if previous price is 0 or missing (new asset)
+    if (previousPrice <= 0 || newPrice <= 0) return;
+    
+    const changePercent = Math.abs((newPrice - previousPrice) / previousPrice) * 100;
+    
+    if (changePercent > ORACLE_CONFIG.MAX_PRICE_CHANGE_PERCENT) {
+        const oldPriceUSD = (previousPrice / 1e18).toFixed(2);
+        const newPriceUSD = (newPrice / 1e18).toFixed(2);
+        const direction = newPrice > previousPrice ? 'increased' : 'decreased';
+        logWarning('CronScheduler',
+            `Significant price change alert for ${assetKey}: ${direction} ${changePercent.toFixed(2)}% (max ${ORACLE_CONFIG.MAX_PRICE_CHANGE_PERCENT}%). Previous: $${oldPriceUSD}, New: $${newPriceUSD}`
         );
     }
+}
+
+function checkSourceDivergence(assetKey: string, sources: Array<{ name: string; price: number }>, medianPrice: number): void {
+    if (sources.length < 2 || medianPrice === 0) return;
     
-    return schedule;
+    const prices = sources.map(s => s.price);
+    const minPrice = Math.min(...prices);
+    const maxPrice = Math.max(...prices);
+    const spreadPercent = ((maxPrice - minPrice) / medianPrice) * 100;
+    
+    if (spreadPercent > ORACLE_CONFIG.MAX_SOURCE_DIVERGENCE_PERCENT) {
+        const sourcePrices = sources.map(s => `${s.name}: $${(s.price / 1e18).toFixed(2)}`).join(', ');
+        logWarning('CronScheduler',
+            `Source divergence alert for ${assetKey}: ${spreadPercent.toFixed(2)}% spread (max ${ORACLE_CONFIG.MAX_SOURCE_DIVERGENCE_PERCENT}%). Sources: [${sourcePrices}]`
+        );
+    }
 }
 
 function isMetalsMarketClosed(): boolean {
@@ -24,305 +62,231 @@ function isMetalsMarketClosed(): boolean {
     const hour = etDate.getHours();
     const minute = etDate.getMinutes();
     
-    // Friday after 12:00 PM (noon) ET - LBMA stops
-    if (day === 5 && hour >= 12) return true;
-    // Saturday all day
-    if (day === 6) return true;
-    // Sunday all day
-    if (day === 0) return true;
-    // Monday before 5:30 AM ET - first LBMA auction
-    if (day === 1 && (hour < 5 || (hour === 5 && minute < 30))) return true;
+    if (day === 5 && hour >= 12) return true;  // Friday after noon ET
+    if (day === 6) return true;                 // Saturday
+    if (day === 0) return true;                 // Sunday
+    if (day === 1 && (hour < 5 || (hour === 5 && minute < 30))) return true; // Monday before 5:30 AM ET
     
     return false;
 }
 
-// Process all feeds in parallel and combine results
-async function processAllFeeds(configLoader: ConfigLoader): Promise<void> {
-    const allFeeds = configLoader.getResolvedFeeds();
-    const marketClosed = isMetalsMarketClosed();
-    
-    const resolvedFeeds = allFeeds.filter(feed => {
-        if (feed.name === 'metals-batch') return !marketClosed;
-        if (feed.name === 'metals-weekend') return marketClosed;
-        return true;
-    });
-    
-    logInfo('CronScheduler', `Metals market ${marketClosed ? 'closed' : 'open'}, using feeds: [${resolvedFeeds.map(f => f.name).join(', ')}]`);
-    
-    // Process all feeds in parallel - collect results as they complete until timeout
-    const feedPromises = resolvedFeeds.map(async (feed, index) => {
-        try {
-            return { index, feedName: feed.name, result: await processBatchFeed(feed, configLoader), error: null };
-        } catch (err) {
-            const error = err as Error;
-            logError('CronScheduler', new Error(`${feed.name}: ${error.message}`));
-            return { index, feedName: feed.name, result: null, error: error.message };
-        }
-    });
-
-    // Wait for all feeds to complete or timeout
-    const completedFeeds = new Set<string>();
-    const feedResults: Array<{ index: number; feedName: string; result: any; error: string | null }> = [];
-
-    const timeoutMs = 60000;
-    const startTime = Date.now();
-    let timedOut = false;
-
-    await Promise.race([
-        (async () => {
-            for (const promise of feedPromises) {
-                try {
-                    const result = await promise;
-                    completedFeeds.add(result.feedName);
-                    feedResults.push(result);
-                } catch (err) {
-                    // Individual feed errors are already handled in the promise
-                }
-            }
-        })(),
-        new Promise((resolve) => setTimeout(() => { timedOut = true; resolve(undefined); }, timeoutMs))
-    ]);
-
-    // Log timeout info if it occurred
-    if (timedOut) {
-        const pendingFeeds = resolvedFeeds.filter(f => !completedFeeds.has(f.name)).map(f => f.name);
-        const completedList = Array.from(completedFeeds);
-        logError('CronScheduler', new Error(
-            `Feed processing timeout after ${Date.now() - startTime}ms. ` +
-            `Feeds completed: [${completedList.join(', ') || 'none'}]. ` +
-            `Feeds still pending: [${pendingFeeds.join(', ') || 'none'}]`
-        ));
+export function getCronSchedule(): string {
+    const schedule = process.env.CRON_SCHEDULE || "0 */15 * * * *";
+    if (!cron.validate(schedule)) {
+        throw new Error(
+            `Invalid CRON_SCHEDULE: ${schedule}. See https://nodecron.com/cron-syntax.html for cron schedule syntax.`
+        );
     }
-
-    // Collect all successful results from completed feeds
-    const allAssetPrices: Record<string, number> = {};
-    const allAssetAddresses: Record<string, string> = {};
-    const allAssetSources: Record<string, Array<{ name: string; price: number }>> = {};
-
-    feedResults.forEach(({ result, feedName }) => {
-        if (result) {
-            const { assetPrices, assetAddresses, assetSources } = result;
-
-            // Merge results from all feeds
-            Object.keys(assetPrices).forEach(assetName => {
-                allAssetPrices[assetName] = assetPrices[assetName];
-                allAssetAddresses[assetName] = assetAddresses[assetName];
-                allAssetSources[assetName] = assetSources[assetName];
-            });
-        }
-    });
-
-    const allExpectedAssets = new Set(
-        resolvedFeeds.flatMap(feed => feed.assets.map(asset => asset.name))
-    );
-
-    const missingAssets = Array.from(allExpectedAssets).filter(name => !allAssetPrices[name]);
-    if (missingAssets.length > 0) {
-        logError('CronScheduler', new Error(`No price data found for assets: [${missingAssets.join(', ')}]`));
-    }
-
-    if (Object.keys(allAssetPrices).length === 0) {
-        throw new Error('No valid prices received from any feed');
-    }
-
-    // Submit all assets to the contract - it handles round logic automatically
-    const assetNames = Object.keys(allAssetPrices);
-    const assetAddresses = assetNames.map(name => allAssetAddresses[name]);
-    const assetPriceValues = assetNames.map(name => allAssetPrices[name]);
-
-    const result = await pushAssetPrices(assetAddresses, assetPriceValues);
-
-    // Log success for each asset
-    assetNames.forEach(assetName => {
-        const price = allAssetPrices[assetName];
-        const sources = allAssetSources[assetName];
-
-        logFeedUpdate(assetName, price, sources, result.hash);
-    });
+    return schedule;
 }
 
-async function processBatchFeed(feed: any, configLoader: ConfigLoader): Promise<{
-    assetPrices: Record<string, number>;
-    assetAddresses: Record<string, string>;
-    assetSources: Record<string, Array<{ name: string; price: number }>>;
-}> {
-    const resolvedFeed = configLoader.getResolvedFeeds().find(f => f.name === feed.name);
-    if (!resolvedFeed) {
-        throw new Error(`Feed ${feed.name} not found in resolved configuration`);
-    }
+// ============================================================================
+// Step 1: Fetch from All Sources
+// ============================================================================
 
-    // Check if this feed uses constant pricing
-    const hasConstantSource = resolvedFeed.sources.includes('constant');
-    if (hasConstantSource) {
-        const constantPrices = generateConstantPrices(resolvedFeed.assets);
-        const assetPrices: Record<string, number> = {};
-        const assetAddresses: Record<string, string> = {};
-        const assetSources: Record<string, Array<{ name: string; price: number }>> = {};
-        
-        resolvedFeed.assets.forEach(asset => {
-            const priceData = constantPrices[asset.name];
-            if (priceData) {
-                assetPrices[asset.name] = priceData.price;
-                assetAddresses[asset.name] = asset.targetAssetAddress;
-                assetSources[asset.name] = [{ name: 'constant', price: priceData.price }];
-            }
-        });
-        
-        return { assetPrices, assetAddresses, assetSources };
-    }
-
-    // Track which sources have completed
-    const completedSources = new Set<string>();
+async function fetchSource(sourceName: string, sourceConfig: SourceConfig, configLoader: ConfigLoader): Promise<SourceResult> {
     const startTime = Date.now();
-
-    // Prepare parallel fetch tasks for batch sources
-    const fetchTasks = resolvedFeed.sources.map(async (sourceName: string) => {
-        const fetchStartTime = Date.now();
-        logInfo('CronScheduler', `${feed.name}: Starting fetch from source ${sourceName}`);
-
-        try {
-            const sourceConfig = configLoader.getSourceConfig(sourceName);
-            const batchResult = await fetchBatchPrices(resolvedFeed.assets, sourceConfig);
-
-            completedSources.add(sourceName);
-            const fetchDuration = Date.now() - fetchStartTime;
-            logInfo('CronScheduler', `${feed.name}: Completed fetch from source ${sourceName} in ${fetchDuration}ms`);
-
-            return { batchResult, source: sourceName, success: true };
-
-        } catch (err) {
-            const error = err as Error;
-            completedSources.add(sourceName);
-            const fetchDuration = Date.now() - fetchStartTime;
-            logError('CronScheduler', new Error(`${feed.name}: Failed to fetch from source ${sourceName} after ${fetchDuration}ms: ${error.message}`));
-
-            return { batchResult: {}, source: sourceName, success: false, error: error.message };
-        }
-    });
-
-    // Wait for sources to complete or timeout - collect results as they come in
-    const sourceResults: Array<{ batchResult: any; source: string; success: boolean; error?: string }> = [];
-    const timeoutMs = 30000;
-    let timedOut = false;
-
-    await Promise.race([
-        (async () => {
-            for (const promise of fetchTasks) {
-                try {
-                    const result = await promise;
-                    completedSources.add(result.source);
-                    sourceResults.push(result);
-                } catch (err) {
-                    // Individual source errors are already handled in fetchTasks
-                }
-            }
-        })(),
-        new Promise((resolve) => setTimeout(() => { timedOut = true; resolve(undefined); }, timeoutMs))
-    ]);
-
-    // Log timeout info if it occurred
-    if (timedOut) {
+    try {
+        const fetchPromise = sourceName === 'constant'
+            ? Promise.resolve(generateConstantPrices(sourceConfig.assets, configLoader.getAllAssets()))
+            : fetchPrices(sourceConfig);
+        const prices = await withTimeout(fetchPromise, TIMEOUTS.FETCH);
+        return { sourceName, prices, success: true, duration: Date.now() - startTime };
+    } catch (err) {
         const duration = Date.now() - startTime;
-        const pendingSources = resolvedFeed.sources.filter((s: string) => !completedSources.has(s));
-        const completedSourcesList = Array.from(completedSources);
-
-        logError('CronScheduler', new Error(
-            `${feed.name}: Timeout after ${duration}ms. ` +
-            `Sources completed: [${completedSourcesList.join(', ') || 'none'}]. ` +
-            `Sources still pending: [${pendingSources.join(', ') || 'none'}]`
-        ));
+        logWarning('CronScheduler', `${sourceName} failed (${duration}ms): ${(err as Error).message}`);
+        return { sourceName, prices: {}, success: false, duration };
     }
+}
 
-    // Process completed source results
-    const allSuccessfulSources: Array<{name: string, prices: Record<string, number>}> = [];
-    const failedSources: string[] = [];
-
-    sourceResults.forEach((result) => {
-        if (result.success) {
-            allSuccessfulSources.push({
-                name: result.source,
-                prices: result.batchResult
-            });
-        } else {
-            failedSources.push(result.source);
-            // Error already logged in fetchTasks
-        }
+async function fetchFromAllSources(configLoader: ConfigLoader): Promise<Map<string, SourceResult>> {
+    const allSources = Object.entries(configLoader.getAllSourceConfigs());
+    const fetchResults = await Promise.all(
+        allSources.map(([name, config]) => fetchSource(name, config, configLoader))
+    );
+    
+    const results = new Map<string, SourceResult>();
+    const succeeded: string[] = [], failed: string[] = [];
+    fetchResults.forEach(r => {
+        results.set(r.sourceName, r);
+        (r.success ? succeeded : failed).push(`${r.sourceName} (${r.duration}ms)`);
     });
+    
+    logInfo('CronScheduler', `${succeeded.length}/${allSources.length} sources: [${succeeded.join(', ')}]${failed.length ? `. Failed: [${failed.join(', ')}]` : ''}`);
+    return results;
+}
 
-    // Log summary of source results
-    const successfulSourceNames = allSuccessfulSources.map(s => s.name);
-    logInfo('CronScheduler', `${feed.name}: ${successfulSourceNames.length}/${resolvedFeed.sources.length} sources succeeded. Successful: [${successfulSourceNames.join(', ')}]. Failed: [${failedSources.join(', ')}]`);
+// ============================================================================
+// Step 2: Aggregate Prices
+// ============================================================================
 
-    // Mark service as unhealthy if any source fails
-    if (failedSources.length > 0) {
-        const error = `Source failures for feed ${feed.name}: [${failedSources.join(', ')}]`;
-        logError('CronScheduler', new Error(error));
-    }
-
-    // Calculate average prices for each asset across sources
-    const assetPrices: Record<string, number> = {};
-    const assetAddresses: Record<string, string> = {};
-    const assetSources: Record<string, Array<{ name: string; price: number }>> = {};
-
-    resolvedFeed.assets.forEach((asset: Asset) => {
-        const prices: number[] = [];
+function aggregatePrices(
+    configLoader: ConfigLoader,
+    sourceResults: Map<string, SourceResult>,
+    marketClosed: boolean,
+    previousPrices: Map<string, number>
+): AggregatedPrice[] {
+    return Object.entries(configLoader.getAllAssets()).map(([assetKey, asset]) => {
+        const useProxy = asset.weekendProxy && marketClosed;
+        const requiredSources = asset.constantPrice !== undefined ? 1 : ORACLE_CONFIG.MIN_VALID_SOURCES;
+        const weekdaySources = configLoader.getSourcesForAsset(assetKey);
         const sources: Array<{ name: string; price: number }> = [];
+        let expectedCount = weekdaySources.length;
 
-        allSuccessfulSources.forEach(source => {
-            const assetResult = source.prices[asset.name] as any;
-            if (assetResult && assetResult.price && assetResult.feedTimestamp) {
-                prices.push(assetResult.price);
-                sources.push({ name: source.name, price: assetResult.price });
+        const collect = (names: string[], symbol: string) => {
+            names.forEach(name => {
+                const result = sourceResults.get(name);
+                const data = result?.success && result?.prices[symbol];
+                if (data) {
+                    sources.push({ name, price: data.price });
+                } else if (result?.success) {
+                    logInfo('CronScheduler', `${symbol}: ${name} returned no price (API succeeded but symbol missing from response)`);
+                }
+            });
+            return sources.length;
+        };
+
+        if (!useProxy) {
+            collect(weekdaySources, assetKey);
+        } else {
+            const proxySources = configLoader.getSourcesForProxySymbol(asset.weekendProxy!);
+            logInfo('CronScheduler', `${assetKey}: Using proxy ${asset.weekendProxy}`);
+            if (collect(proxySources, asset.weekendProxy!) >= requiredSources) {
+                expectedCount = proxySources.length;
+            } else {
+                logInfo('CronScheduler', `${assetKey}: Proxy insufficient, falling back`);
+                sources.length = 0;
+                collect(weekdaySources, assetKey);
+                expectedCount = weekdaySources.length;
+            }
+        }
+        
+        const isValid = sources.length >= requiredSources;
+        if (!isValid) logError('CronScheduler', new Error(`Insufficient sources for ${assetKey}: got ${sources.length}, need ${requiredSources}`));
+        
+        const medianPrice = isValid ? calculateMedian(sources.map(s => s.price)) : 0;
+        
+        // Check for source divergence (alert only, still submit)
+        if (isValid) {
+            checkSourceDivergence(assetKey, sources, medianPrice);
+            // Check for significant price change vs previous on-chain price
+            const previousPrice = previousPrices.get(asset.targetAssetAddress.toLowerCase()) || 0;
+            checkPriceChange(assetKey, medianPrice, previousPrice);
+        }
+        
+        return {
+            assetKey,
+            medianPrice,
+            targetAddress: asset.targetAssetAddress,
+            sources,
+            expectedSourceCount: expectedCount,
+            ...(isValid ? {} : { failed: true, error: `Not enough sources (${sources.length}/${requiredSources})` })
+        };
+    });
+}
+
+/**
+ * Adds equivalent asset prices as additional sources.
+ * For example, XAU (gold) can use XAUT (Tether Gold) as an equivalent since both track gold price.
+ * This allows assets with few direct sources to benefit from equivalent assets that have more sources.
+ * The equivalent asset's aggregated median price is added as a single additional source.
+ */
+function addEquivalentAssetPrices(prices: AggregatedPrice[], configLoader: ConfigLoader): AggregatedPrice[] {
+    const allAssets = configLoader.getAllAssets();
+    prices.forEach(p => {
+        const asset = allAssets[p.assetKey];
+        if (!asset.equivalentAssets) return;
+
+        // Add each equivalent asset's median price as an additional source
+        const sourceCountBefore = p.sources.length;
+        asset.equivalentAssets.forEach(equivKey => {
+            const equiv = prices.find(ap => ap.assetKey === equivKey);
+            if (equiv && !equiv.failed && equiv.medianPrice > 0) {
+                p.sources.push({ name: `${equivKey}(equiv)`, price: equiv.medianPrice });
+                p.expectedSourceCount += 1;
             }
         });
 
-        if (prices.length > 0) {
-            const averagePrice = Math.floor(prices.reduce((sum, price) => sum + price, 0) / prices.length);
-
-            assetPrices[asset.name] = averagePrice;
-            assetAddresses[asset.name] = asset.targetAssetAddress;
-            assetSources[asset.name] = sources;
+        // Recalculate median if we added any equivalent sources
+        if (p.sources.length > sourceCountBefore) {
+            p.medianPrice = calculateMedian(p.sources.map(s => s.price));
+            if (p.failed && p.sources.length >= ORACLE_CONFIG.MIN_VALID_SOURCES) {
+                delete p.failed;
+                delete p.error;
+            }
         }
     });
-
-    return { assetPrices, assetAddresses, assetSources };
+    return prices;
 }
+
+// ============================================================================
+// Main Orchestrator
+// ============================================================================
+
+async function processAllAssets(configLoader: ConfigLoader): Promise<void> {
+    const [, previousPrices] = await Promise.all([
+        checkBalances(),
+        fetchPreviousPrices()
+    ]);
+    
+    const marketClosed = isMetalsMarketClosed();
+    const assetCount = Object.keys(configLoader.getAllAssets()).length;
+    
+    logInfo('CronScheduler', `Market ${marketClosed ? 'closed' : 'open'}, processing ${assetCount} assets`);
+    
+    const sourceResults = await fetchFromAllSources(configLoader);
+    const aggregatedPrices = addEquivalentAssetPrices(
+        aggregatePrices(configLoader, sourceResults, marketClosed, previousPrices),
+        configLoader
+    );
+    
+    // Partition into valid and failed prices, excluding proxy-only assets (submit: false)
+    const allAssets = configLoader.getAllAssets();
+    const validPrices: AggregatedPrice[] = [];
+    const failedPrices: AggregatedPrice[] = [];
+    aggregatedPrices.forEach(p => {
+        if (allAssets[p.assetKey].submit === false) return;
+        (p.failed ? failedPrices : validPrices).push(p);
+    });
+    
+    if (validPrices.length === 0) {
+        throw new Error('No valid prices to submit');
+    }
+    
+    const skipped = failedPrices.length ? `. Skipped ${failedPrices.length}: [${failedPrices.map(p => p.assetKey).join(', ')}]` : '';
+    logInfo('CronScheduler', `Submitting ${validPrices.length} prices: [${validPrices.map(p => p.assetKey).join(', ')}]${skipped}`);
+    
+    const result = await pushAssetPrices(validPrices);
+    
+    // Log all prices (including failed ones)
+    aggregatedPrices.forEach(p => logFeedUpdate(p.assetKey, p.medianPrice, p.sources, p.expectedSourceCount, result.hash, p.failed, p.error));
+}
+
+// ============================================================================
+// Scheduler
+// ============================================================================
 
 export async function startCronScheduler(): Promise<void> {
     const configLoader = new ConfigLoader();
-    const resolvedFeeds = configLoader.getResolvedFeeds();
+    const allAssets = Object.keys(configLoader.getAllAssets());
     
-    logInfo('CronScheduler', `Starting Oracle Service with ${resolvedFeeds.length} feeds`);
+    logInfo('CronScheduler', `Starting Oracle with ${allAssets.length} assets: [${allAssets.join(', ')}]`);
 
-    // Single cron job that processes all feeds in parallel
-    const jobFunction = async () => {
+    const cronSchedule = getCronSchedule();
+    logInfo('CronScheduler', `Cron: ${cronSchedule}`);
+    
+    const job = async () => {
         try {
-            await processAllFeeds(configLoader);
+            await processAllAssets(configLoader);
         } catch (err) {
-            const error = err as Error;
-            logError('CronScheduler', new Error(`Feed processing error: ${error.message}`));
+            logError('CronScheduler', new Error(`Processing error: ${(err as Error).message}`));
         }
     };
 
-    // Schedule the job based on cron schedule provided.
-    const cronSchedule = await getCronSchedule();
-    logInfo('CronScheduler', `Scheduling oracle updates (cron: ${cronSchedule})`);
-    
-    cron.schedule(cronSchedule, jobFunction);
-    
-    // Run the job immediately on startup
-    setTimeout(() => {
-        jobFunction();
-    }, 1000); // Small delay to ensure everything is initialized
+    cron.schedule(cronSchedule, job);
+    setTimeout(job, 1000); // Run immediately
 }
 
 // Graceful shutdown
-process.on('SIGINT', () => {
-    logInfo('CronScheduler', 'Received SIGINT, shutting down gracefully...');
-    process.exit(0);
-});
-
-process.on('SIGTERM', () => {
-    logInfo('CronScheduler', 'Received SIGTERM, shutting down gracefully...');
-    process.exit(0);
-}); 
+process.on('SIGINT', () => { logInfo('CronScheduler', 'SIGINT received'); process.exit(0); });
+process.on('SIGTERM', () => { logInfo('CronScheduler', 'SIGTERM received'); process.exit(0); });

@@ -10,8 +10,11 @@ import { useSearchParams, Link } from "react-router-dom";
 import { useBridgeContext } from "@/context/BridgeContext";
 import { Loader2, ArrowRight } from "lucide-react";
 import { formatBalance } from "@/utils/numberUtils";
+import { useUser } from "@/context/UserContext";
+import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 
 const WithdrawalsPage = () => {
+  const { isLoggedIn } = useUser();
   const [activeTab, setActiveTab] = useState<"from-savings" | "bridge-out">(
     "from-savings"
   );
@@ -81,6 +84,9 @@ const WithdrawalsPage = () => {
         <DashboardHeader title="Withdrawals" />
 
         <main className="flex-1 p-4 md:p-6 pb-10 md:pb-6 overflow-y-auto">
+          {!isLoggedIn && (
+            <GuestSignInBanner message="Sign in to withdraw assets and bridge tokens" />
+          )}
           <div className="mb-8 flex flex-col lg:flex-row gap-6 items-stretch">
             <div className="w-full lg:w-[50%] flex">
               <Card className="shadow-sm flex-1 flex flex-col">
@@ -89,8 +95,18 @@ const WithdrawalsPage = () => {
                     <CardTitle className="text-base md:text-xl">Withdraw Assets</CardTitle>
                     <Link
                       to="/bridge-transactions?from=withdrawals"
-                      onClick={() => setTargetTransactionTab('WithdrawalInitiated')}
-                      className="flex items-center gap-1 text-xs md:text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors whitespace-nowrap"
+                      onClick={(e) => {
+                        if (!isLoggedIn) {
+                          e.preventDefault();
+                          return;
+                        }
+                        setTargetTransactionTab('WithdrawalInitiated');
+                      }}
+                      className={`flex items-center gap-1 text-xs md:text-sm font-semibold transition-colors whitespace-nowrap ${
+                        isLoggedIn 
+                          ? "text-blue-600 hover:text-blue-800 cursor-pointer" 
+                          : "text-muted-foreground cursor-not-allowed opacity-50 pointer-events-none"
+                      }`}
                     >
                       <ArrowRight size={14} className="md:w-4 md:h-4" />
                       View Transactions
@@ -122,8 +138,8 @@ const WithdrawalsPage = () => {
                         } as React.CSSProperties
                       }
                     />
-                    <div className="mt-4 flex-1 min-h-0 overflow-auto">
-                      <BridgeOut isSaving={activeTab === "from-savings"} />
+                    <div className="mt-4 flex-1 min-h-0 overflow-auto p-1 -m-1">
+                      <BridgeOut isSaving={activeTab === "from-savings"} guestMode={!isLoggedIn} />
                     </div>
                   </div>
                 </CardContent>
@@ -192,15 +208,17 @@ const WithdrawalsPage = () => {
             </div>
           </div>
 
-          {/* Withdrawal History - hidden on mobile to avoid horizontal scroll */}
-          <Card className="shadow-sm hidden md:block">
-            <CardHeader>
-              <CardTitle>Withdrawal History</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <WithdrawTransactionDetails context="withdrawals" />
-            </CardContent>
-          </Card>
+          {/* Withdrawal History - hidden on mobile and for guests */}
+          {isLoggedIn && (
+            <Card className="shadow-sm hidden md:block">
+              <CardHeader>
+                <CardTitle>Withdrawal History</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <WithdrawTransactionDetails context="withdrawals" />
+              </CardContent>
+            </Card>
+          )}
         </main>
       </div>
 

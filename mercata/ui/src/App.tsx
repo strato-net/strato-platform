@@ -36,6 +36,7 @@ import BridgeTransactionsPage from "./pages/BridgeTransactionsPage";
 import WithdrawalsPage from "./pages/WithdrawalsPage";
 import Admin from "./pages/Admin";
 import ProtectedRoute from "./components/ProtectedRoute";
+import GuestAccessibleRoute from "./components/GuestAccessibleRoute";
 import {
   coinbaseWallet,
   metaMaskWallet,
@@ -145,25 +146,25 @@ const App = () => {
                                           <Route
                                             path="/dashboard"
                                             element={
-                                              <ProtectedRoute>
+                                              <GuestAccessibleRoute>
                                                 <Dashboard />
-                                              </ProtectedRoute>
+                                              </GuestAccessibleRoute>
                                             }
                                           />
                                           <Route
                                             path="/dashboard/swap"
                                             element={
-                                              <ProtectedRoute>
+                                              <GuestAccessibleRoute>
                                                 <SwapAsset />
-                                              </ProtectedRoute>
+                                              </GuestAccessibleRoute>
                                             }
                                           />
                                           <Route
                                             path="/dashboard/deposits"
                                             element={
-                                              <ProtectedRoute>
+                                              <GuestAccessibleRoute>
                                                 <DepositsPage />
-                                              </ProtectedRoute>
+                                              </GuestAccessibleRoute>
                                             }
                                           />
                                           <Route
@@ -177,17 +178,17 @@ const App = () => {
                                           <Route
                                             path="/dashboard/borrow"
                                             element={
-                                              <ProtectedRoute>
+                                              <GuestAccessibleRoute>
                                                 <Borrow />
-                                              </ProtectedRoute>
+                                              </GuestAccessibleRoute>
                                             }
                                           />
                                           <Route
                                             path="/dashboard/advanced"
                                             element={
-                                              <ProtectedRoute>
+                                              <GuestAccessibleRoute>
                                                 <Advanced />
-                                              </ProtectedRoute>
+                                              </GuestAccessibleRoute>
                                             }
                                           />
                                           <Route
@@ -201,17 +202,17 @@ const App = () => {
                                           <Route
                                             path="/dashboard/activity"
                                             element={
-                                              <ProtectedRoute>
+                                              <GuestAccessibleRoute>
                                                 <ActivityFeed />
-                                              </ProtectedRoute>
+                                              </GuestAccessibleRoute>
                                             }
                                           />
                                           <Route
                                             path="/dashboard/transfer"
                                             element={
-                                              <ProtectedRoute>
+                                              <GuestAccessibleRoute>
                                                 <Transfer />
-                                              </ProtectedRoute>
+                                              </GuestAccessibleRoute>
                                             }
                                           />
                                           <Route
@@ -237,27 +238,27 @@ const App = () => {
                                           <Route
                                             path="/dashboard/stats"
                                             element={
-                                              <ProtectedRoute>
+                                              <GuestAccessibleRoute>
                                                 <StratoStats />
-                                              </ProtectedRoute>
+                                              </GuestAccessibleRoute>
                                             }
                                           />
 
                                           <Route
                                             path="/dashboard/withdrawals"
                                             element={
-                                              <ProtectedRoute>
+                                              <GuestAccessibleRoute>
                                                 <WithdrawalsPage />
-                                              </ProtectedRoute>
+                                              </GuestAccessibleRoute>
                                             }
                                           />
 
                                           <Route
                                             path="/dashboard/rewards"
                                             element={
-                                              <ProtectedRoute>
+                                              <GuestAccessibleRoute>
                                                 <Rewards />
-                                              </ProtectedRoute>
+                                              </GuestAccessibleRoute>
                                             }
                                           />
 
@@ -273,9 +274,9 @@ const App = () => {
                                           <Route
                                             path="/dashboard/referrals"
                                             element={
-                                              <ProtectedRoute>
+                                              <GuestAccessibleRoute>
                                                 <ReferralsManagement />
-                                              </ProtectedRoute>
+                                              </GuestAccessibleRoute>
                                             }
                                           />
 

@@ -16,12 +16,16 @@ module SolidVM.Model.Value
     defaultValue,
     createDefaultValue,
     valEquals,
+    valueTypeName,
   )
 where
 
 import Blockchain.Data.RLP
 import Blockchain.SolidVM.Exception
 import Blockchain.Strato.Model.Address
+import qualified Data.ByteString.Char8 as BC
+import Text.Format
+import Control.Applicative ((<|>))
 import Control.Lens ((^.))
 import Control.Monad (forM, when)
 import Control.Monad.IO.Class
@@ -36,6 +40,7 @@ import Data.Vector (Vector)
 import qualified Data.Vector as V
 import Data.Word
 import Numeric
+import SolidVM.Model.CodeCollection (CodeCollection)
 import qualified SolidVM.Model.CodeCollection as CC
 import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Storable as MS
@@ -105,6 +110,7 @@ data Value
   | SHexDecodeAndTrim -- Hack to implement blockapps-sol's bytes32ToString without
   -- supporting indexing into bytes32s.
   | SStringConcat -- for easy concat of multiple arguments
+  | SDeferredConstant SolidString -- Constant with complex expression, evaluated on access
   | SAddressToAscii -- Hack to implement addressToAsciiString without supporting indexing into bytes
   | SBreak
   | SContinue
@@ -198,6 +204,7 @@ rlpEncodeValue SNULL = rlpEncodeValue $ SInteger 0
 rlpEncodeValue SReference{} = rlpEncodeValue $ SInteger 0
 rlpEncodeValue (SInteger i) = rlpEncode i
 rlpEncodeValue (SString s) = rlpEncode s
+rlpEncodeValue (SBytes bs) = rlpEncode bs
 rlpEncodeValue (SDecimal decimal) = rlpEncode $ show decimal
 rlpEncodeValue (SBool b) = rlpEncode b
 rlpEncodeValue (SAddress a _) = rlpEncode a
@@ -215,41 +222,42 @@ rlpEncodeValues xs = rlpEncodeValue $ STuple $ V.fromList $ Constant <$> xs
 -- coerceFromInt is useful to force integer literals
 -- to assume the type that was intended for them, once
 -- it is determined that their expected type is
-coerceFromInt :: CC.Contract -> Value -> Integer -> Value
-coerceFromInt _ SInteger {} n = SInteger n
-coerceFromInt _ (SAddress _ b) n = SAddress (fromIntegral n) b
-coerceFromInt _ SBool {} n = SBool $ n /= 0
-coerceFromInt _ SString {} 0 = SString ""
-coerceFromInt _ SString {} n = SString $ showHex n ""
-coerceFromInt _ SDecimal {} n = SDecimal $ Decimal 0 n
-coerceFromInt _ (SContract c _) n = SContract c $ fromIntegral n
-coerceFromInt ct (SEnumVal tipe _ _) n' =
-  fromMaybe (typeError "missing enum val" (tipe, n')) $ do
+coerceFromInt :: CC.Contract -> CodeCollection -> Value -> Integer -> Value
+coerceFromInt _ _ SInteger {} n = SInteger n
+coerceFromInt _ _ (SAddress _ b) n = SAddress (fromIntegral n) b
+coerceFromInt _ _ SBool {} n = SBool $ n /= 0
+coerceFromInt _ _ SString {} 0 = SString ""
+coerceFromInt _ _ SString {} n = SString $ showHex n ""
+coerceFromInt _ _ SDecimal {} n = SDecimal $ Decimal 0 n
+coerceFromInt _ _ (SContract c _) n = SContract c $ fromIntegral n
+coerceFromInt ct cc (SEnumVal tipe _ _) n' =
+  fromMaybe (typeError "missing enum val" $ show (tipe, n')) $ do
     let n = fromIntegral n'
-    enumDef <- fmap fst . M.lookup tipe $ CC._enums ct
+    -- Look up enum in contract first, then fall back to file-level enums
+    enumDef <- fmap fst $ M.lookup tipe (CC._enums ct) <|> M.lookup tipe (cc ^. CC.flEnums)
     when (n >= length enumDef) $ fail "enum val out of range"
     return $ SEnumVal tipe (enumDef !! n) $ fromIntegral n'
-coerceFromInt _ SNULL n = SInteger n
-coerceFromInt _ SReference{} n = SInteger n
-coerceFromInt _ t x = typeError "coerceFromInt: invalid literal for type" (t, x)
+coerceFromInt _ _ SNULL n = SInteger n
+coerceFromInt _ _ SReference{} n = SInteger n
+coerceFromInt _ _ t x = typeError "coerceFromInt: invalid literal for type" $ show (t, x)
 
 -- coerceType allows integer literals to initialize integers, addresses, and
 -- strings (in the special case of 0) and bytes32, determined by type instead of value
-coerceType :: CC.Contract -> SVMType.Type -> Value -> Value
-coerceType ct xt = \case
-  SInteger i -> coerceFromInt ct (defaultValue ct xt) i
+coerceType :: CC.Contract -> CodeCollection -> SVMType.Type -> Value -> Value
+coerceType ct cc xt = \case
+  SInteger i -> coerceFromInt ct cc (defaultValue ct xt) i
   SString s -> case xt of
     SVMType.String {} -> SString s
     SVMType.Bytes {} -> SString s
     SVMType.Decimal {} -> SDecimal (read s :: Decimal)
-    _ -> typeError "string literal must be string or bytes" (xt, s)
+    _ -> typeError "string literal must be string or bytes" $ show (xt, s)
   v -> v
 
-valEquals :: CC.Contract -> Value -> Value -> Bool
-valEquals ct lhs rhs = case (lhs, rhs) of
+valEquals :: CC.Contract -> CodeCollection -> Value -> Value -> Bool
+valEquals ct cc lhs rhs = case (lhs, rhs) of
   (SInteger _, SInteger _) -> lhs == rhs
-  (SInteger i, _) -> coerceFromInt ct rhs i == rhs
-  (_, SInteger i) -> lhs == coerceFromInt ct lhs i
+  (SInteger i, _) -> coerceFromInt ct cc rhs i == rhs
+  (_, SInteger i) -> lhs == coerceFromInt ct cc lhs i
   _ -> lhs == rhs
 
 createVar' :: MonadIO m => Value -> m Variable
@@ -276,7 +284,9 @@ defaultValue _ (SVMType.Int _ _) = SInteger 0
 defaultValue _ SVMType.Bool = SBool False
 defaultValue _ (SVMType.Address _) = (SAddress 0) False
 defaultValue _ (SVMType.String _) = SString ""
-defaultValue _ (SVMType.Bytes _ _) = SString ""
+defaultValue _ (SVMType.Bytes _ mSize) = SBytes $ case mSize of
+  Just n -> BC.replicate (fromIntegral n) '\0'
+  Nothing -> BC.empty
 defaultValue _ SVMType.Decimal = SDecimal 0
 defaultValue ctract (SVMType.UnknownLabel name) =
   fromMaybe (SContract name 0x0) $
@@ -306,7 +316,9 @@ createDefaultValue _ _ (SVMType.Int _ _) = return $ SInteger 0
 createDefaultValue _ _ SVMType.Bool = return $ SBool False
 createDefaultValue _ _ (SVMType.Address _) = return $ (SAddress 0) False
 createDefaultValue _ _ (SVMType.String _) = return $ SString ""
-createDefaultValue _ _ (SVMType.Bytes _ _) = return $ SString ""
+createDefaultValue _ _ (SVMType.Bytes _ mSize) = return $ SBytes $ case mSize of
+  Just n -> BC.replicate (fromIntegral n) '\0'  -- Fixed-size bytes (e.g., bytes32)
+  Nothing -> BC.empty  -- Dynamic bytes
 createDefaultValue _ _ SVMType.Decimal = return $ SDecimal 0
 createDefaultValue cc ctract (SVMType.UnknownLabel name) =
   case (M.lookup name $ CC._enums ctract, M.lookup name $ CC._structs ctract) of
@@ -338,8 +350,52 @@ byteStringToValue x = Just . SInteger . rlpDecode . rlpDeserialize $ x
 
 castToInt :: Value -> Integer
 castToInt (SInteger i) = i
-castToInt s = typeError "castToInt" s
+castToInt s = typeError "castToInt" $ show s
 -}
 
 -- Evaluated ArgLists
 type ValList = [Value]
+
+-- | Human-readable type name for Value constructors (used in error messages)
+valueTypeName :: Value -> String
+valueTypeName (SInteger _) = "Integer"
+valueTypeName (SDecimal _) = "Decimal"
+valueTypeName (SString _) = "String"
+valueTypeName (SBool _) = "Bool"
+valueTypeName (SAddress _ _) = "Address"
+valueTypeName (SUserDefined n _ _) = "UserDefined(" ++ show n ++ ")"
+valueTypeName (SEnum n) = "Enum(" ++ show n ++ ")"
+valueTypeName (SEnumVal n _ _) = "EnumVal(" ++ show n ++ ")"
+valueTypeName (SStructDef n) = "StructDef(" ++ show n ++ ")"
+valueTypeName (SStruct n _) = "Struct(" ++ show n ++ ")"
+valueTypeName (STuple _) = "Tuple"
+valueTypeName (SArray _) = "Array"
+valueTypeName (SMap _) = "Map"
+valueTypeName (SFunction n _) = "Function(" ++ show n ++ ")"
+valueTypeName (SBuiltinVariable n) = "BuiltinVariable(" ++ show n ++ ")"
+valueTypeName (SSetterGetter n _) = "SetterGetter(" ++ n ++ ")"
+valueTypeName (SContractDef n) = "ContractDef(" ++ show n ++ ")"
+valueTypeName (SContractItem _ n) = "ContractItem(" ++ show n ++ ")"
+valueTypeName (SContract n _) = "Contract(" ++ show n ++ ")"
+valueTypeName (SContractFunction _ n) = "ContractFunction(" ++ show n ++ ")"
+valueTypeName (SPush _ _) = "Push"
+valueTypeName SNULL = "Null"
+valueTypeName (SReference _) = "Reference"
+valueTypeName SHexDecodeAndTrim = "HexDecodeAndTrim"
+valueTypeName SStringConcat = "StringConcat"
+valueTypeName (SDeferredConstant n) = "DeferredConstant(" ++ show n ++ ")"
+valueTypeName SAddressToAscii = "AddressToAscii"
+valueTypeName SBreak = "Break"
+valueTypeName SContinue = "Continue"
+valueTypeName (SBytes _) = "Bytes"
+valueTypeName (SVariadic _) = "Variadic"
+
+-- | Format instance for human-readable Value output in error messages
+instance Format Value where
+  format (SReference (AddressPath addr path)) =
+    "Reference(" ++ take 10 (show addr) ++ ".../" ++ BC.unpack (MS.unparsePath path) ++ ")"
+  format (SInteger n) = "Integer(" ++ show n ++ ")"
+  format (SBool b) = "Bool(" ++ show b ++ ")"
+  format (SString s) = "String(" ++ show (take 20 s) ++ if length s > 20 then "...)" else ")"
+  format (SAddress a _) = "Address(" ++ take 10 (show a) ++ "...)"
+  format v = valueTypeName v

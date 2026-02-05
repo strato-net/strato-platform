@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import CopyButton from "../ui/copy";
 import { LiquidationEntry, useLiquidationContext } from "@/context/LiquidationContext";
@@ -29,7 +29,7 @@ const weiToEther = (v?: string) => {
 
 const LiquidationsSection: React.FC = () => {
   const { liquidatable, loading, error, refreshData } = useLiquidationContext();
-  const { userAddress } = useUser();
+  const { userAddress, isLoggedIn } = useUser();
 
   const [modalData, setModalData] = React.useState<{
     loan: LiquidationEntry;
@@ -39,10 +39,12 @@ const LiquidationsSection: React.FC = () => {
   // You cannot liquidate your own loans
   const isOwnLoan = (loan: LiquidationEntry) => loan.user.toLowerCase() === userAddress?.toLowerCase();
 
-  // Refresh liquidation data when component mounts (tab is opened)
+  // Refresh liquidation data when component mounts (tab is opened) - only if logged in
   useEffect(() => {
-    refreshData();
-  }, [refreshData]);
+    if (isLoggedIn) {
+      refreshData();
+    }
+  }, [refreshData, isLoggedIn]);
 
   const openModal = (loan: LiquidationEntry, collateral: CollateralData) => setModalData({ loan, collateral });
   const closeModal = () => setModalData(null);

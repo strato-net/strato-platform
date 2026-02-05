@@ -12,7 +12,7 @@ import type { VaultCandidate, Allocation, TransactionProgress, WEI } from '@/com
 import { formatUnits } from 'ethers';
 import { formatNumberWithCommas, parseCommaNumber } from '@/utils/numberUtils';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
-import { CompactRewardsDisplay } from '@/components/rewards/CompactRewardsDisplay';
+import { RewardsWidget } from '@/components/rewards/RewardsWidget';
 import MintProgressModal, { type ProgressStep } from '../../../MintProgressModal';
 import LoanForm from './LoanForm';
 import VaultBreakdown from './VaultBreakdown';
@@ -39,9 +39,10 @@ import { DECIMAL, ADDRESS, UNITS, USD } from '@/components/cdp/v2/cdpTypes';
 interface MintProps {
   onSuccess?: () => void;
   refreshTrigger?: number;
+  guestMode?: boolean;
 }
 
-const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
+const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger, guestMode = false }) => {
 
 
   // ============================================================================
@@ -137,16 +138,23 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   // Memos - Allocations
   // ============================================================================
 
-  const maxAllocationsForTargetHF = useMemo<VaultCandidate[]>(() => {
-    if (vaultCandidates.length === 0) return [];
+  const maxAllocationsResult = useMemo<{ allocations: VaultCandidate[]; debtFloorHit: boolean; debtCeilingHit: boolean }>(() => {
+    if (vaultCandidates.length === 0) {
+      return { allocations: [], debtFloorHit: false, debtCeilingHit: false };
+    }
     try {
       const isAtMinHF = Math.abs(targetHF - sliderMinHF) < 0.01;
       const result = isAtMinHF 
         ? getAbsoluteMaxAllocations(vaultCandidates)
         : getMaxAllocations(vaultCandidates, targetHF);
-      return addAllocationsToVaultCandidates(result, vaultCandidates);
+      const allocationsWithCandidates = addAllocationsToVaultCandidates(result.allocations, vaultCandidates);
+      return { 
+        allocations: allocationsWithCandidates, 
+        debtFloorHit: result.debtFloorHit, 
+        debtCeilingHit: result.debtCeilingHit 
+      };
     } catch {
-      return [];
+      return { allocations: [], debtFloorHit: false, debtCeilingHit: false };
     }
   }, [targetHF, sliderMinHF, vaultCandidates]);
 
@@ -176,8 +184,8 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   [targetHF, vaultCandidates]);
 
   const totalMaxMint: WEI = useMemo(() => 
-    calculateTotalMaxMint(maxAllocationsForTargetHF),
-  [maxAllocationsForTargetHF]);
+    calculateTotalMaxMint(maxAllocationsResult.allocations),
+  [maxAllocationsResult.allocations]);
 
   const availableToMint = useMemo(() => 
     calculateAvailableToMint(totalMaxMint),
@@ -216,7 +224,16 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     return calculateAggregateHealthFactor(vaultData);
   }, [vaultCandidates, allocations]); // Recalculates when vaultCandidates or allocations change
 
-  const weightedAverageAPR = useMemo(() => calculateWeightedAverageAPR(allocations), [allocations]);
+  const displayedStabilityFee = useMemo(
+    () => calculateWeightedAverageAPR(mergedVaultCandidates),
+    [mergedVaultCandidates]
+  );
+
+  // Only show stability fee when there are allocations with mint amounts
+  const hasAllocationsWithMint = useMemo(
+    () => allocations.some(v => v.allocation && v.allocation.mintAmount > 0n),
+    [allocations]
+  );
 
   const transactionCount = useMemo(() => calculateTransactionCount(allocations), [allocations]);
 
@@ -240,7 +257,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   // Derived Values
   // ============================================================================
 
-  const shouldLockInput = maxAllocationsForTargetHF.length === 0 || totalMaxMint === 0n;
+  const shouldLockInput = maxAllocationsResult.allocations.length === 0 || totalMaxMint === 0n;
   const exceedsMaxCollateral = !isMaxMode && mintAmountUSDST > 0n && mintAmountUSDST > totalHeadroom;
 
 
@@ -250,6 +267,11 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   // ============================================================================
 
   const fetchVaultCandidates = useCallback(async () => {
+    // Skip API call for guests
+    if (guestMode) {
+      setVaultCandidates([]);
+      return;
+    }
     try {
       const { existingVaults, potentialVaults } = await cdpService.getVaultCandidates();
       const candidates = [...existingVaults, ...potentialVaults];
@@ -257,7 +279,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     } catch {
       setVaultCandidates([]);
     }
-  }, []);
+  }, [guestMode]);
 
   useEffect(() => {
     fetchVaultCandidates();
@@ -273,14 +295,24 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   }, [vaultCandidates, sliderMinHF, hasInitializedHF]);
 
   useEffect(() => {
+    // Skip for guests
+    if (guestMode) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     fetchAllPrices()
       .catch(() => setError('Could not load CDP data'))
       .finally(() => setLoading(false));
-  }, [fetchAllPrices, refreshTrigger]);
+  }, [fetchAllPrices, refreshTrigger, guestMode]);
 
   useEffect(() => {
+    // Skip for guests
+    if (guestMode) {
+      setCurrentAverageHF(undefined);
+      return;
+    }
     const fetchCurrentPosition = async () => {
       try {
         const positions = await cdpService.getVaults();
@@ -300,7 +332,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
       }
     };
     fetchCurrentPosition();
-  }, [refreshTrigger]);
+  }, [refreshTrigger, guestMode]);
 
   // ============================================================================
   // Effects - Allocation Computation
@@ -312,10 +344,11 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     let result: OptimalAllocationResult;
 
     if (isMaxMode) {
+      // Use the computed flags from maxAllocationsResult instead of hard-coding false
       result = {
-        optimalAllocations: maxAllocationsForTargetHF,
-        debtFloorHit: false,
-        debtCeilingHit: false,
+        optimalAllocations: maxAllocationsResult.allocations,
+        debtFloorHit: maxAllocationsResult.debtFloorHit,
+        debtCeilingHit: maxAllocationsResult.debtCeilingHit,
       };
     } else {
       result = computeOptimalAllocations(
@@ -330,7 +363,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
     setOptimalAllocations(result.optimalAllocations);
     setDebtFloorHit(result.debtFloorHit);
     setDebtCeilingHit(result.debtCeilingHit);
-  }, [mintAmountUSDST, targetHF, vaultCandidates, isMaxMode, maxAllocationsForTargetHF, autoAllocate]);
+  }, [mintAmountUSDST, targetHF, vaultCandidates, isMaxMode, maxAllocationsResult, autoAllocate]);
 
   useEffect(() => {
     prevAutoSupplyRef.current = autoAllocate;
@@ -688,6 +721,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
   // ============================================================================
 
   const isButtonDisabled = 
+    guestMode ||
     (autoAllocate ? (mintAmount <= 0 && !isMaxMode) : parseFloat(totalManualMint) <= 0) || 
     allocations.length === 0 || 
     transactionsExecuting || 
@@ -709,7 +743,8 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
           <LoanForm
             availableLabel="Available to Mint"
             availableAmount={availableToMint}
-            averageStabilityFee={weightedAverageAPR || 1.5}
+            averageStabilityFee={displayedStabilityFee}
+            showStabilityFee={hasAllocationsWithMint}
             mintAmountInput={mintAmountInput}
             onMintAmountChange={handleMintAmountChange}
             onMaxClick={handleMaxClick}
@@ -720,8 +755,8 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
             minHF={sliderMinHF}
             currentHF={currentAverageHF}
             sliderRangeColor={sliderColor}
-            inputDisabled={!autoAllocate}
-            sliderDisabled={!autoAllocate}
+            inputDisabled={guestMode || !autoAllocate}
+            sliderDisabled={guestMode || !autoAllocate}
             averageVaultHealth={projectedVaultHealth}
             showButton={false}
             actionButtonLabel="Confirm Mint"
@@ -736,14 +771,15 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
               id="auto-supply"
               checked={autoAllocate}
               onCheckedChange={(checked) => handleAutoAllocateChange(checked === true)}
+              disabled={guestMode}
             />
-            <Label htmlFor="auto-supply" className="text-sm cursor-pointer">
+            <Label htmlFor="auto-supply" className={`text-sm ${guestMode ? 'text-muted-foreground' : 'cursor-pointer'}`}>
               Automatically allocate across vaults
             </Label>
           </div>
 
-          {/* Warning Messages */}
-          {shouldLockInput && autoAllocate ? (
+          {/* Warning Messages - only for logged-in users */}
+          {!guestMode && (shouldLockInput && autoAllocate ? (
             <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
               <p className="text-sm font-semibold text-red-800 dark:text-red-200 mb-2">Insufficient Collateral</p>
               <p className="text-xs text-red-700 dark:text-red-300">
@@ -770,10 +806,10 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
                   : 'No vaults are available for minting at this time.'}
               </p>
             </div>
-          ) : null}
+          ) : null)}
 
-          {/* Debt Constraint Warning */}
-          {(debtFloorHit || debtCeilingHit) && (
+          {/* Debt Constraint Warning - only for logged-in users */}
+          {!guestMode && (debtFloorHit || debtCeilingHit) && (
             <div className="p-3 rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
               <p className="text-xs text-amber-800 dark:text-amber-200">
                 ⚠️ One or more vaults have hit a debt {debtFloorHit && debtCeilingHit ? 'floor/ceiling' : debtFloorHit ? 'floor' : 'ceiling'}. Effective mint amount may be lower than requested.
@@ -781,17 +817,29 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
             </div>
           )}
 
-          {/* Confirm Button */}
-          <Button
-            disabled={isButtonDisabled}
-            onClick={handleConfirmMint}
-            className="w-full"
-          >
-            {transactionsExecuting ? 'Processing...' : 'Confirm Mint'}
-          </Button>
+          {/* Confirm Button / Sign In Button */}
+          {guestMode ? (
+            <Button
+              onClick={() => {
+                const theme = localStorage.getItem('theme') || 'light';
+                window.location.href = `/login?theme=${theme}`;
+              }}
+              className="w-full"
+            >
+              Sign in to mint USDST
+            </Button>
+          ) : (
+            <Button
+              disabled={isButtonDisabled}
+              onClick={handleConfirmMint}
+              className="w-full"
+            >
+              {transactionsExecuting ? 'Processing...' : 'Confirm Mint'}
+            </Button>
+          )}
 
-          {/* Vault Breakdown */}
-          {(!autoAllocate || !(allocations.length === 0 && parseFloat(availableToMint.replace(/,/g, '')) <= 0)) && (
+          {/* Vault Breakdown - only for logged-in users */}
+          {!guestMode && (!autoAllocate || !(allocations.length === 0 && parseFloat(availableToMint.replace(/,/g, '')) <= 0)) && (
             <VaultBreakdown
               vaultCandidates={mergedVaultCandidates}
               showMintAmounts={true}
@@ -812,14 +860,16 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger }) => {
             />
           )}
 
-          {/* Transaction Fee */}
-          <div className="text-sm text-muted-foreground">
-            Transaction Fee: {formatUSD(totalFees, 2)} USDST ({Math.round(totalFees * 100)} vouchers)
-          </div>
+          {/* Transaction Fee - only for logged-in users */}
+          {!guestMode && (
+            <div className="text-sm text-muted-foreground">
+              Transaction Fee: {formatUSD(totalFees, 2)} USDST ({Math.round(totalFees * 100)} vouchers)
+            </div>
+          )}
 
           {/* Rewards Display */}
           {userRewards && cdpActivity && (
-            <CompactRewardsDisplay
+            <RewardsWidget
               key={mintAmount}
               userRewards={userRewards}
               activityName={cdpActivity.activity.name}

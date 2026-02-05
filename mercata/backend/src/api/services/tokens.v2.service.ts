@@ -100,10 +100,59 @@ export const getEarningAssets = async (
       balance,
       price,
       collateralBalance,
+      totalBalance: totalBalance.toString(),
       isPoolToken:
         t._symbol?.endsWith("-LP") ||
         t._symbol === "SUSDST" ||
         t._symbol === "MUSDST" ||
+        t.description === "Liquidity Provider Token",
+      value,
+    };
+  });
+};
+
+export const getPublicEarningAssets = async (
+  accessToken: string
+): Promise<EarningAsset[]> => {
+  // Build token query params - no user balance filter for public data
+  const tokenParams: Record<string, string> = {
+        select: buildTokenSelectFields({
+          images: true,
+          attributes: true,
+          balance: false, // No balance for guests
+        }).join(","),
+        status: "eq.2",
+  };
+
+  // Fetch only tokens and prices (skip user-specific collateral data)
+  const results = await Promise.all([
+    cirrus.get(accessToken, "/" + Token, { params: tokenParams }),
+    getCompletePriceMap(accessToken),
+  ]);
+
+  const tokens = results[0];
+  const rawPrices = results[1];
+
+  // No collateral map for guests - all balances are "0"
+  const collateralMap = new Map<string, bigint>();
+
+  return (tokens.data || []).map((t: any) => {
+    const balance = "0";
+    const price = rawPrices.get(t.address) || "0";
+    const collateralBalance = "0";
+    const totalBalance = 0n;
+    const value = "0.00";
+
+    return {
+      ...t,
+      balance,
+      price,
+      collateralBalance,
+      totalBalance: totalBalance.toString(),
+      isPoolToken:
+        t._symbol?.endsWith("-LP") ||
+        t._symbol === "SUSDST" || t._symbol === "SAFETYUSDST" ||
+        t._symbol === "MUSDST" || t._symbol === "LENDUSDST" ||
         t.description === "Liquidity Provider Token",
       value,
     };
@@ -345,7 +394,7 @@ export const getNetBalanceHistory = async (
   const storageFilters = [
     'data->>lpToken.neq.""',
     'data->>_symbol.like.*-LP',
-    'data->>_symbol.in.(MUSDST,SUSDST)',
+    'data->>_symbol.in.(MUSDST,SUSDST,SAFETYUSDST,LENDUSDST)',
     'data->>sToken.gt.0',
     'and(data->>mToken.gt.0,data->>borrowIndex.gt.0)'
   ]

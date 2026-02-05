@@ -2,8 +2,9 @@ import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { ChevronDown, ChevronUp } from "lucide-react";
-import { cdpService, Vault, AssetConfig, TransactionResponse } from "@/services/cdpService";
+import { ChevronDown, ChevronUp, Info, AlertTriangle } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { cdpService, Vault, AssetConfig } from "@/services/cdpService";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
@@ -11,8 +12,7 @@ import { useTokenContext } from "@/context/TokenContext";
 import { formatWeiToDecimalHP, formatNumber } from "@/utils/numberUtils";
 
 interface LiquidationsViewProps {
-  // Props can be added here if needed in the future
-  children?: never; // Placeholder to make interface non-empty
+  guestMode?: boolean;
 }
 
 // Format percentage with reasonable precision
@@ -21,7 +21,7 @@ const formatPercentage = (num: number, decimals: number = 2): string => {
   return num.toFixed(decimals) + '%';
 };
 
-const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
+const LiquidationsView: React.FC<LiquidationsViewProps> = ({ guestMode = false }) => {
   const [liquidatableVaults, setLiquidatableVaults] = useState<Vault[]>([]);
   const [assetConfigs, setAssetConfigs] = useState<Record<string, AssetConfig>>({});
   const [loading, setLoading] = useState(true);
@@ -30,6 +30,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
   const [liquidatingVaults, setLiquidatingVaults] = useState<Record<string, boolean>>({});
   const [maxStates, setMaxStates] = useState<Record<string, boolean>>({});
   const [maxValues, setMaxValues] = useState<Record<string, number>>({});
+  const [positionMaxValues, setPositionMaxValues] = useState<Record<string, number>>({}); // Backend max (not balance-limited)
   const [availableUsdstBalance, setAvailableUsdstBalance] = useState<number>(0);
   const [isGlobalPaused, setIsGlobalPaused] = useState<boolean>(false);
   const { toast } = useToast();
@@ -42,6 +43,15 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
+        // Skip API calls for non-logged-in users - they can't liquidate anyway
+        if (guestMode) {
+          setLiquidatableVaults([]);
+          setAssetConfigs({});
+          setIsGlobalPaused(false);
+          setLoading(false);
+          return;
+        }
+
         // Fetch global pause status
         let globalPaused = false;
         try {
@@ -93,27 +103,66 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
         });
         setLiquidatableVaults(filteredLiquidatable);
 
-        // Fetch USDST balance once for the entire component
+        // Fetch USDST balance and max amounts only for logged-in users
+        if (!guestMode) {
         await fetchUsdstBalance();
         const availableUsdstWei = BigInt(usdstBalance || "0");
         const availableUsdstDecimal = parseFloat(
           formatWeiToDecimalHP(availableUsdstWei.toString(), 18)
         );
         setAvailableUsdstBalance(availableUsdstDecimal);
+
+          // Fetch max liquidatable amounts for all vaults (pre-fetch for better UX)
+          const maxPromises = filteredLiquidatable.map(async (vault, index) => {
+            const vaultKey = `${vault.borrower || 'unknown'}-${vault.asset}-${index}`;
+            if (vault.borrower) {
+              try {
+                const result = await cdpService.getMaxLiquidatable(vault.asset, vault.borrower);
+                const backendMaxWei = result.maxAmount;
+                const backendMaxDecimal = parseFloat(formatWeiToDecimalHP(backendMaxWei, 18));
+                const actualMaxDecimal = Math.min(backendMaxDecimal, Math.max(0, availableUsdstDecimal - 0.02));
+                return { vaultKey, positionMax: backendMaxDecimal, actualMax: actualMaxDecimal };
+              } catch (error) {
+                console.error(`Error fetching max for vault ${vaultKey}:`, error);
+                return null;
+              }
+            }
+            return null;
+          });
+
+          const maxResults = await Promise.all(maxPromises);
+          const positionMaxMap: Record<string, number> = {};
+          const maxMap: Record<string, number> = {};
+          maxResults.forEach((result) => {
+            if (result) {
+              positionMaxMap[result.vaultKey] = result.positionMax;
+              maxMap[result.vaultKey] = result.actualMax;
+            }
+          });
+          setPositionMaxValues(positionMaxMap);
+          setMaxValues(maxMap);
+        }
       } catch (error) {
         console.error("Error fetching data:", error);
-        toast({
-          title: "Error",
-          description: "Failed to fetch liquidatable positions",
-          variant: "destructive",
-        });
+        // Don't show error toast for non-logged-in users - it's expected that API calls will fail
+        if (!guestMode) {
+          toast({
+            title: "Error",
+            description: "Failed to fetch liquidatable positions",
+            variant: "destructive",
+          });
+        }
+        // Set empty array for guests so they see "No liquidatable positions found" instead of error
+        if (guestMode) {
+          setLiquidatableVaults([]);
+        }
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, [toast, userAddress, fetchUsdstBalance, usdstBalance]);
+  }, [toast, userAddress, fetchUsdstBalance, usdstBalance, guestMode]);
 
   const toggleExpanded = async (vaultKey: string) => {
     const isCurrentlyExpanded = expandedVaults[vaultKey];
@@ -124,7 +173,8 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
     }));
     
     // If expanding the vault and we don't have max value yet, fetch it
-    if (!isCurrentlyExpanded && !maxValues[vaultKey]) {
+    // Skip for guests since they can't perform liquidations anyway
+    if (!guestMode && !isCurrentlyExpanded && !maxValues[vaultKey]) {
       const vaultIndex = parseInt(vaultKey.split('-').pop() || '0');
       const vault = liquidatableVaults[vaultIndex];
       
@@ -137,10 +187,13 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
           // Convert backend max from wei to decimal (18 decimals for USDST)
           const backendMaxDecimal = parseFloat(formatWeiToDecimalHP(backendMaxWei, 18));
           
-          // Calculate actual max as minimum of backend max and available USDST balance
-          const actualMaxDecimal = Math.min(backendMaxDecimal, availableUsdstBalance - 0.02);
+          // Store position max (backend max - not balance limited)
+          setPositionMaxValues(prev => ({ ...prev, [vaultKey]: backendMaxDecimal }));
           
-          // Store the max value
+          // Calculate actual max as minimum of backend max and available USDST balance
+          const actualMaxDecimal = Math.min(backendMaxDecimal, Math.max(0, availableUsdstBalance - 0.02));
+          
+          // Store the balance-limited max value
           setMaxValues(prev => ({ ...prev, [vaultKey]: actualMaxDecimal }));
           
         } catch (error) {
@@ -183,6 +236,9 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
 
   // Handle MAX button click
   const handleMaxClick = async (vault: Vault, vaultKey: string) => {
+    // Skip for guests
+    if (guestMode) return;
+    
     const isCurrentlyMax = maxStates[vaultKey];
     if (isCurrentlyMax) {
       // Clear max state and amount
@@ -206,10 +262,13 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
           // Convert backend max from wei to decimal (18 decimals for USDST)
           const backendMaxDecimal = parseFloat(formatWeiToDecimalHP(backendMaxWei, 18));
           
-          // Calculate actual max as minimum of backend max and available USDST balance
-          actualMaxDecimal = Math.min(backendMaxDecimal, availableUsdstBalance - 0.02);
+          // Store position max (backend max - not balance limited)
+          setPositionMaxValues(prev => ({ ...prev, [vaultKey]: backendMaxDecimal }));
           
-          // Store the max value
+          // Calculate actual max as minimum of backend max and available USDST balance
+          actualMaxDecimal = Math.min(backendMaxDecimal, Math.max(0, availableUsdstBalance - 0.02));
+          
+          // Store the balance-limited max value
           setMaxValues(prev => ({ ...prev, [vaultKey]: actualMaxDecimal }));
           
         } catch (error) {
@@ -230,7 +289,9 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
             const result = await cdpService.getMaxLiquidatable(currentVault.asset, currentVault.borrower);
             const backendMaxWei = result.maxAmount;
             const backendMaxDecimal = parseFloat(formatWeiToDecimalHP(backendMaxWei, 18));
-            actualMaxDecimal = Math.min(backendMaxDecimal, availableUsdstBalance - 0.02);
+            // Store position max (backend max - not balance limited)
+            setPositionMaxValues(prev => ({ ...prev, [vaultKey]: backendMaxDecimal }));
+            actualMaxDecimal = Math.min(backendMaxDecimal, Math.max(0, availableUsdstBalance - 0.02));
             setMaxValues(prev => ({ ...prev, [vaultKey]: actualMaxDecimal }));
           } catch (error) {
             console.error("Error updating max liquidatable amount:", error);
@@ -248,8 +309,26 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
     }
   };
 
-  const calculateExpectedProfit = (vault: Vault, liquidationAmount: string): string => {
-    const vaultKey = `${vault.borrower || 'unknown'}-${vault.asset}-${liquidatableVaults.findIndex(v => v.borrower === vault.borrower && v.asset === vault.asset)}`;
+  // Helper to get consistent vault key
+  const getVaultKey = (vault: Vault, index?: number): string => {
+    const idx = index ?? liquidatableVaults.findIndex(v => v.borrower === vault.borrower && v.asset === vault.asset);
+    return `${vault.borrower || 'unknown'}-${vault.asset}-${idx}`;
+  };
+
+  // Calculate max profit (full opportunity from position - not balance limited)
+  const calculateMaxProfit = (vault: Vault, index: number): string => {
+    const vaultKey = getVaultKey(vault, index);
+    const positionMax = positionMaxValues[vaultKey];
+    if (!positionMax || positionMax <= 0) return "$0.00";
+    
+    const assetConfig = assetConfigs[vault.asset];
+    const penaltyRate = (assetConfig?.liquidationPenaltyBps || 1000) / 10000;
+    return `$${formatNumber(positionMax * penaltyRate)}`;
+  };
+
+  // Calculate your profit (balance-limited)
+  const calculateYourProfit = (vault: Vault, liquidationAmount: string, index: number): string => {
+    const vaultKey = getVaultKey(vault, index);
     const amount = parseFloat(liquidationAmount);
     
     // If no valid amount provided, use the maximum liquidatable amount instead of 0
@@ -278,6 +357,13 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
     const liquidationBonus = assetConfig.liquidationPenaltyBps / 10000;
     const profit = calculationAmount * liquidationBonus;
     return `$${formatNumber(profit)}`;
+  };
+
+  // Check if balance is limiting profit potential
+  const isBalanceLimitingProfit = (vaultKey: string): boolean => {
+    const positionMax = positionMaxValues[vaultKey];
+    const actualMax = maxValues[vaultKey];
+    return positionMax !== undefined && actualMax !== undefined && actualMax < positionMax - 0.01;
   };
 
   const handleLiquidate = async (vault: Vault, vaultKey: string) => {
@@ -401,26 +487,40 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
                 <div key={vaultKey} className="border rounded-lg">
                   {/* Collapsed View */}
                   <div 
-                    className="p-3 md:p-4 cursor-pointer hover:bg-muted/50 flex items-center gap-2 md:gap-4"
+                    className="p-3 md:p-4 cursor-pointer hover:bg-muted/50"
                     onClick={() => toggleExpanded(vaultKey)}
                   >
-                    <div className="flex items-center shrink-0">
+                    <div className="flex items-start gap-2 md:gap-4">
+                      <div className="flex items-center shrink-0 pt-0.5">
                       {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                     </div>
-                    <div className="flex-1 grid grid-cols-3 gap-2 md:gap-8">
+                      <div className="flex-1 grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-8">
                       <div className="min-w-0">
-                        <span className="text-xs md:text-sm text-muted-foreground">Borrower</span>
-                        <div className="font-medium font-mono text-xs md:text-sm truncate">
+                          <span className="text-xs text-muted-foreground">Borrower</span>
+                          <div className="font-medium font-mono text-xs md:text-sm truncate mt-0.5">
                           {vault.borrower ? `${vault.borrower.slice(0, 6)}...${vault.borrower.slice(-4)}` : "Unknown"}
                         </div>
                       </div>
                       <div className="min-w-0">
-                        <span className="text-xs md:text-sm text-muted-foreground">Borrowed</span>
-                        <div className="font-medium text-xs md:text-sm">{formatNumber(parseFloat(formatWeiToDecimalHP(vault.debtAmount, 18)))} USDST</div>
+                          <span className="text-xs text-muted-foreground">Borrowed</span>
+                          <div className="font-medium text-xs md:text-sm mt-0.5">{formatNumber(parseFloat(formatWeiToDecimalHP(vault.debtAmount, 18)))} USDST</div>
+                        </div>
+                        <div className="min-w-0">
+                          <span className="text-xs text-muted-foreground">Up for Liquidation</span>
+                          <div className="font-medium text-xs md:text-sm mt-0.5">
+                            {positionMaxValues[vaultKey] ? `${formatNumber(positionMaxValues[vaultKey])} USDST` : "—"}
+                          </div>
+                        </div>
+                        <div className="min-w-0">
+                          <span className="text-xs text-muted-foreground">Max Profit</span>
+                          <div className="font-medium text-xs md:text-sm text-green-600 mt-0.5">
+                            {calculateMaxProfit(vault, index)}
+                          </div>
+                        </div>
+                        <div className="min-w-0 md:text-left">
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">Health Factor</span>
+                          <div className="font-medium text-xs md:text-sm text-red-600 dark:text-red-400 mt-0.5">{formatNumber(vault.healthFactor)}</div>
                       </div>
-                      <div className="min-w-0 text-right md:text-left">
-                        <span className="text-xs md:text-sm text-muted-foreground whitespace-nowrap">Health Factor</span>
-                        <div className="font-medium text-xs md:text-sm text-red-600 dark:text-red-400">{formatNumber(vault.healthFactor)}</div>
                       </div>
                     </div>
                   </div>
@@ -428,87 +528,133 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
                   {/* Expanded View */}
                   {isExpanded && (
                     <div className="border-t bg-muted/30">
-                      {/* Table Header */}
-                      <div className="grid grid-cols-4 gap-2 md:gap-4 p-3 md:p-4 text-xs md:text-sm text-muted-foreground font-medium border-b border-border">
-                        <div>Asset</div>
-                        <div>Amount</div>
-                        <div>Value</div>
-                        <div>Profit</div>
-                      </div>
-                      
-                      {/* Table Row - Position Values */}
-                      <div className="grid grid-cols-4 gap-2 md:gap-4 p-3 md:p-4 items-center border-b text-xs md:text-sm">
-                        <div className="flex items-center space-x-1 md:space-x-1.5 min-w-0">
-                          <div className="w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-white text-[10px] md:text-xs font-bold flex-shrink-0">
-                            {vault.symbol.charAt(0)}
+                      {/* Single scrollable container for both header and data */}
+                      <div className="overflow-x-auto">
+                        <div className="min-w-[600px]">
+                          {/* Table Header */}
+                          <div className="flex items-center gap-2 md:gap-4 p-3 md:p-4 text-xs text-muted-foreground font-medium border-b border-border">
+                            <div className="w-4 shrink-0"></div>
+                            <div className="flex-1 grid grid-cols-5 gap-2 md:gap-4">
+                              <div className="min-w-[80px]">Asset</div>
+                              <div className="min-w-[80px]">Amount</div>
+                              <div className="min-w-[80px]">Value</div>
+                              <div className="min-w-[100px] flex items-center gap-1">
+                                <span className="whitespace-nowrap">Liquidatable</span>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Info className="h-3 w-3 cursor-help flex-shrink-0" />
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Calculated based on your USDST balance</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
+                              <div className="min-w-[100px] flex items-center gap-1">
+                                <span className="whitespace-nowrap">Your Profit</span>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Info className="h-3 w-3 cursor-help flex-shrink-0" />
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Profit based on the amount you enter</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
+                            </div>
                           </div>
-                          <span className="font-medium truncate">{vault.symbol}</span>
-                        </div>
-                        <div className="truncate">{formatNumber(parseFloat(formatWeiToDecimalHP(vault.collateralAmount, vault.collateralAmountDecimals)))}</div>
-                        <div className="truncate">${formatNumber(parseFloat(formatWeiToDecimalHP(vault.collateralValueUSD, 18)))}</div>
-                        <div className="text-green-600 font-medium truncate">
-                          {calculateExpectedProfit(vault, liquidationAmount)}
+                          
+                          {/* Table Row - Position Values */}
+                          <div className="flex items-center gap-2 md:gap-4 p-3 md:p-4 border-b text-xs md:text-sm">
+                            <div className="w-4 shrink-0"></div>
+                            <div className="flex-1 grid grid-cols-5 gap-2 md:gap-4 items-center">
+                              <div className="flex items-center space-x-1.5 min-w-[80px]">
+                                <div className="w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-white text-[10px] md:text-xs font-bold flex-shrink-0">
+                                  {vault.symbol.charAt(0)}
+                                </div>
+                                <span className="font-medium truncate">{vault.symbol}</span>
+                              </div>
+                              <div className="truncate min-w-[80px]">{formatNumber(parseFloat(formatWeiToDecimalHP(vault.collateralAmount, vault.collateralAmountDecimals)))}</div>
+                              <div className="truncate min-w-[80px]">${formatNumber(parseFloat(formatWeiToDecimalHP(vault.collateralValueUSD, 18)))}</div>
+                              <div className="truncate font-medium min-w-[100px]">
+                                {maxValues[vaultKey] ? `${formatNumber(maxValues[vaultKey])} USDST` : "—"}
+                              </div>
+                              <div className={`flex items-center gap-1 font-medium min-w-[100px] ${isBalanceLimitingProfit(vaultKey) ? 'text-yellow-600' : 'text-green-600'}`}>
+                                <span className="truncate">{calculateYourProfit(vault, liquidationAmount, index)}</span>
+                                {isBalanceLimitingProfit(vaultKey) && (
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <AlertTriangle className="h-3 w-3 text-yellow-600 cursor-help flex-shrink-0" />
+                                      </TooltipTrigger>
+                                      <TooltipContent className="max-w-[250px] whitespace-normal">
+                                        <p>Your USDST balance ({formatNumber(availableUsdstBalance)}) limits your liquidation capacity. Acquire more USDST to maximize profits.</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                )}
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </div>
                       
                       {/* Action Row - Input and Button */}
                       <div className="p-3 md:p-4">
-                        {/* Transaction Fee Display */}
-                        <div className="text-center mb-2 md:mb-3">
+                        <div className="flex flex-col gap-3">
+                          {/* Transaction Fee Display */}
                           <p className="text-xs text-muted-foreground">
                             Transaction Fee: 0.02 USDST
                           </p>
-                        </div>
-                        
-                        <div className="flex flex-col items-center space-y-2">
-                          <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 md:space-x-3 w-full md:w-auto">
+                          
+                          {/* Error messages */}
+                          {(isAmountExceedsMax(vaultKey) || isUsdstBalanceInsufficient()) && (
+                            <p className="text-xs text-red-500">
+                              {isUsdstBalanceInsufficient() ? "Insufficient USDST Balance" : "Max amount reached"}
+                            </p>
+                          )}
+                          
+                          {/* Input and Buttons */}
+                          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                             <Input
                               type="number"
                               placeholder="Amount to liquidate"
                               value={liquidationAmount}
                               onChange={(e) => handleLiquidationAmountChange(vaultKey, e.target.value)}
-                              className={`w-full md:w-40 text-sm ${isAmountExceedsMax(vaultKey) ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+                              className={`flex-1 sm:w-40 text-sm ${isAmountExceedsMax(vaultKey) ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
                               min="0"
                               step="0.01"
+                              disabled={guestMode}
                             />
-                            <div className="flex gap-2">
+                            <div className="flex items-center gap-2">
                               <Button 
                                 variant={maxStates[vaultKey] ? "default" : "outline"}
                                 size="sm" 
-                                className={`flex-1 md:flex-none min-w-[50px] ${maxStates[vaultKey] ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}`}
+                                className={`flex-1 sm:min-w-[50px] ${maxStates[vaultKey] ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}`}
                                 onClick={() => handleMaxClick(vault, vaultKey)}
-                                disabled={isUsdstBalanceInsufficient()}
+                                disabled={guestMode || isUsdstBalanceInsufficient()}
                               >
                                 MAX
                               </Button>
                               <Button 
-                                className="flex-1 md:flex-none bg-red-600 hover:bg-red-700 text-white text-sm"
+                                className="flex-1 sm:flex-initial bg-red-600 hover:bg-red-700 text-white text-sm"
                                 size="sm"
                                 onClick={() => handleLiquidate(vault, vaultKey)}
-                                disabled={isLiquidating || !liquidationAmount || isAmountExceedsMax(vaultKey) || isUsdstBalanceInsufficient()}
+                                disabled={guestMode || isLiquidating || !liquidationAmount || isAmountExceedsMax(vaultKey) || isUsdstBalanceInsufficient()}
                               >
                                 {isLiquidating ? "Liquidating..." : "Liquidate"}
                               </Button>
                             </div>
+                            {/* Guest mode message */}
+                            {guestMode && (
+                              <span className="text-xs text-muted-foreground text-center sm:text-left">
+                                Sign in to liquidate
+                              </span>
+                            )}
                           </div>
-                          
-                          {/* Error message when amount exceeds max */}
-                          {isAmountExceedsMax(vaultKey) && (
-                            <div className="text-center">
-                              <p className="text-xs text-red-500">
-                                Maximum liquidation amount reached
-                              </p>
-                            </div>
-                          )}
-                          
-                          {/* Error message when USDST balance is insufficient */}
-                          {isUsdstBalanceInsufficient() && (
-                            <div className="text-center">
-                              <p className="text-xs text-red-500">
-                                Insufficient USDST Balance
-                              </p>
-                            </div>
-                          )}
                         </div>
                       </div>
                     </div>

@@ -323,8 +323,17 @@ export const calculateAvailableToMint = (totalMaxMint: WEI): string => {
 };
 
 // APR calculation utilities
+/**
+ * Calculate stability fee rate based on available data
+ * - If allocations exist with mint amounts: returns weighted average by mint amount
+ * - Otherwise: returns simple average across all vault configs
+ * @param vaultCandidates - Array of vault candidates (may or may not have allocations)
+ * @returns Stability fee as percentage (e.g., 2.5 for 2.5%)
+ */
 export const calculateWeightedAverageAPR = (vaultCandidates: VaultCandidate[]): DECIMAL => {
   if (vaultCandidates.length === 0) return 0;
+  
+  // First, try to calculate weighted average from allocations
   let totalMint: DECIMAL = 0;
   let weightedSum: DECIMAL = 0;
   
@@ -339,7 +348,25 @@ export const calculateWeightedAverageAPR = (vaultCandidates: VaultCandidate[]): 
     }
   }
   
-  const result = totalMint > 0 ? weightedSum / totalMint : 0;
+  // If we have allocations with mint amounts, return weighted average
+  if (totalMint > 0) {
+    const result = weightedSum / totalMint;
+    return isFinite(result) ? result : 0;
+  }
+  
+  // Otherwise, fall back to simple average across all vault configs
+  let sum: DECIMAL = 0;
+  let count = 0;
+  
+  for (const v of vaultCandidates) {
+    const feeRate = convertStabilityFeeRateToAnnualPercentage(v.vaultConfig.stabilityFeeRate);
+    if (isFinite(feeRate) && feeRate >= 0) {
+      sum += feeRate;
+      count++;
+    }
+  }
+  
+  const result = count > 0 ? sum / count : 0;
   return isFinite(result) ? result : 0;
 };
 
@@ -676,10 +703,16 @@ export const truncateForDisplay = (value: number): string => {
 
 /**
  * Get HF color class based on value
+ * Matches the color rules from HFSlider.tsx:
+ * - hf >= 2.5: green (Low Risk)
+ * - hf >= 2.0: blue (Medium Risk)
+ * - hf >= 1.5: yellow (Higher Risk)
+ * - hf < 1.5: red (High Risk)
  */
 export const getHFColorClass = (hf: string, hfNum: number): string => {
   if (isNaN(hfNum) || hf === '∞') return 'text-green-600';
-  if (hfNum >= 2.0) return 'text-green-600';
+  if (hfNum >= 2.5) return 'text-green-600';
+  if (hfNum >= 2.0) return 'text-blue-600';
   if (hfNum >= 1.5) return 'text-yellow-600';
   return 'text-red-600';
 };
@@ -782,11 +815,11 @@ export const findMaxAchievableHF = (
   while (currentHF >= minHF) {
     try {
       const isAtMinHF = Math.abs(currentHF - minHF) < 0.01;
-      const allocations = isAtMinHF
+      const result = isAtMinHF
         ? getAbsoluteMaxAllocations(vaultCandidates)
         : getMaxAllocations(vaultCandidates, currentHF);
       
-      const vaultsWithAllocations = addAllocationsToVaultCandidates(allocations, vaultCandidates);
+      const vaultsWithAllocations = addAllocationsToVaultCandidates(result.allocations, vaultCandidates);
       const totalMaxMint = calculateTotalMaxMint(vaultsWithAllocations);
       
       // If we can mint something at this HF, return it
