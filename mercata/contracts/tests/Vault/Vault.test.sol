@@ -58,7 +58,7 @@ contract Describe_Vault is Authorizable {
 
     // Constants
     uint constant WAD = 1e18;
-    uint constant MIN_FIRST_DEPOSIT_USD = 50000000000000000000000; // 50000 * 1e18
+    uint constant MIN_FIRST_DEPOSIT_USD = 30000000000000000000000; // 30000 * 1e18
 
     // ============ SETUP ============
 
@@ -166,7 +166,7 @@ contract Describe_Vault is Authorizable {
         require(address(vault.priceOracle()) == address(m.priceOracle()), "Price oracle should be set");
         require(vault.botExecutor() == address(botExecutor), "Bot executor should be set");
         // Note: WAD is a public constant (1e18), no need to test its value
-        require(vault.MIN_FIRST_DEPOSIT_USD() == MIN_FIRST_DEPOSIT_USD, "MIN_FIRST_DEPOSIT_USD should be $50,000");
+        require(vault.MIN_FIRST_DEPOSIT_USD() == MIN_FIRST_DEPOSIT_USD, "MIN_FIRST_DEPOSIT_USD should be $30,000");
         require(vault.WAD() == 1e18, "WAD should be 1e18");
     }
 
@@ -187,8 +187,8 @@ contract Describe_Vault is Authorizable {
     // ============ FIRST DEPOSIT TESTS ============
 
     function it_rejects_first_deposit_below_minimum() {
-        // First deposit of $49,999 should fail (need 25 ETHST at $2000 = $50,000)
-        uint smallDeposit = 24e18; // 24 ETHST = $48,000 < $50,000
+        // First deposit of $29,999 should fail (need 15 ETHST at $2000 = $30,000)
+        uint smallDeposit = 14e18; // 14 ETHST = $28,000 < $30,000
 
         require(ERC20(tokenA).approve(vaultAddress, smallDeposit), "Approval failed");
 
@@ -200,27 +200,27 @@ contract Describe_Vault is Authorizable {
     }
 
     function it_accepts_first_deposit_at_minimum() {
-        // First deposit of exactly $50,000 should succeed
-        uint deposit = 25e18; // 25 ETHST = $50,000
+        // First deposit of exactly $30,000 should succeed
+        uint deposit = 15e18; // 15 ETHST = $30,000
 
         require(ERC20(tokenA).approve(vaultAddress, deposit), "Approval failed");
 
         uint sharesMinted = vault.deposit(tokenA, deposit);
 
-        require(sharesMinted == 50000e18, "Should mint $50,000 worth of shares (1 share = $1)");
+        require(sharesMinted == 30000e18, "Should mint $30,000 worth of shares (1 share = $1)");
         require(IERC20(shareTokenAddress).totalSupply() == sharesMinted, "Total supply should equal minted shares");
         require(IERC20(shareTokenAddress).balanceOf(address(this)) == sharesMinted, "Depositor should have shares");
     }
 
     function it_accepts_first_deposit_above_minimum() {
-        // First deposit of $100,000 should succeed
-        uint deposit = 50e18; // 50 ETHST = $100,000
+        // First deposit of $60,000 should succeed
+        uint deposit = 30e18; // 30 ETHST = $60,000
 
         require(ERC20(tokenA).approve(vaultAddress, deposit), "Approval failed");
 
         uint sharesMinted = vault.deposit(tokenA, deposit);
 
-        require(sharesMinted == 100000e18, "Should mint $100,000 worth of shares");
+        require(sharesMinted == 60000e18, "Should mint $60,000 worth of shares");
     }
 
     // ============ SUBSEQUENT DEPOSIT TESTS ============
