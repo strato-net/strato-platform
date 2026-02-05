@@ -1,12 +1,16 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Railgun.API
   ( -- * STRATO API interaction
     callShield
   , callTransact
   , approveToken
+  , getChainId
+  , getMerkleRoot
+  , getTreeNumber
     -- * Configuration
   , StratoConfig(..)
   , defaultConfig
@@ -23,7 +27,9 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import qualified Data.Vector as V
-import Network.HTTP.Client (newManager, defaultManagerSettings)
+import Data.Aeson (decode, eitherDecode, parseJSON, (.:), Value)
+import Data.Aeson.Types (parseMaybe, Parser)
+import Network.HTTP.Client (newManager, defaultManagerSettings, httpLbs, parseRequest, requestHeaders, responseBody)
 import Servant.Client (BaseUrl(..), Scheme(..), ClientEnv(..), mkClientEnv, runClientM, defaultMakeClientRequest)
 import Servant.Client.Core (addHeader)
 
@@ -249,3 +255,91 @@ boundParamsToArgValue BoundParams{..} = ArgObject $ KM.fromList
     unshieldTypeToString UnshieldNone = "NONE"
     unshieldTypeToString UnshieldNormal = "NORMAL"
     unshieldTypeToString UnshieldRedirect = "REDIRECT"
+
+-- | Get the chain ID from STRATO metadata endpoint
+getChainId :: StratoConfig -> IO (Either Text Integer)
+getChainId config = do
+  manager <- newManager defaultManagerSettings
+  let url = "http://" ++ T.unpack (stratoHost config) ++ ":" ++ show (stratoPort config) ++ "/strato-api/eth/v1.2/metadata"
+  request <- parseRequest url
+  let requestWithAuth = request 
+        { requestHeaders = [("Authorization", TE.encodeUtf8 $ "Bearer " <> stratoAuthToken config)]
+        }
+  response <- httpLbs requestWithAuth manager
+  case decode (responseBody response) of
+    Nothing -> return $ Left "Failed to parse metadata response"
+    Just json -> case parseMaybe (\obj -> obj .: "networkID") json of
+      Nothing -> return $ Left "networkID not found in metadata"
+      Just (networkIdStr :: Text) -> case reads (T.unpack networkIdStr) of
+        [(n, "")] -> return $ Right n
+        _ -> return $ Left $ "Failed to parse networkID: " <> networkIdStr
+
+-- | Get the current merkle root from the Railgun contract
+-- Uses Cirrus storage table which is more reliable than bloc state endpoint
+getMerkleRoot :: StratoConfig -> IO (Either Text Text)
+getMerkleRoot config = do
+  manager <- newManager defaultManagerSettings
+  -- Use Cirrus storage table instead of bloc state endpoint
+  let storageUrl = "http://" ++ T.unpack (stratoHost config) ++ ":" ++ show (stratoPort config) 
+            ++ "/cirrus/search/storage?address=eq." 
+            ++ T.unpack (railgunContractAddress config) ++ "&limit=1"
+  request <- parseRequest storageUrl
+  let requestWithAuth = request 
+        { requestHeaders = 
+            [ ("Authorization", TE.encodeUtf8 $ "Bearer " <> stratoAuthToken config)
+            , ("Accept", "application/json")
+            ]
+        }
+  response <- httpLbs requestWithAuth manager
+  case eitherDecode (responseBody response) of
+    Left _ -> return $ Left "Failed to parse Cirrus storage response"
+    Right (results :: [Value]) -> 
+      case results of
+        [] -> return $ Left "No storage found for contract"
+        (r:_) -> case parseMaybe extractMerkleRoot r of
+          Nothing -> return $ Left "merkleRoot not found in storage"
+          Just root -> return $ Right root
+  where
+    extractMerkleRoot :: Value -> Parser Text
+    extractMerkleRoot v = do
+      obj <- parseJSON v
+      dataObj <- obj .: "data"
+      dataObj .: "merkleRoot"
+
+-- | Get the current tree number from the Railgun contract
+-- Uses Cirrus storage table which is more reliable than bloc state endpoint
+getTreeNumber :: StratoConfig -> IO (Either Text Integer)
+getTreeNumber config = do
+  manager <- newManager defaultManagerSettings
+  -- Use Cirrus storage table instead of bloc state endpoint
+  let storageUrl = "http://" ++ T.unpack (stratoHost config) ++ ":" ++ show (stratoPort config) 
+            ++ "/cirrus/search/storage?address=eq." 
+            ++ T.unpack (railgunContractAddress config) ++ "&limit=1"
+  request <- parseRequest storageUrl
+  let requestWithAuth = request 
+        { requestHeaders = 
+            [ ("Authorization", TE.encodeUtf8 $ "Bearer " <> stratoAuthToken config)
+            , ("Accept", "application/json")
+            ]
+        }
+  response <- httpLbs requestWithAuth manager
+  case eitherDecode (responseBody response) of
+    Left _ -> return $ Right 0  -- Default to tree 0
+    Right (results :: [Value]) -> 
+      case results of
+        [] -> return $ Right 0
+        (r:_) -> case parseMaybe extractTreeNumberFromStorage r of
+          Nothing -> return $ Right 0  -- Default to 0 if not found
+          Just n -> return $ Right n
+  where
+    extractTreeNumberFromStorage :: Value -> Parser Integer
+    extractTreeNumberFromStorage v = do
+      obj <- parseJSON v
+      dataObj <- obj .: "data"
+      treeNumStr <- dataObj .: "treeNumber"
+      -- Empty string means 0
+      if T.null treeNumStr
+        then return 0
+        else case reads (T.unpack treeNumStr) of
+          [(n, "")] -> return n
+          _ -> return 0
