@@ -21,6 +21,7 @@ import rewardsRoutes from "./routes/rewards.routes";
 import protocolFeeRoutes from "./routes/protocolFee.routes";
 import rpcRoutes from "./routes/rpc.routes";
 import referRoutes from "./routes/refer.routes";
+import vaultRoutes from "./routes/vault.routes";
 
 const router = Router();
 
@@ -86,6 +87,9 @@ router.use("/protocol-fees", protocolFeeRoutes);
 
 // ----- Refer Routes -----
 router.use("/refer", referRoutes);
+
+// ----- Vault Routes -----
+router.use("/vault", vaultRoutes);
 
 // ----- Documentation Routes -----
 // Serve static files for Swagger customizations

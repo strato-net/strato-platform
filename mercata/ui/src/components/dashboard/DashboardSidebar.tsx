@@ -16,7 +16,8 @@ import {
   UserPlus,
   ChevronUp,
   ChevronDown,
-  LucideIcon
+  LucideIcon,
+  Vault
 } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import STRATOLOGO from '@/assets/strato.png';
@@ -35,6 +36,7 @@ const PRIMARY_NAV_ITEMS: NavItem[] = [
   { icon: Send, label: 'Transfer', path: '/dashboard/transfer' },
   { icon: Landmark, label: 'Borrow', path: '/dashboard/borrow' },
   { icon: ArrowLeftRight, label: 'Swap', path: '/dashboard/swap' },
+  { icon: Vault, label: 'Vault', path: '/dashboard/vault' },
   { icon: Gift, label: 'Rewards', path: '/dashboard/rewards' },
 ];
 

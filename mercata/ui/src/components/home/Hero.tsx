@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTheme } from 'next-themes';
 import { 
   ArrowRight, 
@@ -10,12 +10,24 @@ import {
   Gift,
   Sparkles
 } from 'lucide-react';
+import { useUser } from '@/context/UserContext';
 import heroBackground from '../../assets/home/hero-background.png';
 import darkThemeBackground from '../../assets/home/darktheme-hero-bg.png';
 
 const Hero = () => {
   const { resolvedTheme } = useTheme();
+  const { isLoggedIn } = useUser();
+  const navigate = useNavigate();
   const backgroundImage = resolvedTheme === 'dark' ? darkThemeBackground : heroBackground;
+
+  const handleGetStarted = () => {
+    if (isLoggedIn) {
+      navigate('/dashboard');
+    } else {
+      const theme = localStorage.getItem('theme') || 'light';
+      window.location.href = `/login?theme=${theme}`;
+    }
+  };
 
   return (
     <>
@@ -55,13 +67,13 @@ const Hero = () => {
               
               {/* CTA Buttons */}
               <div className="flex flex-col sm:flex-row gap-4 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
-            <Link
-              to="/dashboard"
+            <button
+              onClick={handleGetStarted}
                   className="group inline-flex items-center justify-center gap-2 bg-strato-lightblue hover:bg-strato-blue text-white px-6 py-3 rounded-lg font-medium transition-all duration-300 shadow-lg hover:shadow-xl"
                 >
                   Get Started
                   <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
-                </Link>
+                </button>
                 <Link
                   to="/dashboard/stats"
                   className="inline-flex items-center justify-center gap-2 bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700 text-foreground px-6 py-3 rounded-lg font-medium border border-border transition-all duration-300"

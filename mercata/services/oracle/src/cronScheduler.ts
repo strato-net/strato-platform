@@ -1,6 +1,7 @@
 import cron from 'node-cron';
-import { logInfo, logError, logFeedUpdate } from './utils/logger';
+import { logInfo, logError, logWarning, logFeedUpdate } from './utils/logger';
 import { fetchPrices, generateConstantPrices } from './adapters/genericRestAdapter';
+import { fetchChainlinkPrices } from './adapters/chainlinkPriceFeedRpcAdapter';
 import { pushAssetPrices } from './utils/oraclePusher';
 import { checkBalances } from './utils/balanceChecker';
 import { fetchPreviousPrices } from './utils/priceReader';
@@ -32,9 +33,9 @@ function checkPriceChange(assetKey: string, newPrice: number, previousPrice: num
         const oldPriceUSD = (previousPrice / 1e18).toFixed(2);
         const newPriceUSD = (newPrice / 1e18).toFixed(2);
         const direction = newPrice > previousPrice ? 'increased' : 'decreased';
-        logError('CronScheduler', new Error(
+        logWarning('CronScheduler',
             `Significant price change alert for ${assetKey}: ${direction} ${changePercent.toFixed(2)}% (max ${ORACLE_CONFIG.MAX_PRICE_CHANGE_PERCENT}%). Previous: $${oldPriceUSD}, New: $${newPriceUSD}`
-        ));
+        );
     }
 }
 
@@ -48,9 +49,9 @@ function checkSourceDivergence(assetKey: string, sources: Array<{ name: string; 
     
     if (spreadPercent > ORACLE_CONFIG.MAX_SOURCE_DIVERGENCE_PERCENT) {
         const sourcePrices = sources.map(s => `${s.name}: $${(s.price / 1e18).toFixed(2)}`).join(', ');
-        logError('CronScheduler', new Error(
+        logWarning('CronScheduler',
             `Source divergence alert for ${assetKey}: ${spreadPercent.toFixed(2)}% spread (max ${ORACLE_CONFIG.MAX_SOURCE_DIVERGENCE_PERCENT}%). Sources: [${sourcePrices}]`
-        ));
+        );
     }
 }
 
@@ -87,14 +88,19 @@ export function getCronSchedule(): string {
 async function fetchSource(sourceName: string, sourceConfig: SourceConfig, configLoader: ConfigLoader): Promise<SourceResult> {
     const startTime = Date.now();
     try {
-        const fetchPromise = sourceName === 'constant'
-            ? Promise.resolve(generateConstantPrices(sourceConfig.assets, configLoader.getAllAssets()))
-            : fetchPrices(sourceConfig);
+        let fetchPromise;
+        if (sourceName === 'constant') {
+            fetchPromise = Promise.resolve(generateConstantPrices(sourceConfig.assets, configLoader.getAllAssets()));
+        } else if (sourceName === 'ChainlinkPriceFeedRPC') {
+            fetchPromise = fetchChainlinkPrices(sourceConfig.assets);
+        } else {
+            fetchPromise = fetchPrices(sourceConfig);
+        }
         const prices = await withTimeout(fetchPromise, TIMEOUTS.FETCH);
         return { sourceName, prices, success: true, duration: Date.now() - startTime };
     } catch (err) {
         const duration = Date.now() - startTime;
-        logError('CronScheduler', new Error(`${sourceName} failed (${duration}ms): ${(err as Error).message}`));
+        logWarning('CronScheduler', `${sourceName} failed (${duration}ms): ${(err as Error).message}`);
         return { sourceName, prices: {}, success: false, duration };
     }
 }
