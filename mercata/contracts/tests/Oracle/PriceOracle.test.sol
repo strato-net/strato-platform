@@ -36,6 +36,7 @@ contract Describe_PriceOracle {
     function beforeEach() {
         // Create a fresh oracle instance for each test
         oracle = new PriceOracle(owner);
+        // Global queue size defaults to 2, auto-synced on first push per asset
     }
 
     // ============ CONSTRUCTOR TESTS ============
@@ -783,6 +784,62 @@ contract Describe_PriceOracle {
         require(twapB == expectedTwapB, "TWAP tokenB independent of tokenA");
     }
 
+    function it_price_oracle_twap_after_full_change_queue_size() {
+        // Non-60 intervals; set queue size to 3 before third update so ring stays chronological
+        uint256 P0 = 80e8;
+        uint256 P1 = 120e8;
+        uint256 P2 = 160e8;
+        uint256 P3 = 180e8;
+        uint256 P4 = 250e8;
+        uint256 d0 = 30;
+        uint256 d1 = 70;
+        uint256 d2 = 50;
+        uint256 d3 = 40;
+        oracle.setAssetPrice(tokenA, P0);
+        fastForward(d0);
+        oracle.setAssetPrice(tokenA, P1);
+        fastForward(d1);
+        oracle.setAssetPrice(tokenA, P2);
+        fastForward(d2);
+        uint256 twap2 = oracle.getAssetPriceTwap(tokenA);
+        require(twap2 == (P0 * d0 + P1 * d1 + P2 * d2) / (d0 + d1 + d2), "TWAP after queue size change: exact weighted average over new window");
+        oracle.setTwapQueueSize(3);
+        oracle.setAssetPrice(tokenA, P3);
+        oracle.setAssetPrice(tokenA, P4);
+        fastForward(d3);
+        uint256 twap = oracle.getAssetPriceTwap(tokenA);
+        uint256 expectedTwap = (P1 * d1 + P2 * d2 + P3 * 0 + P4 * d3) / (d1 + d2 + d3);
+        require(twap == expectedTwap, "TWAP after queue size change: exact weighted average over new window");
+    }
+
+    function it_price_oracle_twap_change_queue_size_after_full() {
+        // Same as above but setTwapQueueSize(3) after set P3 (queue was full at size 2, then we grow)
+        uint256 P0 = 80e8;
+        uint256 P1 = 120e8;
+        uint256 P2 = 160e8;
+        uint256 P3 = 180e8;
+        uint256 P4 = 250e8;
+        uint256 d0 = 30;
+        uint256 d1 = 70;
+        uint256 d2 = 50;
+        uint256 d3 = 40;
+        oracle.setAssetPrice(tokenA, P0);
+        fastForward(d0);
+        oracle.setAssetPrice(tokenA, P1);
+        fastForward(d1);
+        oracle.setAssetPrice(tokenA, P2);
+        fastForward(d2);
+        oracle.setAssetPrice(tokenA, P3);
+        uint256 twap3 = oracle.getAssetPriceTwap(tokenA);
+        require(twap3 == (P1 * d1 + P2 * d2) / (d1 + d2), "TWAP after queue size change: exact weighted average over new window");
+        oracle.setTwapQueueSize(3);
+        oracle.setAssetPrice(tokenA, P4);
+        fastForward(d3);
+        uint256 twap = oracle.getAssetPriceTwap(tokenA);
+        uint256 expectedTwap = (P1 * d1 + P2 * d2 + P4 * d3) / (d1 + d2 + d3);
+        require(twap == expectedTwap, "TWAP when queue size changed after full: chronological window");
+    }
+
     // ============ COMPREHENSIVE INTEGRATION TESTS ============
 
     function it_price_oracle_comprehensive_workflow() {
@@ -829,5 +886,307 @@ contract Describe_PriceOracle {
         // New owner sets a price
         user1.do(address(oracle), "setAssetPrice", tokenC, 400e8);
         require(oracle.prices(tokenC) == 400e8, "New owner can set prices");
+    }
+
+    function it_price_oracle_twap_race_condition_global_size_change() {
+        // Test race condition: global size changes, TWAP read before next push
+        // This verifies per-asset queueSize is used for TWAP, not global
+        uint256 P0 = 100e8;
+        uint256 P1 = 110e8;
+        uint256 P2 = 120e8;
+        uint256 d = 10;
+
+        // Fill queue to capacity (size 2), causing writeIndex to wrap
+        oracle.setAssetPrice(tokenA, P0);
+        fastForward(d);
+        oracle.setAssetPrice(tokenA, P1);
+        fastForward(d);
+        oracle.setAssetPrice(tokenA, P2); // Queue full: [P1, P0] with writeIndex=1? No wait...
+        // After P2: queue has [P0, P1], spot=P2, writeIndex=0, then overwrites [0] -> queue=[P2's prev which is P1, P1]
+        // Actually let me trace: on push of P2, we push (P1's timestamp, P1) to queue
+        // Queue was [P0], now [P0, P1], writeIndex=0, len=2, size=2, so it's full
+        // Next push (P3) would overwrite at writeIndex=0
+        fastForward(d);
+        
+        // At this point: queue=[P0@t0, P1@t1], writeIndex=0, size=2
+        // TWAP should work with size 2
+        uint256 twapBefore = oracle.getAssetPriceTwap(tokenA);
+        
+        // Now change global size to 5 (but don't push yet)
+        oracle.setTwapQueueSize(5);
+        
+        // Read TWAP again - should still work correctly using per-asset size (2)
+        // The per-asset queueSize hasn't synced to 5 yet
+        uint256 twapAfter = oracle.getAssetPriceTwap(tokenA);
+        
+        // Both TWAPs should be identical (race condition handled correctly)
+        require(twapBefore == twapAfter, "TWAP should be same before/after global size change (no push yet)");
+    }
+
+    function it_price_oracle_twap_race_condition_wrapped_queue() {
+        // More critical test: queue is wrapped (writeIndex != 0) when global size changes
+        uint256 P0 = 100e8;
+        uint256 P1 = 110e8;
+        uint256 P2 = 120e8;
+        uint256 P3 = 130e8;
+        uint256 d = 10;
+
+        // Fill and wrap the queue
+        oracle.setAssetPrice(tokenA, P0);
+        fastForward(d);
+        oracle.setAssetPrice(tokenA, P1);
+        fastForward(d);
+        oracle.setAssetPrice(tokenA, P2);
+        fastForward(d);
+        oracle.setAssetPrice(tokenA, P3); // Queue overflows, writeIndex becomes 1
+        fastForward(d);
+
+        // TWAP should work correctly
+        uint256 twapBefore = oracle.getAssetPriceTwap(tokenA);
+        
+        // Change global size (but don't push)
+        oracle.setTwapQueueSize(5);
+        
+        // TWAP should still work - uses per-asset size=2, handles ring buffer correctly
+        uint256 twapAfter = oracle.getAssetPriceTwap(tokenA);
+        
+        require(twapBefore == twapAfter, "TWAP should handle wrapped queue correctly after global size change");
+    }
+
+    function it_price_oracle_twap_race_condition_shrink() {
+        // Test shrink race condition: global size shrinks, TWAP read before next push
+        oracle.setTwapQueueSize(3);  // Start with size 3
+        
+        uint256 P0 = 100e8;
+        uint256 P1 = 110e8;
+        uint256 P2 = 120e8;
+        uint256 P3 = 130e8;
+        uint256 d = 10;
+
+        // Fill queue to size 3
+        oracle.setAssetPrice(tokenA, P0);
+        fastForward(d);
+        oracle.setAssetPrice(tokenA, P1);
+        fastForward(d);
+        oracle.setAssetPrice(tokenA, P2);
+        fastForward(d);
+        oracle.setAssetPrice(tokenA, P3);
+        fastForward(d);
+
+        // Queue: [P0, P1, P2], spot=P3, per-asset size=3
+        uint256 twapBefore = oracle.getAssetPriceTwap(tokenA);
+        
+        // Shrink global size to 2 (but don't push yet)
+        oracle.setTwapQueueSize(2);
+        
+        // TWAP should still use per-asset size=3 until next push
+        uint256 twapAfter = oracle.getAssetPriceTwap(tokenA);
+        
+        require(twapBefore == twapAfter, "TWAP should be same before/after shrink (no push yet)");
+    }
+
+    function it_price_oracle_twap_shrink_with_sync() {
+        // Test shrink with sync: push after shrink triggers rotation and resize
+        oracle.setTwapQueueSize(3);  // Start with size 3
+        
+        uint256 P0 = 100e8;
+        uint256 P1 = 110e8;
+        uint256 P2 = 120e8;
+        uint256 P3 = 130e8;
+        uint256 P4 = 140e8;
+        uint256 d = 10;
+
+        // Fill queue to size 3
+        oracle.setAssetPrice(tokenA, P0);
+        fastForward(d);
+        oracle.setAssetPrice(tokenA, P1);
+        fastForward(d);
+        oracle.setAssetPrice(tokenA, P2);
+        fastForward(d);
+        oracle.setAssetPrice(tokenA, P3);
+        fastForward(d);
+
+        // Queue: [P0, P1, P2], spot=P3, per-asset size=3
+        
+        // Shrink global size to 2
+        oracle.setTwapQueueSize(2);
+        
+        // Push to trigger sync - should rotate and keep most recent 2 entries [P1, P2]
+        oracle.setAssetPrice(tokenA, P4);
+        fastForward(d);
+
+        // After sync: queue=[P2, P3], spot=P4, per-asset size=2
+        // TWAP window: P2->P3->P4
+        uint256 twap = oracle.getAssetPriceTwap(tokenA);
+        
+        // Expected: (P2*d + P3*d + P4*d) / (3*d) = (P2+P3+P4)/3 = (120+130+140)/3 = 130e8
+        uint256 expectedTwap = (P2 + P3 + P4) / 3;
+        require(twap == expectedTwap, "TWAP after shrink sync: should use most recent entries");
+    }
+
+    function it_price_oracle_twap_shrink_wrapped_queue() {
+        // Test shrink when queue is wrapped (writeIndex != 0)
+        oracle.setTwapQueueSize(3);  // Start with size 3
+        
+        uint256 P0 = 100e8;
+        uint256 P1 = 110e8;
+        uint256 P2 = 120e8;
+        uint256 P3 = 130e8;
+        uint256 P4 = 140e8;
+        uint256 P5 = 150e8;
+        uint256 d = 10;
+
+        // Fill and wrap queue (size 3)
+        oracle.setAssetPrice(tokenA, P0);
+        fastForward(d);
+        oracle.setAssetPrice(tokenA, P1);
+        fastForward(d);
+        oracle.setAssetPrice(tokenA, P2);
+        fastForward(d);
+        oracle.setAssetPrice(tokenA, P3);
+        fastForward(d);
+        oracle.setAssetPrice(tokenA, P4); // Queue wraps
+        fastForward(d);
+
+        // Queue wrapped: writeIndex != 0
+        uint256 twapBefore = oracle.getAssetPriceTwap(tokenA);
+        
+        // Shrink global to 2
+        oracle.setTwapQueueSize(2);
+        
+        // TWAP before push should still work (uses per-asset size=3)
+        uint256 twapAfterShrink = oracle.getAssetPriceTwap(tokenA);
+        require(twapBefore == twapAfterShrink, "TWAP should be same before push with wrapped queue");
+        
+        // Push to trigger sync with rotation + shrink
+        oracle.setAssetPrice(tokenA, P5);
+        fastForward(d);
+
+        // After sync: rotated, shrunk to 2, then pushed
+        // TWAP should compute correctly with new size
+        uint256 twapAfterSync = oracle.getAssetPriceTwap(tokenA);
+        
+        // After shrink+sync: queue should have [P3, P4], spot=P5
+        // TWAP = (P3*d + P4*d + P5*d) / (3*d) = (P3+P4+P5)/3 = (130+140+150)/3 = 140e8
+        uint256 expectedTwap = (P3 + P4 + P5) / 3;
+        require(twapAfterSync == expectedTwap, "TWAP after shrink sync with wrapped queue");
+    }
+
+    function it_price_oracle_twap_expand_shrink_expand_clears_old_values() {
+        // Test that shrink properly clears old values, so expand doesn't resurrect stale data
+        // Cycle: expand to 5 -> fill -> shrink to 2 -> test -> expand to 5 -> test
+        
+        uint256 P0 = 100e8;  // Will be dropped after shrink
+        uint256 P1 = 110e8;  // Will be dropped after shrink
+        uint256 P2 = 120e8;  // Will be dropped after shrink
+        uint256 P3 = 130e8;  // Kept after shrink
+        uint256 P4 = 140e8;  // Kept after shrink
+        uint256 P5 = 150e8;  // spot at shrink
+        uint256 P6 = 160e8;  // First push after shrink
+        uint256 P7 = 170e8;  // Second push after expand
+        uint256 P8 = 180e8;  // Third push after expand
+        uint256 d = 10;
+
+        // PHASE 1: Expand to size 5 and fill
+        oracle.setTwapQueueSize(5);
+        
+        oracle.setAssetPrice(tokenA, P0);
+        fastForward(d);
+        oracle.setAssetPrice(tokenA, P1);
+        fastForward(d);
+        oracle.setAssetPrice(tokenA, P2);
+        fastForward(d);
+        oracle.setAssetPrice(tokenA, P3);
+        fastForward(d);
+        oracle.setAssetPrice(tokenA, P4);
+        fastForward(d);
+        oracle.setAssetPrice(tokenA, P5);
+        fastForward(d);
+
+        // Queue: [P0, P1, P2, P3, P4], spot=P5, size=5
+        uint256 twapSize5 = oracle.getAssetPriceTwap(tokenA);
+        // TWAP = (P0+P1+P2+P3+P4+P5)/6 = (100+110+120+130+140+150)/6 = 125e8
+        uint256 expectedTwapSize5 = (P0 + P1 + P2 + P3 + P4 + P5) / 6;
+        require(twapSize5 == expectedTwapSize5, "Phase 1: TWAP with size 5 queue");
+
+        // PHASE 2: Shrink to size 2, push to trigger sync
+        oracle.setTwapQueueSize(2);
+        oracle.setAssetPrice(tokenA, P6);
+        fastForward(d);
+
+        // After shrink+sync: queue should have [P4, P5], spot=P6
+        // TWAP = (P4+P5+P6)/3 = (140+150+160)/3 = 150e8
+        uint256 twapAfterShrink = oracle.getAssetPriceTwap(tokenA);
+        uint256 expectedTwapShrunk = (P4 + P5 + P6) / 3;
+        require(twapAfterShrink == expectedTwapShrunk, "Phase 2: TWAP after shrink should only use recent values");
+
+        // PHASE 3: Expand back to size 5, push new values
+        // This is the critical test - old P0,P1,P2 should NOT reappear
+        oracle.setTwapQueueSize(5);
+        oracle.setAssetPrice(tokenA, P7);
+        fastForward(d);
+        oracle.setAssetPrice(tokenA, P8);
+        fastForward(d);
+
+        // After expand: P4, P5 (kept from shrink) remain, plus P6, P7 pushed
+        // State: queue=[P4, P5, P6, P7], len=4, spot=P8
+        // TWAP reads P4->P5->P6->P7->P8 (5 values, equal intervals)
+        // = (P4+P5+P6+P7+P8)/5 = (140+150+160+170+180)/5 = 160e8
+        // Key: P0, P1, P2 are NOT here - they were properly cleared by shrink
+        uint256 twapAfterExpand = oracle.getAssetPriceTwap(tokenA);
+        uint256 expectedTwapExpanded = (P4 + P5 + P6 + P7 + P8) / 5;
+        require(twapAfterExpand == expectedTwapExpanded, "Phase 3: TWAP after expand should NOT include old P0,P1,P2 values");
+
+        // Continue filling to verify queue grows correctly without stale data
+        uint256 P9 = 190e8;
+        uint256 P10 = 200e8;
+        uint256 P11 = 210e8;
+        oracle.setAssetPrice(tokenA, P9);
+        fastForward(d);
+        oracle.setAssetPrice(tokenA, P10);
+        fastForward(d);
+        oracle.setAssetPrice(tokenA, P11);
+        fastForward(d);
+
+        // Now queue should be full at size 5: [P6, P7, P8, P9, P10], spot=P11
+        uint256 twapFull = oracle.getAssetPriceTwap(tokenA);
+        // TWAP = (P6+P7+P8+P9+P10+P11)/6 = (160+170+180+190+200+210)/6 = 185e8
+        uint256 expectedTwapFull = (P6 + P7 + P8 + P9 + P10 + P11) / 6;
+        require(twapFull == expectedTwapFull, "Phase 3b: TWAP after filling expanded queue - no stale data");
+    }
+
+    function it_price_oracle_twap_rotation_len_3() {
+        // Test TWAP when queue wraps (writeIndex != 0)
+        // Setup: queue size 3, fill with 4 prices so writeIndex wraps
+        oracle.setTwapQueueSize(3);
+
+        uint256 P0 = 100e8;
+        uint256 P1 = 110e8;
+        uint256 P2 = 120e8;
+        uint256 P3 = 130e8;
+        uint256 P4 = 140e8;
+
+        uint256 d = 10; // uniform intervals for simplicity
+
+        oracle.setAssetPrice(tokenA, P0);
+        fastForward(d);
+        oracle.setAssetPrice(tokenA, P1);
+        fastForward(d);
+        oracle.setAssetPrice(tokenA, P2);
+        fastForward(d);
+        oracle.setAssetPrice(tokenA, P3);
+        fastForward(d);
+        oracle.setAssetPrice(tokenA, P4); // Queue full, writeIndex wraps
+        fastForward(d);
+
+        // Queue has 3 entries with writeIndex=1 (wrapped)
+        // TWAP should compute correctly over ring buffer
+        // Spot = P4, window covers P1->P2->P3->P4
+        uint256 twap = oracle.getAssetPriceTwap(tokenA);
+
+        // Expected TWAP: (P1*d + P2*d + P3*d + P4*d) / (4*d) = (P1+P2+P3+P4)/4
+        // = (110 + 120 + 130 + 140) / 4 = 125e8
+        uint256 expectedTwap = (P1 + P2 + P3 + P4) / 4;
+        require(twap == expectedTwap, "TWAP with wrapped queue: should be average of P1,P2,P3,P4");
     }
 }
