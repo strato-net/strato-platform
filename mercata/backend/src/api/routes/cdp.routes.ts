@@ -577,7 +577,7 @@ router.post("/asset-debt-info", authHandler.authorizeRequest(), CDPController.ge
  *               type: object
  *               additionalProperties: true
  */
-router.post("/admin/set-collateral-config", authHandler.authorizeRequest(true), CDPController.setCollateralConfig);
+router.post("/admin/set-collateral-config", authHandler.authorizeRequest(), CDPController.setCollateralConfig);
 
 /**
  * @openapi
@@ -608,7 +608,7 @@ router.post("/admin/set-collateral-config", authHandler.authorizeRequest(true), 
  *               type: object
  *               additionalProperties: true
  */
-router.post("/admin/set-asset-paused", authHandler.authorizeRequest(true), CDPController.setAssetPaused);
+router.post("/admin/set-asset-paused", authHandler.authorizeRequest(), CDPController.setAssetPaused);
 
 /**
  * @openapi
@@ -639,7 +639,7 @@ router.post("/admin/set-asset-paused", authHandler.authorizeRequest(true), CDPCo
  *               type: object
  *               additionalProperties: true
  */
-router.post("/admin/set-asset-supported", authHandler.authorizeRequest(true), CDPController.setAssetSupported);
+router.post("/admin/set-asset-supported", authHandler.authorizeRequest(), CDPController.setAssetSupported);
 
 /**
  * @openapi
@@ -667,7 +667,7 @@ router.post("/admin/set-asset-supported", authHandler.authorizeRequest(true), CD
  *               type: object
  *               additionalProperties: true
  */
-router.post("/admin/set-global-paused", authHandler.authorizeRequest(true), CDPController.setGlobalPaused);
+router.post("/admin/set-global-paused", authHandler.authorizeRequest(), CDPController.setGlobalPaused);
 
 /**
  * @openapi
@@ -686,7 +686,7 @@ router.post("/admin/set-global-paused", authHandler.authorizeRequest(true), CDPC
  *                 isPaused:
  *                   type: boolean
  */
-router.get("/admin/global-paused", authHandler.authorizeRequest(true), CDPController.getGlobalPaused);
+router.get("/admin/global-paused", authHandler.authorizeRequest(), CDPController.getGlobalPaused);
 
 /**
  * @openapi
@@ -705,7 +705,7 @@ router.get("/admin/global-paused", authHandler.authorizeRequest(true), CDPContro
  *                 type: object
  *                 additionalProperties: true
  */
-router.get("/admin/all-configs", authHandler.authorizeRequest(true), CDPController.getAllCollateralConfigs);
+router.get("/admin/all-configs", authHandler.authorizeRequest(), CDPController.getAllCollateralConfigs);
 
 /**
  * @openapi
@@ -885,7 +885,7 @@ router.post("/bad-debt/claim-junior-note", authHandler.authorizeRequest(), CDPCo
  *                         type: integer
  *                         description: Number of vaults for this asset
  */
-router.get("/stats", authHandler.authorizeRequest(), CDPController.getCDPStats);
+router.get("/stats", authHandler.authorizeRequest(true), CDPController.getCDPStats);
 
 /**
  * @openapi

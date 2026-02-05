@@ -5,7 +5,11 @@ import { Copy } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 
-const BridgeWalletStatus = () => {
+interface BridgeWalletStatusProps {
+  guestMode?: boolean;
+}
+
+const BridgeWalletStatus: React.FC<BridgeWalletStatusProps> = ({ guestMode = false }) => {
   const { address, isConnected } = useAccount();
   const { disconnect } = useDisconnect();
   const { toast } = useToast();
@@ -61,7 +65,7 @@ const BridgeWalletStatus = () => {
           </TooltipProvider>
         </div>
       ) : (
-        <div className="w-full [&_button]:!w-full [&_button]:bg-gradient-to-r [&_button]:from-[#1f1f5f] [&_button]:via-[#293b7d] [&_button]:to-[#16737d] [&_button]:text-white [&_button]:px-4 [&_button]:py-2 [&_button]:rounded-xl [&_button]:font-semibold [&_button]:hover:opacity-90 [&_button]:transition-all [&_button]:flex [&_button]:items-center [&_button]:justify-center">
+        <div className={`w-full [&_button]:!w-full [&_button]:bg-gradient-to-r [&_button]:from-[#1f1f5f] [&_button]:via-[#293b7d] [&_button]:to-[#16737d] [&_button]:text-white [&_button]:px-4 [&_button]:py-2 [&_button]:rounded-xl [&_button]:font-semibold [&_button]:transition-all [&_button]:flex [&_button]:items-center [&_button]:justify-center ${guestMode ? '[&_button]:opacity-50 [&_button]:cursor-not-allowed pointer-events-none' : '[&_button]:hover:opacity-90'}`}>
           <ConnectButton label={"Connect Wallet"} />
         </div>
       )}
