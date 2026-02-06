@@ -35,12 +35,26 @@ import qualified Data.Vector as V
 import Data.Aeson (eitherDecode, parseJSON, (.:), Value, encode)
 import Data.Aeson.Types (parseMaybe, Parser)
 import qualified Data.ByteString.Lazy as LBS
-import Network.HTTP.Client (newManager, defaultManagerSettings, httpLbs, parseRequest, requestHeaders, responseBody)
-import Servant.Client (BaseUrl(..), Scheme(..), ClientEnv(..), mkClientEnv, runClientM, defaultMakeClientRequest)
-import Servant.Client.Core (addHeader)
+import qualified Network.HTTP.Client as HTTP
+import Servant.Client (BaseUrl(..), Scheme(..), ClientEnv(..), mkClientEnv, runClientM, defaultMakeClientRequest, ClientError(..))
+import Servant.Client.Core (addHeader, ResponseF(..))
+import Network.HTTP.Types (Status(..))
 
 import Railgun.Types (ShieldRequest(..), CommitmentPreimage(..), ShieldCiphertext(..), TokenData(..), TokenType(..), integerToHex32, encryptedBundleToHexList)
 import Railgun.Unshield (UnshieldRequest(..), Transaction(..), SnarkProof(..), G1Point(..), G2Point(..), BoundParams(..), UnshieldType(..), CommitmentCiphertext(..))
+
+-- | Extract a human-readable error message from a Servant ClientError
+formatClientError :: ClientError -> Text
+formatClientError (FailureResponse _ resp) = 
+  let Status code _ = responseStatusCode resp
+      body = TE.decodeUtf8 $ LBS.toStrict $ responseBody resp
+      -- Try to extract the actual error message from the body
+      cleanBody = T.replace "\\\"" "\"" $ T.replace "\"" "" body
+  in "HTTP " <> T.pack (show code) <> ": " <> cleanBody
+formatClientError (DecodeFailure msg _) = "Failed to decode response: " <> msg
+formatClientError (UnsupportedContentType _ _) = "Unsupported content type in response"
+formatClientError (InvalidContentTypeHeader _) = "Invalid content type header"
+formatClientError (ConnectionError ex) = "Connection error: " <> T.pack (show ex)
 
 -- | STRATO API configuration
 data StratoConfig = StratoConfig
@@ -62,7 +76,7 @@ defaultConfig = StratoConfig
 -- | Create a servant-client environment with custom headers for nginx CSRF bypass
 makeClientEnv :: StratoConfig -> IO ClientEnv
 makeClientEnv config = do
-  manager <- newManager defaultManagerSettings
+  manager <- HTTP.newManager HTTP.defaultManagerSettings
   let baseUrl = BaseUrl Http (T.unpack $ stratoHost config) (stratoPort config) "/strato-api/bloc/v2.2"
       env = mkClientEnv manager baseUrl
       -- Add headers to bypass nginx CSRF protection
@@ -107,7 +121,7 @@ callShield config shieldReqs = do
   
   result <- runClientM (postBlocTransactionParallelExternal authHeader Nothing True request) clientEnv
   pure $ case result of
-    Left err -> Left $ T.pack $ show err
+    Left err -> Left $ formatClientError err
     Right txResults -> Right txResults
 
 -- | Call the transact function on the Railgun contract (for unshield/transfer)
@@ -142,7 +156,7 @@ callTransact config unshieldReq = do
   
   result <- runClientM (postBlocTransactionParallelExternal authHeader Nothing True request) clientEnv
   pure $ case result of
-    Left err -> Left $ T.pack $ show err
+    Left err -> Left $ formatClientError err
     Right txResults -> Right txResults
 
 -- | Approve token spending for the Railgun contract
@@ -178,7 +192,7 @@ approveToken config tokenAddr amount = do
   
   result <- runClientM (postBlocTransactionParallelExternal authHeader Nothing True request) clientEnv
   pure $ case result of
-    Left err -> Left $ T.pack $ show err
+    Left err -> Left $ formatClientError err
     Right txResults -> Right txResults
 
 -- | Convert ShieldRequests to ArgValue for the API
@@ -277,14 +291,14 @@ boundParamsToArgValue BoundParams{..} = ArgObject $ KM.fromList
 -- | Get the chain ID from STRATO metadata endpoint
 getChainId :: StratoConfig -> IO (Either Text Integer)
 getChainId config = do
-  manager <- newManager defaultManagerSettings
+  manager <- HTTP.newManager HTTP.defaultManagerSettings
   let url = "http://" ++ T.unpack (stratoHost config) ++ ":" ++ show (stratoPort config) ++ "/strato-api/eth/v1.2/metadata"
-  request <- parseRequest url
+  request <- HTTP.parseRequest url
   let requestWithAuth = request 
-        { requestHeaders = [("Authorization", TE.encodeUtf8 $ "Bearer " <> stratoAuthToken config)]
+        { HTTP.requestHeaders = [("Authorization", TE.encodeUtf8 $ "Bearer " <> stratoAuthToken config)]
         }
-  response <- httpLbs requestWithAuth manager
-  case eitherDecode (responseBody response) of
+  response <- HTTP.httpLbs requestWithAuth manager
+  case eitherDecode (HTTP.responseBody response) of
     Left err -> return $ Left $ "Failed to parse metadata response: " <> T.pack err
     Right json -> case parseMaybe (\obj -> obj .: "networkID") json of
       Nothing -> return $ Left "networkID not found in metadata"
@@ -295,19 +309,19 @@ getChainId config = do
 -- | Get the current merkle root from the Railgun contract
 getMerkleRoot :: StratoConfig -> IO (Either Text Text)
 getMerkleRoot config = do
-  manager <- newManager defaultManagerSettings
+  manager <- HTTP.newManager HTTP.defaultManagerSettings
   let storageUrl = "http://" ++ T.unpack (stratoHost config) ++ ":" ++ show (stratoPort config) 
             ++ "/cirrus/search/storage?address=eq." 
             ++ T.unpack (railgunContractAddress config) ++ "&limit=1"
-  request <- parseRequest storageUrl
+  request <- HTTP.parseRequest storageUrl
   let requestWithAuth = request 
-        { requestHeaders = 
+        { HTTP.requestHeaders = 
             [ ("Authorization", TE.encodeUtf8 $ "Bearer " <> stratoAuthToken config)
             , ("Accept", "application/json")
             ]
         }
-  response <- httpLbs requestWithAuth manager
-  case eitherDecode (responseBody response) of
+  response <- HTTP.httpLbs requestWithAuth manager
+  case eitherDecode (HTTP.responseBody response) of
     Left err -> return $ Left $ "Failed to parse Cirrus storage response: " <> T.pack err
     Right (results :: [Value]) -> 
       case results of
@@ -372,7 +386,7 @@ getBoundParamsHash config treeNum chainId numCiphertexts = do
   
   result <- runClientM (postBlocTransactionParallelExternal authHeader Nothing True request) clientEnv
   pure $ case result of
-    Left err -> Left $ T.pack $ show err
+    Left err -> Left $ formatClientError err
     Right txResults -> case txResults of
       [] -> Left "No transaction result"
       (r:_) -> case blocTransactionData r of
@@ -387,19 +401,19 @@ getBoundParamsHash config treeNum chainId numCiphertexts = do
 -- | Get the current tree number from the Railgun contract
 getTreeNumber :: StratoConfig -> IO (Either Text Integer)
 getTreeNumber config = do
-  manager <- newManager defaultManagerSettings
+  manager <- HTTP.newManager HTTP.defaultManagerSettings
   let storageUrl = "http://" ++ T.unpack (stratoHost config) ++ ":" ++ show (stratoPort config) 
             ++ "/cirrus/search/storage?address=eq." 
             ++ T.unpack (railgunContractAddress config) ++ "&limit=1"
-  request <- parseRequest storageUrl
+  request <- HTTP.parseRequest storageUrl
   let requestWithAuth = request 
-        { requestHeaders = 
+        { HTTP.requestHeaders = 
             [ ("Authorization", TE.encodeUtf8 $ "Bearer " <> stratoAuthToken config)
             , ("Accept", "application/json")
             ]
         }
-  response <- httpLbs requestWithAuth manager
-  case eitherDecode (responseBody response) of
+  response <- HTTP.httpLbs requestWithAuth manager
+  case eitherDecode (HTTP.responseBody response) of
     Left err -> return $ Left $ "Failed to parse Cirrus storage response: " <> T.pack err
     Right (results :: [Value]) -> 
       case results of
