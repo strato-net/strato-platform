@@ -11,30 +11,36 @@ module Railgun.API
   , getChainId
   , getMerkleRoot
   , getTreeNumber
+  , getBoundParamsHash
     -- * Configuration
   , StratoConfig(..)
   , defaultConfig
   ) where
 
-import Bloc.API (FunctionPayload(..), PostBlocTransactionRequest(..), BlocTransactionPayload(..), BlocTransactionResult(..))
+import Bloc.API (FunctionPayload(..), PostBlocTransactionRequest(..), BlocTransactionPayload(..), BlocTransactionResult(..), BlocTransactionData(..))
 import Bloc.Client (postBlocTransactionParallelExternal)
 import BlockApps.Solidity.ArgValue (ArgValue(..))
+import BlockApps.Solidity.SolidityValue (SolidityValue(..))
 import Blockchain.Strato.Model.Address (Address(..))
 import qualified Data.Aeson.KeyMap as KM
+import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.Map as Map
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
+import qualified Data.Text.IO as TIO
+import System.IO (stderr)
 import qualified Data.Vector as V
-import Data.Aeson (eitherDecode, parseJSON, (.:), Value)
+import Data.Aeson (eitherDecode, parseJSON, (.:), Value, encode)
 import Data.Aeson.Types (parseMaybe, Parser)
+import qualified Data.ByteString.Lazy as LBS
 import Network.HTTP.Client (newManager, defaultManagerSettings, httpLbs, parseRequest, requestHeaders, responseBody)
 import Servant.Client (BaseUrl(..), Scheme(..), ClientEnv(..), mkClientEnv, runClientM, defaultMakeClientRequest)
 import Servant.Client.Core (addHeader)
 
 import Railgun.Types (ShieldRequest(..), CommitmentPreimage(..), ShieldCiphertext(..), TokenData(..), TokenType(..), integerToHex32, encryptedBundleToHexList)
-import Railgun.Unshield (UnshieldRequest(..), Transaction(..), SnarkProof(..), G1Point(..), G2Point(..), BoundParams(..), UnshieldType(..))
+import Railgun.Unshield (UnshieldRequest(..), Transaction(..), SnarkProof(..), G1Point(..), G2Point(..), BoundParams(..), UnshieldType(..), CommitmentCiphertext(..))
 
 -- | STRATO API configuration
 data StratoConfig = StratoConfig
@@ -113,8 +119,11 @@ callTransact config unshieldReq = do
   
   let contractAddr = textToAddress (railgunContractAddress config)
       args = Map.singleton "_transactions" (transactionsToArgValue (urTransactions unshieldReq))
-      
-      payload = BlocFunction $ FunctionPayload
+  
+  -- Debug: print the args as JSON
+  TIO.hPutStrLn stderr $ "DEBUG args JSON: " <> TE.decodeUtf8 (LBS.toStrict $ encode args)
+  
+  let payload = BlocFunction $ FunctionPayload
         { functionpayloadContractAddress = contractAddr
         , functionpayloadMethod = "transact"
         , functionpayloadArgs = args
@@ -236,9 +245,9 @@ g1ToArgValue (G1Point x y) = ArgObject $ KM.fromList
   ]
 
 g2ToArgValue :: G2Point -> ArgValue
-g2ToArgValue (G2Point (xIm, xRe) (yIm, yRe)) = ArgObject $ KM.fromList
-  [ ("x", ArgArray $ V.fromList [ArgString $ T.pack $ show xIm, ArgString $ T.pack $ show xRe])
-  , ("y", ArgArray $ V.fromList [ArgString $ T.pack $ show yIm, ArgString $ T.pack $ show yRe])
+g2ToArgValue (G2Point (x0, x1) (y0, y1)) = ArgObject $ KM.fromList
+  [ ("x", ArgArray $ V.fromList [ArgString $ T.pack $ show x1, ArgString $ T.pack $ show x0])  -- Swap to match swapped vkey
+  , ("y", ArgArray $ V.fromList [ArgString $ T.pack $ show y1, ArgString $ T.pack $ show y0])  -- Swap to match swapped vkey
   ]
 
 boundParamsToArgValue :: BoundParams -> ArgValue
@@ -249,12 +258,21 @@ boundParamsToArgValue BoundParams{..} = ArgObject $ KM.fromList
   , ("chainID", ArgString $ T.pack $ show bpChainID)
   , ("adaptContract", ArgString $ T.drop 2 bpAdaptContract)  -- Remove 0x prefix
   , ("adaptParams", ArgString $ TE.decodeUtf8 $ B16.encode bpAdaptParams)
-  , ("commitmentCiphertext", ArgArray V.empty)
+  , ("commitmentCiphertext", ArgArray $ V.fromList $ map commitmentCiphertextToArgValue bpCommitmentCiphertext)
   ]
   where
     unshieldTypeToString UnshieldNone = "NONE"
     unshieldTypeToString UnshieldNormal = "NORMAL"
     unshieldTypeToString UnshieldRedirect = "REDIRECT"
+    
+    commitmentCiphertextToArgValue CommitmentCiphertext{..} = ArgObject $ KM.fromList $
+      [ ("ciphertext", ArgArray $ V.fromList $ map (ArgString . TE.decodeUtf8 . B16.encode) ccCiphertext)
+      , ("blindedSenderViewingKey", ArgString $ TE.decodeUtf8 $ B16.encode ccBlindedSenderViewingKey)
+      , ("blindedReceiverViewingKey", ArgString $ TE.decodeUtf8 $ B16.encode ccBlindedReceiverViewingKey)
+      ]
+      -- Only include annotationData and memo if non-empty
+      ++ (if BS.null ccAnnotationData then [] else [("annotationData", ArgString $ TE.decodeUtf8 $ B16.encode ccAnnotationData)])
+      ++ (if BS.null ccMemo then [] else [("memo", ArgString $ TE.decodeUtf8 $ B16.encode ccMemo)])
 
 -- | Get the chain ID from STRATO metadata endpoint
 getChainId :: StratoConfig -> IO (Either Text Integer)
@@ -303,6 +321,68 @@ getMerkleRoot config = do
       obj <- parseJSON v
       dataObj <- obj .: "data"
       dataObj .: "merkleRoot"
+
+-- | Call the contract's hashBoundParams function to get the exact hash it will compute
+-- This is needed because SolidVM's ABI encoding may differ from standard Ethereum
+getBoundParamsHash :: StratoConfig 
+                   -> Int       -- ^ Tree number
+                   -> Integer   -- ^ Chain ID
+                   -> Int       -- ^ Number of ciphertext entries (commitments - 1 for unshield)
+                   -> IO (Either Text Integer)
+getBoundParamsHash config treeNum chainId numCiphertexts = do
+  clientEnv <- makeClientEnv config
+  
+  -- Build dummy ciphertext entries (all zeros)
+  let zeros64 = T.replicate 64 "0"
+      dummyCiphertext = ArgObject $ KM.fromList
+        [ ("ciphertext", ArgArray $ V.fromList $ replicate 4 (ArgString zeros64))
+        , ("blindedSenderViewingKey", ArgString zeros64)
+        , ("blindedReceiverViewingKey", ArgString zeros64)
+        ]
+      ciphertextArray = V.fromList $ replicate numCiphertexts dummyCiphertext
+  
+  let contractAddr = textToAddress (railgunContractAddress config)
+      boundParams = ArgObject $ KM.fromList
+        [ ("treeNumber", ArgInt $ fromIntegral treeNum)
+        , ("minGasPrice", ArgString "0")
+        , ("unshield", ArgString "NORMAL")
+        , ("chainID", ArgString $ T.pack $ show chainId)
+        , ("adaptContract", ArgString "0000000000000000000000000000000000000000")
+        , ("adaptParams", ArgString "0000000000000000000000000000000000000000000000000000000000000000")
+        , ("commitmentCiphertext", ArgArray ciphertextArray)
+        ]
+      args = Map.singleton "_boundParams" boundParams
+      
+      payload = BlocFunction $ FunctionPayload
+        { functionpayloadContractAddress = contractAddr
+        , functionpayloadMethod = "hashBoundParams"
+        , functionpayloadArgs = args
+        , functionpayloadTxParams = Nothing
+        , functionpayloadMetadata = Nothing
+        }
+      
+      request = PostBlocTransactionRequest
+        { postbloctransactionrequestAddress = Nothing
+        , postbloctransactionrequestTxs = [payload]
+        , postbloctransactionrequestTxParams = Nothing
+        , postbloctransactionrequestSrcs = Nothing
+        }
+      
+      authHeader = Just $ "Bearer " <> stratoAuthToken config
+  
+  result <- runClientM (postBlocTransactionParallelExternal authHeader Nothing True request) clientEnv
+  pure $ case result of
+    Left err -> Left $ T.pack $ show err
+    Right txResults -> case txResults of
+      [] -> Left "No transaction result"
+      (r:_) -> case blocTransactionData r of
+        Just (Call contents) -> case contents of
+          [] -> Left "Empty result from hashBoundParams"
+          (SolidityValueAsString hashStr:_) -> case reads (T.unpack hashStr) of
+            [(n, "")] -> Right n
+            _ -> Left $ "Failed to parse hash: " <> hashStr
+          _ -> Left "Unexpected value type from hashBoundParams"
+        _ -> Left "Unexpected result type from hashBoundParams"
 
 -- | Get the current tree number from the Railgun contract
 getTreeNumber :: StratoConfig -> IO (Either Text Integer)

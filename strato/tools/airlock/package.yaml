@@ -24,8 +24,13 @@ library:
     - Railgun.API
     - Railgun.Scan
     - Railgun.Balance
+    - Railgun.Merkle
+    - Railgun.Witness
+    - Railgun.Prover
+    - Railgun.Signing
   dependencies:
     - aeson
+    - baby-jubjub
     - base16-bytestring
     - poseidon-hash
     - base64-bytestring
@@ -35,12 +40,15 @@ library:
     - containers
     - cryptonite
     - evm-solidity
+    - filepath
     - http-client
     - http-types
     - memory
+    - process
     - servant-client
     - servant-client-core
     - strato-model
+    - temporary
     - text
     - transformers
     - vector

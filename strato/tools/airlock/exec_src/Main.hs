@@ -29,12 +29,18 @@ import Text.Printf (printf)
 import Bloc.API (BlocTransactionResult(..))
 import qualified Bloc.API as Bloc
 import Blockchain.Strato.Model.Keccak256 (keccak256ToHex)
-import Railgun.Keys (deriveFromMnemonic, railgunAddress)
+import Railgun.Keys (deriveFromMnemonic, railgunAddress, getMasterPublicKeyPoint)
 import Railgun.Shield (createERC20ShieldRequest, serializeShieldRequest)
-import Railgun.Unshield (createDummyUnshieldRequest, serializeUnshieldRequest)
-import Railgun.API (StratoConfig(..), callShield, callTransact, approveToken, getChainId, getMerkleRoot, getTreeNumber)
-import Railgun.Types (RailgunAddress(..), RailgunKeys, TokenType(..))
-import Railgun.Balance (scanShieldedBalance, ShieldedNote(..), TokenBalance(..))
+import Railgun.Unshield (createUnshieldRequest)
+import Railgun.API (StratoConfig(..), callShield, callTransact, approveToken, getChainId, getMerkleRoot, getTreeNumber, getBoundParamsHash)
+import Railgun.Types (RailgunAddress(..), RailgunKeys(..), TokenType(..))
+import Railgun.Balance (scanShieldedBalance, TokenBalance(..))
+import qualified Railgun.Balance as Bal
+import Railgun.Merkle (fetchMerkleTreeData, computeMerkleProof, MerkleTreeData(..))
+import Railgun.Crypto (poseidonHash, computeNullifier)
+import Railgun.Witness (SpendableNote(..), buildUnshieldWitness)
+import Railgun.Prover (generateProof, defaultProverConfig)
+import Railgun.Signing (deriveSigningKey, signTransactionData, computeSignatureMessage, RailgunSignature(..))
 
 -- | Path to the mnemonic file
 mnemonicFilePath :: IO FilePath
@@ -733,39 +739,54 @@ runUnshield uopts = do
   let addr = railgunAddress keys
   TIO.putStrLn $ "Railgun address: " <> unRailgunAddress addr
   
-  -- Create DUMMY unshield request
-  TIO.putStrLn "\n*** WARNING: This creates a DUMMY unshield request ***"
-  TIO.putStrLn "*** The transaction WILL FAIL on-chain (invalid proof) ***"
-  TIO.putStrLn "*** This is for testing transaction structure only ***\n"
+  -- Read auth token
+  authToken <- readAuthToken
+  
+  let (host, port) = parseHostPort (uoBaseUrl uopts)
+      config = StratoConfig
+        { stratoHost = T.pack host
+        , stratoPort = port
+        , stratoAuthToken = authToken
+        , railgunContractAddress = T.pack $ uoRailgunContractAddr uopts
+        }
+      baseUrl = "http://" <> T.pack host <> ":" <> T.pack (show port)
+      tokenAddr = T.toLower $ normalizeAddress $ T.pack $ uoTokenAddress uopts
+  
+  -- Step 1: Scan for our notes
+  TIO.putStrLn "\nScanning for shielded notes..."
+  notesResult <- scanShieldedBalance keys baseUrl authToken (railgunContractAddress config)
+  (notes, _) <- case notesResult of
+    Left err -> do
+      TIO.hPutStrLn stderr $ "Failed to scan notes: " <> err
+      exitFailure
+    Right r -> return r
+  
+  TIO.putStrLn $ "Found " <> T.pack (show $ length notes) <> " note(s)"
+  
+  -- Step 2: Find a note for the requested token with enough value
+  let matchingNotes = filter (\n -> T.toLower (Bal.snTokenAddress n) == tokenAddr 
+                                && Bal.snValue n >= uoAmount uopts) notes
+  noteToSpend <- case matchingNotes of
+    [] -> do
+      TIO.hPutStrLn stderr $ "No spendable note found for token " <> tokenAddr 
+                          <> " with value >= " <> T.pack (show $ uoAmount uopts)
+      TIO.hPutStrLn stderr "Available notes:"
+      mapM_ (\n -> TIO.hPutStrLn stderr $ "  " <> Bal.snTokenAddress n <> ": " <> T.pack (show $ Bal.snValue n)) notes
+      exitFailure
+    (n:_) -> return n
+  TIO.putStrLn $ "Selected note at tree position " <> T.pack (show $ Bal.snTreePosition noteToSpend)
+  TIO.putStrLn $ "  Value: " <> T.pack (show $ Bal.snValue noteToSpend)
   
   if uoDryRun uopts
     then do
-      -- For dry run, use placeholder values
-      let dummyMerkleRoot = BS.replicate 32 0x01
-          unshieldReq = createDummyUnshieldRequest 
-                          (T.pack $ uoTokenAddress uopts)
-                          (uoAmount uopts)
-                          (T.pack $ uoRecipient uopts)
-                          0  -- Placeholder chain ID
-                          dummyMerkleRoot
-                          0  -- Placeholder tree number
-      TIO.putStrLn "\n=== Unshield Request (dry run) ==="
-      TIO.putStrLn $ serializeUnshieldRequest unshieldReq
+      TIO.putStrLn "\n=== Dry run - would unshield ==="
+      TIO.putStrLn $ "  Token: " <> tokenAddr
+      TIO.putStrLn $ "  Amount: " <> T.pack (show $ uoAmount uopts)
+      TIO.putStrLn $ "  Recipient: " <> T.pack (uoRecipient uopts)
       exitSuccess
     else do
-      -- Read auth token
-      authToken <- readAuthToken
-      
-      let (host, port) = parseHostPort (uoBaseUrl uopts)
-          config = StratoConfig
-            { stratoHost = T.pack host
-            , stratoPort = port
-            , stratoAuthToken = authToken
-            , railgunContractAddress = T.pack $ uoRailgunContractAddr uopts
-            }
-      
-      -- Get chain ID from network
-      TIO.putStrLn "Fetching chain ID..."
+      -- Step 3: Get chain ID and merkle root
+      TIO.putStrLn "\nFetching chain ID..."
       chainIdResult <- getChainId config
       chainId <- case chainIdResult of
         Left err -> do
@@ -775,7 +796,6 @@ runUnshield uopts = do
           TIO.putStrLn $ "Chain ID: " <> T.pack (show cid)
           return cid
       
-      -- Get merkle root from contract
       TIO.putStrLn "Fetching merkle root..."
       merkleRootResult <- getMerkleRoot config
       merkleRootHex <- case merkleRootResult of
@@ -786,7 +806,6 @@ runUnshield uopts = do
           TIO.putStrLn $ "Merkle root: " <> root
           return root
       
-      -- Get tree number from contract
       TIO.putStrLn "Fetching tree number..."
       treeNumResult <- getTreeNumber config
       treeNum <- case treeNumResult of
@@ -797,19 +816,150 @@ runUnshield uopts = do
           TIO.putStrLn $ "Tree number: " <> T.pack (show tn)
           return tn
       
-      -- Convert merkle root hex to bytes
-      let merkleRootBytes = hexToBytes merkleRootHex
+      -- Step 4: Get Merkle proof for the note
+      TIO.putStrLn "Fetching Merkle tree data..."
+      merkleDataResult <- fetchMerkleTreeData 
+                            (stratoHost config) 
+                            (stratoPort config) 
+                            authToken 
+                            (railgunContractAddress config)
+      treeData <- case merkleDataResult of
+        Left err -> do
+          TIO.hPutStrLn stderr $ "Failed to fetch Merkle data: " <> err
+          exitFailure
+        Right td -> return td
       
-      let unshieldReq = createDummyUnshieldRequest 
+      TIO.putStrLn $ "  Commitments: " <> T.pack (show $ length $ mtdCommitments treeData)
+      
+      let leafIndex = fromIntegral $ Bal.snTreePosition noteToSpend
+      merkleProof <- case computeMerkleProof treeData leafIndex of
+        Left err -> do
+          TIO.hPutStrLn stderr $ "Failed to compute Merkle proof: " <> err
+          exitFailure
+        Right mp -> do
+          TIO.putStrLn $ "  Merkle proof computed for leaf " <> T.pack (show leafIndex)
+          return mp
+      
+      -- Step 5: Build the SpendableNote
+      let randomInt = bytesToIntegerBE (Bal.snRandom noteToSpend)
+          npkInt = poseidonHash [masterPublicKey keys, randomInt]
+          spendable = SpendableNote
+            { snNoteIndex = Bal.snTreePosition noteToSpend
+            , snNpk = npkInt
+            , snValue = Bal.snValue noteToSpend
+            , snTokenAddress = Bal.snTokenAddress noteToSpend
+            , snRandom = randomInt
+            }
+      
+      -- Step 6: Get Baby JubJub public key and generate signature
+      TIO.putStrLn "\nPreparing circuit inputs..."
+      
+      let merkleRootInt = hexToInteger merkleRootHex
+      
+      -- Get Baby JubJub public key from spending key (same derivation as masterPublicKey)
+      let (pkX, pkY) = getMasterPublicKeyPoint keys
+      TIO.putStrLn $ "  Public key X: " <> T.pack (show pkX)
+      TIO.putStrLn $ "  Public key Y: " <> T.pack (show pkY)
+      
+      -- Derive signing key (uses same spending key)
+      signingKey <- case deriveSigningKey (spendingKey keys) of
+        Nothing -> do
+          TIO.hPutStrLn stderr "Failed to derive signing key"
+          exitFailure
+        Just sk -> return sk
+      
+      -- Compute values needed for signature message
+      -- Nullifier = poseidon(nullifyingKey, leafIndex) - note: only 2 args
+      let nullifierKeyInt = bytesToIntegerBE (nullifierKey keys)
+          nullifier = computeNullifier nullifierKeyInt leafIndex
+          
+          -- Token and recipient as integers
+          tokenId = hexToInteger (Bal.snTokenAddress noteToSpend)
+          recipientInt = hexToInteger (T.pack $ uoRecipient uopts)
+          
+      -- Get bound params hash from contract (SolidVM has different ABI encoding)
+      -- For unshield with 2 commitments (change + unshield), we need 1 ciphertext entry
+      boundParamsHashResult <- getBoundParamsHash config (fromIntegral treeNum) chainId 1
+      boundParamsHash <- case boundParamsHashResult of
+        Left err -> do
+          TIO.hPutStrLn stderr $ "Failed to get boundParamsHash: " <> err
+          exitFailure
+        Right h -> do
+          TIO.putStrLn $ "  BoundParamsHash: " <> T.pack (show h)
+          return h
+          
+      let -- Compute output commitments
+          unshieldCommitment = poseidonHash [recipientInt, tokenId, uoAmount uopts]
+          changeValue = Bal.snValue noteToSpend - uoAmount uopts
+          -- Always use our NPK for change commitment (even if value is 0)
+          changeCommitment = poseidonHash [npkInt, tokenId, changeValue]
+          
+          -- Compute the message to sign
+          sigMessage = computeSignatureMessage 
+                         merkleRootInt 
+                         boundParamsHash 
+                         [nullifier] 
+                         [changeCommitment, unshieldCommitment]  -- Change first, unshield last (contract expects unshield at last)
+      
+      TIO.putStrLn $ "  Nullifier: " <> T.pack (show nullifier)
+      TIO.putStrLn $ "  Signature message: " <> T.pack (show sigMessage)
+      
+      -- Sign the message
+      let signature = signTransactionData signingKey sigMessage
+          sigR8x = rsR8x signature
+          sigR8y = rsR8y signature
+          sigS = rsS signature
+      
+      TIO.putStrLn $ "  Signature R.x: " <> T.pack (show sigR8x)
+      TIO.putStrLn $ "  Signature R.y: " <> T.pack (show sigR8y)
+      TIO.putStrLn $ "  Signature S: " <> T.pack (show sigS)
+      
+      -- Step 7: Build witness
+      witnessResult <- case buildUnshieldWitness 
+                              spendable 
+                              merkleProof 
+                              nullifierKeyInt
+                              (pkX, pkY)
+                              (sigR8x, sigR8y, sigS)
+                              (T.pack $ uoRecipient uopts)
+                              (uoAmount uopts)
+                              boundParamsHash
+                              merkleRootInt of
+        Left err -> do
+          TIO.hPutStrLn stderr $ "Failed to build witness: " <> err
+          exitFailure
+        Right w -> return w
+      
+      TIO.putStrLn "  Circuit inputs built"
+      
+      -- Step 8: Generate proof using snarkjs
+      TIO.putStrLn "\nGenerating SNARK proof..."
+      let proverConfig = defaultProverConfig
+      
+      proofResult <- generateProof proverConfig witnessResult
+      snarkProof <- case proofResult of
+        Left err -> do
+          TIO.hPutStrLn stderr $ "Proof generation failed: " <> err
+          exitFailure
+        Right p -> do
+          TIO.putStrLn "  Proof generated successfully"
+          return p
+      
+      -- Step 9: Build and send the transaction
+      let merkleRootBytes = hexToBytes merkleRootHex
+          -- Build the real unshield request with actual proof
+          unshieldReq = createUnshieldRequest
+                          snarkProof
+                          merkleRootBytes
+                          nullifier
+                          [changeCommitment, unshieldCommitment]  -- Change first, unshield last (contract expects unshield at last)
                           (T.pack $ uoTokenAddress uopts)
                           (uoAmount uopts)
                           (T.pack $ uoRecipient uopts)
                           chainId
-                          merkleRootBytes
                           (fromIntegral treeNum)
       
-      -- Send unshield transaction
-      TIO.putStrLn "Sending unshield transaction (will fail with invalid proof)..."
+      TIO.putStrLn "\nSending unshield transaction..."
       unshieldResult <- callTransact config unshieldReq
       case unshieldResult of
         Left err -> do
@@ -820,6 +970,28 @@ runUnshield uopts = do
           mapM_ printTxResult results
       
       exitSuccess
+  where
+    normalizeAddress :: T.Text -> T.Text
+    normalizeAddress t
+      | "0x" `T.isPrefixOf` T.toLower t = T.drop 2 t
+      | otherwise = t
+    
+    hexToInteger :: T.Text -> Integer
+    hexToInteger t =
+      let cleanHex = if "0x" `T.isPrefixOf` T.toLower t then T.drop 2 t else t
+          digits = T.unpack cleanHex
+      in foldl (\acc c -> acc * 16 + fromIntegral (hexDigitValue c)) 0 digits
+    
+    hexDigitValue :: Char -> Int
+    hexDigitValue c
+      | c >= '0' && c <= '9' = fromEnum c - fromEnum '0'
+      | c >= 'a' && c <= 'f' = fromEnum c - fromEnum 'a' + 10
+      | c >= 'A' && c <= 'F' = fromEnum c - fromEnum 'A' + 10
+      | otherwise = 0
+    
+    -- Big-endian bytes to Integer conversion (for Poseidon hash inputs)
+    bytesToIntegerBE :: BS.ByteString -> Integer
+    bytesToIntegerBE = BS.foldl' (\acc b -> acc * 256 + fromIntegral b) 0
 
 runBalance :: BalanceOpts -> IO ()
 runBalance bopts = do
@@ -886,11 +1058,11 @@ printBalance tb = do
   TIO.putStrLn $ "  Notes: " <> T.pack (show $ tbNoteCount tb)
   TIO.putStrLn ""
 
-printNote :: ShieldedNote -> IO ()
+printNote :: Bal.ShieldedNote -> IO ()
 printNote note = do
-  let valueInTokens = fromIntegral (snValue note) / (1e18 :: Double)
-  TIO.putStrLn $ "  Note at tree position " <> T.pack (show $ snTreePosition note) <> " (block " <> snBlockNumber note <> ")"
-  TIO.putStrLn $ "    Token: 0x" <> snTokenAddress note
+  let valueInTokens = fromIntegral (Bal.snValue note) / (1e18 :: Double)
+  TIO.putStrLn $ "  Note at tree position " <> T.pack (show $ Bal.snTreePosition note) <> " (block " <> Bal.snBlockNumber note <> ")"
+  TIO.putStrLn $ "    Token: 0x" <> Bal.snTokenAddress note
   TIO.putStrLn $ "    Value: " <> T.pack (printf "%.18f" valueInTokens) <> " tokens"
   TIO.putStrLn ""
 

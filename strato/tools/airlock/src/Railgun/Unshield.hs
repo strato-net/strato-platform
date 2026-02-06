@@ -10,7 +10,9 @@ module Railgun.Unshield
   , G2Point(..)
   , BoundParams(..)
   , UnshieldType(..)
+  , CommitmentCiphertext(..)
     -- * Construction
+  , createUnshieldRequest
   , createDummyUnshieldRequest
   , serializeUnshieldRequest
   ) where
@@ -50,6 +52,25 @@ data SnarkProof = SnarkProof
 data UnshieldType = UnshieldNone | UnshieldNormal | UnshieldRedirect
   deriving (Show, Eq, Enum)
 
+-- | Commitment ciphertext for encrypted note data
+data CommitmentCiphertext = CommitmentCiphertext
+  { ccCiphertext :: [ByteString]  -- bytes32[4]
+  , ccBlindedSenderViewingKey :: ByteString  -- bytes32
+  , ccBlindedReceiverViewingKey :: ByteString  -- bytes32
+  , ccAnnotationData :: ByteString  -- bytes (empty for us)
+  , ccMemo :: ByteString  -- bytes (empty for us)
+  } deriving (Show, Eq)
+
+-- | Create a dummy commitment ciphertext (all zeros)
+dummyCommitmentCiphertext :: CommitmentCiphertext
+dummyCommitmentCiphertext = CommitmentCiphertext
+  { ccCiphertext = [BS.replicate 32 0, BS.replicate 32 0, BS.replicate 32 0, BS.replicate 32 0]
+  , ccBlindedSenderViewingKey = BS.replicate 32 0
+  , ccBlindedReceiverViewingKey = BS.replicate 32 0
+  , ccAnnotationData = BS.empty
+  , ccMemo = BS.empty
+  }
+
 -- | Bound parameters for transaction
 data BoundParams = BoundParams
   { bpTreeNumber :: Int
@@ -58,7 +79,7 @@ data BoundParams = BoundParams
   , bpChainID :: Integer
   , bpAdaptContract :: Text  -- address
   , bpAdaptParams :: ByteString  -- bytes32
-  , bpCommitmentCiphertext :: [ByteString]  -- empty for unshield
+  , bpCommitmentCiphertext :: [CommitmentCiphertext]  -- ciphertext for change notes
   } deriving (Show, Eq)
 
 -- | A Railgun transaction (for unshield/transfer)
@@ -126,6 +147,72 @@ bytesToInteger = BS.foldl' (\acc b -> acc * 256 + fromIntegral b) 0
 integerToBytes32 :: Integer -> ByteString
 integerToBytes32 n = BS.pack $ reverse $ take 32 $ 
   map (\i -> fromIntegral $ (n `shiftR` (i * 8)) .&. 0xff) [0..31]
+
+-- | Create a real unshield request with actual proof and values
+createUnshieldRequest
+  :: SnarkProof     -- ^ The generated SNARK proof
+  -> ByteString     -- ^ Merkle root (32 bytes)
+  -> Integer        -- ^ Nullifier (will be converted to bytes32)
+  -> [Integer]      -- ^ Output commitments (will be converted to bytes32)
+  -> Text           -- ^ Token address
+  -> Integer        -- ^ Amount to unshield
+  -> Text           -- ^ Recipient address
+  -> Integer        -- ^ Chain ID
+  -> Int            -- ^ Tree number
+  -> UnshieldRequest
+createUnshieldRequest proof merkleRoot nullifier commitments tokenAddr amount recipient chainId treeNum =
+  let
+    -- Convert nullifier to bytes32
+    nullifierBytes = integerToBytes32 nullifier
+    
+    -- Convert commitments to bytes32
+    commitmentBytes = map integerToBytes32 commitments
+    
+    -- Token data
+    tokenData = TokenData
+      { tokenType = ERC20
+      , tokenAddress = tokenAddr
+      , tokenSubID = 0
+      }
+    
+    -- Recipient address as NPK (for NORMAL unshield, npk = recipient address as uint256)
+    recipientAsNpk = hexToInteger recipient
+    
+    -- Unshield preimage - describes what's being withdrawn
+    unshieldPreimage = CommitmentPreimage
+      { cpNpk = recipientAsNpk
+      , cpToken = tokenData
+      , cpValue = amount
+      }
+    
+    -- Bound params
+    -- For unshield with 2 commitments (unshield + change), we need 1 ciphertext entry
+    -- The ciphertext length must equal commitments.length - 1
+    ciphertextForChange = if length commitments > 1
+                          then [dummyCommitmentCiphertext]  -- Dummy ciphertext for change note
+                          else []
+    
+    boundParams = BoundParams
+      { bpTreeNumber = treeNum
+      , bpMinGasPrice = 0
+      , bpUnshield = UnshieldNormal
+      , bpChainID = chainId
+      , bpAdaptContract = "0x0000000000000000000000000000000000000000"
+      , bpAdaptParams = BS.replicate 32 0
+      , bpCommitmentCiphertext = ciphertextForChange
+      }
+    
+    -- The transaction
+    tx = Transaction
+      { txProof = proof
+      , txMerkleRoot = merkleRoot
+      , txNullifiers = [nullifierBytes]
+      , txCommitments = commitmentBytes
+      , txBoundParams = boundParams
+      , txUnshieldPreimage = unshieldPreimage
+      }
+    
+  in UnshieldRequest { urTransactions = [tx] }
 
 -- | Create a dummy unshield request
 -- This will fail on-chain (invalid proof) but establishes the transaction structure
