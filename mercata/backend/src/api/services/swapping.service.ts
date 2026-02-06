@@ -66,9 +66,12 @@ export const getPools = async (
     })
   ]);
 
-  // Filter out hidden pools
+  // Filter out hidden pools and pools with deactivated tokens (status !== 2 = ACTIVE)
+  const ACTIVE_TOKEN_STATUS = "2";
   const validatedPools = (poolData as RawGetPool[]).filter(
     pool => !config.hiddenSwapPools.has(pool.address)
+      && pool.tokenA.status === ACTIVE_TOKEN_STATUS
+      && pool.tokenB.status === ACTIVE_TOKEN_STATUS
   );
   const validatedFactory = factoryData[0] as RawPoolFactory;
   const tokenAddresses = extractTokenAddresses(validatedPools);
