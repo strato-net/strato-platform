@@ -129,9 +129,12 @@ export const getSwapableTokens = async (
     }
   });
 
-  // Filter out hidden pools
+  // Filter out hidden pools and pools with deactivated tokens
+  const ACTIVE_TOKEN_STATUS = "2";
   const validatedPools = (poolData as (PoolWithTokens & { address: string })[]).filter(
     pool => !config.hiddenSwapPools.has(pool.address)
+      && pool.tokenA.status === ACTIVE_TOKEN_STATUS
+      && pool.tokenB.status === ACTIVE_TOKEN_STATUS
   ) as PoolWithTokens[];
   const tokenAddresses = extractTokenAddresses(validatedPools);
   const priceMap = await getOraclePrices(accessToken, {
@@ -180,12 +183,15 @@ export const getSwapableTokenPairs = async (
     })
   ]);
 
-  // Filter out hidden pools
+  // Filter out hidden pools and pools with deactivated tokens
+  const ACTIVE_TOKEN_STATUS = "2";
   const validatedPoolsA = (poolDataA as (PoolWithTokenB & { address: string })[]).filter(
     pool => !config.hiddenSwapPools.has(pool.address)
+      && pool.tokenB.status === ACTIVE_TOKEN_STATUS
   ) as PoolWithTokenB[];
   const validatedPoolsB = (poolDataB as (PoolWithTokenA & { address: string })[]).filter(
     pool => !config.hiddenSwapPools.has(pool.address)
+      && pool.tokenA.status === ACTIVE_TOKEN_STATUS
   ) as PoolWithTokenA[];
 
   const allTokens: Array<{token: RawToken, poolBalance: string}> = [
