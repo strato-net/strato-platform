@@ -445,14 +445,12 @@ const getHistoricalEquity = async (
   let totalEquity = 0n;
 
   for (const assetAddress of supportedAssets) {
-    // Get historical balance and price
     const balance = await getHistoricalTokenBalance(accessToken, assetAddress, botExecutor, date);
     const balanceBN = safeBigInt(balance);
 
     const price = await getHistoricalAssetPrice(accessToken, priceOracleAddress, assetAddress, date);
     const priceBN = safeBigInt(price);
 
-    // Calculate value: (balance * price) / WAD
     if (priceBN > 0n) {
       totalEquity += (balanceBN * priceBN) / WAD;
     }
@@ -493,10 +491,10 @@ const getFirstDepositDate = async (
 };
 
 /**
- * Get APY for the vault based on performance over time
- * Uses 30-day period if available, otherwise uses time since first deposit
+ * Get APY for the vault based on performance over time.
+ * Uses 30-day period if available, otherwise uses time since first deposit.
  * Formula: profit = (currentEquity - startEquity) + totalWithdrawals - totalDeposits
- * APY = ((1 + periodReturn)^(365/days)) - 1
+ * APY = ((1 + periodReturn)^(365/30)) - 1
  */
 const getAPY = async (
   accessToken: string,
@@ -507,44 +505,55 @@ const getAPY = async (
   supportedAssets: string[]
 ): Promise<string> => {
   try {
+    // ── Step 1: Determine the measurement period ──────────────────────────
+    const firstDeposit = await getFirstDepositDate(accessToken, vaultAddress);
+
+    if (!firstDeposit) {
+      return "-"; // No deposits yet
+    }
+
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    let startDate = thirtyDaysAgo.toISOString().split("T")[0]; // YYYY-MM-DD
-    let periodDays = 30;
 
-    // Get historical equity from 30 days ago
-    let startEquity = await getHistoricalEquity(
-      accessToken,
-      vaultAddress,
-      botExecutor,
-      priceOracleAddress,
-      supportedAssets,
-      startDate
-    );
+    const msSinceFirstDeposit = now.getTime() - firstDeposit.timestamp.getTime();
+    const periodDays = msSinceFirstDeposit / (24 * 60 * 60 * 1000);
 
-    // If vault is less than 30 days old, use time since first deposit
-    if (startEquity === 0n) {
-      const firstDeposit = await getFirstDepositDate(accessToken, vaultAddress);
-      
-      if (!firstDeposit) {
-        return "-"; // No deposits yet
-      }
 
-      // Calculate days since first deposit
-      const msSinceFirstDeposit = now.getTime() - firstDeposit.timestamp.getTime();
-      periodDays = msSinceFirstDeposit / (24 * 60 * 60 * 1000);
-      
-      // Need at least 1 day of history for meaningful APY
-      if (periodDays < 1) {
+    // The measurement period must start on or after the day AFTER the first deposit.
+    // The first deposit itself is "baked into" startEquity, not counted as a flow.
+    const dayAfterFirstDeposit = new Date(firstDeposit.timestamp.getTime() + 24 * 60 * 60 * 1000);
+    const earliestStartDate = dayAfterFirstDeposit.toISOString().split("T")[0];
+    const todayStr = now.toISOString().split("T")[0];
+
+    let startEquity: bigint;
+    let profit: bigint;
+
+    if (earliestStartDate > todayStr) {
+      // ── Path A: Vault < 1 calendar day old ──────────────────────────────
+      // dayAfterFirstDeposit is in the future, so historical equity is useless.
+      // Use total net deposits as starting capital; profit is simply the gain over deposits.
+      const { totalDepositsUsd: allDeposits, totalWithdrawalsUsd: allWithdrawals } =
+        await getDepositsWithdrawalsInPeriod(accessToken, vaultAddress, firstDeposit.date);
+
+      startEquity = allDeposits - allWithdrawals;
+
+      if (startEquity <= 0n) {
         return "-";
       }
 
-      // Use the day AFTER the first deposit as the start date for deposits/withdrawals query
-      // This way the first deposit is "baked into" the startEquity and not double-counted
-      const dayAfterFirstDeposit = new Date(firstDeposit.timestamp.getTime() + 24 * 60 * 60 * 1000);
-      startDate = dayAfterFirstDeposit.toISOString().split("T")[0];
-      
-      // Get equity at the day after first deposit (should reflect the initial deposit)
+      profit = currentEquity - startEquity;
+    } else {
+      // ── Path B: Vault >= 1 calendar day old ─────────────────────────────
+      // Use historical equity from startDate plus deposit/withdrawal flows in the period.
+      let startDate: string;
+
+      if (thirtyDaysAgo >= dayAfterFirstDeposit) {
+        startDate = thirtyDaysAgo.toISOString().split("T")[0];
+      } else {
+        startDate = earliestStartDate;
+      }
+
+      // Get starting equity from historical data
       startEquity = await getHistoricalEquity(
         accessToken,
         vaultAddress,
@@ -554,50 +563,30 @@ const getAPY = async (
         startDate
       );
 
-      // If still no historical equity (edge case), use first deposit's value
-      if (startEquity === 0n) {
-        // Get deposits on the first deposit day to use as starting equity
-        const { totalDepositsUsd } = await getDepositsWithdrawalsInPeriod(
-          accessToken,
-          vaultAddress,
-          firstDeposit.date
-        );
-        startEquity = totalDepositsUsd;
-      }
-
-      if (startEquity === 0n) {
+      if (startEquity <= 0n) {
         return "-";
       }
+
+      // Get deposit / withdrawal flows in the period
+      const { totalDepositsUsd, totalWithdrawalsUsd } = await getDepositsWithdrawalsInPeriod(
+        accessToken,
+        vaultAddress,
+        startDate
+      );
+
+      profit = (currentEquity - startEquity) + totalWithdrawalsUsd - totalDepositsUsd;
     }
 
-    // Get deposits and withdrawals in the period
-    const { totalDepositsUsd, totalWithdrawalsUsd } = await getDepositsWithdrawalsInPeriod(
-      accessToken,
-      vaultAddress,
-      startDate
-    );
-
-    // Calculate profit: (currentEquity - startEquity) + totalWithdrawals - totalDeposits
-    // All values are BigInt to preserve precision
-    const profit = (currentEquity - startEquity) + totalWithdrawalsUsd - totalDepositsUsd;
-
-    // Calculate period return using BigInt with 18 decimal precision
-
-    // periodReturn = profit * WAD / startEquity (result is scaled by 1e18)
+    // ── Calculate period return and APY ───────────────────────────────────
     const periodReturnScaled = (profit * WAD) / startEquity;
-    
-    // Convert to decimal: divide by 1e18
     const periodReturn = Number(periodReturnScaled) / 1e18;
-    
-    // Guard against invalid values (periodReturn <= -1 would cause issues with pow)
+
     if (periodReturn <= -1) {
       return "-";
     }
-    
-    // Calculate APY: ((1 + periodReturn)^(365/periodDays)) - 1
-    const apy = Math.pow(1 + periodReturn, 365 / periodDays) - 1;
 
-    // Return APY as percentage (e.g., 26.5 for 26.5%)
+    // Always annualize over 30 days — profit is measured over a 30-day window
+    const apy = Math.pow(1 + periodReturn, 365 / 30) - 1;
     const apyPercent = apy * 100;
 
     return apyPercent.toFixed(2);
