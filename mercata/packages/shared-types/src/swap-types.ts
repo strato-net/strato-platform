@@ -186,6 +186,7 @@ export interface RawLPToken {
   _symbol: string;
   customDecimals: number;
   _totalSupply: string;
+  status: string;
   balances: TokenBalance[];
   images: Array<{ value: string }>;
 }
