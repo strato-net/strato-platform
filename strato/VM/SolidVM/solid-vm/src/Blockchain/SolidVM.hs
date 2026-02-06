@@ -2300,6 +2300,7 @@ callBuiltin ("payable") [SAddress a _] = return $ SAddress a True
 callBuiltin "require" (SBool cond : msg) = do
   case msg of
     [] -> require cond Nothing
+    (SString s : _) -> require cond (Just s)
     (m : _) -> require cond (Just $ show m)
   return SNULL
 callBuiltin "assert" [SBool cond] = SNULL <$ assert cond
