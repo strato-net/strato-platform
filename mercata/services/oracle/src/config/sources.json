@@ -42,7 +42,7 @@
     "parse": "{id}.usd",
     "timestamp": "{id}.last_updated_at",
     "apiKeyEnvVar": "COINGECKO_API_KEY",
-    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "KAG", "WSTETH", "bCSPX"],
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "KAG", "WSTETH"],
     "symbolMapping": {
       "ETH": "ethereum",
       "WBTC": "wrapped-bitcoin",
@@ -50,8 +50,7 @@
       "XAUT": "tether-gold",
       "SUSDS": "susds",
       "KAG": "kinesis-silver",
-      "WSTETH": "wrapped-steth",
-      "bCSPX": "backed-cspx-core-s-p-500"
+      "WSTETH": "wrapped-steth"
     }
   },
   "CoinAPI": {
@@ -95,11 +94,10 @@
     "parse": "{symbol}.price",
     "apiKeyEnvVar": "TWELVEDATA_API_KEY",
     "comment": "Also supports crypto: ETH/USD, BTC/USD, WBTC/USD, PAXG/USD, XAUT/USD. XAG requires Grow plan ($29/mo)",
-    "assets": ["XAU", "XAG", "bCSPX"],
+    "assets": ["XAU", "XAG"],
     "symbolMapping": {
       "XAU": "XAU/USD",
-      "XAG": "XAG/USD",
-      "bCSPX": "CSPX"
+      "XAG": "XAG/USD"
     }
   },
   "OANDA": {
@@ -115,10 +113,6 @@
       "XAU": "XAU_USD",
       "XAG": "XAG_USD"
     }
-  },
-  "ChainlinkPriceFeedRPC": {
-    "parse": "chainlink-price-feed-rpc",
-    "assets": ["bCSPX"]
   },
   "constant": {
     "parse": "constant",
