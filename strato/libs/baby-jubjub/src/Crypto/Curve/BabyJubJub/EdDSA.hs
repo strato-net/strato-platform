@@ -34,6 +34,7 @@ module Crypto.Curve.BabyJubJub.EdDSA
   , signWithNonce
     -- * Poseidon-based operations (for SNARK compatibility)
   , signPoseidon
+  , signPoseidonWithScalar
   , verifyPoseidon
     -- * Low-level operations
   , hashToScalar
@@ -214,6 +215,49 @@ signPoseidon poseidonHash priv msg =
       
       -- S = (r + h * s) mod l
       sScalar = (r + hScalar * s) `mod` subgroupOrder
+      
+  in Signature rPoint sScalar
+
+-- | Sign using Poseidon hash with a raw scalar (for SNARK circuit compatibility)
+-- This variant takes a private scalar directly without hashing/clamping.
+-- Use when the scalar is derived externally (e.g., from Railgun key derivation).
+--
+-- IMPORTANT: This is designed to work with circomlib's EdDSA verification which
+-- uses cofactor clearing (multiplies h by 8 in verification). Since our public
+-- key is A = Base8 * s (not divided by 8), we compensate by multiplying s by 8
+-- in the signature computation: S = r + h * s * 8
+--
+-- Verification in circuit: S * Base8 == R + A * (h * 8)
+-- Substituting: (r + h*s*8) * Base8 == r*Base8 + (Base8*s) * (h*8) = r*Base8 + Base8*s*h*8 ✓
+signPoseidonWithScalar :: ([Integer] -> Integer)  -- ^ Poseidon hash function (list -> scalar)
+                       -> Integer  -- ^ Private scalar (NOT hashed/clamped)
+                       -> Integer  -- ^ Message (as field element)
+                       -> Signature
+signPoseidonWithScalar poseidonHash privScalar msg =
+  let s = privScalar `mod` subgroupOrder
+      
+      -- For Poseidon-based EdDSA, nonce is derived using Poseidon
+      -- r = H(s, msg) using Poseidon
+      r = poseidonHash [s, msg] `mod` subgroupOrder
+      
+      -- R = r * G (where G = Base8, the cofactor-cleared generator)
+      rPoint = scalarMultBase r
+      (rx, ry) = case rPoint of
+        Point x y -> (x, y)
+        Infinity -> (0, 1)
+      
+      -- Get public key A = s * G (NOT divided by 8, so we compensate below)
+      pubKey = scalarMultBase s
+      (ax, ay) = case pubKey of
+        Point x y -> (x, y)
+        Infinity -> (0, 1)
+      
+      -- h = Poseidon(Rx, Ry, Ax, Ay, msg)
+      hScalar = poseidonHash [rx, ry, ax, ay, msg] `mod` subgroupOrder
+      
+      -- S = (r + h * s * 8) mod l
+      -- The *8 compensates for circuit's A*(h*8) verification since our A = Base8*s (not Base8*(s/8))
+      sScalar = (r + hScalar * s * 8) `mod` subgroupOrder
       
   in Signature rPoint sScalar
 
