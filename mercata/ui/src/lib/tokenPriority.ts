@@ -29,7 +29,7 @@ export const getTokenPriority = (token: Token): number => {
   if (collateralTokens.includes(symbol)) return 2;
 
   // Priority 3: Special LP Tokens
-  const specialLpTokens = ['MUSDST', 'SUSDST', 'LENDUSDST', 'SAFETYUSDST'];
+  const specialLpTokens = ['MUSDST', 'SUSDST', 'lendUSDST', 'safetyUSDST'];
   if (specialLpTokens.includes(symbol)) return 3;
 
   // Priority 4: LP Tokens (contains "LP" in symbol)
