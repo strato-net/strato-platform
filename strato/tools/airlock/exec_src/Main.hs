@@ -5,7 +5,7 @@ module Main where
 
 import Control.Concurrent (threadDelay)
 import Control.Exception (try, SomeException)
-import Control.Monad (when)
+import Control.Monad (when, unless, forM_)
 import Data.Aeson (decode, encode, (.:), (.=), object)
 import Data.Aeson.Types (parseMaybe)
 import qualified Data.ByteString as BS
@@ -32,7 +32,7 @@ import Blockchain.Strato.Model.Keccak256 (keccak256ToHex)
 import Railgun.Keys (deriveFromMnemonic, railgunAddress, getMasterPublicKeyPoint)
 import Railgun.Shield (createERC20ShieldRequest, serializeShieldRequest)
 import Railgun.Unshield (createUnshieldRequest)
-import Railgun.API (StratoConfig(..), callShield, callTransact, approveToken, getChainId, getMerkleRoot, getTreeNumber, getBoundParamsHash)
+import Railgun.API (StratoConfig(..), defaultConfig, callShield, callTransact, approveToken, getChainId, getMerkleRoot, getTreeNumber, getBoundParamsHash, getUserAddress, getTokenBalance)
 import Railgun.Types (RailgunAddress(..), RailgunKeys(..), TokenType(..))
 import Railgun.Balance (scanShieldedBalance, TokenBalance(..))
 import qualified Railgun.Balance as Bal
@@ -267,6 +267,7 @@ data BalanceOpts = BalanceOpts
   , boRailgunContractAddr :: String
   , boDerivationIndex :: Int
   , boShowNotes :: Bool
+  , boTokenAddress :: Maybe String  -- ^ Optional: check specific token's unshielded balance
   } deriving (Show)
 
 -- | Parser for login command
@@ -401,7 +402,11 @@ balanceParser = Balance <$> (BalanceOpts
      <> help "Wallet derivation index (default 0)" )
   <*> switch
       ( long "shownotes"
-     <> help "Show individual notes (not just totals)" ))
+     <> help "Show individual notes (not just totals)" )
+  <*> optional (strOption
+      ( long "tokenaddress"
+     <> metavar "ADDRESS"
+     <> help "Check unshielded balance for specific token" )))
 
 -- | Combined command parser
 commandParser :: Parser Command
@@ -423,7 +428,7 @@ commandParser = hsubparser
       (progDesc "Unshield (withdraw) tokens from Railgun (DUMMY - will fail verification)"))
   <> command "balance"
     (info balanceParser
-      (progDesc "Show shielded token balances"))
+      (progDesc "Show token balances (shielded and unshielded)"))
   )
 
 -- | Main parser with info
@@ -1006,6 +1011,21 @@ runBalance bopts = do
   -- Read auth token
   authToken <- readAuthToken
   
+  -- Create config for API calls
+  let config = defaultConfig
+        { stratoAuthToken = authToken
+        , stratoHost = T.pack $ extractHost (boBaseUrl bopts)
+        , stratoPort = extractPort (boBaseUrl bopts)
+        , railgunContractAddress = T.pack $ boRailgunContractAddr bopts
+        }
+  
+  -- Get user's Ethereum address for unshielded balances
+  TIO.putStrLn "Getting user address..."
+  userAddrResult <- getUserAddress config
+  let maybeUserAddr = case userAddrResult of
+        Right addr' -> Just addr'
+        Left _ -> Nothing
+  
   TIO.putStrLn "Scanning Shield events..."
   TIO.putStrLn ""
   
@@ -1021,16 +1041,71 @@ runBalance bopts = do
       exitFailure
     Right (notes, balances) -> do
       TIO.putStrLn "============================================================"
-      TIO.putStrLn "               SHIELDED BALANCE SUMMARY"
+      TIO.putStrLn "                    BALANCE SUMMARY"
       TIO.putStrLn "============================================================"
       TIO.putStrLn ""
       
-      if null balances
-        then TIO.putStrLn "  No shielded notes found for this wallet."
-        else do
-          mapM_ printBalance balances
-          TIO.putStrLn ""
-          TIO.putStrLn $ "  Total notes: " <> T.pack (show $ length notes)
+      -- If a specific token address is requested, show its balance
+      case boTokenAddress bopts of
+        Just tokenAddr -> do
+          let tokenAddrT = T.pack tokenAddr
+              -- Find shielded balance for this token if any
+              maybeShielded = filter (\tb -> T.toLower (tbTokenAddress tb) == T.toLower (normalizeAddr tokenAddrT)) balances
+              shieldedValue = sum $ map tbTotalValue maybeShielded
+              shieldedNotes = sum $ map tbNoteCount maybeShielded
+              shieldedInTokens = fromIntegral shieldedValue / (1e18 :: Double)
+          
+          TIO.putStrLn $ "  Token: 0x" <> normalizeAddr tokenAddrT
+          TIO.putStrLn $ "    Shielded:   " <> T.pack (printf "%.6f" shieldedInTokens) <> " tokens (" <> T.pack (show shieldedNotes) <> " notes)"
+          
+          case maybeUserAddr of
+            Just userAddr -> do
+              unshieldedResult <- getTokenBalance config tokenAddrT userAddr
+              case unshieldedResult of
+                Right unshieldedWei -> do
+                  let unshieldedInTokens = fromIntegral unshieldedWei / (1e18 :: Double)
+                      totalInTokens = shieldedInTokens + unshieldedInTokens
+                  TIO.putStrLn $ "    Unshielded: " <> T.pack (printf "%.6f" unshieldedInTokens) <> " tokens"
+                  TIO.putStrLn $ "    Total:      " <> T.pack (printf "%.6f" totalInTokens) <> " tokens"
+                Left _ -> 
+                  TIO.putStrLn "    Unshielded: (unable to fetch)"
+            Nothing -> 
+              TIO.putStrLn "    Unshielded: (unable to fetch user address)"
+        
+        Nothing -> do
+          -- No specific token requested - show all balances
+          -- Include default tokens (like USDST) even if no shielded notes
+          let defaultTokens = ["937efa7e3a77e20bbdbd7c0d32b6514f368c1010"]  -- USDST
+              shieldedTokenAddrs = map (T.toLower . tbTokenAddress) balances
+              -- Find default tokens that aren't already in shielded balances
+              extraTokens = filter (\t -> T.toLower t `notElem` shieldedTokenAddrs) defaultTokens
+          
+          -- Show shielded balances with unshielded
+          unless (null balances) $ do
+            mapM_ (printBalanceWithUnshielded config maybeUserAddr) balances
+          
+          -- Show default tokens that only have unshielded balance
+          forM_ extraTokens $ \tokenAddr -> do
+            case maybeUserAddr of
+              Just userAddr -> do
+                unshieldedResult <- getTokenBalance config tokenAddr userAddr
+                case unshieldedResult of
+                  Right unshieldedWei | unshieldedWei > 0 -> do
+                    let unshieldedInTokens = fromIntegral unshieldedWei / (1e18 :: Double)
+                    TIO.putStrLn $ "  Token: 0x" <> tokenAddr <> " (USDST)"
+                    TIO.putStrLn $ "    Shielded:   0.000000 tokens (0 notes)"
+                    TIO.putStrLn $ "    Unshielded: " <> T.pack (printf "%.6f" unshieldedInTokens) <> " tokens"
+                    TIO.putStrLn $ "    Total:      " <> T.pack (printf "%.6f" unshieldedInTokens) <> " tokens"
+                    TIO.putStrLn ""
+                  _ -> return ()
+              Nothing -> return ()
+          
+          when (null balances && null extraTokens) $
+            TIO.putStrLn "  No balances found."
+          
+          unless (null notes) $ do
+            TIO.putStrLn ""
+            TIO.putStrLn $ "  Total shielded notes: " <> T.pack (show $ length notes)
       
       -- Optionally show individual notes
       when (boShowNotes bopts && not (null notes)) $ do
@@ -1044,6 +1119,22 @@ runBalance bopts = do
       TIO.putStrLn ""
       TIO.putStrLn "============================================================"
       exitSuccess
+  where
+    normalizeAddr t = if "0x" `T.isPrefixOf` T.toLower t then T.drop 2 (T.toLower t) else T.toLower t
+
+-- | Extract host from URL like "http://localhost:8081"
+extractHost :: String -> String
+extractHost url = 
+  let withoutScheme = dropWhile (/= '/') $ dropWhile (/= ':') url
+      hostPart = takeWhile (/= ':') $ drop 2 withoutScheme  -- skip "//"
+  in if null hostPart then "localhost" else hostPart
+
+-- | Extract port from URL like "http://localhost:8081"
+extractPort :: String -> Int
+extractPort url =
+  let afterHost = dropWhile (/= ':') $ drop 7 url  -- skip "http://"
+      portStr = takeWhile (\c -> c >= '0' && c <= '9') $ drop 1 afterHost
+  in if null portStr then 8081 else read portStr
 
 printBalance :: TokenBalance -> IO ()
 printBalance tb = do
@@ -1053,9 +1144,36 @@ printBalance tb = do
         ERC1155 -> "ERC1155"
       valueInTokens = fromIntegral (tbTotalValue tb) / (1e18 :: Double)
   TIO.putStrLn $ "  Token: 0x" <> tbTokenAddress tb <> " (" <> tokenDisplay <> ")"
-  TIO.putStrLn $ "  Balance: " <> T.pack (printf "%.18f" valueInTokens) <> " tokens"
+  TIO.putStrLn $ "  Shielded: " <> T.pack (printf "%.18f" valueInTokens) <> " tokens"
   TIO.putStrLn $ "  Raw wei: " <> T.pack (show $ tbTotalValue tb)
   TIO.putStrLn $ "  Notes: " <> T.pack (show $ tbNoteCount tb)
+  TIO.putStrLn ""
+
+printBalanceWithUnshielded :: StratoConfig -> Maybe T.Text -> TokenBalance -> IO ()
+printBalanceWithUnshielded config maybeUserAddr tb = do
+  let tokenDisplay = case tbTokenType tb of
+        ERC20 -> "ERC20"
+        ERC721 -> "ERC721"
+        ERC1155 -> "ERC1155"
+      shieldedInTokens = fromIntegral (tbTotalValue tb) / (1e18 :: Double)
+  
+  TIO.putStrLn $ "  Token: 0x" <> tbTokenAddress tb <> " (" <> tokenDisplay <> ")"
+  TIO.putStrLn $ "    Shielded:   " <> T.pack (printf "%.6f" shieldedInTokens) <> " tokens (" <> T.pack (show $ tbNoteCount tb) <> " notes)"
+  
+  -- Get unshielded balance if we have user address
+  case maybeUserAddr of
+    Just userAddr -> do
+      unshieldedResult <- getTokenBalance config (tbTokenAddress tb) userAddr
+      case unshieldedResult of
+        Right unshieldedWei -> do
+          let unshieldedInTokens = fromIntegral unshieldedWei / (1e18 :: Double)
+              totalInTokens = shieldedInTokens + unshieldedInTokens
+          TIO.putStrLn $ "    Unshielded: " <> T.pack (printf "%.6f" unshieldedInTokens) <> " tokens"
+          TIO.putStrLn $ "    Total:      " <> T.pack (printf "%.6f" totalInTokens) <> " tokens"
+        Left _ -> 
+          TIO.putStrLn "    Unshielded: (unable to fetch)"
+    Nothing -> 
+      TIO.putStrLn "    Unshielded: (unable to fetch user address)"
   TIO.putStrLn ""
 
 printNote :: Bal.ShieldedNote -> IO ()

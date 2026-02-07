@@ -12,6 +12,8 @@ module Railgun.API
   , getMerkleRoot
   , getTreeNumber
   , getBoundParamsHash
+  , getUserAddress
+  , getTokenBalance
     -- * Configuration
   , StratoConfig(..)
   , defaultConfig
@@ -433,3 +435,61 @@ getTreeNumber config = do
         else case reads (T.unpack treeNumStr) of
           [(n, "")] -> return n
           _ -> return 0
+
+-- | Get the user's Ethereum address from the vault-proxy key endpoint
+getUserAddress :: StratoConfig -> IO (Either Text Text)
+getUserAddress config = do
+  manager <- HTTP.newManager HTTP.defaultManagerSettings
+  let url = "http://" ++ T.unpack (stratoHost config) ++ ":" ++ show (stratoPort config) ++ "/strato/v2.3/key"
+  request <- HTTP.parseRequest url
+  let requestWithAuth = request 
+        { HTTP.requestHeaders = [("Authorization", TE.encodeUtf8 $ "Bearer " <> stratoAuthToken config)]
+        }
+  response <- HTTP.httpLbs requestWithAuth manager
+  case eitherDecode (HTTP.responseBody response) of
+    Left err -> return $ Left $ "Failed to parse key response: " <> T.pack err
+    Right json -> case parseMaybe (\obj -> obj .: "address") json of
+      Nothing -> return $ Left "address not found in key response"
+      Just addr -> return $ Right addr
+
+-- | Get the unshielded balance of a token for a given address
+-- Calls the token contract's balanceOf function
+getTokenBalance :: StratoConfig -> Text -> Text -> IO (Either Text Integer)
+getTokenBalance config tokenAddr userAddr = do
+  clientEnv <- makeClientEnv config
+  
+  let normalizedToken = if "0x" `T.isPrefixOf` T.toLower tokenAddr then T.drop 2 tokenAddr else tokenAddr
+      normalizedUser = if "0x" `T.isPrefixOf` T.toLower userAddr then T.drop 2 userAddr else userAddr
+      contractAddr = textToAddress normalizedToken
+      args = Map.singleton "accountAddress" (ArgString normalizedUser)
+      
+      payload = BlocFunction $ FunctionPayload
+        { functionpayloadContractAddress = contractAddr
+        , functionpayloadMethod = "balanceOf"
+        , functionpayloadArgs = args
+        , functionpayloadTxParams = Nothing
+        , functionpayloadMetadata = Nothing
+        }
+      
+      request = PostBlocTransactionRequest
+        { postbloctransactionrequestAddress = Nothing
+        , postbloctransactionrequestTxs = [payload]
+        , postbloctransactionrequestTxParams = Nothing
+        , postbloctransactionrequestSrcs = Nothing
+        }
+      
+      authHeader = Just $ "Bearer " <> stratoAuthToken config
+  
+  result <- runClientM (postBlocTransactionParallelExternal authHeader Nothing True request) clientEnv
+  pure $ case result of
+    Left err -> Left $ formatClientError err
+    Right txResults -> case txResults of
+      [] -> Left "No transaction result"
+      (r:_) -> case blocTransactionData r of
+        Just (Call contents) -> case contents of
+          [] -> Right 0
+          (SolidityValueAsString balStr:_) -> case reads (T.unpack balStr) of
+            [(n, "")] -> Right n
+            _ -> Right 0
+          _ -> Right 0
+        _ -> Right 0
