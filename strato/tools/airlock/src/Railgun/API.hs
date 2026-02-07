@@ -34,10 +34,8 @@ import qualified Data.Map as Map
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
-import qualified Data.Text.IO as TIO
-import System.IO (stderr)
 import qualified Data.Vector as V
-import Data.Aeson (eitherDecode, parseJSON, (.:), Value, encode)
+import Data.Aeson (eitherDecode, parseJSON, (.:), Value)
 import Data.Aeson.Types (parseMaybe, Parser)
 import qualified Data.ByteString.Lazy as LBS
 import qualified Network.HTTP.Client as HTTP
@@ -139,11 +137,7 @@ callTransact config unshieldReq = do
   
   let contractAddr = textToAddress (railgunContractAddress config)
       args = Map.singleton "_transactions" (transactionsToArgValue (urTransactions unshieldReq))
-  
-  -- Debug: print the args as JSON
-  TIO.hPutStrLn stderr $ "DEBUG args JSON: " <> TE.decodeUtf8 (LBS.toStrict $ encode args)
-  
-  let payload = BlocFunction $ FunctionPayload
+      payload = BlocFunction $ FunctionPayload
         { functionpayloadContractAddress = contractAddr
         , functionpayloadMethod = "transact"
         , functionpayloadArgs = args

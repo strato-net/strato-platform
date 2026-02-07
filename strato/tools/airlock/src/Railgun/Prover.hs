@@ -50,8 +50,6 @@ generateProof config inputs = do
     -- Write inputs to JSON file
     let inputJson = witnessToJSON inputs
     LBS.writeFile inputFile inputJson
-    -- Debug: also write to a persistent location
-    LBS.writeFile "debug_circuit_inputs.json" inputJson
     
     -- Step 1: Generate witness
     let witnessCmd = pcSnarkjsPath config
@@ -74,10 +72,6 @@ generateProof config inputs = do
           ExitSuccess -> do
             -- Parse the proof
             proofJson <- LBS.readFile proofFile
-            publicJson <- LBS.readFile publicFile
-            -- Debug: also write to persistent locations
-            LBS.writeFile "debug_proof.json" proofJson
-            LBS.writeFile "debug_public.json" publicJson
             case parseProofJSON proofJson of
               Left err -> return $ Left $ "Failed to parse proof: " <> err
               Right proof -> return $ Right proof
