@@ -19,8 +19,7 @@ CONTRACT_ADDR="$1"
 # Get user's address for treasury
 echo "Getting user address..."
 TOKEN=$(ensure_valid_token) || exit 1
-USER_ADDR=$(curl -s -H "Authorization: Bearer $TOKEN" \
-    "http://localhost:8081/strato/v2.3/key" | jq -r '.address')
+USER_ADDR=$(restish strato get-eth-account | jq -r '.address')
 
 if [ -z "$USER_ADDR" ] || [ "$USER_ADDR" = "null" ]; then
     echo "Error: Could not get user address"
@@ -31,27 +30,13 @@ echo "User address: $USER_ADDR"
 echo "Initializing Railgun contract at $CONTRACT_ADDR..."
 
 # Initialize with 0.25% fees
-jq -n \
-    --arg addr "$CONTRACT_ADDR" \
-    --arg treasury "$USER_ADDR" \
-    --arg owner "$USER_ADDR" '{
-  txs: [{
-    type: "FUNCTION",
-    payload: {
-      contractAddress: $addr,
-      method: "initializeRailgunLogic",
-      args: {
-        _treasury: $treasury,
-        _shieldFee: "25",
-        _unshieldFee: "25",
-        _nftFee: "25",
-        _owner: $owner
-      }
-    }
-  }]
-}' | restish strato post-bloc-transaction --resolve > /tmp/init-response.json
+RESPONSE=$("$SCRIPT_DIR/strato-call" "$CONTRACT_ADDR" initializeRailgunLogic \
+    "_treasury=$USER_ADDR" \
+    "_shieldFee=25" \
+    "_unshieldFee=25" \
+    "_nftFee=25" \
+    "_owner=$USER_ADDR")
 
-RESPONSE=$(cat /tmp/init-response.json)
 STATUS=$(echo "$RESPONSE" | jq -r '.[0].status // empty')
 
 if [ "$STATUS" = "Success" ]; then

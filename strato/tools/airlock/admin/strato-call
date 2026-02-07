@@ -80,6 +80,12 @@ show_usage() {
     echo "Usage:"
     echo "  strato-call <contract> <function> [arg1=val1] [arg2=val2] ..."
     echo ""
+    echo "Arguments are auto-detected:"
+    echo "  key=123        -> number"
+    echo "  key=hello      -> string"
+    echo "  key={...}      -> JSON object"
+    echo "  key=[...]      -> JSON array"
+    echo ""
     echo "Commands:"
     echo "  --list-functions <contract>          List functions for a contract"
     echo "  --function-info <contract> <func>    Show function parameters"
@@ -89,8 +95,9 @@ show_usage() {
     echo ""
     echo "Examples:"
     echo "  strato-call usdst balanceOf accountAddress=f1ba16..."
+    echo "  strato-call usdst transfer to=abc123 value=1000000000000000000"
+    echo "  strato-call mycontract setData 'data={\"enabled\":true}'"
     echo "  strato-call --register usdst 937efa7e3a77e20bbdbd7c0d32b6514f368c1010 USDST"
-    echo "  strato-call --list-functions usdst"
 }
 
 list_functions() {
@@ -162,15 +169,25 @@ call_function() {
     local contract_addr=$(resolve_contract "$input")
     
     # Build args JSON
+    # Auto-detects value type:
+    #   key=123       -> number
+    #   key=hello     -> string
+    #   key={...}     -> JSON object (parsed)
+    #   key=[...]     -> JSON array (parsed)
     local args_json="{}"
     for arg in "$@"; do
         local key="${arg%%=*}"
         local value="${arg#*=}"
-        # Try to detect if value should be a number or string
-        if [[ "$value" =~ ^[0-9]+$ ]]; then
+        
+        if [[ "$value" =~ ^\{.*\}$ ]] || [[ "$value" =~ ^\[.*\]$ ]]; then
+            # Looks like JSON object or array - parse it
+            args_json=$(echo "$args_json" | jq --argjson v "$value" ". + {\"$key\": \$v}")
+        elif [[ "$value" =~ ^[0-9]+$ ]]; then
+            # Number
             args_json=$(echo "$args_json" | jq ". + {\"$key\": $value}")
         else
-            args_json=$(echo "$args_json" | jq ". + {\"$key\": \"$value\"}")
+            # String
+            args_json=$(echo "$args_json" | jq --arg v "$value" ". + {\"$key\": \$v}")
         fi
     done
     

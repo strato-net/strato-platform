@@ -29,29 +29,14 @@ fi
 
 echo "Setting verification key for circuit ($NULLIFIERS, $COMMITMENTS) on contract $CONTRACT_ADDR..."
 
+# Read the verifier key JSON and pass it directly
 VERIFYING_KEY=$(cat "$KEY_FILE")
 
-jq -n \
-    --arg addr "$CONTRACT_ADDR" \
-    --argjson nullifiers "$NULLIFIERS" \
-    --argjson commitments "$COMMITMENTS" \
-    --argjson vk "$VERIFYING_KEY" '{
-  txs: [{
-    type: "FUNCTION",
-    payload: {
-      contractAddress: $addr,
-      method: "setVerificationKey",
-      args: {
-        _nullifiers: $nullifiers,
-        _commitments: $commitments,
-        _verifyingKey: $vk
-      },
-      metadata: {VM: "SolidVM"}
-    }
-  }]
-}' | restish strato post-bloc-transaction --resolve > /tmp/setkey-response.json
+RESPONSE=$("$SCRIPT_DIR/strato-call" "$CONTRACT_ADDR" setVerificationKey \
+    "_nullifiers=$NULLIFIERS" \
+    "_commitments=$COMMITMENTS" \
+    "_verifyingKey=$VERIFYING_KEY")
 
-RESPONSE=$(cat /tmp/setkey-response.json)
 STATUS=$(echo "$RESPONSE" | jq -r '.[0].status // empty')
 
 if [ "$STATUS" = "Success" ]; then
