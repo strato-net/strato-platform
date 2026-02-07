@@ -242,7 +242,7 @@ data ListAddressesOpts = ListAddressesOpts
 data ShieldOpts = ShieldOpts
   { soPassphrase :: String
   , soTokenAddress :: String
-  , soAmount :: Integer
+  , soAmount :: String  -- Amount in tokens (e.g., "1.5"), default "1"
   , soBaseUrl :: String
   , soRailgunContractAddr :: String
   , soDerivationIndex :: Int
@@ -308,11 +308,11 @@ shieldParser = Shield <$> (ShieldOpts
      <> value ""
      <> metavar "ADDRESS"
      <> help "ERC20 token contract address" )
-  <*> option auto
+  <*> strOption
       ( long "amount"
-     <> value 1000000000000000000
+     <> value "1"
      <> metavar "AMOUNT"
-     <> help "Amount to shield (in smallest unit, default 1e18)" )
+     <> help "Amount to shield in tokens (e.g., '1.5'), default 1" )
   <*> strOption
       ( long "baseurl"
      <> value "http://localhost:8081"
@@ -683,9 +683,30 @@ runShield sopts = do
   let addr = railgunAddress keys
   TIO.putStrLn $ "Railgun address: " <> unRailgunAddress addr
   
+  -- Read auth token for API calls
+  authToken <- readAuthToken
+  
+  let (host, port) = parseHostPort (soBaseUrl sopts)
+      config = StratoConfig
+        { stratoHost = T.pack host
+        , stratoPort = port
+        , stratoAuthToken = authToken
+        , railgunContractAddress = T.pack $ soRailgunContractAddr sopts
+        }
+      tokenAddr = T.pack $ soTokenAddress sopts
+  
+  -- Get token decimals and parse amount
+  decimals <- getTokenDecimals config tokenAddr
+  amountWei <- case parseTokenAmount (T.pack $ soAmount sopts) decimals of
+    Left err -> do
+      TIO.hPutStrLn stderr $ "Error: " <> err
+      exitFailure
+    Right amt -> return amt
+  
   -- Create shield request
   TIO.putStrLn "Creating shield request..."
-  shieldReq <- createERC20ShieldRequest keys (T.pack $ soTokenAddress sopts) (soAmount sopts)
+  TIO.putStrLn $ "  Amount: " <> formatTokenAmount amountWei decimals <> " tokens"
+  shieldReq <- createERC20ShieldRequest keys tokenAddr amountWei
   
   if soDryRun sopts
     then do
@@ -693,21 +714,10 @@ runShield sopts = do
       TIO.putStrLn $ serializeShieldRequest shieldReq
       exitSuccess
     else do
-      -- Read auth token
-      authToken <- readAuthToken
-      
-      let (host, port) = parseHostPort (soBaseUrl sopts)
-          config = StratoConfig
-            { stratoHost = T.pack host
-            , stratoPort = port
-            , stratoAuthToken = authToken
-            , railgunContractAddress = T.pack $ soRailgunContractAddr sopts
-            }
-      
       -- Optionally approve tokens first
       when (soApproveFirst sopts) $ do
-        TIO.putStrLn $ "Approving " <> T.pack (show $ soAmount sopts) <> " tokens..."
-        approveResult <- approveToken config (T.pack $ soTokenAddress sopts) (soAmount sopts)
+        TIO.putStrLn $ "Approving " <> formatTokenAmount amountWei decimals <> " tokens..."
+        approveResult <- approveToken config tokenAddr amountWei
         case approveResult of
           Left err -> do
             TIO.hPutStrLn stderr $ "Approval failed: " <> err
