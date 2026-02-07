@@ -5,9 +5,55 @@ Scripts for deploying and configuring the Railgun contract on STRATO.
 ## Prerequisites
 
 - Run `airlock login` first to authenticate (token stored in `~/.secrets/stratoToken`)
-- jq and curl must be installed
+- jq and restish must be installed
+- For bash autocomplete, source the completion script
 
-## Scripts
+## Tools
+
+### strato-call
+
+A CLI tool for calling Solidity contract functions with tab completion.
+
+```bash
+# Register contracts for easy access
+./strato-call --register usdst 937efa7e3a77e20bbdbd7c0d32b6514f368c1010 USDST
+./strato-call --register railgun 95be101d075f44084ca1cf51d0106c8606773952 RailgunSmartWallet
+
+# List registered contracts
+./strato-call --list-contracts
+
+# List functions for a contract
+./strato-call --list-functions usdst
+
+# Show function parameters
+./strato-call --function-info usdst transfer
+
+# Call a function
+./strato-call usdst balanceOf accountAddress=f1ba16a6cfb2a17fb34ad477eaaf0c76eac64f14
+./strato-call usdst transfer to=... value=1000000000000000000
+```
+
+#### Tab Completion Setup
+
+**Bash:**
+```bash
+# Add to your ~/.bashrc:
+source /path/to/strato-call-completion.bash
+```
+
+**Zsh:**
+```bash
+# Copy to your fpath and add to ~/.zshrc:
+fpath=(/path/to/airlock/admin $fpath)
+autoload -Uz compinit && compinit
+```
+
+After setup, tab completion works for:
+- Contract aliases (first argument)
+- Function names (second argument)
+- Function parameters (subsequent arguments)
+
+## Deployment Scripts
 
 ### deploy-railgun.sh
 
