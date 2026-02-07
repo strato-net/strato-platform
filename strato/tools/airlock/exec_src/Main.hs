@@ -32,7 +32,7 @@ import Blockchain.Strato.Model.Keccak256 (keccak256ToHex)
 import Railgun.Keys (deriveFromMnemonic, railgunAddress, getMasterPublicKeyPoint)
 import Railgun.Shield (createERC20ShieldRequest, serializeShieldRequest)
 import Railgun.Unshield (createUnshieldRequest)
-import Railgun.API (StratoConfig(..), defaultConfig, callShield, callTransact, approveToken, getChainId, getMerkleRoot, getTreeNumber, getBoundParamsHash, getUserAddress, getTokenBalance)
+import Railgun.API (StratoConfig(..), defaultConfig, callShield, callTransact, approveToken, getChainId, getMerkleRoot, getTreeNumber, getBoundParamsHash, getUserAddress, getTokenBalance, getTokenDecimals, formatTokenAmount, parseTokenAmount)
 import Railgun.Types (RailgunAddress(..), RailgunKeys(..), TokenType(..))
 import Railgun.Balance (scanShieldedBalance, TokenBalance(..))
 import qualified Railgun.Balance as Bal
@@ -253,7 +253,7 @@ data ShieldOpts = ShieldOpts
 data UnshieldOpts = UnshieldOpts
   { uoPassphrase :: String
   , uoTokenAddress :: String
-  , uoAmount :: Integer
+  , uoAmount :: String  -- Amount in tokens (e.g., "1.5") or empty for entire note
   , uoRecipient :: String
   , uoBaseUrl :: String
   , uoRailgunContractAddr :: String
@@ -348,11 +348,11 @@ unshieldParser = Unshield <$> (UnshieldOpts
      <> value ""
      <> metavar "ADDRESS"
      <> help "ERC20 token contract address" )
-  <*> option auto
+  <*> strOption
       ( long "amount"
-     <> value 1000000000000000000
+     <> value ""
      <> metavar "AMOUNT"
-     <> help "Amount to unshield (in smallest unit)" )
+     <> help "Amount to unshield in tokens (e.g., '1.5'), empty = entire note" )
   <*> strOption
       ( long "recipient"
      <> value ""
@@ -720,6 +720,8 @@ runShield sopts = do
       case shieldResult of
         Left err -> do
           TIO.hPutStrLn stderr $ "Shield failed: " <> err
+          when ("insufficient allowance" `T.isInfixOf` T.toLower err) $
+            TIO.hPutStrLn stderr "\nHint: Use --approvefirst to approve the Railgun contract to spend your tokens."
           exitFailure
         Right results -> do
           TIO.putStrLn $ "Shield response: " <> T.pack (show $ length results) <> " transaction result(s)"
@@ -768,25 +770,50 @@ runUnshield uopts = do
   
   TIO.putStrLn $ "Found " <> T.pack (show $ length notes) <> " note(s)"
   
-  -- Step 2: Find a note for the requested token with enough value
-  let matchingNotes = filter (\n -> T.toLower (Bal.snTokenAddress n) == tokenAddr 
-                                && Bal.snValue n >= uoAmount uopts) notes
-  noteToSpend <- case matchingNotes of
-    [] -> do
-      TIO.hPutStrLn stderr $ "No spendable note found for token " <> tokenAddr 
-                          <> " with value >= " <> T.pack (show $ uoAmount uopts)
-      TIO.hPutStrLn stderr "Available notes:"
-      mapM_ (\n -> TIO.hPutStrLn stderr $ "  " <> Bal.snTokenAddress n <> ": " <> T.pack (show $ Bal.snValue n)) notes
+  -- Get token decimals for formatting and parsing
+  decimals <- getTokenDecimals config tokenAddr
+  
+  -- Parse requested amount (empty string = entire note)
+  requestedAmount <- case parseTokenAmount (T.pack $ uoAmount uopts) decimals of
+    Left err -> do
+      TIO.hPutStrLn stderr $ "Error: " <> err
       exitFailure
-    (n:_) -> return n
+    Right amt -> return amt
+  
+  -- Step 2: Find a note for the requested token
+  -- If amount is 0 (empty input), use the entire note value; otherwise find a note with enough value
+  let tokenNotes = filter (\n -> T.toLower (Bal.snTokenAddress n) == tokenAddr) notes
+  
+  (noteToSpend, actualAmount) <- case tokenNotes of
+    [] -> do
+      TIO.hPutStrLn stderr $ "No notes found for token " <> tokenAddr
+      TIO.hPutStrLn stderr "Available notes:"
+      mapM_ (\n -> TIO.hPutStrLn stderr $ "  " <> Bal.snTokenAddress n <> ": " <> formatTokenAmount (Bal.snValue n) decimals) notes
+      exitFailure
+    (n:_) | requestedAmount == 0 -> do
+      -- Use the first note's full value
+      return (n, Bal.snValue n)
+    ns -> do
+      -- Find a note with enough value
+      let matchingNotes = filter (\n -> Bal.snValue n >= requestedAmount) ns
+      case matchingNotes of
+        [] -> do
+          TIO.hPutStrLn stderr $ "No spendable note found for token " <> tokenAddr 
+                              <> " with value >= " <> formatTokenAmount requestedAmount decimals
+          TIO.hPutStrLn stderr "Available notes:"
+          mapM_ (\n -> TIO.hPutStrLn stderr $ "  " <> Bal.snTokenAddress n <> ": " <> formatTokenAmount (Bal.snValue n) decimals) notes
+          exitFailure
+        (m:_) -> return (m, requestedAmount)
+  
   TIO.putStrLn $ "Selected note at tree position " <> T.pack (show $ Bal.snTreePosition noteToSpend)
-  TIO.putStrLn $ "  Value: " <> T.pack (show $ Bal.snValue noteToSpend)
+  TIO.putStrLn $ "  Note value: " <> formatTokenAmount (Bal.snValue noteToSpend) decimals
+  TIO.putStrLn $ "  Unshielding: " <> formatTokenAmount actualAmount decimals
   
   if uoDryRun uopts
     then do
       TIO.putStrLn "\n=== Dry run - would unshield ==="
       TIO.putStrLn $ "  Token: " <> tokenAddr
-      TIO.putStrLn $ "  Amount: " <> T.pack (show $ uoAmount uopts)
+      TIO.putStrLn $ "  Amount: " <> formatTokenAmount actualAmount decimals
       TIO.putStrLn $ "  Recipient: " <> T.pack (uoRecipient uopts)
       exitSuccess
     else do
@@ -894,8 +921,8 @@ runUnshield uopts = do
           return h
           
       let -- Compute output commitments
-          unshieldCommitment = poseidonHash [recipientInt, tokenId, uoAmount uopts]
-          changeValue = Bal.snValue noteToSpend - uoAmount uopts
+          unshieldCommitment = poseidonHash [recipientInt, tokenId, actualAmount]
+          changeValue = Bal.snValue noteToSpend - actualAmount
           -- Always use our NPK for change commitment (even if value is 0)
           changeCommitment = poseidonHash [npkInt, tokenId, changeValue]
           
@@ -927,7 +954,7 @@ runUnshield uopts = do
                               (pkX, pkY)
                               (sigR8x, sigR8y, sigS)
                               (T.pack $ uoRecipient uopts)
-                              (uoAmount uopts)
+                              actualAmount
                               boundParamsHash
                               merkleRootInt of
         Left err -> do
@@ -959,7 +986,7 @@ runUnshield uopts = do
                           nullifier
                           [changeCommitment, unshieldCommitment]  -- Change first, unshield last (contract expects unshield at last)
                           (T.pack $ uoTokenAddress uopts)
-                          (uoAmount uopts)
+                          actualAmount
                           (T.pack $ uoRecipient uopts)
                           chainId
                           (fromIntegral treeNum)
@@ -1025,6 +1052,11 @@ runBalance bopts = do
   let maybeUserAddr = case userAddrResult of
         Right addr' -> Just addr'
         Left _ -> Nothing
+  
+  case maybeUserAddr of
+    Just userAddr -> TIO.putStrLn $ "Ethereum address: 0x" <> userAddr
+    Nothing -> return ()
+  TIO.putStrLn ""
   
   TIO.putStrLn "Scanning Shield events..."
   TIO.putStrLn ""

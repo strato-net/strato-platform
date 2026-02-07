@@ -25,6 +25,8 @@ import qualified Data.ByteString.Base16 as B16
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe, mapMaybe)
+import Data.List (sortBy)
+import Data.Function (on)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
@@ -123,6 +125,21 @@ fetchMapping manager baseUrl authToken contractAddr collectionName = do
 -- | Fetch commitments from Shield events
 fetchCommitments :: Manager -> String -> Text -> Text -> IO (Either Text [(Integer, Integer)])
 fetchCommitments manager baseUrl authToken contractAddr = do
+  -- Fetch from Shield events (initial deposits)
+  shieldResult <- fetchShieldCommitments manager baseUrl authToken contractAddr
+  -- Fetch from Transact events (transfers/unshields that create change outputs)
+  transactResult <- fetchTransactCommitments manager baseUrl authToken contractAddr
+  
+  case (shieldResult, transactResult) of
+    (Left err, _) -> return $ Left err
+    (_, Left err) -> return $ Left err
+    (Right shieldCommits, Right transactCommits) ->
+      -- Sort by position to ensure correct ordering
+      return $ Right $ sortBy (compare `on` fst) (shieldCommits ++ transactCommits)
+
+-- | Fetch commitments from Shield events
+fetchShieldCommitments :: Manager -> String -> Text -> Text -> IO (Either Text [(Integer, Integer)])
+fetchShieldCommitments manager baseUrl authToken contractAddr = do
   let url = baseUrl ++ "/cirrus/search/event?address=eq." ++ T.unpack contractAddr 
             ++ "&event_name=eq.Shield&order=block_number"
   request <- parseRequest url
@@ -136,11 +153,11 @@ fetchCommitments manager baseUrl authToken contractAddr = do
   case Aeson.eitherDecode (responseBody response) of
     Left err -> return $ Left $ T.pack err
     Right (results :: [Value]) -> do
-      let commitmentsList = concatMap extractCommitments results
+      let commitmentsList = concatMap extractShieldCommitments results
       return $ Right commitmentsList
   where
-    extractCommitments :: Value -> [(Integer, Integer)]
-    extractCommitments v = fromMaybe [] $ parseMaybe parseShieldEvent v
+    extractShieldCommitments :: Value -> [(Integer, Integer)]
+    extractShieldCommitments v = fromMaybe [] $ parseMaybe parseShieldEvent v
     
     parseShieldEvent :: Value -> Parser [(Integer, Integer)]
     parseShieldEvent v = do
@@ -161,6 +178,46 @@ fetchCommitments manager baseUrl authToken contractAddr = do
       -- commitment = poseidon(npk, tokenId, value)
       case extractCommitmentHashes str of
         Just hashes -> hashes
+        Nothing -> []
+
+-- | Fetch commitments from Transact events (these contain commitment hashes directly)
+fetchTransactCommitments :: Manager -> String -> Text -> Text -> IO (Either Text [(Integer, Integer)])
+fetchTransactCommitments manager baseUrl authToken contractAddr = do
+  let url = baseUrl ++ "/cirrus/search/event?address=eq." ++ T.unpack contractAddr 
+            ++ "&event_name=eq.Transact&order=block_number"
+  request <- parseRequest url
+  let requestWithAuth = request 
+        { requestHeaders = 
+            [ ("Authorization", TE.encodeUtf8 $ "Bearer " <> authToken)
+            , ("Accept", "application/json")
+            ]
+        }
+  response <- httpLbs requestWithAuth manager
+  case Aeson.eitherDecode (responseBody response) of
+    Left err -> return $ Left $ T.pack err
+    Right (results :: [Value]) -> do
+      let commitmentsList = concatMap extractTransactCommitments results
+      return $ Right commitmentsList
+  where
+    extractTransactCommitments :: Value -> [(Integer, Integer)]
+    extractTransactCommitments v = fromMaybe [] $ parseMaybe parseTransactEvent v
+    
+    parseTransactEvent :: Value -> Parser [(Integer, Integer)]
+    parseTransactEvent v = do
+      obj <- Aeson.parseJSON v
+      attrs <- obj .: "attributes"
+      startPosStr <- attrs .: "startPosition"
+      hashStr <- attrs .: "hash"  -- Transact events have "hash" array with commitment hashes
+      let startPos = read (T.unpack startPosStr) :: Integer
+          -- Parse hash array - these are bytes32 hex strings
+          hashes = parseHashArray hashStr
+      return $ zip [startPos..] hashes
+    
+    -- Parse the hash array from Transact event
+    parseHashArray :: Text -> [Integer]
+    parseHashArray str =
+      case Aeson.decodeStrict (TE.encodeUtf8 str) of
+        Just (arr :: [Text]) -> map hexToInteger arr
         Nothing -> []
 
 -- | Extract commitment hashes from the commitments JSON string

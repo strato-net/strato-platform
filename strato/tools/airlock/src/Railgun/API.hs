@@ -14,6 +14,9 @@ module Railgun.API
   , getBoundParamsHash
   , getUserAddress
   , getTokenBalance
+  , getTokenDecimals
+  , formatTokenAmount
+  , parseTokenAmount
     -- * Configuration
   , StratoConfig(..)
   , defaultConfig
@@ -41,6 +44,7 @@ import qualified Network.HTTP.Client as HTTP
 import Servant.Client (BaseUrl(..), Scheme(..), ClientEnv(..), mkClientEnv, runClientM, defaultMakeClientRequest, ClientError(..))
 import Servant.Client.Core (addHeader, ResponseF(..))
 import Network.HTTP.Types (Status(..))
+import Text.Printf (printf)
 
 import Railgun.Types (ShieldRequest(..), CommitmentPreimage(..), ShieldCiphertext(..), TokenData(..), TokenType(..), integerToHex32, encryptedBundleToHexList)
 import Railgun.Unshield (UnshieldRequest(..), Transaction(..), SnarkProof(..), G1Point(..), G2Point(..), BoundParams(..), UnshieldType(..), CommitmentCiphertext(..))
@@ -493,3 +497,82 @@ getTokenBalance config tokenAddr userAddr = do
             _ -> Right 0
           _ -> Right 0
         _ -> Right 0
+
+-- | Get the decimals for a token (default 18 if not found)
+getTokenDecimals :: StratoConfig -> Text -> IO Int
+getTokenDecimals config tokenAddr = do
+  clientEnv <- makeClientEnv config
+  
+  let normalizedToken = if "0x" `T.isPrefixOf` T.toLower tokenAddr then T.drop 2 tokenAddr else tokenAddr
+      contractAddr = textToAddress normalizedToken
+      
+      payload = BlocFunction $ FunctionPayload
+        { functionpayloadContractAddress = contractAddr
+        , functionpayloadMethod = "decimals"
+        , functionpayloadArgs = Map.empty
+        , functionpayloadTxParams = Nothing
+        , functionpayloadMetadata = Nothing
+        }
+      
+      request = PostBlocTransactionRequest
+        { postbloctransactionrequestAddress = Nothing
+        , postbloctransactionrequestTxs = [payload]
+        , postbloctransactionrequestTxParams = Nothing
+        , postbloctransactionrequestSrcs = Nothing
+        }
+      
+      authHeader = Just $ "Bearer " <> stratoAuthToken config
+  
+  result <- runClientM (postBlocTransactionParallelExternal authHeader Nothing True request) clientEnv
+  pure $ case result of
+    Left _ -> 18  -- Default to 18 decimals
+    Right txResults -> case txResults of
+      [] -> 18
+      (r:_) -> case blocTransactionData r of
+        Just (Call contents) -> case contents of
+          (SolidityValueAsString decStr:_) -> case reads (T.unpack decStr) of
+            [(n, "")] -> n
+            _ -> 18
+          _ -> 18
+        _ -> 18
+
+-- | Format a token amount with proper decimal places
+formatTokenAmount :: Integer -> Int -> Text
+formatTokenAmount amount decimals =
+  let divisor = 10 ^ decimals :: Integer
+      intPart = amount `div` divisor
+      fracPart = amount `mod` divisor
+      -- Pad fractional part with leading zeros if needed
+      fracStr = T.pack $ printf ("%0" ++ show decimals ++ "d") fracPart
+      -- Remove trailing zeros but keep at least 2 decimal places
+      trimmedFrac = T.dropWhileEnd (== '0') fracStr
+      finalFrac = if T.length trimmedFrac < 2 then T.take 2 fracStr else trimmedFrac
+  in T.pack (show intPart) <> "." <> finalFrac
+
+-- | Parse a decimal token amount string into wei
+-- e.g., "1.5" with 18 decimals -> 1500000000000000000
+parseTokenAmount :: Text -> Int -> Either Text Integer
+parseTokenAmount amountStr decimals
+  | T.null amountStr = Right 0  -- Empty means "entire note"
+  | otherwise = case T.splitOn "." amountStr of
+      [intPart] -> 
+        -- No decimal point, just an integer
+        case reads (T.unpack intPart) of
+          [(n, "")] -> Right $ n * (10 ^ decimals)
+          _ -> Left $ "Invalid amount: " <> amountStr
+      [intPart, fracPart] ->
+        -- Has decimal point
+        let intVal = case T.unpack intPart of
+              "" -> 0
+              s -> case reads s of
+                [(n, "")] -> n
+                _ -> -1  -- Invalid
+            -- Pad or truncate fractional part to match decimals
+            paddedFrac = T.take decimals (fracPart <> T.replicate decimals "0")
+            fracVal = case reads (T.unpack paddedFrac) of
+              [(n, "")] -> n
+              _ -> -1  -- Invalid
+        in if intVal < 0 || fracVal < 0
+           then Left $ "Invalid amount: " <> amountStr
+           else Right $ intVal * (10 ^ decimals) + fracVal
+      _ -> Left $ "Invalid amount format: " <> amountStr

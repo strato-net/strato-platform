@@ -31,9 +31,11 @@ import GHC.Generics (Generic)
 import Network.HTTP.Client
 import Network.HTTP.Types.Status (statusCode)
 import Text.Read (readMaybe)
+import Text.Printf (printf)
 
-import Railgun.Crypto (getSharedSymmetricKey, decryptRandom, poseidonHash)
+import Railgun.Crypto (getSharedSymmetricKey, decryptRandom, poseidonHash, computeNullifier)
 import Railgun.Types (RailgunKeys(..), TokenType(..))
+import qualified Data.Set as Set
 
 -- | A Shield event from Cirrus
 data ShieldEvent = ShieldEvent
@@ -80,6 +82,28 @@ data TokenBalance = TokenBalance
   , tbTotalValue :: Integer
   , tbNoteCount :: Int
   } deriving (Show, Eq)
+
+-- | A Nullified event from Cirrus (emitted when notes are spent)
+data NullifiedEvent = NullifiedEvent
+  { neTreeNumber :: Integer
+  , neNullifiers :: [Text]  -- ^ List of nullifier hashes (hex)
+  } deriving (Show, Eq, Generic)
+
+-- | A Transact event from Cirrus (emitted on transfers/unshields with change outputs)
+data TransactEvent = TransactEvent
+  { teBlockNumber :: Text
+  , teTreeNumber :: Integer
+  , teStartPosition :: Integer
+  , teCommitmentHashes :: [Text]     -- ^ Commitment hashes (bytes32[])
+  , teCiphertexts :: [TransactCiphertext]  -- ^ Encrypted note data
+  } deriving (Show, Eq, Generic)
+
+-- | Ciphertext data from a Transact event
+data TransactCiphertext = TransactCiphertext
+  { tcCiphertext :: [Text]           -- ^ 4 x 32-byte hex strings
+  , tcBlindedSenderViewingKey :: Text    -- ^ 32-byte hex (for sender to decrypt)
+  , tcBlindedReceiverViewingKey :: Text  -- ^ 32-byte hex (for receiver to decrypt)
+  } deriving (Show, Eq, Generic)
 
 -- | Fetch all Shield events from Cirrus
 fetchShieldEvents :: Text -> Text -> Text -> IO (Either Text [ShieldEvent])
@@ -225,6 +249,150 @@ extractJsonArray str =
          in decode (LBS.fromStrict $ TE.encodeUtf8 jsonStr)
        _ -> Nothing
 
+-- | Fetch all Nullified events from Cirrus (these indicate spent notes)
+fetchNullifierEvents :: Text -> Text -> Text -> IO (Either Text [NullifiedEvent])
+fetchNullifierEvents baseUrl authToken contractAddr = do
+  manager <- newManager defaultManagerSettings
+  
+  let url = T.unpack baseUrl <> "/cirrus/search/event?event_name=eq.Nullified&address=eq." <> T.unpack (normalizeAddress contractAddr)
+  
+  requestResult <- try $ parseRequest url
+  case requestResult of
+    Left (e :: SomeException) -> return $ Left $ "Failed to parse URL: " <> T.pack (show e)
+    Right request -> do
+      let requestWithAuth = request
+            { requestHeaders = 
+                [ ("Authorization", TE.encodeUtf8 $ "Bearer " <> authToken)
+                , ("Accept", "application/json")
+                ]
+            }
+      
+      responseResult <- try $ httpLbs requestWithAuth manager
+      case responseResult of
+        Left (e :: SomeException) -> return $ Left $ "HTTP request failed: " <> T.pack (show e)
+        Right response -> do
+          let status = statusCode $ responseStatus response
+          if status /= 200
+            then return $ Left $ "HTTP error " <> T.pack (show status)
+            else case eitherDecode (responseBody response) of
+              Left err -> return $ Left $ "JSON parse error: " <> T.pack err
+              Right events -> return $ Right $ parseNullifierEvents events
+
+-- | Parse Nullified events from JSON array
+parseNullifierEvents :: [Value] -> [NullifiedEvent]
+parseNullifierEvents = mapMaybe parseNullifierEvent
+
+parseNullifierEvent :: Value -> Maybe NullifiedEvent
+parseNullifierEvent val = flip parseMaybe val $ \v -> do
+  obj <- parseJSON v
+  attrs <- obj .: "attributes"
+  
+  treeNumber <- parseIntField attrs "treeNumber"
+  nullifierStr <- attrs .: "nullifier"
+  
+  let nullifiers = parseNullifierList nullifierStr
+  
+  return NullifiedEvent
+    { neTreeNumber = treeNumber
+    , neNullifiers = nullifiers
+    }
+
+-- | Parse nullifier list from string format "[\"0x...\", \"0x...\"]"
+parseNullifierList :: Text -> [Text]
+parseNullifierList str =
+  case extractJsonArray str of
+    Just arr -> mapMaybe extractText arr
+    Nothing -> []
+  where
+    extractText (String s) = Just $ normalizeAddress s
+    extractText _ = Nothing
+
+-- | Fetch all Transact events from Cirrus (for finding change notes)
+fetchTransactEventsForNotes :: Text -> Text -> Text -> IO (Either Text [TransactEvent])
+fetchTransactEventsForNotes baseUrl authToken contractAddr = do
+  manager <- newManager defaultManagerSettings
+  
+  let url = T.unpack baseUrl <> "/cirrus/search/event?event_name=eq.Transact&address=eq." <> T.unpack (normalizeAddress contractAddr)
+  
+  requestResult <- try $ parseRequest url
+  case requestResult of
+    Left (e :: SomeException) -> return $ Left $ "Failed to parse URL: " <> T.pack (show e)
+    Right request -> do
+      let requestWithAuth = request
+            { requestHeaders = 
+                [ ("Authorization", TE.encodeUtf8 $ "Bearer " <> authToken)
+                , ("Accept", "application/json")
+                ]
+            }
+      
+      responseResult <- try $ httpLbs requestWithAuth manager
+      case responseResult of
+        Left (e :: SomeException) -> return $ Left $ "HTTP request failed: " <> T.pack (show e)
+        Right response -> do
+          let status = statusCode $ responseStatus response
+          if status /= 200
+            then return $ Left $ "HTTP error " <> T.pack (show status)
+            else case eitherDecode (responseBody response) of
+              Left err -> return $ Left $ "JSON parse error: " <> T.pack err
+              Right events -> return $ Right $ parseTransactEventsForNotes events
+
+-- | Parse Transact events from JSON array
+parseTransactEventsForNotes :: [Value] -> [TransactEvent]
+parseTransactEventsForNotes = mapMaybe parseTransactEventForNotes
+
+parseTransactEventForNotes :: Value -> Maybe TransactEvent
+parseTransactEventForNotes val = flip parseMaybe val $ \v -> do
+  obj <- parseJSON v
+  blockNumber <- obj .: "block_number"
+  attrs <- obj .: "attributes"
+  
+  treeNumber <- parseIntField attrs "treeNumber"
+  startPosition <- parseIntField attrs "startPosition"
+  hashStr <- attrs .: "hash"
+  ciphertextStr <- attrs .: "ciphertext"
+  
+  let commitmentHashes = parseHashList hashStr
+      ciphertexts = parseTransactCiphertexts ciphertextStr
+  
+  return TransactEvent
+    { teBlockNumber = blockNumber
+    , teTreeNumber = treeNumber
+    , teStartPosition = startPosition
+    , teCommitmentHashes = commitmentHashes
+    , teCiphertexts = ciphertexts
+    }
+
+-- | Parse hash list from Transact event
+parseHashList :: Text -> [Text]
+parseHashList str =
+  case extractJsonArray str of
+    Just arr -> mapMaybe extractText arr
+    Nothing -> []
+  where
+    extractText (String s) = Just $ normalizeAddress s
+    extractText _ = Nothing
+
+-- | Parse ciphertext array from Transact event
+parseTransactCiphertexts :: Text -> [TransactCiphertext]
+parseTransactCiphertexts str =
+  -- The string may have CommitmentCiphertext prefix
+  let cleaned = T.replace "CommitmentCiphertext" "" str
+  in case extractJsonArray cleaned of
+       Just arr -> mapMaybe parseTransactCiphertext arr
+       Nothing -> []
+
+parseTransactCiphertext :: Value -> Maybe TransactCiphertext
+parseTransactCiphertext val = flip parseMaybe val $ \v -> do
+  obj <- parseJSON v
+  ciphertext <- obj .: "ciphertext"
+  blindedSender <- obj .: "blindedSenderViewingKey"
+  blindedReceiver <- obj .: "blindedReceiverViewingKey"
+  return TransactCiphertext
+    { tcCiphertext = ciphertext
+    , tcBlindedSenderViewingKey = blindedSender
+    , tcBlindedReceiverViewingKey = blindedReceiver
+    }
+
 -- | Try to decrypt a single note
 tryDecryptNote :: RailgunKeys 
                -> CommitmentData 
@@ -267,20 +435,120 @@ safeIndex xs i
   | i < length xs = Just (xs !! i)
   | otherwise = Nothing
 
--- | Scan all Shield events and return notes that belong to us
+-- | Try to decrypt a note from a Transact event (for change notes)
+-- Transact events have a different ciphertext structure than Shield events
+tryDecryptTransactNote :: RailgunKeys 
+                       -> Text              -- ^ Commitment hash (to verify)
+                       -> TransactCiphertext 
+                       -> Integer           -- ^ Tree position
+                       -> Text              -- ^ Block number
+                       -> Maybe ShieldedNote
+tryDecryptTransactNote keys commitmentHash ciphertext treePos blockNum = do
+  -- Parse the ciphertext components
+  -- ciphertext[0] = IV, ciphertext[1] = encrypted random | token type, ciphertext[2] = encrypted value
+  ct0 <- hexToBS =<< safeIndex (tcCiphertext ciphertext) 0
+  ct1 <- hexToBS =<< safeIndex (tcCiphertext ciphertext) 1
+  ct2 <- hexToBS =<< safeIndex (tcCiphertext ciphertext) 2
+  ct3 <- hexToBS =<< safeIndex (tcCiphertext ciphertext) 3
+  
+  -- Try with sender's viewing key first (for change notes we created)
+  senderKey <- hexToBS $ tcBlindedSenderViewingKey ciphertext
+  
+  -- Derive shared key via ECDH
+  sharedKey <- getSharedSymmetricKey (viewingPrivateKey keys) senderKey
+  
+  -- Decrypt the random value (first 15 bytes of ct1 after decryption)
+  let encryptedRandom = BS.take 16 ct1
+  randomValue <- decryptRandom sharedKey ct0 encryptedRandom
+  
+  -- The last byte of the decrypted data is the token type
+  let randomInt = bytesToInteger (BS.take 15 randomValue)
+      tokenType = fromIntegral $ BS.last randomValue
+  
+  -- Decrypt the value (ct2)
+  decryptedValue <- decryptRandom sharedKey ct0 ct2
+  let valueInt = bytesToInteger $ BS.take 16 decryptedValue
+  
+  -- Decrypt the token address (ct3)
+  decryptedToken <- decryptRandom sharedKey ct0 ct3
+  let tokenAddr = T.toLower $ TE.decodeUtf8 $ B16.encode $ BS.take 20 decryptedToken
+  
+  -- Compute NPK and verify commitment matches
+  let computedNpk = poseidonHash [masterPublicKey keys, randomInt]
+      tokenId = hexToInteger tokenAddr
+      computedCommitment = poseidonHash [computedNpk, tokenId, valueInt]
+      eventCommitment = hexToInteger commitmentHash
+  
+  if computedCommitment == eventCommitment
+    then Just ShieldedNote
+      { snTokenAddress = tokenAddr
+      , snTokenType = intToTokenType tokenType
+      , snTokenSubID = 0
+      , snValue = valueInt
+      , snBlockNumber = blockNum
+      , snTreePosition = treePos
+      , snRandom = BS.take 15 randomValue
+      }
+    else Nothing
+
+-- | Try to decrypt all notes from a Transact event
+tryDecryptTransactEvent :: RailgunKeys -> TransactEvent -> [ShieldedNote]
+tryDecryptTransactEvent keys event =
+  let hashes = teCommitmentHashes event
+      ciphertexts = teCiphertexts event
+      startPos = teStartPosition event
+      blockNum = teBlockNumber event
+      -- Zip hashes with ciphertexts and positions
+      zipped = zip3 hashes ciphertexts [startPos..]
+  in mapMaybe (\(h, ct, pos) -> tryDecryptTransactNote keys h ct pos blockNum) zipped
+
+-- | Scan all Shield and Transact events and return notes that belong to us (excluding spent notes)
 scanShieldedBalance :: RailgunKeys 
                     -> Text  -- ^ Base URL
                     -> Text  -- ^ Auth token
                     -> Text  -- ^ Railgun contract address
                     -> IO (Either Text ([ShieldedNote], [TokenBalance]))
 scanShieldedBalance keys baseUrl authToken contractAddr = do
-  eventsResult <- fetchShieldEvents baseUrl authToken contractAddr
-  case eventsResult of
+  -- Fetch Shield events
+  shieldEventsResult <- fetchShieldEvents baseUrl authToken contractAddr
+  case shieldEventsResult of
     Left err -> return $ Left err
-    Right events -> do
-      let notes = concatMap (tryDecryptEvent keys) events
-          balances = aggregateBalances notes
-      return $ Right (notes, balances)
+    Right shieldEvents -> do
+      -- Fetch Transact events (for change notes)
+      transactEventsResult <- fetchTransactEventsForNotes baseUrl authToken contractAddr
+      let transactEvents = case transactEventsResult of
+            Left _ -> []  -- If we can't fetch, skip
+            Right evts -> evts
+      
+      -- Fetch Nullified events to find spent notes
+      nullifierResult <- fetchNullifierEvents baseUrl authToken contractAddr
+      let spentNullifiers = case nullifierResult of
+            Left _ -> Set.empty  -- If we can't fetch, assume none spent
+            Right nullEvents -> Set.fromList $ concatMap neNullifiers nullEvents
+      
+      -- Decrypt all notes from Shield events
+      let shieldNotes = concatMap (tryDecryptEvent keys) shieldEvents
+          -- Decrypt all notes from Transact events (change notes)
+          transactNotes = concatMap (tryDecryptTransactEvent keys) transactEvents
+          allNotes = shieldNotes ++ transactNotes
+          
+          -- Filter out spent notes by computing nullifiers
+          nullifierKeyInt = bytesToInteger $ nullifierKey keys
+          isNotSpent note = 
+            let nullifier = computeNullifier nullifierKeyInt (snTreePosition note)
+                nullifierHex = T.toLower $ integerToHex32 nullifier
+            in not $ Set.member nullifierHex spentNullifiers
+          
+          unspentNotes = filter isNotSpent allNotes
+          balances = aggregateBalances unspentNotes
+      
+      return $ Right (unspentNotes, balances)
+
+-- | Convert an integer to a 32-byte hex string (lowercase, no 0x prefix)
+integerToHex32 :: Integer -> Text
+integerToHex32 n =
+  let hexStr = T.pack $ printf "%064x" n
+  in T.toLower hexStr
 
 -- | Try to decrypt all notes in a single event
 tryDecryptEvent :: RailgunKeys -> ShieldEvent -> [ShieldedNote]
