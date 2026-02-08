@@ -110,7 +110,7 @@ parseProofObject = either (Left . T.pack) Right . parseEither parseProof
                       bY1Int = read (T.unpack bY1) :: Integer
                   return SnarkProof
                     { proofA = G1Point aXInt aYInt
-                    , proofB = G2Point (bX0Int, bX1Int) (bY0Int, bY1Int)  -- Keep snarkjs order, don't swap
+                    , proofB = G2Point (bX0Int, bX1Int) (bY0Int, bY1Int)  -- Keep snarkjs order
                     , proofC = G1Point cXInt cYInt
                     }
                 _ -> fail "Invalid pi_b format"

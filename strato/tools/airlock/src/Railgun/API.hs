@@ -259,9 +259,11 @@ g1ToArgValue (G1Point x y) = ArgObject $ KM.fromList
   ]
 
 g2ToArgValue :: G2Point -> ArgValue
+-- Swap G2 coordinates for Ethereum bn128 compatibility: [imaginary, real] order
+-- snarkjs outputs [real, imaginary], but ecPairing expects [imaginary, real]
 g2ToArgValue (G2Point (x0, x1) (y0, y1)) = ArgObject $ KM.fromList
-  [ ("x", ArgArray $ V.fromList [ArgString $ T.pack $ show x1, ArgString $ T.pack $ show x0])  -- Swap to match swapped vkey
-  , ("y", ArgArray $ V.fromList [ArgString $ T.pack $ show y1, ArgString $ T.pack $ show y0])  -- Swap to match swapped vkey
+  [ ("x", ArgArray $ V.fromList [ArgString $ T.pack $ show x1, ArgString $ T.pack $ show x0])  -- Swap: [imag, real]
+  , ("y", ArgArray $ V.fromList [ArgString $ T.pack $ show y1, ArgString $ T.pack $ show y0])  -- Swap: [imag, real]
   ]
 
 boundParamsToArgValue :: BoundParams -> ArgValue
