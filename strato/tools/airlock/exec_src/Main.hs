@@ -7,13 +7,15 @@ import Control.Concurrent (threadDelay)
 import Control.Exception (try, SomeException)
 import Control.Monad (when, unless, forM_)
 import Data.Aeson (decode, encode, (.:), (.=), object)
+import qualified Data.Aeson as Aeson
 import Data.Aeson.Types (parseMaybe)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Lazy as LBS
 import Data.Time.Clock.POSIX (getPOSIXTime)
 import Options.Applicative
-import System.Directory (doesFileExist, createDirectoryIfMissing, getHomeDirectory)
+import System.Directory (doesFileExist, doesDirectoryExist, createDirectoryIfMissing, getHomeDirectory, listDirectory)
+import Data.List (isPrefixOf)
 import System.Exit (exitFailure, exitSuccess)
 import System.FilePath ((</>))
 import System.IO (hPutStrLn, stderr, hFlush, stdout, hGetEcho, stdin, hSetEcho)
@@ -38,15 +40,25 @@ import Railgun.Balance (scanShieldedBalance, TokenBalance(..))
 import qualified Railgun.Balance as Bal
 import Railgun.Merkle (fetchMerkleTreeData, computeMerkleProof, MerkleTreeData(..))
 import Railgun.Crypto (poseidonHash, computeNullifier)
-import Railgun.Witness (SpendableNote(..), buildUnshieldWitness)
+import qualified Railgun.Crypto
+import Railgun.Witness (SpendableNote(..), buildUnshieldWitness, buildTransferWitness)
+import Railgun.Transfer (parseRecipientAddress, createTransferRequest, TransferNote(..), encryptNoteForRecipient, createCommitmentCiphertext)
+import qualified Railgun.Transfer
+import qualified Railgun.Unshield
+import Railgun.Unshield (CommitmentCiphertext(..))
 import Railgun.Prover (generateProof, defaultProverConfig)
 import Railgun.Signing (deriveSigningKey, signTransactionData, computeSignatureMessage, RailgunSignature(..))
 
--- | Path to the mnemonic file
-mnemonicFilePath :: IO FilePath
-mnemonicFilePath = do
+-- | Path to the mnemonic file for a named wallet
+-- Each wallet has its own mnemonic for security (different owners, imports, etc.)
+mnemonicFilePath :: String -> IO FilePath
+mnemonicFilePath walletName = do
   home <- getHomeDirectory
-  return $ home </> ".secrets" </> "railgunMnemonic"
+  let filename = if walletName == "default" || null walletName
+                 then "railgunMnemonic"
+                 else "railgunMnemonic." ++ walletName
+  return $ home </> ".secrets" </> filename
+
 
 -- | Path to the auth token file
 tokenFilePath :: IO FilePath
@@ -204,17 +216,19 @@ saveTokens accessToken refreshToken expiresAt = do
         ]
   LBS.writeFile path (encode tokenData)
 
--- | Read mnemonic from file, or fail with instructions
-readMnemonicFromFile :: IO T.Text
-readMnemonicFromFile = do
-  path <- mnemonicFilePath
+-- | Read mnemonic from file for a named wallet, or fail with instructions
+readMnemonicFromFile :: String -> IO T.Text
+readMnemonicFromFile walletName = do
+  path <- mnemonicFilePath walletName
   exists <- doesFileExist path
   if exists
     then T.strip <$> TIO.readFile path
     else do
-      hPutStrLn stderr $ "Error: Mnemonic not found at " ++ path
+      hPutStrLn stderr $ "Error: Wallet" ++ (if walletName == "default" then "" else " '" ++ walletName ++ "'") ++ " not found."
       hPutStrLn stderr ""
-      hPutStrLn stderr "Please run 'airlock create_wallet' to set up your wallet."
+      if walletName == "default"
+        then hPutStrLn stderr "Create it with: airlock setup_wallet"
+        else hPutStrLn stderr $ "Create it with: airlock setup_wallet --wallet " ++ walletName
       exitFailure
 
 --------------------------------------------------------------------------------
@@ -223,24 +237,27 @@ readMnemonicFromFile = do
 
 data Command
   = Login
-  | CreateWallet CreateWalletOpts
+  | SetupWallet SetupWalletOpts
+  | ListWallets
   | ListAddresses ListAddressesOpts
   | Shield ShieldOpts
   | Unshield UnshieldOpts
+  | Transfer TransferOpts
   | Balance BalanceOpts
   deriving (Show)
 
-data CreateWalletOpts = CreateWalletOpts
-  { cwoForceOverwrite :: Bool
+data SetupWalletOpts = SetupWalletOpts
+  { swoWalletName :: String
+  , swoForceOverwrite :: Bool
   } deriving (Show)
 
 data ListAddressesOpts = ListAddressesOpts
-  { laoPassphrase :: String
+  { laoWallet :: String
   , laoNumAddresses :: Int
   } deriving (Show)
 
 data ShieldOpts = ShieldOpts
-  { soPassphrase :: String
+  { soWallet :: String
   , soTokenAddress :: String
   , soAmount :: String  -- Amount in tokens (e.g., "1.5"), default "1"
   , soBaseUrl :: String
@@ -251,7 +268,7 @@ data ShieldOpts = ShieldOpts
   } deriving (Show)
 
 data UnshieldOpts = UnshieldOpts
-  { uoPassphrase :: String
+  { uoWallet :: String
   , uoTokenAddress :: String
   , uoAmount :: String  -- Amount in tokens (e.g., "1.5") or empty for entire note
   , uoRecipient :: String
@@ -261,8 +278,19 @@ data UnshieldOpts = UnshieldOpts
   , uoDryRun :: Bool
   } deriving (Show)
 
+data TransferOpts = TransferOpts
+  { toWallet :: String
+  , toTokenAddress :: String
+  , toAmount :: String  -- Amount in tokens (e.g., "1.5") or empty for entire note
+  , toRecipient :: String  -- Railgun address (0zk...)
+  , toBaseUrl :: String
+  , toRailgunContractAddr :: String
+  , toDerivationIndex :: Int
+  , toDryRun :: Bool
+  } deriving (Show)
+
 data BalanceOpts = BalanceOpts
-  { boPassphrase :: String
+  { boWallet :: String
   , boBaseUrl :: String
   , boRailgunContractAddr :: String
   , boDerivationIndex :: Int
@@ -274,21 +302,26 @@ data BalanceOpts = BalanceOpts
 loginParser :: Parser Command
 loginParser = pure Login
 
--- | Parser for create_wallet command
-createWalletParser :: Parser Command
-createWalletParser = CreateWallet <$> (CreateWalletOpts
-  <$> switch
+-- | Parser for setup_wallet command
+setupWalletParser :: Parser Command
+setupWalletParser = SetupWallet <$> (SetupWalletOpts
+  <$> strOption
+      ( long "wallet"
+     <> value "default"
+     <> metavar "NAME"
+     <> help "Wallet name (default: 'default')" )
+  <*> switch
       ( long "force"
-     <> help "Overwrite existing mnemonic (dangerous!)" ))
+     <> help "Overwrite existing wallet" ))
 
 -- | Parser for list_addresses command
 listAddressesParser :: Parser Command
 listAddressesParser = ListAddresses <$> (ListAddressesOpts
   <$> strOption
-      ( long "passphrase"
-     <> value ""
-     <> metavar "PASSPHRASE"
-     <> help "Optional BIP39 passphrase" )
+      ( long "wallet"
+     <> value "default"
+     <> metavar "NAME"
+     <> help "Wallet name (default: 'default')" )
   <*> option auto
       ( long "num"
      <> value 10
@@ -299,10 +332,10 @@ listAddressesParser = ListAddresses <$> (ListAddressesOpts
 shieldParser :: Parser Command
 shieldParser = Shield <$> (ShieldOpts
   <$> strOption
-      ( long "passphrase"
-     <> value ""
-     <> metavar "PASSPHRASE"
-     <> help "Optional BIP39 passphrase" )
+      ( long "wallet"
+     <> value "default"
+     <> metavar "NAME"
+     <> help "Wallet name (default: 'default')" )
   <*> strOption
       ( long "tokenaddress"
      <> value ""
@@ -339,10 +372,10 @@ shieldParser = Shield <$> (ShieldOpts
 unshieldParser :: Parser Command
 unshieldParser = Unshield <$> (UnshieldOpts
   <$> strOption
-      ( long "passphrase"
-     <> value ""
-     <> metavar "PASSPHRASE"
-     <> help "Optional BIP39 passphrase" )
+      ( long "wallet"
+     <> value "default"
+     <> metavar "NAME"
+     <> help "Wallet name (default: 'default')" )
   <*> strOption
       ( long "tokenaddress"
      <> value ""
@@ -377,14 +410,56 @@ unshieldParser = Unshield <$> (UnshieldOpts
       ( long "dryrun"
      <> help "Show request without sending" ))
 
+-- | Parser for transfer command (shielded transfer)
+transferParser :: Parser Command
+transferParser = Transfer <$> (TransferOpts
+  <$> strOption
+      ( long "wallet"
+     <> value "default"
+     <> metavar "NAME"
+     <> help "Wallet name (default: 'default')" )
+  <*> strOption
+      ( long "tokenaddress"
+     <> value ""
+     <> metavar "ADDRESS"
+     <> help "ERC20 token contract address" )
+  <*> strOption
+      ( long "amount"
+     <> value ""
+     <> metavar "AMOUNT"
+     <> help "Amount to transfer in tokens (e.g., '1.5'), empty = entire note" )
+  <*> strOption
+      ( long "recipient"
+     <> value ""
+     <> metavar "ADDRESS"
+     <> help "Recipient's Railgun address (0zk...)" )
+  <*> strOption
+      ( long "baseurl"
+     <> value "http://localhost:8081"
+     <> metavar "URL"
+     <> help "STRATO base URL" )
+  <*> strOption
+      ( long "railguncontractaddr"
+     <> value "95be101d075f44084ca1cf51d0106c8606773952"
+     <> metavar "ADDRESS"
+     <> help "Railgun contract address" )
+  <*> option auto
+      ( long "derivationindex"
+     <> value 0
+     <> metavar "INDEX"
+     <> help "Wallet derivation index (default 0)" )
+  <*> switch
+      ( long "dryrun"
+     <> help "Show request without sending" ))
+
 -- | Parser for balance command
 balanceParser :: Parser Command
 balanceParser = Balance <$> (BalanceOpts
   <$> strOption
-      ( long "passphrase"
-     <> value ""
-     <> metavar "PASSPHRASE"
-     <> help "Optional BIP39 passphrase" )
+      ( long "wallet"
+     <> value "default"
+     <> metavar "NAME"
+     <> help "Wallet name (default: 'default')" )
   <*> strOption
       ( long "baseurl"
      <> value "http://localhost:8081"
@@ -414,9 +489,12 @@ commandParser = hsubparser
   ( command "login"
     (info loginParser
       (progDesc "Authenticate using OAuth device flow"))
-  <> command "create_wallet"
-    (info createWalletParser
-      (progDesc "Create wallet by storing a mnemonic phrase"))
+  <> command "setup_wallet"
+    (info setupWalletParser
+      (progDesc "Set up a wallet with your recovery phrase"))
+  <> command "list_wallets"
+    (info (pure ListWallets)
+      (progDesc "List all configured wallets"))
   <> command "list_addresses"
     (info listAddressesParser
       (progDesc "List derived addresses from the wallet"))
@@ -425,7 +503,10 @@ commandParser = hsubparser
       (progDesc "Shield (deposit) tokens into Railgun"))
   <> command "unshield"
     (info unshieldParser
-      (progDesc "Unshield (withdraw) tokens from Railgun (DUMMY - will fail verification)"))
+      (progDesc "Unshield (withdraw) tokens from Railgun"))
+  <> command "transfer"
+    (info transferParser
+      (progDesc "Transfer tokens to another Railgun address (shielded)"))
   <> command "balance"
     (info balanceParser
       (progDesc "Show token balances (shielded and unshielded)"))
@@ -443,10 +524,12 @@ main = do
   cmd <- customExecParser prefs' opts
   case cmd of
     Login -> runLogin
-    CreateWallet o -> runCreateWallet o
+    SetupWallet o -> runSetupWallet o
+    ListWallets -> runListWallets
     ListAddresses o -> runListAddresses o
     Shield o -> runShield o
     Unshield o -> runUnshield o
+    Transfer o -> runTransfer o
     Balance o -> runBalance o
   where
     prefs' = prefs showHelpOnEmpty
@@ -571,77 +654,110 @@ pollForToken manager config deviceCode interval = do
           hPutStrLn stderr $ "Unexpected response: " ++ show (responseBody tokenResp)
           exitFailure
 
-runCreateWallet :: CreateWalletOpts -> IO ()
-runCreateWallet cwopts = do
-  path <- mnemonicFilePath
-  exists <- doesFileExist path
+runSetupWallet :: SetupWalletOpts -> IO ()
+runSetupWallet swopts = do
+  let walletName = swoWalletName swopts
+  mnemonicPath <- mnemonicFilePath walletName
+  mnemonicExists <- doesFileExist mnemonicPath
   
-  when (exists && not (cwoForceOverwrite cwopts)) $ do
-    hPutStrLn stderr $ "Error: Mnemonic already exists at " ++ path
+  when (mnemonicExists && not (swoForceOverwrite swopts)) $ do
+    hPutStrLn stderr $ "Error: Wallet" ++ (if walletName == "default" then "" else " '" ++ walletName ++ "'") ++ " already exists."
     hPutStrLn stderr "Use --force to replace it (this will change your wallet!)."
     exitFailure
   
-  TIO.putStrLn "=== Airlock Wallet Setup ==="
+  TIO.putStrLn $ "=== Setup Wallet" <> (if walletName == "default" then "" else ": " <> T.pack walletName) <> " ==="
   TIO.putStrLn ""
   TIO.putStrLn "Enter your BIP39 mnemonic phrase (12-24 words)."
-  TIO.putStrLn "This will be stored securely and used for all airlock commands."
+  TIO.putStrLn "This is your recovery phrase - keep it safe!"
   TIO.putStrLn ""
   TIO.putStr "Mnemonic: "
   hFlush stdout
   
-  -- Read mnemonic (hidden input)
   mnemonic <- getHiddenLine
   TIO.putStrLn ""
   
   let mnemonicText = T.strip $ T.pack mnemonic
       wordCount = length $ T.words mnemonicText
   
-  -- Validate word count
   when (wordCount `notElem` [12, 15, 18, 21, 24]) $ do
     hPutStrLn stderr $ "Error: Invalid mnemonic - expected 12, 15, 18, 21, or 24 words, got " ++ show wordCount
     exitFailure
   
-  -- Verify we can derive keys from it
+  -- Verify keys can be derived
   case deriveFromMnemonic mnemonicText "" 0 of
     Left err -> do
       TIO.hPutStrLn stderr $ "Error: Invalid mnemonic - " <> err
       exitFailure
     Right keys -> do
-      -- Create directory if needed
+      -- Save mnemonic
       home <- getHomeDirectory
       createDirectoryIfMissing True (home </> ".secrets")
-      
-      -- Write mnemonic to file
-      TIO.writeFile path mnemonicText
+      TIO.writeFile mnemonicPath mnemonicText
       
       let addr = railgunAddress keys
-      TIO.putStrLn "Wallet created successfully!"
+      TIO.putStrLn $ "Wallet" <> (if walletName == "default" then "" else " '" <> T.pack walletName <> "'") <> " created successfully!"
       TIO.putStrLn ""
-      TIO.putStrLn $ "Mnemonic stored at: " <> T.pack path
-      TIO.putStrLn $ "Railgun address (index 0): " <> unRailgunAddress addr
+      TIO.putStrLn $ "Railgun address: " <> unRailgunAddress addr
       TIO.putStrLn ""
-      TIO.putStrLn "You can now use 'airlock balance', 'airlock shield', etc."
-      TIO.putStrLn "Use 'airlock list_addresses' to see all derived addresses."
+      if walletName == "default"
+        then TIO.putStrLn "You can now use 'airlock balance', 'airlock shield', etc."
+        else TIO.putStrLn $ "Use --wallet " <> T.pack walletName <> " with other commands."
+      exitSuccess
+
+runListWallets :: IO ()
+runListWallets = do
+  home <- getHomeDirectory
+  let secretsDir = home </> ".secrets"
+  exists <- doesDirectoryExist secretsDir
+  if not exists
+    then do
+      TIO.putStrLn "No wallets configured."
+      TIO.putStrLn "Create one with: airlock setup_wallet --wallet <name>"
+      exitSuccess
+    else do
+      files <- listDirectory secretsDir
+      let prefix = "railgunMnemonic." :: String
+          mnemonicFiles = filter (prefix `isPrefixOf`) files
+          walletNames = map (drop (length prefix)) mnemonicFiles
+      
+      if null walletNames
+        then do
+          -- Check for default wallet (no suffix)
+          defaultExists <- doesFileExist (secretsDir </> "railgunMnemonic")
+          if defaultExists
+            then do
+              TIO.putStrLn "Configured wallets:"
+              TIO.putStrLn "  default"
+            else do
+              TIO.putStrLn "No wallets configured."
+              TIO.putStrLn "Create one with: airlock setup_wallet --wallet <name>"
+        else do
+          TIO.putStrLn "Configured wallets:"
+          -- Check for default wallet too
+          defaultExists <- doesFileExist (secretsDir </> "railgunMnemonic")
+          when defaultExists $ TIO.putStrLn "  default"
+          mapM_ (\n -> TIO.putStrLn $ "  " <> T.pack n) walletNames
       exitSuccess
 
 runListAddresses :: ListAddressesOpts -> IO ()
 runListAddresses laopts = do
-  mnemonic <- readMnemonicFromFile
+  let walletName = laoWallet laopts
+  mnemonic <- readMnemonicFromFile walletName
   
   TIO.putStrLn "============================================================"
-  TIO.putStrLn "                  DERIVED ADDRESSES"
+  TIO.putStrLn $ "         DERIVED ADDRESSES (wallet: " <> T.pack walletName <> ")"
   TIO.putStrLn "============================================================"
   TIO.putStrLn ""
   
   let indices = [0 .. laoNumAddresses laopts - 1]
-  mapM_ (printAddressAtIndex mnemonic (T.pack $ laoPassphrase laopts)) indices
+  mapM_ (printAddressAtIndex mnemonic) indices
   
   TIO.putStrLn "============================================================"
   exitSuccess
 
-printAddressAtIndex :: T.Text -> T.Text -> Int -> IO ()
-printAddressAtIndex mnemonic passphraseText idx = do
-  case deriveFromMnemonic mnemonic passphraseText idx of
+printAddressAtIndex :: T.Text -> Int -> IO ()
+printAddressAtIndex mnemonic idx = do
+  case deriveFromMnemonic mnemonic "" idx of
     Left err -> TIO.putStrLn $ "  [" <> T.pack (show idx) <> "] Error: " <> err
     Right keys -> do
       let addr = railgunAddress keys
@@ -660,11 +776,11 @@ getHiddenLine = do
     Left (_ :: SomeException) -> getLine  -- Fallback if echo control fails
     Right line -> return line
 
--- | Load keys from mnemonic file
+-- | Load keys from mnemonic file using a named wallet
 loadKeys :: String -> Int -> IO RailgunKeys
-loadKeys passphraseStr idx = do
-  mnemonic <- readMnemonicFromFile
-  case deriveFromMnemonic mnemonic (T.pack passphraseStr) idx of
+loadKeys walletName idx = do
+  mnemonic <- readMnemonicFromFile walletName
+  case deriveFromMnemonic mnemonic "" idx of
     Left err -> do
       TIO.hPutStrLn stderr $ "Error deriving keys: " <> err
       exitFailure
@@ -677,8 +793,8 @@ runShield sopts = do
     exitFailure
   
   -- Load keys from mnemonic file
-  TIO.putStrLn "Loading Railgun keys..."
-  keys <- loadKeys (soPassphrase sopts) (soDerivationIndex sopts)
+  TIO.putStrLn $ "Loading Railgun keys (wallet: " <> T.pack (soWallet sopts) <> ")..."
+  keys <- loadKeys (soWallet sopts) (soDerivationIndex sopts)
   
   let addr = railgunAddress keys
   TIO.putStrLn $ "Railgun address: " <> unRailgunAddress addr
@@ -750,8 +866,8 @@ runUnshield uopts = do
     exitFailure
   
   -- Load keys from mnemonic file
-  TIO.putStrLn "Loading Railgun keys..."
-  keys <- loadKeys (uoPassphrase uopts) (uoDerivationIndex uopts)
+  TIO.putStrLn $ "Loading Railgun keys (wallet: " <> T.pack (uoWallet uopts) <> ")..."
+  keys <- loadKeys (uoWallet uopts) (uoDerivationIndex uopts)
   
   let addr = railgunAddress keys
   TIO.putStrLn $ "Railgun address: " <> unRailgunAddress addr
@@ -921,7 +1037,15 @@ runUnshield uopts = do
           
       -- Get bound params hash from contract (SolidVM has different ABI encoding)
       -- For unshield with 2 commitments (change + unshield), we need 1 ciphertext entry
-      boundParamsHashResult <- getBoundParamsHash config (fromIntegral treeNum) chainId 1
+      -- Using dummy ciphertext for unshield (change note - recipient gets unshielded tokens)
+      let dummyCiphertext = CommitmentCiphertext
+            { ccCiphertext = [BS.replicate 32 0, BS.replicate 32 0, BS.replicate 32 0, BS.replicate 32 0]
+            , ccBlindedSenderViewingKey = BS.replicate 32 0
+            , ccBlindedReceiverViewingKey = BS.replicate 32 0
+            , ccAnnotationData = BS.empty
+            , ccMemo = BS.empty
+            }
+      boundParamsHashResult <- getBoundParamsHash config (fromIntegral treeNum) chainId [dummyCiphertext] True -- True = unshield
       boundParamsHash <- case boundParamsHashResult of
         Left err -> do
           TIO.hPutStrLn stderr $ "Failed to get boundParamsHash: " <> err
@@ -1035,11 +1159,368 @@ runUnshield uopts = do
     bytesToIntegerBE :: BS.ByteString -> Integer
     bytesToIntegerBE = BS.foldl' (\acc b -> acc * 256 + fromIntegral b) 0
 
+runTransfer :: TransferOpts -> IO ()
+runTransfer topts = do
+  when (null $ toTokenAddress topts) $ do
+    hPutStrLn stderr "Error: --tokenaddress is required"
+    exitFailure
+  
+  when (null $ toRecipient topts) $ do
+    hPutStrLn stderr "Error: --recipient is required (Railgun address starting with 0zk)"
+    exitFailure
+  
+  -- Validate recipient address format
+  let recipientAddr = T.pack $ toRecipient topts
+  unless ("0zk" `T.isPrefixOf` recipientAddr) $ do
+    hPutStrLn stderr "Error: --recipient must be a Railgun address (starting with 0zk)"
+    hPutStrLn stderr "For transfers to Ethereum addresses, use 'airlock unshield' instead."
+    exitFailure
+  
+  -- Parse recipient's public keys
+  (recipientMasterPk, recipientViewingPk) <- case parseRecipientAddress recipientAddr of
+    Left err -> do
+      TIO.hPutStrLn stderr $ "Error parsing recipient address: " <> err
+      exitFailure
+    Right pks -> return pks
+  
+  -- Load keys from mnemonic file
+  TIO.putStrLn $ "Loading Railgun keys (wallet: " <> T.pack (toWallet topts) <> ")..."
+  keys <- loadKeys (toWallet topts) (toDerivationIndex topts)
+  
+  let addr = railgunAddress keys
+  TIO.putStrLn $ "Railgun address: " <> unRailgunAddress addr
+  
+  -- Read auth token
+  authToken <- readAuthToken
+  
+  let (host, port) = parseHostPort (toBaseUrl topts)
+      config = StratoConfig
+        { stratoHost = T.pack host
+        , stratoPort = port
+        , stratoAuthToken = authToken
+        , railgunContractAddress = T.pack $ toRailgunContractAddr topts
+        }
+      baseUrl = "http://" <> T.pack host <> ":" <> T.pack (show port)
+      tokenAddr = T.toLower $ normalizeAddress $ T.pack $ toTokenAddress topts
+  
+  -- Step 1: Scan for our notes
+  TIO.putStrLn "\nScanning for shielded notes..."
+  notesResult <- scanShieldedBalance keys baseUrl authToken (railgunContractAddress config)
+  (notes, _) <- case notesResult of
+    Left err -> do
+      TIO.hPutStrLn stderr $ "Failed to scan notes: " <> err
+      exitFailure
+    Right r -> return r
+  
+  TIO.putStrLn $ "Found " <> T.pack (show $ length notes) <> " note(s)"
+  
+  -- Get token decimals
+  decimals <- getTokenDecimals config tokenAddr
+  
+  -- Parse requested amount
+  requestedAmount <- case parseTokenAmount (T.pack $ toAmount topts) decimals of
+    Left err -> do
+      TIO.hPutStrLn stderr $ "Error: " <> err
+      exitFailure
+    Right amt -> return amt
+  
+  -- Step 2: Find a note for the requested token
+  let tokenNotes = filter (\n -> T.toLower (Bal.snTokenAddress n) == tokenAddr) notes
+  
+  (noteToSpend, actualAmount) <- case tokenNotes of
+    [] -> do
+      TIO.hPutStrLn stderr $ "No notes found for token " <> tokenAddr
+      TIO.hPutStrLn stderr "Available notes:"
+      mapM_ (\n -> TIO.hPutStrLn stderr $ "  " <> Bal.snTokenAddress n <> ": " <> formatTokenAmount (Bal.snValue n) decimals) notes
+      exitFailure
+    (n:_) | requestedAmount == 0 -> do
+      return (n, Bal.snValue n)
+    ns -> do
+      let matchingNotes = filter (\n -> Bal.snValue n >= requestedAmount) ns
+      case matchingNotes of
+        [] -> do
+          TIO.hPutStrLn stderr $ "No spendable note found for token " <> tokenAddr 
+                              <> " with value >= " <> formatTokenAmount requestedAmount decimals
+          TIO.hPutStrLn stderr "Available notes:"
+          mapM_ (\n -> TIO.hPutStrLn stderr $ "  " <> Bal.snTokenAddress n <> ": " <> formatTokenAmount (Bal.snValue n) decimals) notes
+          exitFailure
+        (m:_) -> return (m, requestedAmount)
+  
+  TIO.putStrLn $ "Selected note at tree position " <> T.pack (show $ Bal.snTreePosition noteToSpend)
+  TIO.putStrLn $ "  Note value: " <> formatTokenAmount (Bal.snValue noteToSpend) decimals
+  TIO.putStrLn $ "  Transferring: " <> formatTokenAmount actualAmount decimals
+  TIO.putStrLn $ "  To: " <> recipientAddr
+  
+  if toDryRun topts
+    then do
+      TIO.putStrLn "\n=== Dry run - would transfer ==="
+      TIO.putStrLn $ "  Token: " <> tokenAddr
+      TIO.putStrLn $ "  Amount: " <> formatTokenAmount actualAmount decimals
+      TIO.putStrLn $ "  Recipient: " <> recipientAddr
+      exitSuccess
+    else do
+      -- Step 3: Get chain ID and merkle root
+      TIO.putStrLn "\nFetching chain ID..."
+      chainIdResult <- getChainId config
+      chainId <- case chainIdResult of
+        Left err -> do
+          TIO.hPutStrLn stderr $ "Failed to get chain ID: " <> err
+          exitFailure
+        Right cid -> do
+          TIO.putStrLn $ "Chain ID: " <> T.pack (show cid)
+          return cid
+      
+      TIO.putStrLn "Fetching merkle root..."
+      merkleRootResult <- getMerkleRoot config
+      merkleRootHex <- case merkleRootResult of
+        Left err -> do
+          TIO.hPutStrLn stderr $ "Failed to get merkle root: " <> err
+          exitFailure
+        Right root -> do
+          TIO.putStrLn $ "Merkle root: " <> root
+          return root
+      
+      TIO.putStrLn "Fetching tree number..."
+      treeNumResult <- getTreeNumber config
+      treeNum <- case treeNumResult of
+        Left err -> do
+          TIO.hPutStrLn stderr $ "Failed to get tree number: " <> err
+          exitFailure
+        Right tn -> do
+          TIO.putStrLn $ "Tree number: " <> T.pack (show tn)
+          return tn
+      
+      -- Step 4: Get Merkle proof
+      TIO.putStrLn "Fetching Merkle tree data..."
+      merkleDataResult <- fetchMerkleTreeData 
+                            (stratoHost config) 
+                            (stratoPort config) 
+                            authToken 
+                            (railgunContractAddress config)
+      treeData <- case merkleDataResult of
+        Left err -> do
+          TIO.hPutStrLn stderr $ "Failed to fetch Merkle data: " <> err
+          exitFailure
+        Right td -> return td
+      
+      TIO.putStrLn $ "  Commitments: " <> T.pack (show $ length $ mtdCommitments treeData)
+      
+      let leafIndex = fromIntegral $ Bal.snTreePosition noteToSpend
+      merkleProof <- case computeMerkleProof treeData leafIndex of
+        Left err -> do
+          TIO.hPutStrLn stderr $ "Failed to compute Merkle proof: " <> err
+          exitFailure
+        Right mp -> do
+          TIO.putStrLn $ "  Merkle proof computed for leaf " <> T.pack (show leafIndex)
+          return mp
+      
+      -- Step 5: Build the SpendableNote
+      let randomInt = bytesToIntegerBE (Bal.snRandom noteToSpend)
+          npkInt = poseidonHash [masterPublicKey keys, randomInt]
+          spendable = SpendableNote
+            { snNoteIndex = Bal.snTreePosition noteToSpend
+            , snNpk = npkInt
+            , snValue = Bal.snValue noteToSpend
+            , snTokenAddress = Bal.snTokenAddress noteToSpend
+            , snRandom = randomInt
+            }
+      
+      -- Step 6: Get Baby JubJub public key and generate signature
+      TIO.putStrLn "\nPreparing circuit inputs..."
+      
+      let merkleRootInt = hexToInteger merkleRootHex
+      let (pkX, pkY) = getMasterPublicKeyPoint keys
+      
+      -- Derive signing key
+      signingKey <- case deriveSigningKey (spendingKey keys) of
+        Nothing -> do
+          TIO.hPutStrLn stderr "Failed to derive signing key"
+          exitFailure
+        Just sk -> return sk
+      
+      -- Compute recipient's NPK for the transfer output note
+      -- NPK = poseidon(masterPublicKey, random)
+      -- The masterPublicKey from the address is already the poseidon-hashed value
+      let recipientMasterPublicKey = bytesToIntegerBE recipientMasterPk
+      
+      -- Generate random for recipient's note
+      recipientRandom <- Railgun.Crypto.randomBytes 16
+      let recipientRandomInt = bytesToIntegerBE recipientRandom
+          -- Compute recipient's NPK using same formula as Shield
+          recipientNpk = poseidonHash [recipientMasterPublicKey, recipientRandomInt]
+      
+      -- Compute values needed for signature
+      let nullifierKeyInt = bytesToIntegerBE (nullifierKey keys)
+          nullifier = computeNullifier nullifierKeyInt leafIndex
+          tokenId = hexToInteger (Bal.snTokenAddress noteToSpend)
+          changeValue = Bal.snValue noteToSpend - actualAmount
+      
+      -- Step 6b: Create commitment ciphertexts FIRST (needed for boundParamsHash)
+      TIO.putStrLn "  Creating encrypted note data..."
+      
+      -- Generate random for change note
+      changeRandom <- Railgun.Crypto.randomBytes 16
+      
+      -- Create ciphertext for change note (going back to ourselves)
+      changeCiphertext <- createCommitmentCiphertext
+                            (viewingPrivateKey keys)
+                            (viewingPublicKey keys)
+                            npkInt
+                            (T.pack $ toTokenAddress topts)
+                            changeValue
+                            changeRandom
+      
+      -- Create the transfer note for encryption
+      let transferNote = TransferNote
+            { tnRecipientNpk = recipientNpk
+            , tnRecipientViewingKey = recipientViewingPk
+            , tnTokenAddress = T.pack $ toTokenAddress topts
+            , tnValue = actualAmount
+            , tnRandom = recipientRandom
+            }
+      
+      -- Encrypt the transfer note for the recipient
+      transferCiphertextResult <- encryptNoteForRecipient
+                                    (viewingPrivateKey keys)
+                                    (viewingPublicKey keys)
+                                    transferNote
+      transferCiphertext <- case transferCiphertextResult of
+        Left err -> do
+          TIO.hPutStrLn stderr $ "Failed to encrypt note: " <> err
+          exitFailure
+        Right ct -> return ct
+      
+      -- Get bound params hash using the ACTUAL ciphertexts
+      boundParamsHashResult <- getBoundParamsHash config (fromIntegral treeNum) chainId 
+                                 [changeCiphertext, transferCiphertext] False
+      boundParamsHash <- case boundParamsHashResult of
+        Left err -> do
+          TIO.hPutStrLn stderr $ "Failed to get boundParamsHash: " <> err
+          exitFailure
+        Right h -> do
+          TIO.putStrLn $ "  BoundParamsHash: " <> T.pack (show h)
+          return h
+      
+      let -- Compute output commitments
+          changeCommitment = poseidonHash [npkInt, tokenId, changeValue]
+          transferCommitment = poseidonHash [recipientNpk, tokenId, actualAmount]
+          
+          -- Compute the message to sign
+          sigMessage = computeSignatureMessage 
+                         merkleRootInt 
+                         boundParamsHash 
+                         [nullifier] 
+                         [changeCommitment, transferCommitment]
+      
+      TIO.putStrLn $ "  Nullifier: " <> T.pack (show nullifier)
+      TIO.putStrLn $ "  Change commitment: " <> T.pack (show changeCommitment)
+      TIO.putStrLn $ "  Transfer commitment: " <> T.pack (show transferCommitment)
+      TIO.putStrLn $ "  Change value: " <> T.pack (show changeValue)
+      TIO.putStrLn $ "  Transfer amount: " <> T.pack (show actualAmount)
+      TIO.putStrLn $ "  TokenId: " <> T.pack (show tokenId)
+      TIO.putStrLn $ "  NPK (ours): " <> T.pack (show npkInt)
+      TIO.putStrLn $ "  NPK (recipient): " <> T.pack (show recipientNpk)
+      
+      -- Sign the message
+      let signature = signTransactionData signingKey sigMessage
+          sigR8x = rsR8x signature
+          sigR8y = rsR8y signature
+          sigS = rsS signature
+      
+      -- Step 7: Build witness for transfer
+      witnessResult <- case buildTransferWitness 
+                              spendable 
+                              merkleProof 
+                              nullifierKeyInt
+                              (pkX, pkY)
+                              (sigR8x, sigR8y, sigS)
+                              recipientNpk
+                              actualAmount
+                              boundParamsHash
+                              merkleRootInt of
+        Left err -> do
+          TIO.hPutStrLn stderr $ "Failed to build witness: " <> err
+          exitFailure
+        Right w -> return w
+      
+      TIO.putStrLn "  Circuit inputs built"
+      
+      -- Debug: Save circuit inputs for inspection
+      let inputsJson = Aeson.encode witnessResult
+      LBS.writeFile "/tmp/circuit_inputs.json" inputsJson
+      TIO.putStrLn "  Circuit inputs saved to /tmp/circuit_inputs.json"
+      
+      -- Step 8: Generate SNARK proof
+      TIO.putStrLn "\nGenerating SNARK proof..."
+      let proverConfig = defaultProverConfig
+      
+      proofResult <- generateProof proverConfig witnessResult
+      snarkProof <- case proofResult of
+        Left err -> do
+          TIO.hPutStrLn stderr $ "Proof generation failed: " <> err
+          exitFailure
+        Right p -> do
+          TIO.putStrLn "  Proof generated successfully"
+          return p
+      
+      -- Step 9: Build and send the transaction (ciphertexts already created above)
+      let merkleRootBytes = hexToBytes merkleRootHex
+          transferReq = createTransferRequest
+                          snarkProof
+                          merkleRootBytes
+                          nullifier
+                          [changeCommitment, transferCommitment]
+                          [changeCiphertext, transferCiphertext]
+                          (T.pack $ toTokenAddress topts)
+                          chainId
+                          (fromIntegral treeNum)
+      
+      TIO.putStrLn "\nSending shielded transfer transaction..."
+      
+      -- Use callTransact (same as unshield) since the contract interface is the same
+      transferResult <- callTransact config (trToUnshield transferReq)
+      case transferResult of
+        Left err -> do
+          TIO.hPutStrLn stderr $ "Transfer failed: " <> err
+          exitFailure
+        Right results -> do
+          TIO.putStrLn $ "Transfer response: " <> T.pack (show $ length results) <> " transaction result(s)"
+          mapM_ printTxResult results
+      
+      exitSuccess
+  where
+    normalizeAddress :: T.Text -> T.Text
+    normalizeAddress t
+      | "0x" `T.isPrefixOf` T.toLower t = T.drop 2 t
+      | otherwise = t
+    
+    hexToInteger :: T.Text -> Integer
+    hexToInteger t =
+      let cleanHex = if "0x" `T.isPrefixOf` T.toLower t then T.drop 2 t else t
+          digits = T.unpack cleanHex
+      in foldl (\acc c -> acc * 16 + fromIntegral (hexDigitValue c)) 0 digits
+    
+    hexDigitValue :: Char -> Int
+    hexDigitValue c
+      | c >= '0' && c <= '9' = fromEnum c - fromEnum '0'
+      | c >= 'a' && c <= 'f' = fromEnum c - fromEnum 'a' + 10
+      | c >= 'A' && c <= 'F' = fromEnum c - fromEnum 'A' + 10
+      | otherwise = 0
+    
+    bytesToIntegerBE :: BS.ByteString -> Integer
+    bytesToIntegerBE = BS.foldl' (\acc b -> acc * 256 + fromIntegral b) 0
+    
+    -- Convert TransferRequest to UnshieldRequest for the API call
+    -- They use the same structure
+    trToUnshield :: Railgun.Transfer.TransferRequest -> Railgun.Unshield.UnshieldRequest
+    trToUnshield tr = Railgun.Unshield.UnshieldRequest 
+                        { Railgun.Unshield.urTransactions = Railgun.Transfer.trTransactions tr }
+
 runBalance :: BalanceOpts -> IO ()
 runBalance bopts = do
   -- Load keys from mnemonic file
-  TIO.putStrLn "Loading Railgun keys..."
-  keys <- loadKeys (boPassphrase bopts) (boDerivationIndex bopts)
+  TIO.putStrLn $ "Loading Railgun keys (wallet: " <> T.pack (boWallet bopts) <> ")..."
+  keys <- loadKeys (boWallet bopts) (boDerivationIndex bopts)
   
   let addr = railgunAddress keys
   TIO.putStrLn $ "Railgun address: " <> unRailgunAddress addr
