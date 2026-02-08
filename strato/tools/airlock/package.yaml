@@ -19,6 +19,7 @@ library:
     - Railgun.Keys
     - Railgun.Shield
     - Railgun.Unshield
+    - Railgun.Transfer
     - Railgun.Crypto
     - Railgun.Types
     - Railgun.API

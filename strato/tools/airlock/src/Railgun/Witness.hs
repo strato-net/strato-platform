@@ -8,6 +8,7 @@ module Railgun.Witness
   , CircuitInputs(..)
     -- * Construction
   , buildUnshieldWitness
+  , buildTransferWitness
   , witnessToJSON
   ) where
 
@@ -133,6 +134,66 @@ buildUnshieldWitness note proof nullifyingKey (pkX, pkY) (sigR8x, sigR8y, sigS) 
 -- | Convert witness to JSON for snarkjs
 witnessToJSON :: CircuitInputs -> LBS.ByteString
 witnessToJSON = Aeson.encode
+
+-- | Build witness for shielded transfer (1 input, 2 outputs circuit)
+-- For transfer: spending 1 note, outputting transfer commitment + change
+-- The transfer commitment goes to the recipient (shielded)
+buildTransferWitness 
+  :: SpendableNote       -- ^ The note to spend
+  -> MerkleProof         -- ^ Merkle proof for the note
+  -> Integer             -- ^ Nullifying key
+  -> (Integer, Integer)  -- ^ Public key (x, y)
+  -> (Integer, Integer, Integer)  -- ^ Signature (R8x, R8y, S)
+  -> Integer             -- ^ Recipient's NPK (note public key / master public key)
+  -> Integer             -- ^ Amount to transfer
+  -> Integer             -- ^ Bound params hash
+  -> Integer             -- ^ Merkle root
+  -> Either Text CircuitInputs
+buildTransferWitness note proof nullifyingKey (pkX, pkY) (sigR8x, sigR8y, sigS) recipientNpk amount boundParamsHash merkleRoot = do
+  -- Validate note has enough value
+  if snValue note < amount
+    then Left $ "Note value " <> T.pack (show (snValue note)) 
+             <> " less than transfer amount " <> T.pack (show amount)
+    else Right ()
+  
+  -- Compute nullifier
+  let leafIndex = snNoteIndex note
+      npk = snNpk note
+      nullifier = computeNullifier nullifyingKey leafIndex
+  
+  -- Token as uint256
+  let tokenId = hexToInteger (snTokenAddress note)
+  
+  -- Compute output commitments
+  -- For transfer: first output is change (to sender), second is transfer (to recipient)
+  let changeValue = snValue note - amount
+      -- Change commitment uses our NPK
+      changeCommitment = poseidonHash [npk, tokenId, changeValue]
+      -- Transfer commitment uses recipient's NPK
+      transferCommitment = poseidonHash [recipientNpk, tokenId, amount]
+  
+  -- Format Merkle path elements
+  let pathElements = map (T.pack . show) (mpSiblings proof)
+  
+  Right CircuitInputs
+    { ciMerkleRoot = T.pack $ show merkleRoot
+    , ciBoundParamsHash = T.pack $ show boundParamsHash
+    , ciNullifiers = [T.pack $ show nullifier]
+    -- For transfer: change first, transfer second (last position)
+    , ciCommitmentsOut = [T.pack $ show changeCommitment, T.pack $ show transferCommitment]
+    , ciToken = T.pack $ show tokenId
+    , ciPublicKey = [T.pack $ show pkX, T.pack $ show pkY]
+    , ciSignature = [T.pack $ show sigR8x, T.pack $ show sigR8y, T.pack $ show sigS]
+    , ciRandomIn = [T.pack $ show (snRandom note)]
+    , ciValueIn = [T.pack $ show (snValue note)]
+    , ciPathElements = pathElements
+    , ciLeavesIndices = [T.pack $ show leafIndex]
+    , ciNullifyingKey = T.pack $ show nullifyingKey
+    -- Output NPKs: change (ours) first, transfer (recipient) second
+    , ciNpkOut = [T.pack $ show npk, T.pack $ show recipientNpk]
+    -- Output values: change first, transfer second
+    , ciValueOut = [T.pack $ show changeValue, T.pack $ show amount]
+    }
 
 -- | Convert hex text to Integer
 hexToInteger :: Text -> Integer

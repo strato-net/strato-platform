@@ -343,25 +343,28 @@ getMerkleRoot config = do
 getBoundParamsHash :: StratoConfig 
                    -> Int       -- ^ Tree number
                    -> Integer   -- ^ Chain ID
-                   -> Int       -- ^ Number of ciphertext entries (commitments - 1 for unshield)
+                   -> [CommitmentCiphertext]  -- ^ Actual ciphertext entries
+                   -> Bool      -- ^ True for unshield (NORMAL), False for transfer (NONE)
                    -> IO (Either Text Integer)
-getBoundParamsHash config treeNum chainId numCiphertexts = do
+getBoundParamsHash config treeNum chainId ciphertexts isUnshield = do
   clientEnv <- makeClientEnv config
   
-  -- Build dummy ciphertext entries (all zeros)
-  let zeros64 = T.replicate 64 "0"
-      dummyCiphertext = ArgObject $ KM.fromList
-        [ ("ciphertext", ArgArray $ V.fromList $ replicate 4 (ArgString zeros64))
-        , ("blindedSenderViewingKey", ArgString zeros64)
-        , ("blindedReceiverViewingKey", ArgString zeros64)
+  -- Convert CommitmentCiphertext to ArgValue
+  let ciphertextToArg ct = ArgObject $ KM.fromList
+        [ ("ciphertext", ArgArray $ V.fromList $ 
+            map (ArgString . TE.decodeUtf8 . B16.encode) (ccCiphertext ct))
+        , ("blindedSenderViewingKey", ArgString $ TE.decodeUtf8 $ B16.encode $ ccBlindedSenderViewingKey ct)
+        , ("blindedReceiverViewingKey", ArgString $ TE.decodeUtf8 $ B16.encode $ ccBlindedReceiverViewingKey ct)
         ]
-      ciphertextArray = V.fromList $ replicate numCiphertexts dummyCiphertext
+      ciphertextArray = V.fromList $ map ciphertextToArg ciphertexts
+      -- Use NORMAL for unshield, NONE for transfer
+      unshieldType = if isUnshield then "NORMAL" else "NONE"
   
   let contractAddr = textToAddress (railgunContractAddress config)
       boundParams = ArgObject $ KM.fromList
         [ ("treeNumber", ArgInt $ fromIntegral treeNum)
         , ("minGasPrice", ArgString "0")
-        , ("unshield", ArgString "NORMAL")
+        , ("unshield", ArgString unshieldType)
         , ("chainID", ArgString $ T.pack $ show chainId)
         , ("adaptContract", ArgString "0000000000000000000000000000000000000000")
         , ("adaptParams", ArgString "0000000000000000000000000000000000000000000000000000000000000000")
