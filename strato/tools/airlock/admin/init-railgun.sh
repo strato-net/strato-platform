@@ -19,7 +19,9 @@ CONTRACT_ADDR="$1"
 # Get user's address for treasury
 echo "Getting user address..."
 TOKEN=$(ensure_valid_token) || exit 1
-USER_ADDR=$(restish strato get-eth-account | jq -r '.address')
+# Get current user's address from the key endpoint
+HOST=${STRATO_HOST:-localhost:8081}
+USER_ADDR=$(curl -s -H "Authorization: Bearer $TOKEN" "http://$HOST/strato/v2.3/key" | jq -r '.address')
 
 if [ -z "$USER_ADDR" ] || [ "$USER_ADDR" = "null" ]; then
     echo "Error: Could not get user address"
