@@ -108,17 +108,24 @@ deriveFromMnemonic mnemonic passphrase index = do
     seed = mnemonicToSeed mnemonic passphrase
 
 -- | Generate a Railgun address from keys
--- Format: "0zk" prefix + bech32 encoded (masterPubKey || viewingPubKey)
+-- Format: "0zk" prefix + hex encoded (masterPublicKey as 32 bytes || viewingPubKey)
+-- The masterPublicKey is the poseidon hash used in circuit commitments
 railgunAddress :: RailgunKeys -> RailgunAddress
 railgunAddress keys = RailgunAddress $ "0zk" <> hexEncoded
   where
-    -- Railgun address contains master public key and viewing public key
-    -- For now, we derive master public key from spending key
-    masterPubKey = deriveEd25519PublicKey (spendingKey keys)
-    combined = masterPubKey <> viewingPublicKey keys
+    -- Encode master public key (Integer) as 32 bytes big-endian
+    mpkBytes = integerToBytes32BE (masterPublicKey keys)
+    combined = mpkBytes <> viewingPublicKey keys
     hexEncoded = TE.decodeUtf8 $ B16.encode combined
+    
+    integerToBytes32BE :: Integer -> ByteString
+    integerToBytes32BE n = BS.pack $ map fromIntegral $ 
+      reverse $ take 32 $ go n ++ repeat 0
+      where go 0 = []
+            go x = (x `mod` 256) : go (x `div` 256)
 
 -- | Decode a Railgun address to extract public keys
+-- Returns (masterPublicKey as bytes, viewingPublicKey as bytes)
 decodeRailgunAddress :: RailgunAddress -> Either Text (ByteString, ByteString)
 decodeRailgunAddress (RailgunAddress addr)
   | not ("0zk" `T.isPrefixOf` addr) = Left "Invalid Railgun address: must start with 0zk"
