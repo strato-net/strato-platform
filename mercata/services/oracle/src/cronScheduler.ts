@@ -133,14 +133,19 @@ function aggregatePrices(
         const sources: Array<{ name: string; price: number }> = [];
         let expectedCount = weekdaySources.length;
 
+        const failedSources: string[] = [];
+
         const collect = (names: string[], symbol: string) => {
+            failedSources.length = 0;
             names.forEach(name => {
                 const result = sourceResults.get(name);
                 const data = result?.success && result?.prices[symbol];
                 if (data) {
                     sources.push({ name, price: data.price });
                 } else if (result?.success) {
-                    logInfo('CronScheduler', `${symbol}: ${name} returned no price (API succeeded but symbol missing from response)`);
+                    failedSources.push(`${name}(no ${symbol})`);
+                } else {
+                    failedSources.push(`${name}(fetch failed)`);
                 }
             });
             return sources.length;
@@ -160,9 +165,11 @@ function aggregatePrices(
                 expectedCount = weekdaySources.length;
             }
         }
-        
+
         const isValid = sources.length >= requiredSources;
-        if (!isValid) logError('CronScheduler', new Error(`Insufficient sources for ${assetKey}: got ${sources.length}, need ${requiredSources}`));
+        if (!isValid) {
+            logError('CronScheduler', new Error(`Insufficient sources for ${assetKey}: got ${sources.length}, need ${requiredSources}. Failed: [${failedSources.join(', ')}]`));
+        }
         
         const medianPrice = isValid ? calculateMedian(sources.map(s => s.price)) : 0;
         
