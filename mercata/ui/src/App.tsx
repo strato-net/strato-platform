@@ -29,6 +29,7 @@ import ReferFriend from "./pages/ReferFriend";
 import Claim from "./pages/Claim";
 import ReferralsManagement from "./pages/ReferralsManagement";
 import Vault from "./pages/Vault";
+import CreditCard from "./pages/CreditCard";
 
 // Import dashboard components
 
@@ -196,6 +197,14 @@ const App = () => {
                                             element={
                                               <GuestAccessibleRoute>
                                                 <Vault />
+                                              </GuestAccessibleRoute>
+                                            }
+                                          />
+                                          <Route
+                                            path="/dashboard/credit-card"
+                                            element={
+                                              <GuestAccessibleRoute>
+                                                <CreditCard />
                                               </GuestAccessibleRoute>
                                             }
                                           />

@@ -17,7 +17,8 @@ import {
   ChevronUp,
   ChevronDown,
   LucideIcon,
-  Vault
+  Vault,
+  CreditCard
 } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import STRATOLOGO from '@/assets/strato.png';
@@ -42,6 +43,7 @@ const PRIMARY_NAV_ITEMS: NavItem[] = [
 
 const MORE_NAV_ITEMS: NavItem[] = [
   { icon: Activity, label: 'Activity Feed', path: '/dashboard/activity' },
+  { icon: CreditCard, label: 'Crypto Credit Card', path: '/dashboard/credit-card' },
   { icon: Download, label: 'Withdrawals', path: '/dashboard/withdrawals' },
   { icon: BarChart3, label: 'STRATO Stats', path: '/dashboard/stats' },
   { icon: Droplets, label: 'Advanced', path: '/dashboard/advanced' },
