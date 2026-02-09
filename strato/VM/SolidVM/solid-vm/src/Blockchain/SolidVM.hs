@@ -1134,7 +1134,7 @@ expToVar' ex@(CC.Binary _ "/=" lhs rhs) = do
     Left 0 -> divideByZero $ unparseExpression ex
     Right 0 -> divideByZero $ unparseExpression ex
     _ -> binopDivide (div) (/) lhs rhs
-expToVar' (CC.Binary _ "%=" lhs rhs) = do
+expToVar' ex@(CC.Binary _ "%=" lhs rhs) = do
   rhs' <- getRealNum =<< expToVar rhs
   case rhs' of
     Left 0 -> divideByZero $ unparseExpression ex
@@ -1311,7 +1311,7 @@ expToVar' ex@(CC.Binary _ "/" expr1 expr2) = do
     Right 0 -> divideByZero $ unparseExpression ex
     _ -> expToVarDivide (div) (/) expr1 expr2
 --modified to use decimal division
-expToVar' (CC.Binary _ "%" expr1 expr2) = do
+expToVar' ex@(CC.Binary _ "%" expr1 expr2) = do
   rhs <- getRealNum =<< expToVar expr2
   case rhs of
     Left 0 -> divideByZero $ unparseExpression ex
