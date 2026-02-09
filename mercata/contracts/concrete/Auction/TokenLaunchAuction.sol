@@ -15,11 +15,10 @@ interface ILpSeeder {
     function seedAndLock(uint usdAmount, uint stratoAmount, uint price, address lpTokenRecipient) external returns (address lpToken, uint lpTokensMinted);
 }
 
-// Uniform clearing price auction with tiered vesting, refunds, and TGE flow.
+// Uniform clearing price auction with tiered windows, refunds, and TGE flow.
 // Summary:
 // - Bidders escrow USDST with a max price; clearing price is computed after end.
-// - Allocation is split into immediate + vested based on tier.
-// - Immediate tokens are distributed in batches; vested tokens are claimed over time.
+// - Allocation is fully immediate and distributed after TGE.
 // - TGE seeds LP, releases treasury/reserve funds, and unpauses transfers if configured.
 contract record TokenLaunchAuction is Ownable {
     enum BidState { NULL, ACTIVE, CANCELED, FINALIZED }
@@ -37,18 +36,14 @@ contract record TokenLaunchAuction is Ownable {
         uint tokensCapped;
         uint spentUSDST;
         uint refundUSDST;
-        uint immediateTokens;
-        uint vestedTokens;
-        uint vestingDuration;
-        uint vestingClaimed;
+        uint bonusTokens;
         bool distributed;
         bool distributionVaulted;
         bool canceledRefundWithdrawn;
         bool finalizedRefundWithdrawn;
         uint distributionAttempts;
         uint vaultedImmediate;
-        uint vaultedVested;
-        uint vaultedVestingClaimed;
+        uint vaultedBonusTokens;
     }
 
     event AuctionInitialized(address usdToken, address stratoToken, uint saleSupply);
@@ -62,10 +57,9 @@ contract record TokenLaunchAuction is Ownable {
     event Finalized(uint clearingPrice, uint raisedUSDST, bool success);
     event FinalizeRewardPaid(address caller, uint amount);
     event RefundWithdrawn(uint bidId, address bidder, uint amount, RefundReason reason);
-    event DistributionProcessed(uint bidId, address bidder, uint immediateTokens, uint vestedTokens);
-    event DistributionVaulted(uint bidId, address bidder, uint immediateTokens, uint vestedTokens);
+    event DistributionProcessed(uint bidId, address bidder, uint tokens);
+    event DistributionVaulted(uint bidId, address bidder, uint tokens);
     event VaultedImmediateWithdrawn(uint bidId, address bidder, uint amount);
-    event VaultedVestedWithdrawn(uint bidId, address bidder, uint amount);
     event AllowlistConfigured(bool enabled, uint durationSeconds);
     event AllowlistUpdated(address indexed account, bool allowed);
     event TgeScheduled(uint tgeTime);
@@ -97,6 +91,9 @@ contract record TokenLaunchAuction is Ownable {
     uint public withdrawDelay;
     uint public finalizeRewardUSDST;
     uint public maxDistributionAttempts;
+    uint public bonusTokenReserve;
+    uint public bonusTokenReserveRemaining;
+    uint public bonusScaleBps;
 
     uint public lpBps;
     uint public treasuryBps;
@@ -106,8 +103,6 @@ contract record TokenLaunchAuction is Ownable {
     uint public closeBufferSeconds;
     uint public tier1WindowSeconds;
     uint public tier2WindowSeconds;
-    uint public tier2VestingSeconds;
-    uint public tier3VestingSeconds;
     bool public allowlistEnabled;
     uint public allowlistDurationSeconds;
 
@@ -176,12 +171,11 @@ contract record TokenLaunchAuction is Ownable {
         uint withdrawDelay_,
         uint finalizeRewardUSDST_,
         uint maxDistributionAttempts_,
+        uint bonusTokenReserve_,
         uint auctionDurationSeconds_,
         uint closeBufferSeconds_,
         uint tier1WindowSeconds_,
         uint tier2WindowSeconds_,
-        uint tier2VestingSeconds_,
-        uint tier3VestingSeconds_,
         bool allowlistEnabled_,
         uint allowlistDurationSeconds_,
         uint lpBps_,
@@ -221,6 +215,8 @@ contract record TokenLaunchAuction is Ownable {
         withdrawDelay = withdrawDelay_;
         finalizeRewardUSDST = finalizeRewardUSDST_;
         maxDistributionAttempts = maxDistributionAttempts_;
+        bonusTokenReserve = bonusTokenReserve_;
+        bonusTokenReserveRemaining = bonusTokenReserve_;
 
         lpBps = lpBps_;
         treasuryBps = treasuryBps_;
@@ -231,14 +227,13 @@ contract record TokenLaunchAuction is Ownable {
         closeBufferSeconds = closeBufferSeconds_;
         tier1WindowSeconds = tier1WindowSeconds_;
         tier2WindowSeconds = tier2WindowSeconds_;
-        tier2VestingSeconds = tier2VestingSeconds_;
-        tier3VestingSeconds = tier3VestingSeconds_;
         allowlistEnabled = allowlistEnabled_;
         allowlistDurationSeconds = allowlistDurationSeconds_;
         if (allowlistEnabled) {
             require(allowlistDurationSeconds > 0, "Allowlist duration required");
             require(allowlistDurationSeconds <= tier1WindowSeconds, "Allowlist > tier1");
         }
+        require(tier1WindowSeconds > 0, "Tier1 duration required");
 
         preTgeWithdrawBps = preTgeWithdrawBps_;
         maxTgeDelay = maxTgeDelay_;
@@ -267,12 +262,11 @@ contract record TokenLaunchAuction is Ownable {
         uint withdrawDelay_,
         uint finalizeRewardUSDST_,
         uint maxDistributionAttempts_,
+        uint bonusTokenReserve_,
         uint auctionDurationSeconds_,
         uint closeBufferSeconds_,
         uint tier1WindowSeconds_,
         uint tier2WindowSeconds_,
-        uint tier2VestingSeconds_,
-        uint tier3VestingSeconds_,
         bool allowlistEnabled_,
         uint allowlistDurationSeconds_,
         uint lpBps_,
@@ -314,6 +308,8 @@ contract record TokenLaunchAuction is Ownable {
         withdrawDelay = withdrawDelay_;
         finalizeRewardUSDST = finalizeRewardUSDST_;
         maxDistributionAttempts = maxDistributionAttempts_;
+        bonusTokenReserve = bonusTokenReserve_;
+        bonusTokenReserveRemaining = bonusTokenReserve_;
 
         lpBps = lpBps_;
         treasuryBps = treasuryBps_;
@@ -324,8 +320,6 @@ contract record TokenLaunchAuction is Ownable {
         closeBufferSeconds = closeBufferSeconds_;
         tier1WindowSeconds = tier1WindowSeconds_;
         tier2WindowSeconds = tier2WindowSeconds_;
-        tier2VestingSeconds = tier2VestingSeconds_;
-        tier3VestingSeconds = tier3VestingSeconds_;
 
         allowlistEnabled = allowlistEnabled_;
         allowlistDurationSeconds = allowlistDurationSeconds_;
@@ -333,6 +327,7 @@ contract record TokenLaunchAuction is Ownable {
             require(allowlistDurationSeconds > 0, "Allowlist duration required");
             require(allowlistDurationSeconds <= tier1WindowSeconds, "Allowlist > tier1");
         }
+        require(tier1WindowSeconds > 0, "Tier1 duration required");
 
         preTgeWithdrawBps = preTgeWithdrawBps_;
         maxTgeDelay = maxTgeDelay_;
@@ -346,7 +341,10 @@ contract record TokenLaunchAuction is Ownable {
     function startAuction() external onlyOwner {
         require(initialized, "Not initialized");
         require(!auctionStarted, "Already started");
-        require(stratoToken.balanceOf(address(this)) >= claimTokenReserve + lpTokenReserve, "Insufficient escrow");
+        require(
+            stratoToken.balanceOf(address(this)) >= claimTokenReserve + lpTokenReserve + bonusTokenReserve,
+            "Insufficient escrow"
+        );
 
         auctionStarted = true;
         claimReserveRemaining = claimTokenReserve;
@@ -545,12 +543,13 @@ contract record TokenLaunchAuction is Ownable {
     }
 
     // Distribute allocations for a batch of bid IDs.
-    // Transfers immediate tokens; vested tokens remain claimable.
+    // Transfers full allocations after TGE.
     function distributeBatch(uint[] bidIds) external {
         require(finalized, "Not finalized");
         require(success, "Not successful");
         require(!auctionCanceled, "Auction canceled");
         require(!unwound, "Unwound");
+        require(tgeExecuted, "TGE not executed");
 
         uint i;
         for (i = 0; i < bidIds.length; i++) {
@@ -565,18 +564,13 @@ contract record TokenLaunchAuction is Ownable {
                 continue;
             }
 
-            if (bid.immediateTokens == 0) {
-                bid.distributed = true;
-                pendingDistributions = pendingDistributions - 1;
-                emit DistributionProcessed(bidId, bid.bidder, 0, bid.vestedTokens);
-                continue;
-            }
-
+            uint baseTokens = bid.tokensCapped;
+            uint bonusTokens = bid.bonusTokens;
             bool transferOk = true;
-            if (claimReserveRemaining < bid.immediateTokens) {
+            if (claimReserveRemaining < baseTokens || bonusTokenReserveRemaining < bonusTokens) {
                 transferOk = false;
             } else {
-                try stratoToken.transfer(bid.bidder, bid.immediateTokens) returns (bool ok) {
+                try stratoToken.transfer(bid.bidder, baseTokens + bonusTokens) returns (bool ok) {
                     if (!ok) {
                         transferOk = false;
                     }
@@ -586,10 +580,11 @@ contract record TokenLaunchAuction is Ownable {
             }
 
             if (transferOk) {
-                claimReserveRemaining = claimReserveRemaining - bid.immediateTokens;
+                claimReserveRemaining = claimReserveRemaining - baseTokens;
+                bonusTokenReserveRemaining = bonusTokenReserveRemaining - bonusTokens;
                 bid.distributed = true;
                 pendingDistributions = pendingDistributions - 1;
-                emit DistributionProcessed(bidId, bid.bidder, bid.immediateTokens, bid.vestedTokens);
+                emit DistributionProcessed(bidId, bid.bidder, baseTokens + bonusTokens);
                 continue;
             }
 
@@ -597,10 +592,10 @@ contract record TokenLaunchAuction is Ownable {
             if (bid.distributionAttempts >= maxDistributionAttempts) {
                 bid.distributed = true;
                 bid.distributionVaulted = true;
-                bid.vaultedImmediate = bid.immediateTokens;
-                bid.vaultedVested = bid.vestedTokens;
+                bid.vaultedImmediate = baseTokens;
+                bid.vaultedBonusTokens = bonusTokens;
                 pendingDistributions = pendingDistributions - 1;
-                emit DistributionVaulted(bidId, bid.bidder, bid.immediateTokens, bid.vestedTokens);
+                emit DistributionVaulted(bidId, bid.bidder, baseTokens + bonusTokens);
             }
         }
     }
@@ -612,6 +607,7 @@ contract record TokenLaunchAuction is Ownable {
         require(!auctionCanceled, "Auction canceled");
         require(!unwound, "Unwound");
         require(maxCount > 0, "Invalid count");
+        require(tgeExecuted, "TGE not executed");
 
         uint i = nextDistributionIndex;
         uint processed = 0;
@@ -620,17 +616,14 @@ contract record TokenLaunchAuction is Ownable {
             if (!bid.distributed) {
                 if (bid.tokensCapped == 0) {
                     bid.distributed = true;
-                } else if (bid.immediateTokens == 0) {
-                    bid.distributed = true;
-                    pendingDistributions = pendingDistributions - 1;
-                    emit DistributionProcessed(i, bid.bidder, 0, bid.vestedTokens);
-                    processed = processed + 1;
                 } else {
+                    uint baseTokens = bid.tokensCapped;
+                    uint bonusTokens = bid.bonusTokens;
                     bool transferOk = true;
-                    if (claimReserveRemaining < bid.immediateTokens) {
+                    if (claimReserveRemaining < baseTokens || bonusTokenReserveRemaining < bonusTokens) {
                         transferOk = false;
                     } else {
-                        try stratoToken.transfer(bid.bidder, bid.immediateTokens) returns (bool ok) {
+                        try stratoToken.transfer(bid.bidder, baseTokens + bonusTokens) returns (bool ok) {
                             if (!ok) {
                                 transferOk = false;
                             }
@@ -640,20 +633,21 @@ contract record TokenLaunchAuction is Ownable {
                     }
 
                     if (transferOk) {
-                        claimReserveRemaining = claimReserveRemaining - bid.immediateTokens;
+                        claimReserveRemaining = claimReserveRemaining - baseTokens;
+                        bonusTokenReserveRemaining = bonusTokenReserveRemaining - bonusTokens;
                         bid.distributed = true;
                         pendingDistributions = pendingDistributions - 1;
-                        emit DistributionProcessed(i, bid.bidder, bid.immediateTokens, bid.vestedTokens);
+                        emit DistributionProcessed(i, bid.bidder, baseTokens + bonusTokens);
                         processed = processed + 1;
                     } else {
                         bid.distributionAttempts = bid.distributionAttempts + 1;
                         if (bid.distributionAttempts >= maxDistributionAttempts) {
                             bid.distributed = true;
                             bid.distributionVaulted = true;
-                            bid.vaultedImmediate = bid.immediateTokens;
-                            bid.vaultedVested = bid.vestedTokens;
+                            bid.vaultedImmediate = baseTokens;
+                            bid.vaultedBonusTokens = bonusTokens;
                             pendingDistributions = pendingDistributions - 1;
-                            emit DistributionVaulted(i, bid.bidder, bid.immediateTokens, bid.vestedTokens);
+                            emit DistributionVaulted(i, bid.bidder, baseTokens + bonusTokens);
                             processed = processed + 1;
                         }
                     }
@@ -684,26 +678,6 @@ contract record TokenLaunchAuction is Ownable {
         emit RefundWithdrawn(bidId, msg.sender, bid.refundUSDST, RefundReason.FINALIZED);
     }
 
-    // Withdraw vested tokens for a bid as they vest.
-    // Requires auction success and finalization.
-    function withdrawVested(uint bidId) external {
-        require(tgeExecuted, "TGE not executed");
-        require(!unwound, "Unwound");
-        require(bidId < bids.length, "Invalid bid");
-        Bid storage bid = bids[bidId];
-        require(bid.bidder == msg.sender, "Not bidder");
-        require(bid.distributed, "Not distributed");
-        require(!bid.distributionVaulted, "Vaulted");
-        require(bid.vestedTokens > 0, "No vesting");
-
-        uint claimable = _vestedClaimable(bid);
-        require(claimable > 0, "Nothing vested");
-        bid.vestingClaimed = bid.vestingClaimed + claimable;
-        require(claimReserveRemaining >= claimable, "Claim reserve exhausted");
-        claimReserveRemaining = claimReserveRemaining - claimable;
-        require(stratoToken.transfer(msg.sender, claimable), "STRATO transfer failed");
-    }
-
     // Withdraw immediate tokens vaulted due to distribution failures.
     function withdrawVaultedImmediate(uint bidId) external {
         require(!unwound, "Unwound");
@@ -711,33 +685,19 @@ contract record TokenLaunchAuction is Ownable {
         Bid storage bid = bids[bidId];
         require(bid.bidder == msg.sender, "Not bidder");
         require(bid.distributionVaulted, "Not vaulted");
-        require(bid.vaultedImmediate > 0, "No immediate");
+        require(bid.vaultedImmediate > 0 || bid.vaultedBonusTokens > 0, "No tokens");
 
-        uint amount = bid.vaultedImmediate;
+        uint baseAmount = bid.vaultedImmediate;
+        uint bonusAmount = bid.vaultedBonusTokens;
+        uint amount = baseAmount + bonusAmount;
         bid.vaultedImmediate = 0;
-        require(claimReserveRemaining >= amount, "Claim reserve exhausted");
-        claimReserveRemaining = claimReserveRemaining - amount;
+        bid.vaultedBonusTokens = 0;
+        require(claimReserveRemaining >= baseAmount, "Claim reserve exhausted");
+        require(bonusTokenReserveRemaining >= bonusAmount, "Bonus reserve exhausted");
+        claimReserveRemaining = claimReserveRemaining - baseAmount;
+        bonusTokenReserveRemaining = bonusTokenReserveRemaining - bonusAmount;
         require(stratoToken.transfer(msg.sender, amount), "STRATO transfer failed");
         emit VaultedImmediateWithdrawn(bidId, msg.sender, amount);
-    }
-
-    // Withdraw vested tokens vaulted due to distribution failures.
-    function withdrawVaultedVested(uint bidId) external {
-        require(tgeExecuted, "TGE not executed");
-        require(!unwound, "Unwound");
-        require(bidId < bids.length, "Invalid bid");
-        Bid storage bid = bids[bidId];
-        require(bid.bidder == msg.sender, "Not bidder");
-        require(bid.distributionVaulted, "Not vaulted");
-        require(bid.vaultedVested > 0, "No vested");
-
-        uint claimable = _vaultedVestedClaimable(bid);
-        require(claimable > 0, "Nothing vested");
-        bid.vaultedVestingClaimed = bid.vaultedVestingClaimed + claimable;
-        require(claimReserveRemaining >= claimable, "Claim reserve exhausted");
-        claimReserveRemaining = claimReserveRemaining - claimable;
-        require(stratoToken.transfer(msg.sender, claimable), "STRATO transfer failed");
-        emit VaultedVestedWithdrawn(bidId, msg.sender, claimable);
     }
 
     // Burn unsold tokens after a successful auction.
@@ -772,7 +732,6 @@ contract record TokenLaunchAuction is Ownable {
         require(success, "Not successful");
         require(!tgeExecuted, "TGE executed");
         require(!unwound, "Unwound");
-        require(pendingDistributions == 0, "Distribution incomplete");
         require(tgeTime != 0, "TGE not set");
         require(block.timestamp >= tgeTime, "TGE time");
 
@@ -1048,6 +1007,7 @@ contract record TokenLaunchAuction is Ownable {
                 unsoldTokens = saleSupply - totalAllocated;
             }
             _recordFinalizedBids();
+            _computeBonusAllocations();
             _computeBuckets();
         } else {
             success = false;
@@ -1070,15 +1030,58 @@ contract record TokenLaunchAuction is Ownable {
             totalRefundsRemaining = totalRefundsRemaining + bid.refundUSDST;
 
             if (bid.tokensCapped > 0) {
-                uint immediateBps = _immediateBpsForTier(bid.tier);
-                bid.immediateTokens = (bid.tokensCapped * immediateBps) / 10000;
-                bid.vestedTokens = bid.tokensCapped - bid.immediateTokens;
-                bid.vestingDuration = _vestingDurationForTier(bid.tier);
                 pendingDistributions = pendingDistributions + 1;
             }
 
             emit BidFinalized(i, bid.bidder, bid.tokensCapped, bid.spentUSDST, bid.refundUSDST);
         }
+    }
+
+    // Compute bonus allocations for Tier 1 bids, pro-rated to the bonus reserve.
+    function _computeBonusAllocations() internal {
+        bonusScaleBps = 0;
+        if (bonusTokenReserve == 0) {
+            bonusTokenReserveRemaining = 0;
+            return;
+        }
+
+        uint totalDemand = 0;
+        uint i;
+        uint cutoff = startTime + tier1WindowSeconds;
+        for (i = 0; i < bids.length; i++) {
+            Bid storage bid = bids[i];
+            if (bid.state != BidState.FINALIZED) {
+                continue;
+            }
+            if (bid.tokensCapped == 0) {
+                continue;
+            }
+            if (bid.createdAt >= cutoff) {
+                continue;
+            }
+            uint demand = bid.tokensCapped;
+            bid.bonusTokens = demand;
+            totalDemand = totalDemand + demand;
+        }
+
+        if (totalDemand == 0) {
+            bonusTokenReserveRemaining = bonusTokenReserve;
+            return;
+        }
+
+        bonusScaleBps = totalDemand <= bonusTokenReserve ? 10000 : (bonusTokenReserve * 10000) / totalDemand;
+        uint totalAllocated = 0;
+        for (i = 0; i < bids.length; i++) {
+            Bid storage bidScaled = bids[i];
+            if (bidScaled.bonusTokens == 0) {
+                continue;
+            }
+            uint scaled = (bidScaled.bonusTokens * bonusScaleBps) / 10000;
+            bidScaled.bonusTokens = scaled;
+            totalAllocated = totalAllocated + scaled;
+        }
+        // Spendable bonus balance for distribution.
+        bonusTokenReserveRemaining = bonusTokenReserve;
     }
 
     // Record bid states for failed auctions.
@@ -1114,56 +1117,8 @@ contract record TokenLaunchAuction is Ownable {
     // Resolve tier based on timestamp.
     function _tierForTimestamp(uint timestamp) internal view returns (uint) {
         uint tier1End = startTime + tier1WindowSeconds;
-        uint tier2End = startTime + tier2WindowSeconds;
         if (timestamp < tier1End) return 1;
-        if (timestamp < tier2End) return 2;
-        return 3;
-    }
-
-    // Immediate unlock percentage for tier.
-    function _immediateBpsForTier(uint tier) internal view returns (uint) {
-        if (tier == 1) return 10000;
-        if (tier == 2) return 9000;
-        return 7000;
-    }
-
-    // Vesting duration for tier.
-    function _vestingDurationForTier(uint tier) internal view returns (uint) {
-        if (tier == 1) return 0;
-        if (tier == 2) return tier2VestingSeconds;
-        return tier3VestingSeconds;
-    }
-
-    // Vested amount currently claimable for a bid.
-    function _vestedClaimable(Bid storage bid) internal view returns (uint) {
-        if (bid.vestedTokens == 0) return 0;
-        if (bid.vestingDuration == 0) return 0;
-        if (block.timestamp < tgeTime) return 0;
-
-        uint elapsed = uint(block.timestamp) - tgeTime;
-        if (elapsed >= bid.vestingDuration) {
-            return bid.vestedTokens - bid.vestingClaimed;
-        }
-
-        uint vested = (bid.vestedTokens * elapsed) / bid.vestingDuration;
-        if (vested <= bid.vestingClaimed) return 0;
-        return vested - bid.vestingClaimed;
-    }
-
-    // Vested amount claimable for vaulted distributions.
-    function _vaultedVestedClaimable(Bid storage bid) internal view returns (uint) {
-        if (bid.vaultedVested == 0) return 0;
-        if (bid.vestingDuration == 0) return 0;
-        if (block.timestamp < tgeTime) return 0;
-
-        uint elapsed = uint(block.timestamp) - tgeTime;
-        if (elapsed >= bid.vestingDuration) {
-            return bid.vaultedVested - bid.vaultedVestingClaimed;
-        }
-
-        uint vested = (bid.vaultedVested * elapsed) / bid.vestingDuration;
-        if (vested <= bid.vaultedVestingClaimed) return 0;
-        return vested - bid.vaultedVestingClaimed;
+        return 2;
     }
 
     // Claim reserve required to honor claims after burn.
@@ -1177,17 +1132,11 @@ contract record TokenLaunchAuction is Ownable {
             }
             if (bid.distributionVaulted) {
                 required = required + (bid.vaultedImmediate);
-                if (bid.vaultedVested > bid.vaultedVestingClaimed) {
-                    required = required + (bid.vaultedVested - bid.vaultedVestingClaimed);
-                }
                 continue;
             }
 
             if (!bid.distributed) {
-                required = required + bid.immediateTokens;
-            }
-            if (bid.vestedTokens > bid.vestingClaimed) {
-                required = required + (bid.vestedTokens - bid.vestingClaimed);
+                required = required + bid.tokensCapped;
             }
         }
         return required;
