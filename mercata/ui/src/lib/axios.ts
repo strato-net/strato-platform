@@ -135,7 +135,16 @@ api.interceptors.response.use(
       if (isGuestSafeUrl(url)) {
         return Promise.reject(error);
       }
-      
+
+      // Debug: log which endpoint triggered session expiry (helps diagnose frequent 401s in prod)
+      const fullUrl = error.config?.baseURL ? `${error.config.baseURL}${url}` : url;
+      console.warn("[Session Expired] 401", {
+        method: error.config?.method?.toUpperCase(),
+        url: fullUrl,
+        response: error.response?.data,
+        ts: new Date().toISOString(),
+      });
+
       // For non-guest-safe URLs, show session expired message and redirect
       toast({
         title: "Session Expired",
