@@ -112,6 +112,9 @@ contract record PriceOracle is Ownable {
         }
         
         uint256 size = state.queueSize;
+        if (size == 0) {
+            size = 2; // default queue size if not initialized
+        }
         uint256 len = state.observations.length;
         if (len < size) {
             state.observations.push(Observation(prevTs, prevPrice));
