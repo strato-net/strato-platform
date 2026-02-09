@@ -100,6 +100,10 @@ contract record Pool is Ownable {
 
     bool public isStable = false;
 
+    bool public isPaused = false;
+
+    bool public isDisabled = false;
+
     // ============ MODIFIERS ============
 
     /// @notice Prevents reentrant calls to functions
@@ -118,6 +122,27 @@ contract record Pool is Ownable {
             || msg.sender == owner(), // admin override would be useful here - ariya
             "Caller is not PoolFactory");
         _;
+    }
+
+    modifier whenNotPaused() {
+        require(!isPaused, "Pool is paused");
+        _;
+    }
+
+    modifier whenNotDisabled() {
+        require(!isDisabled, "Pool is disabled");
+        _;
+    }
+
+    // ============ OWNER FUNCTIONS ============
+
+    function setPaused(bool _isPaused) external onlyOwner {
+        isPaused = _isPaused;
+    }
+
+    function setDisabled(bool _isDisabled) external onlyOwner {
+        isPaused = _isDisabled;
+        isDisabled = _isDisabled;
     }
 
     // ============ INTERNAL FUNCTIONS ============
@@ -259,7 +284,7 @@ contract record Pool is Ownable {
         uint256 tokenBAmount,
         uint256 maxTokenAAmount,
         uint256 deadline
-    ) external returns (uint256) {
+    ) external whenNotPaused returns (uint256) {
         require(tokenBAmount > 0 && maxTokenAAmount > 0, "Invalid inputs");
         require(block.timestamp <= deadline, "EXPIRED");
 
@@ -302,7 +327,7 @@ contract record Pool is Ownable {
         uint256 minTokenBAmount,
         uint256 minTokenAAmount,
         uint256 deadline
-    ) external returns (uint256, uint256) {
+    ) external whenNotDisabled returns (uint256, uint256) {
         require(lpTokenAmount > 0 && minTokenBAmount > 0 && minTokenAAmount > 0, "Invalid inputs");
         require(block.timestamp <= deadline, "EXPIRED");
         uint256 totalLiquidity = lpToken.totalSupply();
@@ -356,7 +381,7 @@ contract record Pool is Ownable {
         uint256 amountIn,
         uint256 minAmountOut,
         uint256 deadline
-    ) external nonReentrant returns (uint256 amountOut) {
+    ) external whenNotPaused nonReentrant returns (uint256 amountOut) {
         require(amountIn > 0 && minAmountOut > 0, "Invalid input");
         require(block.timestamp <= deadline, "EXPIRED");
 
@@ -468,7 +493,7 @@ contract record Pool is Ownable {
         bool isAToB,
         uint256 amountIn,
         uint256 deadline
-    ) external returns (uint256 liquidityMinted) {
+    ) external whenNotPaused returns (uint256 liquidityMinted) {
         require(amountIn > 0, "Invalid input");
         require(block.timestamp <= deadline, "EXPIRED");
         require(lpToken.totalSupply() > 0, "POOL_EMPTY");
