@@ -1,4 +1,6 @@
 packages:
+- libs/poseidon-hash
+
 - api/bloc/bloc2
 - api/bloc/bloc2api
 - api/bloc/bloc2client
@@ -70,6 +72,7 @@ packages:
 - tools/convoke
 - tools/debugger-tools
 - tools/process-monitor
+- tools/airlock
 
 - vault/api
 - vault/client

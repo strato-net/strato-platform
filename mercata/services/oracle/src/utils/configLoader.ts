@@ -22,7 +22,8 @@ export class ConfigLoader {
         Object.entries(rawSources).forEach(([name, config]) => {
             this.sources[name] = {
                 ...config,
-                apiKey: config.apiKeyEnvVar ? process.env[config.apiKeyEnvVar] || '' : ''
+                apiKey: config.apiKeyEnvVar ? process.env[config.apiKeyEnvVar] || '' : '',
+                accountId: config.accountIdEnvVar ? process.env[config.accountIdEnvVar] || '' : ''
             };
         });
     }

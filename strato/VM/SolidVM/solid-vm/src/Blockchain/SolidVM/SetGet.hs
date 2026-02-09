@@ -53,6 +53,7 @@ fromBasic = \case
   MS.BString s -> case decodeUtf8' s of
     Right t -> SString $ T.unpack t
     Left _ -> SString $ BC.unpack s
+  MS.BBytes bs -> SBytes bs
   MS.BDecimal v -> SDecimal $ read $ BC.unpack v
   MS.BBool b -> SBool b
   MS.BAddress a -> SAddress a False
@@ -70,7 +71,7 @@ toBasic = \case
   SContract n a -> Just $ MS.BContract n a
   SEnumVal k t num -> Just $ MS.BEnumVal k t num
   SUserDefined _ _ x -> toBasic x
-  SBytes bs -> Just $ MS.BString bs
+  SBytes bs -> Just $ MS.BBytes bs
   _ -> Nothing
 
 setVar :: MonadSM m => Variable -> Value -> m ()
@@ -118,7 +119,7 @@ setVal dst@(SReference (AddressPath addr path)) src = do
         SString s -> Just . MS.BString . UTF8.fromString $ s
         _ -> toBasic src
   case basicSrc of
-    Nothing -> typeError "non basic solidity type cannot be stored atomically" src
+    Nothing -> typeError "non basic solidity type cannot be stored atomically" $ show src
     Just b -> do
       markDiffForAction addr path b
       putSolidStorageKeyVal' addr path b
@@ -185,7 +186,7 @@ getInt p = do
     SInteger s -> return s
     SNULL -> return 0
     SReference{} -> pure 0
-    _ -> typeError "getInt" (p, v)
+    _ -> typeError "getInt" $ show (p, v)
 
 getRealNum :: MonadSM m => Variable -> m (Either Integer Decimal)
 getRealNum p = do
@@ -195,7 +196,7 @@ getRealNum p = do
     SDecimal s -> return $ Right s
     SNULL -> return $ Left 0
     SReference{} -> pure $ Left 0
-    _ -> typeError "getRealNum" (p, v)
+    _ -> typeError "getRealNum" $ show (p, v)
 
 getBool :: MonadSM m => Variable -> m Bool
 getBool p = do
@@ -205,7 +206,7 @@ getBool p = do
     SInteger i -> return $ i /= 0
     SNULL -> return False
     SReference{} -> pure False
-    _ -> typeError "getBool" (p, v)
+    _ -> typeError "getBool" $ show (p, v)
 
 deleteVar :: MonadSM m => Variable -> m ()
 deleteVar (Constant (SReference (AddressPath addr path))) = do

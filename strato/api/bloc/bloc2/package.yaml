@@ -15,6 +15,7 @@ library:
   ghc-options: -Wall -Werror -fsimpl-tick-factor=15000
   dependencies:
     - base16-bytestring
+    - bimap
     - bloc2api
     - blockapps-data
     - blockapps-datadefs
@@ -40,6 +41,7 @@ library:
     - lens
     - monad-alter
     - monad-logger
+    - ordered-containers
     - mtl
     - parsec
     - blockapps-secp256k1-haskell

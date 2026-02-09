@@ -177,6 +177,10 @@ applyDelta' [Field n] bv _ = do
 applyDelta' sp bv (ValueArraySentinel {}) = Right $ constructFromNothing' sp bv
 applyDelta' sp@[Index _] BDefault _ = Right $ constructFromNothing' sp BDefault
 applyDelta' sp@[Index _] _ _ = Right $ constructFromNothing' sp BDefault
+-- Handle case where BDefault created a SimpleValue but we now have nested fields
+applyDelta' (Field n : sp) bv (SimpleValue _) = do
+  n' <- first (UnicodeError n) $ decodeUtf8' n
+  Right . ValueStruct . M.singleton n' $ constructFromNothing' sp bv
 applyDelta' sp b s = Left $ TypeMismatch (StoragePath sp) b s
 
 constructFromNothing :: StoragePath -> BasicValue -> V.Value
@@ -220,6 +224,7 @@ fromBasic = \case
   BBool b -> SimpleValue $ ValueBool b
   BInteger n -> SimpleValue $! valueInt n
   BString bs -> SimpleValue $! valueBytes bs
+  BBytes bs -> SimpleValue $! V.ValueBytes Nothing bs
   BDecimal v -> SimpleValue $! ValueDecimal v
   BAddress a -> SimpleValue $! ValueAddress a
   BContract _ c -> ValueContract c

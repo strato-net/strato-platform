@@ -10,11 +10,13 @@ import LPTokenDropdown from "./LPTokenDropdown";
 interface PoolParticipationProps {
   poolTokens: any[];
   loading?: boolean;
+  guestMode?: boolean;
 }
 
 export default function MyPoolParticipationSection({
   poolTokens,
   loading = false,
+  guestMode = false,
 }: PoolParticipationProps) {
   const hasData = poolTokens.length > 0;
   const shouldShowLoading = loading && !hasData;
@@ -41,7 +43,7 @@ export default function MyPoolParticipationSection({
         return liquidityInfo.supplyAPY?.toFixed(2) || null;
       }
 
-      if (token._symbol === "SUSDST") return null;
+      if (token._symbol === "SUSDST" || token._symbol === "safetyUSDST") return null;
 
       if (
         token._symbol?.endsWith("-LP") ||
@@ -165,7 +167,9 @@ export default function MyPoolParticipationSection({
                       </div>
 
                       <div className="hidden md:flex text-center font-semibold text-foreground justify-center">
-                        {anyLoading ? (
+                        {guestMode ? (
+                          "N/A"
+                        ) : anyLoading ? (
                           <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-primary" />
                         ) : apy ? (
                           `${apy}%`

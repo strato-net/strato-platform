@@ -15,13 +15,15 @@ interface OpenJuniorNoteWidgetProps {
   onSuccess?: () => void;
   assetBadDebt?: Record<string, string>; // asset address -> bad debt amount in wei
   onBadDebtCovered?: () => void; // Callback to refresh bad debt data after covering
+  guestMode?: boolean;
 }
 
-const OpenJuniorNoteWidget: React.FC<OpenJuniorNoteWidgetProps> = ({ onSuccess, assetBadDebt = {}, onBadDebtCovered }) => {
+const OpenJuniorNoteWidget: React.FC<OpenJuniorNoteWidgetProps> = ({ onSuccess, assetBadDebt = {}, onBadDebtCovered, guestMode = false }) => {
   const [supportedAssets, setSupportedAssets] = useState<AssetConfig[]>([]);
   const [selectedAsset, setSelectedAsset] = useState<AssetConfig | null>(null);
   const [burnAmount, setBurnAmount] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingAssets, setLoadingAssets] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [isMaxEnabled, setIsMaxEnabled] = useState(false);
   const { toast } = useToast();
@@ -66,10 +68,10 @@ const OpenJuniorNoteWidget: React.FC<OpenJuniorNoteWidgetProps> = ({ onSuccess, 
   // Fetch supported assets on component mount
   useEffect(() => {
     const fetchAssets = async () => {
+      setLoadingAssets(true);
       try {
         const assets = await cdpService.getSupportedAssets();
         setSupportedAssets(assets);
-        // Don't auto-select the first asset anymore - let user choose from the list
         setSelectedAsset(null);
       } catch (error) {
         console.error("Failed to fetch supported assets:", error);
@@ -78,6 +80,8 @@ const OpenJuniorNoteWidget: React.FC<OpenJuniorNoteWidgetProps> = ({ onSuccess, 
           description: "Failed to load supported assets",
           variant: "destructive",
         });
+      } finally {
+        setLoadingAssets(false);
       }
     };
 
@@ -231,6 +235,7 @@ const OpenJuniorNoteWidget: React.FC<OpenJuniorNoteWidgetProps> = ({ onSuccess, 
   const usdstBalance = getUsdstBalance();
   const expectedCap = calculateExpectedCap();
 
+
   return (
     <Card>
       <CardHeader>
@@ -286,14 +291,19 @@ const OpenJuniorNoteWidget: React.FC<OpenJuniorNoteWidgetProps> = ({ onSuccess, 
               return (
                 <div
                   key={asset.asset}
-                  className={`p-3 border rounded-lg cursor-pointer transition-all hover:shadow-sm ${
-                    isSelected 
-                      ? 'border-blue-500 bg-blue-500/10 shadow-sm' 
-                      : hasRealBadDebt
-                        ? 'border-border hover:border-border/80 bg-card'
-                        : 'border-border/50 bg-muted/50 opacity-60'
-                  } ${!hasRealBadDebt ? 'cursor-not-allowed' : ''}`}
+                  className={`p-3 border rounded-lg transition-all ${
+                    guestMode 
+                      ? 'cursor-default border-border bg-card'
+                      : `cursor-pointer hover:shadow-sm ${
+                          isSelected 
+                            ? 'border-blue-500 bg-blue-500/10 shadow-sm' 
+                            : hasRealBadDebt
+                              ? 'border-border hover:border-border/80 bg-card'
+                              : 'border-border/50 bg-muted/50 opacity-60'
+                        } ${!hasRealBadDebt ? 'cursor-not-allowed' : ''}`
+                  }`}
                   onClick={() => {
+                    if (guestMode) return;
                     if (hasRealBadDebt) {
                       // Toggle selection: if already selected, deselect; otherwise select
                       if (isSelected) {
@@ -303,7 +313,7 @@ const OpenJuniorNoteWidget: React.FC<OpenJuniorNoteWidgetProps> = ({ onSuccess, 
                       }
                     }
                   }}
-                  title={!hasRealBadDebt ? "No bad debt available for this asset" : isSelected ? `Click to deselect ${asset.symbol}` : `Click to select ${asset.symbol}`}
+                  title={guestMode ? `${asset.symbol} - ${formatNumber(badDebtDecimal)} USDST bad debt` : !hasRealBadDebt ? "No bad debt available for this asset" : isSelected ? `Click to deselect ${asset.symbol}` : `Click to select ${asset.symbol}`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -354,7 +364,7 @@ const OpenJuniorNoteWidget: React.FC<OpenJuniorNoteWidgetProps> = ({ onSuccess, 
           </div>
           {supportedAssets.length === 0 && (
             <div className="text-center py-8 text-muted-foreground">
-              <div className="text-sm">No supported assets found</div>
+              <div className="text-sm">{loadingAssets ? "Loading assets..." : "No supported assets found"}</div>
             </div>
           )}
         </div>
@@ -375,34 +385,37 @@ const OpenJuniorNoteWidget: React.FC<OpenJuniorNoteWidgetProps> = ({ onSuccess, 
               placeholder="0.0"
               type="number"
               step="any"
+              disabled={guestMode}
             />
             <Button 
               variant={isMaxEnabled ? "default" : "outline"}
               size="sm" 
               className={`min-w-[50px] ${isMaxEnabled ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}`}
               onClick={handleMaxClick}
-                    disabled={calculateMaxBurnAmount() === "0"}
+              disabled={guestMode || calculateMaxBurnAmount() === "0"}
             >
               MAX
             </Button>
           </div>
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">
-              Balance: {usdstBalance && parseFloat(usdstBalance) > 0 
-                ? formatBalanceUtil(usdstBalance, undefined, 18, 1, 4) 
-                : "0"
-              } USDST
-            </p>
-            {selectedAsset && calculateMaxBurnAmount() !== "0" && (
-              <p className="text-xs text-green-600 font-medium">
-                Max Burneable: {formatNumber(parseFloat(calculateMaxBurnAmount()))} USDST
+          {!guestMode && (
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">
+                Balance: {usdstBalance && parseFloat(usdstBalance) > 0 
+                  ? formatBalanceUtil(usdstBalance, undefined, 18, 1, 4) 
+                  : "0"
+                } USDST
               </p>
-            )}
-          </div>
+              {selectedAsset && calculateMaxBurnAmount() !== "0" && (
+                <p className="text-xs text-green-600 font-medium">
+                  Max Burneable: {formatNumber(parseFloat(calculateMaxBurnAmount()))} USDST
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Expected Cap Preview */}
-        {expectedCap > 0 && (
+        {/* Expected Cap Preview - hide for guests */}
+        {!guestMode && expectedCap > 0 && (
           <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
             <div className="text-sm font-medium text-blue-500 mb-1">Expected Note Cap</div>
             <div className="text-lg font-bold text-blue-500">
@@ -414,8 +427,8 @@ const OpenJuniorNoteWidget: React.FC<OpenJuniorNoteWidgetProps> = ({ onSuccess, 
           </div>
         )}
 
-        {/* Transaction Fee */}
-        {parseFloat(burnAmount || "0") > 0 && (
+        {/* Transaction Fee - hide for guests */}
+        {!guestMode && parseFloat(burnAmount || "0") > 0 && (
           <div className="text-center">
             <p className="text-xs text-muted-foreground">
               Transaction Fee: 0.01 USDST
@@ -423,25 +436,37 @@ const OpenJuniorNoteWidget: React.FC<OpenJuniorNoteWidgetProps> = ({ onSuccess, 
           </div>
         )}
 
-        <Button 
-          className="w-full" 
-          onClick={handleOpenJuniorNote}
-          disabled={
-            loading || 
-            !selectedAsset || 
-            parseFloat(burnAmount || "0") <= 0 || 
-            isAmountAboveMax()
-          }
-        >
-          {(() => {
-            if (loading) return "Processing...";
-            if (isAmountAboveMax()) return "Amount exceeds limit";
-            if (!selectedAsset) return "Select asset with bad debt";
-                    if (calculateMaxBurnAmount() === "0") return "Selected asset has no bad debt";
-            if (parseFloat(burnAmount || "0") <= 0) return "Enter amount to burn";
-            return "Cover Bad Debt";
-          })()}
-        </Button>
+        {guestMode ? (
+          <Button 
+            className="w-full" 
+            onClick={() => {
+              const theme = localStorage.getItem('theme') || 'light';
+              window.location.href = `/login?theme=${theme}`;
+            }}
+          >
+            Sign In to Cover Bad Debt
+          </Button>
+        ) : (
+          <Button 
+            className="w-full" 
+            onClick={handleOpenJuniorNote}
+            disabled={
+              loading || 
+              !selectedAsset || 
+              parseFloat(burnAmount || "0") <= 0 || 
+              isAmountAboveMax()
+            }
+          >
+            {(() => {
+              if (loading) return "Processing...";
+              if (isAmountAboveMax()) return "Amount exceeds limit";
+              if (!selectedAsset) return "Select asset with bad debt";
+              if (calculateMaxBurnAmount() === "0") return "Selected asset has no bad debt";
+              if (parseFloat(burnAmount || "0") <= 0) return "Enter amount to burn";
+              return "Cover Bad Debt";
+            })()}
+          </Button>
+        )}
       </CardContent>
     </Card>
   );

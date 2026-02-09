@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { cdpService, Vault } from '@/services/cdpService';
+import { Vault } from '@/services/cdpService';
 import { useUser } from '@/context/UserContext';
 import { api } from '@/lib/axios';
 

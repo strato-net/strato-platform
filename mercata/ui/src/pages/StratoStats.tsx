@@ -8,6 +8,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/lib/axios";
 import { formatUnits } from '@/utils/numberUtils';
+import { useUser } from '@/context/UserContext';
+import GuestSignInBanner from '@/components/ui/GuestSignInBanner';
 
 interface TokenWithStats {
   address: string;
@@ -122,6 +124,7 @@ const createEmptyRevenuePeriod = (): RevenuePeriod => ({
 });
 
 const StratoStats = () => {
+  const { isLoggedIn } = useUser();
   const [tokens, setTokens] = useState<TokenWithStats[]>([]);
   const [totalMarketCap, setTotalMarketCap] = useState<string>('0');
   const [loading, setLoading] = useState(true);
@@ -326,6 +329,9 @@ const StratoStats = () => {
         <DashboardHeader title="STRATO Stats" />
         <main className="p-4 md:p-6">
           <div className="max-w-7xl mx-auto">
+            {!isLoggedIn && (
+              <GuestSignInBanner message="Sign in to view detailed statistics and analytics" />
+            )}
             <Tabs defaultValue="tokens" className="w-full">
               <TabsList className="grid w-full grid-cols-3 mb-6 h-auto">
                 <TabsTrigger value="tokens" className="text-xs md:text-sm py-2 px-1 md:px-3">

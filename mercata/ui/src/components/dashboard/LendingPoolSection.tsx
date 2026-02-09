@@ -18,7 +18,7 @@ import { RewardsWidget } from "@/components/rewards/RewardsWidget";
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 
 const LendingPoolSection = () => {
-  const { userAddress } = useUser();
+  const { isLoggedIn } = useUser();
   const { activeTokens: tokens, loading, fetchTokens } = useUserTokens();
   const { fetchUsdstBalance } = useTokenContext();
   const {
@@ -37,9 +37,13 @@ const LendingPoolSection = () => {
   const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
   const refreshLendingData = (signal?: AbortSignal) => {
-    fetchTokens(signal);
+    // Pool stats are public - always fetch
     refreshLiquidity(signal);
-    fetchUsdstBalance();
+    // User-specific data - only fetch when logged in
+    if (isLoggedIn) {
+      fetchTokens(signal);
+      fetchUsdstBalance();
+    }
   };
 
   const getMaxWithdrawableAmount = (): bigint => {
@@ -165,13 +169,14 @@ const LendingPoolSection = () => {
                         value={depositAmount}
                         onChange={(e) => setDepositAmount(e.target.value)}
                         className={`pl-16 ${!isDepositAmountValid() ? 'text-red-600' : ''}`}
+                        disabled={!isLoggedIn}
                       />
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-medium">USDST</span>
                     </div>
                     <Button
                       onClick={() => handleLiquidityAction("deposit")}
                       className="bg-strato-blue hover:bg-strato-blue/90 w-full sm:w-28 hidden sm:flex sm:items-center sm:justify-center"
-                      disabled={loading || isProcessing || !isDepositAmountValid()}
+                      disabled={loading || isProcessing || !isDepositAmountValid() || !isLoggedIn}
                     >
                       {isProcessing ? (
                         "Processing..."
@@ -286,7 +291,7 @@ const LendingPoolSection = () => {
                   <Button
                     onClick={() => handleLiquidityAction("deposit")}
                     className="bg-strato-blue hover:bg-strato-blue/90 w-full mt-4 sm:hidden"
-                    disabled={loading || isProcessing || !isDepositAmountValid()}
+                    disabled={loading || isProcessing || !isDepositAmountValid() || !isLoggedIn}
                   >
                     {isProcessing ? (
                       "Processing..."
@@ -309,6 +314,7 @@ const LendingPoolSection = () => {
                         value={withdrawAmount}
                         onChange={(e) => setWithdrawAmount(e.target.value)}
                         className={`pl-16 ${!isWithdrawAmountValid() ? 'text-red-600' : ''}`}
+                        disabled={!isLoggedIn}
                       />
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-medium">USDST</span>
                     </div>
@@ -323,7 +329,8 @@ const LendingPoolSection = () => {
                               loadingLiquidity ||
                               isProcessing ||
                               !isWithdrawAmountValid() ||
-                              liquidityInfo?.isPaused
+                              liquidityInfo?.isPaused ||
+                              !isLoggedIn
                             }
                           >
                             {isProcessing ? (
@@ -380,7 +387,7 @@ const LendingPoolSection = () => {
                     ) : (
                       formatBalance(getMaxWithdrawableAmount(), undefined, 18, 2)
                     )}{" "}
-                    USDST ({liquidityInfo?.withdrawable?.userBalance ? formatBalance(liquidityInfo?.withdrawable?.userBalance || 0n,"mUSDST", 18) : "0.00"})
+                    USDST ({liquidityInfo?.withdrawable?.userBalance ? formatBalance(liquidityInfo?.withdrawable?.userBalance || 0n, liquidityInfo?.withdrawable?._name || "lendUSDST", 18) : "0.00"})
                   </div>
                   {/* Fee Display */}
                   <div className="text-sm text-muted-foreground mt-1">
@@ -448,7 +455,8 @@ const LendingPoolSection = () => {
                             loadingLiquidity ||
                             isProcessing ||
                             !isWithdrawAmountValid() ||
-                            liquidityInfo?.isPaused
+                            liquidityInfo?.isPaused ||
+                            !isLoggedIn
                           }
                         >
                           {isProcessing ? (
@@ -581,27 +589,12 @@ const LendingPoolSection = () => {
                   <span className="text-muted-foreground text-sm sm:text-base">Borrow APY</span>
                   <span className="font-medium text-sm sm:text-base">{liquidityInfo?.borrowAPY ? `${liquidityInfo.borrowAPY}%` : "N/A"}</span>
                 </div>
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-muted-foreground text-sm sm:text-base">Your mUSDST (Total)</span>
-                  <span className="font-medium text-sm sm:text-base sm:text-right">
-                    {loadingLiquidity ? (
-                      <span className="text-muted-foreground animate-pulse">
-                        Loading...
-                      </span>
-                    ) : liquidityInfo?.withdrawable?.userBalance ? (
-                      formatBalance(liquidityInfo.withdrawable.userBalance || 0n, undefined, 18, 2, 2)
-                    ) : (
-                      "0.00"
-                    )}
-                  </span>
-                </div>
-                {rewardsEnabled && (
+                {/* User-specific data - only show when logged in */}
+                {isLoggedIn && (
                   <>
-                    {/* Note: userBalanceStaked doesn't exist in TokenInfo interface */}
-                    {/* If staked balance tracking is needed, it should be added to the interface */}
-                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start pl-4">
-                      <span className="text-muted-foreground text-xs sm:text-sm">• Unstaked</span>
-                      <span className="font-medium text-xs sm:text-sm sm:text-right">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
+                    <span className="text-muted-foreground text-sm sm:text-base">Your {liquidityInfo?.withdrawable?._name || "lendUSDST"} (Total)</span>
+                      <span className="font-medium text-sm sm:text-base sm:text-right">
                         {loadingLiquidity ? (
                           <span className="text-muted-foreground animate-pulse">
                             Loading...
@@ -613,11 +606,27 @@ const LendingPoolSection = () => {
                         )}
                       </span>
                     </div>
+                    {rewardsEnabled && (
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start pl-4">
+                        <span className="text-muted-foreground text-xs sm:text-sm">• Unstaked</span>
+                        <span className="font-medium text-xs sm:text-sm sm:text-right">
+                          {loadingLiquidity ? (
+                            <span className="text-muted-foreground animate-pulse">
+                              Loading...
+                            </span>
+                          ) : liquidityInfo?.withdrawable?.userBalance ? (
+                            formatBalance(liquidityInfo.withdrawable.userBalance || 0n, undefined, 18, 2, 2)
+                          ) : (
+                            "0.00"
+                          )}
+                        </span>
+                      </div>
+                    )}
                   </>
                 )}
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
                   <span className="text-muted-foreground text-sm sm:text-base">Conversion Rate</span>
-                  <span className="font-medium text-sm sm:text-base sm:text-right">{liquidityInfo?.exchangeRate ? "1 mUSDST = " + formatUnits(liquidityInfo?.exchangeRate || 0, 18) + " USDST" : "N/A"}</span>
+                  <span className="font-medium text-sm sm:text-base sm:text-right">{liquidityInfo?.exchangeRate ? "1 " + (liquidityInfo?.withdrawable?._name || "lendUSDST") + " = " + formatUnits(liquidityInfo?.exchangeRate || 0, 18) + " USDST" : "N/A"}</span>
                 </div>
               </div>
             </div>
