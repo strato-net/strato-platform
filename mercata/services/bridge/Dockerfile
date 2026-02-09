@@ -8,6 +8,9 @@ RUN apk add --no-cache python3 make g++
 
 WORKDIR /build
 
+# Pre-install node headers to avoid node-gyp cache issues
+RUN npx node-gyp install
+
 COPY package*.json ./
 
 RUN npm ci
@@ -18,6 +21,9 @@ COPY src/ ./src/
 
 RUN npm run build
 
+# Prune dev dependencies to get production-only node_modules
+RUN npm prune --omit=dev
+
 
 FROM base
 
@@ -25,11 +31,8 @@ WORKDIR /app
 
 COPY package*.json ./
 
-# Install build dependencies, run npm ci, then remove them in one layer.
-RUN apk add --no-cache python3 make g++ \
-    && npm ci --omit=dev \
-    && apk del python3 make g++ \
-    && npm cache clean --force
+# Copy pre-built node_modules from builder (already pruned to production deps)
+COPY --from=builder /build/node_modules ./node_modules
 
 COPY --from=builder /build/dist ./dist
 
