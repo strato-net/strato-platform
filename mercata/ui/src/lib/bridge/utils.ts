@@ -81,7 +81,7 @@ export function normalizeError(error: any): BridgeError {
   return {
     code: "UNKNOWN_ERROR",
     message: error?.message || "Unknown error occurred",
-    userMessage: "An unexpected error occurred. Please try again.",
+    userMessage: error?.message || "An unexpected error occurred. Please try again.",
   };
 }
 
