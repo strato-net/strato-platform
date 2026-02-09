@@ -63,10 +63,16 @@ const ActivityFeed = () => {
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3 mb-6">
-              <TabsTrigger value="my-activity">My Activity</TabsTrigger>
-              <TabsTrigger value="all-activity">All Activity</TabsTrigger>
-              <TabsTrigger value="blockchain-events">Blockchain Events</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-3 mb-6 p-0">
+              <TabsTrigger value="my-activity" className="text-[11px] sm:text-sm px-1 sm:px-3 min-w-0 truncate">
+                My Activity
+              </TabsTrigger>
+              <TabsTrigger value="all-activity" className="text-[11px] sm:text-sm px-1 sm:px-3 min-w-0 truncate">
+                All Activity
+              </TabsTrigger>
+              <TabsTrigger value="blockchain-events" className="text-[11px] sm:text-sm px-1 sm:px-3 min-w-0 truncate">
+                Blockchain Events
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="my-activity" className="mt-0">

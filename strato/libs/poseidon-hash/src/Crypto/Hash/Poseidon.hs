@@ -42,19 +42,19 @@ import qualified Data.Vector as V
 
 -- | Poseidon hash function
 -- 
--- Takes a list of 1-16 field elements and returns a single field element.
+-- Takes a list of 1-8 field elements and returns a single field element.
 -- This is the standard Poseidon hash with a single output.
 poseidon :: [F] -> F
 poseidon inputs = V.head $ poseidonN inputs 1
 
 -- | Poseidon hash with multiple outputs
 --
--- Takes a list of 1-16 field elements and returns the specified number
+-- Takes a list of 1-8 field elements and returns the specified number
 -- of output field elements.
 poseidonN :: [F] -> Int -> Vector F
 poseidonN inputs nOut
   | null inputs = error "Poseidon: at least one input required"
-  | length inputs > 16 = error "Poseidon: at most 16 inputs supported"
+  | length inputs > 8 = error "Poseidon: at most 8 inputs supported"
   | otherwise = V.take nOut finalState
   where
     t = length inputs + 1  -- state size
