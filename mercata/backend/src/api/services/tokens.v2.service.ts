@@ -1,6 +1,7 @@
 import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
 import { getCompletePriceMap } from "../helpers/oracle.helper";
+import { getVaultShareTokenAddress } from "./vault.service";
 import { Token, EarningAsset, BalanceSnapshot } from "@mercata/shared-types";
 import { buildTokenSelectFields } from "../../config/tokensConstants";
 import { getHistory, HistoryParams, HistorySnapshot, MappingHistoryElement, StorageHistoryElement } from "../helpers/history.helper";
@@ -46,7 +47,7 @@ export const getEarningAssets = async (
   accessToken: string,
   userAddress: string
 ): Promise<EarningAsset[]> => {
-  const [tokens, collaterals, cdps, rawPrices] = await Promise.all([
+  const [tokens, collaterals, cdps, rawPrices, vaultShareToken] = await Promise.all([
     cirrus.get(accessToken, "/" + Token, {
       params: {
         "balances.key": `eq.${userAddress}`,
@@ -73,6 +74,7 @@ export const getEarningAssets = async (
       },
     }),
     getCompletePriceMap(accessToken),
+    getVaultShareTokenAddress(accessToken),
   ]);
 
   const collateralMap = new Map<string, bigint>();
@@ -105,6 +107,7 @@ export const getEarningAssets = async (
         t._symbol?.endsWith("-LP") ||
         t._symbol === "SUSDST" || t._symbol === "safetyUSDST" ||
         t._symbol === "MUSDST" || t._symbol === "lendUSDST" ||
+        (vaultShareToken && t.address === vaultShareToken) ||
         t.description === "Liquidity Provider Token",
       value,
     };
@@ -125,16 +128,11 @@ export const getPublicEarningAssets = async (
   };
 
   // Fetch only tokens and prices (skip user-specific collateral data)
-  const results = await Promise.all([
+  const [tokens, rawPrices, vaultShareToken] = await Promise.all([
     cirrus.get(accessToken, "/" + Token, { params: tokenParams }),
     getCompletePriceMap(accessToken),
+    getVaultShareTokenAddress(accessToken),
   ]);
-
-  const tokens = results[0];
-  const rawPrices = results[1];
-
-  // No collateral map for guests - all balances are "0"
-  const collateralMap = new Map<string, bigint>();
 
   return (tokens.data || []).map((t: any) => {
     const balance = "0";
@@ -153,6 +151,7 @@ export const getPublicEarningAssets = async (
         t._symbol?.endsWith("-LP") ||
         t._symbol === "SUSDST" || t._symbol === "safetyUSDST" ||
         t._symbol === "MUSDST" || t._symbol === "lendUSDST" ||
+        (vaultShareToken && t.address === vaultShareToken) ||
         t.description === "Liquidity Provider Token",
       value,
     };
