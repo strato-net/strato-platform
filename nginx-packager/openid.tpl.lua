@@ -59,6 +59,9 @@ else
   -- Else - use the openidc authenticate flow
 
   local authenticate_res, authenticate_err
+  -- Allow anonymous access only for safe/read-only methods on endpoints that explicitly allow it
+  local method = ngx.req.get_method()
+  local allow_anonymous_request = ngx.var.allow_optional_anon_access == "true" and (method == "GET" or method == "HEAD" or method == "OPTIONS")
   -- if requested_uri is the UI page (like SMD), else the API call
   if ngx.var.is_ui == "true" then
     -- authenticate with browser UI flow (Authorization Code grant, token exchange) - authenticate(opts) with no additional params will 302-Redirect if unauthorized
@@ -79,8 +82,7 @@ else
       end
       -- Let client know in the response that client is not (or no longer) authenticated (so that the UI could notify user that he's been signed out)
       ngx.header['WWW-Authenticate'] = string.format('realm="%s"', node_host_with_protocol)
-      -- Respond with 401 Unauthorized if the requested endpoint does not allow anonymous access
-      if (ngx.var.allow_optional_anon_access ~= "true") then
+      if not allow_anonymous_request then
         -- respond with 401 if not authorized (if API called by UI client (e.g. SMD) - client should refresh page)
         ngx.exit(ngx.HTTP_UNAUTHORIZED)
       end
@@ -90,8 +92,8 @@ else
   if authenticate_res ~= nil and authenticate_res.access_token then
     user_access_token = authenticate_res.access_token
   else
-    -- not expected to get here if not allow_optional_anon_access
-    if ngx.var.allow_optional_anon_access ~= "true" then
+    -- not expected to get here if anonymous access is not allowed for this request
+    if not allow_anonymous_request then
       ngx.status = 500
       ngx.log(ngx.ERR, 'Unexpected error: not expected to be here if the endpoint does not allow anonymous access')
       ngx.say('Unexpected server error occurred during authentication (#1010)')
