@@ -80,6 +80,26 @@ else
       if (authenticate_err ~= nil) then
         ngx.log(ngx.DEBUG, 'User authentication error: ', authenticate_err)
       end
+
+      -- Handle OIDC callback state mismatch (multi-tab race condition):
+      -- When multiple tabs initiate auth flows, each overwrites the OIDC state in the shared
+      -- session cookie. The tab whose callback arrives with the old state gets this error.
+      -- Recovery: destroy the stale session and redirect to start a fresh auth flow.
+      -- Since Keycloak already has an active SSO session, the user won't need to re-enter credentials.
+      local args = ngx.req.get_uri_args()
+      if ngx.var.uri == authenticate_opts.redirect_uri
+          and args.code
+          and authenticate_err
+          and string.find(authenticate_err, "does not match state restored from session", 1, true)
+      then
+        ngx.log(ngx.WARN, "OIDC state mismatch on callback (multi-tab race condition), restarting auth flow: ", authenticate_err)
+        local session = require("resty.session").open()
+        if session then
+          session:destroy()
+        end
+        return ngx.redirect("/")
+      end
+
       -- Let client know in the response that client is not (or no longer) authenticated (so that the UI could notify user that he's been signed out)
       ngx.header['WWW-Authenticate'] = string.format('realm="%s"', node_host_with_protocol)
       if not allow_anonymous_request then
