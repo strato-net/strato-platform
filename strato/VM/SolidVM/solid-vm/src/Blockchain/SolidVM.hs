@@ -593,6 +593,11 @@ argsToVals args = do
       SVariadic vs : rest -> reverse rest ++ vs
       _ -> vals
 
+-- | Like argsToVals but returns Variables for memory arrays/structs (pass by reference)
+-- This preserves the IORef wrapper so modifications propagate back to caller
+argsToVars :: MonadSM m => CC.ArgList -> m [Variable]
+argsToVars args = traverse expToVar args
+
 runModifiersAndStatements :: MonadSM m => [[CC.Statement]] -> [CC.Statement] -> m (Maybe Value)
 runModifiersAndStatements []   stmts = runStatementBlock stmts
 runModifiersAndStatements mods stmts = withLocalVars $ go mods
@@ -1464,8 +1469,9 @@ expToVar' (CC.FunctionCall _ (CC.Variable _ name) args)
 
 expToVar' (CC.FunctionCall _ e args) = do
       argVals <- argsToVals args
+      argVars <- argsToVars args  -- Get Variables for pass-by-reference
       case e of -- FunctionCall Special Case when calling a function via Member Access
-        (CC.MemberAccess _ (CC.Variable _ "Util") _) -> regularFunctionCall e argVals Nothing --Because of the hardcoded Util functions
+        (CC.MemberAccess _ (CC.Variable _ "Util") _) -> regularFunctionCall e argVals argVars Nothing --Because of the hardcoded Util functions
         (CC.MemberAccess ctx' expr name) -> do
           var1 <- expToVar expr
           val1 <- getVar var1
@@ -1523,11 +1529,11 @@ expToVar' (CC.FunctionCall _ e args) = do
               case res of
                 Just a -> return $ Constant a
                 Nothing -> return $ Constant SNULL
-            (SAddress addr _, itemName) -> regularFunctionCall e argVals $ Just (return $ Constant $ SContractItem addr itemName)
+            (SAddress addr _, itemName) -> regularFunctionCall e argVals argVars $ Just (return $ Constant $ SContractItem addr itemName)
             (SDecimal v, "truncate") -> case argVals of
               (SInteger n:_) -> return . Constant $ SDecimal $ roundTo' truncate (fromInteger n) v
               _ -> invalidArguments ("truncate() called with non-integer value as argument") args
-            (SContractDef _, _) -> regularFunctionCall e argVals Nothing
+            (SContractDef _, _) -> regularFunctionCall e argVals argVars Nothing
             _ -> do
               ctrct <- getCurrentContract
               contracts <- CC._contracts . snd <$> getCurrentCodeCollection
@@ -1535,14 +1541,14 @@ expToVar' (CC.FunctionCall _ e args) = do
                     (flip M.lookup contracts . CC._usingContract)
                     (concat . M.elems $ ctrct ^. CC.usings)
               case mapMaybe (\y -> y <$ M.lookup name (y ^. CC.functions)) usingContracts of
-                [] -> regularFunctionCall e argVals Nothing
+                [] -> regularFunctionCall e argVals argVars Nothing
                 c:_ -> regularFunctionCall
                   (CC.MemberAccess ctx' (CC.Variable ctx' $ c ^. CC.contractName) name)
-                  (val1 : argVals) Nothing
-        _ -> regularFunctionCall e argVals Nothing
+                  (val1 : argVals) (var1 : argVars) Nothing
+        _ -> regularFunctionCall e argVals argVars Nothing
       where
-        regularFunctionCall :: MonadSM m => CC.Expression -> ValList -> Maybe (m Variable) -> m Variable
-        regularFunctionCall expr argVals mSCI = do
+        regularFunctionCall :: MonadSM m => CC.Expression -> ValList -> [Variable] -> Maybe (m Variable) -> m Variable
+        regularFunctionCall expr argVals argVars mSCI = do
           var <- case mSCI of
             Just sci -> sci
             Nothing -> expToVar' expr
@@ -1569,22 +1575,22 @@ expToVar' (CC.FunctionCall _ e args) = do
               address <- getCurrentAddress
               codeAddr <- getCurrentCodeAddress
               (hsh, cc) <- getCurrentCodeCollection
-              -- when (True) (internalError "IT'S MORBIN TIME" matchingFuncOverload)
+              -- Use runTheCallWithVars for internal calls to enable pass-by-reference for memory arrays/structs
               res <- case M.lookup funcName $ contract' ^. CC.functions of
                 Just func -> if (CC._funcIsFree func)
                   then do
                     validateFunctionArguments func argVals >>= \case
-                      Just (mo, argVals') -> runTheCall address codeAddr contract' funcName hsh cc mo argVals' ro True
-                      Nothing -> runTheCall address codeAddr contract' funcName hsh cc func argVals ro True
+                      Just (mo, argVals') -> runTheCallWithVars address codeAddr contract' funcName hsh cc mo argVals' argVars ro True
+                      Nothing -> runTheCallWithVars address codeAddr contract' funcName hsh cc func argVals argVars ro True
                   else do
                     validateFunctionArguments func argVals >>= \case
-                      Just (mo, argVals') -> runTheCall address codeAddr contract' funcName hsh cc mo argVals' ro False
+                      Just (mo, argVals') -> runTheCallWithVars address codeAddr contract' funcName hsh cc mo argVals' argVars ro False
                       Nothing -> case M.lookup funcName $ cc ^. CC.flFuncs of
                         Just ff -> do
                           validateFunctionArguments ff argVals >>= \case
-                            Just (mo, argVals') -> runTheCall address codeAddr contract' funcName hsh cc mo argVals' ro True
-                            Nothing -> runTheCall address codeAddr contract' funcName hsh cc func argVals ro False
-                        Nothing -> runTheCall address codeAddr contract' funcName hsh cc func argVals ro False
+                            Just (mo, argVals') -> runTheCallWithVars address codeAddr contract' funcName hsh cc mo argVals' argVars ro True
+                            Nothing -> runTheCallWithVars address codeAddr contract' funcName hsh cc func argVals argVars ro False
+                        Nothing -> runTheCallWithVars address codeAddr contract' funcName hsh cc func argVals argVars ro False
                 Nothing -> unknownFunction "regularFunctionCall/SFunction" funcName
               return . Constant . fromMaybe SNULL $ res
             Constant (SStructDef structName) -> do
@@ -2509,7 +2515,27 @@ runTheCall ::
   Bool ->
   Bool ->
   m (Maybe Value)
-runTheCall address' codeAddr contract' funcName hsh cc theFunction argVals' ro ff = do
+runTheCall addr cAddr cont fName h coll func vals r f = 
+  runTheCallWithVars addr cAddr cont fName h coll func vals [] r f
+
+-- | Like runTheCall but accepts optional Variables for pass-by-reference semantics.
+-- For memory arrays/structs, if a Variable is provided, it's used directly instead
+-- of creating a new IORef wrapper. This allows modifications to propagate to caller.
+runTheCallWithVars ::
+  MonadSM m =>
+  Address ->
+  Address ->
+  CC.Contract ->
+  SolidString ->
+  Keccak256 ->
+  CC.CodeCollection ->
+  CC.Func ->
+  ValList ->
+  [Variable] ->  -- Variables for pass-by-reference (may be shorter than ValList)
+  Bool ->
+  Bool ->
+  m (Maybe Value)
+runTheCallWithVars address' codeAddr contract' funcName hsh cc theFunction argVals' argVars ro ff = do
   let !returnNamesAndTypes = [(n, t) | (Just n, CC.IndexedType _ t) <- CC._funcVals theFunction]
       !theModifierNames = map fst $ (CC._funcModifiers theFunction)
   !returns <- traverse (\(n, t) -> (n,) <$> createDefaultValue cc contract' t) returnNamesAndTypes
@@ -2540,9 +2566,19 @@ runTheCall address' codeAddr contract' funcName hsh cc theFunction argVals' ro f
                  in (n,(t,v')) : go nts vs'
            in fmap snd <$> go argMeta argVals
   let locals = args ++ returns
+  -- Zip args with provided Variables (padded with Nothing for missing entries)
+  let argVarsPadded = map Just argVars ++ repeat Nothing
   localVars1 <-
-    forM locals $ \(n, v) -> do
-      newVar <- liftIO $ fmap Variable $ newIORef v
+    forM (zip locals argVarsPadded) $ \((n, v), mVar) -> do
+      newVar <- case mVar of
+        -- For memory arrays/structs, use provided Variable (pass by reference)
+        Just var -> case v of
+          SArray _ -> pure var
+          SStruct _ _ -> pure var
+          -- For other types, still create new IORef (pass by value)
+          _ -> liftIO $ fmap Variable $ newIORef v
+        -- No Variable provided, create new IORef
+        Nothing -> liftIO $ fmap Variable $ newIORef v
       return (n, newVar)
 
   val' <- withCallInfo address' codeAddr contract' funcName hsh cc (M.fromList localVars1) ro ff $ do -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
