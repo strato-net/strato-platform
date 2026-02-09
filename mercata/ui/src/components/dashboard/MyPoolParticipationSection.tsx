@@ -43,7 +43,7 @@ export default function MyPoolParticipationSection({
         return liquidityInfo.supplyAPY?.toFixed(2) || null;
       }
 
-      if (token._symbol === "SUSDST" || token._symbol === "SAFETYUSDST") return null;
+      if (token._symbol === "SUSDST" || token._symbol === "safetyUSDST") return null;
 
       if (
         token._symbol?.endsWith("-LP") ||

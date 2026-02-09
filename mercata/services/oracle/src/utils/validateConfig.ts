@@ -108,8 +108,8 @@ export async function validateConfig(): Promise<boolean> {
             return;
         }
         
-        // Skip URL validation for constant and RPC-based sources
-        if (sourceName !== 'constant' && sourceName !== 'ChainlinkPriceFeedRPC' && !source.url) {
+        // Skip URL validation for constant source
+        if (sourceName !== 'constant' && !source.url) {
             errors.push(`${sourcePrefix} Missing url`);
         }
 

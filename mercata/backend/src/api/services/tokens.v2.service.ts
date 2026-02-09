@@ -103,8 +103,8 @@ export const getEarningAssets = async (
       totalBalance: totalBalance.toString(),
       isPoolToken:
         t._symbol?.endsWith("-LP") ||
-        t._symbol === "SUSDST" ||
-        t._symbol === "MUSDST" ||
+        t._symbol === "SUSDST" || t._symbol === "safetyUSDST" ||
+        t._symbol === "MUSDST" || t._symbol === "lendUSDST" ||
         t.description === "Liquidity Provider Token",
       value,
     };
@@ -151,8 +151,8 @@ export const getPublicEarningAssets = async (
       totalBalance: totalBalance.toString(),
       isPoolToken:
         t._symbol?.endsWith("-LP") ||
-        t._symbol === "SUSDST" || t._symbol === "SAFETYUSDST" ||
-        t._symbol === "MUSDST" || t._symbol === "LENDUSDST" ||
+        t._symbol === "SUSDST" || t._symbol === "safetyUSDST" ||
+        t._symbol === "MUSDST" || t._symbol === "lendUSDST" ||
         t.description === "Liquidity Provider Token",
       value,
     };
@@ -394,7 +394,7 @@ export const getNetBalanceHistory = async (
   const storageFilters = [
     'data->>lpToken.neq.""',
     'data->>_symbol.like.*-LP',
-    'data->>_symbol.in.(MUSDST,SUSDST,SAFETYUSDST,LENDUSDST)',
+    'data->>_symbol.in.(MUSDST,SUSDST,safetyUSDST,lendUSDST)',
     'data->>sToken.gt.0',
     'and(data->>mToken.gt.0,data->>borrowIndex.gt.0)'
   ]

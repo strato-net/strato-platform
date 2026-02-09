@@ -5,8 +5,7 @@ Fetches asset prices from multiple sources and pushes them to the STRATO blockch
 ## Features
 
 - **Median Aggregation**: Robust price calculation using median of all valid sources
-- **Minimum Source Requirement**: Requires at least `MIN_VALID_SOURCES` valid sources to submit a price (see `src/utils/constants.ts`)
-- **On-chain Price Feeds (Chainlink via RPC)**: Read Ethereum mainnet Chainlink feed contract state via `RPC_URL`
+- **Minimum Source Requirement**: Requires at least 3 valid sources to submit a price
 - **Batch Updates**: Multiple assets updated in single transaction
 - **Configurable Interval**: Update schedule via `CRON_SCHEDULE` cron pattern (e.g., '0 */15 * * * *' for :00, :15, :30, :45 or '30 7,22,37,52 * * * *' for :07:30, :22:30, :37:30, :52:30)
 - **Parallel Processing**: All feeds run simultaneously
@@ -41,9 +40,6 @@ LIVECOINWATCH_API_KEY=your-livecoinwatch-api-key
 TWELVEDATA_API_KEY=your-twelvedata-key
 OANDA_API_KEY=your-oanda-api-key
 OANDA_ACCOUNT_ID=your-oanda-account-id  # Fetch via: curl -H "Authorization: Bearer API_KEY" https://api-fxpractice.oanda.com/v3/accounts
-
-# RPC Configuration
-RPC_URL=your_rpc_url_with_api_key_here
 
 # Oracle Configuration
 CRON_SCHEDULE="0 */15 * * * *"
