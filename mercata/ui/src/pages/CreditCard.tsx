@@ -19,7 +19,9 @@ import { safeParseUnits } from "@/utils/numberUtils";
 import {
   CARD_PROVIDERS,
   getProviderById,
-  getProviderByChainAndToken,
+  getNetworksForProvider,
+  getTokensForProviderNetwork,
+  findProviderNetworkToken,
 } from "@/lib/creditCard/providers";
 
 const DECIMALS = 18;
@@ -28,7 +30,7 @@ const MAX_APPROVE = "11579208923731619542357098500868790785326998466564056403945
 export default function CreditCardPage() {
   const { isLoggedIn } = useUser();
   const { toast } = useToast();
-  const { loadNetworksAndTokens, availableNetworks } = useBridgeContext();
+  const { loadNetworksAndTokens } = useBridgeContext();
 
   const [config, setConfig] = useState<CreditCardConfig | null>(null);
   const [loading, setLoading] = useState(true);
@@ -37,7 +39,8 @@ export default function CreditCardPage() {
   const [bridgeableTokens, setBridgeableTokens] = useState<BridgeToken[]>([]);
 
   const [selectedProviderId, setSelectedProviderId] = useState("");
-  const [destinationChainId, setDestinationChainId] = useState("");
+  const [selectedNetworkChainId, setSelectedNetworkChainId] = useState("");
+  const [selectedTokenSymbol, setSelectedTokenSymbol] = useState("");
   const [cardWalletAddress, setCardWalletAddress] = useState("");
   const [externalToken, setExternalToken] = useState("");
   const [thresholdAmount, setThresholdAmount] = useState("");
@@ -47,15 +50,20 @@ export default function CreditCardPage() {
   const [cooldownMinutes, setCooldownMinutes] = useState(60);
   const [enabled, setEnabled] = useState(false);
 
-  const supportedProviderIds = new Set(
-    availableNetworks.map((n) => n.chainId)
-  );
-  const providersForDropdown = CARD_PROVIDERS.filter((p) =>
-    supportedProviderIds.has(p.chainId)
-  );
-  const selectedProvider = selectedProviderId
-    ? getProviderById(selectedProviderId)
+  const destinationChainId = selectedNetworkChainId;
+  const networksForProvider = selectedProviderId
+    ? getNetworksForProvider(selectedProviderId)
+    : [];
+  const tokenSymbolsForNetwork = selectedProviderId && selectedNetworkChainId
+    ? getTokensForProviderNetwork(selectedProviderId, selectedNetworkChainId)
+    : [];
+
+  const resolvedBridgeToken = selectedTokenSymbol && bridgeableTokens.length > 0
+    ? bridgeableTokens.find(
+        (t) => t.externalSymbol.toUpperCase() === selectedTokenSymbol.toUpperCase()
+      )
     : null;
+  const isComboSupported = !!resolvedBridgeToken;
 
   const loadConfig = useCallback(async () => {
     if (!isLoggedIn) return;
@@ -63,7 +71,7 @@ export default function CreditCardPage() {
       const { data } = await api.get<CreditCardConfig | null>("/credit-card/config");
       setConfig(data ?? null);
       if (data) {
-        setDestinationChainId(data.destinationChainId);
+        setSelectedNetworkChainId(data.destinationChainId);
         setCardWalletAddress(data.cardWalletAddress);
         setExternalToken(data.externalToken);
         setThresholdAmount(formatWeiToHuman(data.thresholdAmount));
@@ -73,6 +81,7 @@ export default function CreditCardPage() {
         setCooldownMinutes(data.cooldownMinutes);
         setEnabled(data.enabled);
         setSelectedProviderId("");
+        setSelectedTokenSymbol("");
       }
     } catch (e) {
       console.error(e);
@@ -90,45 +99,43 @@ export default function CreditCardPage() {
   }, [loadConfig]);
 
   useEffect(() => {
-    if (!destinationChainId) {
+    if (!selectedNetworkChainId) {
       setBridgeableTokens([]);
       return;
     }
     api
-      .get<BridgeToken[]>(`/bridge/bridgeableTokens/${destinationChainId}`)
+      .get<BridgeToken[]>(`/bridge/bridgeableTokens/${selectedNetworkChainId}`)
       .then((res) => setBridgeableTokens(Array.isArray(res.data) ? res.data : []))
       .catch(() => setBridgeableTokens([]));
-  }, [destinationChainId]);
+  }, [selectedNetworkChainId]);
+
+  useEffect(() => {
+    if (resolvedBridgeToken) setExternalToken(resolvedBridgeToken.externalToken);
+  }, [resolvedBridgeToken?.externalToken]);
 
   useEffect(() => {
     if (!config?.destinationChainId || !config?.externalToken || bridgeableTokens.length === 0) return;
-    if (destinationChainId !== config.destinationChainId) return;
+    if (selectedNetworkChainId !== config.destinationChainId) return;
+    if (selectedProviderId !== "") return;
     const token = bridgeableTokens.find((t) => t.externalToken === config.externalToken);
     if (!token) return;
-    const provider = getProviderByChainAndToken(config.destinationChainId, token.externalSymbol);
-    if (provider) setSelectedProviderId(provider.id);
-  }, [config?.destinationChainId, config?.externalToken, destinationChainId, bridgeableTokens]);
-
-  useEffect(() => {
-    if (!selectedProviderId) return;
-    const provider = getProviderById(selectedProviderId);
-    if (!provider) return;
-    setDestinationChainId(provider.chainId);
-  }, [selectedProviderId]);
-
-  useEffect(() => {
-    if (!selectedProviderId || bridgeableTokens.length === 0) return;
-    const provider = getProviderById(selectedProviderId);
-    if (!provider) return;
-    const match = bridgeableTokens.find(
-      (t) => t.externalSymbol.toUpperCase() === provider.tokenSymbol.toUpperCase()
-    );
-    if (match) setExternalToken(match.externalToken);
-    else setExternalToken(bridgeableTokens[0].externalToken);
-  }, [selectedProviderId, bridgeableTokens]);
+    const found = findProviderNetworkToken(config.destinationChainId, token.externalSymbol);
+    if (found) {
+      setSelectedProviderId(found.providerId);
+      setSelectedNetworkChainId(found.chainId);
+      setSelectedTokenSymbol(found.tokenSymbol);
+    }
+  }, [config?.destinationChainId, config?.externalToken, selectedNetworkChainId, selectedProviderId, bridgeableTokens]);
 
   const handleSave = async () => {
     if (!isLoggedIn) return;
+    if (!isComboSupported) {
+      toast({
+        title: "This provider/network/token combination is not yet supported for bridging.",
+        variant: "destructive",
+      });
+      return;
+    }
     setSaving(true);
     try {
       const thresholdWei = toWei(thresholdAmount);
@@ -140,7 +147,7 @@ export default function CreditCardPage() {
       await api.put("/credit-card/config", {
         destinationChainId,
         cardWalletAddress: cardWalletAddress.trim(),
-        externalToken: externalToken || bridgeableTokens[0]?.externalToken,
+        externalToken: resolvedBridgeToken!.externalToken,
         thresholdAmount: thresholdWei.toString(),
         topUpAmount: topUpWei.toString(),
         useBorrow,
@@ -222,21 +229,62 @@ export default function CreditCardPage() {
                       <select
                         className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
                         value={selectedProviderId}
-                        onChange={(e) => setSelectedProviderId(e.target.value)}
+                        onChange={(e) => {
+                          setSelectedProviderId(e.target.value);
+                          setSelectedNetworkChainId("");
+                          setSelectedTokenSymbol("");
+                        }}
                       >
                         <option value="">Select card provider</option>
-                        {providersForDropdown.map((p) => (
+                        {CARD_PROVIDERS.map((p) => (
                           <option key={p.id} value={p.id}>
                             {p.name}
                           </option>
                         ))}
                       </select>
-                      {selectedProvider && (
-                        <p className="text-xs text-muted-foreground">
-                          Network: {selectedProvider.chainName} · Token: {selectedProvider.tokenSymbol}
-                        </p>
-                      )}
                     </div>
+                    {selectedProviderId && (
+                      <div className="grid gap-2">
+                        <Label>Network</Label>
+                        <select
+                          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                          value={selectedNetworkChainId}
+                          onChange={(e) => {
+                            setSelectedNetworkChainId(e.target.value);
+                            setSelectedTokenSymbol("");
+                          }}
+                        >
+                          <option value="">Select network</option>
+                          {networksForProvider.map((n) => (
+                            <option key={n.chainId} value={n.chainId}>
+                              {n.chainName}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    {selectedProviderId && selectedNetworkChainId && (
+                      <div className="grid gap-2">
+                        <Label>Token</Label>
+                        <select
+                          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                          value={selectedTokenSymbol}
+                          onChange={(e) => setSelectedTokenSymbol(e.target.value)}
+                        >
+                          <option value="">Select token</option>
+                          {tokenSymbolsForNetwork.map((sym) => (
+                            <option key={sym} value={sym}>
+                              {sym}
+                            </option>
+                          ))}
+                        </select>
+                        {selectedTokenSymbol && !isComboSupported && (
+                          <p className="text-xs text-amber-600 dark:text-amber-400">
+                            {selectedTokenSymbol} on this network is not yet supported for bridging. We&apos;re starting with USDC on Base; more options coming soon.
+                          </p>
+                        )}
+                      </div>
+                    )}
                     <div className="grid gap-2">
                       <Label>Card wallet address</Label>
                       <Input
@@ -294,7 +342,10 @@ export default function CreditCardPage() {
                       <Switch checked={enabled} onCheckedChange={setEnabled} />
                     </div>
                     <div className="flex gap-2 pt-2">
-                      <Button onClick={handleSave} disabled={saving}>
+                      <Button
+                        onClick={handleSave}
+                        disabled={saving || !isComboSupported}
+                      >
                         {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save settings"}
                       </Button>
                       <Button variant="outline" onClick={handleApprove} disabled={approving}>
