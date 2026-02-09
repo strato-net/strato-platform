@@ -38,40 +38,7 @@ export async function sendWarningToSlack(context: string, message: string, times
 
     await client.chat.postMessage({
         channel,
-        text: `${emoji} ${oracleName} - Warning: ${message.slice(0, 100)}...`,
-        blocks: [
-            {
-                type: 'header',
-                text: {
-                    type: 'plain_text',
-                    text: `${emoji} ${oracleName} - Warning`,
-                    emoji: true
-                }
-            },
-            {
-                type: 'section',
-                fields: [
-                    {
-                        type: 'mrkdwn',
-                        text: `*Context:*\n${context}`
-                    },
-                    {
-                        type: 'mrkdwn',
-                        text: `*Timestamp:*\n${timestamp}`
-                    }
-                ]
-            },
-            {
-                type: 'section',
-                text: {
-                    type: 'mrkdwn',
-                    text: `*Message:*\n\`\`\`${message}\`\`\``
-                }
-            },
-            {
-                type: 'divider'
-            }
-        ]
+        text: `${emoji} *${oracleName}* [${context}] ${message}`,
     });
 
     logInfo('SlackNotifier', `Warning sent to ${channel}`);
