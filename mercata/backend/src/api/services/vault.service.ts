@@ -674,6 +674,25 @@ export const getVaultShareTokenAddress = async (
 };
 
 /**
+ * Get vault config for history tracking.
+ * Returns shareToken, botExecutor, and supportedAssets needed for portfolio history.
+ */
+export const getVaultHistoryConfig = async (
+  accessToken: string
+): Promise<{ shareToken: string; botExecutor: string; supportedAssets: string[] } | null> => {
+  const vaultAddress = await getVaultAddress(accessToken);
+  if (!vaultAddress) return null;
+  const vaultData = await getVaultData(accessToken, vaultAddress);
+  if (!vaultData) return null;
+  return {
+    shareToken: vaultData.shareToken || "",
+    botExecutor: vaultData.botExecutor || "",
+    supportedAssets: (vaultData.supportedAssets || [])
+      .filter((addr: string) => addr && addr !== "0000000000000000000000000000000000000000"),
+  };
+};
+
+/**
  * Lightweight function to get vault share token price (NAV per share).
  * Calculates totalEquity from supported asset balances and oracle prices,
  * then divides by total shares. 
