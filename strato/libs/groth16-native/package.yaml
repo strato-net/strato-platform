@@ -32,3 +32,13 @@ library:
 ghc-options:
   - -Wall
   - -Werror
+
+executables:
+  bench-groth16-native:
+    source-dirs: bench
+    main: Main.hs
+    dependencies:
+      - base
+      - groth16-native
+      - text
+      - time
