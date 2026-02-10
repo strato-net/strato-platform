@@ -2,19 +2,26 @@
 #
 # Initialize Railgun contract after deployment
 #
-# Usage: ./init-railgun.sh <contract_address>
+# Usage: ./init-railgun.sh [contract_address]
+#        If no address provided, reads from .contract-address
 
 set -e
 
 SCRIPT_DIR="$(dirname "$0")"
 source "$SCRIPT_DIR/refresh-token.sh"
 
-if [ -z "$1" ]; then
-    echo "Usage: ./init-railgun.sh <contract_address>"
+CONTRACT_FILE="$SCRIPT_DIR/.contract-address"
+
+if [ -n "$1" ]; then
+    CONTRACT_ADDR="$1"
+elif [ -f "$CONTRACT_FILE" ]; then
+    CONTRACT_ADDR=$(cat "$CONTRACT_FILE" | tr -d '[:space:]')
+    echo "Using contract address from $CONTRACT_FILE"
+else
+    echo "Usage: ./init-railgun.sh [contract_address]"
+    echo "       Or run deploy-railgun.sh first"
     exit 1
 fi
-
-CONTRACT_ADDR="$1"
 
 # Get user's address for treasury
 echo "Getting user address..."

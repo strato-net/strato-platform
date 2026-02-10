@@ -35,6 +35,10 @@ STATUS=$(echo "$RESPONSE" | jq -r '.[0].status // empty')
 if [ "$STATUS" = "Success" ] && [ -n "$ADDRESS" ]; then
     echo "Contract deployed successfully!"
     echo "Address: $ADDRESS"
+    
+    # Save address to config file for other tools to use
+    echo "$ADDRESS" > "$SCRIPT_DIR/.contract-address"
+    echo "Saved to: $SCRIPT_DIR/.contract-address"
 else
     echo "Deployment failed:"
     echo "$RESPONSE" | jq .
