@@ -242,18 +242,22 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
+      // Use different API endpoints based on login status
+      const endpoint = isLoggedIn ? `/tokens/v2/earning-assets` : `/tokens/v2/earning-assets/public`;
       const res = await api.get<EarningAsset[]>(
-        `/tokens/v2/earning-assets`,
+        endpoint,
         { signal: earningAssetsAbortControllerRef.current.signal }
       );
       
       if (!earningAssetsAbortControllerRef.current.signal.aborted) {
         setEarningAssets(res.data || []);
         
-        // Find USDST token from earning assets and update balance
-        const usdstToken = res.data?.find((asset) => asset.address === usdstAddress);
-        if (usdstToken) {
-          setUsdstBalance(usdstToken.balance || "0");
+        // Find USDST token from earning assets and update balance (only for logged-in users)
+        if (isLoggedIn) {
+          const usdstToken = res.data?.find((asset) => asset.address === usdstAddress);
+          if (usdstToken) {
+            setUsdstBalance(usdstToken.balance || "0");
+          }
         }
       }
     } catch (err: any) {
@@ -265,7 +269,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
         setLoadingEarningAssets(false);
       }
     }
-  }, []);
+  }, [isLoggedIn]);
 
   const getCataBalanceHistory = useCallback(async (duration: string = '1d', end?: string): Promise<BalanceSnapshot[]> => {
     setLoading(true);
@@ -404,25 +408,17 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
   }, [getAllTokens]);
 
   // ========== POLLING EFFECTS ==========
-  // Earning assets polling (30s interval) - only when logged in
+  // Earning assets - fetch once on mount for all users, poll only for logged-in users
   useEffect(() => {
-    if (!isLoggedIn) {
-      // Clear any existing interval if user logs out
-      if (earningAssetsIntervalRef.current) {
-        clearInterval(earningAssetsIntervalRef.current);
-        earningAssetsIntervalRef.current = null;
-      }
-      if (earningAssetsAbortControllerRef.current) {
-        earningAssetsAbortControllerRef.current.abort();
-      }
-      return;
-    }
-
+    // Always fetch earning assets once (works for guests too - returns public data)
     getEarningAssets(true);
 
-    earningAssetsIntervalRef.current = setInterval(() => {
-      getEarningAssets(false);
-    }, 30000);
+    // Only set up polling interval for logged-in users
+    if (isLoggedIn) {
+      earningAssetsIntervalRef.current = setInterval(() => {
+        getEarningAssets(false);
+      }, 30000);
+    }
 
     return () => {
       if (earningAssetsIntervalRef.current) {

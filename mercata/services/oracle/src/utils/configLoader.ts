@@ -22,7 +22,8 @@ export class ConfigLoader {
         Object.entries(rawSources).forEach(([name, config]) => {
             this.sources[name] = {
                 ...config,
-                apiKey: config.apiKeyEnvVar ? process.env[config.apiKeyEnvVar] || '' : ''
+                apiKey: config.apiKeyEnvVar ? process.env[config.apiKeyEnvVar] || '' : '',
+                accountId: config.accountIdEnvVar ? process.env[config.accountIdEnvVar] || '' : ''
             };
         });
     }
@@ -54,12 +55,6 @@ export class ConfigLoader {
     }
 
     public getAllAssets(): Record<string, Asset> {
-        const result: Record<string, Asset> = {};
-        Object.entries(this.assets).forEach(([key, asset]) => {
-            if (asset.submit !== false) {
-                result[key] = asset;
-            }
-        });
-        return result;
+        return this.assets;
     }
 }

@@ -1,5 +1,5 @@
 import cron from 'node-cron';
-import { logInfo, logError, logFeedUpdate } from './utils/logger';
+import { logInfo, logError, logWarning, logFeedUpdate } from './utils/logger';
 import { fetchPrices, generateConstantPrices } from './adapters/genericRestAdapter';
 import { pushAssetPrices } from './utils/oraclePusher';
 import { checkBalances } from './utils/balanceChecker';
@@ -32,9 +32,9 @@ function checkPriceChange(assetKey: string, newPrice: number, previousPrice: num
         const oldPriceUSD = (previousPrice / 1e18).toFixed(2);
         const newPriceUSD = (newPrice / 1e18).toFixed(2);
         const direction = newPrice > previousPrice ? 'increased' : 'decreased';
-        logError('CronScheduler', new Error(
+        logWarning('CronScheduler',
             `Significant price change alert for ${assetKey}: ${direction} ${changePercent.toFixed(2)}% (max ${ORACLE_CONFIG.MAX_PRICE_CHANGE_PERCENT}%). Previous: $${oldPriceUSD}, New: $${newPriceUSD}`
-        ));
+        );
     }
 }
 
@@ -48,9 +48,9 @@ function checkSourceDivergence(assetKey: string, sources: Array<{ name: string; 
     
     if (spreadPercent > ORACLE_CONFIG.MAX_SOURCE_DIVERGENCE_PERCENT) {
         const sourcePrices = sources.map(s => `${s.name}: $${(s.price / 1e18).toFixed(2)}`).join(', ');
-        logError('CronScheduler', new Error(
+        logWarning('CronScheduler',
             `Source divergence alert for ${assetKey}: ${spreadPercent.toFixed(2)}% spread (max ${ORACLE_CONFIG.MAX_SOURCE_DIVERGENCE_PERCENT}%). Sources: [${sourcePrices}]`
-        ));
+        );
     }
 }
 
@@ -94,7 +94,7 @@ async function fetchSource(sourceName: string, sourceConfig: SourceConfig, confi
         return { sourceName, prices, success: true, duration: Date.now() - startTime };
     } catch (err) {
         const duration = Date.now() - startTime;
-        logError('CronScheduler', new Error(`${sourceName} failed (${duration}ms): ${(err as Error).message}`));
+        logWarning('CronScheduler', `${sourceName} failed (${duration}ms): ${(err as Error).message}`);
         return { sourceName, prices: {}, success: false, duration };
     }
 }
@@ -133,10 +133,20 @@ function aggregatePrices(
         const sources: Array<{ name: string; price: number }> = [];
         let expectedCount = weekdaySources.length;
 
+        const failedSources: string[] = [];
+
         const collect = (names: string[], symbol: string) => {
+            failedSources.length = 0;
             names.forEach(name => {
-                const data = sourceResults.get(name)?.success && sourceResults.get(name)?.prices[symbol];
-                if (data) sources.push({ name, price: data.price });
+                const result = sourceResults.get(name);
+                const data = result?.success && result?.prices[symbol];
+                if (data) {
+                    sources.push({ name, price: data.price });
+                } else if (result?.success) {
+                    failedSources.push(`${name}(no ${symbol})`);
+                } else {
+                    failedSources.push(`${name}(fetch failed)`);
+                }
             });
             return sources.length;
         };
@@ -155,9 +165,11 @@ function aggregatePrices(
                 expectedCount = weekdaySources.length;
             }
         }
-        
+
         const isValid = sources.length >= requiredSources;
-        if (!isValid) logError('CronScheduler', new Error(`Insufficient sources for ${assetKey}: got ${sources.length}, need ${requiredSources}`));
+        if (!isValid) {
+            logError('CronScheduler', new Error(`Insufficient sources for ${assetKey}: got ${sources.length}, need ${requiredSources}. Failed: [${failedSources.join(', ')}]`));
+        }
         
         const medianPrice = isValid ? calculateMedian(sources.map(s => s.price)) : 0;
         
@@ -180,6 +192,40 @@ function aggregatePrices(
     });
 }
 
+/**
+ * Adds equivalent asset prices as additional sources.
+ * For example, XAU (gold) can use XAUT (Tether Gold) as an equivalent since both track gold price.
+ * This allows assets with few direct sources to benefit from equivalent assets that have more sources.
+ * The equivalent asset's aggregated median price is added as a single additional source.
+ */
+function addEquivalentAssetPrices(prices: AggregatedPrice[], configLoader: ConfigLoader): AggregatedPrice[] {
+    const allAssets = configLoader.getAllAssets();
+    prices.forEach(p => {
+        const asset = allAssets[p.assetKey];
+        if (!asset.equivalentAssets) return;
+
+        // Add each equivalent asset's median price as an additional source
+        const sourceCountBefore = p.sources.length;
+        asset.equivalentAssets.forEach(equivKey => {
+            const equiv = prices.find(ap => ap.assetKey === equivKey);
+            if (equiv && !equiv.failed && equiv.medianPrice > 0) {
+                p.sources.push({ name: `${equivKey}(equiv)`, price: equiv.medianPrice });
+                p.expectedSourceCount += 1;
+            }
+        });
+
+        // Recalculate median if we added any equivalent sources
+        if (p.sources.length > sourceCountBefore) {
+            p.medianPrice = calculateMedian(p.sources.map(s => s.price));
+            if (p.failed && p.sources.length >= ORACLE_CONFIG.MIN_VALID_SOURCES) {
+                delete p.failed;
+                delete p.error;
+            }
+        }
+    });
+    return prices;
+}
+
 // ============================================================================
 // Main Orchestrator
 // ============================================================================
@@ -196,12 +242,19 @@ async function processAllAssets(configLoader: ConfigLoader): Promise<void> {
     logInfo('CronScheduler', `Market ${marketClosed ? 'closed' : 'open'}, processing ${assetCount} assets`);
     
     const sourceResults = await fetchFromAllSources(configLoader);
-    const aggregatedPrices = aggregatePrices(configLoader, sourceResults, marketClosed, previousPrices);
+    const aggregatedPrices = addEquivalentAssetPrices(
+        aggregatePrices(configLoader, sourceResults, marketClosed, previousPrices),
+        configLoader
+    );
     
-    // Partition into valid and failed prices in single pass
+    // Partition into valid and failed prices, excluding proxy-only assets (submit: false)
+    const allAssets = configLoader.getAllAssets();
     const validPrices: AggregatedPrice[] = [];
     const failedPrices: AggregatedPrice[] = [];
-    aggregatedPrices.forEach(p => (p.failed ? failedPrices : validPrices).push(p));
+    aggregatedPrices.forEach(p => {
+        if (allAssets[p.assetKey].submit === false) return;
+        (p.failed ? failedPrices : validPrices).push(p);
+    });
     
     if (validPrices.length === 0) {
         throw new Error('No valid prices to submit');

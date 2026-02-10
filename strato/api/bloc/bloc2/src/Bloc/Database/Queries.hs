@@ -16,10 +16,12 @@
 module Bloc.Database.Queries
   ( sourceToContractDetails,
     getContractByAddress,
+    getContractWithCodeCollectionByAddress,
     getContractByAccountsFilterParams,
     getContractDetailsForContract,
     getContractDetailsByCodeHash,
     getCodeCollectionByCodePtr,
+    getContractWithCodeCollectionByCodePtr,
     evmContractSolidVMError,
   )
 where
@@ -70,6 +72,52 @@ getContractByAddress ::
 getContractByAddress a = getContractByAccountsFilterParams
   $ accountsFilterParams
   & qaAddress ?~ a
+
+-- | Get contract and code collection by address (for file-level struct access)
+-- Also resolves proxy contracts by looking up their logicContract
+getContractWithCodeCollectionByAddress ::
+  ( MonadIO m,
+    HasCodeDB m,
+    A.Selectable Address AddressState m,
+    (Keccak256 `A.Selectable` SourceMap) m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m
+  ) =>
+  Address ->
+  m (Maybe (Contract, CodeCollection))
+getContractWithCodeCollectionByAddress a = runMaybeT $ do
+  (AddressStateRef' r _) <- MaybeT . fmap listToMaybe $ getAccount' 
+    $ accountsFilterParams & qaAddress ?~ a
+  codePtr <- MaybeT . pure $ addressStateRefCodePtr r
+  (contract, cc) <- MaybeT $ either (const Nothing) Just <$> getContractWithCodeCollectionByCodePtr codePtr
+  -- Check if this is a proxy contract and resolve the logic contract's functions
+  case addressStateRefContractName r of
+    Just name | name `elem` ["Proxy", "UserRegistry", "User"] -> do
+      -- Look up the logicContract storage variable
+      mLogicAddr <- lift . runMaybeT $ do
+        (StorageAddress _ v _) <- MaybeT
+          . fmap listToMaybe
+          . getStorage'
+          $ storageFilterParams
+              { qsAddress = Just a
+              , qsKey = Just "logicContract"
+              }
+        MaybeT . pure $ case v of
+          BAddress address' -> Just address'
+          _ -> Nothing
+      case mLogicAddr of
+        Just logicAddr -> do
+          -- Get the logic contract's code
+          (AddressStateRef' l _) <- MaybeT
+            . fmap listToMaybe
+            . getAccount'
+            $ accountsFilterParams & qaAddress ?~ logicAddr
+          logicCodePtr <- MaybeT . pure $ addressStateRefCodePtr l
+          (logicContract, logicCC) <- MaybeT $ either (const Nothing) Just <$> getContractWithCodeCollectionByCodePtr logicCodePtr
+          -- Merge the proxy and logic contract functions
+          pure (contract <> logicContract, cc <> logicCC)
+        Nothing -> pure (contract, cc)
+    _ -> pure (contract, cc)
 
 getContractByAccountsFilterParams ::
   ( MonadIO m,
@@ -150,6 +198,25 @@ getCodeCollectionByCodePtr ::
   CodePtr ->
   m (Either Text CodeCollection)
 getCodeCollectionByCodePtr = runExceptT . fmap snd . getCodeHashAndCollection
+
+-- | Get both the contract and code collection (for file-level struct access)
+getContractWithCodeCollectionByCodePtr ::
+  ( MonadIO m,
+    HasCodeDB m,
+    A.Selectable Address AddressState m,
+    (Keccak256 `A.Selectable` SourceMap) m
+  ) =>
+  CodePtr ->
+  m (Either Text (Contract, CodeCollection))
+getContractWithCodeCollectionByCodePtr codePtr = runExceptT $ do
+  nameStr <- case codePtr of
+    SolidVMCode n _ -> pure n
+    _ -> throwE "EVM contracts no longer supported"
+  (_, cc) <- getCodeHashAndCollection codePtr
+  contract <- case Map.lookup nameStr $ _contracts cc of
+    Nothing -> throwE $ "Could not find contract " <> (Text.pack nameStr) <> " in code collection " <> Text.pack (format codePtr)
+    Just d -> pure d
+  pure $ force (contract, cc)
 
 getCodeHashAndCollection ::
   ( MonadIO m,

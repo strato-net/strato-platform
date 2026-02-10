@@ -1,13 +1,13 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Link, useLocation, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import MobileBottomNav from '../components/dashboard/MobileBottomNav';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle
+import { 
+  Card, 
+  CardContent,  
+  CardHeader, 
+  CardTitle 
 } from "@/components/ui/card";
 import { Tabs as AntdTabs } from "antd";
 import AssetSummary from '@/components/dashboard/AssetSummary';
@@ -22,12 +22,12 @@ import BridgeIn from '@/components/bridge/BridgeIn';
 import { useBridgeContext } from '@/context/BridgeContext';
 import DepositTransactionDetails from '@/components/dashboard/DepositTransactionDetails';
 import { cataAddress } from '@/lib/constants';
+import GuestSignInBanner from '@/components/ui/GuestSignInBanner';
 
 const DepositsPage = () => {
-  const location = useLocation();
   const [searchParams] = useSearchParams();
-  const { userAddress } = useUser();
-  const { earningAssets, getEarningAssets, inactiveTokens, loadingEarningAssets } = useTokenContext();
+  const { isLoggedIn } = useUser();
+  const { earningAssets, inactiveTokens, loadingEarningAssets } = useTokenContext();
   const { loans } = useLendingContext();
   const { totalCDPDebt } = useCDP();
   const { loadNetworksAndTokens, setTargetTransactionTab } = useBridgeContext();
@@ -46,20 +46,14 @@ const DepositsPage = () => {
     token.address === cataAddress
   );
 
-  // Sort earning assets by value first, then categorize
-  const { nonPoolTokens, sortedEarningAssets } = useMemo(() => {
+  // Sort earning assets by value first, then filter non-pool tokens
+  const nonPoolTokens = useMemo(() => {
     const sorted = [...earningAssets].sort((a, b) => {
       const valueA = parseFloat(a.value || "0");
       const valueB = parseFloat(b.value || "0");
       return valueB - valueA;
     });
-    const nonPool: typeof earningAssets = [];
-    for (const token of sorted) {
-      if (!token.isPoolToken) {
-        nonPool.push(token);
-      }
-    }
-    return { nonPoolTokens: nonPool, sortedEarningAssets: sorted };
+    return sorted.filter(token => !token.isPoolToken);
   }, [earningAssets]);
 
   // Use centralized net balance calculation hook
@@ -70,14 +64,13 @@ const DepositsPage = () => {
     totalCDPDebt
   });
 
+  // Load networks and tokens for bridge once on mount (public data)
   useEffect(() => {
-    const hasExistingEarningAssets = earningAssets.length > 0;
-    
-    getEarningAssets(!hasExistingEarningAssets);
     loadNetworksAndTokens().catch((error) => {
       console.error('Failed to load networks and tokens:', error);
     });
-  }, [location.pathname, userAddress, getEarningAssets, loadNetworksAndTokens]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="h-screen bg-background overflow-hidden pb-16 md:pb-0">
@@ -86,6 +79,9 @@ const DepositsPage = () => {
       <div className="h-screen flex flex-col transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
         <DashboardHeader title="Deposits" />
         <main className="flex-1 p-4 md:p-6 pb-16 md:pb-6 overflow-y-auto">
+          {!isLoggedIn && (
+            <GuestSignInBanner message="Sign in to deposit and start earning" />
+          )}
           <style>{`
             .custom-tabs .ant-tabs-tab {
               justify-content: center !important;
@@ -112,8 +108,18 @@ const DepositsPage = () => {
                     <CardTitle className="text-base md:text-xl">Deposit Assets</CardTitle>
                     <Link
                       to="/bridge-transactions?from=deposits"
-                      onClick={() => setTargetTransactionTab('DepositRecorded')}
-                      className="flex items-center gap-1 text-xs md:text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors whitespace-nowrap"
+                      onClick={(e) => {
+                        if (!isLoggedIn) {
+                          e.preventDefault();
+                          return;
+                        }
+                        setTargetTransactionTab('DepositRecorded');
+                      }}
+                      className={`flex items-center gap-1 text-xs md:text-sm font-semibold transition-colors whitespace-nowrap ${
+                        isLoggedIn 
+                          ? "text-blue-600 hover:text-blue-800 cursor-pointer" 
+                          : "text-muted-foreground cursor-not-allowed opacity-50 pointer-events-none"
+                      }`}
                     >
                       <ArrowRight size={14} className="md:w-4 md:h-4" />
                       View Transactions
@@ -146,7 +152,7 @@ const DepositsPage = () => {
                     }
                   />
                     <div className="mt-4 flex-1 min-h-0 overflow-auto p-1 -m-1">
-                      <BridgeIn isSaving={activeTab === "easy-savings"} />
+                      <BridgeIn isSaving={activeTab === "easy-savings"} guestMode={!isLoggedIn} />
                     </div>
                   </div>
                 </CardContent>
@@ -157,10 +163,10 @@ const DepositsPage = () => {
               <div className="flex-[0.5] flex">
                 <AssetSummary
                   title="Net Balance"
-                  value={`$${totalBalance.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`}
+                  value={isLoggedIn ? `$${totalBalance.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 })}` : "-"}
                   icon={<Wallet className="text-white" size={18} />}
                   color="bg-blue-500"
-                  isLoading={isLoadingNetBalance}
+                  isLoading={isLoggedIn && isLoadingNetBalance}
                 />
               </div>
               {/* My Deposits (Earning Assets) */}
@@ -172,14 +178,16 @@ const DepositsPage = () => {
                   <AssetsList 
                     loading={loadingEarningAssets} 
                     tokens={nonPoolTokens} 
-                    inActiveTokens={inactiveTokens} 
+                    inActiveTokens={isLoggedIn ? inactiveTokens : []} 
                     isDashboard={false}
+                    guestMode={!isLoggedIn}
                   />
                 </CardContent>
               </Card>
             </div>
           </div>
-          {/* Deposit History - hidden on mobile to avoid horizontal scroll */}
+          {/* Deposit History - hidden on mobile and for guests */}
+          {isLoggedIn && (
           <Card className="shadow-sm hidden md:block">
             <CardHeader>
               <CardTitle>Deposit History</CardTitle>
@@ -188,6 +196,7 @@ const DepositsPage = () => {
               <DepositTransactionDetails context="deposits" />
             </CardContent>
           </Card>
+          )}
         </main>
       </div>
 

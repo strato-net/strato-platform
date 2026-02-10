@@ -5,7 +5,7 @@
     "parse": "data[].prices[0].value",
     "timestamp": "data[0].prices[0].lastUpdatedAt",
     "apiKeyEnvVar": "ALCHEMY_API_KEY",
-    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "sUSDS", "KAG"]
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "KAG", "WSTETH"]
   },
   "CoinMarketCap": {
     "url": "https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest",
@@ -14,7 +14,7 @@
     "parse": "data.{symbol}[0].quote.USD.price",
     "timestamp": "data.{firstSymbol}[0].quote.USD.last_updated",
     "apiKeyEnvVar": "COINMARKETCAP_API_KEY",
-    "assets": ["ETH", "WBTC", "PAXG", "XAUT"]
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "WSTETH"]
   },
   "Metals.dev": {
     "url": "https://api.metals.dev/v1/latest",
@@ -42,14 +42,15 @@
     "parse": "{id}.usd",
     "timestamp": "{id}.last_updated_at",
     "apiKeyEnvVar": "COINGECKO_API_KEY",
-    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "sUSDS", "KAG"],
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "KAG", "WSTETH"],
     "symbolMapping": {
       "ETH": "ethereum",
       "WBTC": "wrapped-bitcoin",
       "PAXG": "pax-gold",
       "XAUT": "tether-gold",
-      "sUSDS": "susds",
-      "KAG": "kinesis-silver"
+      "SUSDS": "susds",
+      "KAG": "kinesis-silver",
+      "WSTETH": "wrapped-steth"
     }
   },
   "CoinAPI": {
@@ -59,7 +60,7 @@
     "parse": "assets",
     "timestamp": "data_quote_start",
     "apiKeyEnvVar": "COINAPI_API_KEY",
-    "assets": ["ETH", "WBTC", "PAXG", "XAUT"]
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "WSTETH"]
   },
   "LiveCoinWatch": {
     "url": "https://api.livecoinwatch.com/coins/map",
@@ -68,15 +69,7 @@
     "body": "codes",
     "parse": "coins",
     "apiKeyEnvVar": "LIVECOINWATCH_API_KEY",
-    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "sUSDS", "KAG"],
-    "symbolMapping": {
-      "ETH": "ETH",
-      "WBTC": "WBTC",
-      "PAXG": "PAXG",
-      "XAUT": "XAUT",
-      "sUSDS": "SUSDS",
-      "KAG": "KAG"
-    }
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "KAG", "WSTETH"]
   },
   "Commodities-API": {
     "url": "https://commodities-api.com/api/latest",
@@ -85,6 +78,41 @@
     "timestamp": "data.timestamp",
     "apiKeyEnvVar": "COMMODITIES_API_KEY",
     "assets": ["XAU", "XAG"]
+  },
+  "CommodityPriceAPI": {
+    "url": "https://api.commoditypriceapi.com/v2/rates/latest",
+    "params": "symbols",
+    "headers": "x-api-key",
+    "parse": "rates.{symbol}",
+    "timestamp": "timestamp",
+    "apiKeyEnvVar": "COMMODITY_PRICE_API_KEY",
+    "assets": ["XAU", "XAG"]
+  },
+  "TwelveData": {
+    "url": "https://api.twelvedata.com/price",
+    "params": "apikey,symbol",
+    "parse": "{symbol}.price",
+    "apiKeyEnvVar": "TWELVEDATA_API_KEY",
+    "comment": "Also supports crypto: ETH/USD, BTC/USD, WBTC/USD, PAXG/USD, XAUT/USD. XAG requires Grow plan ($29/mo)",
+    "assets": ["XAU", "XAG"],
+    "symbolMapping": {
+      "XAU": "XAU/USD",
+      "XAG": "XAG/USD"
+    }
+  },
+  "OANDA": {
+    "url": "https://api-fxpractice.oanda.com/v3/accounts/${ACCOUNT_ID}/pricing",
+    "params": "instruments",
+    "headers": "Authorization",
+    "parse": "oanda.prices",
+    "apiKeyEnvVar": "OANDA_API_KEY",
+    "accountIdEnvVar": "OANDA_ACCOUNT_ID",
+    "comment": "Practice API. Use api-fxtrade.oanda.com for live",
+    "assets": ["XAU", "XAG"],
+    "symbolMapping": {
+      "XAU": "XAU_USD",
+      "XAG": "XAG_USD"
+    }
   },
   "constant": {
     "parse": "constant",

@@ -11,7 +11,9 @@ import {
   supplyCollateral,
   withdrawCollateral,
   collateralAndBalance,
+  getPublicCollateralInfo,
   liquidityAndBalance,
+  getPublicLiquidityInfo,
   getLoan,
   listLiquidatableLoans,
   listNearUnhealthyLoans,
@@ -83,7 +85,7 @@ class LendingController {
       const { accessToken, body, address: userAddress } = req;
       validateWithdrawLiquidityArgs(body);
 
-      const result = await withdrawLiquidity(accessToken, userAddress as string, body.amount, body.includeStakedMToken);
+      const result = await withdrawLiquidity(accessToken, userAddress as string, body.amount);
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (error) {
@@ -218,6 +220,34 @@ class LendingController {
       validateUserAddress(userAddress);
 
       const result = await collateralAndBalance(accessToken, userAddress as string);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getPublicCollateralInfo(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken } = req;
+      const result = await getPublicCollateralInfo(accessToken);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getPublicLiquidityInfo(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken } = req;
+      const result = await getPublicLiquidityInfo(accessToken);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);

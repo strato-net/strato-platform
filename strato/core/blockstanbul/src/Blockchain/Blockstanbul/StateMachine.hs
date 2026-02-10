@@ -45,6 +45,8 @@ data BlockstanbulContext = BlockstanbulContext
     _view :: View,
     -- Whether to really authenticate, or just to pretend to.
     _productionAuth :: Bool,
+    -- The latest block created by this peer
+    _myBlock :: Maybe Block,
     -- The block proposed for this round
     _proposal :: Maybe Block,
     -- The designated participant to suggest a block for this round
@@ -103,6 +105,7 @@ newContext network' (Checkpoint v as) addr valB =
    in BlockstanbulContext
         { _view = v,
           _productionAuth = True,
+          _myBlock = Nothing,
           _proposal = Nothing,
           _proposer = prop,
           _validators = valSet,

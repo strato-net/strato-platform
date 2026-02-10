@@ -52,9 +52,10 @@ import DepositProgressModal, { DepositStep } from "./DepositProgressModal";
 
 interface BridgeInProps {
   isSaving?: boolean;
+  guestMode?: boolean;
 }
 
-const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false }) => {
+const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false }) => {
   // Hooks & Context
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
@@ -189,6 +190,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false }) => {
 
   const isButtonDisabled = useMemo(
     () =>
+      guestMode ||
       isLoading ||
       !hasValidAmount ||
       !selectedToken ||
@@ -198,6 +200,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false }) => {
       isBalanceLoading ||
       !isTokenPermitted,
     [
+      guestMode,
       isLoading,
       hasValidAmount,
       selectedToken,
@@ -558,7 +561,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false }) => {
       setCurrentStep("waiting_tx");
       const success = await waitForTransaction(txHash, activeChainId);
       if (!success) {
-        throw new Error("Transaction reverted");
+        throw new Error("Transaction reverted. No funds were deposited on STRATO.");
       }
 
       const externalDecimals = parseInt(selectedToken.externalDecimals || "18");
@@ -629,14 +632,14 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false }) => {
       </div>
 
       <div className="w-full">
-        <BridgeWalletStatus />
+        <BridgeWalletStatus guestMode={guestMode} />
       </div>
 
       <TokenSelector
         selectedToken={selectedToken}
         tokens={currentTokens}
         onTokenChange={setSelectedToken}
-        disabled={isLoading}
+        disabled={guestMode || isLoading}
       />
 
       <div className="space-y-1.5">
@@ -671,7 +674,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false }) => {
           }`}
           value={amount}
           onChange={(e) => handleAmountChange(e.target.value)}
-          disabled={!isConnected || isLoading}
+          disabled={guestMode || !isConnected || isLoading}
         />
         {amountError && <p className="text-sm text-red-500">{amountError}</p>}
         
@@ -682,7 +685,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false }) => {
             onChange={handleAmountChange}
             decimals={parseInt(selectedToken?.externalDecimals || "18")}
             className="mt-2"
-            disabled={isLoading}
+            disabled={guestMode || isLoading}
           />
                     )}
       </div>
@@ -704,7 +707,8 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false }) => {
             type="checkbox" 
             className="accent-blue-600" 
             checked={autoDeposit} 
-            onChange={e => setAutoDeposit(e.target.checked)} 
+            onChange={e => setAutoDeposit(e.target.checked)}
+            disabled={guestMode}
           />
           Earn saving rate by offering USDST for lending
         </label>

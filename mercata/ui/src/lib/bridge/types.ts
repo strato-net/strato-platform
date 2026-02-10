@@ -147,6 +147,7 @@ export type SupportedChainId =
   | 80002
   | 10
   | 8453
+  | 84532
   | 42161
   | 42170
   | 56
