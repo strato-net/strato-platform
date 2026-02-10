@@ -25,6 +25,7 @@ import qualified Data.Bifunctor as BF
 import qualified Data.ByteString as B
 import Data.Foldable (toList)
 import Data.List
+import qualified Data.IntMap as I
 import qualified Data.Map as M
 import Data.Maybe (mapMaybe)
 import Data.Scientific (floatingOrInteger)
@@ -97,7 +98,10 @@ valueToSolidityValue = \case
             ++ intercalate "," (map (formatType . snd) returnTypes)
             ++ ")"
   ValueArrayFixed _ values -> Just . SolidityArray . mapMaybe valueToSolidityValue $ values
-  ValueArrayDynamic values -> Just . SolidityArray . mapMaybe valueToSolidityValue $ unsparse values
+  ValueArrayDynamic values ->
+    let toEntry (_, ValueArraySentinel len) = Just ("_length", SolidityNum (fromIntegral len))
+        toEntry (i, v) = (Text.pack (show i),) <$> valueToSolidityValue v
+     in Just . SolidityObject . mapMaybe toEntry $ I.toList values
   -- TODO(tim): What if struct declaration order is needed here?
   ValueStruct namedItems -> Just . SolidityObject . M.toList $ M.mapMaybe valueToSolidityValue namedItems
   ValueMapping ms -> Just . SolidityObject $ mapMaybe convertBoth (M.toList ms)

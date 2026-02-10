@@ -127,6 +127,7 @@ data SlipstreamQuery = CreateTable
                      | CreateFkeyFunction ForeignKeyInfo
                      | RefreshMaterializedView TableName
                      | NotifyPostgREST
+                     | RawSQL Text
                      deriving (Eq, Ord, Show)
 
 slipstreamQueryPostgres :: SlipstreamQuery -> Text
@@ -474,6 +475,7 @@ slipstreamQueryText _ (RefreshMaterializedView _tableName) = T.concat []
   -- , ";"
   -- ]
 slipstreamQueryText _ NotifyPostgREST = "NOTIFY pgrst, 'reload schema';"
+slipstreamQueryText _ (RawSQL t) = t
 
 data ProcessedCollectionRow = ProcessedCollectionRow
   { address :: Address,
@@ -771,12 +773,13 @@ jsonbUpdateClause tblText colText = T.concat
   , tblText
   , "."
   , colText
-  , ") = 'object' THEN "
+  , ") = 'object' THEN jsonb_merge_deep("
   , tblText
   , "."
   , colText
-  , " || excluded."
+  , ", excluded."
   , colText
+  , ")"
   , " WHEN excluded."
   , colText
   , " IS NOT NULL THEN excluded."
@@ -1221,4 +1224,45 @@ initialSlipstreamQueries =
       ["address", "block_hash", "event_index", "collection_name", "key"]
       (Just $ Foreign "event_event_array" ["address", "block_hash", "event_index"] globalEventTableName ["address", "block_hash", "event_index"])
       []
+  , RawSQL jsonbMergeDeepSQL
+  ]
+
+jsonbMergeDeepSQL :: Text
+jsonbMergeDeepSQL = T.unlines
+  [ "CREATE OR REPLACE FUNCTION jsonb_merge_deep(a jsonb, b jsonb) RETURNS jsonb AS $fn$"
+  , "DECLARE result jsonb; key text; arr_obj jsonb; i int; len int;"
+  , "BEGIN"
+  , "  -- Case 1: old array format + new object format (migration transition)"
+  , "  IF jsonb_typeof(a) = 'array' AND jsonb_typeof(b) = 'object' THEN"
+  , "    arr_obj := '{}'::jsonb;"
+  , "    FOR i IN 0..jsonb_array_length(a)-1 LOOP"
+  , "      arr_obj := jsonb_set(arr_obj, ARRAY[i::text], a->i);"
+  , "    END LOOP;"
+  , "    RETURN jsonb_merge_deep(arr_obj, b);"
+  , "  END IF;"
+  , "  -- Case 2: both objects"
+  , "  IF jsonb_typeof(a) = 'object' AND jsonb_typeof(b) = 'object' THEN"
+  , "    result := a;"
+  , "    FOR key IN SELECT jsonb_object_keys(b) LOOP"
+  , "      IF result ? key THEN"
+  , "        result := jsonb_set(result, ARRAY[key], jsonb_merge_deep(result->key, b->key));"
+  , "      ELSE"
+  , "        result := jsonb_set(result, ARRAY[key], b->key);"
+  , "      END IF;"
+  , "    END LOOP;"
+  , "    -- Trim keys >= _length if present"
+  , "    IF result ? '_length' THEN"
+  , "      len := (result->>'_length')::int;"
+  , "      FOR key IN SELECT jsonb_object_keys(result) LOOP"
+  , "        IF key ~ '^[0-9]+$' AND key::int >= len THEN"
+  , "          result := result - key;"
+  , "        END IF;"
+  , "      END LOOP;"
+  , "    END IF;"
+  , "    RETURN result;"
+  , "  END IF;"
+  , "  -- Case 3: leaf values, new wins"
+  , "  RETURN b;"
+  , "END;"
+  , "$fn$ LANGUAGE plpgsql IMMUTABLE;"
   ]
