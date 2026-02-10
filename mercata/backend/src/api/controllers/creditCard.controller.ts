@@ -3,6 +3,10 @@ import {
   getConfigs,
   getConfigById,
   getCardsFromCirrus,
+  getConfigsForWatcher,
+  executeTopUp as executeTopUpService,
+  findConfigByTopUpParams,
+  markTopUpDone,
   upsertConfig,
   deleteConfig,
   submitApproval,
@@ -224,6 +228,44 @@ class CreditCardController {
         return;
       }
       const result = await submitRemoveCard(accessToken, address, index);
+      res.json({ success: true, data: result });
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
+  /** GET /credit-card/watcher-config — operator only: all enabled configs for the top-up watcher. */
+  static async getWatcherConfig(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const configs = getConfigsForWatcher();
+      res.json(configs);
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
+  /** POST /credit-card/execute-top-up — operator only: run a single top-up and mark done. */
+  static async executeTopUp(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const accessToken = req.accessToken as string;
+      const body = req.body as import("@mercata/shared-types").CreditCardTopUpExecuteParams;
+      if (!body?.userAddress || !body?.stratoTokenAmount || !body?.externalChainId || !body?.externalRecipient || !body?.externalToken) {
+        res.status(400).json({
+          error: "userAddress, stratoTokenAmount, externalChainId, externalRecipient, externalToken required",
+        });
+        return;
+      }
+      const result = await executeTopUpService(accessToken, body);
+      const config = findConfigByTopUpParams(body);
+      if (config) markTopUpDone(config);
       res.json({ success: true, data: result });
     } catch (error: any) {
       next(error);

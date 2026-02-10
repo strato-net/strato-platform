@@ -1,4 +1,6 @@
 import axios from "axios";
+import { promises as fs } from "fs";
+import path from "path";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { strato, cirrus } from "../../utils/mercataApiHelper";
@@ -8,6 +10,15 @@ import type { CreditCardConfig, CreditCardTopUpExecuteParams } from "@mercata/sh
 import type { TransactionResponse } from "@mercata/shared-types";
 
 const { CreditCardTopUp, creditCardTopUp, Token, USDST } = constants;
+
+const CONFIG_STORE_FILENAME = "credit-card-config-store.json";
+
+function getConfigStorePath(): string {
+  return (
+    process.env.CREDIT_CARD_CONFIG_STORE_PATH ||
+    path.join(process.cwd(), "data", CONFIG_STORE_FILENAME)
+  );
+}
 
 /** ERC20 balanceOf selector */
 const BALANCE_OF_SELECTOR = "0x70a08231";
@@ -47,8 +58,32 @@ export async function getErc20Balance(
   return BigInt(result);
 }
 
-/** In-memory store: user address -> list of card configs. Production should use a persistent store. */
+/** In-memory store: user address -> list of card configs. Persisted to JSON file. */
 const configStore = new Map<string, CreditCardConfig[]>();
+
+async function saveConfigStore(): Promise<void> {
+  const filePath = getConfigStorePath();
+  const dir = path.dirname(filePath);
+  await fs.mkdir(dir, { recursive: true });
+  const obj: Record<string, CreditCardConfig[]> = {};
+  for (const [k, v] of configStore) obj[k] = v;
+  await fs.writeFile(filePath, JSON.stringify(obj, null, 2), "utf8");
+}
+
+/**
+ * Load config store from file (call at backend startup). No-op if file does not exist.
+ */
+export async function loadCreditCardConfigStore(): Promise<void> {
+  const filePath = getConfigStorePath();
+  try {
+    const raw = await fs.readFile(filePath, "utf8");
+    const obj = JSON.parse(raw) as Record<string, CreditCardConfig[]>;
+    configStore.clear();
+    for (const [k, v] of Object.entries(obj)) if (Array.isArray(v)) configStore.set(k, v);
+  } catch (e: any) {
+    if (e?.code !== "ENOENT") console.error("loadCreditCardConfigStore:", e);
+  }
+}
 
 function normalizeAddress(addr: string): string {
   return addr?.toLowerCase().replace(/^0x/, "") ?? "";
@@ -79,6 +114,10 @@ export type CardRowFromCirrus = {
     destinationChainId?: string | number;
     externalToken?: string;
     cardWalletAddress?: string;
+    thresholdAmount?: string;
+    cooldownMinutes?: string | number;
+    topUpAmount?: string;
+    lastTopUpTimestamp?: string | number;
   };
 };
 
@@ -88,7 +127,18 @@ export type CardRowFromCirrus = {
 export async function getCardsFromCirrus(
   accessToken: string,
   userAddress: string
-): Promise<Array<{ id: string; nickname?: string; providerId?: string; destinationChainId: string; externalToken: string; cardWalletAddress: string }>> {
+): Promise<Array<{
+  id: string;
+  nickname?: string;
+  providerId?: string;
+  destinationChainId: string;
+  externalToken: string;
+  cardWalletAddress: string;
+  thresholdAmount?: string;
+  cooldownMinutes?: string;
+  topUpAmount?: string;
+  lastTopUpTimestamp?: string;
+}>> {
   if (!creditCardTopUp) {
     return [];
   }
@@ -112,6 +162,10 @@ export async function getCardsFromCirrus(
         destinationChainId: String(v.destinationChainId ?? "0"),
         externalToken: typeof v.externalToken === "string" ? v.externalToken : "",
         cardWalletAddress: typeof v.cardWalletAddress === "string" ? v.cardWalletAddress : "",
+        thresholdAmount: typeof v.thresholdAmount === "string" ? v.thresholdAmount : (v.thresholdAmount != null ? String(v.thresholdAmount) : undefined),
+        cooldownMinutes: v.cooldownMinutes != null ? String(v.cooldownMinutes) : undefined,
+        topUpAmount: typeof v.topUpAmount === "string" ? v.topUpAmount : (v.topUpAmount != null ? String(v.topUpAmount) : undefined),
+        lastTopUpTimestamp: v.lastTopUpTimestamp != null ? String(v.lastTopUpTimestamp) : undefined,
       };
     });
   } catch (err) {
@@ -154,6 +208,7 @@ export function upsertConfig(
     list = [...list, full];
   }
   configStore.set(key, list);
+  void saveConfigStore();
   return full;
 }
 
@@ -163,12 +218,26 @@ export function deleteConfig(userAddress: string, id: string): boolean {
   const next = list.filter((c) => c.id !== id);
   if (next.length === list.length) return false;
   configStore.set(key, next);
+  void saveConfigStore();
   return true;
 }
 
 /** Returns all enabled configs for the balance watcher (all users). */
 export function getConfigsForWatcher(): CreditCardConfig[] {
   return Array.from(configStore.values()).flat().filter((c) => c.enabled);
+}
+
+/** Find config matching top-up params (for marking done after execute). */
+export function findConfigByTopUpParams(params: CreditCardTopUpExecuteParams): CreditCardConfig | null {
+  const list = configStore.get(normalizeAddress(params.userAddress)) ?? [];
+  return (
+    list.find(
+      (c) =>
+        c.destinationChainId === params.externalChainId &&
+        normalizeAddress(c.cardWalletAddress) === normalizeAddress(params.externalRecipient) &&
+        normalizeAddress(c.externalToken) === normalizeAddress(params.externalToken)
+    ) ?? null
+  );
 }
 
 /**
@@ -219,6 +288,9 @@ export async function submitAddCard(
     destinationChainId: string;
     externalToken: string;
     cardWalletAddress: string;
+    thresholdAmount: string;
+    cooldownMinutes: number;
+    topUpAmount: string;
   }
 ): Promise<{ status: string; hash: string }> {
   if (!creditCardTopUp) {
@@ -240,6 +312,8 @@ export async function submitAddCard(
         destinationChainId: body.destinationChainId,
         externalToken,
         cardWalletAddress,
+        topUpFrequencyMinutes: body.cooldownMinutes,
+        topUpAmount: body.topUpAmount,
       },
     },
     userAddress,
@@ -252,6 +326,7 @@ export async function submitAddCard(
 
 /**
  * Submit updateCard transaction to STRATO.
+ * Uses topUpFrequencyMinutes (and omits thresholdAmount) to match currently deployed contract ABI.
  */
 export async function submitUpdateCard(
   accessToken: string,
@@ -263,6 +338,9 @@ export async function submitUpdateCard(
     destinationChainId: string;
     externalToken: string;
     cardWalletAddress: string;
+    thresholdAmount: string;
+    cooldownMinutes: number;
+    topUpAmount: string;
   }
 ): Promise<{ status: string; hash: string }> {
   if (!creditCardTopUp) {
@@ -285,6 +363,8 @@ export async function submitUpdateCard(
         destinationChainId: body.destinationChainId,
         externalToken,
         cardWalletAddress,
+        topUpFrequencyMinutes: body.cooldownMinutes,
+        topUpAmount: body.topUpAmount,
       },
     },
     userAddress,
@@ -360,6 +440,7 @@ export function markTopUpDone(config: CreditCardConfig): void {
   const next = [...list];
   next[idx] = { ...next[idx], lastTopUpAt: new Date().toISOString(), lastError: undefined };
   configStore.set(key, next);
+  void saveConfigStore();
 }
 
 /**
@@ -373,6 +454,7 @@ export function markChecked(config: CreditCardConfig, error?: string): void {
   const next = [...list];
   next[idx] = { ...next[idx], lastCheckedAt: new Date().toISOString(), lastError: error };
   configStore.set(key, next);
+  void saveConfigStore();
 }
 
 /**

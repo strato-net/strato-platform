@@ -43,6 +43,10 @@ export type OnChainCardConfig = {
   destinationChainId: string;
   externalToken: string;
   cardWalletAddress: string;
+  thresholdAmount?: string;
+  cooldownMinutes?: string;
+  topUpAmount?: string;
+  lastTopUpTimestamp?: string;
 };
 
 type CardDisplay = {
@@ -307,12 +311,25 @@ export default function CreditCardPage() {
       toast({ title: "This card is already connected.", variant: "destructive" });
       return;
     }
+    const thresholdWei = toWei(thresholdAmount);
+    const topUpWei = toWei(topUpAmount);
+    if (thresholdWei === null || thresholdWei < 0n) {
+      toast({ title: "Enter a valid threshold (top up when balance below)", variant: "destructive" });
+      return;
+    }
+    if (topUpWei === null || topUpWei < 0n) {
+      toast({ title: "Enter a valid top-up amount", variant: "destructive" });
+      return;
+    }
     const payload = {
       nickname: nickname.trim() || "",
       providerId: selectedProviderId || "",
       destinationChainId,
       externalToken: resolvedBridgeToken!.externalToken,
       cardWalletAddress: cardWalletAddress.trim(),
+      thresholdAmount: thresholdWei.toString(),
+      cooldownMinutes,
+      topUpAmount: topUpWei.toString(),
     };
     setSaving(true);
     try {

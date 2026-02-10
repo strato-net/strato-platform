@@ -36,12 +36,20 @@ export type AddCardBody = {
   destinationChainId: string;
   externalToken: string;
   cardWalletAddress: string;
+  thresholdAmount: string;
+  cooldownMinutes: number;
+  topUpAmount: string;
 };
 
 export function validateAddCardBody(body: unknown): asserts body is AddCardBody {
   if (!body || typeof body !== "object") throw new Error("Body must be an object");
   const b = body as Record<string, any>;
   requiredStrings(b, ["destinationChainId", "externalToken", "cardWalletAddress"]);
+  if (typeof b.thresholdAmount !== "string") throw new Error("thresholdAmount must be a string (wei)");
+  if (typeof b.cooldownMinutes !== "number" || b.cooldownMinutes < 0 || !Number.isInteger(b.cooldownMinutes)) {
+    throw new Error("cooldownMinutes must be a non-negative integer");
+  }
+  if (typeof b.topUpAmount !== "string") throw new Error("topUpAmount must be a string (wei)");
   if (b.nickname !== undefined && b.nickname !== null && typeof b.nickname !== "string") {
     throw new Error("nickname must be a string");
   }

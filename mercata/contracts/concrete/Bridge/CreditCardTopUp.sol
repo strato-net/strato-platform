@@ -16,6 +16,10 @@ contract record CreditCardTopUp is Ownable {
         uint256 destinationChainId;
         address externalToken;
         address cardWalletAddress;
+        uint256 thresholdAmount;           // Top up when balance below this (wei on destination chain)
+        uint256 cooldownMinutes;           // Cooldown between top-ups (minutes)
+        uint256 topUpAmount;
+        uint256 lastTopUpTimestamp;
     }
 
     address public mercataBridge;
@@ -88,19 +92,42 @@ contract record CreditCardTopUp is Ownable {
         if (!IERC20(stratoToken).approve(mercataBridge, stratoTokenAmount)) revert ApproveFailed();
 
         withdrawalId = bridge.requestWithdrawal(externalChainId, externalRecipient, externalToken, stratoTokenAmount);
+        _updateLastTopUpTimestamp(user, externalChainId, externalRecipient, externalToken);
         emit TopUpRequested(user, stratoTokenAmount, externalChainId, externalRecipient, withdrawalId);
         return withdrawalId;
     }
 
+    function _updateLastTopUpTimestamp(
+        address user,
+        uint256 externalChainId,
+        address externalRecipient,
+        address externalToken
+    ) internal {
+        CardInfo[] storage cards = userCards[user];
+        for (uint256 i = 0; i < cards.length; i++) {
+            if (
+                cards[i].destinationChainId == externalChainId &&
+                cards[i].cardWalletAddress == externalRecipient &&
+                cards[i].externalToken == externalToken
+            ) {
+                cards[i].lastTopUpTimestamp = block.timestamp;
+                break;
+            }
+        }
+    }
+
     /**
-     * @dev Add a card for msg.sender.
+     * @dev Add a card for msg.sender. lastTopUpTimestamp is set to 0.
      */
     function addCard(
         string calldata nickname,
         string calldata providerId,
         uint256 destinationChainId,
         address externalToken,
-        address cardWalletAddress
+        address cardWalletAddress,
+        uint256 thresholdAmount,
+        uint256 cooldownMinutes,
+        uint256 topUpAmount
     ) external {
         if (cardWalletAddress == address(0)) revert ZeroAddress();
         if (externalToken == address(0)) revert ZeroAddress();
@@ -109,13 +136,17 @@ contract record CreditCardTopUp is Ownable {
             providerId: providerId,
             destinationChainId: destinationChainId,
             externalToken: externalToken,
-            cardWalletAddress: cardWalletAddress
+            cardWalletAddress: cardWalletAddress,
+            thresholdAmount: thresholdAmount,
+            cooldownMinutes: cooldownMinutes,
+            topUpAmount: topUpAmount,
+            lastTopUpTimestamp: 0
         }));
         emit CardAdded(msg.sender, userCards[msg.sender].length - 1);
     }
 
     /**
-     * @dev Update card at index for msg.sender.
+     * @dev Update card at index for msg.sender. Preserves lastTopUpTimestamp.
      */
     function updateCard(
         uint256 index,
@@ -123,18 +154,26 @@ contract record CreditCardTopUp is Ownable {
         string calldata providerId,
         uint256 destinationChainId,
         address externalToken,
-        address cardWalletAddress
+        address cardWalletAddress,
+        uint256 thresholdAmount,
+        uint256 cooldownMinutes,
+        uint256 topUpAmount
     ) external {
         if (cardWalletAddress == address(0)) revert ZeroAddress();
         if (externalToken == address(0)) revert ZeroAddress();
         CardInfo[] storage cards = userCards[msg.sender];
         if (index >= cards.length) revert IndexOutOfBounds();
+        uint256 lastTopUp = cards[index].lastTopUpTimestamp;
         cards[index] = CardInfo({
             nickname: nickname,
             providerId: providerId,
             destinationChainId: destinationChainId,
             externalToken: externalToken,
-            cardWalletAddress: cardWalletAddress
+            cardWalletAddress: cardWalletAddress,
+            thresholdAmount: thresholdAmount,
+            cooldownMinutes: cooldownMinutes,
+            topUpAmount: topUpAmount,
+            lastTopUpTimestamp: lastTopUp
         });
         emit CardUpdated(msg.sender, index);
     }

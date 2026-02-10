@@ -128,13 +128,16 @@ router.put("/config", authHandler.authorizeRequest(), CreditCardController.upser
  *         application/json:
  *           schema:
  *             type: object
- *             required: [destinationChainId, externalToken, cardWalletAddress]
+ *             required: [destinationChainId, externalToken, cardWalletAddress, thresholdAmount, cooldownMinutes, topUpAmount]
  *             properties:
  *               nickname: { type: string }
  *               providerId: { type: string }
  *               destinationChainId: { type: string }
  *               externalToken: { type: string }
  *               cardWalletAddress: { type: string }
+ *               thresholdAmount: { type: string, description: "Wei - top up when balance below this" }
+ *               cooldownMinutes: { type: number, description: "Cooldown between top-ups (minutes)" }
+ *               topUpAmount: { type: string, description: "Wei amount to bridge per top-up" }
  *     responses:
  *       200:
  *         description: { success: true, data: { status, hash } }
@@ -155,7 +158,7 @@ router.post("/add-card", authHandler.authorizeRequest(), CreditCardController.ad
  *         application/json:
  *           schema:
  *             type: object
- *             required: [index, destinationChainId, externalToken, cardWalletAddress]
+ *             required: [index, destinationChainId, externalToken, cardWalletAddress, thresholdAmount, cooldownMinutes, topUpAmount]
  *             properties:
  *               index: { type: number }
  *               nickname: { type: string }
@@ -163,6 +166,9 @@ router.post("/add-card", authHandler.authorizeRequest(), CreditCardController.ad
  *               destinationChainId: { type: string }
  *               externalToken: { type: string }
  *               cardWalletAddress: { type: string }
+ *               thresholdAmount: { type: string, description: "Wei - top up when balance below" }
+ *               cooldownMinutes: { type: number }
+ *               topUpAmount: { type: string, description: "Wei amount per top-up" }
  *     responses:
  *       200:
  *         description: { success: true, data: { status, hash } }
@@ -235,5 +241,15 @@ router.post("/approve", authHandler.authorizeRequest(), CreditCardController.app
  *         description: Unauthorized
  */
 router.delete("/config/:id", authHandler.authorizeRequest(), CreditCardController.deleteConfig);
+
+/**
+ * Operator-only: list of enabled card configs for the top-up watcher service.
+ */
+router.get("/watcher-config", authHandler.authorizeOperatorRequest(), CreditCardController.getWatcherConfig);
+
+/**
+ * Operator-only: execute a single top-up (CreditCardTopUp.topUpCard) and mark config lastTopUpAt.
+ */
+router.post("/execute-top-up", authHandler.authorizeOperatorRequest(), CreditCardController.executeTopUp);
 
 export default router;

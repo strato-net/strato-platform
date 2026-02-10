@@ -39,6 +39,22 @@ interface CustomJwtPayload extends JWTPayload {
 
 class AuthHandler {
   /**
+   * Middleware that allows requests with Bearer token equal to OPERATOR_ACCESS_TOKEN (for internal services).
+   */
+  static authorizeOperatorRequest(): RequestHandler {
+    return (req, res, next) => {
+      const token = getTokenFromHeader(req);
+      const operatorToken = process.env.OPERATOR_ACCESS_TOKEN;
+      if (operatorToken && token === operatorToken) {
+        req.accessToken = token;
+        return next();
+      }
+      res.set("WWW-Authenticate", "Bearer");
+      res.status(401).json({ error: "Unauthorized", message: "Operator token required" });
+    };
+  }
+
+  /**
    * Middleware that enforces OAuth on incoming requests.
    * @param allowAnonAccess if true, will fall back to a service-token.
    */
