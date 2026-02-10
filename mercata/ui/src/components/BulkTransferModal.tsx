@@ -28,6 +28,7 @@ interface ParsedTransfer {
   to: string;
   amount: string;
   error?: string;
+  lineNumber: number; // CSV line number (1-indexed, including header if present)
 }
 
 interface ProcessingTransfer {
@@ -90,7 +91,7 @@ const BulkTransferModal = ({
     return /^[a-fA-F0-9]{40}$/.test(addr);
   };
 
-  const validateTransfer = useCallback((tokenAddress: string, to: string, amount: string): ParsedTransfer => {
+  const validateTransfer = useCallback((tokenAddress: string, to: string, amount: string, lineNumber: number): ParsedTransfer => {
     const errors: string[] = [];
 
     // Validate token address
@@ -112,7 +113,7 @@ const BulkTransferModal = ({
     if (!normalizedTo) {
       errors.push("Missing recipient address");
     } else if (!isValidAddress(normalizedTo)) {
-      errors.push("Invalid address format");
+      errors.push("Invalid recipient address format");
     } else if (userAddress && normalizedTo === userAddress.toLowerCase()) {
       errors.push("Cannot transfer to self");
     }
@@ -133,24 +134,28 @@ const BulkTransferModal = ({
       to: normalizedTo,
       amount: trimmedAmount,
       error: errors.length > 0 ? errors.join("; ") : undefined,
+      lineNumber,
     };
   }, [userAddress, tokens]);
 
   const parseCSV = useCallback((content: string): ParsedTransfer[] => {
-    const lines = content.split(/\r?\n/).filter(line => line.trim());
+    const allLines = content.split(/\r?\n/);
     const transfers: ParsedTransfer[] = [];
 
     // Skip header row if it looks like a header
     let startIndex = 0;
-    if (lines.length > 0) {
-      const firstLine = lines[0].toLowerCase();
+    if (allLines.length > 0) {
+      const firstLine = allLines[0].toLowerCase().trim();
       if (firstLine.includes("token") || firstLine.includes("address") || firstLine.includes("recipient") || firstLine.includes("to") || firstLine.includes("amount")) {
         startIndex = 1;
       }
     }
 
-    for (let i = startIndex; i < lines.length; i++) {
-      const line = lines[i].trim();
+    for (let i = startIndex; i < allLines.length; i++) {
+      const line = allLines[i].trim();
+      // Track actual line number (1-indexed, including header)
+      const csvLineNumber = i + 1;
+      
       if (!line) continue;
 
       // Split by comma, handling potential quoted values
@@ -158,13 +163,14 @@ const BulkTransferModal = ({
 
       if (parts.length >= 3) {
         const [tokenAddress, to, amount] = parts;
-        transfers.push(validateTransfer(tokenAddress, to, amount));
+        transfers.push(validateTransfer(tokenAddress, to, amount, csvLineNumber));
       } else {
         transfers.push({
           tokenAddress: parts[0] || "",
           to: parts[1] || "",
           amount: parts[2] || "",
           error: "Invalid CSV format - expected: token_address,recipient_address,amount",
+          lineNumber: csvLineNumber,
         });
       }
     }
@@ -418,8 +424,8 @@ const BulkTransferModal = ({
   const renderPreviewState = () => (
     <>
       <DialogHeader>
-        <DialogTitle>Review Transfers</DialogTitle>
-        <DialogDescription>
+        <DialogTitle className="text-lg sm:text-xl">Review Transfers</DialogTitle>
+        <DialogDescription className="text-xs sm:text-sm">
           Review the transfers before confirming. {invalidTransfers.length > 0 && (
             <span className="text-yellow-600">
               {invalidTransfers.length} invalid transfer(s) will be skipped.
@@ -429,36 +435,79 @@ const BulkTransferModal = ({
       </DialogHeader>
 
       <div className="space-y-4 py-4">
-        <ScrollArea className="h-[300px] rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[40px]">#</TableHead>
-                <TableHead>Token</TableHead>
-                <TableHead>Recipient</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead className="w-[80px]">Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+        {/* Desktop Table View */}
+        <div className="hidden md:block">
+          <ScrollArea className="h-[300px] rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[50px]">#</TableHead>
+                  <TableHead>Token</TableHead>
+                  <TableHead>Recipient</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead className="w-[100px]">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {parsedTransfers.map((transfer, index) => {
+                  const token = tokens.find(t => t.address.toLowerCase() === transfer.tokenAddress.toLowerCase());
+                  const tokenName = token?.token?._symbol || token?.token?._name || transfer.tokenAddress.slice(0, 8) + "...";
+                  return (
+                    <TableRow key={index} className={transfer.error ? "bg-red-50 dark:bg-red-950/20" : ""}>
+                      <TableCell className="font-mono text-xs">{index + 1}</TableCell>
+                      <TableCell className="text-xs truncate max-w-[100px]" title={transfer.tokenAddress}>
+                        {tokenName}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs truncate max-w-[150px]" title={transfer.to}>
+                        {transfer.to.length > 16 ? `${transfer.to.slice(0, 8)}...${transfer.to.slice(-6)}` : transfer.to}
+                      </TableCell>
+                      <TableCell className="text-right text-sm">{transfer.amount}</TableCell>
+                      <TableCell>
+                        {transfer.error ? (
+                          <span className="flex items-center text-red-600 text-xs" title={transfer.error}>
+                            <XCircle className="h-4 w-4 mr-1" />
+                            <span>Error</span>
+                          </span>
+                        ) : (
+                          <span className="flex items-center text-green-600 text-xs">
+                            <CheckCircle2 className="h-4 w-4 mr-1" />
+                            Valid
+                          </span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </ScrollArea>
+        </div>
+
+        {/* Mobile Card View */}
+        <div className="md:hidden">
+          <ScrollArea className="h-[300px] rounded-md border">
+            <div className="space-y-2 p-2">
               {parsedTransfers.map((transfer, index) => {
                 const token = tokens.find(t => t.address.toLowerCase() === transfer.tokenAddress.toLowerCase());
                 const tokenName = token?.token?._symbol || token?.token?._name || transfer.tokenAddress.slice(0, 8) + "...";
                 return (
-                  <TableRow key={index} className={transfer.error ? "bg-red-50 dark:bg-red-950/20" : ""}>
-                    <TableCell className="font-mono text-xs">{index + 1}</TableCell>
-                    <TableCell className="text-xs truncate max-w-[100px]" title={transfer.tokenAddress}>
-                      {tokenName}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs truncate max-w-[150px]" title={transfer.to}>
-                      {transfer.to.length > 16 ? `${transfer.to.slice(0, 8)}...${transfer.to.slice(-6)}` : transfer.to}
-                    </TableCell>
-                    <TableCell className="text-right text-sm">{transfer.amount}</TableCell>
-                    <TableCell>
+                  <div
+                    key={index}
+                    className={`p-3 rounded-lg border ${
+                      transfer.error
+                        ? "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900"
+                        : "bg-card border-border"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs text-muted-foreground">#{index + 1}</span>
+                        <span className="text-sm font-medium">{tokenName}</span>
+                      </div>
                       {transfer.error ? (
-                        <span className="flex items-center text-red-600 text-xs">
+                        <span className="flex items-center text-red-600 text-xs" title={transfer.error}>
                           <XCircle className="h-4 w-4 mr-1" />
-                          <span className="truncate max-w-[60px]" title={transfer.error}>Error</span>
+                          <span>Error</span>
                         </span>
                       ) : (
                         <span className="flex items-center text-green-600 text-xs">
@@ -466,20 +515,48 @@ const BulkTransferModal = ({
                           Valid
                         </span>
                       )}
-                    </TableCell>
-                  </TableRow>
+                    </div>
+                    <div className="space-y-1.5 text-xs">
+                      <div>
+                        <span className="text-muted-foreground">Recipient: </span>
+                        <span className="font-mono break-all">{transfer.to}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Amount: </span>
+                        <span className="font-medium">{transfer.amount}</span>
+                      </div>
+                      {transfer.error && (
+                        <div className="mt-2 pt-2 border-t border-red-200 dark:border-red-800">
+                          <span className="text-red-600 font-medium">{transfer.error}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 );
               })}
-            </TableBody>
-          </Table>
-        </ScrollArea>
+            </div>
+          </ScrollArea>
+        </div>
 
         {invalidTransfers.length > 0 && (
           <div className="bg-yellow-50 dark:bg-yellow-950/20 p-3 rounded-lg">
-            <p className="text-sm text-yellow-800 dark:text-yellow-200 flex items-center">
-              <AlertCircle className="h-4 w-4 mr-2" />
-              {invalidTransfers.length} transfer(s) have errors and will be skipped
+            <p className="text-sm text-yellow-800 dark:text-yellow-200 flex items-center mb-2">
+              <AlertCircle className="h-4 w-4 mr-2 flex-shrink-0" />
+              <span>{invalidTransfers.length} transfer(s) have errors and will be skipped</span>
             </p>
+            <div className="text-xs text-yellow-700 dark:text-yellow-300 mt-2 space-y-1">
+              <p className="font-medium">Errors found at CSV lines:</p>
+              <ul className="list-disc list-inside ml-2 space-y-1">
+                {invalidTransfers.map((transfer, idx) => {
+                  const rowIndex = parsedTransfers.findIndex(t => t === transfer);
+                  return (
+                    <li key={idx} className="break-words">
+                      Line {rowIndex + 1}: {transfer.error}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
           </div>
         )}
 
@@ -501,8 +578,8 @@ const BulkTransferModal = ({
             <span className="text-muted-foreground">Tokens</span>
             <span className="font-medium">{Object.keys(transfersByToken).length}</span>
           </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Total Fee ({validTransfers.length} x {TRANSFER_FEE} USDST)</span>
+          <div className="flex justify-between text-sm flex-wrap gap-1">
+            <span className="text-muted-foreground text-xs sm:text-sm">Total Fee ({validTransfers.length} x {TRANSFER_FEE} USDST)</span>
             <span className="font-medium">
               {formatBalance(totalFee, "USDST", 18, 2, 2)}
             </span>
@@ -510,12 +587,12 @@ const BulkTransferModal = ({
         </div>
       </div>
 
-      <DialogFooter className="flex gap-2">
-        <Button variant="outline" onClick={() => setModalState("upload")}>
+      <DialogFooter className="flex flex-col sm:flex-row gap-2">
+        <Button variant="outline" onClick={() => setModalState("upload")} className="w-full sm:w-auto">
           Back
         </Button>
         <Button
-          className="bg-blue-600 hover:bg-blue-700"
+          className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto"
           onClick={handleConfirmTransfer}
           disabled={validTransfers.length === 0 || hasInsufficientBalance}
         >
@@ -703,7 +780,7 @@ const BulkTransferModal = ({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="w-[95vw] sm:w-full sm:max-w-lg max-h-[95vh] overflow-y-auto">
         {modalState === "upload" && renderUploadState()}
         {modalState === "preview" && renderPreviewState()}
         {modalState === "processing" && renderProcessingState()}
