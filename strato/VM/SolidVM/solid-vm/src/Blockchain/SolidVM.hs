@@ -2225,13 +2225,16 @@ callBuiltin name args
   | "uint" `isPrefixOf` name && all isDigit (drop 4 name) = return $ intBuiltin False (Just $ read $ drop 4 name) args
   | "int" `isPrefixOf` name && all isDigit (drop 3 name) = return $ intBuiltin True (Just $ read $ drop 3 name) args
 -- Handle sized bytes type casts (bytes1, bytes2, ..., bytes32)
--- bytes32(integer) - convert to bytes representation
+-- bytes32(integer) - convert to bytes representation, padded to correct size
 callBuiltin name [SInteger i]
   | "bytes" `isPrefixOf` name && not (null (drop 5 name)) && all isDigit (drop 5 name) =
       let size = read (drop 5 name) :: Int
           sizeMask = (2 ^ (8 * size)) - 1
           maskedInt = i .&. sizeMask
-      in return $ SBytes $ integer2Bytes maskedInt
+          bytes = integer2Bytes maskedInt
+          -- Pad with leading zeros to ensure correct size (e.g., bytes32 = 32 bytes)
+          paddedBytes = B.replicate (size - B.length bytes) 0 <> bytes
+      in return $ SBytes paddedBytes
 callBuiltin name [SString s]
   | "bytes" `isPrefixOf` name && not (null (drop 5 name)) && all isDigit (drop 5 name) =
       -- Convert string to bytes representation
