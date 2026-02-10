@@ -309,6 +309,9 @@ getChainId config = do
         _ -> return $ Left $ "Failed to parse networkID: " <> networkIdStr
 
 -- | Get the current merkle root from the Railgun contract
+-- Note: Cirrus may strip leading zeros from bytes32 values. We pad to 64 chars
+-- but this may cause contract lookup failures due to a SolidVM bug with
+-- bytes32 mapping keys. See: [TODO: add bug tracker link]
 getMerkleRoot :: StratoConfig -> IO (Either Text Text)
 getMerkleRoot config = do
   manager <- HTTP.newManager HTTP.defaultManagerSettings
@@ -330,13 +333,20 @@ getMerkleRoot config = do
         [] -> return $ Left "No storage found for contract"
         (r:_) -> case parseMaybe extractMerkleRoot r of
           Nothing -> return $ Left "merkleRoot not found in storage"
-          Just root -> return $ Right root
+          Just root -> return $ Right $ padHex64 root
   where
     extractMerkleRoot :: Value -> Parser Text
     extractMerkleRoot v = do
       obj <- parseJSON v
       dataObj <- obj .: "data"
       dataObj .: "merkleRoot"
+    
+    -- Pad hex string to 64 characters (32 bytes) with leading zeros
+    padHex64 :: Text -> Text
+    padHex64 t = 
+      let clean = if "0x" `T.isPrefixOf` T.toLower t then T.drop 2 t else t
+          padding = T.replicate (64 - T.length clean) "0"
+      in padding <> clean
 
 -- | Call the contract's hashBoundParams function to get the exact hash it will compute
 -- This is needed because SolidVM's ABI encoding may differ from standard Ethereum
@@ -456,46 +466,40 @@ getUserAddress config = do
       Just addr -> return $ Right addr
 
 -- | Get the unshielded balance of a token for a given address
--- Calls the token contract's balanceOf function
+-- Reads directly from Cirrus storage (no transaction fees)
 getTokenBalance :: StratoConfig -> Text -> Text -> IO (Either Text Integer)
 getTokenBalance config tokenAddr userAddr = do
-  clientEnv <- makeClientEnv config
+  manager <- HTTP.newManager HTTP.defaultManagerSettings
   
-  let normalizedToken = if "0x" `T.isPrefixOf` T.toLower tokenAddr then T.drop 2 tokenAddr else tokenAddr
-      normalizedUser = if "0x" `T.isPrefixOf` T.toLower userAddr then T.drop 2 userAddr else userAddr
-      contractAddr = textToAddress normalizedToken
-      args = Map.singleton "accountAddress" (ArgString normalizedUser)
-      
-      payload = BlocFunction $ FunctionPayload
-        { functionpayloadContractAddress = contractAddr
-        , functionpayloadMethod = "balanceOf"
-        , functionpayloadArgs = args
-        , functionpayloadTxParams = Nothing
-        , functionpayloadMetadata = Nothing
-        }
-      
-      request = PostBlocTransactionRequest
-        { postbloctransactionrequestAddress = Nothing
-        , postbloctransactionrequestTxs = [payload]
-        , postbloctransactionrequestTxParams = Nothing
-        , postbloctransactionrequestSrcs = Nothing
-        }
-      
-      authHeader = Just $ "Bearer " <> stratoAuthToken config
+  let normalizedToken = T.toLower $ if "0x" `T.isPrefixOf` T.toLower tokenAddr then T.drop 2 tokenAddr else tokenAddr
+      normalizedUser = T.toLower $ if "0x" `T.isPrefixOf` T.toLower userAddr then T.drop 2 userAddr else userAddr
+      baseUrl = "http://" ++ T.unpack (stratoHost config) ++ ":" ++ show (stratoPort config)
+      -- Query the _balances mapping in the token contract
+      -- The key is stored as {"key": "<address>"} so we use the jsonb operator ->>
+      url = baseUrl ++ "/cirrus/search/mapping?address=eq." ++ T.unpack normalizedToken
+            ++ "&collection_name=eq._balances&key->>key=eq." ++ T.unpack normalizedUser
   
-  result <- runClientM (postBlocTransactionParallelExternal authHeader Nothing True request) clientEnv
-  pure $ case result of
-    Left err -> Left $ formatClientError err
-    Right txResults -> case txResults of
-      [] -> Left "No transaction result"
-      (r:_) -> case blocTransactionData r of
-        Just (Call contents) -> case contents of
-          [] -> Right 0
-          (SolidityValueAsString balStr:_) -> case reads (T.unpack balStr) of
-            [(n, "")] -> Right n
-            _ -> Right 0
-          _ -> Right 0
-        _ -> Right 0
+  request <- HTTP.parseRequest url
+  let requestWithAuth = request 
+        { HTTP.requestHeaders = 
+            [ ("Authorization", TE.encodeUtf8 $ "Bearer " <> stratoAuthToken config)
+            , ("Accept", "application/json")
+            ]
+        }
+  response <- HTTP.httpLbs requestWithAuth manager
+  pure $ case eitherDecode (HTTP.responseBody response) of
+    Left err -> Left $ T.pack err
+    Right (results :: [Value]) -> case results of
+      [] -> Right 0  -- No balance entry means 0
+      (r:_) -> case parseMaybe extractBalance r of
+        Nothing -> Right 0
+        Just bal -> Right bal
+  where
+    extractBalance :: Value -> Parser Integer
+    extractBalance v = do
+      obj <- parseJSON v
+      -- value is already an integer in Cirrus, not hex
+      obj .: "value"
 
 -- | Get the decimals for a token (default 18 if not found)
 getTokenDecimals :: StratoConfig -> Text -> IO Int
