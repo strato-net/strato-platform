@@ -16,10 +16,12 @@ interface ILpSeeder {
 }
 
 // Uniform clearing price auction with tiered windows, refunds, and TGE flow.
-// Summary:
-// - Bidders escrow USDST with a max price; clearing price is computed after end.
-// - Allocation is fully immediate and distributed after TGE.
-// - TGE seeds LP, releases treasury/reserve funds, and unpauses transfers if configured.
+//
+// Bidders escrow USDST with a max price; clearing price P* is the highest
+// tick price where aggregate demand >= sale supply.
+// On success, tokens are distributed immediately after finalization (before TGE).
+// Tokens are non-transferable until TGE unpauses the transfer lock.
+// TGE seeds LP, releases treasury/reserve funds, and unpauses transfers.
 contract record TokenLaunchAuction is Ownable {
     enum BidState { NULL, ACTIVE, CANCELED, FINALIZED }
     enum RefundReason { BID_CANCELED, FINALIZED, AUCTION_CANCELED }
@@ -44,6 +46,7 @@ contract record TokenLaunchAuction is Ownable {
         uint distributionAttempts;
         uint vaultedImmediate;
         uint vaultedBonusTokens;
+        uint tokensDistributed;
     }
 
     event AuctionInitialized(address usdToken, address stratoToken, uint saleSupply);
@@ -66,7 +69,9 @@ contract record TokenLaunchAuction is Ownable {
     event TgeExecuted(uint tgeTime, uint lpUSDST, uint lpSTRATO, uint treasuryUSDST, uint reserveUSDST);
     event PreTgeTreasuryWithdrawn(uint amount);
     event UnsoldBurned(uint amount);
+    event BonusBurned(uint amount);
     event Unwound(uint availableUSDST, uint raisedUSDST);
+    event LpReserveReclaimed(uint amount);
     event AuctionConfigUpdated(address caller);
 
     IERC20Metadata public usdToken;
@@ -93,7 +98,6 @@ contract record TokenLaunchAuction is Ownable {
     uint public maxDistributionAttempts;
     uint public bonusTokenReserve;
     uint public bonusTokenReserveRemaining;
-    uint public bonusScaleBps;
 
     uint public lpBps;
     uint public treasuryBps;
@@ -149,11 +153,9 @@ contract record TokenLaunchAuction is Ownable {
     mapping(address => uint[]) public record userBidIds;
     mapping(address => bool) public record allowlisted;
 
-    // Owner is assigned on deployment (proxy-safe).
     constructor(address initialOwner) Ownable(initialOwner) { }
 
     // One-time setup of tokens, wallets, fees, and timing windows.
-    // Must be called before any auction actions.
     function initialize(
         address usdToken_,
         address stratoToken_,
@@ -203,7 +205,6 @@ contract record TokenLaunchAuction is Ownable {
         lpTokenLockVault = lpTokenLockVault_;
         transferLockController = transferLockController_;
 
-        // Derive base unit from STRATO token decimals.
         tokenUnit = 10 ** uint(stratoToken.decimals());
 
         saleSupply = saleSupply_;
@@ -222,7 +223,6 @@ contract record TokenLaunchAuction is Ownable {
         treasuryBps = treasuryBps_;
         reserveBps = reserveBps_;
 
-        // Timing windows are configured up front and locked after start.
         auctionDurationSeconds = auctionDurationSeconds_;
         closeBufferSeconds = closeBufferSeconds_;
         tier1WindowSeconds = tier1WindowSeconds_;
@@ -244,7 +244,6 @@ contract record TokenLaunchAuction is Ownable {
     }
 
     // Pre-start configuration update for init parameters.
-    // Use to correct configuration before `startAuction()`.
     function updateConfig(
         address usdToken_,
         address stratoToken_,
@@ -315,7 +314,6 @@ contract record TokenLaunchAuction is Ownable {
         treasuryBps = treasuryBps_;
         reserveBps = reserveBps_;
 
-        // Timing windows are configurable pre-start only.
         auctionDurationSeconds = auctionDurationSeconds_;
         closeBufferSeconds = closeBufferSeconds_;
         tier1WindowSeconds = tier1WindowSeconds_;
@@ -348,7 +346,6 @@ contract record TokenLaunchAuction is Ownable {
 
         auctionStarted = true;
         claimReserveRemaining = claimTokenReserve;
-        // Start time is set when the auction is started.
         startTime = uint(block.timestamp);
         endTime = startTime + auctionDurationSeconds;
         closeBufferStart = endTime - closeBufferSeconds;
@@ -356,7 +353,7 @@ contract record TokenLaunchAuction is Ownable {
         emit AuctionStarted(startTime, endTime, closeBufferStart);
     }
 
-    // Temporarily pause bidding (admin).
+    // Temporarily pause bidding.
     function pauseBids() external onlyOwner {
         require(auctionStarted, "Not started");
         require(!auctionCanceled, "Auction canceled");
@@ -366,7 +363,7 @@ contract record TokenLaunchAuction is Ownable {
         emit BidsPaused();
     }
 
-    // Resume bidding (admin).
+    // Resume bidding.
     function unpauseBids() external onlyOwner {
         require(auctionStarted, "Not started");
         require(!auctionCanceled, "Auction canceled");
@@ -399,7 +396,6 @@ contract record TokenLaunchAuction is Ownable {
     }
 
     // Place a bid with budget and max price; USDST is escrowed.
-    // Enforces allowlist during its window and per-address caps.
     function placeBid(uint budgetUSDST, uint maxPriceUSDST) external {
         require(auctionStarted, "Not started");
         require(!auctionCanceled, "Auction canceled");
@@ -504,7 +500,7 @@ contract record TokenLaunchAuction is Ownable {
     }
 
     // Finalize after end time; computes clearing price and allocations.
-    // Anyone may call to move auction into finalized state.
+    // Permissionless — anyone may call to advance auction state.
     function finalize() external {
         require(auctionStarted, "Not started");
         require(!auctionCanceled, "Auction canceled");
@@ -543,13 +539,14 @@ contract record TokenLaunchAuction is Ownable {
     }
 
     // Distribute allocations for a batch of bid IDs.
-    // Transfers full allocations after TGE.
+    // Transfers full allocations (base + bonus) from escrow to winners.
+    // May be called immediately after finalization; tokens are non-transferable
+    // until TGE unpauses the transfer lock.
     function distributeBatch(uint[] bidIds) external {
         require(finalized, "Not finalized");
         require(success, "Not successful");
         require(!auctionCanceled, "Auction canceled");
         require(!unwound, "Unwound");
-        require(tgeExecuted, "TGE not executed");
 
         uint i;
         for (i = 0; i < bidIds.length; i++) {
@@ -566,11 +563,12 @@ contract record TokenLaunchAuction is Ownable {
 
             uint baseTokens = bid.tokensCapped;
             uint bonusTokens = bid.bonusTokens;
+            uint totalSent = baseTokens + bonusTokens;
             bool transferOk = true;
             if (claimReserveRemaining < baseTokens || bonusTokenReserveRemaining < bonusTokens) {
                 transferOk = false;
             } else {
-                try stratoToken.transfer(bid.bidder, baseTokens + bonusTokens) returns (bool ok) {
+                try stratoToken.transfer(bid.bidder, totalSent) returns (bool ok) {
                     if (!ok) {
                         transferOk = false;
                     }
@@ -582,9 +580,10 @@ contract record TokenLaunchAuction is Ownable {
             if (transferOk) {
                 claimReserveRemaining = claimReserveRemaining - baseTokens;
                 bonusTokenReserveRemaining = bonusTokenReserveRemaining - bonusTokens;
+                bid.tokensDistributed = totalSent;
                 bid.distributed = true;
                 pendingDistributions = pendingDistributions - 1;
-                emit DistributionProcessed(bidId, bid.bidder, baseTokens + bonusTokens);
+                emit DistributionProcessed(bidId, bid.bidder, totalSent);
                 continue;
             }
 
@@ -595,19 +594,19 @@ contract record TokenLaunchAuction is Ownable {
                 bid.vaultedImmediate = baseTokens;
                 bid.vaultedBonusTokens = bonusTokens;
                 pendingDistributions = pendingDistributions - 1;
-                emit DistributionVaulted(bidId, bid.bidder, baseTokens + bonusTokens);
+                emit DistributionVaulted(bidId, bid.bidder, totalSent);
             }
         }
     }
 
     // Distribute the next `maxCount` bids in order, starting from the cursor.
+    // Same semantics as distributeBatch but sequential.
     function distributeNext(uint maxCount) external {
         require(finalized, "Not finalized");
         require(success, "Not successful");
         require(!auctionCanceled, "Auction canceled");
         require(!unwound, "Unwound");
         require(maxCount > 0, "Invalid count");
-        require(tgeExecuted, "TGE not executed");
 
         uint i = nextDistributionIndex;
         uint processed = 0;
@@ -619,11 +618,12 @@ contract record TokenLaunchAuction is Ownable {
                 } else {
                     uint baseTokens = bid.tokensCapped;
                     uint bonusTokens = bid.bonusTokens;
+                    uint totalSent = baseTokens + bonusTokens;
                     bool transferOk = true;
                     if (claimReserveRemaining < baseTokens || bonusTokenReserveRemaining < bonusTokens) {
                         transferOk = false;
                     } else {
-                        try stratoToken.transfer(bid.bidder, baseTokens + bonusTokens) returns (bool ok) {
+                        try stratoToken.transfer(bid.bidder, totalSent) returns (bool ok) {
                             if (!ok) {
                                 transferOk = false;
                             }
@@ -635,9 +635,10 @@ contract record TokenLaunchAuction is Ownable {
                     if (transferOk) {
                         claimReserveRemaining = claimReserveRemaining - baseTokens;
                         bonusTokenReserveRemaining = bonusTokenReserveRemaining - bonusTokens;
+                        bid.tokensDistributed = totalSent;
                         bid.distributed = true;
                         pendingDistributions = pendingDistributions - 1;
-                        emit DistributionProcessed(i, bid.bidder, baseTokens + bonusTokens);
+                        emit DistributionProcessed(i, bid.bidder, totalSent);
                         processed = processed + 1;
                     } else {
                         bid.distributionAttempts = bid.distributionAttempts + 1;
@@ -647,7 +648,7 @@ contract record TokenLaunchAuction is Ownable {
                             bid.vaultedImmediate = baseTokens;
                             bid.vaultedBonusTokens = bonusTokens;
                             pendingDistributions = pendingDistributions - 1;
-                            emit DistributionVaulted(i, bid.bidder, baseTokens + bonusTokens);
+                            emit DistributionVaulted(i, bid.bidder, totalSent);
                             processed = processed + 1;
                         }
                     }
@@ -661,6 +662,7 @@ contract record TokenLaunchAuction is Ownable {
     }
 
     // Withdraw finalized refund after allocations are computed.
+    // Available regardless of TGE timing or unwind state.
     function withdrawRefund(uint bidId) external {
         require(finalized, "Not finalized");
         require(bidId < bids.length, "Invalid bid");
@@ -700,8 +702,7 @@ contract record TokenLaunchAuction is Ownable {
         emit VaultedImmediateWithdrawn(bidId, msg.sender, amount);
     }
 
-    // Burn unsold tokens after a successful auction.
-    // Ensures claim reserve remains sufficient.
+    // Burn unsold base tokens after a successful auction.
     function burnUnsold() external {
         require(finalized, "Not finalized");
         require(success, "Not successful");
@@ -715,6 +716,21 @@ contract record TokenLaunchAuction is Ownable {
         claimReserveRemaining = claimReserveRemaining - amount;
         stratoToken.burn(address(this), amount);
         emit UnsoldBurned(amount);
+    }
+
+    // Burn remaining bonus tokens (rounding dust or full reserve if
+    // no bonus-window bids won). Callable after all distributions complete.
+    function burnRemainingBonus() external {
+        require(finalized, "Not finalized");
+        require(success, "Not successful");
+        require(!unwound, "Unwound");
+        require(pendingDistributions == 0, "Distributions pending");
+        require(bonusTokenReserveRemaining > 0, "No bonus remaining");
+
+        uint amount = bonusTokenReserveRemaining;
+        bonusTokenReserveRemaining = 0;
+        stratoToken.burn(address(this), amount);
+        emit BonusBurned(amount);
     }
 
     // Schedule a TGE timestamp.
@@ -734,6 +750,7 @@ contract record TokenLaunchAuction is Ownable {
         require(!unwound, "Unwound");
         require(tgeTime != 0, "TGE not set");
         require(block.timestamp >= tgeTime, "TGE time");
+        require(pendingDistributions == 0, "Distribution incomplete");
 
         uint lpStratoRequired = 0;
         if (lpUSDST > 0) {
@@ -790,8 +807,10 @@ contract record TokenLaunchAuction is Ownable {
         return uint(block.timestamp) > finalizeTime + maxTgeDelay;
     }
 
-    // Enter resolution mode and unlock pro-rata refunds.
-    // Used when TGE is delayed beyond maxTgeDelay.
+    // Abort path when TGE is delayed beyond maxTgeDelay.
+    // Burns all participant STRATO (distributed, vaulted, and escrowed),
+    // then computes pro-rata USDST refund pool from remaining balance.
+    // Finalized refunds remain independently withdrawable.
     function unwind() external onlyOwner {
         require(finalized, "Not finalized");
         require(success, "Not successful");
@@ -799,6 +818,48 @@ contract record TokenLaunchAuction is Ownable {
         require(!unwound, "Already unwound");
         require(inResolutionMode(), "Not in resolution");
 
+        uint i;
+
+        // Burn tokens already distributed to bidders.
+        // Transfers are still locked (no TGE), so bidders hold
+        // non-transferable tokens that must be reclaimed.
+        for (i = 0; i < bids.length; i++) {
+            Bid storage bid = bids[i];
+            if (bid.state != BidState.FINALIZED) continue;
+            if (!bid.distributed) continue;
+            if (bid.distributionVaulted) continue;
+
+            if (bid.tokensDistributed > 0) {
+                stratoToken.burn(bid.bidder, bid.tokensDistributed);
+                bid.tokensDistributed = 0;
+            }
+        }
+
+        // Zero vaulted balances (tokens still held by this contract).
+        for (i = 0; i < bids.length; i++) {
+            Bid storage bid = bids[i];
+            if (bid.state != BidState.FINALIZED) continue;
+            if (!bid.distributionVaulted) continue;
+
+            bid.vaultedImmediate = 0;
+            bid.vaultedBonusTokens = 0;
+        }
+
+        // Burn undistributed participant escrow and remaining bonus.
+        if (claimReserveRemaining > 0) {
+            uint claimBurn = claimReserveRemaining;
+            claimReserveRemaining = 0;
+            stratoToken.burn(address(this), claimBurn);
+        }
+        if (bonusTokenReserveRemaining > 0) {
+            uint bonusBurn = bonusTokenReserveRemaining;
+            bonusTokenReserveRemaining = 0;
+            stratoToken.burn(address(this), bonusBurn);
+        }
+
+        // Compute USDST available for pro-rata unwind claims.
+        // Finalized and canceled refunds remain independently withdrawable,
+        // so they are excluded from the unwind pool.
         uint available = usdToken.balanceOf(address(this));
         uint refundable = totalRefundsRemaining + totalCanceledRefundsRemaining;
         if (available > refundable) {
@@ -810,11 +871,12 @@ contract record TokenLaunchAuction is Ownable {
         unwound = true;
         unwindAvailableUSDST = available;
         unwindRaisedUSDST = raisedUSDST;
+        require(unwindRaisedUSDST > 0, "No raised funds to unwind");
 
         emit Unwound(unwindAvailableUSDST, unwindRaisedUSDST);
     }
 
-    // Withdraw pro-rata USDST after unwind.
+    // Withdraw pro-rata USDST after unwind, proportional to accepted spend.
     function withdrawUnwound(uint bidId) external {
         require(unwound, "Not unwound");
         require(bidId < bids.length, "Invalid bid");
@@ -827,6 +889,17 @@ contract record TokenLaunchAuction is Ownable {
         require(claimable > 0, "Nothing to withdraw");
         bid.spentUSDST = 0;
         require(usdToken.transfer(msg.sender, claimable), "USDST transfer failed");
+    }
+
+    // Reclaim LP reserve STRATO after unwind (LP will never be seeded).
+    function reclaimLpReserve() external onlyOwner {
+        require(unwound, "Not unwound");
+        require(lpTokenReserve > 0, "No LP reserve");
+
+        uint amount = lpTokenReserve;
+        lpTokenReserve = 0;
+        require(stratoToken.transfer(treasuryWallet, amount), "STRATO transfer failed");
+        emit LpReserveReclaimed(amount);
     }
 
     // Test-only reset of auction state (must be inactive).
@@ -876,12 +949,14 @@ contract record TokenLaunchAuction is Ownable {
         nextDistributionIndex = 0;
     }
 
+    // --- Internal functions ---
+
     // Handle finalize when there are no active bids.
     function _finalizeEmpty() internal {
         uint i;
         for (i = 0; i < bids.length; i++) {
             Bid storage bid = bids[i];
-        if (bid.state == BidState.ACTIVE) {
+            if (bid.state == BidState.ACTIVE) {
                 bid.state = BidState.FINALIZED;
                 bid.spentUSDST = 0;
                 bid.refundUSDST = bid.budgetUSDST;
@@ -891,8 +966,10 @@ contract record TokenLaunchAuction is Ownable {
         }
     }
 
-    // Compute capped allocations and refunds.
-    // Updates bid state for distribution/withdrawal.
+    // Compute capped allocations, spend, and refunds at the clearing price.
+    // Classifies bids as above-P*, at-P*, or below-P* and distributes
+    // supply accordingly. Applies maxRaise haircut if proceeds exceed cap.
+    // Determines auction success based on minRaiseUSDST.
     function _computeAllocations() internal {
         uint totalTokensAbove = 0;
         uint totalDemandAt = 0;
@@ -915,6 +992,8 @@ contract record TokenLaunchAuction is Ownable {
             }
         }
 
+        // If above-P* demand alone exceeds supply, pro-rate them
+        // and zero out at-P* allocations to prevent oversell.
         if (totalTokensAbove > saleSupply) {
             uint scalePrecision = tokenUnit;
             uint scale = (saleSupply * scalePrecision) / totalTokensAbove;
@@ -935,25 +1014,28 @@ contract record TokenLaunchAuction is Ownable {
             totalDemandAt = 0;
         }
 
+        // Remaining supply after above-P* fills goes to at-P* bids pro-rata.
         uint remainingSupply = 0;
         if (saleSupply > totalTokensAbove) {
             remainingSupply = saleSupply - totalTokensAbove;
         }
 
+        uint totalDemandAtOriginal = totalDemandAt;
         for (i = 0; i < bids.length; i++) {
             Bid storage bidAt = bids[i];
             if (bidAt.state != BidState.ACTIVE) {
                 continue;
             }
             if (bidAt.maxPriceUSDST == clearingPrice) {
-                if (totalDemandAt > 0) {
-                    bidAt.tokensUncapped = (remainingSupply * bidAt.tokensUncapped) / totalDemandAt;
+                if (totalDemandAtOriginal > 0) {
+                    bidAt.tokensUncapped = (remainingSupply * bidAt.tokensUncapped) / totalDemandAtOriginal;
                 } else {
                     bidAt.tokensUncapped = 0;
                 }
             }
         }
 
+        // Compute uncapped proceeds (token-first: spend derived from tokens).
         raisedUncappedUSDST = 0;
         for (i = 0; i < bids.length; i++) {
             Bid storage bidSpent = bids[i];
@@ -967,6 +1049,7 @@ contract record TokenLaunchAuction is Ownable {
             raisedUncappedUSDST = raisedUncappedUSDST + spentUncapped;
         }
 
+        // Apply maxRaise haircut if proceeds exceed cap.
         uint raisedTmp = raisedUncappedUSDST;
         uint totalAllocatedTmp = 0;
         if (maxRaiseUSDST > 0 && raisedUncappedUSDST > maxRaiseUSDST) {
@@ -999,6 +1082,7 @@ contract record TokenLaunchAuction is Ownable {
             }
         }
 
+        // Auction succeeds iff cleared proceeds meet minimum raise.
         if (raisedTmp >= minRaiseUSDST) {
             success = true;
             raisedUSDST = raisedTmp;
@@ -1017,7 +1101,7 @@ contract record TokenLaunchAuction is Ownable {
         }
     }
 
-    // Record finalized bid results for distribution.
+    // Record finalized bid results and count pending distributions.
     function _recordFinalizedBids() internal {
         uint i;
         for (i = 0; i < bids.length; i++) {
@@ -1037,9 +1121,12 @@ contract record TokenLaunchAuction is Ownable {
         }
     }
 
-    // Compute bonus allocations for Tier 1 bids, pro-rated to the bonus reserve.
+    // Distribute the full bonus token reserve pro-rata among winning bids
+    // placed during the bonus window (tier 1).
+    // bonus_i = floor(bonusTokenReserve * tokensCapped_i / totalEligibleTokens)
+    // Rounding dust remains in bonusTokenReserveRemaining, burnable via
+    // burnRemainingBonus() after all distributions complete.
     function _computeBonusAllocations() internal {
-        bonusScaleBps = 0;
         if (bonusTokenReserve == 0) {
             bonusTokenReserveRemaining = 0;
             return;
@@ -1069,22 +1156,23 @@ contract record TokenLaunchAuction is Ownable {
             return;
         }
 
-        bonusScaleBps = totalDemand <= bonusTokenReserve ? 10000 : (bonusTokenReserve * 10000) / totalDemand;
-        uint totalAllocated = 0;
+        uint totalBonusAllocated = 0;
         for (i = 0; i < bids.length; i++) {
             Bid storage bidScaled = bids[i];
             if (bidScaled.bonusTokens == 0) {
                 continue;
             }
-            uint scaled = (bidScaled.bonusTokens * bonusScaleBps) / 10000;
-            bidScaled.bonusTokens = scaled;
-            totalAllocated = totalAllocated + scaled;
+            uint bonus = (bonusTokenReserve * bidScaled.bonusTokens) / totalDemand;
+            bidScaled.bonusTokens = bonus;
+            totalBonusAllocated = totalBonusAllocated + bonus;
         }
-        // Spendable bonus balance for distribution.
+
+        // Full reserve available for distribution; decremented as
+        // transfers happen in distributeBatch/distributeNext.
         bonusTokenReserveRemaining = bonusTokenReserve;
     }
 
-    // Record bid states for failed auctions.
+    // Record bid states for failed auctions (full refund, no tokens).
     function _recordFailureBids() internal {
         uint i;
         for (i = 0; i < bids.length; i++) {
@@ -1103,7 +1191,8 @@ contract record TokenLaunchAuction is Ownable {
         }
     }
 
-    // Build bid buckets for clearing price calculation.
+    // Compute proceeds buckets from cleared raise amount.
+    // Rounding dust is added to treasury.
     function _computeBuckets() internal {
         lpUSDST = (raisedUSDST * lpBps) / 10000;
         treasuryUSDST = (raisedUSDST * treasuryBps) / 10000;
@@ -1114,14 +1203,14 @@ contract record TokenLaunchAuction is Ownable {
         }
     }
 
-    // Resolve tier based on timestamp.
+    // Resolve tier based on timestamp relative to auction start.
     function _tierForTimestamp(uint timestamp) internal view returns (uint) {
         uint tier1End = startTime + tier1WindowSeconds;
         if (timestamp < tier1End) return 1;
         return 2;
     }
 
-    // Claim reserve required to honor claims after burn.
+    // Minimum claim reserve needed to honor outstanding claims after a burn.
     function _requiredClaimReserve(uint additionalBurn) internal view returns (uint) {
         uint required = additionalBurn;
         uint i;
@@ -1134,7 +1223,6 @@ contract record TokenLaunchAuction is Ownable {
                 required = required + (bid.vaultedImmediate);
                 continue;
             }
-
             if (!bid.distributed) {
                 required = required + bid.tokensCapped;
             }
@@ -1142,17 +1230,20 @@ contract record TokenLaunchAuction is Ownable {
         return required;
     }
 
-    // Convert budget to token amount at price.
+    // Convert budget to token amount at a given price.
     function _tokensFromBudget(uint budgetUSDST, uint price) internal view returns (uint) {
         return (budgetUSDST * tokenUnit) / price;
     }
 
-    // Convert token amount to USDST spent at price.
+    // Convert token amount to USDST spent at a given price.
     function _spentFromTokens(uint tokens, uint price) internal view returns (uint) {
         return (tokens * price) / tokenUnit;
     }
 
-    // Compute uniform clearing price from bid buckets.
+    // Find the highest tick price where aggregate demand >= sale supply.
+    // Starts at ceil-to-tick(minPrice) since all bids are included below
+    // that point. Returns minPrice if undersubscribed (no tick clears);
+    // success/failure is determined by minRaiseUSDST in _computeAllocations.
     function _computeClearingPrice() internal view returns (uint) {
         uint minPrice = 0;
         uint maxPrice = 0;
@@ -1173,11 +1264,17 @@ contract record TokenLaunchAuction is Ownable {
             return 0;
         }
 
-        uint price = priceTickUSDST;
+        uint startAt = minPrice - (minPrice % priceTickUSDST);
+        if (startAt < minPrice) startAt = startAt + priceTickUSDST;
+
+        uint bestPrice = 0;
+        uint price = startAt;
         while (price <= maxPrice) {
             uint demand = _demandAtPrice(price);
             if (demand >= saleSupply) {
-                return price;
+                bestPrice = price;
+            } else {
+                break;
             }
             if (maxPrice - price < priceTickUSDST) {
                 break;
@@ -1185,10 +1282,10 @@ contract record TokenLaunchAuction is Ownable {
             price = price + priceTickUSDST;
         }
 
-        return minPrice;
+        return bestPrice > 0 ? bestPrice : minPrice;
     }
 
-    // Total demand at a given price point.
+    // Total token demand at a given price from all eligible active bids.
     function _demandAtPrice(uint price) internal view returns (uint) {
         if (price == 0) return 0;
         uint demand = 0;
