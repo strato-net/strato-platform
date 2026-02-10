@@ -309,6 +309,7 @@ setupWalletParser = SetupWallet <$> (SetupWalletOpts
       ( long "wallet"
      <> value "default"
      <> metavar "NAME"
+     <> completer walletCompleter
      <> help "Wallet name (default: 'default')" )
   <*> switch
       ( long "force"
@@ -321,6 +322,7 @@ listAddressesParser = ListAddresses <$> (ListAddressesOpts
       ( long "wallet"
      <> value "default"
      <> metavar "NAME"
+     <> completer walletCompleter
      <> help "Wallet name (default: 'default')" )
   <*> option auto
       ( long "num"
@@ -335,6 +337,7 @@ shieldParser = Shield <$> (ShieldOpts
       ( long "wallet"
      <> value "default"
      <> metavar "NAME"
+     <> completer walletCompleter
      <> help "Wallet name (default: 'default')" )
   <*> strOption
       ( long "tokenaddress"
@@ -375,6 +378,7 @@ unshieldParser = Unshield <$> (UnshieldOpts
       ( long "wallet"
      <> value "default"
      <> metavar "NAME"
+     <> completer walletCompleter
      <> help "Wallet name (default: 'default')" )
   <*> strOption
       ( long "tokenaddress"
@@ -417,6 +421,7 @@ transferParser = Transfer <$> (TransferOpts
       ( long "wallet"
      <> value "default"
      <> metavar "NAME"
+     <> completer walletCompleter
      <> help "Wallet name (default: 'default')" )
   <*> strOption
       ( long "tokenaddress"
@@ -452,6 +457,21 @@ transferParser = Transfer <$> (TransferOpts
       ( long "dryrun"
      <> help "Show request without sending" ))
 
+-- | Completer for wallet names - lists available wallets from ~/.secrets/
+walletCompleter :: Completer
+walletCompleter = listIOCompleter $ do
+  home <- getHomeDirectory
+  let secretsDir = home </> ".secrets"
+  exists <- doesDirectoryExist secretsDir
+  if not exists
+    then return ["default"]
+    else do
+      files <- listDirectory secretsDir
+      let prefix = "railgunMnemonic."
+          namedWallets = [drop (length prefix) f | f <- files, prefix `isPrefixOf` f]
+      defaultExists <- doesFileExist (secretsDir </> "railgunMnemonic")
+      return $ (if defaultExists then ["default"] else []) ++ namedWallets
+
 -- | Parser for balance command
 balanceParser :: Parser Command
 balanceParser = Balance <$> (BalanceOpts
@@ -459,6 +479,7 @@ balanceParser = Balance <$> (BalanceOpts
       ( long "wallet"
      <> value "default"
      <> metavar "NAME"
+     <> completer walletCompleter
      <> help "Wallet name (default: 'default')" )
   <*> strOption
       ( long "baseurl"
