@@ -2,19 +2,24 @@ import { useEffect, useState, useCallback } from "react";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import MobileBottomNav from "@/components/dashboard/MobileBottomNav";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useBridgeContext } from "@/context/BridgeContext";
+import { useNetwork } from "@/context/NetworkContext";
 import { useUser } from "@/context/UserContext";
 import { api } from "@/lib/axios";
 import { useToast } from "@/hooks/use-toast";
-import type { CreditCardConfig } from "@mercata/shared-types";
 import type { BridgeToken } from "@mercata/shared-types";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
-import { Loader2, CreditCard } from "lucide-react";
+import { Loader2, CreditCard, Plus } from "lucide-react";
 import { safeParseUnits } from "@/utils/numberUtils";
 import {
   CARD_PROVIDERS,
@@ -22,22 +27,101 @@ import {
   getNetworksForProvider,
   getTokensForProviderNetwork,
   findProviderNetworkToken,
+  getCardDisplayLabel,
+  getNetworkName,
 } from "@/lib/creditCard/providers";
+import { formatWeiAmount } from "@/utils/numberUtils";
 
 const DECIMALS = 18;
-const MAX_APPROVE = "115792089237316195423570985008687907853269984665640564039457584007913129639935"; // 2^256 - 1
+const MAX_APPROVE = "115792089237316195423570985008687907853269984665640564039457584007913129639935";
+
+/** On-chain card shape (id = array index) */
+export type OnChainCardConfig = {
+  id: string;
+  nickname?: string;
+  providerId?: string;
+  destinationChainId: string;
+  externalToken: string;
+  cardWalletAddress: string;
+};
+
+type CardDisplay = {
+  config: OnChainCardConfig;
+  providerId: string | null;
+  providerName: string;
+  networkName: string;
+  tokenSymbol: string;
+  balance: string | null;
+};
+
+const METAMASK_LOGO_URL = "https://images.ctfassets.net/clixtyxoaeas/1ezuBGezqfIeifWdVtwU4c/d970d4cdf13b163efddddd5709164d2e/MetaMask-icon-Fox.svg";
+const ETHERFI_LOGO_URL = "https://avatars.githubusercontent.com/u/142260511";
+/** Provider id -> logo URL for card grid and modal */
+const PROVIDER_LOGO_URL: Record<string, string> = {
+  "metamask-card": METAMASK_LOGO_URL,
+  "etherfi-card": ETHERFI_LOGO_URL,
+};
+
+function getProviderLogoUrl(providerId: string | null): string | null {
+  return (providerId && PROVIDER_LOGO_URL[providerId]) ? PROVIDER_LOGO_URL[providerId]! : null;
+}
+
+const TW = "https://raw.githubusercontent.com/trustwallet/assets/master";
+const NETWORK_LOGO: Record<string, string> = {
+  "8453": `${TW}/blockchains/base/info/logo.png`,
+  "84532": `${TW}/blockchains/base/info/logo.png`,
+  "59144": `${TW}/blockchains/linea/info/logo.png`,
+  solana: `${TW}/blockchains/solana/info/logo.png`,
+};
+const TOKEN_LOGO: Record<string, string> = {
+  USDC: `${TW}/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png`,
+  USDT: `${TW}/blockchains/ethereum/assets/0xdAC17F958D2ee523a2206206994597C13D831ec7/logo.png`,
+  wETH: `${TW}/blockchains/ethereum/assets/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2/logo.png`,
+};
+
+function getNetworkLogoUrl(chainId: string): string | null {
+  return NETWORK_LOGO[chainId] ?? null;
+}
+function getTokenLogoUrl(symbol: string): string | null {
+  return TOKEN_LOGO[symbol?.toUpperCase()] ?? null;
+}
 
 export default function CreditCardPage() {
   const { isLoggedIn } = useUser();
   const { toast } = useToast();
+  const { isTestnet } = useNetwork();
   const { loadNetworksAndTokens } = useBridgeContext();
 
-  const [config, setConfig] = useState<CreditCardConfig | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [configs, setConfigs] = useState<OnChainCardConfig[]>([]);
+  const [loadingCards, setLoadingCards] = useState(true);
+
+  const loadCards = useCallback(async () => {
+    if (!isLoggedIn) return;
+    setLoadingCards(true);
+    try {
+      const { data } = await api.get<OnChainCardConfig[]>("/credit-card");
+      setConfigs(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error(e);
+      setConfigs([]);
+    } finally {
+      setLoadingCards(false);
+    }
+  }, [isLoggedIn]);
+
+  useEffect(() => {
+    loadCards();
+  }, [loadCards]);
+
+
+  const [cardDisplays, setCardDisplays] = useState<CardDisplay[]>([]);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingConfig, setEditingConfig] = useState<OnChainCardConfig | null>(null);
+
   const [saving, setSaving] = useState(false);
   const [approving, setApproving] = useState(false);
   const [bridgeableTokens, setBridgeableTokens] = useState<BridgeToken[]>([]);
-
+  const [nickname, setNickname] = useState("");
   const [selectedProviderId, setSelectedProviderId] = useState("");
   const [selectedNetworkChainId, setSelectedNetworkChainId] = useState("");
   const [selectedTokenSymbol, setSelectedTokenSymbol] = useState("");
@@ -52,7 +136,7 @@ export default function CreditCardPage() {
 
   const destinationChainId = selectedNetworkChainId;
   const networksForProvider = selectedProviderId
-    ? getNetworksForProvider(selectedProviderId)
+    ? getNetworksForProvider(selectedProviderId, isTestnet)
     : [];
   const tokenSymbolsForNetwork = selectedProviderId && selectedNetworkChainId
     ? getTokensForProviderNetwork(selectedProviderId, selectedNetworkChainId)
@@ -65,38 +149,115 @@ export default function CreditCardPage() {
     : null;
   const isComboSupported = !!resolvedBridgeToken;
 
-  const loadConfig = useCallback(async () => {
-    if (!isLoggedIn) return;
-    try {
-      const { data } = await api.get<CreditCardConfig | null>("/credit-card/config");
-      setConfig(data ?? null);
-      if (data) {
-        setSelectedNetworkChainId(data.destinationChainId);
-        setCardWalletAddress(data.cardWalletAddress);
-        setExternalToken(data.externalToken);
-        setThresholdAmount(formatWeiToHuman(data.thresholdAmount));
-        setTopUpAmount(formatWeiToHuman(data.topUpAmount));
-        setUseBorrow(data.useBorrow);
-        setCheckFrequencyMinutes(data.checkFrequencyMinutes);
-        setCooldownMinutes(data.cooldownMinutes);
-        setEnabled(data.enabled);
-        setSelectedProviderId("");
-        setSelectedTokenSymbol("");
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  }, [isLoggedIn]);
+  const loading = loadingCards;
 
   useEffect(() => {
     loadNetworksAndTokens().catch(console.error);
   }, [loadNetworksAndTokens]);
 
   useEffect(() => {
-    loadConfig();
-  }, [loadConfig]);
+    if (configs.length === 0) {
+      setCardDisplays([]);
+      return;
+    }
+    const chainIds = [...new Set(configs.map((c) => c.destinationChainId))];
+    const tokensByChain = new Map<string, BridgeToken[]>();
+    let pending = chainIds.length;
+    chainIds.forEach((chainId) => {
+      api
+        .get<BridgeToken[]>(`/bridge/bridgeableTokens/${chainId}`)
+        .then((res) => {
+          tokensByChain.set(chainId, Array.isArray(res.data) ? res.data : []);
+        })
+        .catch(() => tokensByChain.set(chainId, []))
+        .finally(() => {
+          pending -= 1;
+          if (pending === 0) {
+            const norm = (a: string) => (a || "").toLowerCase().replace(/^0x/, "");
+            const displays: CardDisplay[] = configs.map((config) => {
+              const tokens = tokensByChain.get(config.destinationChainId) ?? [];
+              const configTokenNorm = norm(config.externalToken);
+              const token = tokens.find((t) => norm(t.externalToken) === configTokenNorm);
+              const symbol = token?.externalSymbol ?? "";
+              const resolvedProviderId =
+                (config.providerId && getProviderById(config.providerId))
+                  ? config.providerId
+                  : (findProviderNetworkToken(config.destinationChainId, symbol)?.providerId ?? null);
+              const label = getCardDisplayLabel(config.destinationChainId, symbol);
+              const provider = getProviderById(resolvedProviderId ?? "");
+              const networkName =
+                label?.networkName ?? getNetworkName(config.destinationChainId);
+              return {
+                config,
+                providerId: resolvedProviderId,
+                providerName: provider?.name ?? label?.providerName ?? "Card",
+                networkName,
+                tokenSymbol: symbol,
+                balance: null,
+              };
+            });
+            setCardDisplays(displays);
+          }
+        });
+    });
+  }, [configs]);
+
+  useEffect(() => {
+    if (configs.length === 0) return;
+    configs.forEach((config) => {
+      api
+        .get<{ balance: string | null }>("/credit-card/balance", {
+          params: {
+            destinationChainId: config.destinationChainId,
+            externalToken: config.externalToken,
+            cardWalletAddress: config.cardWalletAddress,
+          },
+        })
+        .then((res) => {
+          const balance = res.data?.balance ?? null;
+          setCardDisplays((prev) =>
+            prev.map((cd) => (cd.config.id === config.id ? { ...cd, balance } : cd))
+          );
+        })
+        .catch(() => {});
+    });
+  }, [configs]);
+
+  const openModal = (config: OnChainCardConfig | null) => {
+    setEditingConfig(config);
+    if (config) {
+      setNickname(config.nickname ?? "");
+      setSelectedProviderId(config.providerId ?? "");
+      setSelectedNetworkChainId(config.destinationChainId);
+      setCardWalletAddress(config.cardWalletAddress);
+      setExternalToken(config.externalToken);
+      setThresholdAmount("");
+      setTopUpAmount("");
+      setUseBorrow(false);
+      setCheckFrequencyMinutes(15);
+      setCooldownMinutes(60);
+      setEnabled(false);
+      setSelectedTokenSymbol("");
+    } else {
+      setNickname("");
+      setSelectedProviderId("");
+      setSelectedNetworkChainId("");
+      setSelectedTokenSymbol("");
+      setCardWalletAddress("");
+      setThresholdAmount("");
+      setTopUpAmount("");
+      setUseBorrow(false);
+      setCheckFrequencyMinutes(15);
+      setCooldownMinutes(60);
+      setEnabled(false);
+    }
+    setModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setEditingConfig(null);
+  };
 
   useEffect(() => {
     if (!selectedNetworkChainId) {
@@ -114,18 +275,18 @@ export default function CreditCardPage() {
   }, [resolvedBridgeToken?.externalToken]);
 
   useEffect(() => {
-    if (!config?.destinationChainId || !config?.externalToken || bridgeableTokens.length === 0) return;
-    if (selectedNetworkChainId !== config.destinationChainId) return;
+    if (!editingConfig || !editingConfig.destinationChainId || !editingConfig.externalToken || bridgeableTokens.length === 0) return;
+    if (selectedNetworkChainId !== editingConfig.destinationChainId) return;
     if (selectedProviderId !== "") return;
-    const token = bridgeableTokens.find((t) => t.externalToken === config.externalToken);
+    const token = bridgeableTokens.find((t) => t.externalToken === editingConfig.externalToken);
     if (!token) return;
-    const found = findProviderNetworkToken(config.destinationChainId, token.externalSymbol);
+    const found = findProviderNetworkToken(editingConfig.destinationChainId, token.externalSymbol);
     if (found) {
       setSelectedProviderId(found.providerId);
       setSelectedNetworkChainId(found.chainId);
       setSelectedTokenSymbol(found.tokenSymbol);
     }
-  }, [config?.destinationChainId, config?.externalToken, selectedNetworkChainId, selectedProviderId, bridgeableTokens]);
+  }, [editingConfig, selectedNetworkChainId, selectedProviderId, bridgeableTokens]);
 
   const handleSave = async () => {
     if (!isLoggedIn) return;
@@ -136,29 +297,57 @@ export default function CreditCardPage() {
       });
       return;
     }
+    const walletNorm = cardWalletAddress.trim().toLowerCase().replace(/^0x/, "");
+    if (!editingConfig && configs.some(
+      (c) =>
+        c.destinationChainId === destinationChainId &&
+        (c.externalToken || "").toLowerCase() === (resolvedBridgeToken!.externalToken || "").toLowerCase() &&
+        (c.cardWalletAddress || "").toLowerCase().replace(/^0x/, "") === walletNorm
+    )) {
+      toast({ title: "This card is already connected.", variant: "destructive" });
+      return;
+    }
+    const payload = {
+      nickname: nickname.trim() || "",
+      providerId: selectedProviderId || "",
+      destinationChainId,
+      externalToken: resolvedBridgeToken!.externalToken,
+      cardWalletAddress: cardWalletAddress.trim(),
+    };
     setSaving(true);
     try {
-      const thresholdWei = toWei(thresholdAmount);
-      const topUpWei = toWei(topUpAmount);
-      if (!thresholdWei || !topUpWei) {
-        toast({ title: "Invalid amounts", variant: "destructive" });
-        return;
+      if (editingConfig) {
+        const index = parseInt(editingConfig.id, 10);
+        if (Number.isNaN(index) || index < 0) throw new Error("Invalid card index");
+        await api.post("/credit-card/update-card", { ...payload, index });
+        toast({ title: "Card updated" });
+      } else {
+        await api.post("/credit-card/add-card", payload);
+        toast({ title: "Card added" });
       }
-      await api.put("/credit-card/config", {
-        destinationChainId,
-        cardWalletAddress: cardWalletAddress.trim(),
-        externalToken: resolvedBridgeToken!.externalToken,
-        thresholdAmount: thresholdWei.toString(),
-        topUpAmount: topUpWei.toString(),
-        useBorrow,
-        checkFrequencyMinutes,
-        cooldownMinutes,
-        enabled,
-      });
-      toast({ title: "Settings saved" });
-      loadConfig();
+      await loadCards();
+      closeModal();
     } catch (e: any) {
-      toast({ title: e?.response?.data?.error || "Failed to save", variant: "destructive" });
+      const msg = e?.response?.data?.error ?? e?.message ?? "Failed to save";
+      toast({ title: String(msg), variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!editingConfig?.id) return;
+    const index = parseInt(editingConfig.id, 10);
+    if (Number.isNaN(index) || index < 0) return;
+    setSaving(true);
+    try {
+      await api.post("/credit-card/remove-card", { index });
+      toast({ title: "Card removed" });
+      await loadCards();
+      closeModal();
+    } catch (e: any) {
+      const msg = e?.response?.data?.error ?? e?.message ?? "Failed to remove";
+      toast({ title: String(msg), variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -195,6 +384,8 @@ export default function CreditCardPage() {
     }
   }
 
+  const cardShapeClass = "rounded-2xl border bg-gradient-to-br from-slate-800 to-slate-900 text-white p-5 min-h-[140px] flex flex-col justify-between shadow-lg aspect-[1.586/1] max-w-[320px]";
+
   return (
     <div className="h-screen bg-background overflow-hidden pb-16 md:pb-0">
       <DashboardSidebar />
@@ -202,177 +393,265 @@ export default function CreditCardPage() {
         className="h-screen flex flex-col transition-all duration-300"
         style={{ paddingLeft: "var(--sidebar-width, 0px)" }}
       >
-        <DashboardHeader title="Crypto Credit Card" />
+        <DashboardHeader title="Card" />
         <main className="flex-1 p-4 md:p-6 overflow-y-auto">
           {!isLoggedIn && (
             <GuestSignInBanner message="Sign in to link your card wallet and set up automatic top-ups" />
           )}
 
-          <div className="max-w-2xl space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <CreditCard size={20} />
-                  Card wallet &amp; settings
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {loading ? (
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Loading...
+          {loading ? (
+            <div className="flex items-center gap-2 text-muted-foreground py-12">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              Loading...
+            </div>
+          ) : configs.length === 0 ? (
+            <div className="flex justify-center items-center min-h-[280px]">
+              <button
+                type="button"
+                onClick={() => openModal(null)}
+                className={cardShapeClass + " w-full max-w-[320px] cursor-pointer hover:from-slate-700 hover:to-slate-800 transition-colors"}
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-full border-2 border-dashed border-white/50 flex items-center justify-center">
+                    <Plus className="h-6 w-6" />
                   </div>
-                ) : (
-                  <>
-                    <div className="grid gap-2">
-                      <Label>Card provider</Label>
-                      <select
-                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
-                        value={selectedProviderId}
-                        onChange={(e) => {
-                          setSelectedProviderId(e.target.value);
-                          setSelectedNetworkChainId("");
-                          setSelectedTokenSymbol("");
-                        }}
-                      >
-                        <option value="">Select card provider</option>
-                        {CARD_PROVIDERS.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    {selectedProviderId && (
-                      <div className="grid gap-2">
-                        <Label>Network</Label>
-                        <select
-                          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
-                          value={selectedNetworkChainId}
-                          onChange={(e) => {
-                            setSelectedNetworkChainId(e.target.value);
-                            setSelectedTokenSymbol("");
-                          }}
-                        >
-                          <option value="">Select network</option>
-                          {networksForProvider.map((n) => (
-                            <option key={n.chainId} value={n.chainId}>
-                              {n.chainName}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                    {selectedProviderId && selectedNetworkChainId && (
-                      <div className="grid gap-2">
-                        <Label>Token</Label>
-                        <select
-                          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
-                          value={selectedTokenSymbol}
-                          onChange={(e) => setSelectedTokenSymbol(e.target.value)}
-                        >
-                          <option value="">Select token</option>
-                          {tokenSymbolsForNetwork.map((sym) => (
-                            <option key={sym} value={sym}>
-                              {sym}
-                            </option>
-                          ))}
-                        </select>
-                        {selectedTokenSymbol && !isComboSupported && (
-                          <p className="text-xs text-amber-600 dark:text-amber-400">
-                            {selectedTokenSymbol} on this network is not yet supported for bridging. We&apos;re starting with USDC on Base; more options coming soon.
-                          </p>
-                        )}
-                      </div>
-                    )}
-                    <div className="grid gap-2">
-                      <Label>Card wallet address</Label>
-                      <Input
-                        placeholder="0x..."
-                        value={cardWalletAddress}
-                        onChange={(e) => setCardWalletAddress(e.target.value)}
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="grid gap-2">
-                        <Label>Top up when balance below</Label>
-                        <Input
-                          type="text"
-                          placeholder="e.g. 100"
-                          value={thresholdAmount}
-                          onChange={(e) => setThresholdAmount(e.target.value)}
+                  <span className="text-lg font-medium">Connect Card</span>
+                </div>
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {cardDisplays.map((d) => (
+                <button
+                  key={d.config.id}
+                  type="button"
+                  onClick={() => openModal(d.config)}
+                  className={cardShapeClass + " text-left cursor-pointer hover:from-slate-700 hover:to-slate-800 transition-colors"}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="relative w-20 h-20 rounded-xl bg-white/10 flex items-center justify-center overflow-hidden shrink-0">
+                      {getProviderLogoUrl(d.providerId) ? (
+                        <img
+                          src={getProviderLogoUrl(d.providerId)!}
+                          alt={d.providerName}
+                          className="h-12 w-12 object-contain"
                         />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label>Top-up amount</Label>
-                        <Input
-                          type="text"
-                          placeholder="e.g. 500"
-                          value={topUpAmount}
-                          onChange={(e) => setTopUpAmount(e.target.value)}
-                        />
-                      </div>
+                      ) : (
+                        <CreditCard className="h-12 w-12" />
+                      )}
+                      {(getNetworkLogoUrl(d.config.destinationChainId) || getTokenLogoUrl(d.tokenSymbol)) && (
+                        <div className="absolute bottom-0.5 right-0.5 flex gap-0.5 rounded-tl p-0.5">
+                          {getNetworkLogoUrl(d.config.destinationChainId) && (
+                            <img
+                              src={getNetworkLogoUrl(d.config.destinationChainId)!}
+                              alt=""
+                              className="h-3 w-3 rounded object-contain"
+                            />
+                          )}
+                          {getTokenLogoUrl(d.tokenSymbol) && (
+                            <img
+                              src={getTokenLogoUrl(d.tokenSymbol)!}
+                              alt=""
+                              className="h-3 w-3 rounded object-contain"
+                            />
+                          )}
+                        </div>
+                      )}
                     </div>
-                    <div className="flex items-center justify-between">
-                      <Label>Borrow USDST against collateral, then bridge</Label>
-                      <Switch checked={useBorrow} onCheckedChange={setUseBorrow} />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="grid gap-2">
-                        <Label>Check frequency (minutes)</Label>
-                        <Input
-                          type="number"
-                          min={1}
-                          value={checkFrequencyMinutes}
-                          onChange={(e) => setCheckFrequencyMinutes(Number(e.target.value) || 15)}
-                        />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label>Cooldown between top-ups (minutes)</Label>
-                        <Input
-                          type="number"
-                          min={0}
-                          value={cooldownMinutes}
-                          onChange={(e) => setCooldownMinutes(Number(e.target.value) || 60)}
-                        />
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <Label>Auto top-up enabled</Label>
-                      <Switch checked={enabled} onCheckedChange={setEnabled} />
-                    </div>
-                    <div className="flex gap-2 pt-2">
-                      <Button
-                        onClick={handleSave}
-                        disabled={saving || !isComboSupported}
-                      >
-                        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save settings"}
-                      </Button>
-                      <Button variant="outline" onClick={handleApprove} disabled={approving}>
-                        {approving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Approve USDST for top-ups"}
-                      </Button>
-                    </div>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-
-            {config && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Status</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-1 text-sm text-muted-foreground">
-                  {config.lastTopUpAt && <p>Last top-up: {new Date(config.lastTopUpAt).toLocaleString()}</p>}
-                  {config.lastCheckedAt && <p>Last checked: {new Date(config.lastCheckedAt).toLocaleString()}</p>}
-                  {config.lastError && <p className="text-destructive">Error: {config.lastError}</p>}
-                </CardContent>
-              </Card>
-            )}
-          </div>
+                    <span className="text-xs font-medium opacity-80 truncate max-w-[120px]">
+                      {d.config.nickname?.trim() || d.providerName}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">{d.networkName} · {d.tokenSymbol}</p>
+                    <p className="text-lg font-semibold mt-1">
+                      {d.balance !== null
+                        ? formatWeiAmount(d.balance, 6)
+                        : "—"}
+                    </p>
+                  </div>
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => openModal(null)}
+                className={cardShapeClass + " border-dashed border-2 border-slate-600 cursor-pointer hover:border-slate-500 hover:from-slate-800/80 hover:to-slate-900/80 transition-colors"}
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-full border-2 border-dashed border-white/50 flex items-center justify-center">
+                    <Plus className="h-6 w-6" />
+                  </div>
+                  <span className="text-lg font-medium">Connect Card</span>
+                </div>
+              </button>
+            </div>
+          )}
         </main>
         <MobileBottomNav />
       </div>
+
+      <Dialog open={modalOpen} onOpenChange={(open) => !open && closeModal()}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingConfig ? "Card settings" : "Connect Card"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div className="grid gap-2">
+              <Label>Nickname</Label>
+              <Input
+                placeholder="e.g. Daily spender"
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Card provider</Label>
+              <select
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                value={selectedProviderId}
+                onChange={(e) => {
+                  setSelectedProviderId(e.target.value);
+                  setSelectedNetworkChainId("");
+                  setSelectedTokenSymbol("");
+                }}
+              >
+                <option value="">Select card provider</option>
+                {CARD_PROVIDERS.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {selectedProviderId && (
+              <div className="grid gap-2">
+                <Label>Network</Label>
+                <select
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                  value={selectedNetworkChainId}
+                  onChange={(e) => {
+                    setSelectedNetworkChainId(e.target.value);
+                    setSelectedTokenSymbol("");
+                  }}
+                >
+                  <option value="">Select network</option>
+                  {networksForProvider.map((n) => (
+                    <option key={n.chainId} value={n.chainId}>
+                      {n.chainName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {selectedProviderId && selectedNetworkChainId && (
+              <div className="grid gap-2">
+                <Label>Token</Label>
+                <select
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                  value={selectedTokenSymbol}
+                  onChange={(e) => setSelectedTokenSymbol(e.target.value)}
+                >
+                  <option value="">Select token</option>
+                  {tokenSymbolsForNetwork.map((sym) => (
+                    <option key={sym} value={sym}>
+                      {sym}
+                    </option>
+                  ))}
+                </select>
+                {selectedTokenSymbol && !isComboSupported && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    {selectedTokenSymbol} on this network is not yet supported for bridging.
+                  </p>
+                )}
+              </div>
+            )}
+            {isComboSupported && (
+              <div className="grid gap-2">
+                <Label>Card wallet address</Label>
+                <Input
+                  placeholder="0x..."
+                  value={cardWalletAddress}
+                  onChange={(e) => setCardWalletAddress(e.target.value)}
+                />
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>Top up when balance below</Label>
+                <Input
+                  type="text"
+                  placeholder="e.g. 100"
+                  value={thresholdAmount}
+                  onChange={(e) => setThresholdAmount(e.target.value)}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Top-up amount</Label>
+                <Input
+                  type="text"
+                  placeholder="e.g. 500"
+                  value={topUpAmount}
+                  onChange={(e) => setTopUpAmount(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <Label>Borrow USDST against collateral, then bridge</Label>
+              <Switch checked={useBorrow} onCheckedChange={setUseBorrow} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>Check frequency (minutes)</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={checkFrequencyMinutes}
+                  onChange={(e) => setCheckFrequencyMinutes(Number(e.target.value) || 15)}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Cooldown between top-ups (minutes)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={cooldownMinutes}
+                  onChange={(e) => setCooldownMinutes(Number(e.target.value) || 60)}
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <Label>Auto top-up enabled</Label>
+              <Switch checked={enabled} onCheckedChange={setEnabled} />
+            </div>
+            <div className="flex flex-wrap gap-2 pt-2">
+              <Button
+                onClick={handleSave}
+                disabled={saving || !isComboSupported}
+              >
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : editingConfig ? "Save" : "Add card"}
+              </Button>
+              <Button variant="outline" onClick={handleApprove} disabled={approving}>
+                {approving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Approve USDST for top-ups"}
+              </Button>
+              {editingConfig && (
+                <Button variant="destructive" onClick={handleDelete}>
+                  Remove card
+                </Button>
+              )}
+            </div>
+            {editingConfig && (editingConfig.lastTopUpAt || editingConfig.lastError) && (
+              <div className="text-sm text-muted-foreground border-t pt-2 space-y-1">
+                {editingConfig.lastTopUpAt && (
+                  <p>Last top-up: {new Date(editingConfig.lastTopUpAt).toLocaleString()}</p>
+                )}
+                {editingConfig.lastError && (
+                  <p className="text-destructive">Error: {editingConfig.lastError}</p>
+                )}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

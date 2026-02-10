@@ -8,7 +8,9 @@ const requiredStrings = (obj: Record<string, any>, keys: string[]) => {
   }
 };
 
-export function validateUpsertConfig(body: unknown): asserts body is Omit<CreditCardConfig, "userAddress"> {
+export function validateUpsertConfig(
+  body: unknown
+): asserts body is Omit<CreditCardConfig, "userAddress"> & { id?: string } {
   if (!body || typeof body !== "object") throw new Error("Body must be an object");
   const b = body as Record<string, any>;
   requiredStrings(b, ["destinationChainId", "cardWalletAddress", "externalToken", "thresholdAmount", "topUpAmount"]);
@@ -20,4 +22,40 @@ export function validateUpsertConfig(body: unknown): asserts body is Omit<Credit
     throw new Error("cooldownMinutes must be a non-negative number");
   }
   if (typeof b.enabled !== "boolean") throw new Error("enabled must be a boolean");
+  if (b.nickname !== undefined && b.nickname !== null && typeof b.nickname !== "string") {
+    throw new Error("nickname must be a string");
+  }
+  if (b.providerId !== undefined && b.providerId !== null && typeof b.providerId !== "string") {
+    throw new Error("providerId must be a string");
+  }
+}
+
+export type AddCardBody = {
+  nickname: string;
+  providerId: string;
+  destinationChainId: string;
+  externalToken: string;
+  cardWalletAddress: string;
+};
+
+export function validateAddCardBody(body: unknown): asserts body is AddCardBody {
+  if (!body || typeof body !== "object") throw new Error("Body must be an object");
+  const b = body as Record<string, any>;
+  requiredStrings(b, ["destinationChainId", "externalToken", "cardWalletAddress"]);
+  if (b.nickname !== undefined && b.nickname !== null && typeof b.nickname !== "string") {
+    throw new Error("nickname must be a string");
+  }
+  if (b.providerId !== undefined && b.providerId !== null && typeof b.providerId !== "string") {
+    throw new Error("providerId must be a string");
+  }
+}
+
+export type UpdateCardBody = AddCardBody & { index: number };
+
+export function validateUpdateCardBody(body: unknown): asserts body is UpdateCardBody {
+  validateAddCardBody(body);
+  const b = body as Record<string, any>;
+  if (typeof b.index !== "number" || b.index < 0 || !Number.isInteger(b.index)) {
+    throw new Error("index must be a non-negative integer");
+  }
 }

@@ -47,7 +47,7 @@ export const adminRegistry = process.env.ADMIN_REGISTRY || "00000000000000000000
 export const voucher = process.env.VOUCHER_CONTRACT_ADDRESS || "000000000000000000000000000000000000100e";
 export const cdpRegistry = process.env.CDP_REGISTRY || "0000000000000000000000000000000000001012";
 export const rewardsChef = process.env.REWARDS_CHEF || "000000000000000000000000000000000000101f";
-export const creditCardTopUp = process.env.CREDIT_CARD_TOP_UP_ADDRESS || "";
+export let creditCardTopUp = process.env.CREDIT_CARD_TOP_UP_ADDRESS || "648dfcbcad0dc9a574cabb560d90f2859a57e736";
 
 // Hidden swap pools - these pools are filtered out from API responses
 export const hiddenSwapPools: Set<string> = new Set([
@@ -78,6 +78,10 @@ export const defaultReferralServiceFor: Record<string, string> = {
 export const defaultVaultFactoryFor: Record<string, string> = {
   "114784819836269": "37b446ec53607a0cdae38c820b838baf240a8b74", // Helium testnet
   "33056204878082667": "55c77951e9cadc73af24ec18881d01fedff1f1f1" // Upquark mainnet
+};
+
+export const defaultCreditCardTopUpFor: Record<string, string> = {
+  "114784819836269": "648dfcbcad0dc9a574cabb560d90f2859a57e736", // Helium testnet
 };
 
 export let bridgeUrl: string | undefined;
@@ -124,6 +128,16 @@ export function setVaultFactoryConfig(networkId: string) {
   }
 }
 
+export function setCreditCardTopUpConfig(networkId: string) {
+  console.log(`setCreditCardTopUp: ${networkId}`)
+  if (process.env.CREDIT_CARD_TOP_UP_ADDRESS) {
+    creditCardTopUp = process.env.CREDIT_CARD_TOP_UP_ADDRESS;
+  } else {
+    creditCardTopUp = defaultCreditCardTopUpFor[networkId] || "";
+    console.log(`setCreditCardTopUp: ${networkId} ${creditCardTopUp}`)
+  }
+}
+
 export async function initNetworkConfig() {
   // Import eth here to avoid circular dependency (eth depends on nodeUrl)
   const { eth } = await import("../utils/mercataApiHelper");
@@ -137,4 +151,5 @@ export async function initNetworkConfig() {
   setRewardsConfig(networkId);
   setReferralConfig(networkId);
   setVaultFactoryConfig(networkId);
+  setCreditCardTopUpConfig(networkId);
 }

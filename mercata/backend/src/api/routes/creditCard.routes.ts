@@ -6,17 +6,75 @@ const router = Router();
 
 /**
  * @openapi
- * /credit-card/config:
+ * /credit-card:
  *   get:
- *     summary: Get crypto credit card config for the authenticated user
+ *     summary: Get user's cards from Cirrus (on-chain data, no RPC)
  *     tags: [Credit Card]
  *     responses:
  *       200:
- *         description: Config or null
+ *         description: Array of card objects (id, nickname, providerId, destinationChainId, externalToken, cardWalletAddress)
  *       401:
  *         description: Unauthorized
  */
-router.get("/config", authHandler.authorizeRequest(), CreditCardController.getConfig);
+router.get("/", authHandler.authorizeRequest(), CreditCardController.getCards);
+
+/**
+ * @openapi
+ * /credit-card/config:
+ *   get:
+ *     summary: Get all crypto credit card configs for the authenticated user
+ *     tags: [Credit Card]
+ *     responses:
+ *       200:
+ *         description: Array of card configs
+ *       401:
+ *         description: Unauthorized
+ */
+router.get("/config", authHandler.authorizeRequest(), CreditCardController.getConfigs);
+
+/**
+ * @openapi
+ * /credit-card/config/:id/balance:
+ *   get:
+ *     summary: Get card wallet balance for a config
+ *     tags: [Credit Card]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: { balance: string | null } (wei string)
+ *       404:
+ *         description: Card not found
+ */
+router.get("/config/:id/balance", authHandler.authorizeRequest(), CreditCardController.getConfigBalance);
+
+/**
+ * @openapi
+ * /credit-card/balance:
+ *   get:
+ *     summary: Get card wallet token balance by chain/token/wallet (for on-chain cards)
+ *     tags: [Credit Card]
+ *     parameters:
+ *       - name: destinationChainId
+ *         in: query
+ *         required: true
+ *         schema: { type: string }
+ *       - name: externalToken
+ *         in: query
+ *         required: true
+ *         schema: { type: string }
+ *       - name: cardWalletAddress
+ *         in: query
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: { balance: string | null } (wei string)
+ */
+router.get("/balance", authHandler.authorizeRequest(), CreditCardController.getBalanceByParams);
 
 /**
  * @openapi
@@ -60,6 +118,84 @@ router.put("/config", authHandler.authorizeRequest(), CreditCardController.upser
 
 /**
  * @openapi
+ * /credit-card/add-card:
+ *   post:
+ *     summary: Add a card on-chain (backend submits tx to STRATO)
+ *     tags: [Credit Card]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [destinationChainId, externalToken, cardWalletAddress]
+ *             properties:
+ *               nickname: { type: string }
+ *               providerId: { type: string }
+ *               destinationChainId: { type: string }
+ *               externalToken: { type: string }
+ *               cardWalletAddress: { type: string }
+ *     responses:
+ *       200:
+ *         description: { success: true, data: { status, hash } }
+ *       401:
+ *         description: Unauthorized
+ */
+router.post("/add-card", authHandler.authorizeRequest(), CreditCardController.addCard);
+
+/**
+ * @openapi
+ * /credit-card/update-card:
+ *   post:
+ *     summary: Update a card on-chain (backend submits tx to STRATO)
+ *     tags: [Credit Card]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [index, destinationChainId, externalToken, cardWalletAddress]
+ *             properties:
+ *               index: { type: number }
+ *               nickname: { type: string }
+ *               providerId: { type: string }
+ *               destinationChainId: { type: string }
+ *               externalToken: { type: string }
+ *               cardWalletAddress: { type: string }
+ *     responses:
+ *       200:
+ *         description: { success: true, data: { status, hash } }
+ *       401:
+ *         description: Unauthorized
+ */
+router.post("/update-card", authHandler.authorizeRequest(), CreditCardController.updateCard);
+
+/**
+ * @openapi
+ * /credit-card/remove-card:
+ *   post:
+ *     summary: Remove a card on-chain (backend submits tx to STRATO)
+ *     tags: [Credit Card]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [index]
+ *             properties:
+ *               index: { type: number }
+ *     responses:
+ *       200:
+ *         description: { success: true, data: { status, hash } }
+ *       401:
+ *         description: Unauthorized
+ */
+router.post("/remove-card", authHandler.authorizeRequest(), CreditCardController.removeCard);
+
+/**
+ * @openapi
  * /credit-card/approve:
  *   post:
  *     summary: Approve CreditCardTopUp contract to spend USDST for automatic top-ups
@@ -83,16 +219,21 @@ router.post("/approve", authHandler.authorizeRequest(), CreditCardController.app
 
 /**
  * @openapi
- * /credit-card/config:
+ * /credit-card/config/:id:
  *   delete:
- *     summary: Remove crypto credit card config
+ *     summary: Remove a crypto credit card config
  *     tags: [Credit Card]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
  *     responses:
  *       200:
  *         description: { deleted: boolean }
  *       401:
  *         description: Unauthorized
  */
-router.delete("/config", authHandler.authorizeRequest(), CreditCardController.deleteConfig);
+router.delete("/config/:id", authHandler.authorizeRequest(), CreditCardController.deleteConfig);
 
 export default router;

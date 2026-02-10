@@ -43,7 +43,7 @@ const PRIMARY_NAV_ITEMS: NavItem[] = [
 
 const MORE_NAV_ITEMS: NavItem[] = [
   { icon: Activity, label: 'Activity Feed', path: '/dashboard/activity' },
-  { icon: CreditCard, label: 'Crypto Credit Card', path: '/dashboard/credit-card' },
+  { icon: CreditCard, label: 'Card', path: '/dashboard/credit-card' },
   { icon: Download, label: 'Withdrawals', path: '/dashboard/withdrawals' },
   { icon: BarChart3, label: 'STRATO Stats', path: '/dashboard/stats' },
   { icon: Droplets, label: 'Advanced', path: '/dashboard/advanced' },

@@ -1,7 +1,7 @@
 import axios from "axios";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
-import { strato } from "../../utils/mercataApiHelper";
+import { strato, cirrus } from "../../utils/mercataApiHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import { extractContractName } from "../../utils/utils";
 import type { CreditCardConfig, CreditCardTopUpExecuteParams } from "@mercata/shared-types";
@@ -47,36 +47,128 @@ export async function getErc20Balance(
   return BigInt(result);
 }
 
-/** In-memory store keyed by user address (STRATO). Production should use a persistent store. */
-const configStore = new Map<string, CreditCardConfig>();
+/** In-memory store: user address -> list of card configs. Production should use a persistent store. */
+const configStore = new Map<string, CreditCardConfig[]>();
 
 function normalizeAddress(addr: string): string {
   return addr?.toLowerCase().replace(/^0x/, "") ?? "";
 }
 
-export function getConfig(userAddress: string): CreditCardConfig | null {
-  const key = normalizeAddress(userAddress);
-  return configStore.get(key) ?? null;
+function generateId(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 }
 
-export function upsertConfig(userAddress: string, config: Omit<CreditCardConfig, "userAddress">): CreditCardConfig {
+export function getConfigs(userAddress: string): CreditCardConfig[] {
   const key = normalizeAddress(userAddress);
-  const full: CreditCardConfig = {
-    ...config,
-    userAddress: userAddress,
+  return configStore.get(key) ?? [];
+}
+
+export function getConfigById(userAddress: string, id: string): CreditCardConfig | null {
+  const list = getConfigs(userAddress);
+  return list.find((c) => c.id === id) ?? null;
+}
+
+/**
+ * Card row from Cirrus userCards table (value may be struct with nickname, providerId, etc.).
+ */
+export type CardRowFromCirrus = {
+  key2?: number;
+  value?: {
+    nickname?: string;
+    providerId?: string;
+    destinationChainId?: string | number;
+    externalToken?: string;
+    cardWalletAddress?: string;
   };
-  configStore.set(key, full);
+};
+
+/**
+ * Get a user's cards from Cirrus (CreditCardTopUp-userCards table). No RPC/eth_call.
+ */
+export async function getCardsFromCirrus(
+  accessToken: string,
+  userAddress: string
+): Promise<Array<{ id: string; nickname?: string; providerId?: string; destinationChainId: string; externalToken: string; cardWalletAddress: string }>> {
+  if (!creditCardTopUp) {
+    return [];
+  }
+  const normalizedUser = normalizeAddress(userAddress);
+  try {
+    const { data } = await cirrus.get(accessToken, `/${CreditCardTopUp}-userCards`, {
+      params: {
+        select: "key2,value",
+        address: `eq.${creditCardTopUp}`,
+        key: `eq.${normalizedUser}`,
+        order: "key2.asc",
+      },
+    });
+    if (!Array.isArray(data)) return [];
+    return data.map((row: CardRowFromCirrus, i: number) => {
+      const v = row?.value ?? {};
+      return {
+        id: String(row?.key2 ?? i),
+        nickname: typeof v.nickname === "string" ? v.nickname : undefined,
+        providerId: typeof v.providerId === "string" ? v.providerId : undefined,
+        destinationChainId: String(v.destinationChainId ?? "0"),
+        externalToken: typeof v.externalToken === "string" ? v.externalToken : "",
+        cardWalletAddress: typeof v.cardWalletAddress === "string" ? v.cardWalletAddress : "",
+      };
+    });
+  } catch (err) {
+    console.error("getCardsFromCirrus:", err);
+    return [];
+  }
+}
+
+function sameCard(a: CreditCardConfig, b: { destinationChainId: string; externalToken: string; cardWalletAddress: string }): boolean {
+  return (
+    a.destinationChainId === b.destinationChainId &&
+    a.externalToken === b.externalToken &&
+    normalizeAddress(a.cardWalletAddress) === normalizeAddress(b.cardWalletAddress)
+  );
+}
+
+export function upsertConfig(
+  userAddress: string,
+  body: Omit<CreditCardConfig, "userAddress"> & { id?: string }
+): CreditCardConfig {
+  const key = normalizeAddress(userAddress);
+  let list = configStore.get(key) ?? [];
+  const existingIndex = body.id ? list.findIndex((c) => c.id === body.id) : -1;
+  if (existingIndex < 0) {
+    const duplicate = list.find((c) => sameCard(c, body));
+    if (duplicate) {
+      throw new Error("This card is already connected.");
+    }
+  }
+  const id = existingIndex >= 0 ? list[existingIndex].id : generateId();
+  const full: CreditCardConfig = {
+    ...body,
+    id,
+    userAddress,
+  };
+  if (existingIndex >= 0) {
+    list = [...list];
+    list[existingIndex] = full;
+  } else {
+    list = [...list, full];
+  }
+  configStore.set(key, list);
   return full;
 }
 
-export function deleteConfig(userAddress: string): boolean {
+export function deleteConfig(userAddress: string, id: string): boolean {
   const key = normalizeAddress(userAddress);
-  return configStore.delete(key);
+  const list = configStore.get(key) ?? [];
+  const next = list.filter((c) => c.id !== id);
+  if (next.length === list.length) return false;
+  configStore.set(key, next);
+  return true;
 }
 
-/** Returns all enabled configs for the balance watcher. */
+/** Returns all enabled configs for the balance watcher (all users). */
 export function getConfigsForWatcher(): CreditCardConfig[] {
-  return Array.from(configStore.values()).filter((c) => c.enabled);
+  return Array.from(configStore.values()).flat().filter((c) => c.enabled);
 }
 
 /**
@@ -115,6 +207,121 @@ export async function executeTopUp(
 }
 
 /**
+ * Submit addCard transaction to STRATO via POST /strato/v2.3/transaction/parallel.
+ * Called by the app when the user adds a card (no MetaMask tx).
+ */
+export async function submitAddCard(
+  accessToken: string,
+  userAddress: string,
+  body: {
+    nickname: string;
+    providerId: string;
+    destinationChainId: string;
+    externalToken: string;
+    cardWalletAddress: string;
+  }
+): Promise<{ status: string; hash: string }> {
+  if (!creditCardTopUp) {
+    throw new Error("CREDIT_CARD_TOP_UP_ADDRESS is not configured");
+  }
+  const externalToken = (body.externalToken || "").replace(/^0x/i, "").toLowerCase();
+  const cardWalletAddress = (body.cardWalletAddress || "").replace(/^0x/i, "").toLowerCase();
+  if (!externalToken || !cardWalletAddress) {
+    throw new Error("externalToken and cardWalletAddress are required");
+  }
+  const tx = await buildFunctionTx(
+    {
+      contractName: extractContractName(CreditCardTopUp),
+      contractAddress: creditCardTopUp,
+      method: "addCard",
+      args: {
+        nickname: body.nickname || "",
+        providerId: body.providerId || "",
+        destinationChainId: body.destinationChainId,
+        externalToken,
+        cardWalletAddress,
+      },
+    },
+    userAddress,
+    accessToken
+  );
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, tx)
+  );
+}
+
+/**
+ * Submit updateCard transaction to STRATO.
+ */
+export async function submitUpdateCard(
+  accessToken: string,
+  userAddress: string,
+  body: {
+    index: number;
+    nickname: string;
+    providerId: string;
+    destinationChainId: string;
+    externalToken: string;
+    cardWalletAddress: string;
+  }
+): Promise<{ status: string; hash: string }> {
+  if (!creditCardTopUp) {
+    throw new Error("CREDIT_CARD_TOP_UP_ADDRESS is not configured");
+  }
+  const externalToken = (body.externalToken || "").replace(/^0x/i, "").toLowerCase();
+  const cardWalletAddress = (body.cardWalletAddress || "").replace(/^0x/i, "").toLowerCase();
+  if (!externalToken || !cardWalletAddress) {
+    throw new Error("externalToken and cardWalletAddress are required");
+  }
+  const tx = await buildFunctionTx(
+    {
+      contractName: extractContractName(CreditCardTopUp),
+      contractAddress: creditCardTopUp,
+      method: "updateCard",
+      args: {
+        index: body.index,
+        nickname: body.nickname || "",
+        providerId: body.providerId || "",
+        destinationChainId: body.destinationChainId,
+        externalToken,
+        cardWalletAddress,
+      },
+    },
+    userAddress,
+    accessToken
+  );
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, tx)
+  );
+}
+
+/**
+ * Submit removeCard transaction to STRATO.
+ */
+export async function submitRemoveCard(
+  accessToken: string,
+  userAddress: string,
+  index: number
+): Promise<{ status: string; hash: string }> {
+  if (!creditCardTopUp) {
+    throw new Error("CREDIT_CARD_TOP_UP_ADDRESS is not configured");
+  }
+  const tx = await buildFunctionTx(
+    {
+      contractName: extractContractName(CreditCardTopUp),
+      contractAddress: creditCardTopUp,
+      method: "removeCard",
+      args: { index },
+    },
+    userAddress,
+    accessToken
+  );
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, tx)
+  );
+}
+
+/**
  * Submit ERC-20 approve(creditCardTopUp, amount) for USDST so the operator can top up on the user's behalf.
  */
 export async function submitApproval(
@@ -143,25 +350,29 @@ export async function submitApproval(
 }
 
 /**
- * Update last top-up timestamp and clear last error for a user.
+ * Update last top-up timestamp and clear last error for a card config.
  */
-export function markTopUpDone(userAddress: string): void {
-  const key = normalizeAddress(userAddress);
-  const c = configStore.get(key);
-  if (c) {
-    configStore.set(key, { ...c, lastTopUpAt: new Date().toISOString(), lastError: undefined });
-  }
+export function markTopUpDone(config: CreditCardConfig): void {
+  const key = normalizeAddress(config.userAddress);
+  const list = configStore.get(key) ?? [];
+  const idx = list.findIndex((c) => c.id === config.id);
+  if (idx < 0) return;
+  const next = [...list];
+  next[idx] = { ...next[idx], lastTopUpAt: new Date().toISOString(), lastError: undefined };
+  configStore.set(key, next);
 }
 
 /**
- * Update last checked timestamp and optionally set last error.
+ * Update last checked timestamp and optionally set last error for a card config.
  */
-export function markChecked(userAddress: string, error?: string): void {
-  const key = normalizeAddress(userAddress);
-  const c = configStore.get(key);
-  if (c) {
-    configStore.set(key, { ...c, lastCheckedAt: new Date().toISOString(), lastError: error });
-  }
+export function markChecked(config: CreditCardConfig, error?: string): void {
+  const key = normalizeAddress(config.userAddress);
+  const list = configStore.get(key) ?? [];
+  const idx = list.findIndex((c) => c.id === config.id);
+  if (idx < 0) return;
+  const next = [...list];
+  next[idx] = { ...next[idx], lastCheckedAt: new Date().toISOString(), lastError: error };
+  configStore.set(key, next);
 }
 
 /**
@@ -177,10 +388,10 @@ export async function runBalanceWatcher(operatorAccessToken: string): Promise<vo
   const configs = getConfigsForWatcher();
   for (const c of configs) {
     try {
-      markChecked(c.userAddress);
+      markChecked(c);
       const rpcUrl = rpcUrls[c.destinationChainId];
       if (!rpcUrl) {
-        markChecked(c.userAddress, "No RPC URL for chain " + c.destinationChainId);
+        markChecked(c, "No RPC URL for chain " + c.destinationChainId);
         continue;
       }
       const balance = await getErc20Balance(rpcUrl, c.externalToken, c.cardWalletAddress);
@@ -196,9 +407,24 @@ export async function runBalanceWatcher(operatorAccessToken: string): Promise<vo
         externalRecipient: c.cardWalletAddress,
         externalToken: c.externalToken,
       });
-      markTopUpDone(c.userAddress);
+      markTopUpDone(c);
     } catch (err: any) {
-      markChecked(c.userAddress, err?.message ?? "Top-up failed");
+      markChecked(c, err?.message ?? "Top-up failed");
     }
+  }
+}
+
+/**
+ * Get card wallet token balance for a config (for display). Returns wei string or null if RPC unavailable.
+ */
+export async function getCardBalance(config: CreditCardConfig): Promise<string | null> {
+  const rpcUrls = getExternalChainRpcUrls();
+  const rpcUrl = rpcUrls[config.destinationChainId];
+  if (!rpcUrl) return null;
+  try {
+    const balance = await getErc20Balance(rpcUrl, config.externalToken, config.cardWalletAddress);
+    return balance.toString();
+  } catch {
+    return null;
   }
 }

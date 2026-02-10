@@ -15,12 +15,13 @@ Allow users to link a **card wallet** (e.g. a single-admin SAFE or EOA on an ext
 ### 2. STRATO: approved bridge-out (CreditCardTopUp contract)
 
 - **Purpose:** Let the backend (relayer) trigger a bridge-out **without the user signing** each time, using a prior ERC‑20 approval.
+- **Card storage on-chain:** Card metadata (nickname, provider, network, token, card wallet address) is stored in the contract per user: `mapping(address => CardInfo[]) public userCards`. Users call **addCard**, **updateCard**, or **removeCard** to manage their list; the app reads **getCards(user)** from Cirrus and calls add/update/remove when the user saves or removes a card, then re-fetches to refresh the grid.
 - **Flow:**
   1. User approves **CreditCardTopUp** to spend USDST (or the relevant STRATO token) up to a limit.
   2. User configures card wallet (chain + address), threshold, and optionally “borrow then bridge”.
   3. When the service decides to top up, it calls **CreditCardTopUp.topUpCard(user, amount, destChainId, destAddress, externalToken)**.
   4. Contract: `transferFrom(user, this, amount)` → `approve(MercataBridge, amount)` → **MercataBridge.requestWithdrawal(destChainId, destAddress, externalToken, amount)**.
-- **Access control:** Only a designated **operator** (relayer backend) can call `topUpCard`; owner sets the operator.
+- **Access control:** Only a designated **operator** (relayer backend) can call `topUpCard`; owner sets the operator. Only `msg.sender` can add/update/remove their own cards.
 - **Security:** User only risks the allowance they grant to CreditCardTopUp; no custody of funds by the protocol beyond the existing bridge flow.
 
 ### 3. Backend service
@@ -77,7 +78,8 @@ Allow users to link a **card wallet** (e.g. a single-admin SAFE or EOA on an ext
 
 - **Contract:** `CreditCardTopUp.sol` in `mercata/contracts/concrete/Bridge/`. Deploy and set `mercataBridge` and `operator`; set backend env `CREDIT_CARD_TOP_UP_ADDRESS`.
 - **Backend:** Config stored in-memory (production should use a DB). Env: `CREDIT_CARD_TOP_UP_ADDRESS`, optional `OPERATOR_ACCESS_TOKEN` (for watcher), optional `EXTERNAL_CHAIN_RPC_URLS` (JSON map of chainId -> rpcUrl for balance checks). Run balance watcher periodically (e.g. cron) by calling `runBalanceWatcher(operatorAccessToken)` from `creditCard.service`.
-- **UI:** Tab "Crypto Credit Card" under dashboard More; page at `/dashboard/credit-card` for config, approval, and status.
+- **UI:** Tab "Crypto Credit Card" under dashboard More; page at `/dashboard/credit-card`. Cards are **stored on-chain** in CreditCardTopUp: the app reads **getCards(user)** from Cirrus on load, and calls **addCard** / **updateCard** / **removeCard** when the user adds, edits, or removes a card, then re-fetches to refresh the grid. Supported card providers: **MetaMask Card** (Linea, Solana, Base / Base Sepolia) and **Ether.fi Card** (Base / Base Sepolia). Tokens per network in `lib/creditCard/providers.ts`. Balance is fetched via GET `/credit-card/balance?destinationChainId=...&externalToken=...&cardWalletAddress=...`.
+- **Bridge – USDT on Base:** To support USDT on Base (and Base Sepolia), the MercataBridge owner must call `setAsset(enabled, externalChainId, externalDecimals, externalName, externalSymbol, externalToken, maxPerWithdrawal, stratoToken)` for the USDT contract on that chain. On Base mainnet (8453), bridged USDT is at `0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2` (6 decimals). Use the STRATO-side token that mints/burns for USDT; configure the matching external token address for Base Sepolia (84532) if needed. Once the asset is enabled, the credit card flow will show USDT as a supported token for Base and top-ups will work.
 
 ## Out of scope for v1
 
