@@ -4,115 +4,133 @@
 module Railgun.Prover
   ( -- * Types
     ProverConfig(..)
+  , ProverMode(..)
     -- * Proof generation
   , generateProof
   , defaultProverConfig
   ) where
 
-import qualified Data.Aeson as Aeson
-import Data.Aeson ((.:))
-import Data.Aeson.Types (Parser, parseEither)
 import qualified Data.ByteString.Lazy as LBS
 import Data.Text (Text)
 import qualified Data.Text as T
-import System.Exit (ExitCode(..))
-import System.Process (readProcessWithExitCode)
-import System.IO.Temp (withSystemTempDirectory)
-import System.FilePath ((</>))
+import System.Environment (lookupEnv)
 
 import Railgun.Unshield (SnarkProof(..), G1Point(..), G2Point(..))
 import Railgun.Witness (CircuitInputs, witnessToJSON)
 
+import qualified Groth16.Snarkjs as Snarkjs
+import qualified Groth16.Rapidsnark as Rapidsnark
+import qualified Groth16.BN254 as Native
+
+-- | Prover mode
+data ProverMode = SnarkjsProver | RapidsnarkProver | NativeProver
+  deriving (Show, Eq)
+
 -- | Configuration for the prover
 data ProverConfig = ProverConfig
-  { pcCircuitWasm :: FilePath    -- ^ Path to circuit .wasm file
-  , pcProvingKey :: FilePath     -- ^ Path to .zkey proving key
-  , pcSnarkjsPath :: FilePath    -- ^ Path to snarkjs executable
+  { pcCircuitWasm    :: !FilePath   -- ^ Path to circuit .wasm file
+  , pcProvingKey     :: !FilePath   -- ^ Path to .zkey proving key
+  , pcProvingKeyJSON :: !FilePath   -- ^ Path to .json proving key (native prover)
+  , pcSnarkjsPath    :: !FilePath   -- ^ Path to snarkjs executable
+  , pcRapidsnarkPath :: !FilePath   -- ^ Path to rapidsnark executable
+  , pcProverMode     :: !ProverMode -- ^ Which prover to use
   } deriving (Show, Eq)
 
--- | Default prover config for 01x02 circuit (absolute paths)
+-- | Default prover config for 01x02 circuit
 defaultProverConfig :: ProverConfig
 defaultProverConfig = ProverConfig
   { pcCircuitWasm = "/home/golemshid/strato-platform/strato/tools/airlock/circuits/01x02/circuit.wasm"
   , pcProvingKey = "/home/golemshid/strato-platform/strato/tools/airlock/circuits/01x02/zkey"
+  , pcProvingKeyJSON = "/home/golemshid/strato-platform/strato/tools/airlock/circuits/01x02/circuit_pk.json"
   , pcSnarkjsPath = "snarkjs"
+  , pcRapidsnarkPath = "rapidsnark"
+  , pcProverMode = SnarkjsProver
   }
 
--- | Generate a Groth16 proof using snarkjs
+-- | Generate a Groth16 proof
+--   Use AIRLOCK_PROVER env var to override: native, snarkjs, rapidsnark
 generateProof :: ProverConfig -> CircuitInputs -> IO (Either Text SnarkProof)
 generateProof config inputs = do
-  withSystemTempDirectory "railgun_proof" $ \tmpDir -> do
-    let inputFile = tmpDir </> "input.json"
-        witnessFile = tmpDir </> "witness.wtns"
-        proofFile = tmpDir </> "proof.json"
-        publicFile = tmpDir </> "public.json"
-    
-    -- Write inputs to JSON file
-    let inputJson = witnessToJSON inputs
-    LBS.writeFile inputFile inputJson
-    
-    -- Step 1: Generate witness
-    let witnessCmd = pcSnarkjsPath config
-        witnessArgs = ["wtns", "calculate", pcCircuitWasm config, inputFile, witnessFile]
-    
-    (exitCode1, stdout1, stderr1) <- readProcessWithExitCode witnessCmd witnessArgs ""
-    case exitCode1 of
-      ExitFailure code -> 
-        return $ Left $ "Witness generation failed (exit " <> T.pack (show code) <> "): " 
-                     <> T.pack stdout1 <> " | " <> T.pack stderr1
-      ExitSuccess -> do
-        -- Step 2: Generate proof
-        let proveCmd = pcSnarkjsPath config
-            proveArgs = ["groth16", "prove", pcProvingKey config, witnessFile, proofFile, publicFile]
-        
-        (exitCode2, _, stderr2) <- readProcessWithExitCode proveCmd proveArgs ""
-        case exitCode2 of
-          ExitFailure code ->
-            return $ Left $ "Proof generation failed (exit " <> T.pack (show code) <> "): " <> T.pack stderr2
-          ExitSuccess -> do
-            -- Parse the proof
-            proofJson <- LBS.readFile proofFile
-            case parseProofJSON proofJson of
-              Left err -> return $ Left $ "Failed to parse proof: " <> err
-              Right proof -> return $ Right proof
+  mode <- getProverMode config
+  let inputJson = witnessToJSON inputs
+  case mode of
+    SnarkjsProver    -> generateSnarkjs config inputJson
+    RapidsnarkProver -> generateRapidsnark config inputJson
+    NativeProver     -> generateNative config inputJson
 
--- | Parse snarkjs proof JSON format
-parseProofJSON :: LBS.ByteString -> Either Text SnarkProof
-parseProofJSON json = 
-  case Aeson.eitherDecode json of
-    Left err -> Left $ T.pack err
-    Right obj -> parseProofObject obj
+-- | Get prover mode (env var overrides config)
+getProverMode :: ProverConfig -> IO ProverMode
+getProverMode config = do
+  env <- lookupEnv "AIRLOCK_PROVER"
+  return $ case env of
+    Just "native"     -> NativeProver
+    Just "snarkjs"    -> SnarkjsProver
+    Just "rapidsnark" -> RapidsnarkProver
+    _                 -> pcProverMode config
 
-parseProofObject :: Aeson.Value -> Either Text SnarkProof
-parseProofObject = either (Left . T.pack) Right . parseEither parseProof
-  where
-    parseProof :: Aeson.Value -> Parser SnarkProof
-    parseProof v = do
-      obj <- Aeson.parseJSON v
-      piA <- obj .: "pi_a" :: Parser [Text]
-      piB <- obj .: "pi_b" :: Parser [[Text]]
-      piC <- obj .: "pi_c" :: Parser [Text]
-      -- Parse G1 point (pi_a and pi_c are [x, y, z] where z=1)
-      case (piA, piC) of
-        (aX:aY:_, cX:cY:_) -> do
-          let aXInt = read (T.unpack aX) :: Integer
-              aYInt = read (T.unpack aY) :: Integer
-              cXInt = read (T.unpack cX) :: Integer
-              cYInt = read (T.unpack cY) :: Integer
-          -- Parse G2 point (pi_b is [[x0, x1], [y0, y1], [z0, z1]])
-          case piB of
-            (bXArr:bYArr:_) ->
-              case (bXArr, bYArr) of
-                (bX0:bX1:_, bY0:bY1:_) -> do
-                  let bX0Int = read (T.unpack bX0) :: Integer
-                      bX1Int = read (T.unpack bX1) :: Integer
-                      bY0Int = read (T.unpack bY0) :: Integer
-                      bY1Int = read (T.unpack bY1) :: Integer
-                  return SnarkProof
-                    { proofA = G1Point aXInt aYInt
-                    , proofB = G2Point (bX0Int, bX1Int) (bY0Int, bY1Int)  -- Keep snarkjs order
-                    , proofC = G1Point cXInt cYInt
-                    }
-                _ -> fail "Invalid pi_b format"
-            _ -> fail "Invalid pi_b format"
-        _ -> fail "Invalid pi_a or pi_c format"
+-- | Generate proof via snarkjs
+generateSnarkjs :: ProverConfig -> LBS.ByteString -> IO (Either Text SnarkProof)
+generateSnarkjs ProverConfig{..} inputJson = do
+  let cfg = Snarkjs.Config
+        { Snarkjs.cfgCircuitWasm = pcCircuitWasm
+        , Snarkjs.cfgProvingKey  = pcProvingKey
+        , Snarkjs.cfgSnarkjsPath = pcSnarkjsPath
+        }
+  result <- Snarkjs.generateProof cfg inputJson
+  return $ fmap convertSnarkjsProof result
+
+-- | Generate proof via rapidsnark
+generateRapidsnark :: ProverConfig -> LBS.ByteString -> IO (Either Text SnarkProof)
+generateRapidsnark ProverConfig{..} inputJson = do
+  let cfg = Rapidsnark.Config
+        { Rapidsnark.cfgCircuitWasm    = pcCircuitWasm
+        , Rapidsnark.cfgProvingKey     = pcProvingKey
+        , Rapidsnark.cfgRapidsnarkPath = pcRapidsnarkPath
+        , Rapidsnark.cfgSnarkjsPath    = pcSnarkjsPath
+        }
+  result <- Rapidsnark.generateProof cfg inputJson
+  return $ fmap convertRapidsnarkProof result
+
+-- | Generate proof via native Haskell prover
+generateNative :: ProverConfig -> LBS.ByteString -> IO (Either Text SnarkProof)
+generateNative ProverConfig{..} inputJson = do
+  putStrLn "WARNING: Native prover is experimental and may produce invalid proofs."
+  -- Load proving key
+  pkResult <- Native.loadProvingKeyJSON pcProvingKeyJSON
+  case pkResult of
+    Left err -> return $ Left $ "Failed to load proving key: " <> err
+    Right pk -> do
+      -- Generate witness via snarkjs (native prover only does proving)
+      let cfg = Snarkjs.Config
+            { Snarkjs.cfgCircuitWasm = pcCircuitWasm
+            , Snarkjs.cfgProvingKey  = pcProvingKey
+            , Snarkjs.cfgSnarkjsPath = pcSnarkjsPath
+            }
+      -- Use snarkjs just for witness, then extract and use native prover
+      -- For now, use a simplified approach: call snarkjs for full proof
+      -- but with native key loaded (TODO: proper witness extraction)
+      result <- Snarkjs.generateProof cfg inputJson
+      case result of
+        Left err -> return $ Left err
+        Right _ -> do
+          -- Generate native proof (requires witness file - simplified for now)
+          -- TODO: Extract witness from snarkjs and use Native.prove
+          return $ Left $ "Native prover integration incomplete. " <>
+                         "Proving key loaded: nVars=" <> T.pack (show (Native.pkNVars pk)) <>
+                         ", domainSize=" <> T.pack (show (Native.pkDomainSize pk))
+
+-- | Convert Snarkjs.Proof to SnarkProof
+convertSnarkjsProof :: Snarkjs.Proof -> SnarkProof
+convertSnarkjsProof p = SnarkProof
+  { proofA = G1Point (Snarkjs.g1x $ Snarkjs.proofA p) (Snarkjs.g1y $ Snarkjs.proofA p)
+  , proofB = G2Point (Snarkjs.g2x $ Snarkjs.proofB p) (Snarkjs.g2y $ Snarkjs.proofB p)
+  , proofC = G1Point (Snarkjs.g1x $ Snarkjs.proofC p) (Snarkjs.g1y $ Snarkjs.proofC p)
+  }
+
+-- | Convert Rapidsnark.Proof to SnarkProof
+convertRapidsnarkProof :: Rapidsnark.Proof -> SnarkProof
+convertRapidsnarkProof p = SnarkProof
+  { proofA = G1Point (Rapidsnark.g1x $ Rapidsnark.proofA p) (Rapidsnark.g1y $ Rapidsnark.proofA p)
+  , proofB = G2Point (Rapidsnark.g2x $ Rapidsnark.proofB p) (Rapidsnark.g2y $ Rapidsnark.proofB p)
+  , proofC = G1Point (Rapidsnark.g1x $ Rapidsnark.proofC p) (Rapidsnark.g1y $ Rapidsnark.proofC p)
+  }

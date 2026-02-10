@@ -53,6 +53,11 @@ library:
     - text
     - transformers
     - vector
+    - directory
+    # Groth16 provers
+    - groth16-native
+    - groth16-snarkjs
+    - groth16-rapidsnark
 
 executables:
   airlock:
@@ -75,4 +80,3 @@ executables:
       - strato-model
       - text
       - time
-
