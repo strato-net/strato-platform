@@ -1,5 +1,5 @@
 import cron from 'node-cron';
-import { logInfo, logError, logFeedUpdate } from './utils/logger';
+import { logInfo, logError, logWarning, logFeedUpdate } from './utils/logger';
 import { fetchPrices, generateConstantPrices } from './adapters/genericRestAdapter';
 import { pushAssetPrices } from './utils/oraclePusher';
 import { checkBalances } from './utils/balanceChecker';
@@ -32,9 +32,9 @@ function checkPriceChange(assetKey: string, newPrice: number, previousPrice: num
         const oldPriceUSD = (previousPrice / 1e18).toFixed(2);
         const newPriceUSD = (newPrice / 1e18).toFixed(2);
         const direction = newPrice > previousPrice ? 'increased' : 'decreased';
-        logError('CronScheduler', new Error(
+        logWarning('CronScheduler',
             `Significant price change alert for ${assetKey}: ${direction} ${changePercent.toFixed(2)}% (max ${ORACLE_CONFIG.MAX_PRICE_CHANGE_PERCENT}%). Previous: $${oldPriceUSD}, New: $${newPriceUSD}`
-        ));
+        );
     }
 }
 
@@ -48,9 +48,9 @@ function checkSourceDivergence(assetKey: string, sources: Array<{ name: string; 
     
     if (spreadPercent > ORACLE_CONFIG.MAX_SOURCE_DIVERGENCE_PERCENT) {
         const sourcePrices = sources.map(s => `${s.name}: $${(s.price / 1e18).toFixed(2)}`).join(', ');
-        logError('CronScheduler', new Error(
+        logWarning('CronScheduler',
             `Source divergence alert for ${assetKey}: ${spreadPercent.toFixed(2)}% spread (max ${ORACLE_CONFIG.MAX_SOURCE_DIVERGENCE_PERCENT}%). Sources: [${sourcePrices}]`
-        ));
+        );
     }
 }
 
@@ -94,7 +94,7 @@ async function fetchSource(sourceName: string, sourceConfig: SourceConfig, confi
         return { sourceName, prices, success: true, duration: Date.now() - startTime };
     } catch (err) {
         const duration = Date.now() - startTime;
-        logError('CronScheduler', new Error(`${sourceName} failed (${duration}ms): ${(err as Error).message}`));
+        logWarning('CronScheduler', `${sourceName} failed (${duration}ms): ${(err as Error).message}`);
         return { sourceName, prices: {}, success: false, duration };
     }
 }
@@ -133,14 +133,19 @@ function aggregatePrices(
         const sources: Array<{ name: string; price: number }> = [];
         let expectedCount = weekdaySources.length;
 
+        const failedSources: string[] = [];
+
         const collect = (names: string[], symbol: string) => {
+            failedSources.length = 0;
             names.forEach(name => {
                 const result = sourceResults.get(name);
                 const data = result?.success && result?.prices[symbol];
                 if (data) {
                     sources.push({ name, price: data.price });
                 } else if (result?.success) {
-                    logInfo('CronScheduler', `${symbol}: ${name} returned no price (API succeeded but symbol missing from response)`);
+                    failedSources.push(`${name}(no ${symbol})`);
+                } else {
+                    failedSources.push(`${name}(fetch failed)`);
                 }
             });
             return sources.length;
@@ -160,9 +165,11 @@ function aggregatePrices(
                 expectedCount = weekdaySources.length;
             }
         }
-        
+
         const isValid = sources.length >= requiredSources;
-        if (!isValid) logError('CronScheduler', new Error(`Insufficient sources for ${assetKey}: got ${sources.length}, need ${requiredSources}`));
+        if (!isValid) {
+            logError('CronScheduler', new Error(`Insufficient sources for ${assetKey}: got ${sources.length}, need ${requiredSources}. Failed: [${failedSources.join(', ')}]`));
+        }
         
         const medianPrice = isValid ? calculateMedian(sources.map(s => s.price)) : 0;
         

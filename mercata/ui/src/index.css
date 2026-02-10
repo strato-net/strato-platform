@@ -90,6 +90,11 @@
     @apply border-border;
   }
 
+  html {
+    /* Prevent layout shift when modal opens and scrollbar disappears */
+    scrollbar-gutter: stable;
+  }
+
   body {
     @apply bg-background text-foreground;
   }

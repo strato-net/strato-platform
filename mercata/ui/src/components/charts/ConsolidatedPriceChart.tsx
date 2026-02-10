@@ -90,12 +90,12 @@ const CustomTooltip = ({
   // For LP tokens, only show NAV (spotPrice), not STRATO price
   if (isLPToken) {
     return (
-      <div className="rounded-lg border bg-background p-3 shadow-lg">
-        <p className="text-sm font-medium mb-2">{label}</p>
+      <div className="rounded-lg border bg-background p-2 md:p-3 shadow-lg text-xs md:text-sm">
+        <p className="font-medium mb-2 text-xs md:text-sm">{label}</p>
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: CHART_COLORS.SPOT }} />
-            <span className="text-sm">
+            <div className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full flex-shrink-0" style={{ backgroundColor: CHART_COLORS.SPOT }} />
+            <span className="text-xs md:text-sm">
               Net Asset Value: {spotPrice !== undefined && spotPrice !== null ? formatTooltipValue(spotPrice) : 'N/A'}
             </span>
           </div>
@@ -106,18 +106,18 @@ const CustomTooltip = ({
 
   // For regular tokens, show both prices
   return (
-    <div className="rounded-lg border bg-background p-3 shadow-lg">
-      <p className="text-sm font-medium mb-2">{label}</p>
+    <div className="rounded-lg border bg-background p-2 md:p-3 shadow-lg text-xs md:text-sm">
+      <p className="font-medium mb-2 text-xs md:text-sm">{label}</p>
       <div className="space-y-1">
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: CHART_COLORS.SWAP }} />
-          <span className="text-sm">
+          <div className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full flex-shrink-0" style={{ backgroundColor: CHART_COLORS.SWAP }} />
+          <span className="text-xs md:text-sm">
             STRATO Price: {stratoPrice !== undefined && stratoPrice !== null ? formatTooltipValue(stratoPrice) : 'N/A'}
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: CHART_COLORS.SPOT }} />
-          <span className="text-sm">
+          <div className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full flex-shrink-0" style={{ backgroundColor: CHART_COLORS.SPOT }} />
+          <span className="text-xs md:text-sm">
             Spot Price: {spotPrice !== undefined && spotPrice !== null ? formatTooltipValue(spotPrice) : 'N/A'}
           </span>
         </div>
@@ -254,7 +254,7 @@ const ConsolidatedPriceChart: React.FC<ConsolidatedPriceChartProps> = ({
     }
 
     return (
-      <div className="w-full aspect-[21/9]">
+      <div className="w-full aspect-[4/3] md:aspect-[21/9]">
         <ChartContainer
           config={{
             spotPrice: {
@@ -277,7 +277,7 @@ const ConsolidatedPriceChart: React.FC<ConsolidatedPriceChartProps> = ({
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart
               data={mergedData}
-              margin={{ top: 10, right: 30, left: 30, bottom: 5 }}
+              margin={{ top: 10, right: 10, left: 0, bottom: 20 }}
             >
               <defs>
                 <linearGradient id="colorSpot" x1="0" y1="0" x2="0" y2="1">
@@ -300,18 +300,24 @@ const ConsolidatedPriceChart: React.FC<ConsolidatedPriceChartProps> = ({
                   const parts = value.split(' ');
                   return parts[0];
                 }}
+                className="text-xs md:text-sm"
               />
               
               <YAxis
                 axisLine={false}
                 tickLine={false}
-                tick={{ fontSize: 12, dx: -15 }}
+                tick={{ fontSize: 10, dx: -5 }}
                 domain={yAxisDomain}
-                width={110}
-                tickFormatter={(value) => `$${parseFloat(value).toLocaleString('en-US', { 
-                  minimumFractionDigits: 2, 
-                  maximumFractionDigits: 2 
-                })}`}
+                width={60}
+                className="text-xs md:text-sm"
+                tickFormatter={(value) => {
+                  const formatted = parseFloat(value).toLocaleString('en-US', { 
+                    minimumFractionDigits: 2, 
+                    maximumFractionDigits: 2 
+                  });
+                  // On mobile, show shorter format if needed
+                  return `$${formatted.length > 8 ? parseFloat(value).toFixed(2) : formatted}`;
+                }}
               />
               
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -326,6 +332,8 @@ const ConsolidatedPriceChart: React.FC<ConsolidatedPriceChartProps> = ({
                   if (value === 'swapPrice') return 'STRATO Price';
                   return value;
                 }}
+                className="text-xs md:text-sm"
+                iconSize={12}
               />
               
               <Tooltip content={<CustomTooltip isLPToken={isLPToken} />} />
@@ -368,13 +376,13 @@ const ConsolidatedPriceChart: React.FC<ConsolidatedPriceChartProps> = ({
 
   return (
     <Card className="mb-6">
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg md:text-xl">{title}</CardTitle>
         {subtitle && (
-          <p className="text-sm text-muted-foreground">{subtitle}</p>
+          <p className="text-xs md:text-sm text-muted-foreground mt-1">{subtitle}</p>
         )}
       </CardHeader>
-      <CardContent className="overflow-hidden">
+      <CardContent className="overflow-hidden px-2 md:px-6 pb-4">
         {renderChart()}
       </CardContent>
     </Card>

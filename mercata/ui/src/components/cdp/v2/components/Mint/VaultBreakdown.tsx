@@ -1205,15 +1205,18 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
 
             {/* Vault Grid */}
             <div className="space-y-2">
-              <div className={`grid gap-2 text-xs font-medium text-muted-foreground pb-2 border-b border-border ${getGridClass()}`}>
-                <div>Asset</div>
-                <div>Stability Fee</div>
-                <div>Deposit</div>
-                {showMintAmounts && <div>Mint</div>}
-                {!autoAllocate && <div className="text-right pr-3">HF</div>}
-              </div>
-              
-              {vaultCandidates
+              {/* Mobile-friendly scrollable container */}
+              <div className="overflow-x-auto -mx-3 px-3">
+                <div className="min-w-[600px]">
+                  <div className={`grid gap-2 text-xs font-medium text-muted-foreground pb-2 border-b border-border ${getGridClass()}`}>
+                    <div className="min-w-[100px]">Asset</div>
+                    <div className="min-w-[80px]">Stability Fee</div>
+                    <div className="min-w-[120px]">Deposit</div>
+                    {showMintAmounts && <div className="min-w-[120px]">Mint</div>}
+                    {!autoAllocate && <div className="text-right pr-3 min-w-[60px]">HF</div>}
+                  </div>
+                  
+                  {vaultCandidates
                 .filter((candidate) => {
                   // In auto mode, omit vaults with 0 deposit and 0 mint
                   if (autoAllocate) {
@@ -1288,7 +1291,7 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
                 return (
                   <div key={candidate.vaultConfig.assetAddress} className={`grid gap-2 items-center text-sm ${getGridClass()}`}>
                     {/* Asset */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 min-w-[100px]">
                       {tokenImage ? (
                         <img src={tokenImage} alt={candidate.vaultConfig.symbol} className="w-6 h-6 rounded-full object-cover" />
                       ) : (
@@ -1303,10 +1306,10 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
                     </div>
                     
                     {/* Stability Fee */}
-                    <div className="text-muted-foreground">{formatPercentage(stabilityFeeRate)}</div>
+                    <div className="text-muted-foreground min-w-[80px]">{formatPercentage(stabilityFeeRate)}</div>
                     
                     {/* Deposit Input */}
-                    <div className="space-y-1">
+                    <div className="space-y-1 min-w-[120px]">
                       <div className="relative">
                         {displayMode === 'Value' && (
                           <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none z-10">$</span>
@@ -1357,7 +1360,7 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
                     
                     {/* Mint Input */}
                     {showMintAmounts && (
-                      <div className="space-y-1">
+                      <div className="space-y-1 min-w-[120px]">
                         <div className="relative">
                           {displayMode === 'Value' && (
                             <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none z-10">$</span>
@@ -1400,11 +1403,13 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
                     
                     {/* HF */}
                     {!autoAllocate && (
-                      <div className={`font-medium text-right pr-3 ${hfColor}`}>{hf}</div>
+                      <div className={`font-medium text-right pr-3 min-w-[60px] ${hfColor}`}>{hf}</div>
                     )}
                   </div>
                 );
               })}
+                </div>
+              </div>
               
               {vaultCandidates.length === 0 && (
                 <div className="text-sm text-muted-foreground text-center py-2">No vault candidates available</div>

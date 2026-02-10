@@ -6,13 +6,137 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Plus, XCircle, Copy, CopyCheck } from "lucide-react";
+import { Loader2, Plus, XCircle, Copy, CopyCheck, Gift, Users, Clock, CheckCircle } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/axios";
 import { useNavigate } from "react-router-dom";
 import { formatUnits } from "@/utils/numberUtils";
 import { useTokenContext } from "@/context/TokenContext";
+import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
+
+// Guest View Component - Static informational page for non-logged-in users
+const GuestReferralsView = () => {
+  return (
+    <div className="min-h-screen bg-background pb-16 md:pb-0">
+      <DashboardSidebar />
+
+      <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
+        <DashboardHeader title="My Referrals" />
+        <main className="p-4 md:p-6">
+          <div className="max-w-4xl mx-auto space-y-6">
+            <GuestSignInBanner message="Sign in to create referral deposits and gift tokens to friends" />
+            {/* Hero Section */}
+            <Card className="border-2 border-dashed bg-gradient-to-br from-pink-50/50 to-purple-50/50 dark:from-pink-950/20 dark:to-purple-950/20">
+              <CardHeader className="text-center pb-2">
+                <div className="mx-auto w-20 h-20 bg-gradient-to-br from-pink-500 to-purple-600 rounded-full flex items-center justify-center mb-4 shadow-lg">
+                  <Gift className="w-10 h-10 text-white" />
+                </div>
+                <CardTitle className="text-2xl">Refer Friends & Gift Tokens</CardTitle>
+                <CardDescription className="text-base max-w-lg mx-auto">
+                  Create referral deposits to onboard new users to STRATO. 
+                  Gift tokens to friends and help grow the community.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="text-center space-y-6">
+                {/* Key Features */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl mx-auto">
+                  <div className="flex flex-col items-center gap-2 p-4 rounded-lg bg-card border">
+                    <Gift className="w-8 h-8 text-pink-500" />
+                    <span className="font-medium">Token Gifting</span>
+                    <span className="text-sm text-muted-foreground">Gift tokens to new users</span>
+                  </div>
+                  <div className="flex flex-col items-center gap-2 p-4 rounded-lg bg-card border">
+                    <Users className="w-8 h-8 text-purple-500" />
+                    <span className="font-medium">Grow Community</span>
+                    <span className="text-sm text-muted-foreground">Help onboard new members</span>
+                  </div>
+                  <div className="flex flex-col items-center gap-2 p-4 rounded-lg bg-card border">
+                    <Clock className="w-8 h-8 text-blue-500" />
+                    <span className="font-medium">Expiry Control</span>
+                    <span className="text-sm text-muted-foreground">Set expiration dates</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Key Features */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Referral Features</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="flex items-start gap-3">
+                      <CheckCircle className="w-5 h-5 text-green-500 mt-0.5" />
+                      <div>
+                        <h4 className="font-medium">Multiple Tokens</h4>
+                        <p className="text-sm text-muted-foreground">
+                          Bundle multiple token types (USDST, etc.) in a single referral deposit
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <CheckCircle className="w-5 h-5 text-green-500 mt-0.5" />
+                      <div>
+                        <h4 className="font-medium">Quantity Control</h4>
+                        <p className="text-sm text-muted-foreground">
+                          Set how many redemptions a single deposit supports
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <CheckCircle className="w-5 h-5 text-green-500 mt-0.5" />
+                      <div>
+                        <h4 className="font-medium">Easy Sharing</h4>
+                        <p className="text-sm text-muted-foreground">
+                          Share via SMS, email, or any messaging app with one click
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="flex items-start gap-3">
+                      <CheckCircle className="w-5 h-5 text-green-500 mt-0.5" />
+                      <div>
+                        <h4 className="font-medium">Expiration Control</h4>
+                        <p className="text-sm text-muted-foreground">
+                          Set date and time for when referrals expire (default: 7 days)
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <CheckCircle className="w-5 h-5 text-green-500 mt-0.5" />
+                      <div>
+                        <h4 className="font-medium">Secure Redemption</h4>
+                        <p className="text-sm text-muted-foreground">
+                          Private key split ensures only the recipient with the code can claim
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <CheckCircle className="w-5 h-5 text-green-500 mt-0.5" />
+                      <div>
+                        <h4 className="font-medium">Token Recovery</h4>
+                        <p className="text-sm text-muted-foreground">
+                          Cancel expired or unclaimed referrals to recover your tokens
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+          </div>
+        </main>
+      </div>
+
+      <MobileBottomNav />
+    </div>
+  );
+};
 
 interface UserReferral {
   ephemeralAddress: string;
@@ -24,7 +148,12 @@ interface UserReferral {
 }
 
 const ReferralsManagement = () => {
-  const { userAddress } = useUser();
+  const { userAddress, isLoggedIn } = useUser();
+  
+  // Show guest view for non-logged-in users
+  if (!isLoggedIn) {
+    return <GuestReferralsView />;
+  }
   const { toast } = useToast();
   const navigate = useNavigate();
   const { getTransferableTokens } = useTokenContext();

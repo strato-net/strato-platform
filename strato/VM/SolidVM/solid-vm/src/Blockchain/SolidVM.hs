@@ -1463,7 +1463,16 @@ expToVar' (CC.FunctionCall _ (CC.Variable _ name) args)
     ("int" `isPrefixOf` name && all isDigit (drop 3 name)) ||
     ("bytes" `isPrefixOf` name && not (null (drop 5 name)) && all isDigit (drop 5 name)) = do
       argVals <- argsToVals args
-      Constant <$> callBuiltin name argVals
+      case name of
+        "bytes32" -> do
+          currentBlockNum <- BlockHeader.number . Env.blockHeader <$> getEnv
+          -- Helium network ID = 114784819836269
+          -- Blocks before 31000 on helium have TXs that relied on the buggy behavior, so preserve it there
+          let isHeliumPreFork = computeNetworkID == 114784819836269 && currentBlockNum < 31000
+          if isHeliumPreFork
+            then unknownVariable "getVariableOfName" ("bytes32" :: String)
+            else Constant <$> callBuiltin name argVals
+        _ -> Constant <$> callBuiltin name argVals
 
 -- case to catch a using statement function like _x.add(3)
 
@@ -2290,20 +2299,23 @@ callBuiltin "ecPairing" xs =
         Right points -> pure . SBool $ Builtins.ecPairing points
         Left xs' -> typeError "invalid args passed to ecPairing" $ show xs'
 callBuiltin "poseidon" [SVariadic xs] =
-  let go (SInteger x : xs') = (x:) <$> go xs'
-      go []   = Right []
-      go xs' = Left xs'
-   in case go xs of
-        Right inputs -> pure . SInteger $ Builtins.poseidonHash inputs
+  let go !n (SInteger x : xs') = fmap (x:) <$> go (n+1) xs'
+      go !n []   = Right (n, [])
+      go _ xs' = Left xs'
+   in case go (0 :: Int) xs of
+        Right (n, inputs) | n > 0 && n <= 8 -> pure . SInteger $ Builtins.poseidonHash inputs
+        Right _ -> typeError "invalid args passed to poseidon" $ show xs
         Left xs' -> typeError "invalid args passed to poseidon" $ show xs'
-callBuiltin "poseidon" [SArray xs] =
-  SInteger . Builtins.poseidonHash <$> traverse getInt (V.toList xs)
+callBuiltin "poseidon" [SArray xs] = case V.length xs of
+  n | n > 0 && n <= 8 -> SInteger . Builtins.poseidonHash <$> traverse getInt (V.toList xs)
+  _ -> typeError "invalid args passed to poseidon" $ show xs
 callBuiltin "poseidon" xs =
-  let go (SInteger x : xs') = (x:) <$> go xs'
-      go []   = Right []
-      go xs' = Left xs'
-   in case go xs of
-        Right inputs -> pure . SInteger $ Builtins.poseidonHash inputs
+  let go !n (SInteger x : xs') = fmap (x:) <$> go (n+1) xs'
+      go !n []   = Right (n, [])
+      go _ xs' = Left xs'
+   in case go (0 :: Int) xs of
+        Right (n, inputs) | n > 0 && n <= 8 -> pure . SInteger $ Builtins.poseidonHash inputs
+        Right _ -> typeError "invalid args passed to poseidon" $ show xs
         Left xs' -> typeError "invalid args passed to poseidon" $ show xs'
 callBuiltin ("payable") [SAddress a _] = return $ SAddress a True
 callBuiltin "require" (SBool cond : msg) = do

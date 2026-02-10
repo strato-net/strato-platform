@@ -20,6 +20,8 @@ services:
     - SENDGRID_API_KEY=${SENDGRID_API_KEY}
     - CHAIN_1_RPC_URL=${CHAIN_1_RPC_URL}
     - CHAIN_11155111_RPC_URL=${CHAIN_11155111_RPC_URL}
+    - CHAIN_8453_RPC_URL=${CHAIN_8453_RPC_URL}
+    - CHAIN_84532_RPC_URL=${CHAIN_84532_RPC_URL}
     build: .
     image: ${BRIDGE_IMAGE:-<REPO_URL>bridge:<VERSION>}
     restart: unless-stopped
