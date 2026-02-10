@@ -7,7 +7,7 @@ import Control.Concurrent (threadDelay)
 import Control.Exception (try, SomeException)
 import Control.Monad (when, unless, forM_)
 import Data.Aeson (decode, encode, (.:), (.=), object)
-import qualified Data.Aeson as Aeson
+-- import qualified Data.Aeson as Aeson  -- Used by debug code below
 import Data.Aeson.Types (parseMaybe)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as B16
@@ -1358,8 +1358,8 @@ runTransfer topts = do
       -- Step 6b: Create commitment ciphertexts FIRST (needed for boundParamsHash)
       TIO.putStrLn "  Creating encrypted note data..."
       
-      -- Generate random for change note
-      changeRandom <- Railgun.Crypto.randomBytes 16
+      -- Use input note's random for change note (must match NPK derivation)
+      let changeRandom = Bal.snRandom noteToSpend
       
       -- Create ciphertext for change note (going back to ourselves)
       changeCiphertext <- createCommitmentCiphertext
@@ -1446,9 +1446,9 @@ runTransfer topts = do
       TIO.putStrLn "  Circuit inputs built"
       
       -- Debug: Save circuit inputs for inspection
-      let inputsJson = Aeson.encode witnessResult
-      LBS.writeFile "/tmp/circuit_inputs.json" inputsJson
-      TIO.putStrLn "  Circuit inputs saved to /tmp/circuit_inputs.json"
+      -- let inputsJson = Aeson.encode witnessResult
+      -- LBS.writeFile "/tmp/circuit_inputs.json" inputsJson
+      -- TIO.putStrLn "  Circuit inputs saved to /tmp/circuit_inputs.json"
       
       -- Step 8: Generate SNARK proof
       TIO.putStrLn "\nGenerating SNARK proof..."

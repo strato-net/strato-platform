@@ -33,7 +33,7 @@ import Network.HTTP.Types.Status (statusCode)
 import Text.Read (readMaybe)
 import Text.Printf (printf)
 
-import Railgun.Crypto (getSharedSymmetricKey, decryptRandom, poseidonHash, computeNullifier)
+import Railgun.Crypto (getSharedSymmetricKey, decryptRandom, poseidonHash, computeNullifier, aesDecryptCTR)
 import Railgun.Types (RailgunKeys(..), TokenType(..))
 import qualified Data.Set as Set
 
@@ -436,60 +436,80 @@ safeIndex xs i
   | otherwise = Nothing
 
 -- | Try to decrypt a note from a Transact event (for change notes)
--- Transact events have a different ciphertext structure than Shield events
+-- Ciphertext format: 4 chunks of 32 bytes each
+--   ct0 = IV (16 bytes) || first 16 bytes of encrypted data
+--   ct1 = next 32 bytes of encrypted data
+--   ct2 = next 32 bytes of encrypted data
+--   ct3 = last 16 bytes of encrypted data || 16 bytes padding
+-- Decrypted payload (96 bytes): npk (32) || token (32) || value (16) || random (16)
 tryDecryptTransactNote :: RailgunKeys 
                        -> Text              -- ^ Commitment hash (to verify)
                        -> TransactCiphertext 
                        -> Integer           -- ^ Tree position
                        -> Text              -- ^ Block number
                        -> Maybe ShieldedNote
-tryDecryptTransactNote keys commitmentHash ciphertext treePos blockNum = do
-  -- Parse the ciphertext components
-  -- ciphertext[0] = IV, ciphertext[1] = encrypted random | token type, ciphertext[2] = encrypted value
-  ct0 <- hexToBS =<< safeIndex (tcCiphertext ciphertext) 0
-  ct1 <- hexToBS =<< safeIndex (tcCiphertext ciphertext) 1
-  ct2 <- hexToBS =<< safeIndex (tcCiphertext ciphertext) 2
-  ct3 <- hexToBS =<< safeIndex (tcCiphertext ciphertext) 3
-  
-  -- Try with sender's viewing key first (for change notes we created)
-  senderKey <- hexToBS $ tcBlindedSenderViewingKey ciphertext
-  
-  -- Derive shared key via ECDH
-  sharedKey <- getSharedSymmetricKey (viewingPrivateKey keys) senderKey
-  
-  -- Decrypt the random value (first 15 bytes of ct1 after decryption)
-  let encryptedRandom = BS.take 16 ct1
-  randomValue <- decryptRandom sharedKey ct0 encryptedRandom
-  
-  -- The last byte of the decrypted data is the token type
-  let randomInt = bytesToInteger (BS.take 15 randomValue)
-      tokenType = fromIntegral $ BS.last randomValue
-  
-  -- Decrypt the value (ct2)
-  decryptedValue <- decryptRandom sharedKey ct0 ct2
-  let valueInt = bytesToInteger $ BS.take 16 decryptedValue
-  
-  -- Decrypt the token address (ct3)
-  decryptedToken <- decryptRandom sharedKey ct0 ct3
-  let tokenAddr = T.toLower $ TE.decodeUtf8 $ B16.encode $ BS.take 20 decryptedToken
-  
-  -- Compute NPK and verify commitment matches
-  let computedNpk = poseidonHash [masterPublicKey keys, randomInt]
-      tokenId = hexToInteger tokenAddr
-      computedCommitment = poseidonHash [computedNpk, tokenId, valueInt]
-      eventCommitment = hexToInteger commitmentHash
-  
-  if computedCommitment == eventCommitment
-    then Just ShieldedNote
-      { snTokenAddress = tokenAddr
-      , snTokenType = intToTokenType tokenType
-      , snTokenSubID = 0
-      , snValue = valueInt
-      , snBlockNumber = blockNum
-      , snTreePosition = treePos
-      , snRandom = BS.take 15 randomValue
-      }
-    else Nothing
+tryDecryptTransactNote keys commitmentHash ciphertext treePos blockNum =
+  -- Try with sender key first (for change notes), then receiver key (for incoming notes)
+  let senderKey = tcBlindedSenderViewingKey ciphertext
+      receiverKey = tcBlindedReceiverViewingKey ciphertext
+  in case tryWithKey senderKey of
+    Just note -> Just note
+    Nothing -> tryWithKey receiverKey
+  where
+    tryWithKey blindedKey = do
+      -- Parse the ciphertext chunks
+      ct0 <- hexToBS =<< safeIndex (tcCiphertext ciphertext) 0
+      ct1 <- hexToBS =<< safeIndex (tcCiphertext ciphertext) 1
+      ct2 <- hexToBS =<< safeIndex (tcCiphertext ciphertext) 2
+      ct3 <- hexToBS =<< safeIndex (tcCiphertext ciphertext) 3
+      
+      -- Extract IV and encrypted data
+      let iv = BS.take 16 ct0
+          encryptedData = BS.drop 16 ct0 <> ct1 <> ct2 <> BS.take 16 ct3  -- 96 bytes
+      
+      -- Skip if key is all zeros
+      blindedKeyBytes <- hexToBS blindedKey
+      if BS.all (== 0) blindedKeyBytes
+        then Nothing
+        else do
+          -- Derive shared key via ECDH
+          sharedKey <- getSharedSymmetricKey (viewingPrivateKey keys) blindedKeyBytes
+          
+          -- Decrypt the full payload with AES-CTR
+          let decrypted = aesDecryptCTR sharedKey iv encryptedData
+          
+          -- Parse decrypted data: npk (32) || token (32) || value (16) || random (16)
+          let npkBytes = BS.take 32 decrypted
+              tokenBytes = BS.take 32 $ BS.drop 32 decrypted
+              valueBytes = BS.take 16 $ BS.drop 64 decrypted
+              randomBytes' = BS.take 16 $ BS.drop 80 decrypted
+              
+              npkInt = bytesToInteger npkBytes
+              -- Token is stored as 32-byte big-endian integer, address in LAST 20 bytes
+              tokenAddr = T.toLower $ TE.decodeUtf8 $ B16.encode $ BS.drop 12 tokenBytes
+              tokenId = hexToInteger tokenAddr
+              valueInt = bytesToInteger valueBytes
+              randomInt = bytesToInteger randomBytes'
+              
+              -- Verify NPK matches: npk should equal poseidon(masterPublicKey, random)
+              expectedNpk = poseidonHash [masterPublicKey keys, randomInt]
+              
+              -- Verify commitment matches
+              computedCommitment = poseidonHash [npkInt, tokenId, valueInt]
+              eventCommitment = hexToInteger commitmentHash
+          
+          -- Note is ours if NPK matches AND commitment matches
+          if npkInt == expectedNpk && computedCommitment == eventCommitment
+            then Just ShieldedNote
+              { snTokenAddress = tokenAddr
+              , snTokenType = ERC20  -- Transact notes are always ERC20
+              , snTokenSubID = 0
+              , snValue = valueInt
+              , snBlockNumber = blockNum
+              , snTreePosition = treePos
+              , snRandom = randomBytes'
+              }
+            else Nothing
 
 -- | Try to decrypt all notes from a Transact event
 tryDecryptTransactEvent :: RailgunKeys -> TransactEvent -> [ShieldedNote]
@@ -498,7 +518,6 @@ tryDecryptTransactEvent keys event =
       ciphertexts = teCiphertexts event
       startPos = teStartPosition event
       blockNum = teBlockNumber event
-      -- Zip hashes with ciphertexts and positions
       zipped = zip3 hashes ciphertexts [startPos..]
   in mapMaybe (\(h, ct, pos) -> tryDecryptTransactNote keys h ct pos blockNum) zipped
 
@@ -517,7 +536,7 @@ scanShieldedBalance keys baseUrl authToken contractAddr = do
       -- Fetch Transact events (for change notes)
       transactEventsResult <- fetchTransactEventsForNotes baseUrl authToken contractAddr
       let transactEvents = case transactEventsResult of
-            Left _ -> []  -- If we can't fetch, skip
+            Left _ -> []
             Right evts -> evts
       
       -- Fetch Nullified events to find spent notes
