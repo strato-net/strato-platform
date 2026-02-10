@@ -1,0 +1,34 @@
+name: groth16-native
+version: 0.1.0
+synopsis: Native Haskell Groth16 prover for BN254 curve
+description: |
+  Pure Haskell implementation of Groth16 zero-knowledge proof generation
+  for the BN254 (alt_bn128) curve. Parses snarkjs/circom format files.
+  
+  EXPERIMENTAL: May produce invalid proofs - use for development/testing only.
+license: AllRightsReserved
+author: BlockApps
+maintainer: info@blockapps.net
+
+library:
+  source-dirs: src
+  exposed-modules:
+    - Groth16.BN254
+  dependencies:
+    - base
+    - aeson
+    - bytestring
+    - binary
+    - text
+    - vector
+    # Cryptographic libraries
+    - pairing
+    - galois-field
+    - elliptic-curve
+    - groups
+    # Utilities
+    - random
+
+ghc-options:
+  - -Wall
+  - -Werror

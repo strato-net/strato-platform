@@ -1,6 +1,7 @@
 packages:
 - libs/poseidon-hash
 - libs/baby-jubjub
+- libs/groth16-native
 
 - api/bloc/bloc2
 - api/bloc/bloc2api
