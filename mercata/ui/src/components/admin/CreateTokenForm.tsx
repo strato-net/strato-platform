@@ -205,8 +205,8 @@ const CreateTokenForm = () => {
                 message: 'Symbol must be letters only'
               },
               maxLength: {
-                value: 10,
-                message: 'Symbol must be 10 characters or less'
+                value: 12,
+                message: 'Symbol must be 12 characters or less'
               }
             }}
             render={({ field }) => (
