@@ -147,7 +147,7 @@ contract record Pool is Ownable {
     }
 
     function setDisabled(bool _isDisabled) external onlyOwner {
-        isPaused = !isPaused && _isDisabled ? true : isPaused;
+        isPaused = _isDisabled ? true : isPaused;
         isDisabled = _isDisabled;
     }
 
