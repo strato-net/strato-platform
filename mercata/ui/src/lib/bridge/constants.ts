@@ -189,6 +189,14 @@ export const SUPPORTED_CHAINS = {
   AVALANCHE: 43114
 } as const;
 
+// Network display priority; first network is default
+export const NETWORK_SORT_PRIORITY: Array<number> = [
+  SUPPORTED_CHAINS.MAINNET,
+  SUPPORTED_CHAINS.SEPOLIA,
+  SUPPORTED_CHAINS.BASE,
+  SUPPORTED_CHAINS.BASE_SEPOLIA,
+];
+
 const chainCache = new Map<number, Chain>();
 
 export async function resolveViemChain(

@@ -15,6 +15,7 @@ import {
   NetworkSummary,
   BridgeContextType,
 } from "@/lib/bridge/types";
+import { NETWORK_SORT_PRIORITY } from "@/lib/bridge/constants";
 import { NetworkConfig, BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, TransactionResponse, AutoSaveRequestParams, WithdrawalSummaryResponse } from "@mercata/shared-types";
 
 const BridgeContext = createContext<BridgeContextType | undefined>(undefined);
@@ -81,7 +82,13 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
           depositRouter: cfg.chainInfo.depositRouter,
         }));
 
-      networks.sort((a, b) => a.chainId.localeCompare(b.chainId));
+      // Sort networks by priority
+      const defaultPriority = NETWORK_SORT_PRIORITY.length+1;
+      networks.sort((a, b) => 
+        (NETWORK_SORT_PRIORITY.indexOf(Number(a.chainId))+1 || defaultPriority) -
+        (NETWORK_SORT_PRIORITY.indexOf(Number(b.chainId))+1 || defaultPriority)
+      );
+
       setAvailableNetworks(networks);
       setNetworksLoaded(true);
 
