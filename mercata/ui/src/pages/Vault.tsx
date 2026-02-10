@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import MobileSidebar from "@/components/dashboard/MobileSidebar";
+import MobileBottomNav from "@/components/dashboard/MobileBottomNav";
 import VaultOverview from "@/components/vault/VaultOverview";
 import VaultTransactions from "@/components/vault/VaultTransactions";
 import VaultUserPosition from "@/components/vault/VaultUserPosition";
@@ -49,7 +50,7 @@ const Vault = () => {
           onMenuClick={() => setIsMobileSidebarOpen(true)}
         />
 
-        <main className="p-6 space-y-8">
+        <main className="p-4 md:p-6 pb-16 md:pb-6 space-y-8">
           {guestMode && (
             <GuestSignInBanner message="Sign in to deposit or withdraw from the vault" />
           )}
@@ -67,6 +68,8 @@ const Vault = () => {
           <VaultTransactions />
         </main>
       </div>
+
+      <MobileBottomNav />
 
       {/* Modals */}
       {!guestMode && (
