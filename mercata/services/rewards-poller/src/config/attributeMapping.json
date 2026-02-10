@@ -123,5 +123,13 @@
     "Burned": {
       "amount": "value"
     }
+  },
+  "2d436fce87f609a4d15f7ccb7cbbfaa8ffd143b3": {
+    "Minted": {
+      "amount": "value"
+    },
+    "Burned": {
+      "amount": "value"
+    }
   }
 }
