@@ -132,22 +132,12 @@
       "amount": "value"
     }
   },
-  "ff2befcd850183170627dcbc377c3fd573789172": {
-    "Swap": {
-      "amount": "amountIn"
-    }
-  },
   "af543d9086416b048564fa165f9587aa565cce2f": {
     "Minted": {
       "amount": "value"
     },
     "Burned": {
       "amount": "value"
-    }
-  },
-  "bab35f9fe024e2735edae7a9c0aba4db260a649c": {
-    "Swap": {
-      "amount": "amountIn"
     }
   },
   "96c26f8306a0097d985d1654b4596c48bb6277c4": {
