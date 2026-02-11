@@ -7,26 +7,28 @@ import { Input } from "@/components/ui/input";
 import { Token } from "@/interface";
 
 import { useUser } from "@/context/UserContext";
-import { useTokenContext } from "@/context/TokenContext";
+import { useTokenContext, BulkTransferItem, BulkTransferResponse } from "@/context/TokenContext";
 import { useToast } from "@/hooks/use-toast";
 import { usdstAddress, TRANSFER_FEE } from "@/lib/constants";
 import TransferConfirmationModal from "../components/TransferConfirmationModal";
+import BulkTransferModal from "../components/BulkTransferModal";
 import { safeParseUnits, roundToDecimals, addCommasToInput, formatBalance, formatUnits } from "@/utils/numberUtils";
+import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 
 import {
   Popover,
   PopoverTrigger,
   PopoverContent,
 } from "@/components/ui/popover";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Upload } from "lucide-react";
 import { handleRecipientAddress, handleAmountInputChange, computeMaxTransferable } from "@/utils/transferValidation";
 import { sortTokensCompareFn } from "@/lib/tokenPriority";
 
 const Transfer = () => {
-  const { userAddress } = useUser();
-  const { usdstBalance, voucherBalance, fetchUsdstBalance, loadingUsdstBalance, getTransferableTokens, transferToken } = useTokenContext();
+  const { userAddress, isLoggedIn } = useUser();
+  const { usdstBalance, voucherBalance, fetchUsdstBalance, loadingUsdstBalance, getTransferableTokens, transferToken, bulkTransferToken } = useTokenContext();
   const { toast } = useToast();
-  
+  const guestMode = !isLoggedIn;
   useEffect(() => {
     document.title = "Transfer Assets | STRATO";
   }, []);
@@ -39,6 +41,7 @@ const Transfer = () => {
   const [amountError, setAmountError] = useState("");
   const [tokenPopoverOpen, setTokenPopoverOpen] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showBulkTransferModal, setShowBulkTransferModal] = useState(false);
   const [recipientError, setRecipientError] = useState("");
   const [feeError, setFeeError] = useState("");
   const [showInactiveTokens, setShowInactiveTokens] = useState(false);
@@ -77,11 +80,13 @@ const Transfer = () => {
     return { activeTokens: active, inactiveTokens: inactive };
   }, [tokens]);
 
-  // Fetch USDST balance on mount
+  // Fetch USDST balance on mount (only for logged-in users)
   useEffect(() => {
-    fetchUserTokens();
-    fetchUsdstBalance();
-  }, [fetchUserTokens, fetchUsdstBalance]);
+    if (isLoggedIn) {
+      fetchUserTokens();
+      fetchUsdstBalance();
+    }
+  }, [isLoggedIn, fetchUserTokens, fetchUsdstBalance]);
 
   const handleConfirmTransfer = async () => {
     if (!fromAsset || !recipient || !fromAmount) return;
@@ -103,20 +108,43 @@ const Transfer = () => {
       setFromAmount("");
       setRecipient("");
       const updatedTokens = await fetchUserTokens();
-      const updatedToken = updatedTokens.find((t: Token) => t.address === fromAsset?.address);      
+      const updatedToken = updatedTokens.find((t: Token) => t.address === fromAsset?.address);
       if (updatedToken) {
         setFromAsset(updatedToken); // triggers re-render with updated balance
       } else {
         setFromAsset(null)
       }
-      // Refresh USDST balance since gas fees were paid
       await fetchUsdstBalance();
     } catch (error) {
-      // Error handling is now done globally by axios interceptor
       console.error("Transfer error:", error);
     } finally {
       setSwapLoading(false);
     }
+  };
+
+  const handleBulkTransferConfirm = async (tokenAddress: string, transfers: BulkTransferItem[]): Promise<BulkTransferResponse> => {
+    const response = await bulkTransferToken({
+      address: tokenAddress,
+      transfers,
+    });
+
+    return response;
+  };
+
+  const handleBulkTransferComplete = async () => {
+    // Refresh token balances after bulk transfer modal closes
+    const updatedTokens = await fetchUserTokens();
+    if (fromAsset) {
+      const updatedToken = updatedTokens.find((t: Token) => t.address === fromAsset.address);
+      if (updatedToken) {
+        setFromAsset(updatedToken);
+      } else {
+        setFromAsset(undefined);
+      }
+    }
+
+    // Refresh USDST balance since gas fees were paid
+    await fetchUsdstBalance();
   };
 
   return (
@@ -126,15 +154,31 @@ const Transfer = () => {
       <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
         <DashboardHeader title="Transfer" />
         <main className="p-4 md:p-6">
+          {guestMode && (
+            <GuestSignInBanner message="Sign in to transfer tokens to other addresses" />
+          )}
           <div className="max-w-2xl mx-auto bg-card shadow-md rounded-lg p-6 space-y-6 border border-border">
-            <h2 className="text-xl font-semibold">Transfer your tokens</h2>
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-semibold">Transfer your tokens</h2>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowBulkTransferModal(true)}
+                disabled={tokens.length === 0}
+                title={tokens.length === 0 ? "No tokens available" : "Upload CSV for bulk transfer"}
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Bulk Transfer
+              </Button>
+            </div>
 
             {/* Token selector */}
             <div className="space-y-2">
               <label className="text-sm text-muted-foreground">Token</label>
               <Popover
-                open={tokenPopoverOpen}
+                open={tokenPopoverOpen && !guestMode}
                 onOpenChange={(open) => {
+                  if (guestMode) return;
                   setTokenPopoverOpen(open);
                   if (!open) setShowInactiveTokens(false); // Reset when closing
                 }}
@@ -143,6 +187,7 @@ const Transfer = () => {
                   <Button
                     variant="outline"
                     className="w-full flex justify-between items-center"
+                    disabled={guestMode}
                   >
                     <span>
                       {fromAsset
@@ -164,10 +209,12 @@ const Transfer = () => {
                             variant="ghost"
                             className="justify-start"
                             onClick={() => {
+                              if (guestMode) return;
                               setFromAsset(token);
                               setFromAmount("");
                               setTokenPopoverOpen(false);
                             }}
+                            disabled={guestMode}
                           >
                             {token?.token?._symbol ||
                               token?.token?._name}
@@ -179,7 +226,11 @@ const Transfer = () => {
                           <Button
                             variant="ghost"
                             className="justify-center text-muted-foreground hover:text-foreground border-t"
-                            onClick={() => setShowInactiveTokens(true)}
+                            onClick={() => {
+                              if (guestMode) return;
+                              setShowInactiveTokens(true);
+                            }}
+                            disabled={guestMode}
                           >
                             Show More ({inactiveTokens.length})
                           </Button>
@@ -192,10 +243,12 @@ const Transfer = () => {
                             variant="ghost"
                             className="justify-start text-muted-foreground"
                             onClick={() => {
+                              if (guestMode) return;
                               setFromAsset(token);
                               setFromAmount("");
                               setTokenPopoverOpen(false);
                             }}
+                            disabled={guestMode}
                           >
                             {token?.token?._symbol ||
                               token?.token?._name}
@@ -207,7 +260,11 @@ const Transfer = () => {
                           <Button
                             variant="ghost"
                             className="justify-center text-muted-foreground hover:text-foreground border-t"
-                            onClick={() => setShowInactiveTokens(false)}
+                            onClick={() => {
+                              if (guestMode) return;
+                              setShowInactiveTokens(false);
+                            }}
+                            disabled={guestMode}
                           >
                             Show Less
                           </Button>
@@ -232,6 +289,7 @@ const Transfer = () => {
                 onChange={(e) => handleRecipientAddress(e, setRecipient, setRecipientError, userAddress)}
                 placeholder="..."
                 className="w-full p-2 border rounded"
+                disabled={guestMode}
               />
               {recipientError && <span className="text-red-600 text-sm">{recipientError}</span>}
             </div>
@@ -245,6 +303,7 @@ const Transfer = () => {
                     <button
                       type="button"
                       onClick={() => {
+                        if (guestMode) return;
                         try {
                           const raw = formatUnits(maxAmount);
                           const clampedAmount = roundToDecimals(raw, 18);
@@ -253,7 +312,8 @@ const Transfer = () => {
                           console.error("Error setting max amount:", error);
                         }
                       }}
-                      className="font-medium text-blue-600 hover:underline focus:outline-none"
+                      className="font-medium text-blue-600 hover:underline focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={guestMode}
                     >
                       Max: {formatBalance(maxAmount, undefined, 18, 0, 4)}
                     </button>
@@ -265,11 +325,13 @@ const Transfer = () => {
                 inputMode="decimal"
                 value={addCommasToInput(fromAmount)}
                 onChange={(e) => {
+                  if (guestMode) return;
                   handleAmountInputChange(e.target.value, setFromAmount, setAmountError, maxAmount, 18);
                 }}
                 placeholder="0.00"
                 className={`w-full p-2 border rounded ${amountError ? "border-red-500" : ""
                   }`}
+                disabled={guestMode}
               />
               {amountError && (
                 <p className="text-red-600 text-sm">
@@ -297,6 +359,7 @@ const Transfer = () => {
               className="w-full"
               onClick={() => setShowConfirmModal(true)}
               disabled={
+                guestMode ||
                 !fromAsset ||
                 !recipient ||
                 !fromAmount ||
@@ -318,6 +381,19 @@ const Transfer = () => {
             recipient={recipient}
             swapLoading={swapLoading}
             onConfirm={handleConfirmTransfer}
+          />
+
+          <BulkTransferModal
+            open={showBulkTransferModal}
+            onOpenChange={(open) => {
+              setShowBulkTransferModal(open);
+              if (!open) {
+                handleBulkTransferComplete();
+              }
+            }}
+            userAddress={userAddress}
+            tokens={tokens}
+            onConfirm={handleBulkTransferConfirm}
           />
         </main>
       </div>

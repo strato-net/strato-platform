@@ -527,6 +527,7 @@ export const formatDecimalToWeiHP = (
 /**
  * Calculates the dollar value of a token by multiplying balance and price.
  * Both values are expected to be in 18-decimal wei format.
+ * Uses BigInt arithmetic throughout to avoid precision loss.
  * 
  * @param rawBalance - Token balance in wei (18 decimals)
  * @param rawPrice - Token price in wei (18 decimals)
@@ -541,18 +542,23 @@ export const calculateTokenValue = (
   if (!rawPrice || rawPrice === "0" || rawPrice === 0 || rawPrice === 0n) return "0.00";
 
   try {
-    const balance = rawBalance 
-      ? parseFloat(formatUnits(safeBigInt(rawBalance), 18))
-      : 0;
-    const price = parseFloat(formatUnits(safeBigInt(rawPrice), 18));
-    const collateral = rawCollateral 
-      ? parseFloat(formatUnits(safeBigInt(rawCollateral), 18))
-      : 0;
+    // Convert to BigInt (all in 18-decimal wei)
+    const balance = safeBigInt(rawBalance);
+    const price = safeBigInt(rawPrice);
+    const collateral = rawCollateral ? safeBigInt(rawCollateral) : 0n;
     
+    // Calculate total balance in wei
     const totalBalance = balance + collateral;
-    const value = totalBalance * price;
-
-    return value.toFixed(2);
+    
+    // Multiply: (totalBalance wei) * (price wei) / 1e18 = value in wei
+    // This keeps full precision throughout the calculation
+    const valueWei = (totalBalance * price) / (10n ** 18n);
+    
+    // Convert wei to decimal string and format to 2 decimal places
+    const valueDecimal = formatUnits(valueWei, 18);
+    const valueFloat = parseFloat(valueDecimal);
+    
+    return valueFloat.toFixed(2);
   } catch (error) {
     return "0.00";
   }

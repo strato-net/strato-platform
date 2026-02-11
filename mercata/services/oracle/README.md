@@ -4,6 +4,8 @@ Fetches asset prices from multiple sources and pushes them to the STRATO blockch
 
 ## Features
 
+- **Median Aggregation**: Robust price calculation using median of all valid sources
+- **Minimum Source Requirement**: Requires at least 3 valid sources to submit a price
 - **Batch Updates**: Multiple assets updated in single transaction
 - **Configurable Interval**: Update schedule via `CRON_SCHEDULE` cron pattern (e.g., '0 */15 * * * *' for :00, :15, :30, :45 or '30 7,22,37,52 * * * *' for :07:30, :22:30, :37:30, :52:30)
 - **Parallel Processing**: All feeds run simultaneously
@@ -11,6 +13,7 @@ Fetches asset prices from multiple sources and pushes them to the STRATO blockch
 - **Health Monitoring**: Service marks itself unhealthy on persistent failures
 - **Balance Checks**: Validates USDST balance before transactions
 - **Transaction Metrics**: Records transaction timing data to AWS CloudWatch (optional)
+- **Weekend Fallback**: Metals weekend feed falls back to metals-batch prices when insufficient sources
 
 ## Environment Variables
 
@@ -30,6 +33,13 @@ COINMARKETCAP_API_KEY=your-coinmarketcap-key
 COINGECKO_API_KEY=your-coingecko-api-key
 METALS_DEV_API_KEY=your-metals-dev-key
 METALS_API_API_KEY=your-metals-api-key
+COMMODITIES_API_KEY=your-commodities-api-key
+COMMODITY_PRICE_API_KEY=your-commodity-price-api-key
+COINAPI_API_KEY=your-coinapi-api-key
+LIVECOINWATCH_API_KEY=your-livecoinwatch-api-key
+TWELVEDATA_API_KEY=your-twelvedata-key
+OANDA_API_KEY=your-oanda-api-key
+OANDA_ACCOUNT_ID=your-oanda-account-id  # Fetch via: curl -H "Authorization: Bearer API_KEY" https://api-fxpractice.oanda.com/v3/accounts
 
 # Oracle Configuration
 CRON_SCHEDULE="0 */15 * * * *"

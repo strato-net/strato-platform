@@ -17,7 +17,7 @@ import { WITHDRAW_FEE, rewardsEnabled } from "@/lib/constants";
 import { Pool } from '@/interface';
 import { safeParseUnits, formatWeiAmount, formatUnits } from '@/utils/numberUtils';
 import { handleAmountInputChange, computeMaxTransferable } from '@/utils/transferValidation';
-import { CompactRewardsDisplay } from '@/components/rewards/CompactRewardsDisplay';
+import { RewardsWidget } from '@/components/rewards/RewardsWidget';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 
 interface WithdrawFormValues {
@@ -315,7 +315,7 @@ const LiquidityWithdrawModal = ({
             // Pass withdrawPercent and availableLPBalance for accurate stake calculation
             // The component will calculate: stakeChange = availableLPBalance × withdrawPercent
             return (
-              <CompactRewardsDisplay
+              <RewardsWidget
                 userRewards={userRewards}
                 activityName={activity.activity.name}
                 isWithdrawal={true}

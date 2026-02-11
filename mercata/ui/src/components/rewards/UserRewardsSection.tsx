@@ -9,21 +9,71 @@ import {
   roundByMagnitude,
   formatRoundedWithCommas,
 } from "@/services/rewardsService";
-import { formatBalance } from "@/utils/numberUtils";
+import { formatBalance, calculateTokenValue, safeParseUnits } from "@/utils/numberUtils";
 import { Loader2, Coins, TrendingUp, Info, Clock, Star } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { useUser } from "@/context/UserContext";
+import { useOracleContext } from "@/context/OracleContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatDistanceToNow } from "date-fns";
 import { Link } from "react-router-dom";
 import { getActivityLink } from "@/lib/rewards/activityLinks";
+import { useMobileTooltip } from "@/hooks/use-mobile-tooltip";
 
 interface UserRewardsSectionProps {
   userRewards: UserRewardsData | null;
   loading: boolean;
   onClaimSuccess?: () => void;
 }
+
+// Mobile-friendly Info Tooltip component
+const InfoTooltip = ({ content }: { content: string }) => {
+  const { isMobile, showTooltip, handleToggle } = useMobileTooltip('stake-info-tooltip-container');
+
+  if (isMobile) {
+    return (
+      <div className="relative stake-info-tooltip-container inline-flex">
+        <Info 
+          className="h-3 w-3 text-muted-foreground cursor-pointer" 
+          onClick={handleToggle}
+        />
+        {showTooltip && (
+          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] bg-popover border rounded-lg px-4 py-3 text-sm text-popover-foreground shadow-lg max-w-[85vw] w-[320px]">
+            <p className="text-center">{content}</p>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleToggle(e);
+              }}
+              className="absolute top-2 right-2 text-muted-foreground hover:text-foreground"
+            >
+              <span className="sr-only">Close</span>
+              ×
+            </button>
+          </div>
+        )}
+        {showTooltip && (
+          <div 
+            className="fixed inset-0 z-[99] bg-black/20"
+            onClick={handleToggle}
+          />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+      </TooltipTrigger>
+      <TooltipContent>
+        <p className="max-w-xs">{content}</p>
+      </TooltipContent>
+    </Tooltip>
+  );
+};
 
 export const UserRewardsSection = ({
   userRewards,
@@ -32,6 +82,7 @@ export const UserRewardsSection = ({
 }: UserRewardsSectionProps) => {
   const { toast } = useToast();
   const { userAddress } = useUser();
+  const { getPrice } = useOracleContext();
   const [claimingActivityIds, setClaimingActivityIds] = useState<number[]>([]);
   const [isClaimingAll, setIsClaimingAll] = useState(false);
 
@@ -368,16 +419,7 @@ export const UserRewardsSection = ({
                       <div className="flex items-center space-x-2 mb-1">
                         <TrendingUp className="h-4 w-4 text-muted-foreground" />
                         <p className="text-sm text-muted-foreground">Stake</p>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Info className="h-3 w-3 text-muted-foreground cursor-help" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="max-w-xs">
-                              Your total staked amount in this activity. This determines your share of rewards based on your proportion of the total stake.
-                            </p>
-                          </TooltipContent>
-                        </Tooltip>
+                        <InfoTooltip content="Your total staked amount in this activity. This determines your share of rewards based on your proportion of the total stake." />
                       </div>
                       <p className="text-lg font-semibold">{userStakeFormatted}</p>
                       {totalStakeFormatted !== "?" && (
@@ -390,6 +432,31 @@ export const UserRewardsSection = ({
                     <div>
                       <p className="text-sm text-muted-foreground mb-1">Estimated Rewards/Day</p>
                       <p className="text-lg font-semibold">{estimatedPerDayFormatted}</p>
+                      {(() => {
+                        // Show pts/$1/day based on *user* stake USD (personal normalization)
+                        if (!activity || estimatedPerDayFormatted === "?" || !userInfo) return null;
+
+                        const userStakeUsd =
+                          userInfo.stakeUsd !== null && userInfo.stakeUsd !== undefined
+                            ? BigInt(userInfo.stakeUsd)
+                            : (activity.stakeUnitPriceUsd
+                                ? (BigInt(userInfo.stake || "0") * BigInt(activity.stakeUnitPriceUsd)) / BigInt(10 ** 18)
+                                : (activity.stakeDenomination === "usd_notional" ? BigInt(userInfo.stake || "0") : 0n));
+
+                        if (userStakeUsd === 0n) return null;
+
+                        const estimatedPerDayBig = BigInt(estimatedPerDay || "0");
+                        const ptsPerDollarPerDay = (estimatedPerDayBig * BigInt(10 ** 18)) / userStakeUsd;
+                        const formatted = formatRoundedWithCommas(
+                          roundByMagnitude(formatBalance(ptsPerDollarPerDay.toString(), "", 18, 18, 18))
+                        );
+
+                        return (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {formatted} pts/$1/day
+                          </p>
+                        );
+                      })()}
                     </div>
 
                     <div>

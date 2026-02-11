@@ -52,6 +52,7 @@ import qualified Data.Binary as Bin
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.DList as DL
+import Data.Function (on)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -312,7 +313,7 @@ makeNewBlock mineTransactions mSelfAddress = do
                     txsDroppedCallback [f] []
                     let theRejectedTx = rejectedTx f
                     purgeFromPending theRejectedTx
-                    return (nsr, nbg, lastExec ++ rtx, filter (/= theRejectedTx) urtx)
+                    return (nsr, nbg, lastExec ++ rtx, filter (on (/=) otSigner theRejectedTx) urtx)
                   x -> error (show x)
 
             let !newMiningCache =

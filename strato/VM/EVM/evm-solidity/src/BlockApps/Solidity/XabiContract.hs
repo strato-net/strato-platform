@@ -1,6 +1,7 @@
 --this module is used to convert an EVM XABI to a partial Contract type (defined in SolidVM).  Since the XABI is missing a lot of the stuff in Contract, this conversion will always be incomplete, but the resulting type can be used anywhere that doesn't need the missing stuff.  This will allow us to unify some code that works with both solidvm and EVM
 module BlockApps.Solidity.XabiContract
   ( indexedTypeToEvmIndexedType,
+    typeToEvmType,
   )
 where
 

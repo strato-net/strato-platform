@@ -4,6 +4,7 @@ import { calculateLPTokenPrice } from "./swapping.helper";
 import { getExchangeRateFromCirrus } from "../services/lending.service";
 import { getOraclePrices } from "../services/oracle.service";
 import { getSafetyModuleConfig } from "../services/safety.service";
+import { getVaultShareTokenPrice } from "../services/vault.service";
 import * as config from "../../config/config";
 import { OraclePriceMap } from "@mercata/shared-types";
 
@@ -91,6 +92,16 @@ const addLPTokenPrices = async (
   });
 };
 
+const addVaultTokenPrice = async (
+  accessToken: string,
+  priceMap: OraclePriceMap
+): Promise<void> => {
+  const { shareTokenAddress, pricePerShare } = await getVaultShareTokenPrice(accessToken);
+  if (shareTokenAddress && pricePerShare !== "0") {
+    priceMap.set(shareTokenAddress, pricePerShare);
+  }
+};
+
 export const getCompletePriceMap = async (
   accessToken: string
 ): Promise<Map<string, string>> => {
@@ -98,7 +109,8 @@ export const getCompletePriceMap = async (
   await Promise.all([
     addMTokenPrice(accessToken, priceMap),
     addSTokenPrice(accessToken, priceMap),
-    addLPTokenPrices(accessToken, priceMap)
+    addLPTokenPrices(accessToken, priceMap),
+    addVaultTokenPrice(accessToken, priceMap)
   ]);
   return priceMap;
 };

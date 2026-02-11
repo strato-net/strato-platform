@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Modal } from "antd";
 import { CheckCircle2, Loader2, Clock, AlertCircle } from "lucide-react";
 import { formatTxHash, getExplorerUrl } from "@/lib/bridge/utils";
@@ -34,6 +34,8 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
   onClose,
 }) => {
   const [collapsedSteps, setCollapsedSteps] = useState<Set<number>>(new Set());
+  const lastActiveStepRef = useRef<number>(-1);
+
   const getSteps = () => {
     if (isEasySavings) {
       return [
@@ -63,41 +65,44 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
   };
 
   const steps = getSteps();
-  const currentStepIndex = steps.findIndex((s) => s.key === currentStep);
+  const rawStepIndex = steps.findIndex((s) => s.key === currentStep);
+  const isError = currentStep === "error";
+
+  // Track the last known active step so we can show it as failed on error
+  if (rawStepIndex >= 0) {
+    lastActiveStepRef.current = rawStepIndex;
+  }
+
+  const effectiveStepIndex = isError ? lastActiveStepRef.current : rawStepIndex;
   
   // Auto-collapse all steps except the current one on step change
   useEffect(() => {
-    if (currentStepIndex >= 0) {
+    if (effectiveStepIndex >= 0) {
       const newCollapsed = new Set<number>();
       for (let i = 0; i < steps.length; i++) {
-        if (i !== currentStepIndex) {
+        if (i !== effectiveStepIndex) {
           newCollapsed.add(i);
         }
       }
       setCollapsedSteps(newCollapsed);
     }
-  }, [currentStepIndex, steps.length]);
+  }, [effectiveStepIndex, steps.length]);
 
   const getStepIcon = (stepIndex: number) => {
     const step = steps[stepIndex];
     const isCompleteStep = step?.key === "complete";
     
-    // If current step not found in steps array, treat all as pending
-    if (currentStepIndex === -1) {
+    if (effectiveStepIndex === -1) {
       return <Clock className="w-5 h-5 text-muted-foreground" />;
     }
-    if (stepIndex < currentStepIndex) {
-      // For completed steps before current, use green checkmark unless it's the complete step
-      if (isCompleteStep) {
-        return <Clock className="w-5 h-5 text-yellow-500" />;
-      }
+    if (stepIndex < effectiveStepIndex) {
       return <CheckCircle2 className="w-5 h-5 text-green-500" />;
     }
-    if (stepIndex === currentStepIndex) {
-      if (currentStep === "error") {
+    if (stepIndex === effectiveStepIndex) {
+      if (isError) {
         return <AlertCircle className="w-5 h-5 text-red-500" />;
       }
-      if (currentStep === "complete") {
+      if (isCompleteStep) {
         return <Clock className="w-5 h-5 text-yellow-500" />;
       }
       return <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />;
@@ -106,15 +111,14 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
   };
 
   const getStepStatus = (stepIndex: number) => {
-    // If current step not found in steps array, treat all as pending
-    if (currentStepIndex === -1) {
+    if (effectiveStepIndex === -1) {
       return "pending";
     }
-    if (stepIndex < currentStepIndex) {
+    if (stepIndex < effectiveStepIndex) {
       return "completed";
     }
-    if (stepIndex === currentStepIndex) {
-      if (currentStep === "error") {
+    if (stepIndex === effectiveStepIndex) {
+      if (isError) {
         return "error";
       }
       if (currentStep === "complete") {
@@ -177,10 +181,10 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
             const isActive = status === "active";
             const isCompleted = status === "completed";
             const isError = status === "error";
-            const isCurrentStep = index === currentStepIndex;
+            const isCurrentStep = index === effectiveStepIndex;
             const isCollapsed = collapsedSteps.has(index);
 
-            const isCompleteStep = step.key === "complete";
+            const isCompleteStep = step.key === "complete" && isCurrentStep;
             return (
               <div
                 key={step.key}
@@ -241,20 +245,18 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
                           {isActive && (
                             <span className="text-xs text-blue-500 font-medium">In Progress</span>
                           )}
-                          {(isCompleted || isCurrentStep) && (
-                            <button
-                              onClick={() => setCollapsedSteps(prev => new Set(prev).add(index))}
-                              className={`text-xs underline ${
-                                isCompleteStep 
-                                  ? "text-yellow-500 hover:text-yellow-600" 
-                                  : isCompleted
-                                  ? "text-green-500 hover:text-green-600"
-                                  : "text-muted-foreground hover:text-foreground"
-                              }`}
-                            >
-                              Collapse
-                            </button>
-                          )}
+                          <button
+                            onClick={() => setCollapsedSteps(prev => new Set(prev).add(index))}
+                            className={`text-xs underline ${
+                              isCompleteStep 
+                                ? "text-yellow-500 hover:text-yellow-600" 
+                                : isCompleted
+                                ? "text-green-500 hover:text-green-600"
+                                : "text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            Collapse
+                          </button>
                         </div>
                       </div>
                       <p
@@ -272,7 +274,7 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
                       >
                         {step.description}
                       </p>
-                      {isActive && txHash && chainId && step.key === "waiting_tx" && (
+                      {txHash && chainId && step.key === "waiting_tx" && (
                         <div className="mt-2">
                           <a
                             href={getExplorerUrl(chainId.toString(), txHash)}

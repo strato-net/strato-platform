@@ -1,8 +1,7 @@
 import { apiPost } from './apiClient';
 import { oauthClient } from './oauth';
 import { logError, logInfo } from './logger';
-import { TransactionResult, CallListArg } from '../types';
-import { checkBalances } from './balanceChecker';
+import { TransactionResult, CallListArg, AggregatedPrice } from '../types';
 import { GAS_PARAMS, TIMEOUTS, RETRY_DELAYS } from './constants';
 import { txMetricsService } from './txMetricsService';
 
@@ -64,12 +63,18 @@ async function callListAndWait(callListArgs: CallListArg[]): Promise<Transaction
     };
 
     const immediate = getImmediateResult(response.data);
+    if (!immediate) {
+        logInfo('OraclePusher', `Tx is slow - the result was not available within 10 seconds, polling for transaction ${txHash}`);
+    }
     const result = immediate ?? await waitForTransaction(txHash);
+    
+    const duration = Date.now() - submitTime;
+    logInfo('OraclePusher', `Tx submission time: ${duration} ms`);
     
     // Record metrics (errors are handled inside txMetricsService)
     await txMetricsService.recordTxMetric({
         txHash,
-        duration: Date.now() - submitTime,
+        duration: duration,
         status: result.status,
     });
     
@@ -91,16 +96,14 @@ function extractTransactionHash(data: any): string {
     throw new Error('No transaction hash returned from STRATO');
 }
 
-export async function pushAssetPrices(assets: string[], prices: number[]): Promise<TransactionResult> {
-    logInfo('OraclePusher', 'Submitting prices');
-    
-    // Check balances before submitting
-    await checkBalances();
-    
+export async function pushAssetPrices(validPrices: AggregatedPrice[]): Promise<TransactionResult> {
     const callListArgs: CallListArg[] = [{
         contract: { address: process.env.PRICE_ORACLE_ADDRESS!, name: "PriceOracle" },
         method: "setAssetPrices",
-        args: { assets, priceValues: prices },
+        args: { 
+            assets: validPrices.map(p => p.targetAddress), 
+            priceValues: validPrices.map(p => p.medianPrice) 
+        },
     }];
 
     const result = await callListAndWait(callListArgs);

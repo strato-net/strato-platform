@@ -1,4 +1,5 @@
 import { lendingRegistry, poolFactory, tokenFactory, adminRegistry, mercataBridge, cdpRegistry, voucher } from "./config";
+import * as config from "./config";
 import {
   SWAP_CONTRACTS,
   SWAP_TOKEN_SELECT_FIELDS,
@@ -34,6 +35,8 @@ export const constants = (() => {
   const RewardsChef = `${CONTRACT_PREFIX}RewardsChef`;
   const Rewards = `${CONTRACT_PREFIX}Rewards`;
   const Voucher = `${CONTRACT_PREFIX}Voucher`;
+  const Vault = `${CONTRACT_PREFIX}Vault`;
+  const VaultFactory = `${CONTRACT_PREFIX}VaultFactory`;
   const Event = "event";
     
   const tokenSelectFields = [
@@ -140,6 +143,9 @@ export const constants = (() => {
     RewardsChef,
     Rewards,
     Voucher,
+    Vault,
+    VaultFactory,
+    get vaultFactory() { return config.vaultFactory; },  // Use getter to get current value after init
     mercataBridge,
     Event,
     tokenSelectFields,

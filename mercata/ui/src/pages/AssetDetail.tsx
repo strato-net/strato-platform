@@ -45,6 +45,11 @@ interface Pool {
   bToARatio: string;
 }
 
+const isLPToken = (token: Token): boolean => {
+  const symbol = token?.token?._symbol || token?._symbol || '';
+  return symbol.endsWith('-LP');
+};
+
 const fetchPriceHistory = async (assetAddress: string): Promise<PricePoint[]> => {
   try {
     const response = await api.get<{ data: PriceHistoryApiEntry[] }>(`/oracle/price-history/${assetAddress}`);
@@ -212,11 +217,16 @@ const AssetDetail = () => {
           .then(data => setPriceData(data.slice(-(PRICE_WINDOW * 24)))) // Show last N days (24 hours each)
           .finally(() => setPriceDataLoading(false));
 
-        // Fetch swap pool price history
-        setSwapPriceDataLoading(true);
-        fetchSwapPoolPrices(foundAsset.address)
-          .then(data => setSwapPriceData(data))
-          .finally(() => setSwapPriceDataLoading(false));
+        // Only fetch swap pool prices for non-LP tokens
+        if (isLPToken(foundAsset)) {
+          setSwapPriceData([]);
+          setSwapPriceDataLoading(false);
+        } else {
+          setSwapPriceDataLoading(true);
+          fetchSwapPoolPrices(foundAsset.address)
+            .then(data => setSwapPriceData(data))
+            .finally(() => setSwapPriceDataLoading(false));
+        }
       }
     };
 
@@ -466,7 +476,12 @@ const AssetDetail = () => {
                   spotLoading={priceDataLoading}
                   swapLoading={swapPriceDataLoading}
                   title="Price History"
-                  subtitle="Spot price (blue) and STRATO price (orange)"
+                  subtitle={
+                    isLPToken(asset)
+                      ? "Net Asset Value per token, calculated from pool balances and oracle prices"
+                      : "Spot price (blue) and STRATO price (orange)"
+                  }
+                  isLPToken={isLPToken(asset)}
                 />
             </div>
           </div>

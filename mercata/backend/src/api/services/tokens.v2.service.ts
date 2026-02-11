@@ -1,6 +1,7 @@
 import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
 import { getCompletePriceMap } from "../helpers/oracle.helper";
+import { getVaultShareTokenAddress, getVaultHistoryConfig } from "./vault.service";
 import { Token, EarningAsset, BalanceSnapshot } from "@mercata/shared-types";
 import { buildTokenSelectFields } from "../../config/tokensConstants";
 import { getHistory, HistoryParams, HistorySnapshot, MappingHistoryElement, StorageHistoryElement } from "../helpers/history.helper";
@@ -46,7 +47,7 @@ export const getEarningAssets = async (
   accessToken: string,
   userAddress: string
 ): Promise<EarningAsset[]> => {
-  const [tokens, collaterals, cdps, rawPrices] = await Promise.all([
+  const [tokens, collaterals, cdps, rawPrices, vaultShareToken] = await Promise.all([
     cirrus.get(accessToken, "/" + Token, {
       params: {
         "balances.key": `eq.${userAddress}`,
@@ -73,6 +74,7 @@ export const getEarningAssets = async (
       },
     }),
     getCompletePriceMap(accessToken),
+    getVaultShareTokenAddress(accessToken),
   ]);
 
   const collateralMap = new Map<string, bigint>();
@@ -100,10 +102,56 @@ export const getEarningAssets = async (
       balance,
       price,
       collateralBalance,
+      totalBalance: totalBalance.toString(),
       isPoolToken:
         t._symbol?.endsWith("-LP") ||
-        t._symbol === "SUSDST" ||
-        t._symbol === "MUSDST" ||
+        t._symbol === "SUSDST" || t._symbol === "safetyUSDST" ||
+        t._symbol === "MUSDST" || t._symbol === "lendUSDST" ||
+        (vaultShareToken && t.address === vaultShareToken) ||
+        t.description === "Liquidity Provider Token",
+      value,
+    };
+  });
+};
+
+export const getPublicEarningAssets = async (
+  accessToken: string
+): Promise<EarningAsset[]> => {
+  // Build token query params - no user balance filter for public data
+  const tokenParams: Record<string, string> = {
+        select: buildTokenSelectFields({
+          images: true,
+          attributes: true,
+          balance: false, // No balance for guests
+        }).join(","),
+        status: "eq.2",
+  };
+
+  // Fetch only tokens and prices (skip user-specific collateral data)
+  const [tokens, rawPrices, vaultShareToken] = await Promise.all([
+    cirrus.get(accessToken, "/" + Token, { params: tokenParams }),
+    getCompletePriceMap(accessToken),
+    getVaultShareTokenAddress(accessToken),
+  ]);
+
+  return (tokens.data || []).map((t: any) => {
+    const balance = "0";
+    const price = rawPrices.get(t.address) || "0";
+    const collateralBalance = "0";
+    const totalBalance = 0n;
+    const value = "0.00";
+
+    return {
+      ...t,
+      balance,
+      price,
+      collateralBalance,
+      totalBalance: totalBalance.toString(),
+      isPoolToken:
+        t._symbol?.endsWith("-LP") ||
+        t._symbol === "SUSDST" || t._symbol === "safetyUSDST" ||
+        t._symbol === "MUSDST" || t._symbol === "lendUSDST" ||
+        (vaultShareToken && t.address === vaultShareToken) ||
         t.description === "Liquidity Provider Token",
       value,
     };
@@ -162,6 +210,16 @@ function updatePortfolioInfoMapping(portfolioInfo: any, newInfo: MappingHistoryE
           tokens: { ...portfolioInfo.tokens,
             [newInfo.address]: { ...portfolioInfo.tokens[newInfo.address],
               liquidityPoolBalance: newValue
+            }
+          }
+        };
+      }
+      const botExecutor = portfolioInfo.vaultConfig?.botExecutor;
+      if (botExecutor && newInfo.path === `_balances[${botExecutor}]`) {
+        return { ...portfolioInfo, 
+          tokens: { ...portfolioInfo.tokens,
+            [newInfo.address]: { ...portfolioInfo.tokens[newInfo.address],
+              vaultAssetBalance: newValue
             }
           }
         };
@@ -268,6 +326,19 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
         );
       } else if (managedAssets) { // sUSDST
         tokenPrice = Number((managedAssets * BigInt(1e18)) / BigInt(totalSupply));
+      } else if (snapshot.data.vaultConfig?.shareToken === tokenAddr) { // Vault share token
+        const supportedAssets: string[] = snapshot.data.vaultConfig?.supportedAssets || [];
+        let totalEquity = 0n;
+        for (const assetAddr of supportedAssets) {
+          const bal = BigInt(snapshot.data.tokens[assetAddr]?.vaultAssetBalance || 0) || 0n;
+          const assetPrice = BigInt(snapshot.data.tokens[assetAddr]?.price || 0) || 0n;
+          if (assetPrice > 0n) {
+            totalEquity += (bal * assetPrice) / BigInt(1e18);
+          }
+        }
+        if (totalEquity > 0n) {
+          tokenPrice = Number((totalEquity * BigInt(1e18)) / BigInt(totalSupply));
+        }
       } else { // mUSDST
         const borrowIndex = BigInt(token?.borrowIndex) || 0n;
         const borrowableAsset = token?.borrowableAsset || '';
@@ -342,12 +413,16 @@ export const getNetBalanceHistory = async (
   historyParams: HistoryParams,
 ): Promise<BalanceSnapshot[]> => {
 
+  // Pre-fetch vault config for vault share token history tracking
+  const vaultConfig = await getVaultHistoryConfig(accessToken);
+
   const storageFilters = [
     'data->>lpToken.neq.""',
     'data->>_symbol.like.*-LP',
-    'data->>_symbol.in.(MUSDST,SUSDST)',
+    'data->>_symbol.in.(MUSDST,SUSDST,safetyUSDST,lendUSDST)',
     'data->>sToken.gt.0',
-    'and(data->>mToken.gt.0,data->>borrowIndex.gt.0)'
+    'and(data->>mToken.gt.0,data->>borrowIndex.gt.0)',
+    ...(vaultConfig?.shareToken ? [`address.eq.${vaultConfig.shareToken}`] : []),
   ]
 
   const mappingFilters = [
@@ -355,7 +430,8 @@ export const getNetBalanceHistory = async (
     'path.like.prices[*',
     'path.like.collateralConfigs[*',
     'path.like.collateralGlobalStates[*',
-    'and(address.eq.937efa7e3a77e20bbdbd7c0d32b6514f368c1010,path.eq._balances[0000000000000000000000000000000000001004])'
+    'and(address.eq.937efa7e3a77e20bbdbd7c0d32b6514f368c1010,path.eq._balances[0000000000000000000000000000000000001004])',
+    ...(vaultConfig?.botExecutor ? [`path.eq._balances[${vaultConfig.botExecutor}]`] : []),
   ]
 
   const mappingCollectionNames = [
@@ -374,7 +450,7 @@ export const getNetBalanceHistory = async (
     storageFilters,
     mappingFilters,
     mappingCollectionNames,
-    { tokens: {}, userLoan: {} },
+    { tokens: {}, userLoan: {}, vaultConfig: vaultConfig || undefined },
     updatePortfolioInfoStorage,
     updatePortfolioInfoMapping,
     processBalanceSnapshot
