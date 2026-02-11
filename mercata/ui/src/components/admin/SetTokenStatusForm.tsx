@@ -123,8 +123,8 @@ const SetTokenStatusModal = ({ open, onOpenChange, token }: SetTokenStatusModalP
             <Alert>
               <Info className="h-4 w-4" />
               <AlertDescription>
-                Changing token status affects how the token behaves across the platform. Only the TokenFactory 
-                contract can call this function. Ensure you have the proper permissions before attempting this operation.
+                Changing token status affects how the token behaves across the platform.
+                Only the token owner can call this function.
               </AlertDescription>
             </Alert>
 

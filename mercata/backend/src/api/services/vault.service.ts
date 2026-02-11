@@ -662,6 +662,89 @@ export interface UserTokenBalance {
 }
 
 /**
+ * Get the vault share token address.
+ */
+export const getVaultShareTokenAddress = async (
+  accessToken: string
+): Promise<string> => {
+  const vaultAddress = await getVaultAddress(accessToken);
+  if (!vaultAddress) return "";
+  const vaultData = await getVaultData(accessToken, vaultAddress);
+  return vaultData?.shareToken || "";
+};
+
+/**
+ * Get vault config for history tracking.
+ * Returns shareToken, botExecutor, and supportedAssets needed for portfolio history.
+ */
+export const getVaultHistoryConfig = async (
+  accessToken: string
+): Promise<{ shareToken: string; botExecutor: string; supportedAssets: string[] } | null> => {
+  const vaultAddress = await getVaultAddress(accessToken);
+  if (!vaultAddress) return null;
+  const vaultData = await getVaultData(accessToken, vaultAddress);
+  if (!vaultData) return null;
+  return {
+    shareToken: vaultData.shareToken || "",
+    botExecutor: vaultData.botExecutor || "",
+    supportedAssets: (vaultData.supportedAssets || [])
+      .filter((addr: string) => addr && addr !== "0000000000000000000000000000000000000000"),
+  };
+};
+
+/**
+ * Lightweight function to get vault share token price (NAV per share).
+ * Calculates totalEquity from supported asset balances and oracle prices,
+ * then divides by total shares. 
+ */
+export const getVaultShareTokenPrice = async (
+  accessToken: string
+): Promise<{ shareTokenAddress: string; pricePerShare: string }> => {
+  const vaultAddress = await getVaultAddress(accessToken);
+
+  if (!vaultAddress) {
+    return { shareTokenAddress: "", pricePerShare: "0" };
+  }
+
+  const vaultData = await getVaultData(accessToken, vaultAddress);
+
+  if (!vaultData) {
+    return { shareTokenAddress: "", pricePerShare: "0" };
+  }
+
+  const shareToken = vaultData.shareToken;
+  const botExecutor = vaultData.botExecutor;
+  const priceOracleAddress = vaultData.priceOracle || "";
+  const supportedAssetAddresses: string[] = (vaultData.supportedAssets || [])
+    .filter((addr: string) => addr && addr !== "0000000000000000000000000000000000000000");
+
+  // Calculate total equity: sum of (balance * price) for each asset
+  let totalEquity = 0n;
+  for (const assetAddress of supportedAssetAddresses) {
+    const balance = await getTokenBalance(accessToken, assetAddress, botExecutor);
+    const balanceBN = safeBigInt(balance);
+    const priceUsd = await getAssetPrice(accessToken, priceOracleAddress, assetAddress);
+    const priceBN = safeBigInt(priceUsd);
+
+    if (priceBN > 0n) {
+      totalEquity += (balanceBN * priceBN) / WAD;
+    }
+  }
+
+  // Get total shares
+  const totalShares = await getTokenTotalSupply(accessToken, shareToken);
+  const totalSharesBN = safeBigInt(totalShares);
+
+  // NAV per share
+  let pricePerShare = WAD.toString();
+  if (totalSharesBN > 0n && totalEquity > 0n) {
+    pricePerShare = ((totalEquity * WAD) / totalSharesBN).toString();
+  }
+
+  return { shareTokenAddress: shareToken, pricePerShare };
+};
+
+/**
  * Get user's token balances for all supported vault assets
  * Returns only tokens where the user has a positive balance
  */

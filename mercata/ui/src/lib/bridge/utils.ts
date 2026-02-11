@@ -81,7 +81,7 @@ export function normalizeError(error: any): BridgeError {
   return {
     code: "UNKNOWN_ERROR",
     message: error?.message || "Unknown error occurred",
-    userMessage: "An unexpected error occurred. Please try again.",
+    userMessage: error?.message || "An unexpected error occurred. Please try again.",
   };
 }
 
@@ -155,6 +155,8 @@ export function getExplorerUrl(chainId: string, txHash: string): string {
       return `https://optimistic.etherscan.io/tx/${txHash}`;
     case 8453: // Base
       return `https://basescan.org/tx/${txHash}`;
+    case 84532: // Base Sepolia
+      return `https://sepolia.basescan.org/tx/${txHash}`;
     case 42161: // Arbitrum
       return `https://arbiscan.io/tx/${txHash}`;
     case 56: // BSC

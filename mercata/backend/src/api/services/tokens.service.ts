@@ -240,6 +240,70 @@ export const transferToken = async (
   }
 };
 
+export interface BulkTransferItem {
+  to: string;
+  value: string;
+}
+
+export interface BulkTransferResult {
+  to: string;
+  value: string;
+  status: string;
+  hash?: string;
+  error?: string;
+}
+
+/**
+ * Execute bulk transfers for a single token to multiple recipients
+ * Processes transfers sequentially to ensure proper nonce handling
+ */
+export const bulkTransferToken = async (
+  accessToken: string,
+  userAddress: string,
+  tokenAddress: string,
+  transfers: BulkTransferItem[]
+): Promise<{ results: BulkTransferResult[]; successCount: number; failureCount: number }> => {
+  const results: BulkTransferResult[] = [];
+  let successCount = 0;
+  let failureCount = 0;
+
+  for (const transfer of transfers) {
+    try {
+      const tx = await buildFunctionTx({
+        contractName: extractContractName(Token),
+        contractAddress: tokenAddress,
+        method: "transfer",
+        args: {
+          to: transfer.to,
+          value: transfer.value,
+        },
+      }, userAddress, accessToken);
+
+      const { status, hash } = await postAndWaitForTx(accessToken, () =>
+        strato.post(accessToken, StratoPaths.transactionParallel, tx)
+      );
+
+      results.push({
+        to: transfer.to,
+        value: transfer.value,
+        status,
+        hash,
+      });
+      successCount++;
+    } catch (error: any) {
+      results.push({
+        to: transfer.to,
+        value: transfer.value,
+        status: "failure",
+        error: error.message || "Transfer failed",
+      });
+      failureCount++;
+    }
+  }
+
+  return { results, successCount, failureCount };
+};
+
 // Approve an allowance for a spender
 export const approveToken = async (
   accessToken: string,

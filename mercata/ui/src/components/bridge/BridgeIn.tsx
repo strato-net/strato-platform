@@ -561,7 +561,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
       setCurrentStep("waiting_tx");
       const success = await waitForTransaction(txHash, activeChainId);
       if (!success) {
-        throw new Error("Transaction reverted");
+        throw new Error(`Transaction reverted on ${selectedNetwork} network. No funds were deposited on STRATO. Please try again.`);
       }
 
       const externalDecimals = parseInt(selectedToken.externalDecimals || "18");

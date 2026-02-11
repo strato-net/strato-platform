@@ -1,21 +1,21 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  ArrowUpDown, 
-  Landmark, 
-  ArrowLeftRight, 
-  Menu, 
-  Send, 
-  Gift, 
-  Activity, 
-  Download, 
-  BarChart3, 
-  Droplets, 
+import {
+  LayoutDashboard,
+  ArrowUpDown,
+  Landmark,
+  ArrowLeftRight,
+  Menu,
+  Send,
+  Gift,
+  Activity,
+  Download,
+  BarChart3,
+  Droplets,
   Shield,
   UserPlus,
-  LineChart,
-  X 
+  Vault,
+  X
 } from 'lucide-react';
 import { Drawer, DrawerClose, DrawerContent } from '@/components/ui/drawer';
 import { useUser } from '@/context/UserContext';
@@ -31,6 +31,7 @@ const PRIMARY_NAV_ITEMS = [
 // Items shown in "More" drawer
 const MORE_ITEMS = [
   { icon: Send, label: 'Transfer', path: '/dashboard/transfer' },
+  { icon: Vault, label: 'Vault', path: '/dashboard/vault' },
   { icon: Gift, label: 'Rewards', path: '/dashboard/rewards' },
   { icon: Activity, label: 'Activity Feed', path: '/dashboard/activity' },
   { icon: Download, label: 'Withdrawals', path: '/dashboard/withdrawals' },
