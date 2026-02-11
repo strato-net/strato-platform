@@ -1,6 +1,44 @@
 local openidc = require("resty.openidc")
+local cjson = require("cjson.safe")
 
 local node_host_with_protocol = string.format("<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>://%s/", ngx.var.http_host)
+
+-- Request correlation: use incoming X-Request-ID or nginx request_id, and echo back in response
+local req_id = ngx.var.http_x_request_id or ngx.var.request_id or ("lua-" .. tostring(ngx.now()):gsub("%.", "-"))
+ngx.req.set_header("X-Request-ID", req_id)
+
+-- Safe JWT exp extraction (no token or claims logged)
+local function jwt_exp_from_token(token)
+  if not token or type(token) ~= "string" then return nil end
+  local parts = {}
+  for part in string.gmatch(token, "[^.]+") do parts[#parts + 1] = part end
+  if #parts < 2 then return nil end
+  local payload_b64 = parts[2]:gsub("-", "+"):gsub("_", "/")
+  local pad = #payload_b64 % 4
+  if pad > 0 then payload_b64 = payload_b64 .. string.rep("=", 4 - pad) end
+  local ok, decoded = pcall(ngx.decode_base64, payload_b64)
+  if not ok or not decoded then return nil end
+  local payload = cjson.decode(decoded)
+  return payload and payload.exp
+end
+
+-- Safe auth debug log: req_id, is_ui, has_access_token, has_refresh_token, expires_in, now, exp, delta_to_exp
+local function log_auth_state(res, access_token_value)
+  local now_ts = os.time()
+  local has_access = res and res.access_token and res.access_token ~= ""
+  local has_refresh = res and res.refresh_token and res.refresh_token ~= ""
+  local expires_in = (res and (res.access_token_expires_in or res.expires_in)) or "nil"
+  local exp = (access_token_value and jwt_exp_from_token(access_token_value)) or nil
+  local delta = (exp and (exp - now_ts)) or "nil"
+  ngx.log(ngx.INFO, "openidc_auth req_id=", req_id,
+    " is_ui=", ngx.var.is_ui or "nil",
+    " has_access_token=", tostring(has_access),
+    " has_refresh_token=", tostring(has_refresh),
+    " expires_in=", tostring(expires_in),
+    " now=", now_ts,
+    " exp=", exp or "nil",
+    " delta_to_exp=", tostring(delta))
+end
 
 local unique_name = ''
 local user_access_token = ''
@@ -111,7 +149,11 @@ else
 
   if authenticate_res ~= nil and authenticate_res.access_token then
     user_access_token = authenticate_res.access_token
+    log_auth_state(authenticate_res, user_access_token)
   else
+    if authenticate_res == nil and authenticate_err then
+      ngx.log(ngx.INFO, "openidc_auth req_id=", req_id, " is_ui=", ngx.var.is_ui or "nil", " auth_failed=1 err=", authenticate_err or "nil")
+    end
     -- not expected to get here if anonymous access is not allowed for this request
     if not allow_anonymous_request then
       ngx.status = 500
@@ -125,6 +167,9 @@ end
 if user_access_token ~= '' then
   ngx.req.set_header("X-USER-ACCESS-TOKEN", user_access_token)
 end
+
+-- Echo request id in response for client-side correlation with logs
+ngx.header["X-Request-ID"] = req_id
 
 -- Check if session was rotated during authentication and mark for CSRF token regeneration
 local old_session_id = ngx.var.cookie_strato_session
