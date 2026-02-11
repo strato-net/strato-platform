@@ -912,7 +912,7 @@ createEventTable (creator, n) evName ev cc inherited = do
       evLogToPair (EventLog n' _ t') = (n', t')
       cols = getTableColumnAndType isEvent cc [(x, indexedTypeType y) | (x, y) <- fillFirstEmptyEntries . map evLogToPair $ ev ^. eventLogs]
       fcols = mapMaybe (\(x, t, mf) -> (\f -> ForeignKeyInfo eventTable (indexTableName creator f) x t) <$> mf) cols
-      arrayNamesAndTypes = [(key, entry) | (key, IndexedType _ (SVMType.Array entry _)) <- map evLogToPair $ ev ^. eventLogs]
+      arrayNamesAndTypes = [(key, entry) | (key, IndexedType _ (SVMType.Array entry _) _) <- map evLogToPair $ ev ^. eventLogs]
   $logInfoS "keys" (T.pack $ show arrayNamesAndTypes)
   yieldMany $
     (\i ->

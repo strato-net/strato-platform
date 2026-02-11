@@ -15,13 +15,18 @@ import Data.Swagger
 import GHC.Generics
 import qualified Generic.Random as GR
 import SolidVM.Model.Type
+import SolidVM.Model.CodeCollection.Statement (Location(..))
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
 
 typeAesonOptions :: Options
 typeAesonOptions = defaultOptions
 
-data IndexedType = IndexedType {indexedTypeIndex :: Int32, indexedTypeType :: Type}
+data IndexedType = IndexedType 
+  { indexedTypeIndex :: Int32
+  , indexedTypeType :: Type
+  , indexedTypeLocation :: Maybe Location  -- memory/storage/calldata annotation
+  }
   deriving (Eq, Show, Generic, NFData)
 
 -- instance ToJSON Person where
@@ -40,11 +45,12 @@ instance FromJSON IndexedType where
     withObject "xabi" $ \v -> do
       index <- v .: "index"
       theType <- parseJSON $ Object $ KeyMap.insertWith (const id) "type" "Contract" v
-      return $ IndexedType index theType
+      location <- v .:? "location"
+      return $ IndexedType index theType location
 
 instance ToJSON IndexedType where
-  toJSON (IndexedType indexedTypeIndex theType) =
-    object ["index" .= indexedTypeIndex, "type" .= theType]
+  toJSON (IndexedType indexedTypeIndex theType location) =
+    object ["index" .= indexedTypeIndex, "type" .= theType, "location" .= location]
 
 instance Arbitrary IndexedType where arbitrary = GR.genericArbitrary GR.uniform
 
@@ -53,7 +59,7 @@ instance ToSchema IndexedType where
     genericDeclareNamedSchema defaultSchemaOptions proxy
       & mapped . name ?~ "Solidity type"
       & mapped . schema . description ?~ "Represents a soldity type"
-      & mapped . schema . example ?~ toJSON (IndexedType 10 (Mapping (Just False) (Address False) (Bytes Nothing Nothing)))
+      & mapped . schema . example ?~ toJSON (IndexedType 10 (Mapping (Just False) (Address False) (Bytes Nothing Nothing)) Nothing)
 
 data FieldType = FieldType {fieldTypeAtBytes :: Int32, fieldTypeType :: Type}
   deriving (Eq, Show, Generic, NFData)

@@ -936,7 +936,7 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
           -- pair up field names with values one-by-one (no type checking tho, lol)
           -- let pairs = zip (map (T.unpack . fst) $ CC._eventLogs ev) expStrs
 
-          let evArgs = zipWith (\(CC.EventLog name _ (CC.IndexedType _ idxType)) value ->
+          let evArgs = zipWith (\(CC.EventLog name _ (CC.IndexedType _ idxType _)) value ->
                         (T.unpack name, value, if isTypeArray idxType then "Array" else "Other"))
                      (CC._eventLogs ev) expStrs
                 where
@@ -2559,7 +2559,7 @@ runTheCallWithVars ::
   Bool ->
   m (Maybe Value)
 runTheCallWithVars address' codeAddr contract' funcName hsh cc theFunction argVals' argVars ro ff = do
-  let !returnNamesAndTypes = [(n, t) | (Just n, CC.IndexedType _ t) <- CC._funcVals theFunction]
+  let !returnNamesAndTypes = [(n, t) | (Just n, CC.IndexedType _ t _) <- CC._funcVals theFunction]
       !theModifierNames = map fst $ (CC._funcModifiers theFunction)
   !returns <- traverse (\(n, t) -> (n,) <$> createDefaultValue cc contract' t) returnNamesAndTypes
 
@@ -2576,19 +2576,23 @@ runTheCallWithVars address' codeAddr contract' funcName hsh cc theFunction argVa
       let mismatchInfo = formatArgMismatch $ zip argVals' (map (CC.indexedTypeType . snd) (CC._funcArgs theFunction))
       in typeError ("argument type mismatch in '" ++ funcName ++ "'") mismatchInfo
 
-  let !args =
+  -- Extract args with location info: (name, Maybe Location, value)
+  let !argsWithLoc =
           let argMeta =
-                map (\(n, CC.IndexedType _ t) -> (fromMaybe "" n, t)) $
+                map (\(n, CC.IndexedType _ t loc) -> (fromMaybe "" n, t, loc)) $
                   CC._funcArgs theFunction
-              go [(n, SVMType.Variadic)] [SVariadic vs'] = [(n, (SVMType.Variadic, SVariadic vs'))]
-              go [(n, SVMType.Variadic)] vs' = [(n, (SVMType.Variadic, SVariadic vs'))]
+              go [(n, SVMType.Variadic, _)] [SVariadic vs'] = [(n, Nothing, SVariadic vs')]
+              go [(n, SVMType.Variadic, _)] vs' = [(n, Nothing, SVariadic vs')]
               go [] _ = []
               go _ [] = []
-              go ((n,t):nts) (v:vs') =
+              go ((n,t,loc):nts) (v:vs') =
                 let v' = coerceType contract' cc t v
-                 in (n,(t,v')) : go nts vs'
-           in fmap snd <$> go argMeta argVals
-  let locals = args ++ returns
+                 in (n, loc, v') : go nts vs'
+           in go argMeta argVals
+  -- Build locals: (name, value) pairs for both args and returns
+  let locals = [(n, v) | (n, _, v) <- argsWithLoc] ++ returns
+  -- Build location map for args
+  let argLocations = [(n, loc) | (n, loc, _) <- argsWithLoc]
   -- Zip args with provided Variables (padded with Nothing for missing entries)
   let argVarsPadded = map Just argVars ++ repeat Nothing
   -- Helium network ID = 114784819836269
@@ -2598,17 +2602,23 @@ runTheCallWithVars address' codeAddr contract' funcName hsh cc theFunction argVa
   let heliumPassByRefForkBlock = 999999999 :: Integer  -- TODO: Set to actual fork block when network upgrades
   let passByRefEnabled = not (computeNetworkID == 114784819836269 && currentBlockNum < heliumPassByRefForkBlock)
   localVars1 <-
-    forM (zip locals argVarsPadded) $ \((n, v), mVar) -> do
+    forM (zip3 locals argVarsPadded (map snd argLocations ++ repeat Nothing)) $ \((n, v), mVar, mLoc) -> do
       newVar <- case mVar of
-        -- For memory arrays/structs, use provided Variable (pass by reference) - only after fork
-        Just var | passByRefEnabled -> case v of
-          SArray _ -> pure var
-          SStruct _ _ -> pure var
-          -- For other types, still create new IORef (pass by value)
+        -- For memory arrays/structs, use provided Variable (pass by reference)
+        -- Only if: 1) fork is enabled, AND 2) location is Memory (or no location for backward compat)
+        Just var | passByRefEnabled -> case (v, mLoc) of
+          -- Explicitly marked as memory - pass by reference for arrays/structs
+          (SArray _, Just CC.Memory) -> pure var
+          (SStruct _ _, Just CC.Memory) -> pure var
+          -- No location annotation - use type-based heuristic (backward compat after fork)
+          (SArray _, Nothing) -> pure var
+          (SStruct _ _, Nothing) -> pure var
+          -- Explicitly marked as storage or calldata, or other types - pass by value
           _ -> liftIO $ fmap Variable $ newIORef v
         -- Pre-fork or no Variable provided, create new IORef (pass by value)
         _ -> liftIO $ fmap Variable $ newIORef v
       return (n, newVar)
+  let args = [(n, v) | (n, _, v) <- argsWithLoc]
 
   val' <- withCallInfo address' codeAddr contract' funcName hsh cc (M.fromList localVars1) ro ff $ do -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
     matchedArgvals <- forM theModifiers $ \modi -> do
@@ -3301,6 +3311,6 @@ validateFunctionArguments func argVals = checkFunc $ func : CC._funcOverload fun
             go [] [] = pure $ Just []
             go _ _ = pure Nothing
             argMeta =
-              map (\(n, CC.IndexedType _ t) -> (fromMaybe "" n, t)) $
+              map (\(n, CC.IndexedType _ t _) -> (fromMaybe "" n, t)) $
                 CC._funcArgs theFunc
          in go argMeta argVals
