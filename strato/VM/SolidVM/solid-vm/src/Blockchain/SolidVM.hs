@@ -1478,7 +1478,15 @@ expToVar' (CC.FunctionCall _ (CC.Variable _ name) args)
 
 expToVar' (CC.FunctionCall _ e args) = do
       argVals <- argsToVals args
-      argVars <- argsToVars args  -- Get Variables for pass-by-reference
+      -- Helium network ID = 114784819836269
+      -- Pass-by-reference for memory arrays/structs is only enabled after fork block on helium
+      -- Set to high value until network upgrade is coordinated
+      currentBlockNum <- BlockHeader.number . Env.blockHeader <$> getEnv
+      let heliumPassByRefForkBlock = 999999999 :: Integer  -- TODO: Set to actual fork block when network upgrades
+      let passByRefEnabled = not (computeNetworkID == 114784819836269 && currentBlockNum < heliumPassByRefForkBlock)
+      argVars <- if passByRefEnabled
+                 then argsToVars args  -- Get Variables for pass-by-reference
+                 else pure []  -- Pre-fork: pass empty list to disable pass-by-reference
       case e of -- FunctionCall Special Case when calling a function via Member Access
         (CC.MemberAccess _ (CC.Variable _ "Util") _) -> regularFunctionCall e argVals argVars Nothing --Because of the hardcoded Util functions
         (CC.MemberAccess ctx' expr name) -> do
@@ -2583,17 +2591,23 @@ runTheCallWithVars address' codeAddr contract' funcName hsh cc theFunction argVa
   let locals = args ++ returns
   -- Zip args with provided Variables (padded with Nothing for missing entries)
   let argVarsPadded = map Just argVars ++ repeat Nothing
+  -- Helium network ID = 114784819836269
+  -- Pass-by-reference for memory arrays/structs is only enabled after fork block on helium
+  -- Set to high value until network upgrade is coordinated
+  currentBlockNum <- BlockHeader.number . Env.blockHeader <$> getEnv
+  let heliumPassByRefForkBlock = 999999999 :: Integer  -- TODO: Set to actual fork block when network upgrades
+  let passByRefEnabled = not (computeNetworkID == 114784819836269 && currentBlockNum < heliumPassByRefForkBlock)
   localVars1 <-
     forM (zip locals argVarsPadded) $ \((n, v), mVar) -> do
       newVar <- case mVar of
-        -- For memory arrays/structs, use provided Variable (pass by reference)
-        Just var -> case v of
+        -- For memory arrays/structs, use provided Variable (pass by reference) - only after fork
+        Just var | passByRefEnabled -> case v of
           SArray _ -> pure var
           SStruct _ _ -> pure var
           -- For other types, still create new IORef (pass by value)
           _ -> liftIO $ fmap Variable $ newIORef v
-        -- No Variable provided, create new IORef
-        Nothing -> liftIO $ fmap Variable $ newIORef v
+        -- Pre-fork or no Variable provided, create new IORef (pass by value)
+        _ -> liftIO $ fmap Variable $ newIORef v
       return (n, newVar)
 
   val' <- withCallInfo address' codeAddr contract' funcName hsh cc (M.fromList localVars1) ro ff $ do -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
