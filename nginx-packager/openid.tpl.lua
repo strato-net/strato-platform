@@ -81,6 +81,15 @@ else
         ngx.log(ngx.DEBUG, 'User authentication error: ', authenticate_err)
       end
 
+      -- Destroy the stale session to prevent repeated refresh token attempts
+      -- against an expired/revoked Keycloak session. Without this, concurrent
+      -- requests each independently try to refresh the same dead token,
+      -- flooding Keycloak with REFRESH_TOKEN_ERROR warnings.
+      local stale_session = require("resty.session").open()
+      if stale_session then
+        stale_session:destroy()
+      end
+
       -- Handle OIDC callback state mismatch (multi-tab race condition):
       -- When multiple tabs initiate auth flows, each overwrites the OIDC state in the shared
       -- session cookie. The tab whose callback arrives with the old state gets this error.
