@@ -61,7 +61,7 @@
     "parse": "assets",
     "timestamp": "data_quote_start",
     "apiKeyEnvVar": "COINAPI_API_KEY",
-    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "WSTETH"]
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT"]
   },
   "LiveCoinWatch": {
     "url": "https://api.livecoinwatch.com/coins/map",
