@@ -5,10 +5,6 @@ import {
   getCardsFromCirrus,
   getConfigsForWatcher,
   executeTopUp as executeTopUpService,
-  findConfigByTopUpParams,
-  markTopUpDone,
-  upsertConfig,
-  deleteConfig,
   submitApproval,
   getCardBalance,
   submitAddCard,
@@ -46,11 +42,12 @@ class CreditCardController {
   ): Promise<void> {
     try {
       const address = req.address as string;
-      if (!address) {
+      const accessToken = req.accessToken as string;
+      if (!address || !accessToken) {
         res.status(401).json({ error: "Unauthorized" });
         return;
       }
-      const configs = getConfigs(address);
+      const configs = await getConfigs(accessToken, address);
       res.json(configs);
     } catch (error: any) {
       next(error);
@@ -64,12 +61,13 @@ class CreditCardController {
   ): Promise<void> {
     try {
       const address = req.address as string;
+      const accessToken = req.accessToken as string;
       const id = req.params.id;
-      if (!address || !id) {
-        res.status(400).json({ error: "Missing id" });
+      if (!address || !accessToken || !id) {
+        res.status(400).json({ error: "Missing id or unauthorized" });
         return;
       }
-      const config = getConfigById(address, id);
+      const config = await getConfigById(accessToken, address, id);
       if (!config) {
         res.status(404).json({ error: "Card not found" });
         return;
@@ -112,13 +110,44 @@ class CreditCardController {
   ): Promise<void> {
     try {
       const address = req.address as string;
-      if (!address) {
+      const accessToken = req.accessToken as string;
+      if (!address || !accessToken) {
         res.status(401).json({ error: "Unauthorized" });
         return;
       }
       validateUpsertConfig(req.body);
-      const config = upsertConfig(address, req.body as Omit<CreditCardConfig, "userAddress"> & { id?: string });
-      res.json(config);
+      const body = req.body as Omit<CreditCardConfig, "userAddress"> & { id?: string };
+      if (body.id != null && body.id !== "") {
+        const index = parseInt(String(body.id), 10);
+        if (!Number.isInteger(index) || index < 0) {
+          res.status(400).json({ error: "Invalid id for update" });
+          return;
+        }
+        const result = await submitUpdateCard(accessToken, address, {
+          index,
+          nickname: body.nickname ?? "",
+          providerId: body.providerId ?? "",
+          destinationChainId: body.destinationChainId,
+          externalToken: body.externalToken,
+          cardWalletAddress: body.cardWalletAddress,
+          thresholdAmount: body.thresholdAmount,
+          cooldownMinutes: body.cooldownMinutes,
+          topUpAmount: body.topUpAmount,
+        });
+        res.json({ success: true, data: result });
+      } else {
+        const result = await submitAddCard(accessToken, address, {
+          nickname: body.nickname ?? "",
+          providerId: body.providerId ?? "",
+          destinationChainId: body.destinationChainId,
+          externalToken: body.externalToken,
+          cardWalletAddress: body.cardWalletAddress,
+          thresholdAmount: body.thresholdAmount,
+          cooldownMinutes: body.cooldownMinutes,
+          topUpAmount: body.topUpAmount,
+        });
+        res.json({ success: true, data: result });
+      }
     } catch (error: any) {
       next(error);
     }
@@ -131,13 +160,19 @@ class CreditCardController {
   ): Promise<void> {
     try {
       const address = req.address as string;
+      const accessToken = req.accessToken as string;
       const id = req.params.id;
-      if (!address || !id) {
+      if (!address || !accessToken || !id) {
         res.status(400).json({ error: "Missing id" });
         return;
       }
-      const deleted = deleteConfig(address, id);
-      res.json({ deleted });
+      const index = parseInt(id, 10);
+      if (!Number.isInteger(index) || index < 0) {
+        res.status(400).json({ error: "Invalid id" });
+        return;
+      }
+      await submitRemoveCard(accessToken, address, index);
+      res.json({ deleted: true });
     } catch (error: any) {
       next(error);
     }
@@ -234,21 +269,26 @@ class CreditCardController {
     }
   }
 
-  /** GET /credit-card/watcher-config — operator only: all enabled configs for the top-up watcher. */
+  /** GET /credit-card/watcher-config — operator only: all card configs from Cirrus for the top-up watcher. */
   static async getWatcherConfig(
     req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> {
     try {
-      const configs = getConfigsForWatcher();
+      const accessToken = req.accessToken as string;
+      if (!accessToken) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      const configs = await getConfigsForWatcher(accessToken);
       res.json(configs);
     } catch (error: any) {
       next(error);
     }
   }
 
-  /** POST /credit-card/execute-top-up — operator only: run a single top-up and mark done. */
+  /** POST /credit-card/execute-top-up — operator only: run a single top-up (contract updates lastTopUpTimestamp on chain). */
   static async executeTopUp(
     req: Request,
     res: Response,
@@ -264,8 +304,6 @@ class CreditCardController {
         return;
       }
       const result = await executeTopUpService(accessToken, body);
-      const config = findConfigByTopUpParams(body);
-      if (config) markTopUpDone(config);
       res.json({ success: true, data: result });
     } catch (error: any) {
       next(error);

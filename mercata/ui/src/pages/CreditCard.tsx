@@ -123,7 +123,6 @@ export default function CreditCardPage() {
   const [editingConfig, setEditingConfig] = useState<OnChainCardConfig | null>(null);
 
   const [saving, setSaving] = useState(false);
-  const [approving, setApproving] = useState(false);
   const [bridgeableTokens, setBridgeableTokens] = useState<BridgeToken[]>([]);
   const [nickname, setNickname] = useState("");
   const [selectedProviderId, setSelectedProviderId] = useState("");
@@ -234,13 +233,15 @@ export default function CreditCardPage() {
       setSelectedProviderId(config.providerId ?? "");
       setSelectedNetworkChainId(config.destinationChainId);
       setCardWalletAddress(config.cardWalletAddress);
-      setExternalToken(config.externalToken);
-      setThresholdAmount("");
-      setTopUpAmount("");
+      setExternalToken(config.externalToken ?? "");
+      setThresholdAmount(config.thresholdAmount ? formatWeiAmount(config.thresholdAmount, DECIMALS) : "");
+      setTopUpAmount(config.topUpAmount ? formatWeiAmount(config.topUpAmount, DECIMALS) : "");
       setUseBorrow(false);
       setCheckFrequencyMinutes(15);
-      setCooldownMinutes(60);
-      setEnabled(false);
+      setCooldownMinutes(config.cooldownMinutes != null ? Number(config.cooldownMinutes) : 60);
+      const th = BigInt(config.thresholdAmount ?? 0);
+      const tu = BigInt(config.topUpAmount ?? 0);
+      setEnabled(th > 0n || tu > 0n);
       setSelectedTokenSymbol("");
     } else {
       setNickname("");
@@ -281,8 +282,8 @@ export default function CreditCardPage() {
   useEffect(() => {
     if (!editingConfig || !editingConfig.destinationChainId || !editingConfig.externalToken || bridgeableTokens.length === 0) return;
     if (selectedNetworkChainId !== editingConfig.destinationChainId) return;
-    if (selectedProviderId !== "") return;
-    const token = bridgeableTokens.find((t) => t.externalToken === editingConfig.externalToken);
+    const norm = (a: string) => (a || "").toLowerCase().replace(/^0x/, "");
+    const token = bridgeableTokens.find((t) => norm(t.externalToken) === norm(editingConfig.externalToken));
     if (!token) return;
     const found = findProviderNetworkToken(editingConfig.destinationChainId, token.externalSymbol);
     if (found) {
@@ -290,7 +291,7 @@ export default function CreditCardPage() {
       setSelectedNetworkChainId(found.chainId);
       setSelectedTokenSymbol(found.tokenSymbol);
     }
-  }, [editingConfig, selectedNetworkChainId, selectedProviderId, bridgeableTokens]);
+  }, [editingConfig, selectedNetworkChainId, bridgeableTokens]);
 
   const handleSave = async () => {
     if (!isLoggedIn) return;
@@ -311,15 +312,17 @@ export default function CreditCardPage() {
       toast({ title: "This card is already connected.", variant: "destructive" });
       return;
     }
-    const thresholdWei = toWei(thresholdAmount);
-    const topUpWei = toWei(topUpAmount);
-    if (thresholdWei === null || thresholdWei < 0n) {
-      toast({ title: "Enter a valid threshold (top up when balance below)", variant: "destructive" });
-      return;
-    }
-    if (topUpWei === null || topUpWei < 0n) {
-      toast({ title: "Enter a valid top-up amount", variant: "destructive" });
-      return;
+    const thresholdWei = enabled ? toWei(thresholdAmount) : 0n;
+    const topUpWei = enabled ? toWei(topUpAmount) : 0n;
+    if (enabled) {
+      if (thresholdWei === null || thresholdWei < 0n) {
+        toast({ title: "Enter a valid threshold (top up when balance below)", variant: "destructive" });
+        return;
+      }
+      if (topUpWei === null || topUpWei < 0n) {
+        toast({ title: "Enter a valid top-up amount", variant: "destructive" });
+        return;
+      }
     }
     const payload = {
       nickname: nickname.trim() || "",
@@ -327,9 +330,9 @@ export default function CreditCardPage() {
       destinationChainId,
       externalToken: resolvedBridgeToken!.externalToken,
       cardWalletAddress: cardWalletAddress.trim(),
-      thresholdAmount: thresholdWei.toString(),
-      cooldownMinutes,
-      topUpAmount: topUpWei.toString(),
+      thresholdAmount: (enabled ? thresholdWei! : 0n).toString(),
+      cooldownMinutes: enabled ? cooldownMinutes : 0,
+      topUpAmount: (enabled ? topUpWei! : 0n).toString(),
     };
     setSaving(true);
     try {
@@ -339,6 +342,7 @@ export default function CreditCardPage() {
         await api.post("/credit-card/update-card", { ...payload, index });
         toast({ title: "Card updated" });
       } else {
+        await api.post("/credit-card/approve", { amount: MAX_APPROVE });
         await api.post("/credit-card/add-card", payload);
         toast({ title: "Card added" });
       }
@@ -367,19 +371,6 @@ export default function CreditCardPage() {
       toast({ title: String(msg), variant: "destructive" });
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleApprove = async () => {
-    if (!isLoggedIn) return;
-    setApproving(true);
-    try {
-      await api.post("/credit-card/approve", { amount: MAX_APPROVE });
-      toast({ title: "Approval submitted" });
-    } catch (e: any) {
-      toast({ title: e?.response?.data?.error || "Approval failed", variant: "destructive" });
-    } finally {
-      setApproving(false);
     }
   };
 
@@ -480,11 +471,9 @@ export default function CreditCardPage() {
                     </span>
                   </div>
                   <div>
-                    <p className="text-sm font-medium">{d.networkName} · {d.tokenSymbol}</p>
+                    <p className="text-sm font-medium">{d.networkName}</p>
                     <p className="text-lg font-semibold mt-1">
-                      {d.balance !== null
-                        ? formatWeiAmount(d.balance, 6)
-                        : "—"}
+                      Balance: {d.balance !== null ? formatWeiAmount(d.balance, 6) : "—"} {d.tokenSymbol}
                     </p>
                   </div>
                 </button>
@@ -592,67 +581,71 @@ export default function CreditCardPage() {
                 />
               </div>
             )}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label>Top up when balance below</Label>
-                <Input
-                  type="text"
-                  placeholder="e.g. 100"
-                  value={thresholdAmount}
-                  onChange={(e) => setThresholdAmount(e.target.value)}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>Top-up amount</Label>
-                <Input
-                  type="text"
-                  placeholder="e.g. 500"
-                  value={topUpAmount}
-                  onChange={(e) => setTopUpAmount(e.target.value)}
-                />
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <Label>Borrow USDST against collateral, then bridge</Label>
-              <Switch checked={useBorrow} onCheckedChange={setUseBorrow} />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label>Check frequency (minutes)</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  value={checkFrequencyMinutes}
-                  onChange={(e) => setCheckFrequencyMinutes(Number(e.target.value) || 15)}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>Cooldown between top-ups (minutes)</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  value={cooldownMinutes}
-                  onChange={(e) => setCooldownMinutes(Number(e.target.value) || 60)}
-                />
-              </div>
-            </div>
             <div className="flex items-center justify-between">
               <Label>Auto top-up enabled</Label>
               <Switch checked={enabled} onCheckedChange={setEnabled} />
             </div>
-            <div className="flex flex-wrap gap-2 pt-2">
+            {enabled && (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label>Top up when balance below</Label>
+                    <Input
+                      type="text"
+                      placeholder="e.g. 100"
+                      value={thresholdAmount}
+                      onChange={(e) => setThresholdAmount(e.target.value)}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Top-up amount</Label>
+                    <Input
+                      type="text"
+                      placeholder="e.g. 500"
+                      value={topUpAmount}
+                      onChange={(e) => setTopUpAmount(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label>Check frequency (minutes)</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={checkFrequencyMinutes}
+                      onChange={(e) => setCheckFrequencyMinutes(Number(e.target.value) || 15)}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Cooldown between top-ups (minutes)</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={cooldownMinutes}
+                      onChange={(e) => setCooldownMinutes(Number(e.target.value) || 60)}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Borrow USDST against collateral, then bridge</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">Coming soon</p>
+              </div>
+              <Switch checked={false} onCheckedChange={() => {}} disabled />
+            </div>
+            <div className="flex flex-wrap gap-2 pt-2 justify-end">
               <Button
                 onClick={handleSave}
                 disabled={saving || !isComboSupported}
               >
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : editingConfig ? "Save" : "Add card"}
               </Button>
-              <Button variant="outline" onClick={handleApprove} disabled={approving}>
-                {approving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Approve USDST for top-ups"}
-              </Button>
               {editingConfig && (
                 <Button variant="destructive" onClick={handleDelete}>
-                  Remove card
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Remove card"}
                 </Button>
               )}
             </div>

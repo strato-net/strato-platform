@@ -1,24 +1,14 @@
 import axios from "axios";
-import { promises as fs } from "fs";
-import path from "path";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { strato, cirrus } from "../../utils/mercataApiHelper";
 import { StratoPaths, constants } from "../../config/constants";
+import { getRpcUpstream } from "../../config/rpc.config";
 import { extractContractName } from "../../utils/utils";
 import type { CreditCardConfig, CreditCardTopUpExecuteParams } from "@mercata/shared-types";
 import type { TransactionResponse } from "@mercata/shared-types";
 
 const { CreditCardTopUp, creditCardTopUp, Token, USDST } = constants;
-
-const CONFIG_STORE_FILENAME = "credit-card-config-store.json";
-
-function getConfigStorePath(): string {
-  return (
-    process.env.CREDIT_CARD_CONFIG_STORE_PATH ||
-    path.join(process.cwd(), "data", CONFIG_STORE_FILENAME)
-  );
-}
 
 /** ERC20 balanceOf selector */
 const BALANCE_OF_SELECTOR = "0x70a08231";
@@ -58,55 +48,43 @@ export async function getErc20Balance(
   return BigInt(result);
 }
 
-/** In-memory store: user address -> list of card configs. Persisted to JSON file. */
-const configStore = new Map<string, CreditCardConfig[]>();
-
-async function saveConfigStore(): Promise<void> {
-  const filePath = getConfigStorePath();
-  const dir = path.dirname(filePath);
-  await fs.mkdir(dir, { recursive: true });
-  const obj: Record<string, CreditCardConfig[]> = {};
-  for (const [k, v] of configStore) obj[k] = v;
-  await fs.writeFile(filePath, JSON.stringify(obj, null, 2), "utf8");
-}
-
-/**
- * Load config store from file (call at backend startup). No-op if file does not exist.
- */
-export async function loadCreditCardConfigStore(): Promise<void> {
-  const filePath = getConfigStorePath();
-  try {
-    const raw = await fs.readFile(filePath, "utf8");
-    const obj = JSON.parse(raw) as Record<string, CreditCardConfig[]>;
-    configStore.clear();
-    for (const [k, v] of Object.entries(obj)) if (Array.isArray(v)) configStore.set(k, v);
-  } catch (e: any) {
-    if (e?.code !== "ENOENT") console.error("loadCreditCardConfigStore:", e);
-  }
-}
-
 function normalizeAddress(addr: string): string {
   return addr?.toLowerCase().replace(/^0x/, "") ?? "";
 }
 
-function generateId(): string {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
-}
-
-export function getConfigs(userAddress: string): CreditCardConfig[] {
-  const key = normalizeAddress(userAddress);
-  return configStore.get(key) ?? [];
-}
-
-export function getConfigById(userAddress: string, id: string): CreditCardConfig | null {
-  const list = getConfigs(userAddress);
-  return list.find((c) => c.id === id) ?? null;
+function mapCirrusRowToConfig(
+  userAddress: string,
+  key2: number,
+  v: CardRowFromCirrus["value"]
+): CreditCardConfig {
+  const raw = v ?? {};
+  const thresholdAmount = typeof raw.thresholdAmount === "string" ? raw.thresholdAmount : (raw.thresholdAmount != null ? String(raw.thresholdAmount) : "0");
+  const cooldownMinutes = typeof raw.cooldownMinutes === "number" ? raw.cooldownMinutes : (raw.cooldownMinutes != null ? Number(raw.cooldownMinutes) : 0);
+  const topUpAmount = typeof raw.topUpAmount === "string" ? raw.topUpAmount : (raw.topUpAmount != null ? String(raw.topUpAmount) : "0");
+  const lastTopUpTimestamp = raw.lastTopUpTimestamp != null ? Number(raw.lastTopUpTimestamp) : 0;
+  return {
+    id: String(key2),
+    userAddress,
+    nickname: typeof raw.nickname === "string" ? raw.nickname : undefined,
+    providerId: typeof raw.providerId === "string" ? raw.providerId : undefined,
+    destinationChainId: String(raw.destinationChainId ?? "0"),
+    externalToken: typeof raw.externalToken === "string" ? raw.externalToken : "",
+    cardWalletAddress: typeof raw.cardWalletAddress === "string" ? raw.cardWalletAddress : "",
+    thresholdAmount,
+    topUpAmount,
+    useBorrow: false,
+    checkFrequencyMinutes: 5,
+    cooldownMinutes,
+    enabled: true,
+    lastTopUpAt: lastTopUpTimestamp > 0 ? new Date(lastTopUpTimestamp * 1000).toISOString() : undefined,
+  };
 }
 
 /**
  * Card row from Cirrus userCards table (value may be struct with nickname, providerId, etc.).
  */
 export type CardRowFromCirrus = {
+  key?: string;
   key2?: number;
   value?: {
     nickname?: string;
@@ -174,70 +152,83 @@ export async function getCardsFromCirrus(
   }
 }
 
-function sameCard(a: CreditCardConfig, b: { destinationChainId: string; externalToken: string; cardWalletAddress: string }): boolean {
-  return (
-    a.destinationChainId === b.destinationChainId &&
-    a.externalToken === b.externalToken &&
-    normalizeAddress(a.cardWalletAddress) === normalizeAddress(b.cardWalletAddress)
-  );
-}
-
-export function upsertConfig(
-  userAddress: string,
-  body: Omit<CreditCardConfig, "userAddress"> & { id?: string }
-): CreditCardConfig {
-  const key = normalizeAddress(userAddress);
-  let list = configStore.get(key) ?? [];
-  const existingIndex = body.id ? list.findIndex((c) => c.id === body.id) : -1;
-  if (existingIndex < 0) {
-    const duplicate = list.find((c) => sameCard(c, body));
-    if (duplicate) {
-      throw new Error("This card is already connected.");
-    }
+/**
+ * Get all cards from Cirrus (all users) for the watcher. Query without key filter.
+ */
+export async function getAllCardsFromCirrus(accessToken: string): Promise<CreditCardConfig[]> {
+  if (!creditCardTopUp) return [];
+  try {
+    const { data } = await cirrus.get(accessToken, `/${CreditCardTopUp}-userCards`, {
+      params: {
+        select: "key,key2,value",
+        address: `eq.${creditCardTopUp}`,
+        order: "key.asc,key2.asc",
+      },
+    });
+    if (!Array.isArray(data)) return [];
+    return data.map((row: CardRowFromCirrus) => {
+      const userAddress = typeof row?.key === "string" ? row.key : "";
+      const key2 = row?.key2 ?? 0;
+      return mapCirrusRowToConfig(userAddress, key2, row?.value);
+    });
+  } catch (err) {
+    console.error("getAllCardsFromCirrus:", err);
+    return [];
   }
-  const id = existingIndex >= 0 ? list[existingIndex].id : generateId();
-  const full: CreditCardConfig = {
-    ...body,
-    id,
-    userAddress,
-  };
-  if (existingIndex >= 0) {
-    list = [...list];
-    list[existingIndex] = full;
-  } else {
-    list = [...list, full];
+}
+
+/**
+ * Fetch cards from Cirrus for the watcher with filter: only auto top-up enabled
+ * (thresholdAmount > 0 or topUpAmount > 0). Uses or=(thresholdAmount.gt.0,topUpAmount.gt.0)
+ * when the API supports it; always filters in memory so behavior is correct.
+ */
+export async function getConfigsForWatcher(accessToken: string): Promise<CreditCardConfig[]> {
+  if (!creditCardTopUp) return [];
+  try {
+    const params: Record<string, string> = {
+      select: "key,key2,value",
+      address: `eq.${creditCardTopUp}`,
+      order: "key.asc,key2.asc",
+      or: "(thresholdAmount.gt.0,topUpAmount.gt.0)",
+    };
+    const { data } = await cirrus.get(accessToken, `/${CreditCardTopUp}-userCards`, { params });
+    if (!Array.isArray(data)) return [];
+    const configs = data.map((row: CardRowFromCirrus) => {
+      const userAddress = typeof row?.key === "string" ? row.key : "";
+      const key2 = row?.key2 ?? 0;
+      return mapCirrusRowToConfig(userAddress, key2, row?.value);
+    });
+    return configs.filter(
+      (c) => BigInt(c.thresholdAmount ?? "0") > 0n || BigInt(c.topUpAmount ?? "0") > 0n
+    );
+  } catch (err) {
+    const all = await getAllCardsFromCirrus(accessToken);
+    return all.filter(
+      (c) => BigInt(c.thresholdAmount ?? "0") > 0n || BigInt(c.topUpAmount ?? "0") > 0n
+    );
   }
-  configStore.set(key, list);
-  void saveConfigStore();
-  return full;
 }
 
-export function deleteConfig(userAddress: string, id: string): boolean {
-  const key = normalizeAddress(userAddress);
-  const list = configStore.get(key) ?? [];
-  const next = list.filter((c) => c.id !== id);
-  if (next.length === list.length) return false;
-  configStore.set(key, next);
-  void saveConfigStore();
-  return true;
+/** Get configs for one user from Cirrus (on-chain cards as CreditCardConfig shape). */
+export async function getConfigs(accessToken: string, userAddress: string): Promise<CreditCardConfig[]> {
+  const rows = await getCardsFromCirrus(accessToken, userAddress);
+  return rows.map((r, i) => mapCirrusRowToConfig(userAddress, Number(r.id) || i, {
+    nickname: r.nickname,
+    providerId: r.providerId,
+    destinationChainId: r.destinationChainId,
+    externalToken: r.externalToken,
+    cardWalletAddress: r.cardWalletAddress,
+    thresholdAmount: r.thresholdAmount,
+    cooldownMinutes: r.cooldownMinutes != null ? Number(r.cooldownMinutes) : undefined,
+    topUpAmount: r.topUpAmount,
+    lastTopUpTimestamp: r.lastTopUpTimestamp != null ? Number(r.lastTopUpTimestamp) : undefined,
+  }));
 }
 
-/** Returns all enabled configs for the balance watcher (all users). */
-export function getConfigsForWatcher(): CreditCardConfig[] {
-  return Array.from(configStore.values()).flat().filter((c) => c.enabled);
-}
-
-/** Find config matching top-up params (for marking done after execute). */
-export function findConfigByTopUpParams(params: CreditCardTopUpExecuteParams): CreditCardConfig | null {
-  const list = configStore.get(normalizeAddress(params.userAddress)) ?? [];
-  return (
-    list.find(
-      (c) =>
-        c.destinationChainId === params.externalChainId &&
-        normalizeAddress(c.cardWalletAddress) === normalizeAddress(params.externalRecipient) &&
-        normalizeAddress(c.externalToken) === normalizeAddress(params.externalToken)
-    ) ?? null
-  );
+/** Get one config by user and id (card index) from Cirrus. */
+export async function getConfigById(accessToken: string, userAddress: string, id: string): Promise<CreditCardConfig | null> {
+  const list = await getConfigs(accessToken, userAddress);
+  return list.find((c) => c.id === id) ?? null;
 }
 
 /**
@@ -312,7 +303,8 @@ export async function submitAddCard(
         destinationChainId: body.destinationChainId,
         externalToken,
         cardWalletAddress,
-        topUpFrequencyMinutes: body.cooldownMinutes,
+        thresholdAmount: body.thresholdAmount,
+        cooldownMinutes: body.cooldownMinutes,
         topUpAmount: body.topUpAmount,
       },
     },
@@ -326,7 +318,6 @@ export async function submitAddCard(
 
 /**
  * Submit updateCard transaction to STRATO.
- * Uses topUpFrequencyMinutes (and omits thresholdAmount) to match currently deployed contract ABI.
  */
 export async function submitUpdateCard(
   accessToken: string,
@@ -363,7 +354,8 @@ export async function submitUpdateCard(
         destinationChainId: body.destinationChainId,
         externalToken,
         cardWalletAddress,
-        topUpFrequencyMinutes: body.cooldownMinutes,
+        thresholdAmount: body.thresholdAmount,
+        cooldownMinutes: body.cooldownMinutes,
         topUpAmount: body.topUpAmount,
       },
     },
@@ -430,52 +422,19 @@ export async function submitApproval(
 }
 
 /**
- * Update last top-up timestamp and clear last error for a card config.
- */
-export function markTopUpDone(config: CreditCardConfig): void {
-  const key = normalizeAddress(config.userAddress);
-  const list = configStore.get(key) ?? [];
-  const idx = list.findIndex((c) => c.id === config.id);
-  if (idx < 0) return;
-  const next = [...list];
-  next[idx] = { ...next[idx], lastTopUpAt: new Date().toISOString(), lastError: undefined };
-  configStore.set(key, next);
-  void saveConfigStore();
-}
-
-/**
- * Update last checked timestamp and optionally set last error for a card config.
- */
-export function markChecked(config: CreditCardConfig, error?: string): void {
-  const key = normalizeAddress(config.userAddress);
-  const list = configStore.get(key) ?? [];
-  const idx = list.findIndex((c) => c.id === config.id);
-  if (idx < 0) return;
-  const next = [...list];
-  next[idx] = { ...next[idx], lastCheckedAt: new Date().toISOString(), lastError: error };
-  configStore.set(key, next);
-  void saveConfigStore();
-}
-
-/**
- * Run the balance watcher: for each enabled config, check card wallet balance on the
+ * Run the balance watcher: for each card from Cirrus, check card wallet balance on the
  * destination chain; if below threshold and cooldown elapsed, execute a top-up.
- * Requires OPERATOR_ACCESS_TOKEN and CREDIT_CARD_TOP_UP_ADDRESS. Optional
- * EXTERNAL_CHAIN_RPC_URLS (JSON map of chainId -> rpcUrl) for balance checks.
+ * Contract updates lastTopUpTimestamp on chain when topUpCard is called.
  */
 export async function runBalanceWatcher(operatorAccessToken: string): Promise<void> {
   if (!operatorAccessToken) return;
   if (!creditCardTopUp) return;
   const rpcUrls = getExternalChainRpcUrls();
-  const configs = getConfigsForWatcher();
+  const configs = await getConfigsForWatcher(operatorAccessToken);
   for (const c of configs) {
     try {
-      markChecked(c);
       const rpcUrl = rpcUrls[c.destinationChainId];
-      if (!rpcUrl) {
-        markChecked(c, "No RPC URL for chain " + c.destinationChainId);
-        continue;
-      }
+      if (!rpcUrl) continue;
       const balance = await getErc20Balance(rpcUrl, c.externalToken, c.cardWalletAddress);
       const threshold = BigInt(c.thresholdAmount);
       if (balance >= threshold) continue;
@@ -489,9 +448,8 @@ export async function runBalanceWatcher(operatorAccessToken: string): Promise<vo
         externalRecipient: c.cardWalletAddress,
         externalToken: c.externalToken,
       });
-      markTopUpDone(c);
-    } catch (err: any) {
-      markChecked(c, err?.message ?? "Top-up failed");
+    } catch {
+      // continue to next card
     }
   }
 }
@@ -500,8 +458,13 @@ export async function runBalanceWatcher(operatorAccessToken: string): Promise<vo
  * Get card wallet token balance for a config (for display). Returns wei string or null if RPC unavailable.
  */
 export async function getCardBalance(config: CreditCardConfig): Promise<string | null> {
+  const chainIdStr = String(config.destinationChainId);
   const rpcUrls = getExternalChainRpcUrls();
-  const rpcUrl = rpcUrls[config.destinationChainId];
+  let rpcUrl = rpcUrls[chainIdStr];
+  if (!rpcUrl) {
+    const { upstream, fallback } = getRpcUpstream(chainIdStr);
+    rpcUrl = upstream ?? fallback ?? undefined;
+  }
   if (!rpcUrl) return null;
   try {
     const balance = await getErc20Balance(rpcUrl, config.externalToken, config.cardWalletAddress);

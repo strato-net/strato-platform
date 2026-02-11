@@ -18,8 +18,12 @@ Standalone service that watches crypto credit card wallet balances and calls `to
 See `.env.example`. Required:
 
 - `MERCATA_API_URL` – backend base URL
-- `OPERATOR_ACCESS_TOKEN` – must match backend’s `OPERATOR_ACCESS_TOKEN`
+- `OPERATOR_CLIENT_ID` – OAuth2 client id for the operator (client credentials)
+- `OPERATOR_CLIENT_SECRET` – OAuth2 client secret
+- `OPERATOR_DISCOVERY_URL` – OpenID Connect discovery URL (e.g. `https://keycloak.example/auth/realms/mercata/.well-known/openid-configuration`)
 - `EXTERNAL_CHAIN_RPC_URLS` – JSON map of `destinationChainId` → RPC URL (e.g. `{"84532":"https://sepolia.base.org"}`)
+
+The service obtains an access token via the client credentials grant and sends it as `Authorization: Bearer <token>` to the backend. When using OAuth, set the backend’s `OPERATOR_CLIENT_ID` to the same client id so the backend can verify and allow the operator JWT (same realm/JWKS as the app’s `OAUTH_DISCOVERY_URL`).
 
 Optional: `POLL_INTERVAL_MS` (default 300000), `PORT` (default 3004).
 

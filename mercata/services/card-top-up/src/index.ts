@@ -31,8 +31,13 @@ async function startPolling(): Promise<void> {
 
 app.listen(PORT, async () => {
   try {
-    if (!config.api.operatorToken) {
-      logError("CardTopUp", new Error("OPERATOR_ACCESS_TOKEN is not set"), {});
+    const { clientId, clientSecret, discoveryUrl } = config.operator;
+    if (!clientId || !clientSecret || !discoveryUrl) {
+      logError(
+        "CardTopUp",
+        new Error("OPERATOR_CLIENT_ID, OPERATOR_CLIENT_SECRET, and OPERATOR_DISCOVERY_URL are required"),
+        {}
+      );
       process.exit(1);
     }
     const rpcCount = Object.keys(config.rpcUrls).length;

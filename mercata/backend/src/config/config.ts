@@ -47,7 +47,7 @@ export const adminRegistry = process.env.ADMIN_REGISTRY || "00000000000000000000
 export const voucher = process.env.VOUCHER_CONTRACT_ADDRESS || "000000000000000000000000000000000000100e";
 export const cdpRegistry = process.env.CDP_REGISTRY || "0000000000000000000000000000000000001012";
 export const rewardsChef = process.env.REWARDS_CHEF || "000000000000000000000000000000000000101f";
-export let creditCardTopUp = process.env.CREDIT_CARD_TOP_UP_ADDRESS || "648dfcbcad0dc9a574cabb560d90f2859a57e736";
+export let creditCardTopUp = process.env.CREDIT_CARD_TOP_UP_ADDRESS || "337bbb2b6e85e8c4903f8cba56bb4e1807db0bc6";
 
 // Hidden swap pools - these pools are filtered out from API responses
 export const hiddenSwapPools: Set<string> = new Set([
@@ -81,7 +81,7 @@ export const defaultVaultFactoryFor: Record<string, string> = {
 };
 
 export const defaultCreditCardTopUpFor: Record<string, string> = {
-  "114784819836269": "648dfcbcad0dc9a574cabb560d90f2859a57e736", // Helium testnet
+  "114784819836269": "337bbb2b6e85e8c4903f8cba56bb4e1807db0bc6", // Helium testnet
 };
 
 export let bridgeUrl: string | undefined;
@@ -129,12 +129,10 @@ export function setVaultFactoryConfig(networkId: string) {
 }
 
 export function setCreditCardTopUpConfig(networkId: string) {
-  console.log(`setCreditCardTopUp: ${networkId}`)
   if (process.env.CREDIT_CARD_TOP_UP_ADDRESS) {
     creditCardTopUp = process.env.CREDIT_CARD_TOP_UP_ADDRESS;
   } else {
     creditCardTopUp = defaultCreditCardTopUpFor[networkId] || "";
-    console.log(`setCreditCardTopUp: ${networkId} ${creditCardTopUp}`)
   }
 }
 

@@ -2,7 +2,6 @@ import express from "express";
 import cors from "cors";
 import routes from "./api/routes";
 import { initOpenIdConfig, initNetworkConfig } from "./config/config";
-import { loadCreditCardConfigStore } from "./api/services/creditCard.service";
 import { errorHandler, notFoundHandler } from "./api/middleware/errorHandler";
 
 const PORT = process.env.PORT || 3001;
@@ -23,7 +22,6 @@ app.use(errorHandler);
   try {
     await initOpenIdConfig();
     await initNetworkConfig();
-    await loadCreditCardConfigStore();
     app.listen(PORT, () => {
       console.log(`Server running at http://localhost:${PORT}`);
     });

@@ -1,5 +1,6 @@
 import axios from "axios";
 import { config } from "../config";
+import { getOperatorToken } from "../auth";
 import type { WatcherConfig, ExecuteTopUpParams } from "../types";
 import { logInfo, logError } from "../utils/logger";
 import { appendError } from "../utils/healthMonitor";
@@ -29,32 +30,36 @@ async function getErc20Balance(
   return BigInt(result);
 }
 
-async function fetchWatcherConfigs(): Promise<WatcherConfig[]> {
-  const { baseUrl, operatorToken, timeout } = config.api;
-  if (!operatorToken) return [];
+async function fetchWatcherConfigs(token: string): Promise<WatcherConfig[]> {
+  const { baseUrl, timeout } = config.api;
   const url = `${baseUrl.replace(/\/$/, "")}/api/credit-card/watcher-config`;
   const { data } = await axios.get<WatcherConfig[]>(url, {
-    headers: { Authorization: `Bearer ${operatorToken}` },
+    headers: { Authorization: `Bearer ${token}` },
     timeout,
   });
   return Array.isArray(data) ? data : [];
 }
 
-async function executeTopUp(params: ExecuteTopUpParams): Promise<void> {
-  const { baseUrl, operatorToken, timeout } = config.api;
+async function executeTopUp(token: string, params: ExecuteTopUpParams): Promise<void> {
+  const { baseUrl, timeout } = config.api;
   const url = `${baseUrl.replace(/\/$/, "")}/api/credit-card/execute-top-up`;
   await axios.post(url, params, {
-    headers: { Authorization: `Bearer ${operatorToken}`, "Content-Type": "application/json" },
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     timeout,
   });
 }
 
 export async function runTopUpCycle(): Promise<void> {
-  if (!config.api.operatorToken) {
-    logInfo("CardTopUp", "OPERATOR_ACCESS_TOKEN not set; skipping cycle");
+  let token: string;
+  logInfo("CardTopUp", `Starting top-up cycle`);
+  try {
+    token = await getOperatorToken();
+  } catch (err) {
+    logError("CardTopUp", err instanceof Error ? err : new Error(String(err)), { operation: "getOperatorToken" });
     return;
   }
-  const configs = await fetchWatcherConfigs();
+  const configs = await fetchWatcherConfigs(token);
+  logInfo("CardTopUp", `Watcher config: ${JSON.stringify(configs)}`);
   if (configs.length === 0) return;
   logInfo("CardTopUp", `Checking ${configs.length} card(s)`);
   const rpcUrls = config.rpcUrls;
@@ -74,7 +79,7 @@ export async function runTopUpCycle(): Promise<void> {
         logInfo("CardTopUp", `Card ${c.id} below threshold but cooldown not elapsed`);
         continue;
       }
-      await executeTopUp({
+      await executeTopUp(token, {
         userAddress: c.userAddress,
         stratoTokenAmount: c.topUpAmount,
         externalChainId: c.destinationChainId,

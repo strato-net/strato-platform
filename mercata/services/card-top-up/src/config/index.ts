@@ -11,8 +11,12 @@ function getExternalChainRpcUrls(): Record<string, string> {
 export const config = {
   api: {
     baseUrl: process.env.MERCATA_API_URL || "http://localhost:3001",
-    operatorToken: process.env.OPERATOR_ACCESS_TOKEN || "",
     timeout: 30_000,
+  },
+  operator: {
+    clientId: process.env.OPERATOR_CLIENT_ID || "",
+    clientSecret: process.env.OPERATOR_CLIENT_SECRET || "",
+    discoveryUrl: process.env.OPERATOR_DISCOVERY_URL || "",
   },
   polling: {
     intervalMs: Number(process.env.POLL_INTERVAL_MS) || 5 * 60 * 1000, // 5 min default
