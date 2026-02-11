@@ -33,9 +33,15 @@ api.interceptors.request.use(
 
 // Helper: Extract error message from backend response
 function extractApiErrorMessage(error: any): string {
+  // For 500+ errors, never show the raw server message
+  const status = error?.response?.status;
+  if (!status || status >= 500) {
+    return "Something went wrong. Please try again later.";
+  }
+
   // Handle different error response structures
   const errorData = error?.response?.data;
-  
+
   // If error is an object with message property
   if (errorData?.error && typeof errorData.error === 'object' && errorData.error.message) {
     return errorData.error.message;
