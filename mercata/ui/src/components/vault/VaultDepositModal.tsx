@@ -20,6 +20,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useVaultContext } from "@/context/VaultContext";
 import { useToast } from "@/hooks/use-toast";
 import { formatUnits, parseUnits } from "ethers";
+import { RewardsWidget } from "@/components/rewards/RewardsWidget";
+import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 
 const MIN_FIRST_DEPOSIT_USD = 50000;
 
@@ -55,6 +57,7 @@ const VaultDepositModal = ({ isOpen, onClose, onSuccess }: VaultDepositModalProp
 
   const { vaultState, deposit, refreshVault } = useVaultContext();
   const { toast } = useToast();
+  const { userRewards } = useRewardsUserInfo();
 
   const {
     deficitAssets,
@@ -175,7 +178,7 @@ const VaultDepositModal = ({ isOpen, onClose, onSuccess }: VaultDepositModalProp
       setDepositLoading(false);
       handleClose();
       onSuccess();
-      
+
       // Refresh vault data in background (don't await)
       refreshVault(false);
     } catch (err: any) {
@@ -330,6 +333,14 @@ const VaultDepositModal = ({ isOpen, onClose, onSuccess }: VaultDepositModalProp
               </div>
             </div>
           )}
+
+          {/* Estimated Rewards */}
+          <RewardsWidget
+            userRewards={userRewards}
+            activityName=" Vault Token"
+            inputAmount={sharesToReceive !== "0" ? formatUnits(sharesToReceive, 18) : undefined}
+            actionLabel="Deposit"
+          />
 
           {/* Submit Button */}
           <Button
