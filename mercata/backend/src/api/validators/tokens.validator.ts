@@ -23,6 +23,25 @@ const transferItemSchema = Joi.object({
   value: numericStringField("value"),
 });
 
+const bulkTransferItemSchema = Joi.object({
+  to: validateAddressField("to"),
+  value: numericStringField("value"),
+});
+
+const bulkTransferSchema = Joi.object({
+  address: validateAddressField("address"),
+  transfers: Joi.array()
+    .items(bulkTransferItemSchema)
+    .min(1)
+    .max(50)
+    .required()
+    .messages({
+      "array.min": `"transfers" must contain at least 1 transfer`,
+      "array.max": `"transfers" cannot exceed 50 transfers per batch`,
+      "any.required": `"transfers" is required`,
+    }),
+});
+
 
 const approveArgsSchema = Joi.object({
   address: validateAddressField("address"),
@@ -102,5 +121,12 @@ export function validateSetStatusArgs(args: any) {
   const { error } = setStatusArgsSchema.validate(args);
   if (error) {
     throw new Error("SetStatus Argument Validation Error: " + error.message);
+  }
+}
+
+export function validateBulkTransferArgs(args: any) {
+  const { error } = bulkTransferSchema.validate(args);
+  if (error) {
+    throw new Error("Bulk Transfer Argument Validation Error: " + error.message);
   }
 }

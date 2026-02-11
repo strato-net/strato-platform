@@ -117,6 +117,19 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   DOCKER_NETWORK_CIDR=$(ip route | awk '/src/ {print $1}')
   sed -i "s|__DOCKER_NETWORK_CIDR__|$DOCKER_NETWORK_CIDR|g" /tmp/nginx.conf
 
+  # Generate set_real_ip_from directives for trusted proxy IPs
+  TRUST_PROXY_LINES=""
+  if [ -n "${NGINX_TRUST_PROXY_CIDRS:-}" ]; then
+    IFS=',' read -ra CIDRS <<< "$NGINX_TRUST_PROXY_CIDRS"
+    for cidr in "${CIDRS[@]}"; do
+      cidr=$(echo "$cidr" | xargs) # trim whitespace
+      if [ -n "$cidr" ]; then
+        TRUST_PROXY_LINES="${TRUST_PROXY_LINES}    set_real_ip_from ${cidr};\n"
+      fi
+    done
+  fi
+  sed -i "s|__TRUST_PROXY_CIDRS__|${TRUST_PROXY_LINES%\\\\n}|g" /tmp/nginx.conf
+
   ########
   ### Generate .lua scripts from templates according to configuration provided
   ########

@@ -122,6 +122,7 @@ contract record Mercata is Authorizable {
 
         address priceOracleImpl = address(new PriceOracle(implOwnerIgnored));
         priceOracle = PriceOracle(address(new Proxy(priceOracleImpl, this)));
+        priceOracle.initialize();
         Ownable(priceOracle).transferOwnership(address(adminRegistry));
 
         address poolConfiguratorImpl = address(new PoolConfigurator(implOwnerIgnored));

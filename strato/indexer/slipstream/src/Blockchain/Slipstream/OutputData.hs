@@ -127,6 +127,7 @@ data SlipstreamQuery = CreateTable
                      | CreateFkeyFunction ForeignKeyInfo
                      | RefreshMaterializedView TableName
                      | NotifyPostgREST
+                     | RawSQL Text
                      deriving (Eq, Ord, Show)
 
 slipstreamQueryPostgres :: SlipstreamQuery -> Text
@@ -295,30 +296,40 @@ slipstreamQueryText _ CreateView{..} =
                   ]
                 _ -> ""
             , case t of
+                SqlJsonbArray -> T.concat
+                  [ "THEN (SELECT jsonb_agg(val ORDER BY idx::int) FROM jsonb_each(s."
+                  , wrapEscapeDouble dataColumn
+                  , "->'"
+                  , c
+                  , "') AS e(idx, val) WHERE idx != '_length')"
+                  , " ELSE '[]'::jsonb"
+                  ]
                 SqlJsonb -> T.concat
                   [ "THEN (s."
                   , wrapEscapeDouble dataColumn
                   , "->'"
+                  , c
+                  , "')"
+                  , " ELSE to_jsonb(''::text)"
                   ]
                 _ -> T.concat
                   [ "THEN (s."
                   , wrapEscapeDouble dataColumn
                   , "->>'"
+                  , c
+                  , "')"
+                  , case t of
+                      SqlDecimal -> "::numeric"
+                      SqlBool -> " = 'true'"
+                      _ -> ""
+                  , " ELSE "
+                  , case t of
+                      SqlBool      -> "false::boolean"
+                      SqlDecimal   -> "0::numeric"
+                      SqlText      -> "''::text"
+                      SqlTimestamp -> "'infinity'::timestamp)"
+                      SqlSerial    -> "0::numeric"
                   ]
-            , c
-            , "')"
-            , case t of
-                SqlDecimal -> "::numeric"
-                SqlBool -> " = 'true'"
-                _ -> ""
-            , " ELSE "
-            , case t of
-                SqlBool      -> "false::boolean"
-                SqlDecimal   -> "0::numeric"
-                SqlText      -> "''::text"
-                SqlJsonb     -> "to_jsonb(''::text)"
-                SqlTimestamp -> "'infinity'::timestamp)"
-                SqlSerial    -> "0::numeric"
             , " END AS "
             , wrapEscapeDouble $ if c `Set.member` baseColumnSet then "arg_" <> c else c
             ]) <$> cols') viewColumns
@@ -327,38 +338,53 @@ slipstreamQueryText _ CreateView{..} =
             . ("jsonb_build_object(" <>)
             . T.intercalate ", " $ concatMap (\(c, t) ->
             [ wrapEscapeSingle $ if c `Set.member` baseColumnSet then "arg_" <> c else c
-            , T.concat
-              [ "to_jsonb(CASE WHEN jsonb_exists(s."
-              , wrapEscapeDouble dataColumn
-              , ", '"
-              , c
-              , "') "
-              , case t of
-                  SqlJsonb -> T.concat
-                    [ "THEN (s."
-                    , wrapEscapeDouble dataColumn
-                    , "->'"
-                    ]
-                  _ -> T.concat
-                    [ "THEN (s."
-                    , wrapEscapeDouble dataColumn
-                    , "->>'"
-                    ]
-              , c
-              , "')"
-              , case t of
-                  SqlBool -> "::text = 'true'"
-                  _ -> ""
-              , " ELSE "
-              , case t of
-                  SqlBool      -> "false::boolean"
-                  SqlDecimal   -> "'0'::text"
-                  SqlText      -> "''::text"
-                  SqlJsonb     -> "to_jsonb(''::text)"
-                  SqlTimestamp -> "'infinity'::timestamp)"
-                  SqlSerial    -> "0::numeric"
-              , " END)"
-              ]
+            , case t of
+                SqlJsonbArray -> T.concat
+                  [ "CASE WHEN jsonb_exists(s."
+                  , wrapEscapeDouble dataColumn
+                  , ", '"
+                  , c
+                  , "') THEN (SELECT jsonb_agg(val ORDER BY idx::int) FROM jsonb_each(s."
+                  , wrapEscapeDouble dataColumn
+                  , "->'"
+                  , c
+                  , "') AS e(idx, val) WHERE idx != '_length')"
+                  , " ELSE '[]'::jsonb END"
+                  ]
+                _ -> T.concat
+                  [ "to_jsonb(CASE WHEN jsonb_exists(s."
+                  , wrapEscapeDouble dataColumn
+                  , ", '"
+                  , c
+                  , "') "
+                  , case t of
+                      SqlJsonb -> T.concat
+                        [ "THEN (s."
+                        , wrapEscapeDouble dataColumn
+                        , "->'"
+                        , c
+                        , "')"
+                        ]
+                      _ -> T.concat
+                        [ "THEN (s."
+                        , wrapEscapeDouble dataColumn
+                        , "->>'"
+                        , c
+                        , "')"
+                        ]
+                  , case t of
+                      SqlBool -> "::text = 'true'"
+                      _ -> ""
+                  , " ELSE "
+                  , case t of
+                      SqlBool      -> "false::boolean"
+                      SqlDecimal   -> "'0'::text"
+                      SqlText      -> "''::text"
+                      SqlJsonb     -> "to_jsonb(''::text)"
+                      SqlTimestamp -> "'infinity'::timestamp)"
+                      SqlSerial    -> "0::numeric"
+                  , " END)"
+                  ]
             ]) cols') <$> jsonbColumns)
         , " FROM "
         , tableNameToDoubleQuoteText sourceTableName
@@ -474,6 +500,7 @@ slipstreamQueryText _ (RefreshMaterializedView _tableName) = T.concat []
   -- , ";"
   -- ]
 slipstreamQueryText _ NotifyPostgREST = "NOTIFY pgrst, 'reload schema';"
+slipstreamQueryText _ (RawSQL t) = t
 
 data ProcessedCollectionRow = ProcessedCollectionRow
   { address :: Address,
@@ -771,12 +798,13 @@ jsonbUpdateClause tblText colText = T.concat
   , tblText
   , "."
   , colText
-  , ") = 'object' THEN "
+  , ") = 'object' THEN jsonb_merge_deep("
   , tblText
   , "."
   , colText
-  , " || excluded."
+  , ", excluded."
   , colText
+  , ")"
   , " WHEN excluded."
   , colText
   , " IS NOT NULL THEN excluded."
@@ -1034,7 +1062,7 @@ solidityTypeToSQLType _ _ _ SVMType.Bytes{} = Just SqlText
 solidityTypeToSQLType _ _ _ SVMType.UserDefined{} = Just SqlText
 solidityTypeToSQLType _ _ _ SVMType.Decimal = Just SqlDecimal
 solidityTypeToSQLType _ _ _ SVMType.Address{} = Just SqlText
-solidityTypeToSQLType isEvent _ _ SVMType.Array{} = if isEvent then Just SqlJsonb else Nothing
+solidityTypeToSQLType isEvent _ _ SVMType.Array{} = Just $ if isEvent then SqlJsonb else SqlJsonbArray
 solidityTypeToSQLType _ _ _ SVMType.Mapping{} = Nothing -- Just SqlJsonb
 solidityTypeToSQLType _ mc cc (SVMType.UnknownLabel l) = Just . maybe SqlText (const SqlJsonb) $ (\c -> structDef c cc l) =<< mc
 solidityTypeToSQLType _ _ _ SVMType.Struct{} = Just SqlJsonb
@@ -1089,9 +1117,11 @@ valueToSQLText :: SqlType -> Value -> Maybe Text
 valueToSQLText t v =
   let v' = wrapEscapeSingle <$> valueToSQLText' True v
       pref = case t of
-        SqlJsonb -> "to_jsonb("
+        SqlJsonb      -> "to_jsonb("
+        SqlJsonbArray -> "to_jsonb("
         _ -> ""
       suff = case t of
+        SqlJsonbArray -> "::jsonb)"
         SqlJsonb -> case v of
           SimpleValue ValueBool{} -> "::boolean)"
           SimpleValue ValueInt{} -> "::numeric)"
@@ -1221,4 +1251,41 @@ initialSlipstreamQueries =
       ["address", "block_hash", "event_index", "collection_name", "key"]
       (Just $ Foreign "event_event_array" ["address", "block_hash", "event_index"] globalEventTableName ["address", "block_hash", "event_index"])
       []
+  , RawSQL jsonbMergeDeepSQL
+  ]
+
+jsonbMergeDeepSQL :: Text
+jsonbMergeDeepSQL = T.unlines
+  [ "CREATE OR REPLACE FUNCTION jsonb_merge_deep(a jsonb, b jsonb) RETURNS jsonb AS $fn$"
+  , "DECLARE result jsonb; key text; arr_obj jsonb; i int; len int;"
+  , "BEGIN"
+  , "  IF jsonb_typeof(a) = 'array' AND jsonb_typeof(b) = 'object' THEN"
+  , "    arr_obj := '{}'::jsonb;"
+  , "    FOR i IN 0..jsonb_array_length(a)-1 LOOP"
+  , "      arr_obj := jsonb_set(arr_obj, ARRAY[i::text], a->i);"
+  , "    END LOOP;"
+  , "    RETURN jsonb_merge_deep(arr_obj, b);"
+  , "  END IF;"
+  , "  IF jsonb_typeof(a) = 'object' AND jsonb_typeof(b) = 'object' THEN"
+  , "    result := a;"
+  , "    FOR key IN SELECT jsonb_object_keys(b) LOOP"
+  , "      IF result ?? key THEN"
+  , "        result := jsonb_set(result, ARRAY[key], jsonb_merge_deep(result->key, b->key));"
+  , "      ELSE"
+  , "        result := jsonb_set(result, ARRAY[key], b->key);"
+  , "      END IF;"
+  , "    END LOOP;"
+  , "    IF result ?? '_length' THEN"
+  , "      len := (result->>'_length')::int;"
+  , "      FOR key IN SELECT jsonb_object_keys(result) LOOP"
+  , "        IF key ~ '^[0-9]+$' AND key::int >= len THEN"
+  , "          result := result - key;"
+  , "        END IF;"
+  , "      END LOOP;"
+  , "    END IF;"
+  , "    RETURN result;"
+  , "  END IF;"
+  , "  RETURN b;"
+  , "END;"
+  , "$fn$ LANGUAGE plpgsql IMMUTABLE;"
   ]

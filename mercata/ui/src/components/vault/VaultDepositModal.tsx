@@ -209,7 +209,12 @@ const VaultDepositModal = ({ isOpen, onClose, onSuccess }: VaultDepositModalProp
             </Alert>
           )}
 
-
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Withdrawals are returned as a basket of vault tokens and may not match the token you deposited.
+            </AlertDescription>
+          </Alert>
 
           {/* Token Selector */}
           <div className="space-y-2">
