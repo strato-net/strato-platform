@@ -1,7 +1,6 @@
 import cron from 'node-cron';
 import { logInfo, logError, logWarning, logFeedUpdate } from './utils/logger';
 import { fetchPrices, generateConstantPrices } from './adapters/genericRestAdapter';
-import { fetchChainlinkPrices } from './adapters/chainlinkPriceFeedRpcAdapter';
 import { pushAssetPrices } from './utils/oraclePusher';
 import { checkBalances } from './utils/balanceChecker';
 import { fetchPreviousPrices } from './utils/priceReader';
@@ -88,14 +87,9 @@ export function getCronSchedule(): string {
 async function fetchSource(sourceName: string, sourceConfig: SourceConfig, configLoader: ConfigLoader): Promise<SourceResult> {
     const startTime = Date.now();
     try {
-        let fetchPromise;
-        if (sourceName === 'constant') {
-            fetchPromise = Promise.resolve(generateConstantPrices(sourceConfig.assets, configLoader.getAllAssets()));
-        } else if (sourceName === 'ChainlinkPriceFeedRPC') {
-            fetchPromise = fetchChainlinkPrices(sourceConfig.assets);
-        } else {
-            fetchPromise = fetchPrices(sourceConfig);
-        }
+        const fetchPromise = sourceName === 'constant'
+            ? Promise.resolve(generateConstantPrices(sourceConfig.assets, configLoader.getAllAssets()))
+            : fetchPrices(sourceConfig);
         const prices = await withTimeout(fetchPromise, TIMEOUTS.FETCH);
         return { sourceName, prices, success: true, duration: Date.now() - startTime };
     } catch (err) {
@@ -139,14 +133,19 @@ function aggregatePrices(
         const sources: Array<{ name: string; price: number }> = [];
         let expectedCount = weekdaySources.length;
 
+        const failedSources: string[] = [];
+
         const collect = (names: string[], symbol: string) => {
+            failedSources.length = 0;
             names.forEach(name => {
                 const result = sourceResults.get(name);
                 const data = result?.success && result?.prices[symbol];
                 if (data) {
                     sources.push({ name, price: data.price });
                 } else if (result?.success) {
-                    logInfo('CronScheduler', `${symbol}: ${name} returned no price (API succeeded but symbol missing from response)`);
+                    failedSources.push(`${name}(no ${symbol})`);
+                } else {
+                    failedSources.push(`${name}(fetch failed)`);
                 }
             });
             return sources.length;
@@ -166,9 +165,11 @@ function aggregatePrices(
                 expectedCount = weekdaySources.length;
             }
         }
-        
+
         const isValid = sources.length >= requiredSources;
-        if (!isValid) logError('CronScheduler', new Error(`Insufficient sources for ${assetKey}: got ${sources.length}, need ${requiredSources}`));
+        if (!isValid) {
+            logError('CronScheduler', new Error(`Insufficient sources for ${assetKey}: got ${sources.length}, need ${requiredSources}. Failed: [${failedSources.join(', ')}]`));
+        }
         
         const medianPrice = isValid ? calculateMedian(sources.map(s => s.price)) : 0;
         

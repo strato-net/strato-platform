@@ -81,6 +81,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
           depositRouter: cfg.chainInfo.depositRouter,
         }));
 
+      networks.sort((a, b) => a.chainId.localeCompare(b.chainId));
       setAvailableNetworks(networks);
       setNetworksLoaded(true);
 

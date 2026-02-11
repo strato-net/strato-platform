@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatBalance } from "@/utils/numberUtils";
 import { useLendingContext } from "@/context/LendingContext";
 import { useSwapContext } from "@/context/SwapContext";
+import { useVaultContext } from "@/context/VaultContext";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import LPTokenDropdown from "./LPTokenDropdown";
 
@@ -23,6 +24,7 @@ export default function MyPoolParticipationSection({
 
   const { liquidityInfo, loadingLiquidity } = useLendingContext();
   const { pools, poolsLoading } = useSwapContext();
+  const { vaultState } = useVaultContext();
 
   const [expandedTokens, setExpandedTokens] = useState<Record<string, boolean>>(
     {}
@@ -43,7 +45,7 @@ export default function MyPoolParticipationSection({
         return liquidityInfo.supplyAPY?.toFixed(2) || null;
       }
 
-      if (token._symbol === "SUSDST" || token._symbol === "SAFETYUSDST") return null;
+      if (token._symbol === "SUSDST" || token._symbol === "safetyUSDST") return null;
 
       if (
         token._symbol?.endsWith("-LP") ||
@@ -52,9 +54,15 @@ export default function MyPoolParticipationSection({
         return lpTokenPoolMap.get(token.address)?.apy || null;
       }
 
+      if (vaultState.shareTokenAddress && token.address === vaultState.shareTokenAddress) {
+        return vaultState.apy && vaultState.apy !== "0" && vaultState.apy !== "-"
+          ? vaultState.apy
+          : null;
+      }
+
       return null;
     },
-    [liquidityInfo, lpTokenPoolMap]
+    [liquidityInfo, lpTokenPoolMap, vaultState.apy]
   );
 
   const rows = useMemo(
@@ -93,7 +101,7 @@ export default function MyPoolParticipationSection({
     [poolTokens, lpTokenPoolMap, resolveTokenAPY]
   );
 
-  const anyLoading = poolsLoading || loadingLiquidity;
+  const anyLoading = poolsLoading || loadingLiquidity || vaultState.loading;
 
   const toggleExpanded = (tokenAddress: string) => {
     setExpandedTokens((prev) => ({

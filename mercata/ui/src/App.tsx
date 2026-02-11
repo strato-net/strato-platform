@@ -4,7 +4,7 @@ import UsdstBalanceBox from "@/components/layouts/UsdstBalanceBox";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Transport, WagmiProvider } from "wagmi";
-import { mainnet, polygon, sepolia } from "wagmi/chains";
+import { mainnet, polygon, sepolia, base, baseSepolia } from "wagmi/chains";
 import {
   connectorsForWallets,
   RainbowKitProvider,
@@ -89,7 +89,7 @@ const App = () => {
   useEffect(() => {
     if (!loading) {
       const appName = "Mercata";
-      const chains = [mainnet, polygon, sepolia] as const;
+      const chains = [mainnet, polygon, sepolia, base, baseSepolia] as const;
       const transports: Record<number, Transport> = Object.fromEntries(
         chains.map((chain) => [chain.id, http(`/api/rpc/${chain.id}`, { onFetchRequest: csrfOnRequest })])
       );

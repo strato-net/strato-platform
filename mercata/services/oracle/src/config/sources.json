@@ -5,7 +5,7 @@
     "parse": "data[].prices[0].value",
     "timestamp": "data[0].prices[0].lastUpdatedAt",
     "apiKeyEnvVar": "ALCHEMY_API_KEY",
-    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "KAG", "WSTETH"]
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "KAG", "WSTETH", "SYRUPUSDC"]
   },
   "CoinMarketCap": {
     "url": "https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest",
@@ -14,7 +14,7 @@
     "parse": "data.{symbol}[0].quote.USD.price",
     "timestamp": "data.{firstSymbol}[0].quote.USD.last_updated",
     "apiKeyEnvVar": "COINMARKETCAP_API_KEY",
-    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "WSTETH"]
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "WSTETH", "SYRUPUSDC"]
   },
   "Metals.dev": {
     "url": "https://api.metals.dev/v1/latest",
@@ -42,7 +42,7 @@
     "parse": "{id}.usd",
     "timestamp": "{id}.last_updated_at",
     "apiKeyEnvVar": "COINGECKO_API_KEY",
-    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "KAG", "WSTETH", "bCSPX"],
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "KAG", "WSTETH", "SYRUPUSDC"],
     "symbolMapping": {
       "ETH": "ethereum",
       "WBTC": "wrapped-bitcoin",
@@ -51,7 +51,7 @@
       "SUSDS": "susds",
       "KAG": "kinesis-silver",
       "WSTETH": "wrapped-steth",
-      "bCSPX": "backed-cspx-core-s-p-500"
+      "SYRUPUSDC": "syrupusdc"
     }
   },
   "CoinAPI": {
@@ -61,7 +61,7 @@
     "parse": "assets",
     "timestamp": "data_quote_start",
     "apiKeyEnvVar": "COINAPI_API_KEY",
-    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "WSTETH"]
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT"]
   },
   "LiveCoinWatch": {
     "url": "https://api.livecoinwatch.com/coins/map",
@@ -95,11 +95,10 @@
     "parse": "{symbol}.price",
     "apiKeyEnvVar": "TWELVEDATA_API_KEY",
     "comment": "Also supports crypto: ETH/USD, BTC/USD, WBTC/USD, PAXG/USD, XAUT/USD. XAG requires Grow plan ($29/mo)",
-    "assets": ["XAU", "XAG", "bCSPX"],
+    "assets": ["XAU", "XAG"],
     "symbolMapping": {
       "XAU": "XAU/USD",
-      "XAG": "XAG/USD",
-      "bCSPX": "CSPX"
+      "XAG": "XAG/USD"
     }
   },
   "OANDA": {
@@ -115,10 +114,6 @@
       "XAU": "XAU_USD",
       "XAG": "XAG_USD"
     }
-  },
-  "ChainlinkPriceFeedRPC": {
-    "parse": "chainlink-price-feed-rpc",
-    "assets": ["bCSPX"]
   },
   "constant": {
     "parse": "constant",

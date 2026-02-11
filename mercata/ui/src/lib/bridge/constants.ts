@@ -182,6 +182,7 @@ export const SUPPORTED_CHAINS = {
   POLYGON_AMOY: 80002,
   OPTIMISM: 10,
   BASE: 8453,
+  BASE_SEPOLIA: 84532,
   ARBITRUM: 42161,
   ARBITRUM_NOVA: 42170,
   BSC: 56,
@@ -225,6 +226,7 @@ async function loadBuiltInChain(id: number): Promise<Chain | null> {
       case SUPPORTED_CHAINS.POLYGON_AMOY:  return chains.polygonAmoy;
       case SUPPORTED_CHAINS.OPTIMISM:      return chains.optimism;
       case SUPPORTED_CHAINS.BASE:          return chains.base;
+      case SUPPORTED_CHAINS.BASE_SEPOLIA:  return chains.baseSepolia;
       case SUPPORTED_CHAINS.ARBITRUM:      return chains.arbitrum;
       case SUPPORTED_CHAINS.ARBITRUM_NOVA: return chains.arbitrumNova;
       case SUPPORTED_CHAINS.BSC:           return chains.bsc;

@@ -13,6 +13,9 @@
     "SUSDS": {
       "targetAssetAddress": "6e2d93d323edf1b3cc4672a909681b6a430cae64"
     },
+    "SYRUPUSDC": {
+      "targetAssetAddress": "c6c3e9881665d53ae8c222e24ca7a8d069aa56ca"
+    },
     "USDST": {
       "targetAssetAddress": "937efa7e3a77e20bbdbd7c0d32b6514f368c1010",
       "constantPrice": 1000000000000000000
@@ -35,9 +38,6 @@
     },
     "XAUT": {
       "targetAssetAddress": "47de839c03a3b014c0cc4f3b9352979a5038f910"
-    },
-    "bCSPX": {
-      "targetAssetAddress": "38e63dc51b9f61b02bfda4b89f1ab9e1d9dcba57"
     }
   }
 }

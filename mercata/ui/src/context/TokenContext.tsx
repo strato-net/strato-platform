@@ -13,6 +13,25 @@ import { Token as TokenType, EarningAsset, BalanceSnapshot } from '@mercata/shar
 import { cataAddress, usdstAddress } from '@/lib/constants';
 import { useUser } from '@/context/UserContext';
 
+export interface BulkTransferItem {
+  to: string;
+  value: string;
+}
+
+export interface BulkTransferResult {
+  to: string;
+  value: string;
+  status: string;
+  hash?: string;
+  error?: string;
+}
+
+export interface BulkTransferResponse {
+  results: BulkTransferResult[];
+  successCount: number;
+  failureCount: number;
+}
+
 type TokenContextType = {
   tokens: Token[];
   activeTokens: Token[];
@@ -37,6 +56,7 @@ type TokenContextType = {
   loadingInactiveTokens: boolean;
   createToken: (token: CreateTokenPayload) => Promise<void>;
   transferToken: (payload: { address: string; to: string; value: string }) => Promise<void>;
+  bulkTransferToken: (payload: { address: string; transfers: BulkTransferItem[] }) => Promise<BulkTransferResponse>;
   approveToken: (payload: { address: string; spender: string; value: string }) => Promise<void>;
   transferFromToken: (payload: { address: string; from: string; to: string; value: string }) => Promise<void>;
   setTokenStatus: (payload: { address: string; status: number }) => Promise<void>;
@@ -340,6 +360,18 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  const bulkTransferToken = useCallback(async (payload: { address: string; transfers: BulkTransferItem[] }): Promise<BulkTransferResponse> => {
+    setLoading(true);
+    try {
+      const response = await api.post<BulkTransferResponse>('/tokens/bulk-transfer', payload);
+      return response.data;
+    } catch (err) {
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const approveToken = useCallback(async (payload: { address: string; spender: string; value: string }) => {
     setLoading(true);
     try {
@@ -424,6 +456,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
         getBorrowingHistory,
         createToken,
         transferToken,
+        bulkTransferToken,
         approveToken,
         transferFromToken,
         setTokenStatus,
