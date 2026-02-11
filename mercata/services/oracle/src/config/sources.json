@@ -70,7 +70,7 @@
     "body": "codes",
     "parse": "coins",
     "apiKeyEnvVar": "LIVECOINWATCH_API_KEY",
-    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "KAG", "WSTETH"]
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "KAG"]
   },
   "Commodities-API": {
     "url": "https://commodities-api.com/api/latest",
