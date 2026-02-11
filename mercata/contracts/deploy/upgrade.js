@@ -20,7 +20,7 @@ function printUsage() {
   console.error('Required arguments:');
   console.error('  --proxy-address <address>    Address of the proxy contract to upgrade');
   console.error('  --contract-name <name>       Name of the implementation contract (e.g., PoolFactory)');
-  console.error('  --contract-file <file>       Filename of the contract (e.g., Pools/PoolFactory.sol)');
+  console.error('  --contract-file <file>       Filename of BCC source file which imports the implementation contract (probably BaseCodeCollection.sol)');
   console.error('');
   console.error('Optional arguments:');
   console.error('  --constructor-args <json>    JSON string of constructor arguments (default: ' + JSON.stringify(DEFAULT_CONSTRUCTOR_ARGS) + ')');
@@ -30,8 +30,8 @@ function printUsage() {
   console.error('  OAUTH_CLIENT_SECRET, OAUTH_CLIENT_ID, OAUTH_URL, NODE_URL, GLOBAL_ADMIN_NAME, GLOBAL_ADMIN_PASSWORD');
   console.error('');
   console.error('Example:');
-  console.error('  node upgrade.js --proxy-address abc123 --contract-name PoolFactory --contract-file Pools/PoolFactory.sol');
-  console.error('  node upgrade.js --proxy-address abc123 --contract-name LendingPool --contract-file Lending/LendingPool.sol --constructor-args \'{"param":"value"}\'');
+  console.error('  node upgrade.js --proxy-address abc123 --contract-name PoolFactory --contract-file BaseCodeCollection.sol');
+  console.error('  node upgrade.js --proxy-address abc123 --contract-name LendingPool --contract-file BaseCodeCollection.sol --constructor-args \'{"param":"value"}\'');
 }
 
 /**
