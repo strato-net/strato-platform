@@ -593,10 +593,14 @@ argsToVals args = do
       SVariadic vs : rest -> reverse rest ++ vs
       _ -> vals
 
--- | Like argsToVals but returns Variables for memory arrays/structs (pass by reference)
--- This preserves the IORef wrapper so modifications propagate back to caller
-argsToVars :: MonadSM m => CC.ArgList -> m [Variable]
-argsToVars args = traverse expToVar args
+-- | Get values from pre-computed Variables (avoids re-evaluating expressions)
+argsToValsFromVars :: MonadSM m => [Variable] -> m ValList
+argsToValsFromVars vars = do
+    vals <- traverse getVar vars
+    pure $ case reverse vals of
+      SVariadic vs : rest -> reverse rest ++ vs
+      _ -> vals
+
 
 runModifiersAndStatements :: MonadSM m => [[CC.Statement]] -> [CC.Statement] -> m (Maybe Value)
 runModifiersAndStatements []   stmts = runStatementBlock stmts
@@ -1487,16 +1491,17 @@ expToVar' (CC.FunctionCall _ (CC.Variable _ name) args)
 -- case to catch a using statement function like _x.add(3)
 
 expToVar' (CC.FunctionCall _ e args) = do
-      argVals <- argsToVals args
+      -- Evaluate args ONCE and keep both values and variables
+      -- This avoids double-evaluation which could cause side effects
+      argVarsRaw <- traverse expToVar args
+      argVals <- argsToValsFromVars argVarsRaw
       -- Helium network ID = 114784819836269
       -- Pass-by-reference for memory arrays/structs is only enabled after fork block on helium
       -- Set to high value until network upgrade is coordinated
       currentBlockNum <- BlockHeader.number . Env.blockHeader <$> getEnv
       let heliumPassByRefForkBlock = 999999999 :: Integer  -- TODO: Set to actual fork block when network upgrades
       let passByRefEnabled = not (computeNetworkID == 114784819836269 && currentBlockNum < heliumPassByRefForkBlock)
-      argVars <- if passByRefEnabled
-                 then argsToVars args  -- Get Variables for pass-by-reference
-                 else pure []  -- Pre-fork: pass empty list to disable pass-by-reference
+      let argVars = if passByRefEnabled then argVarsRaw else []
       case e of -- FunctionCall Special Case when calling a function via Member Access
         (CC.MemberAccess _ (CC.Variable _ "Util") _) -> regularFunctionCall e argVals argVars Nothing --Because of the hardcoded Util functions
         (CC.MemberAccess ctx' expr name) -> do
