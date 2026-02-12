@@ -206,14 +206,13 @@ contract record Pool is Ownable {
         // @dev important: must be set here for proxied instances;
         // ensure consistency with desired initial values
         zapSwapFeesEnabled = true;
+        isStable = false;
+        isPaused = false;
+        isDisabled = false;
 
         tokenA = Token(tokenAAddr);
         tokenB = Token(tokenBAddr);
         lpToken = Token(lpTokenAddr);
-
-        isStable = false;
-        isPaused = false;
-        isDisabled = false;
     }
 
     // ============ UTILITY FUNCTIONS ============
