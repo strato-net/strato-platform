@@ -12,8 +12,8 @@ export interface LiquidationAlertState {
 
 const RISK_THRESHOLDS = {
   CRITICAL: 1.0,
-  HIGH: 1.1,
-  MEDIUM: 1.2,
+  HIGH: 1.2,
+  MEDIUM: 1.5,
 } as const;
 
 export const useLiquidationAlert = (): LiquidationAlertState => {
