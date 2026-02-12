@@ -2,12 +2,19 @@ import { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Settings } from "lucide-react";
+import { Search, Settings, ChevronDown, Pause, Play, Ban, Check } from "lucide-react";
 import { useSwapContext } from '@/context/SwapContext';
 import { Pool } from '@/interface';
 import { formatBalance } from '@/utils/numberUtils';
 import SetPoolRatesModal from './SetPoolRatesModal';
 import CopyButton from '../ui/copy';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Badge } from '@/components/ui/badge';
 
 const SwapPoolsTable = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -16,7 +23,7 @@ const SwapPoolsTable = () => {
   const [selectedPool, setSelectedPool] = useState<Pool | null>(null);
   const [showSetRatesModal, setShowSetRatesModal] = useState(false);
 
-  const { fetchPools } = useSwapContext();
+  const { fetchPools, togglePause, toggleDisable } = useSwapContext();
 
   const fetchAndEnrichPools = useCallback(async () => {
     try {
@@ -29,6 +36,30 @@ const SwapPoolsTable = () => {
       setLoading(false);
     }
   }, [fetchPools]);
+
+  const handleTogglePause = useCallback(async (pool: Pool, isPaused: boolean) => {
+    try {
+      setLoading(true);
+      await togglePause(pool.address, isPaused);
+      await fetchAndEnrichPools();
+    } catch (error) {
+      console.error('Failed to toggle pause:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [togglePause, fetchAndEnrichPools]);
+
+  const handleToggleDisable = useCallback(async (pool: Pool, isDisabled: boolean) => {
+    try {
+      setLoading(true);
+      await toggleDisable(pool.address, isDisabled);
+      await fetchAndEnrichPools();
+    } catch (error) {
+      console.error('Failed to toggle disable:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [toggleDisable, fetchAndEnrichPools]);
 
   useEffect(() => {
     fetchAndEnrichPools();
@@ -68,6 +99,7 @@ const SwapPoolsTable = () => {
                 <tr className="border-b">
                   <th className="text-left py-3 px-2 md:px-4 font-medium whitespace-nowrap">Pool</th>
                   <th className="text-left py-3 px-2 md:px-4 font-medium whitespace-nowrap">Pool Address</th>
+                  <th className="text-left py-3 px-2 md:px-4 font-medium whitespace-nowrap">Status</th>
                   <th className="text-left py-3 px-2 md:px-4 font-medium whitespace-nowrap">Liquidity</th>
                   <th className="text-left py-3 px-2 md:px-4 font-medium whitespace-nowrap">Swap Fee Rate</th>
                   <th className="text-left py-3 px-2 md:px-4 font-medium whitespace-nowrap">LP Share %</th>
@@ -131,6 +163,16 @@ const SwapPoolsTable = () => {
                       </div>
                     </td>
                     <td className="py-4 px-2 md:px-4">
+                      <div className="flex flex-wrap gap-1">
+                        <Badge 
+                          variant={(pool.isPaused || pool.isDisabled) ? "destructive" : "default"} 
+                          className="text-[10px] md:text-xs"
+                        >
+                          {pool.isDisabled ? 'Disabled' : pool.isPaused ? 'Paused' : 'Active'}
+                        </Badge>
+                      </div>
+                    </td>
+                    <td className="py-4 px-2 md:px-4">
                       <div className="font-medium text-sm">
                         {formatBalance(pool.lpToken._totalSupply, undefined, 18, 1, 6)} {pool.lpToken._symbol}
                       </div>
@@ -151,18 +193,66 @@ const SwapPoolsTable = () => {
                       </div>
                     </td>
                     <td className="py-4 px-2 md:px-4">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setSelectedPool(pool);
-                          setShowSetRatesModal(true);
-                        }}
-                        className="flex items-center gap-2"
-                      >
-                        <Settings className="h-3 w-3" />
-                        Set Rates
-                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={loading}
+                            className="flex items-center gap-1"
+                          >
+                            <Settings className="h-3 w-3" />
+                            Actions
+                            <ChevronDown className="h-3 w-3" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setSelectedPool(pool);
+                              setShowSetRatesModal(true);
+                            }}
+                          >
+                            <Settings className="h-4 w-4 mr-2" />
+                            Set Rates
+                          </DropdownMenuItem>
+                          {pool.isPaused ? (
+                            <DropdownMenuItem
+                              onClick={() => handleTogglePause(pool, false)}
+                              disabled={loading || pool.isDisabled}
+                            >
+                              <Play className="h-4 w-4 mr-2" />
+                              Unpause
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem
+                              onClick={() => handleTogglePause(pool, true)}
+                              disabled={loading || pool.isDisabled}
+                            >
+                              <Pause className="h-4 w-4 mr-2" />
+                              Pause
+                            </DropdownMenuItem>
+                          )}
+                          {pool.isDisabled ? (
+                            <DropdownMenuItem
+                              onClick={() => handleToggleDisable(pool, false)}
+                              disabled={loading}
+                            >
+                              <Check className="h-4 w-4 mr-2" />
+                              Enable
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem
+                              onClick={() => handleToggleDisable(pool, true)}
+                              disabled={loading}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Ban className="h-4 w-4 mr-2" />
+                              Disable
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </td>
                   </tr>
                 ))}

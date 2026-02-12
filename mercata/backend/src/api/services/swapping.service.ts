@@ -520,3 +520,71 @@ export const setPoolRates = async (
   return executeTransaction(accessToken, tx);
 };
 
+export const pausePool = async (
+  accessToken: string,
+  poolAddress: string,
+  userAddress: string
+): Promise<TransactionResponse> => {
+  const tx = await buildFunctionTx({
+    contractName: extractContractName(Pool),
+    contractAddress: poolAddress,
+    method: "setPaused",
+    args: {
+      _isPaused: true,
+    },
+  }, userAddress, accessToken);
+
+  return executeTransaction(accessToken, tx);
+};
+
+export const unpausePool = async (
+  accessToken: string,
+  poolAddress: string,
+  userAddress: string
+): Promise<TransactionResponse> => {
+  const tx = await buildFunctionTx({
+    contractName: extractContractName(Pool),
+    contractAddress: poolAddress,
+    method: "setPaused",
+    args: {
+      _isPaused: false,
+    },
+  }, userAddress, accessToken);
+
+  return executeTransaction(accessToken, tx);
+};
+
+export const disablePool = async (
+  accessToken: string,
+  poolAddress: string,
+  userAddress: string
+): Promise<TransactionResponse> => {
+  const tx = await buildFunctionTx({
+    contractName: extractContractName(Pool),
+    contractAddress: poolAddress,
+    method: "setDisabled",
+    args: {
+      _isDisabled: true,
+    },
+  }, userAddress, accessToken);
+
+  return executeTransaction(accessToken, tx);
+};
+
+export const enablePool = async (
+  accessToken: string,
+  poolAddress: string,
+  userAddress: string
+): Promise<TransactionResponse> => {
+  const tx = await buildFunctionTx({
+    contractName: extractContractName(Pool),
+    contractAddress: poolAddress,
+    method: "setDisabled",
+    args: {
+      _isDisabled: false,
+    },
+  }, userAddress, accessToken);
+
+  return executeTransaction(accessToken, tx);
+};
+
