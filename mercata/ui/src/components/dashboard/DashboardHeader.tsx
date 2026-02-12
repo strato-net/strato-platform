@@ -12,6 +12,7 @@ import { ModeToggle } from '../mode-toggle';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import STRATOICON from '@/assets/icon.png';
 import STRATOICONDARK from '@/assets/dark-theme-strato-compressed-logo.png';
+import LiquidationNotification from '../ui/LiquidationNotification';
 
 interface DashboardHeaderProps {
   title: string;
@@ -97,6 +98,7 @@ const DashboardHeader = ({ title }: DashboardHeaderProps) => {
       </div>
 
       <div className="flex items-center gap-2 md:gap-3">
+        {isLoggedIn && <LiquidationNotification />}
         <ModeToggle />
         
         {isLoggedIn ? (
