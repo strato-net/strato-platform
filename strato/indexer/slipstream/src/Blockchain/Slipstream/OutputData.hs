@@ -297,11 +297,11 @@ slipstreamQueryText _ CreateView{..} =
                 _ -> ""
             , case t of
                 SqlJsonbArray -> T.concat
-                  [ "THEN (SELECT jsonb_agg(val ORDER BY idx::int) FROM jsonb_each(s."
+                  [ "THEN jsonb_obj_to_array(s."
                   , wrapEscapeDouble dataColumn
                   , "->'"
                   , c
-                  , "') AS e(idx, val) WHERE idx != '_length')"
+                  , "')"
                   , " ELSE '[]'::jsonb"
                   ]
                 SqlJsonb -> T.concat
@@ -344,11 +344,11 @@ slipstreamQueryText _ CreateView{..} =
                   , wrapEscapeDouble dataColumn
                   , ", '"
                   , c
-                  , "') THEN (SELECT jsonb_agg(val ORDER BY idx::int) FROM jsonb_each(s."
+                  , "') THEN jsonb_obj_to_array(s."
                   , wrapEscapeDouble dataColumn
                   , "->'"
                   , c
-                  , "') AS e(idx, val) WHERE idx != '_length')"
+                  , "')"
                   , " ELSE '[]'::jsonb END"
                   ]
                 _ -> T.concat
@@ -1252,6 +1252,7 @@ initialSlipstreamQueries =
       (Just $ Foreign "event_event_array" ["address", "block_hash", "event_index"] globalEventTableName ["address", "block_hash", "event_index"])
       []
   , RawSQL jsonbMergeDeepSQL
+  , RawSQL jsonbObjToArraySQL
   ]
 
 jsonbMergeDeepSQL :: Text
@@ -1288,4 +1289,11 @@ jsonbMergeDeepSQL = T.unlines
   , "  RETURN b;"
   , "END;"
   , "$fn$ LANGUAGE plpgsql IMMUTABLE;"
+  ]
+
+jsonbObjToArraySQL :: Text
+jsonbObjToArraySQL = T.unlines
+  [ "CREATE OR REPLACE FUNCTION jsonb_obj_to_array(obj jsonb) RETURNS jsonb AS $fn$"
+  , "SELECT COALESCE((SELECT jsonb_agg(val ORDER BY idx::int) FROM jsonb_each(obj) AS e(idx, val) WHERE idx != '_length'), '[]'::jsonb);"
+  , "$fn$ LANGUAGE sql IMMUTABLE;"
   ]
