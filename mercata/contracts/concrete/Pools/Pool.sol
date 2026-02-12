@@ -201,8 +201,6 @@ contract record Pool is Ownable {
         require(lpTokenAddr != address(0), "Zero lpToken address");
 
         poolFactory = PoolFactory(msg.sender);
-        require(_tokenFactory().isTokenActive(tokenAAddr), "TokenA is not active");
-        require(_tokenFactory().isTokenActive(tokenBAddr), "TokenB is not active");
 
         // @dev important: must be set here for proxied instances;
         // ensure consistency with desired initial values
@@ -213,6 +211,8 @@ contract record Pool is Ownable {
         lpToken = Token(lpTokenAddr);
 
         isStable = false;
+        isPaused = false;
+        isDisabled = false;
     }
 
     // ============ UTILITY FUNCTIONS ============
