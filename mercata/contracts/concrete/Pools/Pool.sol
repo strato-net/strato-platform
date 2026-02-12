@@ -143,6 +143,7 @@ contract record Pool is Ownable {
     // ============ OWNER FUNCTIONS ============
 
     function setPaused(bool _isPaused) external onlyOwner {
+        require(!isDisabled, "Pool pause cannot be set while isDisabled = true");
         isPaused = _isPaused;
     }
 
