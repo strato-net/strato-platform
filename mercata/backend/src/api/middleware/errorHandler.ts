@@ -5,7 +5,7 @@ const GENERIC_SERVER_ERROR = "Something went wrong. Please try again later.";
 
 const sanitizeMessage = (status: number, message: string): string => {
   if (status >= 500) {
-    console.log(`[Msg Sanitized] Status: ${status}, Original message: "${message}"`);
+    console.warn(`[Msg Sanitized] Status: ${status}, Original message: "${message}"`);
     return GENERIC_SERVER_ERROR;
   }
   return message;

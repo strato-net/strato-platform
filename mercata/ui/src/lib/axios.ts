@@ -36,6 +36,9 @@ function extractApiErrorMessage(error: any): string {
   // For 500+ errors, never show the raw server message
   const status = error?.response?.status;
   if (!status || status >= 500) {
+    const errorData = error?.response?.data;
+    const rawMessage = errorData?.error?.message || errorData?.error || errorData?.message || error?.message || "unknown";
+    console.warn(`[Msg Sanitized] Status: ${status || "N/A"}, Original message: "${rawMessage}"`);
     return "Something went wrong. Please try again later.";
   }
 
