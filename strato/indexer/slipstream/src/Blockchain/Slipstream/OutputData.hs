@@ -607,7 +607,7 @@ createIndexTable contract cc (creator, n) inherited = do
       -- histTableName = historyTableName creator a n
       cols = getTableColumnAndType False cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
       contractCols = ["creator", "contract_name"]
-      cols' = (\(x, t, _) -> (x, t)) <$> cols
+      cols' = [(x, t) | (x, t, _) <- cols, t /= SqlJsonbArray]
       fkeys = mapMaybe (\(x, t, mf) -> (\f -> ForeignKeyInfo tableName (indexTableName creator f) x t) <$> mf) cols
   yield $ CreateView
     tableName
