@@ -53,7 +53,9 @@ import Data.Map (fromList, traverseWithKey)
 import Data.Maybe (listToMaybe)
 import Data.Source.Map
 import Data.Swagger hiding (Header, Http, delete)
+import qualified Data.Swagger as Sw
 import Data.Text (Text)
+import qualified Data.Text as T
 import qualified Data.Text.Encoding as Text
 import HFlags
 import qualified Handlers.AccountInfo as Account
@@ -189,6 +191,7 @@ main = do
               ("", "upquark") -> "https://fileserver.mercata.blockapps.net/highway"
               ("", "mercata") -> "https://fileserver.mercata.blockapps.net/highway"
               ("", "uranium") -> "https://fileserver.mercata.blockapps.net/highway"
+              ("", "lithium") -> "https://fileserver.mercata.blockapps.net/highway"
               ("", _) -> error "File server url was not provided and cannot be derived"
               (fileServer, _) -> fileServer
           ),
@@ -198,12 +201,14 @@ main = do
               "mercata" -> "https://monitor.mercata.blockapps.net:18080"
               "helium" -> "https://monitor.testnet.strato.nexus"
               "upquark" -> "https://monitor.strato.nexus"
+              "lithium" -> "" -- local development network
               _ -> ""
           )
         ]
   _ <- traverseWithKey (\service url' -> putStrLn $ "The url for " <>  service <> " is " <> url') urlMap
 
   let theDoc =
+        addOperationIds $
         toSwagger (Proxy :: Proxy FullAPI)
           & info . title .~ "Strato API"
           & info . description
@@ -263,6 +268,59 @@ addPathsTo404 baseApp req respond' =
                 ++ "\n"
   where
     allPaths = H.keys $ _swaggerPaths $ toSwagger (Proxy :: Proxy FullAPI)
+
+----------
+
+-- | Add operationId to all operations based on path and method
+-- This makes CLI tools like restish generate cleaner command names
+addOperationIds :: Swagger -> Swagger
+addOperationIds swagger = swagger & Sw.paths %~ H.mapWithKey addIdsToPathItem
+  where
+    addIdsToPathItem :: FilePath -> PathItem -> PathItem
+    addIdsToPathItem apiPath item = item
+      & Sw.get    %~ fmap (setOpId "get" apiPath)
+      & Sw.put    %~ fmap (setOpId "put" apiPath)
+      & Sw.post   %~ fmap (setOpId "post" apiPath)
+      & Sw.delete %~ fmap (setOpId "delete" apiPath)
+      & Sw.patch  %~ fmap (setOpId "patch" apiPath)
+
+    setOpId :: Text -> FilePath -> Operation -> Operation
+    setOpId method apiPath op = op & Sw.operationId ?~ generateOperationId method apiPath
+
+    -- Convert "/eth/v1.2/account" + "get" -> "getAccount"
+    -- Convert "/bloc/v2.2/contracts/{contractName}" + "get" -> "getContract"
+    generateOperationId :: Text -> FilePath -> Text
+    generateOperationId method apiPath =
+      let segments = filter (not . T.null) $ T.splitOn "/" $ T.pack apiPath
+          -- Remove version segments like "v1.2", "v2.2"
+          withoutVersion = filter (not . isVersion) segments
+          -- Convert path params {foo} to "ByFoo"
+          cleaned = map cleanSegment withoutVersion
+          -- Take last 1-2 meaningful segments for the opName
+          nameParts = takeEnd 2 cleaned
+          opName = T.concat nameParts
+      in method <> capitalizeFirst opName
+
+    isVersion :: Text -> Bool
+    isVersion t = T.isPrefixOf "v" t && T.any (== '.') t
+
+    cleanSegment :: Text -> Text
+    cleanSegment seg
+      | T.isPrefixOf "{" seg && T.isSuffixOf "}" seg =
+          "By" <> capitalizeFirst (T.drop 1 $ T.dropEnd 1 seg)
+      | otherwise = capitalizeFirst seg
+
+    capitalizeFirst :: Text -> Text
+    capitalizeFirst t = case T.uncons t of
+      Nothing -> t
+      Just (c, rest) -> T.cons (toUpperChar c) rest
+      where
+        toUpperChar c
+          | c >= 'a' && c <= 'z' = toEnum (fromEnum c - 32)
+          | otherwise = c
+
+    takeEnd :: Int -> [a] -> [a]
+    takeEnd n xs = drop (length xs - n) xs
 
 ----------
 

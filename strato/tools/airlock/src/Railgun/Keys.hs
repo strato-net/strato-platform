@@ -10,10 +10,13 @@ module Railgun.Keys
     -- * Key accessors
   , getViewingKeyPair
   , getNullifierPrivateKey
+    -- * Baby JubJub public key
+  , getMasterPublicKeyPoint
   ) where
 
 import qualified Crypto.PubKey.Ed25519 as Ed25519
 import Crypto.Error (CryptoFailable(..))
+import qualified Crypto.Curve.BabyJubJub as BJJ
 
 import Data.ByteArray (convert)
 import Data.ByteString (ByteString)
@@ -23,7 +26,7 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 
-import Railgun.Crypto (mnemonicToSeed, sha256)
+import Railgun.Crypto (mnemonicToSeed, sha256, bytesToIntegerLE, poseidonHash)
 import Railgun.Types (RailgunKeys(..), RailgunAddress(..))
 
 -- | Railgun key derivation path indices
@@ -57,12 +60,31 @@ deriveRailgunKeys seed index = RailgunKeys
     viewPrivKey = BS.take 32 $ sha256 $ spendKey <> "railgun-viewing"
     viewPubKey = deriveEd25519PublicKey viewPrivKey
     
-    -- Derive nullifier key from spending key
-    nullKey = BS.take 32 $ sha256 $ spendKey <> "railgun-nullifier"
+    -- Derive nullifying key using Railgun SDK formula:
+    -- nullifyingKey = poseidon([viewingPrivateKeyAsBigInt])
+    -- Note: We store the hash result as bytes for compatibility, but the actual
+    -- nullifying key INTEGER is viewPrivKeyInt poseidon-hashed
+    viewPrivKeyInt = bytesToIntegerLE viewPrivKey
+    nullifyingKeyInt = poseidonHash [viewPrivKeyInt]
+    -- Store as bytes (32 bytes, big-endian for consistency)
+    nullKey = integerToBytes32BE nullifyingKeyInt
     
-    -- Derive master public key (must be < SNARK_SCALAR_FIELD)
-    masterPubKeyBytes = deriveEd25519PublicKey spendKey
-    mpk = bytesToInteger masterPubKeyBytes `mod` snarkScalarField
+    -- Derive master public key using Railgun SDK formula:
+    -- masterPublicKey = poseidon(spendingPublicKey.x, spendingPublicKey.y, nullifyingKey)
+    -- First get the Baby JubJub public key from spending key scalar
+    spendScalar = bytesToIntegerLE spendKey `mod` BJJ.subgroupOrder
+    (pkX, pkY) = case BJJ.scalarMultBase spendScalar of
+      BJJ.Point x y -> (x, y)
+      BJJ.Infinity -> (0, 1)
+    -- Master public key is poseidon hash of spending public key + nullifying key
+    mpk = poseidonHash [pkX, pkY, nullifyingKeyInt]
+    
+    -- Helper to convert integer to 32 bytes big-endian
+    integerToBytes32BE :: Integer -> ByteString
+    integerToBytes32BE n = BS.pack $ map fromIntegral $ 
+      reverse $ take 32 $ go n ++ repeat 0
+      where go 0 = []
+            go x = (x `mod` 256) : go (x `div` 256)
 
 -- | Derive Ed25519 public key from private key bytes
 deriveEd25519PublicKey :: ByteString -> ByteString
@@ -86,17 +108,24 @@ deriveFromMnemonic mnemonic passphrase index = do
     seed = mnemonicToSeed mnemonic passphrase
 
 -- | Generate a Railgun address from keys
--- Format: "0zk" prefix + bech32 encoded (masterPubKey || viewingPubKey)
+-- Format: "0zk" prefix + hex encoded (masterPublicKey as 32 bytes || viewingPubKey)
+-- The masterPublicKey is the poseidon hash used in circuit commitments
 railgunAddress :: RailgunKeys -> RailgunAddress
 railgunAddress keys = RailgunAddress $ "0zk" <> hexEncoded
   where
-    -- Railgun address contains master public key and viewing public key
-    -- For now, we derive master public key from spending key
-    masterPubKey = deriveEd25519PublicKey (spendingKey keys)
-    combined = masterPubKey <> viewingPublicKey keys
+    -- Encode master public key (Integer) as 32 bytes big-endian
+    mpkBytes = integerToBytes32BE (masterPublicKey keys)
+    combined = mpkBytes <> viewingPublicKey keys
     hexEncoded = TE.decodeUtf8 $ B16.encode combined
+    
+    integerToBytes32BE :: Integer -> ByteString
+    integerToBytes32BE n = BS.pack $ map fromIntegral $ 
+      reverse $ take 32 $ go n ++ repeat 0
+      where go 0 = []
+            go x = (x `mod` 256) : go (x `div` 256)
 
 -- | Decode a Railgun address to extract public keys
+-- Returns (masterPublicKey as bytes, viewingPublicKey as bytes)
 decodeRailgunAddress :: RailgunAddress -> Either Text (ByteString, ByteString)
 decodeRailgunAddress (RailgunAddress addr)
   | not ("0zk" `T.isPrefixOf` addr) = Left "Invalid Railgun address: must start with 0zk"
@@ -108,14 +137,6 @@ decodeRailgunAddress (RailgunAddress addr)
           | BS.length decoded /= 64 -> Left "Invalid address length"
           | otherwise -> Right (BS.take 32 decoded, BS.drop 32 decoded)
 
--- | SNARK scalar field - NPK must be less than this
-snarkScalarField :: Integer
-snarkScalarField = 21888242871839275222246405745257275088548364400416034343698204186575808495617
-
--- | Convert bytes to integer (big-endian)
-bytesToInteger :: ByteString -> Integer
-bytesToInteger = BS.foldl' (\acc b -> acc * 256 + fromIntegral b) 0
-
 -- | Get the viewing key pair
 getViewingKeyPair :: RailgunKeys -> (ByteString, ByteString)
 getViewingKeyPair keys = (viewingPrivateKey keys, viewingPublicKey keys)
@@ -123,3 +144,12 @@ getViewingKeyPair keys = (viewingPrivateKey keys, viewingPublicKey keys)
 -- | Get the nullifier private key
 getNullifierPrivateKey :: RailgunKeys -> ByteString
 getNullifierPrivateKey = nullifierKey
+
+-- | Get the Baby JubJub public key point (x, y) for circuit input
+-- This recomputes the point from the spending key
+getMasterPublicKeyPoint :: RailgunKeys -> (Integer, Integer)
+getMasterPublicKeyPoint keys =
+  let spendScalar = bytesToIntegerLE (spendingKey keys) `mod` BJJ.subgroupOrder
+  in case BJJ.scalarMultBase spendScalar of
+       BJJ.Point x y -> (x, y)
+       BJJ.Infinity -> (0, 1)
