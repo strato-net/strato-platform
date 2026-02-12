@@ -1501,7 +1501,7 @@ expToVar' (CC.FunctionCall _ e args) = do
       -- Pass-by-reference for memory arrays/structs is only enabled after fork block on helium
       -- Set to high value until network upgrade is coordinated
       currentBlockNum <- BlockHeader.number . Env.blockHeader <$> getEnv
-      let heliumPassByRefForkBlock = 999999999 :: Integer  -- TODO: Set to actual fork block when network upgrades
+      let heliumPassByRefForkBlock = 33918 :: Integer
       let passByRefEnabled = not (computeNetworkID == 114784819836269 && currentBlockNum < heliumPassByRefForkBlock)
       let argVars = if passByRefEnabled then argVarsRaw else []
       case e of -- FunctionCall Special Case when calling a function via Member Access
@@ -2617,7 +2617,7 @@ runTheCallWithVars address' codeAddr contract' funcName hsh cc theFunction argVa
   -- Pass-by-reference for memory arrays/structs is only enabled after fork block on helium
   -- Set to high value until network upgrade is coordinated
   currentBlockNum <- BlockHeader.number . Env.blockHeader <$> getEnv
-  let heliumPassByRefForkBlock = 999999999 :: Integer  -- TODO: Set to actual fork block when network upgrades
+  let heliumPassByRefForkBlock = 33918 :: Integer
   let passByRefEnabled = not (computeNetworkID == 114784819836269 && currentBlockNum < heliumPassByRefForkBlock)
   localVars1 <-
     forM (zip3 locals argVarsPadded (map snd argLocations ++ repeat Nothing)) $ \((n, v), mVar, mLoc) -> do
