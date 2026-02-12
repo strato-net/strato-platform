@@ -58,7 +58,7 @@ if ngx.req.get_headers()["Authorization"] then
 else
   -- Else - use the openidc authenticate flow
 
-  local authenticate_res, authenticate_err
+  local authenticate_res, authenticate_err, authenticate_session
   -- Allow anonymous access only for safe/read-only methods on endpoints that explicitly allow it
   local method = ngx.req.get_method()
   local allow_anonymous_request = ngx.var.allow_optional_anon_access == "true" and (method == "GET" or method == "HEAD" or method == "OPTIONS")
@@ -75,19 +75,25 @@ else
     end
   else
     -- only validate the session (do not redirect automatically for Auth Code Grant flow)
-    authenticate_res, authenticate_err = openidc.authenticate(authenticate_opts, nil, "deny")
+    -- 4th return value is the session object, needed to detect dead refresh tokens below
+    authenticate_res, authenticate_err, _, authenticate_session = openidc.authenticate(authenticate_opts, nil, "deny")
     if (authenticate_res == nil or authenticate_err ~= nil) then
       if (authenticate_err ~= nil) then
         ngx.log(ngx.DEBUG, 'User authentication error: ', authenticate_err)
       end
 
-      -- Destroy the stale session to prevent repeated refresh token attempts
-      -- against an expired/revoked Keycloak session. Without this, concurrent
-      -- requests each independently try to refresh the same dead token,
-      -- flooding Keycloak with REFRESH_TOKEN_ERROR warnings.
-      local stale_session = require("resty.session").open()
-      if stale_session then
-        stale_session:destroy()
+      -- If the session had a refresh token but authenticate() still failed, the
+      -- refresh token is dead. Destroy the session to prevent every subsequent
+      -- request from retrying it and flooding Keycloak with REFRESH_TOKEN_ERROR.
+      -- We check session state because lua-resty-openidc swallows the token
+      -- endpoint error (sets err=nil) and returns generic "unauthorized request".
+      if authenticate_session
+          and authenticate_session.data
+          and authenticate_session.data.authenticated
+          and authenticate_session.data.refresh_token
+      then
+        ngx.log(ngx.DEBUG, "Destroying stale session due to failed token refresh: ", authenticate_err)
+        authenticate_session:destroy()
       end
 
       -- Handle OIDC callback state mismatch (multi-tab race condition):
