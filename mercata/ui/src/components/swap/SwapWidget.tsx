@@ -1032,11 +1032,11 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
       </div>
 
       <Button
-        className="w-full bg-strato-blue hover:bg-strato-blue/90"
+        className="w-full bg-strato-blue hover:bg-strato-blue/90 disabled:opacity-50 disabled:cursor-not-allowed"
         onClick={() => setIsDialogOpen(true)}
-        disabled={guestMode || isSwapDisabled()}
+        disabled={guestMode || isSwapDisabled() || !!pool?.isDisabled || !!pool?.isPaused}
       >
-        Swap Assets
+        {pool?.isDisabled ? "This pool is disabled" : pool?.isPaused ? "Pool is paused by admin at this time" : "Swap Assets"}
       </Button>
 
       <SwapDialog
