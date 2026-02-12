@@ -36,7 +36,7 @@ METALS_API_API_KEY=your-metals-api-key
 COMMODITIES_API_KEY=your-commodities-api-key
 COMMODITY_PRICE_API_KEY=your-commodity-price-api-key
 COINAPI_API_KEY=your-coinapi-api-key
-LIVECOINWATCH_API_KEY=your-livecoinwatch-api-key
+# DefiLlama — no API key required (free, public endpoint)
 TWELVEDATA_API_KEY=your-twelvedata-key
 OANDA_API_KEY=your-oanda-api-key
 OANDA_ACCOUNT_ID=your-oanda-account-id  # Fetch via: curl -H "Authorization: Bearer API_KEY" https://api-fxpractice.oanda.com/v3/accounts

@@ -62,7 +62,13 @@ function buildUrl(sourceConfig: SourceConfig): string {
     if (sourceConfig.accountId) {
         url = url.replace(/\$\{ACCOUNT_ID\}/g, sourceConfig.accountId);
     }
-    
+
+    // Handle ${SYMBOLS} path substitution (e.g., DefiLlama: /prices/current/${SYMBOLS})
+    if (url.includes('${SYMBOLS}')) {
+        const mapped = symbols.map(s => sourceConfig.symbolMapping?.[s] || s).join(',');
+        url = url.replace(/\$\{SYMBOLS\}/g, mapped);
+    }
+
     if (sourceConfig.params) {
         const queryParams = new URLSearchParams();
         sourceConfig.params.split(',').map(p => p.trim()).forEach(param => {
@@ -175,14 +181,17 @@ function parseResponse(data: any, sourceConfig: SourceConfig): BatchPriceResult 
             }
         });
         
-    // LiveCoinWatch: coins array
-    } else if (parsePattern === 'coins' && Array.isArray(data)) {
+    // DefiLlama: coins.{coinId}.price
+    } else if (parsePattern === 'defiLlama' && data.coins) {
         symbols.forEach(symbol => {
-            const code = sourceConfig.symbolMapping?.[symbol] || symbol;
-            const coinData = data.find((c: any) => c.code === code);
-            if (coinData?.rate) {
-                const price = Math.floor(parseFloat(coinData.rate) * 1e18);
-                if (isValidPrice(price)) result[symbol] = { price, feedTimestamp: new Date().toISOString() };
+            const coinId = sourceConfig.symbolMapping?.[symbol] || symbol;
+            const coinData = data.coins[coinId];
+            if (coinData?.price) {
+                const price = Math.floor(parseFloat(coinData.price) * 1e18);
+                if (isValidPrice(price)) {
+                    const ts = coinData.timestamp ? new Date(coinData.timestamp * 1000).toISOString() : new Date().toISOString();
+                    result[symbol] = { price, feedTimestamp: ts };
+                }
             }
         });
         
