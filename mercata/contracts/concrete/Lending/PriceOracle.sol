@@ -62,9 +62,9 @@ contract record PriceOracle is Ownable {
             px[i] = tmpPx;
         }
         // Write back in order
-        for (uint256 i = 0; i < len; i++) {
-            state.observations[i].timestamp = ts[i];
-            state.observations[i].price = px[i];
+        for (uint256 j = 0; j < len; j++) {
+            state.observations[j].timestamp = ts[j];
+            state.observations[j].price = px[j];
         }
         state.writeIndex = 0;
     }
@@ -90,9 +90,9 @@ contract record PriceOracle is Ownable {
                 state.observations[i].timestamp = tmpTs;
                 state.observations[i].price = tmpPx;
             }
-            for (uint256 i = globalSize; i < len; i++) {
-                state.observations[i].timestamp = 0;
-                state.observations[i].price = 0;
+            for (uint256 k = globalSize; k < len; k++) {
+                state.observations[k].timestamp = 0;
+                state.observations[k].price = 0;
             }
             state.observations.length = globalSize;
         }
