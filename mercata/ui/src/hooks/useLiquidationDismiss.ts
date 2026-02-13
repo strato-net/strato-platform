@@ -106,9 +106,22 @@ export const useLiquidationDismiss = (
 
     // Handle login or user switch
     if (previousUserAddress !== userAddress) {
-      if (previousUserAddress) clearDismissedForUser(previousUserAddress);
-      clearDismissedForUser(userAddress);
-      setStorageItem(LAST_USER_ADDRESS_KEY, userAddress);
+      // Clear previous user's entries if user switched
+      if (previousUserAddress) {
+        clearDismissedForUser(previousUserAddress);
+      }
+      
+      // Only clear current user's entries if this is a NEW login (different from stored)
+      // Don't clear on refresh (when previousUserAddress is null but userAddress matches stored)
+      const lastUserAddress = getStorageItem(LAST_USER_ADDRESS_KEY);
+      if (lastUserAddress !== userAddress) {
+        // New login - clear for fresh start
+        clearDismissedForUser(userAddress);
+        setStorageItem(LAST_USER_ADDRESS_KEY, userAddress);
+      } else if (!lastUserAddress) {
+        // No stored address - first time login, store it
+        setStorageItem(LAST_USER_ADDRESS_KEY, userAddress);
+      }
     }
 
     previousUserAddressRef.current = userAddress;
