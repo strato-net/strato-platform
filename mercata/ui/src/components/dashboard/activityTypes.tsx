@@ -18,6 +18,7 @@ import {
   Send,
   Coins,
   Plus,
+  Banknote,
   LucideIcon
 } from "lucide-react";
 import { usdstAddress } from "@/lib/constants";
@@ -959,6 +960,170 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
           line2: {
             fieldLabels: ["Referred By", "Referred User"],
             renderer: "addresses-with-arrow",
+          },
+        },
+      };
+    },
+  },
+  "VaultDeposited": {
+    contract_name: "Vault",
+    event_name: "Deposited",
+    displayName: "Vault Deposit",
+    filterConfig: { type: "single", attribute: "user" },
+    iconConfig: { icon: Download, color: "bg-teal-500" },
+    getTokenAddress: (event: Event) => {
+      const asset = event.attributes.asset || event.attributes.Asset;
+      return asset ? [asset] : [];
+    },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+      const user = event.attributes.user || event.attributes.User || "";
+      const asset = event.attributes.asset || event.attributes.Asset || "";
+      const amountIn = event.attributes.amountIn || event.attributes.amount_in || "0";
+      const depositValueUSD = event.attributes.depositValueUSD || event.attributes.deposit_value_usd || "0";
+      const tokenSymbol = asset ? tokenSymbols.get(asset) : undefined;
+      const tokenImage = asset ? tokenImages?.get(asset) : undefined;
+
+      const fields: ActivityField[] = [
+        {
+          label: "Amount",
+          value: formatValue(amountIn, asset),
+          type: "amount",
+          badge: tokenSymbol,
+          image: tokenImage,
+          imageFallback: tokenSymbol || asset,
+          rawAmount: getFullAmount(amountIn),
+        },
+        {
+          label: "Depositor",
+          value: user,
+          type: "address",
+          isUserAddress: isUserAddress(user, userAddress),
+        },
+        {
+          label: "USD Value",
+          value: `$${formatValue(depositValueUSD, usdstAddress)}`,
+          type: "text",
+        },
+      ];
+
+      return {
+        title: "Vault Deposit",
+        fields,
+        timestamp: event.block_timestamp || "",
+        eventId: event.id?.toString(),
+        layout: {
+          type: "two-line",
+          line1: {
+            fieldLabels: ["Amount"],
+            renderer: "amount-with-token",
+          },
+          line2: {
+            fieldLabels: ["Depositor", "USD Value"],
+          },
+        },
+      };
+    },
+  },
+  "VaultWithdrawn": {
+    contract_name: "Vault",
+    event_name: "Withdrawn",
+    displayName: "Vault Withdrawal",
+    filterConfig: { type: "single", attribute: "user" },
+    iconConfig: { icon: Upload, color: "bg-amber-500" },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+      const user = event.attributes.user || event.attributes.User || "";
+      const sharesBurned = event.attributes.sharesBurned || event.attributes.shares_burned || "0";
+      const withdrawValueUSD = event.attributes.withdrawValueUSD || event.attributes.withdraw_value_usd || "0";
+
+      const fields: ActivityField[] = [
+        {
+          label: "USD Value",
+          value: `$${formatValue(withdrawValueUSD, usdstAddress)}`,
+          type: "amount",
+          badge: "USD",
+          rawAmount: `$${getFullAmount(withdrawValueUSD)}`,
+        },
+        {
+          label: "Withdrawer",
+          value: user,
+          type: "address",
+          isUserAddress: isUserAddress(user, userAddress),
+        },
+        {
+          label: "Shares Burned",
+          value: formatValue(sharesBurned),
+          type: "text",
+          badge: "shares",
+        },
+      ];
+
+      return {
+        title: "Vault Withdrawal",
+        fields,
+        timestamp: event.block_timestamp || "",
+        eventId: event.id?.toString(),
+        layout: {
+          type: "two-line",
+          line1: {
+            fieldLabels: ["USD Value"],
+            renderer: "amount-with-token",
+          },
+          line2: {
+            fieldLabels: ["Withdrawer", "Shares Burned"],
+          },
+        },
+      };
+    },
+  },
+  "VaultWithdrawalPayout": {
+    contract_name: "Vault",
+    event_name: "WithdrawalPayout",
+    displayName: "Vault Payout",
+    filterConfig: { type: "single", attribute: "user" },
+    iconConfig: { icon: Banknote, color: "bg-yellow-500" },
+    getTokenAddress: (event: Event) => {
+      const asset = event.attributes.asset || event.attributes.Asset;
+      return asset ? [asset] : [];
+    },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+      const user = event.attributes.user || event.attributes.User || "";
+      const asset = event.attributes.asset || event.attributes.Asset || "";
+      const amount = event.attributes.amount || event.attributes.Amount || "0";
+      const tokenSymbol = asset ? tokenSymbols.get(asset) : undefined;
+      const tokenImage = asset ? tokenImages?.get(asset) : undefined;
+
+      const fields: ActivityField[] = [
+        {
+          label: "Amount",
+          value: formatValue(amount, asset),
+          type: "amount",
+          badge: tokenSymbol,
+          image: tokenImage,
+          imageFallback: tokenSymbol || asset,
+          rawAmount: getFullAmount(amount),
+        },
+        {
+          label: "Recipient",
+          value: user,
+          type: "address",
+          isUserAddress: isUserAddress(user, userAddress),
+        },
+      ];
+
+      return {
+        title: "Vault Payout",
+        fields,
+        timestamp: event.block_timestamp || "",
+        eventId: event.id?.toString(),
+        layout: {
+          type: "two-line",
+          line1: {
+            fieldLabels: ["Amount"],
+            renderer: "amount-with-token",
+          },
+          line2: {
+            fieldLabels: ["Recipient"],
+            renderer: "addresses-with-bullet",
           },
         },
       };

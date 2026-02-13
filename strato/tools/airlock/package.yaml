@@ -19,12 +19,19 @@ library:
     - Railgun.Keys
     - Railgun.Shield
     - Railgun.Unshield
+    - Railgun.Transfer
     - Railgun.Crypto
     - Railgun.Types
     - Railgun.API
     - Railgun.Scan
+    - Railgun.Balance
+    - Railgun.Merkle
+    - Railgun.Witness
+    - Railgun.Prover
+    - Railgun.Signing
   dependencies:
     - aeson
+    - baby-jubjub
     - base16-bytestring
     - poseidon-hash
     - base64-bytestring
@@ -34,14 +41,23 @@ library:
     - containers
     - cryptonite
     - evm-solidity
+    - filepath
     - http-client
+    - http-types
     - memory
+    - process
     - servant-client
     - servant-client-core
     - strato-model
+    - temporary
     - text
     - transformers
     - vector
+    - directory
+    # Groth16 provers
+    - groth16-native
+    - groth16-snarkjs
+    - groth16-rapidsnark
 
 executables:
   airlock:
@@ -49,8 +65,18 @@ executables:
     main: Main.hs
     other-modules: []
     dependencies:
+      - aeson
       - airlock
+      - base16-bytestring
+      - bloc2api
       - bytestring
-      - cmdargs
+      - directory
+      - filepath
+      - http-client
+      - http-client-tls
+      - http-types
       - network-uri
+      - optparse-applicative
+      - strato-model
       - text
+      - time
