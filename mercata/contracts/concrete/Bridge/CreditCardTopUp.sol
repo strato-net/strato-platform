@@ -1,6 +1,24 @@
 import "../../abstract/ERC20/access/Ownable.sol";
 import "../../abstract/ERC20/IERC20.sol";
-import "./MercataBridge.sol";
+
+struct IAssetInfo {
+    bool    enabled;          // quick toggle
+    uint256 externalChainId;  // back-pointer to ChainInfo
+    uint256 externalDecimals; // decimals of externalToken
+    string  externalName;     // external token name
+    string  externalSymbol;   // external token symbol
+    address externalToken;    // token address on external chain
+    uint256 maxPerWithdrawal; // hard ceiling for withdrawals; 0 means "unlimited"
+    address stratoToken;      // STRATO token to mint (ETHst, USDST, etc)
+}
+
+abstract contract IMercataBridge is Ownable {
+    mapping(address => mapping(uint256 => IAssetInfo)) public record assets;
+
+    function requestWithdrawal(
+        uint256 externalChainId, address externalRecipient, address externalToken, uint256 stratoTokenAmount
+    ) external returns (uint256);
+}
 
 /**
  * @title CreditCardTopUp
@@ -79,7 +97,7 @@ contract record CreditCardTopUp is Ownable {
         require(externalRecipient != address(0), "CCTU: zero recipient");
         require(externalToken != address(0), "CCTU: zero external token");
 
-        MercataBridge bridge = MercataBridge(mercataBridge);
+        IMercataBridge bridge = IMercataBridge(mercataBridge);
         (,,,,,,, address stratoToken) = bridge.assets(externalToken, externalChainId);
         if (stratoToken == address(0)) revert AssetNotFound();
 

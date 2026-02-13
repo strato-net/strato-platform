@@ -267,9 +267,9 @@ export default function CreditCardPage() {
       setSelectedTokenSymbol("");
     } else {
       setNickname("");
-      setSelectedProviderId("");
-      setSelectedNetworkChainId("");
-      setSelectedTokenSymbol("");
+      setSelectedProviderId("metamask-card");
+      setSelectedNetworkChainId(isTestnet ? "84532" : "8453");
+      setSelectedTokenSymbol("USDC");
       setCardWalletAddress("");
       setThresholdAmount("");
       setTopUpAmount("");

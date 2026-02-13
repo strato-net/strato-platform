@@ -27,16 +27,16 @@ const METAMASK_CARD: CardProvider = {
   id: "metamask-card",
   name: "MetaMask Card",
   networks: [
-    { chainId: "59144", chainName: "Linea" },
-    { chainId: "solana", chainName: "Solana" },
+    // { chainId: "59144", chainName: "Linea" },
+    // { chainId: "solana", chainName: "Solana" },
     { chainId: "8453", chainName: "Base", mainnetOnly: true },
     { chainId: "84532", chainName: "Base Sepolia", testnetOnly: true },
   ],
   tokensByNetwork: {
     "59144": ["mUSD", "USDC", "USDT", "wETH", "EURe", "GBPe", "aUSDC", "amUSD"],
     solana: ["USDC", "USDT"],
-    "8453": ["USDC", "USDT", "aBasUSDC"],
-    "84532": ["USDC", "USDT", "aBasUSDC"],
+    "8453": ["USDC"], //, "USDT", "aBasUSDC"],
+    "84532": ["USDC"], //, "USDT", "aBasUSDC"],
   },
 };
 
@@ -54,7 +54,7 @@ const ETHERFI_CARD: CardProvider = {
   },
 };
 
-export const CARD_PROVIDERS: CardProvider[] = [METAMASK_CARD, ETHERFI_CARD];
+export const CARD_PROVIDERS: CardProvider[] = [METAMASK_CARD]; //, ETHERFI_CARD];
 
 export function getProviderById(id: string): CardProvider | undefined {
   return CARD_PROVIDERS.find((p) => p.id === id);
