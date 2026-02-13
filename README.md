@@ -18,7 +18,9 @@
         libpq-dev \
         libsecp256k1-dev \
         libsodium-dev \
-        postgresql-client
+        pkg-config \
+        postgresql-client \
+        zlib1g-dev
       ```
       
     - Macos (requires `homebrew` - https://brew.sh/):

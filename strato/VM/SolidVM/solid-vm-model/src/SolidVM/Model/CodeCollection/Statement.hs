@@ -31,7 +31,7 @@ module SolidVM.Model.CodeCollection.Statement
 where
 
 import Blockchain.Strato.Model.Address
---import Data.Swagger
+import Data.Swagger (ToSchema)
 
 import Control.DeepSeq
 import Data.Aeson
@@ -101,6 +101,8 @@ instance FromJSON Location
 
 instance Arbitrary Location where
   arbitrary = GR.genericArbitrary GR.uniform
+
+instance ToSchema Location
 
 data VarDefEntryF a
   = BlankEntry
