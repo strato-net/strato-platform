@@ -1,15 +1,15 @@
-import { useState } from 'react';
 import { Bell, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { useLiquidationAlert } from '@/hooks/useLiquidationAlert';
+import { useLiquidationDismiss } from '@/hooks/useLiquidationDismiss';
 import { useUser } from '@/context/UserContext';
 
 const LiquidationNotification = () => {
   const navigate = useNavigate();
-  const { isLoggedIn } = useUser();
+  const { isLoggedIn, userAddress } = useUser();
   const alertState = useLiquidationAlert();
-  const [isDismissed, setIsDismissed] = useState(false);
+  const { isDismissed, dismiss } = useLiquidationDismiss(alertState.riskLevel, userAddress, isLoggedIn);
 
   if (!isLoggedIn) {
     return null;
@@ -18,17 +18,8 @@ const LiquidationNotification = () => {
   const hasActiveAlert = alertState.shouldShow && !isDismissed;
   const { riskLevel, healthFactor } = alertState;
 
-  const handleAddCollateral = () => {
-    navigate('/dashboard/borrow?tab=borrow');
-  };
-
-  const handleRepayLoan = () => {
-    navigate('/dashboard/borrow?tab=repay');
-  };
-
-  const handleDismiss = () => {
-    setIsDismissed(true);
-  };
+  const handleAddCollateral = () => navigate('/dashboard/borrow?tab=borrow');
+  const handleRepayLoan = () => navigate('/dashboard/borrow?tab=repay');
 
   return (
     <Popover>
@@ -64,7 +55,7 @@ const LiquidationNotification = () => {
                      'Health factor low'}
                   </p>
                   <button
-                    onClick={handleDismiss}
+                    onClick={dismiss}
                     className="flex-shrink-0 p-0.5 hover:bg-muted rounded transition-colors"
                     aria-label="Dismiss notification"
                   >
