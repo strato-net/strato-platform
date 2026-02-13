@@ -463,7 +463,9 @@ export async function getCardBalance(config: CreditCardConfig): Promise<string |
   let rpcUrl = rpcUrls[chainIdStr];
   if (!rpcUrl) {
     const { upstream, fallback } = getRpcUpstream(chainIdStr);
-    rpcUrl = upstream ?? fallback ?? undefined;
+    const candidate = upstream ?? fallback;
+    if (!candidate) return null;
+    rpcUrl = candidate;
   }
   if (!rpcUrl) return null;
   try {
