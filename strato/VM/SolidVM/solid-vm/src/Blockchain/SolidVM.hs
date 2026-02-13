@@ -648,19 +648,20 @@ runStatement (CC.RevertStatement mString theArgs pos) = do
   --    revert customError("error message")
   solidVMBreakpoint pos
   g <- getCurrentContract
+  currentBlockNum <- BlockHeader.number . Env.blockHeader <$> getEnv
   case mString of
     Just name -> do
       err <- case M.lookup name $ CC._errors g of
         Just _ -> do
           argVals <- mapM (getVar <=< expToVar) theArgs
-          let listOfVals = mapMaybe (\x -> toBasic x) argVals
+          let listOfVals = mapMaybe (\x -> toBasic currentBlockNum x) argVals
 
           return $ customError "Reverting based on  Error Method:" name listOfVals
         Nothing -> do revertError "REVERT: to initial state" name
       pure $ err
     Nothing -> do
       argVals <- mapM (getVar <=< expToVar) theArgs
-      let listOfVals = mapMaybe (\x -> toBasic x) argVals
+      let listOfVals = mapMaybe (\x -> toBasic currentBlockNum x) argVals
       return $ revertError "REVERT" listOfVals
 
 -- Assignment to an index into an array or mapping
@@ -906,7 +907,8 @@ runStatement (CC.Throw expr pos) = do
       CC.FunctionCall _ (CC.Variable _ n) a -> pure (n, a)
       _ -> invalidArguments "Invalid argument for throw." expr
   argVals <- mapM (getVar <=< expToVar) args
-  let listOfVals = mapMaybe (\x -> toBasic x) argVals
+  currentBlockNum <- BlockHeader.number . Env.blockHeader <$> getEnv
+  let listOfVals = mapMaybe (\x -> toBasic currentBlockNum x) argVals
   customError "Custom user error thrown" name listOfVals
 runStatement (CC.AssemblyStatement (CC.MloadAdd32 dst src) pos) = do
   solidVMBreakpoint pos
@@ -1499,7 +1501,7 @@ expToVar' (CC.FunctionCall _ e args) = do
       -- Pass-by-reference for memory arrays/structs is only enabled after fork block on helium
       -- Set to high value until network upgrade is coordinated
       currentBlockNum <- BlockHeader.number . Env.blockHeader <$> getEnv
-      let heliumPassByRefForkBlock = 999999999 :: Integer  -- TODO: Set to actual fork block when network upgrades
+      let heliumPassByRefForkBlock = 33918 :: Integer
       let passByRefEnabled = not (computeNetworkID == 114784819836269 && currentBlockNum < heliumPassByRefForkBlock)
       let argVars = if passByRefEnabled then argVarsRaw else []
       case e of -- FunctionCall Special Case when calling a function via Member Access
@@ -2480,7 +2482,8 @@ runTheConstructors from to hsh cc contractName' argVals' = do
         SVMType.Array _ _ -> return ()
         t -> do
           defVal <- createDefaultValue cc contract' t
-          for_ (toBasic defVal) $ markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n])
+          currentBlockNum <- BlockHeader.number . Env.blockHeader <$> getEnv
+          for_ (toBasic currentBlockNum defVal) $ markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n])
     -- SVMType.Bool -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) $ MS.BBool False
 
     forM_ (reverse $ contract' ^. CC.parents) $ \parent -> do
@@ -2614,7 +2617,7 @@ runTheCallWithVars address' codeAddr contract' funcName hsh cc theFunction argVa
   -- Pass-by-reference for memory arrays/structs is only enabled after fork block on helium
   -- Set to high value until network upgrade is coordinated
   currentBlockNum <- BlockHeader.number . Env.blockHeader <$> getEnv
-  let heliumPassByRefForkBlock = 999999999 :: Integer  -- TODO: Set to actual fork block when network upgrades
+  let heliumPassByRefForkBlock = 33918 :: Integer
   let passByRefEnabled = not (computeNetworkID == 114784819836269 && currentBlockNum < heliumPassByRefForkBlock)
   localVars1 <-
     forM (zip3 locals argVarsPadded (map snd argLocations ++ repeat Nothing)) $ \((n, v), mVar, mLoc) -> do

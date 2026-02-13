@@ -31,7 +31,7 @@ const formatShares = (value: string): string => {
 const formatEarnings = (value: string): { formatted: string; isPositive: boolean; isZero: boolean } => {
   try {
     const num = parseFloat(formatUnits(value, 18));
-    const isZero = num === 0;
+    const isZero = Math.abs(num) < 0.005;
     const isPositive = num >= 0;
     const absFormatted = Math.abs(num).toLocaleString("en-US", {
       minimumFractionDigits: 2,
