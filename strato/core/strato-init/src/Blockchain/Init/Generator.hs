@@ -75,6 +75,7 @@ createGenesisInfo network = do
                     [ (0x96714c4a2163a3ee55356e20bc23fe8ea5e7aaf0, 100_000 * HELIUM.oneE18)
                     , (0x523fef378674d39363aa8b6ac5122e301c528432, 100_000 * HELIUM.oneE18)
                     ]
+          "lithium" -> HELIUM.lithiumGenesisBlock
           _ -> HELIUM.genesisBlock
 
   liftIO $ B.writeFile "genesis.json" . BL.toStrict $ JSON.encode genesisInfo

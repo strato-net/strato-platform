@@ -10,6 +10,9 @@ module Railgun.Crypto
   , sha256
   , sha512
   , poseidonHash
+  , computeBoundParamsHash
+    -- * Nullifier computation
+  , computeNullifier
     -- * Encryption (ECIES compatible with noble-ed25519)
   , getSharedSymmetricKey
   , encryptRandom
@@ -24,6 +27,11 @@ module Railgun.Crypto
     -- * Key derivation
   , deriveEd25519PubKey
   , getEd25519PublicKey
+    -- * Signing
+  , signEd25519
+  , signatureToComponents
+    -- * Utilities
+  , bytesToIntegerLE
     -- * Random
   , randomBytes
   ) where
@@ -78,6 +86,79 @@ sha512 bs = convert (hash bs :: Digest SHA512)
 -- Used by Railgun for computing NPK, commitments, and Merkle tree
 poseidonHash :: [Integer] -> Integer
 poseidonHash inputs = Poseidon.fromF $ Poseidon.poseidon (map Poseidon.toF inputs)
+
+-- | Compute nullifier for spending a note
+-- The nullifier is a unique identifier that prevents double-spending
+-- Formula: nullifier = poseidon(nullifyingKey, leafIndex)
+-- Note: This matches the Railgun engine (not older v1 which used 3 args)
+computeNullifier :: Integer  -- ^ Nullifier key (from RailgunKeys)
+                 -> Integer  -- ^ Leaf index in merkle tree
+                 -> Integer
+computeNullifier nullifyingKey leafIndex =
+  poseidonHash [nullifyingKey, leafIndex]
+
+-- | SNARK scalar field prime (BN254)
+snarkScalarField :: Integer
+snarkScalarField = 21888242871839275222246405745257275088548364400416034343698204186575808495617
+
+-- | Compute boundParamsHash using keccak256 like the contract does
+-- This hashes the ABI-encoded BoundParams struct
+-- Formula: uint256(keccak256(abi.encode(boundParams))) % SNARK_SCALAR_FIELD
+computeBoundParamsHash :: Int       -- ^ Tree number
+                       -> Integer   -- ^ Min gas price
+                       -> Int       -- ^ Unshield type (0=NONE, 1=NORMAL, 2=REDIRECT)
+                       -> Integer   -- ^ Chain ID
+                       -> Integer   -- ^ Adapt contract address (as integer)
+                       -> ByteString -- ^ Adapt params (32 bytes)
+                       -> Integer   -- ^ Result: hash % SNARK_SCALAR_FIELD
+computeBoundParamsHash treeNum minGas unshieldType chainId adaptContract adaptParams =
+  let -- ABI encode each field as 32 bytes (big-endian, left-padded with zeros)
+      encTreeNum = integerToBytes32BE (fromIntegral treeNum)
+      encMinGas = integerToBytes32BE minGas
+      encUnshield = integerToBytes32BE (fromIntegral unshieldType)
+      encChainId = integerToBytes32BE chainId
+      encAdaptContract = integerToBytes32BE adaptContract
+      -- adaptParams is already 32 bytes
+      encAdaptParams = if BS.length adaptParams == 32
+                       then adaptParams
+                       else BS.replicate 32 0
+      -- For empty commitmentCiphertext array:
+      -- offset points to position after fixed data (7*32 = 224 = 0xE0)
+      encCiphertextOffset = integerToBytes32BE 224
+      -- Array length = 0
+      encCiphertextLen = integerToBytes32BE 0
+      
+      -- Concatenate all parts
+      encoded = BS.concat 
+        [ encTreeNum
+        , encMinGas
+        , encUnshield
+        , encChainId
+        , encAdaptContract
+        , encAdaptParams
+        , encCiphertextOffset
+        , encCiphertextLen
+        ]
+      
+      -- keccak256 and mod by SNARK scalar field
+      hashBytes = keccak256 encoded
+      hashInt = bytesToIntegerBE hashBytes
+  in hashInt `mod` snarkScalarField
+
+-- | Convert Integer to 32-byte big-endian ByteString
+integerToBytes32BE :: Integer -> ByteString
+integerToBytes32BE n = 
+  let bytes = unrollBE (abs n)
+      padLen = 32 - BS.length bytes
+  in BS.replicate padLen 0 <> bytes
+  where
+    unrollBE :: Integer -> ByteString
+    unrollBE 0 = BS.empty
+    unrollBE i = BS.snoc (unrollBE (i `shiftR` 8)) (fromIntegral (i .&. 0xff))
+
+-- | Convert big-endian ByteString to Integer
+bytesToIntegerBE :: ByteString -> Integer
+bytesToIntegerBE = BS.foldl' (\acc b -> acc * 256 + fromIntegral b) 0
 
 -- ============================================================================
 -- Ed25519 Curve Operations (for Railgun-compatible shared secret)
@@ -264,6 +345,33 @@ getEd25519PublicKey privKey =
 -- | Derive Ed25519 public key from private key (alias)
 deriveEd25519PubKey :: ByteString -> ByteString
 deriveEd25519PubKey = getEd25519PublicKey
+
+-- | Sign a message using Ed25519
+-- Returns the signature as a 64-byte ByteString (R || S)
+signEd25519 :: ByteString  -- ^ Private key (32 bytes)
+            -> ByteString  -- ^ Message to sign
+            -> Maybe ByteString  -- ^ Signature (64 bytes)
+signEd25519 privKey message =
+  case Crypto.PubKey.Ed25519.secretKey privKey of
+    CryptoPassed sk ->
+      let pk = Crypto.PubKey.Ed25519.toPublic sk
+          sig = Crypto.PubKey.Ed25519.sign sk pk message
+      in Just $ convert sig
+    CryptoFailed _ -> Nothing
+
+-- | Extract signature components (R8x, R8y, S) from Ed25519 signature
+-- Returns the signature as three Integers for circuit input
+signatureToComponents :: ByteString -> Maybe (Integer, Integer, Integer)
+signatureToComponents sig
+  | BS.length sig /= 64 = Nothing
+  | otherwise =
+      let rBytes = BS.take 32 sig  -- R point (compressed)
+          sBytes = BS.drop 32 sig  -- S scalar
+          -- Decompress R to get (x, y)
+          sScalar = bytesToIntegerLE sBytes
+      in case pointDecompress rBytes of
+           Just (Ed25519Point rx ry _ _) -> Just (rx, ry, sScalar)
+           Nothing -> Nothing
 
 -- | AES-256-GCM encryption (real authenticated encryption)
 -- Returns (iv, tag, ciphertext)

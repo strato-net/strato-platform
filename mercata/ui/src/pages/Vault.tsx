@@ -23,6 +23,7 @@ const Vault = () => {
 
   useEffect(() => {
     document.title = "STRATO Vault | STRATO";
+    window.scrollTo(0, 0);
   }, []);
 
   const handleDepositSuccess = () => {

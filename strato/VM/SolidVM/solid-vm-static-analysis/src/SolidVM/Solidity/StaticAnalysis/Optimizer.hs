@@ -121,9 +121,9 @@ functionHelperForUserDefined f = f {_funcArgs = tForm $ _funcArgs f, _funcVals =
     tForm :: [(Maybe SolidString, IndexedType)] -> [(Maybe SolidString, IndexedType)]
     tForm =
       Prelude.map
-        ( \(maybeSoldString, (IndexedType z y)) -> case (maybeSoldString, y) of
-            (xxxx, (SVMType.UserDefined _ act)) -> (xxxx, (IndexedType z act))
-            (xxxx, _) -> (xxxx, (IndexedType z y))
+        ( \(maybeSoldString, (IndexedType z y loc)) -> case (maybeSoldString, y) of
+            (xxxx, (SVMType.UserDefined _ act)) -> (xxxx, (IndexedType z act loc))
+            (xxxx, _) -> (xxxx, (IndexedType z y loc))
         )
 
 pushVar :: String -> SVMType.Type -> SSS ()
