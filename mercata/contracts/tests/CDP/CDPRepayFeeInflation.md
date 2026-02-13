@@ -106,13 +106,45 @@ formula is correct.  No phantom fees.
 
 ## Proposed fix (not implemented)
 
-The root problem is that `repay`/`repayAll`/`liquidate` try to decompose the burn
-amount into "principal" and "fee" at repay time, but the information needed (the
-rate at which each unit of scaled debt was originally created) is not stored.
+Two independent improvements, in priority order.
 
-**Approach: collect fees during accrual, not during repay.**
+### 1. Transfer, don't mint (safety net)
 
-In `_accrue`, after computing the new rate, mint the fee for the period:
+The current code burns the full `owed` from the user, then **mints** `feeUSD` as
+fresh USDST to the FeeCollector.  This is what allows the bug to inflate supply.
+
+Replace with **transfer + burn**: transfer the fee portion from the user to the
+FeeCollector, then burn only the remainder.
+
+```solidity
+// repayAll — before (burn all, mint fee fresh)
+Token(_usdst()).burn(msg.sender, owed);
+_routeFees(asset, feeUSD);           // ← mints unbacked USDST
+
+// repayAll — after (transfer fee, burn the rest)
+_transferFees(msg.sender, asset, feeUSD);   // transfer from user
+Token(_usdst()).burn(msg.sender, owed - feeUSD);
+```
+
+With this pattern no tokens are ever created during repay.  Even if the fee
+decomposition is wrong, the worst case is that the FeeCollector gets too large a
+share of the user's payment and not enough gets burned — a misallocation, not an
+unbacked mint.  The entire class of phantom-fee bugs disappears because there is
+no `mint` call to exploit.
+
+The same change applies to `repay`, `repayAll`, and `liquidate`, and to the
+`_routeFees` helper (replace `Token.mint` with `Token.transferFrom`).
+
+### 2. Fix the fee decomposition (correctness)
+
+With transfer-not-mint in place there is no urgency, but the `baseUSD` formula
+should still be corrected so the FeeCollector receives only the actual interest
+and the correct amount of supply is retired.
+
+Two options:
+
+**Option A — collect fees during accrual.**  In `_accrue`, after computing the new
+rate, transfer the fee for the period:
 
 ```solidity
 if (assetState.totalScaledDebt > 0 && newRate > oldRate) {
@@ -121,13 +153,20 @@ if (assetState.totalScaledDebt > 0 && newRate > oldRate) {
 }
 ```
 
-Then remove all `_routeFees` calls from `repay`, `repayAll`, and `liquidate` —
-those functions simply burn the owed amount and update the books.
+Then remove all fee routing from `repay`/`repayAll`/`liquidate` — those functions
+simply burn the full owed amount.  This mirrors MakerDAO's `drip` function: fees
+are materialised continuously as the rate grows, correct by construction.
 
-This mirrors how MakerDAO's `drip` function works: fees are materialised
-continuously as the rate grows, rather than reconstructed at repay time.  The fee
-is correct by construction because it uses the exact rate delta and the actual
-outstanding scaled debt.
+**Option B — track per-vault entry rate.**  Store the `rateAccumulator` at borrow
+time per vault and use it to compute exact principal:
+
+```solidity
+uint principalUSD = (scaledDelta * vault.entryRate) / RAY;
+uint feeUSD = owedForDelta - principalUSD;
+```
+
+Option A is simpler and avoids extra storage; Option B is more precise for
+partial-repay accounting.
 
 ## Running the tests
 
