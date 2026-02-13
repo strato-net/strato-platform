@@ -63,14 +63,21 @@
     "apiKeyEnvVar": "COINAPI_API_KEY",
     "assets": ["ETH", "WBTC", "PAXG", "XAUT"]
   },
-  "LiveCoinWatch": {
-    "url": "https://api.livecoinwatch.com/coins/map",
-    "method": "POST",
-    "headers": "x-api-key",
-    "body": "codes",
-    "parse": "coins",
-    "apiKeyEnvVar": "LIVECOINWATCH_API_KEY",
-    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "KAG", "WSTETH"]
+  "DefiLlama": {
+    "url": "https://pro-api.llama.fi/${API_KEY}/coins/prices/current/${SYMBOLS}",
+    "parse": "defiLlama",
+    "apiKeyEnvVar": "DEFILLAMA_API_KEY",
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "KAG", "WSTETH", "SYRUPUSDC"],
+    "symbolMapping": {
+      "ETH": "coingecko:ethereum",
+      "WBTC": "coingecko:wrapped-bitcoin",
+      "PAXG": "coingecko:pax-gold",
+      "XAUT": "coingecko:tether-gold",
+      "SUSDS": "coingecko:susds",
+      "KAG": "coingecko:kinesis-silver",
+      "WSTETH": "coingecko:wrapped-steth",
+      "SYRUPUSDC": "coingecko:syrupusdc"
+    }
   },
   "Commodities-API": {
     "url": "https://commodities-api.com/api/latest",
