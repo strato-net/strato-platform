@@ -23,7 +23,7 @@ const SwapPoolsTable = () => {
   const [selectedPool, setSelectedPool] = useState<Pool | null>(null);
   const [showSetRatesModal, setShowSetRatesModal] = useState(false);
 
-  const { fetchPools, togglePause, toggleDisable } = useSwapContext();
+  const { fetchPools, togglePause, toggleDisable, refetchSwappableTokens } = useSwapContext();
 
   const fetchAndEnrichPools = useCallback(async () => {
     try {
@@ -42,24 +42,26 @@ const SwapPoolsTable = () => {
       setLoading(true);
       await togglePause(pool.address, isPaused);
       await fetchAndEnrichPools();
+      refetchSwappableTokens();
     } catch (error) {
       console.error('Failed to toggle pause:', error);
     } finally {
       setLoading(false);
     }
-  }, [togglePause, fetchAndEnrichPools]);
+  }, [togglePause, fetchAndEnrichPools, refetchSwappableTokens]);
 
   const handleToggleDisable = useCallback(async (pool: Pool, isDisabled: boolean) => {
     try {
       setLoading(true);
       await toggleDisable(pool.address, isDisabled);
       await fetchAndEnrichPools();
+      refetchSwappableTokens();
     } catch (error) {
       console.error('Failed to toggle disable:', error);
     } finally {
       setLoading(false);
     }
-  }, [toggleDisable, fetchAndEnrichPools]);
+  }, [toggleDisable, fetchAndEnrichPools, refetchSwappableTokens]);
 
   useEffect(() => {
     fetchAndEnrichPools();

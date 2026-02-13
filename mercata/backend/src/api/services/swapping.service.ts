@@ -123,6 +123,7 @@ export const getSwapableTokens = async (
   const { data: poolData } = await cirrus.get(accessToken, `/${Pool}`, {
     params: {
       poolFactory: "eq." + constants.poolFactory,
+      isDisabled: "eq.false",
       select: `address,tokenA:tokenA_fkey(${swapTokenSelectFields.join(',')}),tokenB:tokenB_fkey(${swapTokenSelectFields.join(',')}),tokenABalance::text,tokenBBalance::text`,
       "tokenA.balances.key": `eq.${userAddress}`,
       "tokenB.balances.key": `eq.${userAddress}`,
@@ -168,6 +169,7 @@ export const getSwapableTokenPairs = async (
     cirrus.get(accessToken, `/${Pool}`, {
       params: {
         poolFactory: "eq." + constants.poolFactory,
+        isDisabled: "eq.false",
         select: `address,tokenB:tokenB_fkey(${swapTokenSelectFields.join(',')}),tokenBBalance::text`,
         tokenA: "eq." + tokenAddress,
         "tokenB.balances.key": `eq.${userAddress}`,
@@ -176,6 +178,7 @@ export const getSwapableTokenPairs = async (
     cirrus.get(accessToken, `/${Pool}`, {
       params: {
         poolFactory: "eq." + constants.poolFactory,
+        isDisabled: "eq.false",
         select: `address,tokenA:tokenA_fkey(${swapTokenSelectFields.join(',')}),tokenABalance::text`,
         tokenB: "eq." + tokenAddress,
         "tokenA.balances.key": `eq.${userAddress}`,
