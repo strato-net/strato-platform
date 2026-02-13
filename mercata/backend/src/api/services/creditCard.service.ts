@@ -237,7 +237,7 @@ export async function getConfigById(accessToken: string, userAddress: string, id
  * Contract address must be set in config (CREDIT_CARD_TOP_UP_ADDRESS).
  */
 export async function executeTopUp(
-  operatorAccessToken: string,
+  accessToken: string,
   params: CreditCardTopUpExecuteParams
 ): Promise<TransactionResponse> {
   if (!creditCardTopUp) {
@@ -261,8 +261,9 @@ export async function executeTopUp(
     undefined,
     undefined
   );
-  return await postAndWaitForTx(operatorAccessToken, () =>
-    strato.post(operatorAccessToken, StratoPaths.transactionParallel, tx)
+  console.log(`TX: ${JSON.stringify(tx)}`)
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, tx)
   );
 }
 

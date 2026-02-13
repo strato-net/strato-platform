@@ -39,45 +39,6 @@ interface CustomJwtPayload extends JWTPayload {
 
 class AuthHandler {
   /**
-   * Middleware that allows requests with:
-   * - Bearer token equal to OPERATOR_ACCESS_TOKEN (static), or
-   * - Bearer JWT from operator OAuth client (verified with app JWKS; optional OPERATOR_CLIENT_ID check).
-   */
-  static authorizeOperatorRequest(): RequestHandler {
-    return async (req, res, next) => {
-      const token = getTokenFromHeader(req);
-      if (!token) {
-        res.set("WWW-Authenticate", "Bearer");
-        res.status(401).json({ error: "Unauthorized", message: "Operator token required" });
-        return;
-      }
-      const operatorToken = process.env.OPERATOR_ACCESS_TOKEN;
-      if (operatorToken && token === operatorToken) {
-        req.accessToken = token;
-        return next();
-      }
-      const operatorClientId = process.env.OPERATOR_CLIENT_ID;
-      try {
-        const payload = await verifyAccessTokenSignature(token);
-        if (operatorClientId) {
-          const azp = (payload as any).azp;
-          const clientId = (payload as any).client_id;
-          if (azp !== operatorClientId && clientId !== operatorClientId) {
-            res.set("WWW-Authenticate", "Bearer");
-            res.status(401).json({ error: "Unauthorized", message: "Operator client required" });
-            return;
-          }
-        }
-        req.accessToken = token;
-        return next();
-      } catch {
-        res.set("WWW-Authenticate", "Bearer");
-        res.status(401).json({ error: "Unauthorized", message: "Operator token required" });
-      }
-    };
-  }
-
-  /**
    * Middleware that enforces OAuth on incoming requests.
    * @param allowAnonAccess if true, will fall back to a service-token.
    */

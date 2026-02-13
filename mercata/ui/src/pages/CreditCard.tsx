@@ -19,7 +19,7 @@ import { api } from "@/lib/axios";
 import { useToast } from "@/hooks/use-toast";
 import type { BridgeToken } from "@mercata/shared-types";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
-import { Loader2, CreditCard, Plus } from "lucide-react";
+import { Loader2, CreditCard, DollarSign, Plus, Settings } from "lucide-react";
 import { safeParseUnits } from "@/utils/numberUtils";
 import {
   CARD_PROVIDERS,
@@ -136,6 +136,10 @@ export default function CreditCardPage() {
   const [checkFrequencyMinutes, setCheckFrequencyMinutes] = useState(15);
   const [cooldownMinutes, setCooldownMinutes] = useState(60);
   const [enabled, setEnabled] = useState(false);
+  const [manualModalOpen, setManualModalOpen] = useState(false);
+  const [manualCard, setManualCard] = useState<OnChainCardConfig | null>(null);
+  const [manualAmount, setManualAmount] = useState("");
+  const [manualSaving, setManualSaving] = useState(false);
 
   const destinationChainId = selectedNetworkChainId;
   const networksForProvider = selectedProviderId
@@ -206,25 +210,43 @@ export default function CreditCardPage() {
   }, [configs]);
 
   useEffect(() => {
-    if (configs.length === 0) return;
-    configs.forEach((config) => {
-      api
-        .get<{ balance: string | null }>("/credit-card/balance", {
-          params: {
-            destinationChainId: config.destinationChainId,
-            externalToken: config.externalToken,
-            cardWalletAddress: config.cardWalletAddress,
-          },
+    if (!isLoggedIn || configs.length === 0) return;
+
+    let cancelled = false;
+
+    const fetchBalances = async () => {
+      // Fetch each card balance independently; update UI as results arrive.
+      await Promise.allSettled(
+        configs.map(async (config) => {
+          try {
+            const res = await api.get<{ balance: string | null }>("/credit-card/balance", {
+              params: {
+                destinationChainId: config.destinationChainId,
+                externalToken: config.externalToken,
+                cardWalletAddress: config.cardWalletAddress,
+              },
+            });
+            if (cancelled) return;
+            const balance = res.data?.balance ?? null;
+            setCardDisplays((prev) =>
+              prev.map((cd) => (cd.config.id === config.id ? { ...cd, balance } : cd))
+            );
+          } catch {
+            // ignore; keep previous value
+          }
         })
-        .then((res) => {
-          const balance = res.data?.balance ?? null;
-          setCardDisplays((prev) =>
-            prev.map((cd) => (cd.config.id === config.id ? { ...cd, balance } : cd))
-          );
-        })
-        .catch(() => {});
-    });
-  }, [configs]);
+      );
+    };
+
+    // Run immediately, then once per minute.
+    void fetchBalances();
+    const id = window.setInterval(fetchBalances, 60_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [configs, isLoggedIn]);
 
   const openModal = (config: OnChainCardConfig | null) => {
     setEditingConfig(config);
@@ -257,6 +279,18 @@ export default function CreditCardPage() {
       setEnabled(false);
     }
     setModalOpen(true);
+  };
+
+  const openManualModal = (config: OnChainCardConfig) => {
+    setManualCard(config);
+    setManualAmount("");
+    setManualModalOpen(true);
+  };
+
+  const closeManualModal = () => {
+    setManualModalOpen(false);
+    setManualCard(null);
+    setManualAmount("");
   };
 
   const closeModal = () => {
@@ -356,6 +390,30 @@ export default function CreditCardPage() {
     }
   };
 
+  const handleManualTopUp = async () => {
+    if (!isLoggedIn || !manualCard) return;
+    const wei = toWei(manualAmount);
+    if (wei === null || wei <= 0n) {
+      toast({ title: "Enter a valid top-up amount", variant: "destructive" });
+      return;
+    }
+    setManualSaving(true);
+    try {
+      await api.post("/credit-card/manual-top-up", {
+        id: manualCard.id,
+        amount: wei.toString(),
+      });
+      toast({ title: "Top-up submitted" });
+      await loadCards();
+      closeManualModal();
+    } catch (e: any) {
+      const msg = e?.response?.data?.error ?? e?.message ?? "Failed to top up";
+      toast({ title: String(msg), variant: "destructive" });
+    } finally {
+      setManualSaving(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!editingConfig?.id) return;
     const index = parseInt(editingConfig.id, 10);
@@ -430,11 +488,9 @@ export default function CreditCardPage() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {cardDisplays.map((d) => (
-                <button
+                <div
                   key={d.config.id}
-                  type="button"
-                  onClick={() => openModal(d.config)}
-                  className={cardShapeClass + " text-left cursor-pointer hover:from-slate-700 hover:to-slate-800 transition-colors"}
+                  className={cardShapeClass + " text-left"}
                 >
                   <div className="flex items-start justify-between">
                     <div className="relative w-20 h-20 rounded-xl bg-white/10 flex items-center justify-center overflow-hidden shrink-0">
@@ -470,13 +526,31 @@ export default function CreditCardPage() {
                       {d.config.nickname?.trim() || d.providerName}
                     </span>
                   </div>
-                  <div>
-                    <p className="text-sm font-medium">{d.networkName}</p>
-                    <p className="text-lg font-semibold mt-1">
-                      Balance: {d.balance !== null ? formatWeiAmount(d.balance, 6) : "—"} {d.tokenSymbol}
-                    </p>
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium">{d.networkName}</p>
+                      <p className="text-lg font-semibold mt-1">
+                        Balance: {d.balance !== null ? formatWeiAmount(d.balance, 6) : "—"} {d.tokenSymbol}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+                        onClick={() => openManualModal(d.config)}
+                      >
+                        <DollarSign className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+                        onClick={() => openModal(d.config)}
+                      >
+                        <Settings className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
-                </button>
+                </div>
               ))}
               <button
                 type="button"
@@ -659,6 +733,41 @@ export default function CreditCardPage() {
                 )}
               </div>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={manualModalOpen} onOpenChange={(open) => !open && closeManualModal()}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Add Funds to Card</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            {manualCard && (
+              <p className="text-sm text-muted-foreground">
+                Card: <span className="font-medium">{manualCard.nickname || manualCard.id}</span>
+              </p>
+            )}
+            <div className="grid gap-2">
+              <Label>Amount</Label>
+              <Input
+                type="text"
+                placeholder="e.g. 50"
+                value={manualAmount}
+                onChange={(e) => setManualAmount(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Amount in {manualCard?.externalToken ? "token units" : "USDST equivalent"} (will be converted to wei).
+              </p>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={closeManualModal} disabled={manualSaving}>
+                Cancel
+              </Button>
+              <Button onClick={handleManualTopUp} disabled={manualSaving || !manualAmount.trim()}>
+                {manualSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Top up"}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

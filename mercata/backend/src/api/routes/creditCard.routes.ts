@@ -243,13 +243,18 @@ router.post("/approve", authHandler.authorizeRequest(), CreditCardController.app
 router.delete("/config/:id", authHandler.authorizeRequest(), CreditCardController.deleteConfig);
 
 /**
- * Operator-only: list of enabled card configs for the top-up watcher service.
+ * list of enabled card configs for the top-up watcher service.
  */
-router.get("/watcher-config", authHandler.authorizeOperatorRequest(), CreditCardController.getWatcherConfig);
+router.get("/watcher-config", authHandler.authorizeRequest(), CreditCardController.getWatcherConfig);
 
 /**
- * Operator-only: execute a single top-up (CreditCardTopUp.topUpCard) and mark config lastTopUpAt.
+ * execute a single top-up (CreditCardTopUp.topUpCard) and mark config lastTopUpAt.
  */
-router.post("/execute-top-up", authHandler.authorizeOperatorRequest(), CreditCardController.executeTopUp);
+router.post("/execute-top-up", authHandler.authorizeRequest(), CreditCardController.executeTopUp);
+
+/**
+ * User-triggered manual top-up for a specific card (uses operator service token under the hood).
+ */
+router.post("/manual-top-up", authHandler.authorizeRequest(), CreditCardController.manualTopUp);
 
 export default router;

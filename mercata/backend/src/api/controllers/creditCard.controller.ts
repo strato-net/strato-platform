@@ -13,6 +13,7 @@ import {
 } from "../services/creditCard.service";
 import { validateUpsertConfig, validateAddCardBody, validateUpdateCardBody } from "../validators/creditCard.validators";
 import type { CreditCardConfig } from "@mercata/shared-types";
+import { getServiceToken } from "../../utils/authHelper";
 
 class CreditCardController {
   /** GET /credit-card — cards from Cirrus (no RPC). */
@@ -304,6 +305,43 @@ class CreditCardController {
         return;
       }
       const result = await executeTopUpService(accessToken, body);
+      res.json({ success: true, data: result });
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
+  /** POST /credit-card/manual-top-up — user-triggered manual top-up using custom amount. */
+  static async manualTopUp(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const userAddress = req.address as string;
+      const accessToken = req.accessToken as string;
+      const { id, amount } = req.body as { id?: string; amount?: string };
+      if (!userAddress || !accessToken) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      if (!id || typeof id !== "string" || !amount || typeof amount !== "string") {
+        res.status(400).json({ error: "id and amount (wei string) are required" });
+        return;
+      }
+      const config = await getConfigById(accessToken, userAddress, id);
+      if (!config) {
+        res.status(404).json({ error: "Card not found" });
+        return;
+      }
+      const params: import("@mercata/shared-types").CreditCardTopUpExecuteParams = {
+        userAddress: config.userAddress,
+        stratoTokenAmount: amount,
+        externalChainId: config.destinationChainId,
+        externalRecipient: config.cardWalletAddress,
+        externalToken: config.externalToken,
+      };
+      const result = await executeTopUpService(accessToken, params);
       res.json({ success: true, data: result });
     } catch (error: any) {
       next(error);

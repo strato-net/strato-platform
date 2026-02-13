@@ -35,17 +35,11 @@ contract record CreditCardTopUp is Ownable {
     event CardUpdated(address indexed user, uint256 index);
     event CardRemoved(address indexed user, uint256 index);
 
-    error OnlyOperator();
     error ZeroAddress();
     error TransferFailed();
     error ApproveFailed();
     error AssetNotFound();
     error IndexOutOfBounds();
-
-    modifier onlyOperator() {
-        if (msg.sender != operator) revert OnlyOperator();
-        _;
-    }
 
     constructor(address _owner) Ownable(_owner) {}
 
@@ -77,8 +71,9 @@ contract record CreditCardTopUp is Ownable {
         uint256 externalChainId,
         address externalRecipient,
         address externalToken
-    ) external onlyOperator returns (uint256 withdrawalId) {
+    ) external returns (uint256 withdrawalId) {
         require(mercataBridge != address(0), "CCTU: bridge not set");
+        require(msg.sender == operator || msg.sender == user, "CCTU: unauthorized call");
         require(user != address(0), "CCTU: zero user");
         require(stratoTokenAmount > 0, "CCTU: zero amount");
         require(externalRecipient != address(0), "CCTU: zero recipient");
