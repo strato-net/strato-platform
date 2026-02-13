@@ -20,6 +20,7 @@ sqlTypeSQLite SqlBool      = "bool"
 sqlTypeSQLite SqlDecimal   = "decimal"
 sqlTypeSQLite SqlText      = "text"
 sqlTypeSQLite SqlJsonb     = "jsonb"
+sqlTypeSQLite SqlJsonbArray = "jsonb"
 sqlTypeSQLite SqlTimestamp = "text"
 sqlTypeSQLite SqlSerial    = ""
 
