@@ -243,9 +243,9 @@ codeCollectionFromSource isRunningTests typeCheck initCode = do
       let cc = case ecc of
             Right a -> a
             Left (PEx p) -> parseError "codeCollectionFromSource" p
-            Left (IEx p) -> typeError "codeCollectionFromSource" p
+            Left (IEx p) -> typeError "codeCollectionFromSource" $ show p
             Left (SVMEx (s, _)) -> throw s
-            Left (TCEx xs) -> typeError "Typechecker" (typeErrorToAnnotation xs)
+            Left (TCEx xs) -> typeError "Typechecker" $ T.unpack (typeErrorToAnnotation xs)
       liftIO $ modifyIORef' unsafeCodeCacheLRUIORef (LRU.insert hsh cc)
       return $ assert (hsh == hsh') (hsh, cc)
 
@@ -292,6 +292,6 @@ codeCollectionFromHashNoCache isRunningTests mergeFuncs typeCheck hsh =
       case ecc of
         Right a -> pure a
         Left (PEx p) -> parseError "codeCollectionFromHash" p
-        Left (IEx p) -> typeError "codeCollectionFromHash" p
+        Left (IEx p) -> typeError "codeCollectionFromHash" $ show p
         Left (SVMEx (s, _)) -> throw s
         Left (TCEx xs) -> typeError "codeCollectionFromHash" (show xs)

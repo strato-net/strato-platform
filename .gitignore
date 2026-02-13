@@ -12,6 +12,10 @@ docker-compose.allDocker.push.yml
 docker-compose.allDocker.push.ecr.yml
 docker-compose.allDocker.yml
 docker-compose.allDocker.ecr.yml
+docker-compose.bridge.push.yml
+docker-compose.bridge.push.ecr.yml
+docker-compose.bridge.yml
+docker-compose.bridge.ecr.yml
 docker-compose.highway.push.yml
 docker-compose.highway.push.ecr.yml
 docker-compose.highway.yml
@@ -34,6 +38,11 @@ strato/hpc
 !strato/simulator/strato-obelisk/**/*.cabal
 *~
 bridge_image_tag*
+
+docker-compose.bridge.ecr.yml
+docker-compose.bridge.push.ecr.yml
+docker-compose.bridge.push.yml
+docker-compose.bridge.yml
 
 # Obsolete services, lines to be removed soon:
 rewards-server/src/config/latestBlock.json
@@ -126,3 +135,4 @@ __pycache__/
 /docs/developer/
 /docs/end-user/
 
+.contract-address

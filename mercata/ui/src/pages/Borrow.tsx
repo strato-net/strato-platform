@@ -19,9 +19,10 @@ import RepayForm from "@/components/borrow/RepayForm";
 import CollateralManagementTable from "@/components/borrow/CollateralManagementTable";
 import { useSmartPolling } from "@/hooks/useSmartPolling";
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
+import GuestSignInBanner from '@/components/ui/GuestSignInBanner';
 
 const Borrow = () => {
-  const { userAddress } = useUser();
+  const { userAddress, isLoggedIn } = useUser();
   const { usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
   const [selectedAsset, setSelectedAsset] = useState<CollateralData | null>(null);
   const [borrowLoading, setBorrowLoading] = useState(false);
@@ -32,6 +33,7 @@ const Borrow = () => {
   const [modalLoading, setModalLoading] = useState(false);
   const [repayLoading, setRepayLoading] = useState(false);
   const [eligibleCollateral, setEligibleCollateral] = useState<CollateralData[]>([]);
+  const [activeTab, setActiveTab] = useState<"borrow" | "repay">("borrow");
   const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
   const { toast } = useToast();
@@ -53,7 +55,7 @@ const Borrow = () => {
   // Use the new smart polling hook for balance updates
   const { startPolling, stopPolling } = useSmartPolling({
     fetchFn: fetchUsdstBalance,
-    shouldPoll: () => true,
+    shouldPoll: () => isLoggedIn,
     interval: 10000,
     onError: (error) => console.error("Balance polling error:", error)
   });
@@ -63,8 +65,10 @@ const Borrow = () => {
   }, []);
 
 
-  // Refresh data when page loads
+  // Refresh data when page loads - only for logged-in users
   useEffect(() => {
+    if (!isLoggedIn) return;
+    
     const refreshData = async () => {
       try {
         await Promise.all([
@@ -77,7 +81,7 @@ const Borrow = () => {
       }
     };
     refreshData();
-  }, [userAddress, refreshLoans, refreshCollateral, fetchUsdstBalance]);
+  }, [userAddress, isLoggedIn, refreshLoans, refreshCollateral, fetchUsdstBalance]);
 
     useEffect(() => {
     if (collateralInfo && Array.isArray(collateralInfo)) {
@@ -87,14 +91,14 @@ const Borrow = () => {
       );
       setEligibleCollateral(eligibleWithBalance);
     }
-  }, [collateralInfo])
+  }, [collateralInfo]);
 
-  const handleSupply = (asset) => {
+  const handleSupply = (asset: CollateralData) => {
     setSelectedAsset(asset);
     setModalState({ isOpen: true, type: "supply" });
   };
 
-  const handleWithdraw = (asset) => {
+  const handleWithdraw = (asset: CollateralData) => {
     setSelectedAsset(asset);
     setModalState({ isOpen: true, type: "withdraw" });
   };
@@ -225,6 +229,8 @@ const Borrow = () => {
     }
   };
 
+  const guestMode = !isLoggedIn;
+
   return (
     <div className="min-h-screen bg-background pb-16 md:pb-0">
       <DashboardSidebar />
@@ -233,6 +239,10 @@ const Borrow = () => {
         <DashboardHeader title="Borrow" />
 
         <main className="p-4 md:p-6">
+          {!isLoggedIn && (
+            <GuestSignInBanner message="Sign in to borrow USDST" />
+          )}
+          
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
             {/* Left Column - Borrow/Repay Tabbed Card */}
             <Card>
@@ -242,7 +252,7 @@ const Borrow = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                <Tabs defaultValue="borrow" className="w-full">
+                <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "borrow" | "repay")} className="w-full">
                   <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="borrow">Borrow</TabsTrigger>
                     <TabsTrigger value="repay">Repay</TabsTrigger>
@@ -254,11 +264,12 @@ const Borrow = () => {
                       onBorrow={executeEmbeddedBorrow}
                       usdstBalance={usdstBalance}
                       voucherBalance={voucherBalance}
-                      collateralInfo={eligibleCollateral}
+                      collateralInfo={collateralInfo}
                       startPolling={startPolling}
                       stopPolling={stopPolling}
                       userRewards={userRewards}
                       rewardsLoading={rewardsLoading}
+                      guestMode={guestMode}
                     />
                   </TabsContent>
                   <TabsContent value="repay">
@@ -268,48 +279,51 @@ const Borrow = () => {
                       onRepay={executeEmbeddedRepay}
                       usdstBalance={usdstBalance}
                       voucherBalance={voucherBalance}
+                      guestMode={guestMode}
                     />
                   </TabsContent>
                 </Tabs>
               </CardContent>
             </Card>
 
-            {/* Right Column - Your Position and Collateral Management */}
+            {/* Right Column - Your Position (hidden for guests) and Collateral Management */}
             <div className="space-y-6">
-              <PositionSection loanData={loans} userCollaterals={collateralInfo} />
+              {!guestMode && (
+                <PositionSection loanData={loans} userCollaterals={collateralInfo} />
+              )}
               <CollateralManagementTable
                 collateralInfo={collateralInfo}
                 loadingCollateral={loadingCollateral}
                 loans={loans}
                 onSupply={handleSupply}
                 onWithdraw={handleWithdraw}
+                guestMode={guestMode}
               />
             </div>
           </div>
+
+          {!guestMode && modalState.isOpen && modalState.type && selectedAsset && (
+            <CollateralModal 
+                type={modalState.type}
+                loading={modalLoading}
+                asset={selectedAsset}
+                loanData={loans}
+                isOpen={modalState.isOpen}
+                onClose={closeModal}
+                onAction={(amount) => {
+                  if (modalState.type === "supply") {
+                    executeSupply(selectedAsset, amount);
+                  } else if (modalState.type === "withdraw") {
+                    executeWithdraw(selectedAsset, amount);
+                  }
+                }}
+                usdstBalance={usdstBalance}
+                voucherBalance={voucherBalance}
+                transactionFee={modalState.type === "supply" ? SUPPLY_COLLATERAL_FEE : WITHDRAW_COLLATERAL_FEE}
+            />
+          )}
         </main>
       </div>
-
-
-      {modalState.isOpen && modalState.type && (
-        <CollateralModal 
-            type={modalState.type}
-            loading={modalLoading}
-            asset={selectedAsset}
-            loanData={loans}
-            isOpen={modalState.isOpen}
-            onClose={closeModal}
-            onAction={(amount) => {
-              if (modalState.type === "supply") {
-                executeSupply(selectedAsset, amount);
-              } else if (modalState.type === "withdraw") {
-                executeWithdraw(selectedAsset, amount);
-              }
-            }}
-            usdstBalance={usdstBalance}
-            voucherBalance={voucherBalance}
-            transactionFee={modalState.type === "supply" ? SUPPLY_COLLATERAL_FEE : WITHDRAW_COLLATERAL_FEE}
-        />
-      )}
 
       <MobileBottomNav />
     </div>

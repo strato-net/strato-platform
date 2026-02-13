@@ -63,12 +63,18 @@ async function callListAndWait(callListArgs: CallListArg[]): Promise<Transaction
     };
 
     const immediate = getImmediateResult(response.data);
+    if (!immediate) {
+        logInfo('OraclePusher', `Tx is slow - the result was not available within 10 seconds, polling for transaction ${txHash}`);
+    }
     const result = immediate ?? await waitForTransaction(txHash);
+    
+    const duration = Date.now() - submitTime;
+    logInfo('OraclePusher', `Tx submission time: ${duration} ms`);
     
     // Record metrics (errors are handled inside txMetricsService)
     await txMetricsService.recordTxMetric({
         txHash,
-        duration: Date.now() - submitTime,
+        duration: duration,
         status: result.status,
     });
     

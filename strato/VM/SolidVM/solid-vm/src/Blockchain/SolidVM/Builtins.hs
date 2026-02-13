@@ -9,6 +9,7 @@ module Blockchain.SolidVM.Builtins where
 import Blockchain.SolidVM.SM
 import Blockchain.SolidVM.SetGet
 import Blockchain.VM.SolidException
+import qualified Crypto.Hash.Poseidon as Poseidon
 import qualified Data.ByteString.Char8 as BC
 import Data.Curve                   (Form(Weierstrass), Coordinates(Affine))
 import Data.Curve.Weierstrass.BN254 (BN254, Fq, Fr, Point(..), add, mul)
@@ -84,3 +85,8 @@ ecPairing = maybe False doPairing . toTrios
               acc = mconcat [pairing (point g1) (toG2 (x2,y2)) | (g1,x2,y2) <- trios]
 
            in acc == mempty
+
+-- | Poseidon hash - ZK-friendly hash function over BN254 scalar field
+-- Takes a list of integers (field elements) and returns their Poseidon hash
+poseidonHash :: [Integer] -> Integer
+poseidonHash inputs = Poseidon.fromF $ Poseidon.poseidon (map Poseidon.toF inputs)

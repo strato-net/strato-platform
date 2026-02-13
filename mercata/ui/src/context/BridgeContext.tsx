@@ -81,6 +81,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
           depositRouter: cfg.chainInfo.depositRouter,
         }));
 
+      networks.sort((a, b) => a.chainId.localeCompare(b.chainId));
       setAvailableNetworks(networks);
       setNetworksLoaded(true);
 
@@ -89,6 +90,12 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         setSelectedNetwork(defaultName);
         await fetchTokensForChain(networks[0].chainId);
       }
+    } catch (error) {
+      // Silently handle errors for guest-safe endpoints
+      // Error toast is already handled by axios interceptor for non-guest-safe URLs
+      console.error("Failed to load networks and tokens:", error);
+      setAvailableNetworks([]);
+      setNetworksLoaded(true); // Set to true to prevent retry loops
     } finally {
       setLoading(false);
     }

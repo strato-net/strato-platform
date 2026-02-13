@@ -13,19 +13,33 @@ import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 import { useTokenContext } from "@/context/TokenContext";
 import { useRewardsLeaderboard } from "@/hooks/useRewardsLeaderboard";
 import { useSearchParams } from "react-router-dom";
+import { useUser } from "@/context/UserContext";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { LogIn, Gift } from "lucide-react";
+import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 
 const Rewards = () => {
   const [searchParams] = useSearchParams();
+  const { isLoggedIn } = useUser();
+  
+  // Default to leaderboard for guests, my-rewards for logged-in users
   const [activeTab, setActiveTab] = useState<"activities" | "my-rewards" | "leaderboard">(() => {
     const tabParam = searchParams.get("tab");
     if (tabParam === "leaderboard" || tabParam === "activities" || tabParam === "my-rewards") {
+      // If guest tries to access my-rewards directly, redirect to leaderboard
+      if (tabParam === "my-rewards" && !isLoggedIn) {
+        return "leaderboard";
+      }
       return tabParam;
     }
-    return "my-rewards";
+    // Default: leaderboard for guests, my-rewards for logged-in users
+    return isLoggedIn ? "my-rewards" : "leaderboard";
   });
 
   const { state, loading: stateLoading, refetch: refetchState } = useRewards();
   const { activities, loading: activitiesLoading, refetch: refetchActivities } = useRewardsActivities();
+  // Only fetch user rewards if logged in
   const { userRewards, loading: userRewardsLoading, refetch: refetchUserRewards } = useRewardsUserInfo();
   const { inactiveTokens, getInactiveTokens } = useTokenContext();
   const [leaderboardLimit] = useState(10);
@@ -34,19 +48,24 @@ const Rewards = () => {
   const { entries: leaderboardEntries, total: leaderboardTotal, loading: leaderboardLoading, refetch: refetchLeaderboard } = useRewardsLeaderboard(leaderboardLimit, leaderboardOffset);
 
   useEffect(() => {
-    document.title = "Rewards";
-    // Fetch inactive tokens (includes CATA) if not already loaded
-    if (inactiveTokens.length === 0) {
+    document.title = "Rewards | STRATO";
+    // Only fetch inactive tokens if logged in
+    if (isLoggedIn && inactiveTokens.length === 0) {
       getInactiveTokens(true);
     }
-  }, []);
+  }, [isLoggedIn]);
 
   useEffect(() => {
     const tabParam = searchParams.get("tab");
     if (tabParam === "leaderboard" || tabParam === "activities" || tabParam === "my-rewards") {
+      // If guest tries to access my-rewards, stay on leaderboard
+      if (tabParam === "my-rewards" && !isLoggedIn) {
+        setActiveTab("leaderboard");
+      } else {
       setActiveTab(tabParam);
+      }
     }
-  }, [searchParams]);
+  }, [searchParams, isLoggedIn]);
 
   const handleClaimSuccess = () => {
     // Refetch all data after successful claim
@@ -59,14 +78,50 @@ const Rewards = () => {
 
   const handleRefresh = async () => {
     // Refetch all data when refresh button is clicked
-    await Promise.all([
+    const promises = [
       refetchState(),
       refetchActivities(),
-      refetchUserRewards(),
-      getInactiveTokens(false), // Refresh CATA balance (Total Earned)
       refetchLeaderboard(),
-    ]);
+    ];
+    
+    // Only refetch user-specific data if logged in
+    if (isLoggedIn) {
+      promises.push(refetchUserRewards());
+      promises.push(getInactiveTokens(false));
+    }
+    
+    await Promise.all(promises);
   };
+
+  const handleLogin = () => {
+    const theme = localStorage.getItem('theme') || 'light';
+    window.location.href = `/login?theme=${theme}`;
+  };
+
+  // Guest login prompt component
+  const GuestLoginPrompt = () => (
+    <Card className="border-dashed">
+      <CardHeader className="text-center pb-2">
+        <div className="mx-auto w-16 h-16 bg-gradient-to-br from-purple-100 to-blue-100 dark:from-purple-900/30 dark:to-blue-900/30 rounded-full flex items-center justify-center mb-4">
+          <Gift className="w-8 h-8 text-purple-600 dark:text-purple-400" />
+        </div>
+        <CardTitle className="text-xl">Start Earning Rewards</CardTitle>
+        <CardDescription className="text-base">
+          Sign in to start earning CATA tokens and track your rewards.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="text-center space-y-4">
+        <Button 
+          onClick={handleLogin}
+          className="gap-2"
+          size="lg"
+        >
+          <LogIn className="w-4 h-4" />
+          Sign In to Get Started
+        </Button>
+      </CardContent>
+    </Card>
+  );
 
   return (
     <div className="min-h-screen bg-background pb-16 md:pb-0">
@@ -76,7 +131,10 @@ const Rewards = () => {
         <DashboardHeader title="Rewards" />
 
         <main className="p-4 md:p-6">
-          {/* Global Overview */}
+          {!isLoggedIn && (
+            <GuestSignInBanner message="Sign in to start earning CATA tokens and track your rewards" />
+          )}
+          {/* Global Overview - visible to all */}
           <div className="mb-6">
             <RewardsOverview state={state} loading={stateLoading} onRefresh={handleRefresh} />
           </div>
@@ -94,11 +152,15 @@ const Rewards = () => {
             </TabsList>
 
             <TabsContent value="my-rewards">
+              {isLoggedIn ? (
               <UserRewardsSection
                 userRewards={userRewards}
                 loading={userRewardsLoading}
                 onClaimSuccess={handleClaimSuccess}
               />
+              ) : (
+                <GuestLoginPrompt />
+              )}
             </TabsContent>
 
             <TabsContent value="leaderboard">

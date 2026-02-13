@@ -42,7 +42,7 @@ type LendingContextType = {
   repayAll: () => Promise<{ status: string; hash: string; amountRequested?: string; estimatedDebtAtRead?: string }>;
   getLend: () => Promise<LendData>;
   depositLiquidity: (args: { amount: string; stakeMToken: boolean }) => Promise<void>;
-  withdrawLiquidity: (args: { amount: string; includeStakedMToken?: boolean }) => Promise<void>;
+  withdrawLiquidity: (args: { amount: string }) => Promise<void>;
   withdrawLiquidityAll: () => Promise<void>;
 
   collateralInfo: CollateralData[];
@@ -77,10 +77,11 @@ export const LendingProvider = ({
   const loansAbortControllerRef = useRef<AbortController | null>(null);
 
   const fetchLiquidityInfo = useCallback(async (signal?: AbortSignal) => {
-    if (!isLoggedIn) return;
-    setLoadingLiquidity(true);
     try {
-      const res = await api.get<LiquidityData>("/lending/liquidity", {
+      setLoadingLiquidity(true);
+      // Use different API endpoints based on login status
+      const endpoint = isLoggedIn ? "/lending/liquidity" : "/lending/liquidity/public";
+      const res = await api.get<LiquidityData>(endpoint, {
         signal,
       });
       if (res.data) {
@@ -94,10 +95,11 @@ export const LendingProvider = ({
   }, [isLoggedIn]);
 
   const fetchCollateralInfo = useCallback(async (signal?: AbortSignal) => {
-    if (!isLoggedIn) return;
     try {
       setLoadingCollateral(true);
-      const res = await api.get<CollateralData[]>("/lending/collateral", {
+      // Use different API endpoints based on login status
+      const endpoint = isLoggedIn ? "/lending/collateral" : "/lending/collateral/public";
+      const res = await api.get<CollateralData[]>(endpoint, {
         signal,
       });
       if (res.data) {
@@ -233,13 +235,11 @@ export const LendingProvider = ({
   };
 
 
-  // Run initialization only when the user is logged in
+  // Run initialization - liquidity and collateral info for all users
   useEffect(() => {
-    if (isLoggedIn) {
-      fetchLiquidityInfo();
-      fetchCollateralInfo();
-    }
-  }, [isLoggedIn, fetchLiquidityInfo, fetchCollateralInfo]);
+    fetchLiquidityInfo(); // Uses /lending/liquidity for logged-in, /lending/liquidity/public for guests
+    fetchCollateralInfo(); // Uses /lending/collateral for logged-in, /lending/collateral/public for guests
+  }, [fetchLiquidityInfo, fetchCollateralInfo]);
 
   // ========== POLLING EFFECTS ==========
   // Loans polling (60s interval)

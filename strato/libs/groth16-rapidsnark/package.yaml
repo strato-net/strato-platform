@@ -1,0 +1,27 @@
+name: groth16-rapidsnark
+version: 0.1.0
+synopsis: Groth16 prover wrapper for rapidsnark CLI
+description: |
+  Wrapper for rapidsnark (C++) Groth16 proof generation.
+  Uses snarkjs for witness calculation, rapidsnark for fast proving.
+license: AllRightsReserved
+author: BlockApps
+maintainer: info@blockapps.net
+
+library:
+  source-dirs: src
+  exposed-modules:
+    - Groth16.Rapidsnark
+  dependencies:
+    - base
+    - aeson
+    - bytestring
+    - text
+    - vector
+    - process
+    - temporary
+    - filepath
+
+ghc-options:
+  - -Wall
+  - -Werror

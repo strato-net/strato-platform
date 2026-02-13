@@ -2,12 +2,6 @@
 import "../../concrete/BaseCodeCollection.sol";
 import "../../abstract/ERC20/access/Authorizable.sol";
 
-// Per‑vault state keyed by (user, asset)
-struct Vault {
-    uint collateral; // raw token units
-    uint scaledDebt; // index‑denominated debt
-}
-
 // User contract for multi-user testing
 contract User {
     function do(address a, string f, variadic args) public returns (variadic) {
@@ -17,6 +11,11 @@ contract User {
 }
 
 contract Describe_CDPEngine is Authorizable {
+    // Per‑vault state keyed by (user, asset)
+    struct Vault {
+        uint collateral; // raw token units
+        uint scaledDebt; // index‑denominated debt
+    }
     Mercata m;
     string[] emptyArray;
 

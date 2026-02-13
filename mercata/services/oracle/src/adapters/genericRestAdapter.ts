@@ -53,16 +53,21 @@ function buildUrl(sourceConfig: SourceConfig): string {
     let url = sourceConfig.url || '';
     const symbols = sourceConfig.assets;
     const apiKey = sourceConfig.apiKey || '';
-    
+
     if (apiKey) {
         url = url.replace(/\$\{API_KEY\}/g, apiKey);
+    }
+
+    // Handle OANDA account ID substitution
+    if (sourceConfig.accountId) {
+        url = url.replace(/\$\{ACCOUNT_ID\}/g, sourceConfig.accountId);
     }
     
     if (sourceConfig.params) {
         const queryParams = new URLSearchParams();
         sourceConfig.params.split(',').map(p => p.trim()).forEach(param => {
-            // API key params (contains '_key' or is 'api_key'/'access_key')
-            if ((param.includes('_key') || param === 'api_key' || param === 'access_key') && apiKey) {
+            // API key params (contains '_key' or is 'api_key'/'access_key'/'apikey')
+            if ((param.includes('_key') || param === 'api_key' || param === 'access_key' || param === 'apikey') && apiKey) {
                 queryParams.append(param, apiKey);
             // Static key=value params
             } else if (param.includes('=')) {
@@ -96,7 +101,13 @@ function buildRequestOptions(sourceConfig: SourceConfig, url: string): any {
     // Add API key headers
     if (sourceConfig.headers && sourceConfig.apiKey) {
         sourceConfig.headers.split(',').forEach(h => {
-            headers[h.trim()] = sourceConfig.apiKey!;
+            const headerName = h.trim();
+            // OANDA uses Bearer token auth
+            if (headerName === 'Authorization') {
+                headers[headerName] = `Bearer ${sourceConfig.apiKey}`;
+            } else {
+                headers[headerName] = sourceConfig.apiKey!;
+            }
         });
     }
 
@@ -212,6 +223,54 @@ function parseResponse(data: any, sourceConfig: SourceConfig): BatchPriceResult 
             }
         });
         
+    // CommodityPriceAPI: rates.{symbol} object with close price
+    } else if (parsePattern === 'rates.{symbol}' && data.rates) {
+        symbols.forEach(symbol => {
+            const rate = data.rates[symbol];
+            if (rate) {
+                // Handle both direct number and object with close price
+                const priceUSD = typeof rate === 'number' ? rate : (rate.close || rate.price || rate.value);
+                if (priceUSD) {
+                    const price = Math.floor(parseFloat(priceUSD) * 1e18);
+                    if (isValidPrice(price)) {
+                        const ts = data.timestamp ? new Date(data.timestamp * 1000).toISOString() : new Date().toISOString();
+                        result[symbol] = { price, feedTimestamp: ts };
+                    }
+                }
+            }
+        });
+
+    // TwelveData: {symbol}.price where symbol is mapped (e.g., XAU/USD)
+    // Single symbol returns {"price": "..."}, multiple returns {"XAU/USD": {"price": "..."}}
+    } else if (parsePattern === '{symbol}.price') {
+        symbols.forEach(symbol => {
+            const mapped = sourceConfig.symbolMapping?.[symbol] || symbol;
+            // Handle single symbol response (direct price) vs batch response (keyed by symbol)
+            const symbolData = data[mapped] || (symbols.length === 1 ? data : null);
+            if (symbolData?.price) {
+                const price = Math.floor(parseFloat(symbolData.price) * 1e18);
+                if (isValidPrice(price)) {
+                    result[symbol] = { price, feedTimestamp: new Date().toISOString() };
+                }
+            }
+        });
+
+    // OANDA: prices array with instrument, bids, asks - use mid price (avg of best bid/ask)
+    } else if (parsePattern === 'oanda.prices' && data.prices && Array.isArray(data.prices)) {
+        symbols.forEach(symbol => {
+            const mapped = sourceConfig.symbolMapping?.[symbol] || symbol;
+            const priceData = data.prices.find((p: any) => p.instrument === mapped);
+            if (priceData?.bids?.[0]?.price && priceData?.asks?.[0]?.price) {
+                const bid = parseFloat(priceData.bids[0].price);
+                const ask = parseFloat(priceData.asks[0].price);
+                const midPrice = (bid + ask) / 2;
+                const price = Math.floor(midPrice * 1e18);
+                if (isValidPrice(price)) {
+                    result[symbol] = { price, feedTimestamp: priceData.time || new Date().toISOString() };
+                }
+            }
+        });
+
     // Generic fallback
     } else {
         symbols.forEach(symbol => {
