@@ -66,7 +66,7 @@
   "DefiLlama": {
     "url": "https://coins.llama.fi/prices/current/${SYMBOLS}",
     "parse": "defiLlama",
-    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "KAG", "WSTETH"],
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "KAG", "WSTETH", "SYRUPUSDC"],
     "symbolMapping": {
       "ETH": "coingecko:ethereum",
       "WBTC": "coingecko:wrapped-bitcoin",
@@ -74,7 +74,8 @@
       "XAUT": "coingecko:tether-gold",
       "SUSDS": "coingecko:susds",
       "KAG": "coingecko:kinesis-silver",
-      "WSTETH": "coingecko:wrapped-steth"
+      "WSTETH": "coingecko:wrapped-steth",
+      "SYRUPUSDC": "coingecko:syrupusdc"
     }
   },
   "Commodities-API": {
