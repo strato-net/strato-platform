@@ -857,12 +857,14 @@ contract Verifier is Ownable {
 }
 
 /**
- * @title RailgunProxy
+ * @title Proxy
  * @notice Upgradeable proxy for RailgunSmartWallet
  * @dev Separates contract logic from storage, allowing logic upgrades while preserving state
+ *      Named "Proxy" so STRATO's API automatically resolves delegated functions
+ *      Uses "contract record" for storage indexing
  */
-contract RailgunProxy is Ownable {
-    address public logicContract;
+contract record Proxy is Ownable {
+    address logicContract;
 
     event LogicContractUpdated(address indexed oldLogic, address indexed newLogic);
 
@@ -881,6 +883,7 @@ contract RailgunProxy is Ownable {
         return logicContract.delegatecall(msg.sig, args);
     }
 }
+
 
 interface IERC20 {
     event Transfer(address indexed from, address indexed to, uint256 value);

@@ -6,7 +6,7 @@
 #
 # This script deploys:
 # 1. RailgunSmartWallet (logic contract)
-# 2. RailgunProxy (proxy contract pointing to the logic)
+# 2. Proxy (proxy contract pointing to the logic)
 #
 # Users interact with the proxy address. To upgrade, call setLogicContract() on the proxy.
 
@@ -62,13 +62,13 @@ fi
 echo "Logic contract deployed: $LOGIC_ADDRESS"
 
 echo ""
-echo "Step 2: Deploying RailgunProxy..."
+echo "Step 2: Deploying Proxy..."
 
 # Deploy proxy contract with logic address and owner
 PROXY_RESPONSE=$(jq -n --arg src "$CONTRACT_SRC" --arg logic "$LOGIC_ADDRESS" --arg owner "$USER_ADDR" '{
   txs: [{
     payload: {
-      contract: "RailgunProxy",
+      contract: "Proxy",
       src: $src,
       args: {
         _logicContract: $logic,
@@ -96,7 +96,7 @@ echo "=== Deployment Complete ==="
 echo "Logic contract:  $LOGIC_ADDRESS"
 echo "Proxy contract:  $PROXY_ADDRESS (this is the address users interact with)"
 echo ""
-echo "Next step: Run init-railgun.sh $PROXY_ADDRESS to initialize"
+echo "Next step: Run init-railgun.sh to initialize"
 
 # Save proxy address as the main contract address
 echo "$PROXY_ADDRESS" > "$SCRIPT_DIR/.contract-address"
