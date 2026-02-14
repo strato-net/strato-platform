@@ -7,7 +7,7 @@ import {
 import {
   batchHandleAction,
 } from "../services/rewardsService";
-import { checkBalances } from "../utils/balanceCheck";
+import { checkBalances, refreshCommunityHolders } from "../utils/balanceCheck";
 import { RewardsAction, NonEmptyArray } from "../types";
 import { blockTrackingService } from "../services/blockTrackingService";
 import { nextCursorAfter } from "../utils/eventHelpers";
@@ -15,9 +15,13 @@ import { nextCursorAfter } from "../utils/eventHelpers";
 const processEvents = async (): Promise<void> => {
   try {
     logInfo("RewardsPolling", "Starting polling cycle");
-    await checkBalances();
 
-    const { contractAddresses, eventNames, cursor, validPairs } = await getEventQueryParams();
+    const [, , queryParams] = await Promise.all([
+      checkBalances(),
+      refreshCommunityHolders(),
+      getEventQueryParams(),
+    ]);
+    const { contractAddresses, eventNames, cursor, validPairs } = queryParams;
     
     if (contractAddresses.length === 0 || eventNames.length === 0) {
       throw new Error("No event mappings found");
@@ -101,6 +105,7 @@ export const initializeRewardsPolling = async () => {
   logInfo("RewardsPolling", "Initializing rewards polling...");
 
   await blockTrackingService.getCursor();
+  await refreshCommunityHolders();
 
   startRewardsPolling();
 
