@@ -21,6 +21,16 @@ const config = {
   voucher: {
     address: process.env.VOUCHER_ADDRESS || '000000000000000000000000000000000000100e',
   },
+  communityBonuses: (() => {
+    const raw = process.env.COMMUNITY_BONUSES;
+    if (!raw) return [];
+    try {
+      return JSON.parse(raw) as Array<{
+        tokenAddress: string;
+        eventName: string;
+      }>;
+    } catch { return []; }
+  })(),
   polling: {
     interval: Number(process.env.POLLING_INTERVAL) || 10 * 60 * 1000,
     maxBatchSize: Number(process.env.MAX_BATCH_SIZE) || 50,
