@@ -59,6 +59,26 @@ mnemonicFilePath walletName = do
                  else "railgunMnemonic." ++ walletName
   return $ home </> ".secrets" </> filename
 
+-- | Read Railgun contract address from .contract-address file
+-- Falls back to empty string if file doesn't exist
+readContractAddress :: IO String
+readContractAddress = do
+  -- Try multiple locations for .contract-address
+  home <- getHomeDirectory
+  let locations = 
+        [ "admin/.contract-address"  -- relative to airlock dir
+        , home </> "strato-platform/strato/tools/airlock/admin/.contract-address"
+        , ".contract-address"
+        ]
+  tryLocations locations
+  where
+    tryLocations [] = return ""  -- No file found, use empty (will require --railguncontractaddr)
+    tryLocations (path:rest) = do
+      exists <- doesFileExist path
+      if exists
+        then T.unpack . T.strip <$> TIO.readFile path
+        else tryLocations rest
+
 
 -- | Path to the auth token file
 tokenFilePath :: IO FilePath
@@ -356,9 +376,9 @@ shieldParser = Shield <$> (ShieldOpts
      <> help "STRATO base URL" )
   <*> strOption
       ( long "railguncontractaddr"
-     <> value "95be101d075f44084ca1cf51d0106c8606773952"
+     <> value ""
      <> metavar "ADDRESS"
-     <> help "Railgun contract address" )
+     <> help "Railgun contract address (reads from .contract-address if not specified)" )
   <*> option auto
       ( long "derivationindex"
      <> value 0
@@ -402,9 +422,9 @@ unshieldParser = Unshield <$> (UnshieldOpts
      <> help "STRATO base URL" )
   <*> strOption
       ( long "railguncontractaddr"
-     <> value "95be101d075f44084ca1cf51d0106c8606773952"
+     <> value ""
      <> metavar "ADDRESS"
-     <> help "Railgun contract address" )
+     <> help "Railgun contract address (reads from .contract-address if not specified)" )
   <*> option auto
       ( long "derivationindex"
      <> value 0
@@ -445,9 +465,9 @@ transferParser = Transfer <$> (TransferOpts
      <> help "STRATO base URL" )
   <*> strOption
       ( long "railguncontractaddr"
-     <> value "95be101d075f44084ca1cf51d0106c8606773952"
+     <> value ""
      <> metavar "ADDRESS"
-     <> help "Railgun contract address" )
+     <> help "Railgun contract address (reads from .contract-address if not specified)" )
   <*> option auto
       ( long "derivationindex"
      <> value 0
@@ -488,9 +508,9 @@ balanceParser = Balance <$> (BalanceOpts
      <> help "STRATO base URL" )
   <*> strOption
       ( long "railguncontractaddr"
-     <> value "95be101d075f44084ca1cf51d0106c8606773952"
+     <> value ""
      <> metavar "ADDRESS"
-     <> help "Railgun contract address" )
+     <> help "Railgun contract address (reads from .contract-address if not specified)" )
   <*> option auto
       ( long "derivationindex"
      <> value 0
@@ -823,12 +843,22 @@ runShield sopts = do
   -- Read auth token for API calls
   authToken <- readAuthToken
   
+  -- Resolve contract address (from CLI or .contract-address file)
+  contractAddr <- if null (soRailgunContractAddr sopts)
+                  then do
+                    fileAddr <- readContractAddress
+                    when (null fileAddr) $ do
+                      hPutStrLn stderr "Error: No Railgun contract address. Use --railguncontractaddr or deploy first."
+                      exitFailure
+                    return fileAddr
+                  else return (soRailgunContractAddr sopts)
+  
   let (host, port) = parseHostPort (soBaseUrl sopts)
       config = StratoConfig
         { stratoHost = T.pack host
         , stratoPort = port
         , stratoAuthToken = authToken
-        , railgunContractAddress = T.pack $ soRailgunContractAddr sopts
+        , railgunContractAddress = T.pack contractAddr
         }
       tokenAddr = T.pack $ soTokenAddress sopts
   
@@ -896,12 +926,22 @@ runUnshield uopts = do
   -- Read auth token
   authToken <- readAuthToken
   
+  -- Resolve contract address (from CLI or .contract-address file)
+  contractAddr <- if null (uoRailgunContractAddr uopts)
+                  then do
+                    fileAddr <- readContractAddress
+                    when (null fileAddr) $ do
+                      hPutStrLn stderr "Error: No Railgun contract address. Use --railguncontractaddr or deploy first."
+                      exitFailure
+                    return fileAddr
+                  else return (uoRailgunContractAddr uopts)
+  
   let (host, port) = parseHostPort (uoBaseUrl uopts)
       config = StratoConfig
         { stratoHost = T.pack host
         , stratoPort = port
         , stratoAuthToken = authToken
-        , railgunContractAddress = T.pack $ uoRailgunContractAddr uopts
+        , railgunContractAddress = T.pack contractAddr
         }
       baseUrl = "http://" <> T.pack host <> ":" <> T.pack (show port)
       tokenAddr = T.toLower $ normalizeAddress $ T.pack $ uoTokenAddress uopts
@@ -1214,12 +1254,22 @@ runTransfer topts = do
   -- Read auth token
   authToken <- readAuthToken
   
+  -- Resolve contract address (from CLI or .contract-address file)
+  contractAddr <- if null (toRailgunContractAddr topts)
+                  then do
+                    fileAddr <- readContractAddress
+                    when (null fileAddr) $ do
+                      hPutStrLn stderr "Error: No Railgun contract address. Use --railguncontractaddr or deploy first."
+                      exitFailure
+                    return fileAddr
+                  else return (toRailgunContractAddr topts)
+  
   let (host, port) = parseHostPort (toBaseUrl topts)
       config = StratoConfig
         { stratoHost = T.pack host
         , stratoPort = port
         , stratoAuthToken = authToken
-        , railgunContractAddress = T.pack $ toRailgunContractAddr topts
+        , railgunContractAddress = T.pack contractAddr
         }
       baseUrl = "http://" <> T.pack host <> ":" <> T.pack (show port)
       tokenAddr = T.toLower $ normalizeAddress $ T.pack $ toTokenAddress topts
@@ -1550,12 +1600,22 @@ runBalance bopts = do
   -- Read auth token
   authToken <- readAuthToken
   
+  -- Resolve contract address (from CLI or .contract-address file)
+  contractAddr <- if null (boRailgunContractAddr bopts)
+                  then do
+                    fileAddr <- readContractAddress
+                    when (null fileAddr) $ do
+                      hPutStrLn stderr "Error: No Railgun contract address. Use --railguncontractaddr or deploy first."
+                      exitFailure
+                    return fileAddr
+                  else return (boRailgunContractAddr bopts)
+  
   -- Create config for API calls
   let config = defaultConfig
         { stratoAuthToken = authToken
         , stratoHost = T.pack $ extractHost (boBaseUrl bopts)
         , stratoPort = extractPort (boBaseUrl bopts)
-        , railgunContractAddress = T.pack $ boRailgunContractAddr bopts
+        , railgunContractAddress = T.pack contractAddr
         }
   
   -- Get user's Ethereum address for unshielded balances
@@ -1577,7 +1637,7 @@ runBalance bopts = do
   result <- scanShieldedBalance keys 
               (T.pack $ boBaseUrl bopts) 
               authToken 
-              (T.pack $ boRailgunContractAddr bopts)
+              (T.pack contractAddr)
   
   case result of
     Left err -> do
