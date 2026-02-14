@@ -49,7 +49,7 @@ build_all_docker: build_common_docker strato_docker apex highway highway-nginx n
 
 build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui bridge bridge-nginx oracle
 
-.PHONY: all_develop apex build_all_docker build_buildbase build_common build_common_docker build_common_profiled build_develop docker-compose eks highway highway-nginx mercata mercata-backend bridge bridge-nginx oracle mercata-ui nginx postgrest prometheus smd strato strato_docker vault-nginx vault-wrapper
+.PHONY: all_develop apex build_all_docker build_buildbase build_common build_common_docker build_common_profiled build_develop docker-compose eks highway highway-nginx mercata mercata-backend bridge bridge-nginx oracle mercata-ui nginx postgrest prometheus smd strato strato_docker vault-nginx vault-wrapper install-completions
 
 apex:
 	@echo Now building apex...
@@ -254,3 +254,11 @@ test:
 
 docker-clean:
 	rm -rf ${FAKEROOT}
+
+install-completions:
+	@mkdir -p $(HOME)/.local/share/bash-completion/completions
+	@stack exec -- airlock --bash-completion-script airlock > $(HOME)/.local/share/bash-completion/completions/airlock
+	@stack exec -- baby-jubjub-cli --bash-completion-script baby-jubjub-cli > $(HOME)/.local/share/bash-completion/completions/baby-jubjub-cli
+	@echo '_strato_barometer() { COMPREPLY=($$(CMDARGS_COMPLETE=$$((COMP_CWORD-1)) strato-barometer "$${COMP_WORDS[@]:1}" 2>/dev/null | sed "s/^VALUE //")); }; complete -F _strato_barometer strato-barometer' > $(HOME)/.local/share/bash-completion/completions/strato-barometer
+	@echo "Bash completions installed for: airlock, baby-jubjub-cli, strato-barometer"
+	@echo "Run 'source ~/.local/share/bash-completion/completions/<tool>' or restart your shell."
