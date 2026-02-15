@@ -27,9 +27,7 @@
       "targetAssetAddress": "f2aa370405030a434ae07e7826178325c675e925"
     },
     "XAG": {
-      "targetAssetAddress": "2c59ef92d08efde71fe1a1cb5b45f4f6d48fcc94",
-      "weekendProxy": "KAG",
-      "equivalentAssets": ["KAG"]
+      "targetAssetAddress": "2c59ef92d08efde71fe1a1cb5b45f4f6d48fcc94"
     },
     "XAU": {
       "targetAssetAddress": "cdc93d30182125e05eec985b631c7c61b3f63ff0",

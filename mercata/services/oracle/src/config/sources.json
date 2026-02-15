@@ -5,7 +5,7 @@
     "parse": "data[].prices[0].value",
     "timestamp": "data[0].prices[0].lastUpdatedAt",
     "apiKeyEnvVar": "ALCHEMY_API_KEY",
-    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "KAG", "WSTETH", "SYRUPUSDC"]
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "WSTETH", "SYRUPUSDC"]
   },
   "CoinMarketCap": {
     "url": "https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest",
@@ -42,7 +42,7 @@
     "parse": "{id}.usd",
     "timestamp": "{id}.last_updated_at",
     "apiKeyEnvVar": "COINGECKO_API_KEY",
-    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "KAG", "WSTETH", "SYRUPUSDC"],
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "WSTETH", "SYRUPUSDC"],
     "symbolMapping": {
       "ETH": "ethereum",
       "WBTC": "wrapped-bitcoin",
@@ -70,7 +70,7 @@
     "body": "codes",
     "parse": "coins",
     "apiKeyEnvVar": "LIVECOINWATCH_API_KEY",
-    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "KAG", "WSTETH"]
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "WSTETH"]
   },
   "Commodities-API": {
     "url": "https://commodities-api.com/api/latest",
