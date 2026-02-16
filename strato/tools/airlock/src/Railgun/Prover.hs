@@ -10,16 +10,21 @@ module Railgun.Prover
   , defaultProverConfig
   ) where
 
+import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import Data.Text (Text)
 import qualified Data.Text as T
 import System.Environment (lookupEnv)
+import System.IO.Temp (withSystemTempDirectory)
+import System.FilePath ((</>))
+import System.Process (readProcessWithExitCode)
+import System.Exit (ExitCode(..))
 
 import Railgun.Unshield (SnarkProof(..), G1Point(..), G2Point(..))
 import Railgun.Witness (CircuitInputs, witnessToJSON)
 
 import qualified Groth16.Snarkjs as Snarkjs
-import qualified Groth16.Rapidsnark as Rapidsnark
+import qualified Groth16.Prover as Rapidsnark
 import qualified Groth16.BN254 as Native
 
 -- | Prover mode
@@ -31,8 +36,7 @@ data ProverConfig = ProverConfig
   { pcCircuitWasm    :: !FilePath   -- ^ Path to circuit .wasm file
   , pcProvingKey     :: !FilePath   -- ^ Path to .zkey proving key
   , pcProvingKeyJSON :: !FilePath   -- ^ Path to .json proving key (native prover)
-  , pcSnarkjsPath    :: !FilePath   -- ^ Path to snarkjs executable
-  , pcRapidsnarkPath :: !FilePath   -- ^ Path to rapidsnark executable
+  , pcSnarkjsPath    :: !FilePath   -- ^ Path to snarkjs executable (for witness calculation)
   , pcProverMode     :: !ProverMode -- ^ Which prover to use
   } deriving (Show, Eq)
 
@@ -43,8 +47,7 @@ defaultProverConfig = ProverConfig
   , pcProvingKey = "/home/golemshid/strato-platform/strato/tools/airlock/circuits/01x02/zkey"
   , pcProvingKeyJSON = "/home/golemshid/strato-platform/strato/tools/airlock/circuits/01x02/circuit_pk.json"
   , pcSnarkjsPath = "snarkjs"
-  , pcRapidsnarkPath = "rapidsnark"
-  , pcProverMode = SnarkjsProver
+  , pcProverMode = RapidsnarkProver
   }
 
 -- | Generate a Groth16 proof
@@ -68,7 +71,7 @@ getProverMode config = do
     Just "rapidsnark" -> RapidsnarkProver
     _                 -> pcProverMode config
 
--- | Generate proof via snarkjs
+-- | Generate proof via snarkjs (witness + proving)
 generateSnarkjs :: ProverConfig -> LBS.ByteString -> IO (Either Text SnarkProof)
 generateSnarkjs ProverConfig{..} inputJson = do
   let cfg = Snarkjs.Config
@@ -79,17 +82,34 @@ generateSnarkjs ProverConfig{..} inputJson = do
   result <- Snarkjs.generateProof cfg inputJson
   return $ fmap convertSnarkjsProof result
 
--- | Generate proof via rapidsnark
+-- | Generate proof via rapidsnark (native FFI)
+--   Uses snarkjs for witness calculation, rapidsnark FFI for proving
 generateRapidsnark :: ProverConfig -> LBS.ByteString -> IO (Either Text SnarkProof)
 generateRapidsnark ProverConfig{..} inputJson = do
-  let cfg = Rapidsnark.Config
-        { Rapidsnark.cfgCircuitWasm    = pcCircuitWasm
-        , Rapidsnark.cfgProvingKey     = pcProvingKey
-        , Rapidsnark.cfgRapidsnarkPath = pcRapidsnarkPath
-        , Rapidsnark.cfgSnarkjsPath    = pcSnarkjsPath
-        }
-  result <- Rapidsnark.generateProof cfg inputJson
-  return $ fmap convertRapidsnarkProof result
+  withSystemTempDirectory "rapidsnark" $ \tmpDir -> do
+    let inputFile = tmpDir </> "input.json"
+        witnessFile = tmpDir </> "witness.wtns"
+    
+    -- Write input JSON
+    LBS.writeFile inputFile inputJson
+    
+    -- Generate witness using snarkjs (for WASM circuit execution)
+    (exitCode, _, stderr) <- readProcessWithExitCode pcSnarkjsPath
+      ["wtns", "calculate", pcCircuitWasm, inputFile, witnessFile]
+      ""
+    
+    case exitCode of
+      ExitFailure code -> 
+        return $ Left $ "Witness calculation failed (exit " <> T.pack (show code) <> "): " <> T.pack stderr
+      ExitSuccess -> do
+        -- Read witness bytes
+        witnessBytes <- BS.readFile witnessFile
+        
+        -- Generate proof using native FFI
+        let cfg = Rapidsnark.defaultConfig { Rapidsnark.pcProvingKey = pcProvingKey }
+        result <- Rapidsnark.generateProofFromWitness cfg witnessBytes
+        
+        return $ fmap convertRapidsnarkProof result
 
 -- | Generate proof via native Haskell prover
 generateNative :: ProverConfig -> LBS.ByteString -> IO (Either Text SnarkProof)
@@ -130,7 +150,11 @@ convertSnarkjsProof p = SnarkProof
 -- | Convert Rapidsnark.Proof to SnarkProof
 convertRapidsnarkProof :: Rapidsnark.Proof -> SnarkProof
 convertRapidsnarkProof p = SnarkProof
-  { proofA = G1Point (Rapidsnark.g1x $ Rapidsnark.proofA p) (Rapidsnark.g1y $ Rapidsnark.proofA p)
-  , proofB = G2Point (Rapidsnark.g2x $ Rapidsnark.proofB p) (Rapidsnark.g2y $ Rapidsnark.proofB p)
-  , proofC = G1Point (Rapidsnark.g1x $ Rapidsnark.proofC p) (Rapidsnark.g1y $ Rapidsnark.proofC p)
+  { proofA = G1Point (Rapidsnark.g1x a) (Rapidsnark.g1y a)
+  , proofB = G2Point (Rapidsnark.g2x b) (Rapidsnark.g2y b)
+  , proofC = G1Point (Rapidsnark.g1x c) (Rapidsnark.g1y c)
   }
+  where
+    a = Rapidsnark.proofA p
+    b = Rapidsnark.proofB p
+    c = Rapidsnark.proofC p
