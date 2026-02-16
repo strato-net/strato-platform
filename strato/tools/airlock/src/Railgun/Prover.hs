@@ -10,21 +10,17 @@ module Railgun.Prover
   , defaultProverConfig
   ) where
 
-import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import Data.Text (Text)
 import qualified Data.Text as T
 import System.Environment (lookupEnv)
-import System.IO.Temp (withSystemTempDirectory)
-import System.FilePath ((</>))
-import System.Process (readProcessWithExitCode)
-import System.Exit (ExitCode(..))
 
 import Railgun.Unshield (SnarkProof(..), G1Point(..), G2Point(..))
 import Railgun.Witness (CircuitInputs, witnessToJSON)
 
 import qualified Groth16.Snarkjs as Snarkjs
 import qualified Groth16.Prover as Rapidsnark
+import qualified Groth16.Witness as Witness
 import qualified Groth16.BN254 as Native
 
 -- | Prover mode
@@ -36,17 +32,19 @@ data ProverConfig = ProverConfig
   { pcCircuitWasm    :: !FilePath   -- ^ Path to circuit .wasm file
   , pcProvingKey     :: !FilePath   -- ^ Path to .zkey proving key
   , pcProvingKeyJSON :: !FilePath   -- ^ Path to .json proving key (native prover)
-  , pcSnarkjsPath    :: !FilePath   -- ^ Path to snarkjs executable (for witness calculation)
+  , pcSnarkjsPath    :: !FilePath   -- ^ Path to snarkjs executable (only for SnarkjsProver mode)
   , pcProverMode     :: !ProverMode -- ^ Which prover to use
   } deriving (Show, Eq)
 
 -- | Default prover config for 01x02 circuit
+-- Uses native witness calculation (wasm3) + native proving (rapidsnark FFI)
+-- No Node.js or snarkjs required!
 defaultProverConfig :: ProverConfig
 defaultProverConfig = ProverConfig
   { pcCircuitWasm = "/home/golemshid/strato-platform/strato/tools/airlock/circuits/01x02/circuit.wasm"
   , pcProvingKey = "/home/golemshid/strato-platform/strato/tools/airlock/circuits/01x02/zkey"
   , pcProvingKeyJSON = "/home/golemshid/strato-platform/strato/tools/airlock/circuits/01x02/circuit_pk.json"
-  , pcSnarkjsPath = "snarkjs"
+  , pcSnarkjsPath = "snarkjs"  -- Only used if mode is SnarkjsProver
   , pcProverMode = RapidsnarkProver
   }
 
@@ -74,6 +72,7 @@ getProverMode config = do
 -- | Generate proof via snarkjs (witness + proving)
 generateSnarkjs :: ProverConfig -> LBS.ByteString -> IO (Either Text SnarkProof)
 generateSnarkjs ProverConfig{..} inputJson = do
+  putStrLn "[Prover] Witness: snarkjs (Node.js) | Proving: snarkjs (Node.js)"
   let cfg = Snarkjs.Config
         { Snarkjs.cfgCircuitWasm = pcCircuitWasm
         , Snarkjs.cfgProvingKey  = pcProvingKey
@@ -82,38 +81,29 @@ generateSnarkjs ProverConfig{..} inputJson = do
   result <- Snarkjs.generateProof cfg inputJson
   return $ fmap convertSnarkjsProof result
 
--- | Generate proof via rapidsnark (native FFI)
---   Uses snarkjs for witness calculation, rapidsnark FFI for proving
+-- | Generate proof via rapidsnark (fully native)
+--   Uses wasm3 for witness calculation, rapidsnark FFI for proving.
+--   No Node.js or snarkjs required!
 generateRapidsnark :: ProverConfig -> LBS.ByteString -> IO (Either Text SnarkProof)
 generateRapidsnark ProverConfig{..} inputJson = do
-  withSystemTempDirectory "rapidsnark" $ \tmpDir -> do
-    let inputFile = tmpDir </> "input.json"
-        witnessFile = tmpDir </> "witness.wtns"
-    
-    -- Write input JSON
-    LBS.writeFile inputFile inputJson
-    
-    -- Generate witness using snarkjs (for WASM circuit execution)
-    (exitCode, _, stderr) <- readProcessWithExitCode pcSnarkjsPath
-      ["wtns", "calculate", pcCircuitWasm, inputFile, witnessFile]
-      ""
-    
-    case exitCode of
-      ExitFailure code -> 
-        return $ Left $ "Witness calculation failed (exit " <> T.pack (show code) <> "): " <> T.pack stderr
-      ExitSuccess -> do
-        -- Read witness bytes
-        witnessBytes <- BS.readFile witnessFile
-        
-        -- Generate proof using native FFI
-        let cfg = Rapidsnark.defaultConfig { Rapidsnark.pcProvingKey = pcProvingKey }
-        result <- Rapidsnark.generateProofFromWitness cfg witnessBytes
-        
-        return $ fmap convertRapidsnarkProof result
+  putStrLn "[Prover] Witness: wasm3 (native) | Proving: rapidsnark (native FFI)"
+  
+  -- Calculate witness using native wasm3 runtime
+  let witnessCfg = Witness.WitnessConfig { Witness.wcCircuitWasm = pcCircuitWasm }
+  witnessResult <- Witness.calculateWitness witnessCfg inputJson
+  
+  case witnessResult of
+    Left err -> return $ Left $ "Witness calculation failed: " <> T.pack (show err)
+    Right witnessBytes -> do
+      -- Generate proof using native FFI
+      let cfg = Rapidsnark.defaultConfig { Rapidsnark.pcProvingKey = pcProvingKey }
+      result <- Rapidsnark.generateProofFromWitness cfg witnessBytes
+      return $ fmap convertRapidsnarkProof result
 
 -- | Generate proof via native Haskell prover
 generateNative :: ProverConfig -> LBS.ByteString -> IO (Either Text SnarkProof)
 generateNative ProverConfig{..} inputJson = do
+  putStrLn "[Prover] Witness: snarkjs (Node.js) | Proving: groth16-native (Haskell)"
   putStrLn "WARNING: Native prover is experimental and may produce invalid proofs."
   -- Load proving key
   pkResult <- Native.loadProvingKeyJSON pcProvingKeyJSON

@@ -22,6 +22,8 @@ extra-source-files:
   - vendor/**/*.cpp
   - vendor/**/*.hpp
   - vendor/**/*.h
+  - vendor/**/*.c
+  - vendor/wasm3/LICENSE
 
 library:
   source-dirs: src
@@ -29,6 +31,7 @@ library:
     - Groth16.Prover
     - Groth16.Prover.FFI
     - Groth16.Witness
+    - Groth16.Witness.FFI
   dependencies:
     - base
     - aeson
@@ -39,6 +42,31 @@ library:
     - temporary
     - directory
     - process
+  
+  # C sources (wasm3 + circom witness calculator)
+  c-sources:
+    # wasm3 WASM interpreter
+    - vendor/wasm3/m3_bind.c
+    - vendor/wasm3/m3_code.c
+    - vendor/wasm3/m3_compile.c
+    - vendor/wasm3/m3_core.c
+    - vendor/wasm3/m3_env.c
+    - vendor/wasm3/m3_exec.c
+    - vendor/wasm3/m3_function.c
+    - vendor/wasm3/m3_info.c
+    - vendor/wasm3/m3_module.c
+    - vendor/wasm3/m3_parse.c
+    # Circom witness calculator
+    - vendor/circom_witness.c
+  
+  # C compiler flags
+  cc-options:
+    - -std=c99
+    - -O2
+    - -fPIC
+    - -Wno-unused-parameter
+    - -Wno-unused-variable
+    - -Dd_m3HasFloat=0
   
   # C++ sources from rapidsnark
   cxx-sources:
@@ -72,6 +100,8 @@ library:
     - vendor/rapidsnark/build
     - vendor/ffiasm/c
     - vendor/json/single_include
+    - vendor/wasm3
+    - vendor
   
   # Link against gmp and pthread (system libraries)
   extra-libraries:

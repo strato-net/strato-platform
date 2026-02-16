@@ -4,10 +4,10 @@
 -- | Witness calculation for Groth16 circuits
 --
 -- This module handles converting circuit inputs (JSON) into a binary witness
--- (.wtns format) that can be used by the prover.
+-- that can be used by the prover.
 --
--- The witness is computed by executing the circuit's WebAssembly module
--- with the given inputs.
+-- Uses wasm3 (embedded WASM interpreter) to execute the circuit natively,
+-- without requiring Node.js or snarkjs.
 --
 module Groth16.Witness
   ( -- * Configuration
@@ -22,45 +22,35 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import Data.Text (Text)
 import qualified Data.Text as T
-import System.Exit (ExitCode(..))
-import System.IO.Temp (withSystemTempDirectory)
-import System.FilePath ((</>))
-import System.Process (readProcessWithExitCode)
 import System.Directory (doesFileExist)
+import Foreign.C.String
+import Foreign.Marshal.Alloc
+import Foreign.Marshal.Array
+import Foreign.Storable
+
+import Groth16.Witness.FFI
 
 -- | Witness calculation configuration
 data WitnessConfig = WitnessConfig
   { wcCircuitWasm :: !FilePath   -- ^ Path to circuit .wasm file
-  , wcSnarkjsPath :: !FilePath   -- ^ Path to snarkjs executable (temporary, until native WASM support)
   } deriving (Show, Eq)
 
 -- | Default witness configuration
 defaultWitnessConfig :: WitnessConfig
 defaultWitnessConfig = WitnessConfig
   { wcCircuitWasm = ""
-  , wcSnarkjsPath = "snarkjs"
   }
 
 -- | Errors that can occur during witness calculation
 data WitnessError
   = WitnessCircuitNotFound FilePath
   | WitnessCalculationFailed Text
-  | WitnessSnarkjsNotFound
   deriving (Show, Eq)
 
--- | Calculate witness from circuit inputs
+-- | Calculate witness from circuit inputs using native wasm3 runtime.
 --
--- Takes JSON-encoded circuit inputs and produces binary witness (.wtns format).
---
--- NOTE: This currently uses snarkjs for witness calculation. 
--- Future versions will use a native WASM runtime for true "just works" experience.
--- The witness calculation is fast (~100ms), so this is acceptable for now.
--- The slow part (proving) uses native rapidsnark FFI.
---
--- To fully eliminate Node.js dependency, we need to either:
--- 1. Use a Haskell WASM runtime (wasmer-hs, wasmtime)
--- 2. Include wasm3 (lightweight C WASM interpreter) via FFI
--- 3. Generate C++ witness calculator from circom and include via FFI
+-- Takes JSON-encoded circuit inputs and produces binary witness.
+-- This is a fully native implementation - no Node.js or snarkjs required.
 --
 calculateWitness 
   :: WitnessConfig 
@@ -71,23 +61,42 @@ calculateWitness WitnessConfig{..} inputJson = do
   circuitExists <- doesFileExist wcCircuitWasm
   if not circuitExists
     then return $ Left $ WitnessCircuitNotFound wcCircuitWasm
-    else withSystemTempDirectory "groth16_witness" $ \tmpDir -> do
-      let inputFile = tmpDir </> "input.json"
-          witnessFile = tmpDir </> "witness.wtns"
-      
-      -- Write inputs to JSON file
-      LBS.writeFile inputFile inputJson
-      
-      -- Calculate witness using snarkjs
-      let witnessArgs = ["wtns", "calculate", wcCircuitWasm, inputFile, witnessFile]
-      (exitCode, stdout, stderr) <- readProcessWithExitCode wcSnarkjsPath witnessArgs ""
-      
-      case exitCode of
-        ExitFailure code -> 
-          return $ Left $ WitnessCalculationFailed $ 
-            "snarkjs failed (exit " <> T.pack (show code) <> "): " 
-            <> T.pack stdout <> " | " <> T.pack stderr
-        ExitSuccess -> do
-          -- Read the witness file
-          witnessBytes <- BS.readFile witnessFile
-          return $ Right witnessBytes
+    else calculateWitnessNative wcCircuitWasm (LBS.toStrict inputJson)
+
+-- | Native witness calculation using wasm3
+calculateWitnessNative :: FilePath -> BS.ByteString -> IO (Either WitnessError BS.ByteString)
+calculateWitnessNative wasmPath inputJson = do
+  let errorBufSize = 1024
+  
+  -- First, get the required witness buffer size
+  allocaBytes errorBufSize $ \errorBuf -> do
+    alloca $ \sizePtr -> do
+      withCString wasmPath $ \wasmPathC -> do
+        -- Get witness size
+        ret <- c_circom_witness_size wasmPathC sizePtr errorBuf (fromIntegral errorBufSize)
+        
+        if ret /= 0
+          then do
+            errorMsg <- peekCString errorBuf
+            return $ Left $ WitnessCalculationFailed $ T.pack errorMsg
+          else do
+            requiredSize <- peek sizePtr
+            
+            -- Allocate witness buffer and calculate
+            allocaBytes (fromIntegral requiredSize) $ \witnessBuf -> do
+              alloca $ \witSizePtr -> do
+                poke witSizePtr requiredSize
+                
+                -- Calculate witness
+                BS.useAsCString inputJson $ \inputJsonC -> do
+                  ret2 <- c_circom_calc_witness wasmPathC inputJsonC witnessBuf witSizePtr errorBuf (fromIntegral errorBufSize)
+                  
+                  if ret2 /= 0
+                    then do
+                      errorMsg <- peekCString errorBuf
+                      return $ Left $ WitnessCalculationFailed $ T.pack errorMsg
+                    else do
+                      actualSize <- peek witSizePtr
+                      -- Copy witness data to ByteString
+                      witnessData <- peekArray (fromIntegral actualSize) witnessBuf
+                      return $ Right $ BS.pack $ map fromIntegral witnessData
