@@ -195,13 +195,15 @@ contract record Pool is Ownable {
     function initialize(
         address tokenAAddr,
         address tokenBAddr,
-        address lpTokenAddr
+        address lpTokenAddr,
+        address poolFactoryAddr
     ) external onlyOwner {
         require(tokenAAddr != address(0), "Zero tokenA address");
         require(tokenBAddr != address(0), "Zero tokenB address");
         require(lpTokenAddr != address(0), "Zero lpToken address");
+        require(poolFactoryAddr != address(0), "Zero pool factory address");
 
-        poolFactory = PoolFactory(msg.sender);
+        poolFactory = PoolFactory(address(poolFactoryAddr));
 
         // @dev important: must be set here for proxied instances;
         // ensure consistency with desired initial values
