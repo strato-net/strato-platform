@@ -58,6 +58,14 @@ struct ActivityState {
 }
 
 /**
+ * @dev Community bonus configuration
+ */
+struct CommunityBonusConfig {
+    address token;         // Community token address
+    uint256 multiplier;    // 1e18 = 1x, 1.2e18 = +20%, 0 = disabled
+}
+
+/**
  * Rewards - incentives controller for distributing CATA rewards
  *
  * This contract implements a global incentives controller that tracks rewards
@@ -106,6 +114,7 @@ contract record Rewards is Ownable {
         string reason
     );
     event ActivityNameUpdated(uint256 indexed activityId, string newName);
+    event CommunityBonusMultiplierUpdated(address indexed token, uint256 oldMultiplier, uint256 newMultiplier);
 
     // ═════════════════════════════════════════════════════════════════════════
     // CONSTANTS
@@ -141,6 +150,9 @@ contract record Rewards is Ownable {
 
     // Total unclaimed rewards per user
     mapping(address => uint256) public record unclaimedRewards;
+
+    // Community bonus configurations (token + multiplier)
+    CommunityBonusConfig[] public communityBonusConfigs;
 
     // ═══════════════════════════════════════════════════════════════════════
     // EVENT TO ACTIVITY MAPPING
@@ -379,6 +391,31 @@ contract record Rewards is Ownable {
         activity.weightMultiplier = newWeight;
 
         emit ActivityWeightUpdated(activityId, oldWeight, newWeight);
+    }
+
+    /**
+     * @dev Update community bonus multiplier for a token
+     * @param token Community token address
+     * @param newMultiplier Bonus multiplier (1e18 = 1x, 1.2e18 = +20%, 0 = disabled)
+     */
+    function setCommunityBonusMultiplier(address token, uint256 newMultiplier) external onlyOwner {
+        require(token != address(0), "Invalid token address");
+        require(
+            newMultiplier == 0 || newMultiplier >= PRECISION_MULTIPLIER,
+            "Multiplier must be 0 or >= 1e18"
+        );
+
+        for (uint256 i = 0; i < communityBonusConfigs.length; i++) {
+            if (communityBonusConfigs[i].token == token) {
+                uint256 oldMultiplier = communityBonusConfigs[i].multiplier;
+                communityBonusConfigs[i].multiplier = newMultiplier;
+                emit CommunityBonusMultiplierUpdated(token, oldMultiplier, newMultiplier);
+                return;
+            }
+        }
+
+        communityBonusConfigs.push(CommunityBonusConfig(token, newMultiplier));
+        emit CommunityBonusMultiplierUpdated(token, 0, newMultiplier);
     }
 
     /**
@@ -876,7 +913,11 @@ contract record Rewards is Ownable {
             pendingRewards = (oldStake * indexDelta) / PRECISION_MULTIPLIER;
 
             if (pendingRewards > 0) {
-                unclaimedRewards[action.user] += pendingRewards;
+                uint256 rewardsWithBonus = _applyCommunityBonus(
+                    action.user,
+                    pendingRewards
+                );
+                unclaimedRewards[action.user] += rewardsWithBonus;
             }
         }
 
@@ -936,7 +977,11 @@ contract record Rewards is Ownable {
             uint256 pending = (userStake * indexDelta) / PRECISION_MULTIPLIER;
 
             if (pending > 0) {
-                unclaimedRewards[user] += pending;
+                uint256 rewardsWithBonus = _applyCommunityBonus(
+                    user,
+                    pending
+                );
+                unclaimedRewards[user] += rewardsWithBonus;
             }
 
             // Update user index to current (without changing stake)
@@ -974,6 +1019,40 @@ contract record Rewards is Ownable {
         state.lastUpdateTime = block.timestamp;
 
         emit ActivityIndexUpdated(activityId, state.accRewardPerStake, state.totalStake);
+    }
+
+    /**
+     * @dev Apply global community bonus multipliers for any configured tokens the user holds
+     * @param user The user receiving rewards
+     * @param baseRewards Base reward amount before community bonus
+     * @return Reward amount including any applicable community bonuses
+     */
+    function _applyCommunityBonus(
+        address user,
+        uint256 baseRewards
+    ) internal view returns (uint256) {
+        if (baseRewards == 0) {
+            return 0;
+        }
+
+        uint256 totalWithBonus = baseRewards;
+
+        for (uint256 i = 0; i < communityBonusConfigs.length; i++) {
+            CommunityBonusConfig memory cfg = communityBonusConfigs[i];
+            uint256 multiplier = cfg.multiplier;
+
+            if (multiplier <= PRECISION_MULTIPLIER) {
+                continue;
+            }
+            if (Token(cfg.token).balanceOf(user) == 0) {
+                continue;
+            }
+
+            uint256 bonus = (baseRewards * (multiplier - PRECISION_MULTIPLIER)) / PRECISION_MULTIPLIER;
+            totalWithBonus += bonus;
+        }
+
+        return totalWithBonus;
     }
 
 }
