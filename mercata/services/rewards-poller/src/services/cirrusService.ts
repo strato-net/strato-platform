@@ -100,12 +100,9 @@ export const getEventQueryParams = async (): Promise<{
   cursor: EventCursor;
   validPairs: ValidEventPairs;
 }> => {
-  const activitiesData = await cirrus.get("/mapping", {
+  const activitiesData = await cirrus.get(`/${MERCATA_PREFIX}Rewards-activities`, {
     params: {
       address: `eq.${config.rewards.address}`,
-      collection_name: `eq.activities`,
-      "value->>emissionRate": "neq.0000000000000000000000000000000000000000", // Might break if rate becomes 0 on cirrus
-      select: "value->>sourceContract,value->>actionableEvents",
     },
   });
 
@@ -115,30 +112,23 @@ export const getEventQueryParams = async (): Promise<{
 
   if (Array.isArray(activitiesData) && activitiesData.length > 0) {
     for (const item of activitiesData) {
-      if (!item.sourceContract || !item.actionableEvents) {
-        continue;
-      }
+      const sourceContract = item?.value?.sourceContract;
+      const actionableEventsArray = item?.value?.actionableEvents;
+      const emissionRate = item?.value?.emissionRate;
 
-      let actionableEventsArray: any[] = [];
-      if (typeof item.actionableEvents === "string") {
-        try {
-          const parsed = JSON.parse(item.actionableEvents);
-          actionableEventsArray = Array.isArray(parsed)
-            ? parsed
-            : Object.keys(parsed || {})
-                .filter((key) => /^\d+$/.test(key))
-                .sort((a, b) => Number(a) - Number(b))
-                .map((key) => parsed[key]);
-        } catch {
-          actionableEventsArray = [];
-        }
+      if (
+        !sourceContract ||
+        emissionRate === "0000000000000000000000000000000000000000" ||
+        !Array.isArray(actionableEventsArray)
+      ) {
+        continue;
       }
 
       for (const evt of actionableEventsArray) {
         if (evt?.eventName) {
-          contractAddresses.add(item.sourceContract);
+          contractAddresses.add(sourceContract);
           eventNames.add(evt.eventName);
-          validPairs.add(makeEventPairKey(item.sourceContract, evt.eventName));
+          validPairs.add(makeEventPairKey(sourceContract, evt.eventName));
         }
       }
     }
