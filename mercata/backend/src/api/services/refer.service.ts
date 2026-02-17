@@ -5,23 +5,27 @@ import { StratoPaths, constants } from "../../config/constants";
 import { escrow } from "../../config/config";
 import { extractContractName } from "../../utils/utils";
 import { TransactionResponse } from "@mercata/shared-types";
+import JSONBig from "json-bigint";
 
 const { Token } = constants;
 const Escrow = "storage";
 const EscrowDeposits = `mapping`;
+const JSONbigString = JSONBig({ storeAsString: true });
 
 const normalizeArrayLike = (value: any): string[] => {
-  if (Array.isArray(value)) {
-    return value;
+  if (typeof value === "string") {
+    try {
+      value = JSONbigString.parse(value);
+    } catch {
+      return [];
+    }
   }
-  if (!value || typeof value !== "object") {
-    return [];
-  }
-
+  if (Array.isArray(value)) return value.map(String);
+  if (!value || typeof value !== "object") return [];
   return Object.keys(value)
     .filter((key) => /^\d+$/.test(key))
     .sort((a, b) => Number(a) - Number(b))
-    .map((key) => value[key]);
+    .map((key) => String(value[key]));
 };
 
 export interface DepositParams {
@@ -534,13 +538,13 @@ export const getReferralHistory = async (
       const attributes = typeof event.attributes === 'string' 
         ? JSON.parse(event.attributes) 
         : event.attributes || {};
-      
+
       return {
         id: event.id?.toString() || "",
         eventName: event.event_name || "",
         ephemeralAddress: attributes.ephemeralAddress || "",
-        tokens: Array.isArray(attributes.tokens) ? attributes.tokens : [],
-        amounts: Array.isArray(attributes.amounts) ? attributes.amounts : [],
+        tokens: normalizeArrayLike(attributes.tokens),
+        amounts: normalizeArrayLike(attributes.amounts),
         sender: attributes.sender || "",
         recipient: attributes.recipient || undefined,
         blockTimestamp: event.block_timestamp ? new Date(event.block_timestamp) : new Date(),
