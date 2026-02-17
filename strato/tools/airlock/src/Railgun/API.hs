@@ -74,7 +74,7 @@ defaultConfig = StratoConfig
   { stratoHost = "localhost"
   , stratoPort = 8081
   , stratoAuthToken = ""  -- Must be set from .token file
-  , railgunContractAddress = "95be101d075f44084ca1cf51d0106c8606773952"
+  , railgunContractAddress = ""  -- Read from .contract-address file at runtime
   }
 
 -- | Create a servant-client environment with custom headers for nginx CSRF bypass
