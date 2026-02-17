@@ -6,6 +6,23 @@ import type {
   ContractInfoResponse,
 } from "@mercata/shared-types";
 
+/**
+ * Known protocol contract addresses whose Token:Transfer events are internal
+ * (gas fees, pool operations, minting, etc.) and should be hidden from the
+ * My Activity / All Activity feed.
+ * 
+ * @dev TODO: Improve how these are fetched, rather than hardcoding them here.
+ */
+const getProtocolAddresses = (): string[] => [
+  "0000000000000000000000000000000000001003", //CollateralVault
+  "0000000000000000000000000000000000001004", //LiquidityPool
+  "0000000000000000000000000000000000001005", //LendingPool
+  "0000000000000000000000000000000000001008", //MercataBridge
+  "000000000000000000000000000000000000100d", //FeeCollector
+  "0000000000000000000000000000000000001011", //CDPEngine
+  "0000000000000000000000000000000000001013", //CDPVault
+].filter((addr): addr is string => Boolean(addr));
+
 export const getEvents = async (
   accessToken: string,
   query: Record<string, string> = {}
@@ -87,6 +104,8 @@ export interface FilterConfig {
   type: "single" | "or";
   attribute?: string;
   attributes?: string[];
+  /** Event attribute names to check against the protocol address list for exclusion */
+  excludeProtocolAddresses?: string[];
 }
 
 export interface ActivityTypePair {
@@ -180,10 +199,7 @@ export const getActivitiesByTypes = async (
     if (!pair.contract_name || !pair.event_name) continue;
     const existing = groups.get(pair.contract_name);
     if (existing) {
-      // Avoid duplicate event_names within a group
-      if (!existing.some(p => p.event_name === pair.event_name)) {
-        existing.push(pair);
-      }
+      existing.push(pair);
     } else {
       groups.set(pair.contract_name, [pair]);
     }
@@ -201,6 +217,35 @@ export const getActivitiesByTypes = async (
   // of its own group, so this is always correct.
   const fetchLimit = limit + offset;
 
+  // Exclude internal transfers involving protocol contracts.
+  // Activity types opt in via excludeProtocolAddresses in their filterConfig.
+  const protocolAddresses = getProtocolAddresses();
+  const protocolAddrList = protocolAddresses.join(",");
+
+  const applyFilters = (
+    pairs: ActivityTypePair[],
+    params: Record<string, string>
+  ) => {
+    // Apply protocol address exclusions from filterConfig
+    if (protocolAddrList) {
+      for (const pair of pairs) {
+        const attrs = pair.filterConfig?.excludeProtocolAddresses;
+        if (attrs) {
+          for (const attr of attrs) {
+            params[`attributes->>${attr}`] = `not.in.(${protocolAddrList})`;
+          }
+        }
+      }
+    }
+    // Filter by user address for My Activity
+    if (userAddress) {
+      const attrFilters = buildAttributeFilters(pairs, userAddress);
+      if (attrFilters.length > 0) {
+        params.or = `(${attrFilters.join(",")})`;
+      }
+    }
+  };
+
   const countPromises = groupEntries.map(([contractName, pairs]) => {
     const eventNames = pairs.map(p => p.event_name);
     const countParams: Record<string, string> = {
@@ -211,12 +256,7 @@ export const getActivitiesByTypes = async (
         : `in.(${eventNames.join(",")})`,
       ...timeFilter,
     };
-    if (userAddress) {
-      const attrFilters = buildAttributeFilters(pairs, userAddress);
-      if (attrFilters.length > 0) {
-        countParams.or = `(${attrFilters.join(",")})`;
-      }
-    }
+    applyFilters(pairs, countParams);
     return cirrus.get(accessToken, `/${constants.Event}`, { params: countParams });
   });
 
@@ -233,12 +273,7 @@ export const getActivitiesByTypes = async (
         : `in.(${eventNames.join(",")})`,
       ...timeFilter,
     };
-    if (userAddress) {
-      const attrFilters = buildAttributeFilters(pairs, userAddress);
-      if (attrFilters.length > 0) {
-        params.or = `(${attrFilters.join(",")})`;
-      }
-    }
+    applyFilters(pairs, params);
     return cirrus.get(accessToken, `/${constants.Event}`, { params });
   });
 
