@@ -10,20 +10,6 @@ const { Token } = constants;
 const Escrow = "storage";
 const EscrowDeposits = `mapping`;
 
-const normalizeArrayLike = (value: any): string[] => {
-  if (Array.isArray(value)) {
-    return value;
-  }
-  if (!value || typeof value !== "object") {
-    return [];
-  }
-
-  return Object.keys(value)
-    .filter((key) => /^\d+$/.test(key))
-    .sort((a, b) => Number(a) - Number(b))
-    .map((key) => value[key]);
-};
-
 export interface DepositParams {
   tokens: string[]; // Array of token addresses (with or without 0x)
   amounts: string[]; // Array of amounts in wei (as strings)
@@ -284,14 +270,14 @@ export const getUserReferrals = async (
       return [];
     }
 
-    return data.map((deposit) => ({
+    return data.filter((d) => Array.isArray(d.value?.tokens)).map((deposit) => ({
       ephemeralAddress: deposit.key.key || "",
       sender: deposit.value?.sender || "",
-      tokens: normalizeArrayLike(deposit.value?.tokens),
-      amounts: normalizeArrayLike(deposit.value?.amounts),
+      tokens: deposit.value?.tokens || [],
+      amounts: deposit.value?.amounts || [],
       expiry: deposit.value?.expiry || 0,
       quantity: deposit.value?.quantity || 1,
-    })).filter((deposit) => deposit.tokens.length > 0);
+    }));
   } catch (error: any) {
     if (error.response?.status === 404 || error.response?.status === 200) {
       return [];
