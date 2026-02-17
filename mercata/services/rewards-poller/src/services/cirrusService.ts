@@ -1,9 +1,8 @@
 import { cirrus } from "../utils/api";
 import { ProtocolEvent, CirrusEvent, EventCursor } from "../types";
-import { logInfo } from "../utils/logger";
+import { logError, logInfo } from "../utils/logger";
 import { config } from "../config";
 import { blockTrackingService } from "./blockTrackingService";
-import { getCommunityBonuses } from "../utils/balanceCheck";
 import {
   buildFilter,
   parseJson,
@@ -87,9 +86,7 @@ const queryRegularEvents = async (
     })
   );
 
-  return results
-    .filter((event): event is ProtocolEvent => event !== null)
-    .flatMap((event) => [event, ...getCommunityBonuses(event)]);
+  return results.filter((event): event is ProtocolEvent => event !== null);
 };
 
 export type ValidEventPairs = Set<string>;
@@ -207,8 +204,7 @@ export const getLPTokenTransferEvents = async (
           item.transaction_sender || (isMint ? item.to : item.from),
         amount: item.value || "0",
       };
-    })
-    .flatMap((event) => [event, ...getCommunityBonuses(event)]);
+    });
 };
 
 export const getEventsBatch = async (
