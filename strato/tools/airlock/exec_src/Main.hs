@@ -1671,23 +1671,16 @@ runBalance bopts = do
               extraTokens = filter (\t -> T.toLower t `notElem` shieldedTokenAddrs) defaultTokens
           
           -- Show shielded balances with unshielded
-          unless (null balances) $
-            mapM_ (printBalanceWithUnshielded config maybeUserAddr) balances
+          mapM_ (printTokenBalance config maybeUserAddr) balances
           
           -- Show default tokens that only have unshielded balance
-          forM_ extraTokens $ \tokenAddr -> do
-            case maybeUserAddr of
-              Just userAddr -> do
-                unshieldedResult <- getTokenBalance config tokenAddr userAddr
-                case unshieldedResult of
-                  Right unshieldedWei | unshieldedWei > 0 -> do
-                    let unshieldedInTokens = fromIntegral unshieldedWei / (1e18 :: Double)
-                    TIO.putStrLn $ "Token 0x" <> tokenAddr <> " (USDST):"
-                    TIO.putStrLn $ "  Shielded:   0.000000 (0 notes)"
-                    TIO.putStrLn $ "  Unshielded: " <> T.pack (printf "%.6f" unshieldedInTokens)
-                    TIO.putStrLn ""
-                  _ -> return ()
-              Nothing -> return ()
+          forM_ extraTokens $ \tokenAddr ->
+            printTokenBalance config maybeUserAddr TokenBalance
+              { tbTokenAddress = tokenAddr
+              , tbTotalValue = 0
+              , tbNoteCount = 0
+              , tbTokenType = ERC20
+              }
           
           when (null balances && null extraTokens) $
             TIO.putStrLn "No balances found."
@@ -1714,31 +1707,36 @@ extractPort url =
       portStr = takeWhile (\c -> c >= '0' && c <= '9') $ drop 1 afterHost
   in if null portStr then 8081 else read portStr
 
-printBalanceWithUnshielded :: StratoConfig -> Maybe T.Text -> TokenBalance -> IO ()
-printBalanceWithUnshielded config maybeUserAddr tb = do
-  let tokenDisplay = case tbTokenType tb of
-        ERC20 -> "ERC20"
-        ERC721 -> "ERC721"
-        ERC1155 -> "ERC1155"
-      shieldedInTokens = fromIntegral (tbTotalValue tb) / (1e18 :: Double)
+-- | Known token names
+tokenName :: T.Text -> T.Text
+tokenName addr = case T.toLower addr of
+  "937efa7e3a77e20bbdbd7c0d32b6514f368c1010" -> "USDST"
+  _ -> "ERC20"
+
+-- | Print balance for a token (shielded + unshielded)
+printTokenBalance :: StratoConfig -> Maybe T.Text -> TokenBalance -> IO ()
+printTokenBalance config maybeUserAddr tb = do
+  let shieldedWei = tbTotalValue tb
+      shieldedInTokens = fromIntegral shieldedWei / (1e18 :: Double)
   
-  TIO.putStrLn $ "Token 0x" <> tbTokenAddress tb <> " (" <> tokenDisplay <> "):"
-  TIO.putStrLn $ "  Shielded:   " <> T.pack (printf "%.6f" shieldedInTokens) <> " (" <> T.pack (show $ tbNoteCount tb) <> " notes)"
-  
-  case maybeUserAddr of
+  -- Get unshielded balance
+  unshieldedWei <- case maybeUserAddr of
     Just userAddr -> do
-      unshieldedResult <- getTokenBalance config (tbTokenAddress tb) userAddr
-      case unshieldedResult of
-        Right unshieldedWei -> do
-          let unshieldedInTokens = fromIntegral unshieldedWei / (1e18 :: Double)
-              totalInTokens = shieldedInTokens + unshieldedInTokens
-          TIO.putStrLn $ "  Unshielded: " <> T.pack (printf "%.6f" unshieldedInTokens)
-          TIO.putStrLn $ "  Total:      " <> T.pack (printf "%.6f" totalInTokens)
-        Left _ -> 
-          TIO.putStrLn "  Unshielded: (error)"
-    Nothing -> 
-      TIO.putStrLn "  Unshielded: (no eth address)"
-  TIO.putStrLn ""
+      result <- getTokenBalance config (tbTokenAddress tb) userAddr
+      return $ either (const 0) id result
+    Nothing -> return 0
+  
+  -- Only print if there's some balance
+  when (shieldedWei > 0 || unshieldedWei > 0) $ do
+    let unshieldedInTokens = fromIntegral unshieldedWei / (1e18 :: Double)
+        totalInTokens = shieldedInTokens + unshieldedInTokens
+    
+    TIO.putStrLn $ "Token 0x" <> tbTokenAddress tb <> " (" <> tokenName (tbTokenAddress tb) <> "):"
+    TIO.putStrLn $ "  Shielded:   " <> T.pack (printf "%.6f" shieldedInTokens) <> " (" <> T.pack (show $ tbNoteCount tb) <> " notes)"
+    TIO.putStrLn $ "  Unshielded: " <> T.pack (printf "%.6f" unshieldedInTokens)
+    when (shieldedWei > 0 && unshieldedWei > 0) $
+      TIO.putStrLn $ "  Total:      " <> T.pack (printf "%.6f" totalInTokens)
+    TIO.putStrLn ""
 
 printNote :: Bal.ShieldedNote -> IO ()
 printNote note = do
