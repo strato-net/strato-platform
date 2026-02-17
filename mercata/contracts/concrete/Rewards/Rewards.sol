@@ -1035,24 +1035,30 @@ contract record Rewards is Ownable {
             return 0;
         }
 
-        uint256 totalWithBonus = baseRewards;
+        try {
+            uint256 totalWithBonus = baseRewards;
 
-        for (uint256 i = 0; i < communityBonusConfigs.length; i++) {
-            CommunityBonusConfig memory cfg = communityBonusConfigs[i];
-            uint256 multiplier = cfg.multiplier;
+            for (uint256 i = 0; i < communityBonusConfigs.length; i++) {
+                CommunityBonusConfig memory cfg = communityBonusConfigs[i];
+                uint256 multiplier = cfg.multiplier;
 
-            if (multiplier <= PRECISION_MULTIPLIER) {
-                continue;
+                if (multiplier <= PRECISION_MULTIPLIER) {
+                    continue;
+                }
+                if (Token(cfg.token).balanceOf(user) == 0) {
+                    continue;
+                }
+
+                uint256 bonus = (baseRewards * (multiplier - PRECISION_MULTIPLIER)) / PRECISION_MULTIPLIER;
+                totalWithBonus += bonus;
             }
-            if (Token(cfg.token).balanceOf(user) == 0) {
-                continue;
-            }
 
-            uint256 bonus = (baseRewards * (multiplier - PRECISION_MULTIPLIER)) / PRECISION_MULTIPLIER;
-            totalWithBonus += bonus;
+            return totalWithBonus;
+        } catch {
+            return baseRewards;
         }
 
-        return totalWithBonus;
+        return baseRewards;
     }
 
 }
