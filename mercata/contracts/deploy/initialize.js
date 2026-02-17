@@ -91,7 +91,7 @@ function buildInitializeArgsFromState(target, stateSnapshot) {
         `Cannot derive Pool initialize args from state. Missing one of tokenA/tokenB/lpToken for ${target.address}.`
       );
     }
-    return { tokenAAddr, tokenBAddr, lpTokenAddr };
+    return { tokenAAddr, tokenBAddr, lpTokenAddr, poolFactoryAddr: "0000000000000000000000000000000000000100a" };
   }
 
   throw new Error(
