@@ -291,4 +291,4 @@ install-zsh-completions:
 	@echo '_strato_barometer() { local completions; completions=($${(f)"$$(CMDARGS_COMPLETE=$$((CURRENT-1)) strato-barometer "$${words[@]:1}" 2>/dev/null | sed "s/^VALUE //")"}); _describe "command" completions; }' >> $(ZSH_COMPLETION_DIR)/_strato-barometer
 	@echo '_strato_barometer "$$@"' >> $(ZSH_COMPLETION_DIR)/_strato-barometer
 	@echo "Zsh completions installed to $(ZSH_COMPLETION_DIR)"
-	@echo "Add 'fpath=(~/.zsh/completions $$fpath)' to ~/.zshrc if not already present"
+	@echo "Add 'fpath=(~/.zsh/completions \$$fpath)' to ~/.zshrc if not already present"
