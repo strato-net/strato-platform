@@ -130,6 +130,34 @@ const getTimeRangeFilter = (timeRange?: string): Record<string, string> => {
   };
 };
 
+/**
+ * Build attribute filters for a set of activity type pairs for a given user address.
+ * Returns deduplicated PostgREST filter conditions.
+ */
+const buildAttributeFilters = (pairs: ActivityTypePair[], userAddress: string): string[] => {
+  const filters: string[] = [];
+  for (const pair of pairs) {
+    if (!pair.filterConfig) {
+      throw new Error(`No filter config provided for activity type: ${pair.contract_name}:${pair.event_name}`);
+    }
+    if (pair.filterConfig.type === "single") {
+      if (!pair.filterConfig.attribute) {
+        throw new Error(`Single filter requires attribute for ${pair.contract_name}:${pair.event_name}`);
+      }
+      filters.push(`attributes->>${pair.filterConfig.attribute}.eq.${userAddress}`);
+    } else {
+      const attributes = pair.filterConfig.attributes || [];
+      if (attributes.length === 0) {
+        throw new Error(`OR filter requires attributes for ${pair.contract_name}:${pair.event_name}`);
+      }
+      for (const attr of attributes) {
+        filters.push(`attributes->>${attr}.eq.${userAddress}`);
+      }
+    }
+  }
+  return [...new Set(filters)];
+};
+
 export const getActivitiesByTypes = async (
   accessToken: string,
   activityTypePairs: ActivityTypePair[],
@@ -145,84 +173,107 @@ export const getActivitiesByTypes = async (
 
   const timeFilter = getTimeRangeFilter(timeRange);
 
-  const contractNames = Array.from(
-    new Set(activityTypePairs.map((pair) => pair.contract_name).filter(Boolean))
-  );
-  const eventNames = Array.from(
-    new Set(activityTypePairs.map((pair) => pair.event_name).filter(Boolean))
-  );
+  // Group pairs by contract_name to avoid cross-product from independent in() lists.
+  // Each group gets its own query with exact contract_name + event_name filtering.
+  const groups = new Map<string, ActivityTypePair[]>();
+  for (const pair of activityTypePairs) {
+    if (!pair.contract_name || !pair.event_name) continue;
+    const existing = groups.get(pair.contract_name);
+    if (existing) {
+      // Avoid duplicate event_names within a group
+      if (!existing.some(p => p.event_name === pair.event_name)) {
+        existing.push(pair);
+      }
+    } else {
+      groups.set(pair.contract_name, [pair]);
+    }
+  }
 
-  if (contractNames.length === 0 || eventNames.length === 0) {
+  if (groups.size === 0) {
     return { events: [], total: 0 };
   }
 
-  const attributeFilters: string[] = [];
-  if (userAddress) {
-    activityTypePairs.forEach((pair) => {
-      if (!pair.filterConfig) {
-        throw new Error(`No filter config provided for activity type: ${pair.contract_name}:${pair.event_name}`);
-      }
+  const groupEntries = Array.from(groups.entries());
 
-      if (pair.filterConfig.type === "single") {
-        if (!pair.filterConfig.attribute) {
-          throw new Error(`Single filter requires attribute for ${pair.contract_name}:${pair.event_name}`);
-        }
-        attributeFilters.push(`attributes->>${pair.filterConfig.attribute}.eq.${userAddress}`);
-        return;
-      }
+  // Build parallel queries: one count + one data query per contract group.
+  // For data, fetch (limit + offset) from each group so merge-sort can produce
+  // the correct global page. Any event in the global top N must be in the top N
+  // of its own group, so this is always correct.
+  const fetchLimit = limit + offset;
 
-      const attributes = pair.filterConfig.attributes || [];
-      if (attributes.length === 0) {
-        throw new Error(`OR filter requires attributes for ${pair.contract_name}:${pair.event_name}`);
-      }
-      attributes.forEach((attr) => {
-        attributeFilters.push(`attributes->>${attr}.eq.${userAddress}`);
-      });
-    });
-  }
-
-  const uniqueAttributeFilters = Array.from(new Set(attributeFilters));
-
-  const params: Record<string, string> = {
-    order: "block_timestamp.desc,id.desc",
-    select: `*,${storageSelect}`,
-    limit: limit.toString(),
-    offset: offset.toString(),
-    "storage.contract.contract_name": `in.(${contractNames.join(",")})`,
-    event_name: `in.(${eventNames.join(",")})`,
-    ...timeFilter,
-  };
-
-  const countParams: Record<string, string> = {
-    select: `${storageSelect},count()`,
-    "storage.contract.contract_name": `in.(${contractNames.join(",")})`,
-    event_name: `in.(${eventNames.join(",")})`,
-    ...timeFilter,
-  };
-
-  if (uniqueAttributeFilters.length > 0) {
-    params.or = `(${uniqueAttributeFilters.join(",")})`;
-    countParams.or = `(${uniqueAttributeFilters.join(",")})`;
-  }
-
-  const [countResponse, eventsResponse] = await Promise.all([
-    cirrus.get(accessToken, `/${constants.Event}`, { params: countParams }),
-    cirrus.get(accessToken, `/${constants.Event}`, { params }),
-  ]);
-
-  const total = (countResponse.data || []).reduce((sum: number, row: any) => {
-    const count = row?.count ? Number(row.count) : 0;
-    return sum + count;
-  }, 0);
-  const data = eventsResponse.data || [];
-
-  const events = (data as any[]).map((event: any) => {
-    const { storage, ...eventWithoutStorage } = event;
-    return {
-      ...eventWithoutStorage,
-      contract_name: event.storage?.contract?.[0]?.contract_name || "",
+  const countPromises = groupEntries.map(([contractName, pairs]) => {
+    const eventNames = pairs.map(p => p.event_name);
+    const countParams: Record<string, string> = {
+      select: `${storageSelect},count()`,
+      "storage.contract.contract_name": `eq.${contractName}`,
+      event_name: eventNames.length === 1
+        ? `eq.${eventNames[0]}`
+        : `in.(${eventNames.join(",")})`,
+      ...timeFilter,
     };
+    if (userAddress) {
+      const attrFilters = buildAttributeFilters(pairs, userAddress);
+      if (attrFilters.length > 0) {
+        countParams.or = `(${attrFilters.join(",")})`;
+      }
+    }
+    return cirrus.get(accessToken, `/${constants.Event}`, { params: countParams });
   });
+
+  const dataPromises = groupEntries.map(([contractName, pairs]) => {
+    const eventNames = pairs.map(p => p.event_name);
+    const params: Record<string, string> = {
+      order: "block_timestamp.desc,id.desc",
+      select: `*,${storageSelect}`,
+      limit: fetchLimit.toString(),
+      offset: "0",
+      "storage.contract.contract_name": `eq.${contractName}`,
+      event_name: eventNames.length === 1
+        ? `eq.${eventNames[0]}`
+        : `in.(${eventNames.join(",")})`,
+      ...timeFilter,
+    };
+    if (userAddress) {
+      const attrFilters = buildAttributeFilters(pairs, userAddress);
+      if (attrFilters.length > 0) {
+        params.or = `(${attrFilters.join(",")})`;
+      }
+    }
+    return cirrus.get(accessToken, `/${constants.Event}`, { params });
+  });
+
+  // Run all queries in parallel
+  const allResults = await Promise.all([...countPromises, ...dataPromises]);
+  const countResults = allResults.slice(0, groupEntries.length);
+  const dataResults = allResults.slice(groupEntries.length);
+
+  // Sum counts across groups for exact total
+  const total = countResults.reduce((sum, res) => {
+    return sum + (res.data || []).reduce((s: number, row: any) => {
+      return s + (Number(row?.count) || 0);
+    }, 0);
+  }, 0);
+
+  // Merge all data results and extract contract_name from storage relationship
+  const allEvents = dataResults.flatMap(res =>
+    (res.data || []).map((event: any) => {
+      const { storage, ...eventWithoutStorage } = event;
+      return {
+        ...eventWithoutStorage,
+        contract_name: event.storage?.contract?.[0]?.contract_name || "",
+      };
+    })
+  );
+
+  // Sort merged results by (block_timestamp desc, id desc) to match DB ordering
+  allEvents.sort((a, b) => {
+    const tsCompare = (b.block_timestamp || "").localeCompare(a.block_timestamp || "");
+    if (tsCompare !== 0) return tsCompare;
+    return (Number(b.id) || 0) - (Number(a.id) || 0);
+  });
+
+  // Apply global pagination: slice [offset, offset + limit]
+  const events = allEvents.slice(offset, offset + limit);
 
   return { events, total };
 };
