@@ -8,88 +8,13 @@ import Blockchain.Init.Options
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Options (flags_network)
 import Control.Concurrent
-import Data.Maybe
+import Data.Default
 import Network.HTTP.Client (defaultManagerSettings, newManager)
 import Network.HTTP.Types.Status
 import Servant.Client
 import qualified Strato.Strato23.API as VC
 import Strato.Strato23.Client
 import Text.Format
-
-defaultSqlConfig :: SqlConf
-defaultSqlConfig =
-  SqlConf
-    { user = "postgres",
-      password = "api",
-      host = "postgres",
-      port = 5432,
-      database = "eth",
-      poolsize = 10
-    }
-
-defaultCirrusConfig :: SqlConf
-defaultCirrusConfig =
-  SqlConf
-    { user = "postgres",
-      password = "api",
-      host = "postgres",
-      port = 5432,
-      database = "cirrus",
-      poolsize = 10
-    }
-
-defaultKafkaConfig :: KafkaConf
-defaultKafkaConfig =
-  KafkaConf
-    { kafkaHost = "kafka",
-      kafkaPort = 9092
-    }
-
-defaultLevelDBConfig :: LevelDBConf
-defaultLevelDBConfig =
-  LevelDBConf
-    { table = "",
-      path = ""
-    }
-
-defaultBlockConfig :: BlockConf
-defaultBlockConfig =
-  BlockConf
-    { blockTime = 13,
-      minBlockDifficulty = 131072
-    }
-
-defaultQuarryConfig :: QuarryConf
-defaultQuarryConfig =
-  QuarryConf
-    { coinbaseAddress = "ab",
-      lazyBlocks = False
-    }
-
-defaultDiscoveryConfig :: DiscoveryConf
-defaultDiscoveryConfig =
-  DiscoveryConf
-    { discoveryPort = 30303,
-      minAvailablePeers = flags_minPeers
-    }
-
-defaultRedisBlockDBConfig :: RedisBlockDBConf
-defaultRedisBlockDBConfig =
-  RedisBlockDBConf
-    { redisHost = flags_redisHost,
-      redisPort = flags_redisPort,
-      redisAuth = Nothing,
-      redisDBNumber = flags_redisDBNumber,
-      redisMaxConnections = 10,
-      redisMaxIdleTime = 30
-    }
-
-defaultApiConfig :: ApiConfig
-defaultApiConfig =
-  ApiConfig
-  {
-    ipAddress = flags_apiIPAddress
-  }
 
 -- | Get Railgun contract addresses for known networks
 -- Returns Nothing for networks where contracts haven't been deployed yet
@@ -100,28 +25,22 @@ getRailgunProxyForNetwork network = case network of
   "lithium" -> Nothing  -- TODO: Set when deployed
   _         -> Nothing
 
-defaultContractsConfig :: ContractsConf
-defaultContractsConfig =
-  ContractsConf
-    { railgunProxy = getRailgunProxyForNetwork flags_network
-    }
-
-defaultConfig :: EthConf
-defaultConfig =
-  EthConf
-    { sqlConfig = defaultSqlConfig,
-      cirrusConfig = defaultCirrusConfig,
-      redisBlockDBConfig = defaultRedisBlockDBConfig,
-      levelDBConfig = defaultLevelDBConfig,
-      kafkaConfig = defaultKafkaConfig,
-      blockConfig = defaultBlockConfig,
-      quarryConfig = defaultQuarryConfig,
-      discoveryConfig = defaultDiscoveryConfig,
-      apiConfig = defaultApiConfig,
-      contractsConfig = case railgunProxy defaultContractsConfig of
-        Just _  -> Just defaultContractsConfig  -- Known network with deployed contracts
-        Nothing -> Nothing                      -- No contracts yet
-    }
+-- | Runtime config that overrides defaults with command-line flags
+runtimeConfig :: EthConf
+runtimeConfig = def
+  { sqlConfig = def { host = "postgres" }
+  , cirrusConfig = def { host = "postgres", database = "cirrus" }
+  , redisBlockDBConfig = def
+      { redisHost = flags_redisHost
+      , redisPort = flags_redisPort
+      , redisDBNumber = flags_redisDBNumber
+      }
+  , kafkaConfig = def { kafkaHost = "kafka" }
+  , discoveryConfig = def { minAvailablePeers = flags_minPeers }
+  , apiConfig = def { ipAddress = flags_apiIPAddress }
+  , contractsConfig = getRailgunProxyForNetwork flags_network >>= \addr ->
+      Just ContractsConf { railgunProxy = Just addr }
+  }
 
 getNodeKey :: IO (VC.PublicKey, Address)
 getNodeKey = do
@@ -166,60 +85,50 @@ waitOnVault clientEnv request = do
 
 genEthConf :: IO EthConf
 genEthConf = do
-  maybePGuser <- case flags_pguser of
+  pgUser <- case flags_pguser of
     "" -> do
       putStrLn "using default postgres user: postgres"
-      return (Just "postgres")
-    user' -> return (Just user')
+      return "postgres"
+    u -> return u
 
-  maybePGhost <- case flags_pghost of
+  pgHost <- case flags_pghost of
     "" -> do
       putStrLn "using default postgres host: localhost"
-      return (Just "localhost")
-    host' -> return (Just host')
+      return "localhost"
+    h -> return h
 
-  maybePGpass <- case flags_password of
+  pgPass <- case flags_password of
     "" -> error "specify password for postgres user: "
-    pass -> return (Just pass)
+    p -> return p
 
-  kafkaHostFlag <- case flags_kafkahost of
+  kafkaHost' <- case flags_kafkahost of
     "" -> do
       putStrLn "using default kafka host: localhost"
       return "localhost"
-    host' -> return host'
+    h -> return h
 
   (pub, addr) <- getNodeKey
   putStrLn $ "the node's public key: " ++ format pub
   putStrLn $ "the node's address: " ++ format addr
 
-  let user'' = case maybePGuser of
-        Nothing -> "postgres"
-        Just "" -> "postgres"
-        Just usr -> usr
-  let cfg =
-        defaultConfig
-          { sqlConfig =
-              defaultSqlConfig
-                { user = user'',
-                  host = fromMaybe "localhost" maybePGhost,
-                  password = fromMaybe "" maybePGpass
-                },
-            blockConfig =
-              defaultBlockConfig
-                { blockTime = flags_blockTime,
-                  minBlockDifficulty = flags_minBlockDifficulty
-                },
-            quarryConfig =
-              defaultQuarryConfig
-                { lazyBlocks = flags_lazyblocks
-                }
-          }
-
-  return
-    cfg
-      { kafkaConfig = defaultKafkaConfig {kafkaHost = kafkaHostFlag},
-        quarryConfig =
-          (quarryConfig cfg)
-            { coinbaseAddress = formatAddressWithoutColor addr
-            }
-      }
+  return runtimeConfig
+    { sqlConfig = (sqlConfig runtimeConfig)
+        { user = pgUser
+        , host = pgHost
+        , password = pgPass
+        }
+    , cirrusConfig = (cirrusConfig runtimeConfig)
+        { user = pgUser
+        , host = pgHost
+        , password = pgPass
+        }
+    , kafkaConfig = (kafkaConfig runtimeConfig) { kafkaHost = kafkaHost' }
+    , blockConfig = def
+        { blockTime = flags_blockTime
+        , minBlockDifficulty = flags_minBlockDifficulty
+        }
+    , quarryConfig = def
+        { coinbaseAddress = formatAddressWithoutColor addr
+        , lazyBlocks = flags_lazyblocks
+        }
+    }

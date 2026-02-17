@@ -12,6 +12,7 @@ import Blockchain.Strato.Model.Address (Address)
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C8
+import Data.Default
 import Data.Ratio
 import Data.Yaml
 import qualified Database.PostgreSQL.Simple as PS (ConnectInfo (..), postgreSQLConnectionString)
@@ -116,3 +117,79 @@ data ContractsConf = ContractsConf
   { railgunProxy :: Maybe Address  -- ^ RailgunSmartWallet proxy contract address
   }
   deriving (Show, Eq, Generic, FromJSON, ToJSON)
+
+-- Default instances
+
+instance Default SqlConf where
+  def = SqlConf
+    { user = "postgres"
+    , password = "api"
+    , host = "localhost"
+    , port = 5432
+    , database = "eth"
+    , poolsize = 10
+    }
+
+instance Default KafkaConf where
+  def = KafkaConf
+    { kafkaHost = "localhost"
+    , kafkaPort = 9092
+    }
+
+instance Default RedisBlockDBConf where
+  def = RedisBlockDBConf
+    { redisHost = "localhost"
+    , redisPort = 6379
+    , redisAuth = Nothing
+    , redisDBNumber = 0
+    , redisMaxConnections = 10
+    , redisMaxIdleTime = 30
+    }
+
+instance Default LevelDBConf where
+  def = LevelDBConf
+    { table = ""
+    , path = ""
+    }
+
+instance Default QuarryConf where
+  def = QuarryConf
+    { coinbaseAddress = ""
+    , lazyBlocks = False
+    }
+
+instance Default BlockConf where
+  def = BlockConf
+    { blockTime = 13
+    , minBlockDifficulty = 131072
+    }
+
+instance Default DiscoveryConf where
+  def = DiscoveryConf
+    { discoveryPort = 30303
+    , minAvailablePeers = 0
+    }
+
+instance Default ApiConfig where
+  def = ApiConfig
+    { ipAddress = "127.0.0.1"
+    }
+
+instance Default ContractsConf where
+  def = ContractsConf
+    { railgunProxy = Nothing
+    }
+
+instance Default EthConf where
+  def = EthConf
+    { sqlConfig = def
+    , cirrusConfig = def { database = "cirrus" }
+    , redisBlockDBConfig = def
+    , kafkaConfig = def
+    , levelDBConfig = def
+    , quarryConfig = def
+    , blockConfig = def
+    , discoveryConfig = def
+    , apiConfig = def
+    , contractsConfig = Nothing
+    }
