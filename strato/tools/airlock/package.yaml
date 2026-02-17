@@ -77,6 +77,8 @@ executables:
       - http-types
       - network-uri
       - optparse-applicative
+      - strato-conf
       - strato-model
       - text
       - time
+      - yaml

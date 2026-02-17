@@ -13,6 +13,7 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Lazy as LBS
 import Data.Time.Clock.POSIX (getPOSIXTime)
+import Data.Yaml (decodeFileEither)
 import Options.Applicative
 import System.Directory (doesFileExist, doesDirectoryExist, createDirectoryIfMissing, getHomeDirectory, listDirectory)
 import Data.List (isPrefixOf)
@@ -21,6 +22,9 @@ import System.FilePath ((</>))
 import System.IO (hPutStrLn, stderr, hFlush, stdout, hGetEcho, stdin, hSetEcho)
 import Network.HTTP.Client (newManager, httpLbs, parseRequest, urlEncodedBody, responseBody, Manager)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
+
+import Blockchain.EthConf.Model (EthConf(..), ContractsConf(..))
+import Blockchain.Strato.Model.Address (formatAddressWithoutColor)
 
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
@@ -59,25 +63,57 @@ mnemonicFilePath walletName = do
                  else "railgunMnemonic." ++ walletName
   return $ home </> ".secrets" </> filename
 
--- | Read Railgun contract address from .contract-address file
--- Falls back to empty string if file doesn't exist
-readContractAddress :: IO String
-readContractAddress = do
-  -- Try multiple locations for .contract-address
+-- | Get the node directory from ~/.strato/default-node
+getDefaultNodeDir :: IO (Maybe FilePath)
+getDefaultNodeDir = do
   home <- getHomeDirectory
-  let locations = 
-        [ "admin/.contract-address"  -- relative to airlock dir
-        , home </> "strato-platform/strato/tools/airlock/admin/.contract-address"
-        , ".contract-address"
-        ]
-  tryLocations locations
-  where
-    tryLocations [] = return ""  -- No file found, use empty (will require --railguncontractaddr)
-    tryLocations (path:rest) = do
-      exists <- doesFileExist path
-      if exists
-        then T.unpack . T.strip <$> TIO.readFile path
-        else tryLocations rest
+  let defaultNodeFile = home </> ".strato" </> "default-node"
+  exists <- doesFileExist defaultNodeFile
+  if exists
+    then do
+      contents <- TIO.readFile defaultNodeFile
+      let nodeDir = T.unpack $ T.strip contents
+      dirExists <- doesDirectoryExist nodeDir
+      if dirExists
+        then return $ Just nodeDir
+        else do
+          hPutStrLn stderr $ "Error: Node directory not found: " ++ nodeDir
+          exitFailure
+    else return Nothing
+
+-- | Read Railgun contract address from node's ethconf.yaml
+readContractAddress :: IO (Maybe String)
+readContractAddress = do
+  maybeNodeDir <- getDefaultNodeDir
+  case maybeNodeDir of
+    Nothing -> return Nothing
+    Just nodeDir -> do
+      let ethconfPath = nodeDir </> ".ethereumH" </> "ethconf.yaml"
+      exists <- doesFileExist ethconfPath
+      if not exists
+        then do
+          hPutStrLn stderr $ "Error: Node config not found. Is the node initialized?"
+          exitFailure
+        else do
+          result <- decodeFileEither ethconfPath
+          case result of
+            Left err -> do
+              hPutStrLn stderr $ "Error: Invalid node config: " ++ show err
+              exitFailure
+            Right ethConf -> 
+              return $ formatAddressWithoutColor <$> (contractsConfig ethConf >>= railgunProxy)
+
+-- | Require the Railgun contract address, failing with helpful message if not set
+requireContractAddress :: String -> IO String
+requireContractAddress cliAddr
+  | not (null cliAddr) = return cliAddr
+  | otherwise = do
+      maybeAddr <- readContractAddress
+      case maybeAddr of
+        Just addr | not (null addr) -> return addr
+        _ -> do
+          hPutStrLn stderr "Error: Railgun contract address not found. Has it been deployed?"
+          exitFailure
 
 
 -- | Path to the auth token file
@@ -165,9 +201,7 @@ readAuthToken = do
               now <- round <$> getPOSIXTime
               -- Refresh if token expires in less than 60 seconds
               if now >= expiresAt - 60
-                then do
-                  TIO.hPutStrLn stderr "Token expired, refreshing..."
-                  refreshAuthToken refreshToken
+                then refreshAuthToken refreshToken
                 else return accessToken
             _ -> do
               hPutStrLn stderr "Session expired. Please run 'airlock login' again."
@@ -216,8 +250,6 @@ refreshAuthToken refreshToken = do
               -- Save new tokens
               now <- round <$> getPOSIXTime
               saveTokens newAccessToken newRefreshToken (now + fromIntegral expiresIn)
-              
-              TIO.hPutStrLn stderr "Token refreshed successfully."
               return newAccessToken
             _ -> do
               hPutStrLn stderr "Session expired. Please run 'airlock login' again."
@@ -843,15 +875,8 @@ runShield sopts = do
   -- Read auth token for API calls
   authToken <- readAuthToken
   
-  -- Resolve contract address (from CLI or .contract-address file)
-  contractAddr <- if null (soRailgunContractAddr sopts)
-                  then do
-                    fileAddr <- readContractAddress
-                    when (null fileAddr) $ do
-                      hPutStrLn stderr "Error: No Railgun contract address. Use --railguncontractaddr or deploy first."
-                      exitFailure
-                    return fileAddr
-                  else return (soRailgunContractAddr sopts)
+  -- Resolve contract address
+  contractAddr <- requireContractAddress (soRailgunContractAddr sopts)
   
   let (host, port) = parseHostPort (soBaseUrl sopts)
       config = StratoConfig
@@ -926,15 +951,8 @@ runUnshield uopts = do
   -- Read auth token
   authToken <- readAuthToken
   
-  -- Resolve contract address (from CLI or .contract-address file)
-  contractAddr <- if null (uoRailgunContractAddr uopts)
-                  then do
-                    fileAddr <- readContractAddress
-                    when (null fileAddr) $ do
-                      hPutStrLn stderr "Error: No Railgun contract address. Use --railguncontractaddr or deploy first."
-                      exitFailure
-                    return fileAddr
-                  else return (uoRailgunContractAddr uopts)
+  -- Resolve contract address
+  contractAddr <- requireContractAddress (uoRailgunContractAddr uopts)
   
   let (host, port) = parseHostPort (uoBaseUrl uopts)
       config = StratoConfig
@@ -1254,15 +1272,8 @@ runTransfer topts = do
   -- Read auth token
   authToken <- readAuthToken
   
-  -- Resolve contract address (from CLI or .contract-address file)
-  contractAddr <- if null (toRailgunContractAddr topts)
-                  then do
-                    fileAddr <- readContractAddress
-                    when (null fileAddr) $ do
-                      hPutStrLn stderr "Error: No Railgun contract address. Use --railguncontractaddr or deploy first."
-                      exitFailure
-                    return fileAddr
-                  else return (toRailgunContractAddr topts)
+  -- Resolve contract address
+  contractAddr <- requireContractAddress (toRailgunContractAddr topts)
   
   let (host, port) = parseHostPort (toBaseUrl topts)
       config = StratoConfig
@@ -1600,15 +1611,8 @@ runBalance bopts = do
   -- Read auth token
   authToken <- readAuthToken
   
-  -- Resolve contract address (from CLI or .contract-address file)
-  contractAddr <- if null (boRailgunContractAddr bopts)
-                  then do
-                    fileAddr <- readContractAddress
-                    when (null fileAddr) $ do
-                      hPutStrLn stderr "Error: No Railgun contract address. Use --railguncontractaddr or deploy first."
-                      exitFailure
-                    return fileAddr
-                  else return (boRailgunContractAddr bopts)
+  -- Resolve contract address
+  contractAddr <- requireContractAddress (boRailgunContractAddr bopts)
   
   -- Create config for API calls
   let config = defaultConfig

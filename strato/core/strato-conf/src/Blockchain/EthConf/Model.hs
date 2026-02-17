@@ -8,6 +8,8 @@ module Blockchain.EthConf.Model where
 
 -- These are the aspects EthConf that don't require unsafePerformIO
 
+import Blockchain.Strato.Model.Address (Address)
+import qualified Data.Aeson as Aeson
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C8
 import Data.Ratio
@@ -47,9 +49,14 @@ data EthConf = EthConf
     quarryConfig :: QuarryConf,
     blockConfig :: BlockConf,
     discoveryConfig :: DiscoveryConf,
-    apiConfig :: ApiConfig
+    apiConfig :: ApiConfig,
+    contractsConfig :: Maybe ContractsConf
   }
-  deriving (Show, Eq, Generic, FromJSON, ToJSON)
+  deriving (Show, Eq, Generic, FromJSON)
+
+instance ToJSON EthConf where
+  toJSON = Aeson.genericToJSON Aeson.defaultOptions { Aeson.omitNothingFields = True }
+  toEncoding = Aeson.genericToEncoding Aeson.defaultOptions { Aeson.omitNothingFields = True }
 
 data ApiConfig = ApiConfig
   { ipAddress :: String
@@ -102,5 +109,10 @@ data QuarryConf = QuarryConf
 data BlockConf = BlockConf
   { blockTime :: Integer,
     minBlockDifficulty :: Integer
+  }
+  deriving (Show, Eq, Generic, FromJSON, ToJSON)
+
+data ContractsConf = ContractsConf
+  { railgunProxy :: Maybe Address  -- ^ RailgunSmartWallet proxy contract address
   }
   deriving (Show, Eq, Generic, FromJSON, ToJSON)

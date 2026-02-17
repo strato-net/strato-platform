@@ -6,6 +6,7 @@ module Blockchain.Init.EthConf (genEthConf) where
 import Blockchain.EthConf
 import Blockchain.Init.Options
 import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Options (flags_network)
 import Control.Concurrent
 import Data.Maybe
 import Network.HTTP.Client (defaultManagerSettings, newManager)
@@ -90,6 +91,21 @@ defaultApiConfig =
     ipAddress = flags_apiIPAddress
   }
 
+-- | Get Railgun contract addresses for known networks
+-- Returns Nothing for networks where contracts haven't been deployed yet
+getRailgunProxyForNetwork :: String -> Maybe Address
+getRailgunProxyForNetwork network = case network of
+  "helium"  -> Nothing  -- TODO: Set when deployed
+  "upquark" -> Nothing  -- TODO: Set when deployed
+  "lithium" -> Nothing  -- TODO: Set when deployed
+  _         -> Nothing
+
+defaultContractsConfig :: ContractsConf
+defaultContractsConfig =
+  ContractsConf
+    { railgunProxy = getRailgunProxyForNetwork flags_network
+    }
+
 defaultConfig :: EthConf
 defaultConfig =
   EthConf
@@ -101,7 +117,10 @@ defaultConfig =
       blockConfig = defaultBlockConfig,
       quarryConfig = defaultQuarryConfig,
       discoveryConfig = defaultDiscoveryConfig,
-      apiConfig = defaultApiConfig
+      apiConfig = defaultApiConfig,
+      contractsConfig = case railgunProxy defaultContractsConfig of
+        Just _  -> Just defaultContractsConfig  -- Known network with deployed contracts
+        Nothing -> Nothing                      -- No contracts yet
     }
 
 getNodeKey :: IO (VC.PublicKey, Address)
