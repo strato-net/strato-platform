@@ -410,7 +410,7 @@ shieldParser = Shield <$> (ShieldOpts
       ( long "railguncontractaddr"
      <> value ""
      <> metavar "ADDRESS"
-     <> help "Railgun contract address (reads from .contract-address if not specified)" )
+     <> help "Railgun contract address (reads from node config if not specified)" )
   <*> option auto
       ( long "derivationindex"
      <> value 0
@@ -456,7 +456,7 @@ unshieldParser = Unshield <$> (UnshieldOpts
       ( long "railguncontractaddr"
      <> value ""
      <> metavar "ADDRESS"
-     <> help "Railgun contract address (reads from .contract-address if not specified)" )
+     <> help "Railgun contract address (reads from node config if not specified)" )
   <*> option auto
       ( long "derivationindex"
      <> value 0
@@ -499,7 +499,7 @@ transferParser = Transfer <$> (TransferOpts
       ( long "railguncontractaddr"
      <> value ""
      <> metavar "ADDRESS"
-     <> help "Railgun contract address (reads from .contract-address if not specified)" )
+     <> help "Railgun contract address (reads from node config if not specified)" )
   <*> option auto
       ( long "derivationindex"
      <> value 0
@@ -542,7 +542,7 @@ balanceParser = Balance <$> (BalanceOpts
       ( long "railguncontractaddr"
      <> value ""
      <> metavar "ADDRESS"
-     <> help "Railgun contract address (reads from .contract-address if not specified)" )
+     <> help "Railgun contract address (reads from node config if not specified)" )
   <*> option auto
       ( long "derivationindex"
      <> value 0
@@ -1600,21 +1600,11 @@ runTransfer topts = do
 
 runBalance :: BalanceOpts -> IO ()
 runBalance bopts = do
-  -- Load keys from mnemonic file
-  TIO.putStrLn $ "Loading Railgun keys (wallet: " <> T.pack (boWallet bopts) <> ")..."
+  -- Load keys
   keys <- loadKeys (boWallet bopts) (boDerivationIndex bopts)
-  
-  let addr = railgunAddress keys
-  TIO.putStrLn $ "Railgun address: " <> unRailgunAddress addr
-  TIO.putStrLn ""
-  
-  -- Read auth token
   authToken <- readAuthToken
-  
-  -- Resolve contract address
   contractAddr <- requireContractAddress (boRailgunContractAddr bopts)
   
-  -- Create config for API calls
   let config = defaultConfig
         { stratoAuthToken = authToken
         , stratoHost = T.pack $ extractHost (boBaseUrl bopts)
@@ -1622,20 +1612,12 @@ runBalance bopts = do
         , railgunContractAddress = T.pack contractAddr
         }
   
-  -- Get user's Ethereum address for unshielded balances
-  TIO.putStrLn "Getting user address..."
+  -- Get addresses
+  let railgunAddr = railgunAddress keys
   userAddrResult <- getUserAddress config
   let maybeUserAddr = case userAddrResult of
         Right addr' -> Just addr'
         Left _ -> Nothing
-  
-  case maybeUserAddr of
-    Just userAddr -> TIO.putStrLn $ "Ethereum address: 0x" <> userAddr
-    Nothing -> return ()
-  TIO.putStrLn ""
-  
-  TIO.putStrLn "Scanning Shield events..."
-  TIO.putStrLn ""
   
   -- Scan for shielded notes
   result <- scanShieldedBalance keys 
@@ -1645,26 +1627,28 @@ runBalance bopts = do
   
   case result of
     Left err -> do
-      TIO.hPutStrLn stderr $ "Error scanning events: " <> err
+      TIO.hPutStrLn stderr $ "Error: " <> err
       exitFailure
     Right (notes, balances) -> do
-      TIO.putStrLn "============================================================"
-      TIO.putStrLn "                    BALANCE SUMMARY"
-      TIO.putStrLn "============================================================"
+      -- Header with addresses
+      TIO.putStrLn $ "Wallet: " <> T.pack (boWallet bopts)
+      TIO.putStrLn $ "  Railgun:  " <> unRailgunAddress railgunAddr
+      case maybeUserAddr of
+        Just userAddr -> TIO.putStrLn $ "  Ethereum: 0x" <> userAddr
+        Nothing -> return ()
       TIO.putStrLn ""
       
       -- If a specific token address is requested, show its balance
       case boTokenAddress bopts of
         Just tokenAddr -> do
           let tokenAddrT = T.pack tokenAddr
-              -- Find shielded balance for this token if any
               maybeShielded = filter (\tb -> T.toLower (tbTokenAddress tb) == T.toLower (normalizeAddr tokenAddrT)) balances
               shieldedValue = sum $ map tbTotalValue maybeShielded
               shieldedNotes = sum $ map tbNoteCount maybeShielded
               shieldedInTokens = fromIntegral shieldedValue / (1e18 :: Double)
           
-          TIO.putStrLn $ "  Token: 0x" <> normalizeAddr tokenAddrT
-          TIO.putStrLn $ "    Shielded:   " <> T.pack (printf "%.6f" shieldedInTokens) <> " tokens (" <> T.pack (show shieldedNotes) <> " notes)"
+          TIO.putStrLn $ "Token 0x" <> normalizeAddr tokenAddrT <> ":"
+          TIO.putStrLn $ "  Shielded:   " <> T.pack (printf "%.6f" shieldedInTokens) <> " (" <> T.pack (show shieldedNotes) <> " notes)"
           
           case maybeUserAddr of
             Just userAddr -> do
@@ -1673,23 +1657,21 @@ runBalance bopts = do
                 Right unshieldedWei -> do
                   let unshieldedInTokens = fromIntegral unshieldedWei / (1e18 :: Double)
                       totalInTokens = shieldedInTokens + unshieldedInTokens
-                  TIO.putStrLn $ "    Unshielded: " <> T.pack (printf "%.6f" unshieldedInTokens) <> " tokens"
-                  TIO.putStrLn $ "    Total:      " <> T.pack (printf "%.6f" totalInTokens) <> " tokens"
+                  TIO.putStrLn $ "  Unshielded: " <> T.pack (printf "%.6f" unshieldedInTokens)
+                  TIO.putStrLn $ "  Total:      " <> T.pack (printf "%.6f" totalInTokens)
                 Left _ -> 
-                  TIO.putStrLn "    Unshielded: (unable to fetch)"
+                  TIO.putStrLn "  Unshielded: (error)"
             Nothing -> 
-              TIO.putStrLn "    Unshielded: (unable to fetch user address)"
+              TIO.putStrLn "  Unshielded: (no eth address)"
         
         Nothing -> do
           -- No specific token requested - show all balances
-          -- Include default tokens (like USDST) even if no shielded notes
           let defaultTokens = ["937efa7e3a77e20bbdbd7c0d32b6514f368c1010"]  -- USDST
               shieldedTokenAddrs = map (T.toLower . tbTokenAddress) balances
-              -- Find default tokens that aren't already in shielded balances
               extraTokens = filter (\t -> T.toLower t `notElem` shieldedTokenAddrs) defaultTokens
           
           -- Show shielded balances with unshielded
-          unless (null balances) $ do
+          unless (null balances) $
             mapM_ (printBalanceWithUnshielded config maybeUserAddr) balances
           
           -- Show default tokens that only have unshielded balance
@@ -1700,33 +1682,21 @@ runBalance bopts = do
                 case unshieldedResult of
                   Right unshieldedWei | unshieldedWei > 0 -> do
                     let unshieldedInTokens = fromIntegral unshieldedWei / (1e18 :: Double)
-                    TIO.putStrLn $ "  Token: 0x" <> tokenAddr <> " (USDST)"
-                    TIO.putStrLn $ "    Shielded:   0.000000 tokens (0 notes)"
-                    TIO.putStrLn $ "    Unshielded: " <> T.pack (printf "%.6f" unshieldedInTokens) <> " tokens"
-                    TIO.putStrLn $ "    Total:      " <> T.pack (printf "%.6f" unshieldedInTokens) <> " tokens"
+                    TIO.putStrLn $ "Token 0x" <> tokenAddr <> " (USDST):"
+                    TIO.putStrLn $ "  Shielded:   0.000000 (0 notes)"
+                    TIO.putStrLn $ "  Unshielded: " <> T.pack (printf "%.6f" unshieldedInTokens)
                     TIO.putStrLn ""
                   _ -> return ()
               Nothing -> return ()
           
           when (null balances && null extraTokens) $
-            TIO.putStrLn "  No balances found."
-          
-          unless (null notes) $ do
-            TIO.putStrLn ""
-            TIO.putStrLn $ "  Total shielded notes: " <> T.pack (show $ length notes)
+            TIO.putStrLn "No balances found."
       
       -- Optionally show individual notes
       when (boShowNotes bopts && not (null notes)) $ do
         TIO.putStrLn ""
-        TIO.putStrLn "============================================================"
-        TIO.putStrLn "                   INDIVIDUAL NOTES"
-        TIO.putStrLn "============================================================"
-        TIO.putStrLn ""
+        TIO.putStrLn "Notes:"
         mapM_ printNote notes
-      
-      TIO.putStrLn ""
-      TIO.putStrLn "============================================================"
-      exitSuccess
   where
     normalizeAddr t = if "0x" `T.isPrefixOf` T.toLower t then T.drop 2 (T.toLower t) else T.toLower t
 
@@ -1744,19 +1714,6 @@ extractPort url =
       portStr = takeWhile (\c -> c >= '0' && c <= '9') $ drop 1 afterHost
   in if null portStr then 8081 else read portStr
 
-printBalance :: TokenBalance -> IO ()
-printBalance tb = do
-  let tokenDisplay = case tbTokenType tb of
-        ERC20 -> "ERC20"
-        ERC721 -> "ERC721"
-        ERC1155 -> "ERC1155"
-      valueInTokens = fromIntegral (tbTotalValue tb) / (1e18 :: Double)
-  TIO.putStrLn $ "  Token: 0x" <> tbTokenAddress tb <> " (" <> tokenDisplay <> ")"
-  TIO.putStrLn $ "  Shielded: " <> T.pack (printf "%.18f" valueInTokens) <> " tokens"
-  TIO.putStrLn $ "  Raw wei: " <> T.pack (show $ tbTotalValue tb)
-  TIO.putStrLn $ "  Notes: " <> T.pack (show $ tbNoteCount tb)
-  TIO.putStrLn ""
-
 printBalanceWithUnshielded :: StratoConfig -> Maybe T.Text -> TokenBalance -> IO ()
 printBalanceWithUnshielded config maybeUserAddr tb = do
   let tokenDisplay = case tbTokenType tb of
@@ -1765,10 +1722,9 @@ printBalanceWithUnshielded config maybeUserAddr tb = do
         ERC1155 -> "ERC1155"
       shieldedInTokens = fromIntegral (tbTotalValue tb) / (1e18 :: Double)
   
-  TIO.putStrLn $ "  Token: 0x" <> tbTokenAddress tb <> " (" <> tokenDisplay <> ")"
-  TIO.putStrLn $ "    Shielded:   " <> T.pack (printf "%.6f" shieldedInTokens) <> " tokens (" <> T.pack (show $ tbNoteCount tb) <> " notes)"
+  TIO.putStrLn $ "Token 0x" <> tbTokenAddress tb <> " (" <> tokenDisplay <> "):"
+  TIO.putStrLn $ "  Shielded:   " <> T.pack (printf "%.6f" shieldedInTokens) <> " (" <> T.pack (show $ tbNoteCount tb) <> " notes)"
   
-  -- Get unshielded balance if we have user address
   case maybeUserAddr of
     Just userAddr -> do
       unshieldedResult <- getTokenBalance config (tbTokenAddress tb) userAddr
@@ -1776,21 +1732,19 @@ printBalanceWithUnshielded config maybeUserAddr tb = do
         Right unshieldedWei -> do
           let unshieldedInTokens = fromIntegral unshieldedWei / (1e18 :: Double)
               totalInTokens = shieldedInTokens + unshieldedInTokens
-          TIO.putStrLn $ "    Unshielded: " <> T.pack (printf "%.6f" unshieldedInTokens) <> " tokens"
-          TIO.putStrLn $ "    Total:      " <> T.pack (printf "%.6f" totalInTokens) <> " tokens"
+          TIO.putStrLn $ "  Unshielded: " <> T.pack (printf "%.6f" unshieldedInTokens)
+          TIO.putStrLn $ "  Total:      " <> T.pack (printf "%.6f" totalInTokens)
         Left _ -> 
-          TIO.putStrLn "    Unshielded: (unable to fetch)"
+          TIO.putStrLn "  Unshielded: (error)"
     Nothing -> 
-      TIO.putStrLn "    Unshielded: (unable to fetch user address)"
+      TIO.putStrLn "  Unshielded: (no eth address)"
   TIO.putStrLn ""
 
 printNote :: Bal.ShieldedNote -> IO ()
 printNote note = do
   let valueInTokens = fromIntegral (Bal.snValue note) / (1e18 :: Double)
-  TIO.putStrLn $ "  Note at tree position " <> T.pack (show $ Bal.snTreePosition note) <> " (block " <> Bal.snBlockNumber note <> ")"
-  TIO.putStrLn $ "    Token: 0x" <> Bal.snTokenAddress note
-  TIO.putStrLn $ "    Value: " <> T.pack (printf "%.18f" valueInTokens) <> " tokens"
-  TIO.putStrLn ""
+  TIO.putStrLn $ "  [" <> T.pack (show $ Bal.snTreePosition note) <> "] " 
+    <> T.pack (printf "%.6f" valueInTokens) <> " @ 0x" <> Bal.snTokenAddress note
 
 -- | Print transaction result with status
 printTxResult :: BlocTransactionResult -> IO ()

@@ -98,15 +98,7 @@ echo "Proxy contract:  $PROXY_ADDRESS (this is the address users interact with)"
 echo ""
 echo "Next step: Run init-railgun.sh to initialize"
 
-# Save proxy address as the main contract address (legacy file)
-echo "$PROXY_ADDRESS" > "$SCRIPT_DIR/.contract-address"
-echo "Saved proxy address to: $SCRIPT_DIR/.contract-address"
-
-# Also save logic address for reference
-echo "$LOGIC_ADDRESS" > "$SCRIPT_DIR/.logic-address"
-echo "Saved logic address to: $SCRIPT_DIR/.logic-address"
-
-# Update node's ethconf.yaml if we can find it
+# Update node's ethconf.yaml
 DEFAULT_NODE_FILE="$HOME/.strato/default-node"
 if [ -f "$DEFAULT_NODE_FILE" ]; then
     NODE_DIR=$(cat "$DEFAULT_NODE_FILE" | tr -d '\n')

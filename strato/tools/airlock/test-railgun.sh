@@ -29,9 +29,9 @@ NC='\033[0m' # No Color
 
 # Configuration
 SECRETS_DIR="$HOME/.secrets"
-RAILGUN_CONTRACT_FILE="$SCRIPT_DIR/admin/.contract-address"
 TEST_TOKEN_FILE="$SECRETS_DIR/testTokenAddress"
 NODE_NAME="mynode"
+source "$SCRIPT_DIR/admin/get-contract-address.sh"
 
 # Parse arguments
 SKIP_SHIELD=false
@@ -144,9 +144,7 @@ else
   log_warn "No wipe script found, continuing..."
 fi
 
-# Clean old contract address (but keep token config)
-log_info "Cleaning cached contract address..."
-rm -f "$RAILGUN_CONTRACT_FILE" 2>/dev/null || true
+# Note: Contract address is stored in node's ethconf.yaml, cleaned on redeploy
 
 # Rebuild everything
 log_info "Rebuilding (this may take a while)..."
@@ -248,13 +246,13 @@ cd "$SCRIPT_DIR"
 log_info "Deploying RailgunSmartWallet contract..."
 log_cmd "admin/deploy-railgun.sh"
 if ./admin/deploy-railgun.sh; then
-  RAILGUN_ADDR=$(cat "$RAILGUN_CONTRACT_FILE" 2>/dev/null || echo "")
+  RAILGUN_ADDR=$(get_railgun_address 2>/dev/null || echo "")
   if [ -n "$RAILGUN_ADDR" ]; then
     log_pass "Contract deployed: $RAILGUN_ADDR"
     record_result "Contract Deployment" "PASS" "$RAILGUN_ADDR"
   else
-    log_error "Deploy succeeded but no address saved"
-    record_result "Contract Deployment" "FAIL" "No address"
+    log_error "Deploy succeeded but address not found in config"
+    record_result "Contract Deployment" "FAIL" "No address in config"
   fi
 else
   log_error "Deployment failed"

@@ -3,7 +3,7 @@
 # Upgrade Railgun logic contract (preserves all data in proxy)
 #
 # Usage: ./upgrade-railgun.sh [proxy_address]
-#        If no proxy address provided, reads from .contract-address
+#        If no proxy address provided, reads from node's ethconf.yaml
 #
 # This script:
 # 1. Deploys a new RailgunSmartWallet logic contract
@@ -16,18 +16,13 @@ set -e
 SCRIPT_DIR="$(dirname "$0")"
 CONTRACT_FILE="$SCRIPT_DIR/../contracts/railgun.sol"
 source "$SCRIPT_DIR/refresh-token.sh"
+source "$SCRIPT_DIR/get-contract-address.sh"
 
 # Get proxy address
 if [ -n "$1" ]; then
     PROXY_ADDRESS="$1"
 else
-    if [ -f "$SCRIPT_DIR/.contract-address" ]; then
-        PROXY_ADDRESS=$(cat "$SCRIPT_DIR/.contract-address")
-    else
-        echo "Error: No proxy address provided and .contract-address not found"
-        echo "Usage: $0 [proxy_address]"
-        exit 1
-    fi
+    PROXY_ADDRESS=$(get_railgun_address) || exit 1
 fi
 
 if [ ! -f "$CONTRACT_FILE" ]; then
@@ -36,13 +31,6 @@ if [ ! -f "$CONTRACT_FILE" ]; then
 fi
 
 echo "Upgrading Railgun at proxy: $PROXY_ADDRESS"
-
-# Get old logic address for reference
-OLD_LOGIC=""
-if [ -f "$SCRIPT_DIR/.logic-address" ]; then
-    OLD_LOGIC=$(cat "$SCRIPT_DIR/.logic-address")
-    echo "Current logic contract: $OLD_LOGIC"
-fi
 
 CONTRACT_SRC=$(cat "$CONTRACT_FILE")
 
@@ -81,11 +69,6 @@ echo "Step 2: Updating proxy to use new logic..."
 echo ""
 echo "=== Upgrade Complete ==="
 echo "Proxy address:     $PROXY_ADDRESS (unchanged - users keep same address)"
-echo "Old logic:         ${OLD_LOGIC:-unknown}"
 echo "New logic:         $NEW_LOGIC_ADDRESS"
 echo ""
 echo "All data has been preserved. The proxy now uses the new logic."
-
-# Update saved logic address
-echo "$NEW_LOGIC_ADDRESS" > "$SCRIPT_DIR/.logic-address"
-echo "Updated .logic-address"
