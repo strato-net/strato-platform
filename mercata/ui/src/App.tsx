@@ -29,6 +29,7 @@ import ReferFriend from "./pages/ReferFriend";
 import Claim from "./pages/Claim";
 import ReferralsManagement from "./pages/ReferralsManagement";
 import Vault from "./pages/Vault";
+import StripePaymentPage from "./pages/StripePaymentPage";
 
 // Import dashboard components
 
@@ -276,6 +277,15 @@ const App = () => {
                                             element={
                                               <GuestAccessibleRoute>
                                                 <ReferralsManagement />
+                                              </GuestAccessibleRoute>
+                                            }
+                                          />
+
+                                          <Route
+                                            path="/dashboard/stripe-payment"
+                                            element={
+                                              <GuestAccessibleRoute>
+                                                <StripePaymentPage />
                                               </GuestAccessibleRoute>
                                             }
                                           />
