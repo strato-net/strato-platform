@@ -36,7 +36,7 @@ import Text.Printf (printf)
 import Railgun.Crypto (getSharedSymmetricKey, decryptRandom, poseidonHash, computeNullifier, aesDecryptCTR)
 import Railgun.Types (RailgunKeys(..), TokenType(..))
 import Railgun.API (readContractAddress, defaultHost, defaultPort)
-import Strato.Auth (authRequest, formatAuthError)
+import Strato.Auth (authRequest)
 import qualified Data.Set as Set
 
 -- | A Shield event from Cirrus
@@ -122,16 +122,13 @@ fetchShieldEvents = do
         Left (e :: SomeException) -> return $ Left $ "Failed to parse URL: " <> T.pack (show e)
         Right request -> do
           let requestWithHeaders = request { requestHeaders = [("Accept", "application/json")] }
-          result <- authRequest requestWithHeaders
-          case result of
-            Left authErr -> return $ Left $ formatAuthError authErr
-            Right response -> do
-              let status = statusCode $ responseStatus response
-              if status /= 200
-                then return $ Left $ "HTTP error " <> T.pack (show status) <> ": " <> TE.decodeUtf8 (LBS.toStrict $ responseBody response)
-                else case eitherDecode (responseBody response) of
-                  Left err -> return $ Left $ "JSON parse error: " <> T.pack err
-                  Right events -> return $ Right $ parseShieldEvents events
+          response <- authRequest requestWithHeaders
+          let status = statusCode $ responseStatus response
+          if status /= 200
+            then return $ Left $ "HTTP error " <> T.pack (show status) <> ": " <> TE.decodeUtf8 (LBS.toStrict $ responseBody response)
+            else case eitherDecode (responseBody response) of
+              Left err -> return $ Left $ "JSON parse error: " <> T.pack err
+              Right events -> return $ Right $ parseShieldEvents events
 
 -- | Parse Shield events from JSON array
 parseShieldEvents :: [Value] -> [ShieldEvent]
@@ -263,16 +260,13 @@ fetchNullifierEvents = do
         Left (e :: SomeException) -> return $ Left $ "Failed to parse URL: " <> T.pack (show e)
         Right request -> do
           let requestWithHeaders = request { requestHeaders = [("Accept", "application/json")] }
-          result <- authRequest requestWithHeaders
-          case result of
-            Left authErr -> return $ Left $ formatAuthError authErr
-            Right response -> do
-              let status = statusCode $ responseStatus response
-              if status /= 200
-                then return $ Left $ "HTTP error " <> T.pack (show status)
-                else case eitherDecode (responseBody response) of
-                  Left err -> return $ Left $ "JSON parse error: " <> T.pack err
-                  Right events -> return $ Right $ parseNullifierEvents events
+          response <- authRequest requestWithHeaders
+          let status = statusCode $ responseStatus response
+          if status /= 200
+            then return $ Left $ "HTTP error " <> T.pack (show status)
+            else case eitherDecode (responseBody response) of
+              Left err -> return $ Left $ "JSON parse error: " <> T.pack err
+              Right events -> return $ Right $ parseNullifierEvents events
 
 -- | Parse Nullified events from JSON array
 parseNullifierEvents :: [Value] -> [NullifiedEvent]
@@ -318,16 +312,13 @@ fetchTransactEventsForNotes = do
         Left (e :: SomeException) -> return $ Left $ "Failed to parse URL: " <> T.pack (show e)
         Right request -> do
           let requestWithHeaders = request { requestHeaders = [("Accept", "application/json")] }
-          result <- authRequest requestWithHeaders
-          case result of
-            Left authErr -> return $ Left $ formatAuthError authErr
-            Right response -> do
-              let status = statusCode $ responseStatus response
-              if status /= 200
-                then return $ Left $ "HTTP error " <> T.pack (show status)
-                else case eitherDecode (responseBody response) of
-                  Left err -> return $ Left $ "JSON parse error: " <> T.pack err
-                  Right events -> return $ Right $ parseTransactEventsForNotes events
+          response <- authRequest requestWithHeaders
+          let status = statusCode $ responseStatus response
+          if status /= 200
+            then return $ Left $ "HTTP error " <> T.pack (show status)
+            else case eitherDecode (responseBody response) of
+              Left err -> return $ Left $ "JSON parse error: " <> T.pack err
+              Right events -> return $ Right $ parseTransactEventsForNotes events
 
 -- | Parse Transact events from JSON array
 parseTransactEventsForNotes :: [Value] -> [TransactEvent]

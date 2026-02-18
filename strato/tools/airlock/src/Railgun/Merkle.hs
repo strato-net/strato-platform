@@ -34,7 +34,7 @@ import Network.HTTP.Client (parseRequest, requestHeaders, responseBody)
 
 import Railgun.Crypto (poseidonHash)
 import Railgun.API (readContractAddress, defaultHost, defaultPort)
-import Strato.Auth (authRequest, formatAuthError)
+import Strato.Auth (authRequest)
 
 -- | Tree depth (16 levels for Railgun)
 treeDepth :: Int
@@ -102,14 +102,11 @@ fetchMapping collectionName = do
                 ++ "&collection_name=eq." ++ T.unpack collectionName
       request <- parseRequest url
       let requestWithHeaders = request { requestHeaders = [("Accept", "application/json")] }
-      result <- authRequest requestWithHeaders
-      case result of
-        Left authErr -> return $ Left $ formatAuthError authErr
-        Right response ->
-          case Aeson.eitherDecode (responseBody response) of
-            Left err -> return $ Left $ T.pack err
-            Right (results :: [Value]) -> 
-              return $ Right $ Map.fromList $ mapMaybe extractIndexValue results
+      response <- authRequest requestWithHeaders
+      case Aeson.eitherDecode (responseBody response) of
+        Left err -> return $ Left $ T.pack err
+        Right (results :: [Value]) -> 
+          return $ Right $ Map.fromList $ mapMaybe extractIndexValue results
   where
     extractIndexValue :: Value -> Maybe (Int, Integer)
     extractIndexValue v = parseMaybe parseEntry v
@@ -151,15 +148,12 @@ fetchShieldCommitments = do
                 ++ "&event_name=eq.Shield&order=block_number"
       request <- parseRequest url
       let requestWithHeaders = request { requestHeaders = [("Accept", "application/json")] }
-      result <- authRequest requestWithHeaders
-      case result of
-        Left authErr -> return $ Left $ formatAuthError authErr
-        Right response ->
-          case Aeson.eitherDecode (responseBody response) of
-            Left err -> return $ Left $ T.pack err
-            Right (results :: [Value]) -> do
-              let commitmentsList = concatMap extractShieldCommitments results
-              return $ Right commitmentsList
+      response <- authRequest requestWithHeaders
+      case Aeson.eitherDecode (responseBody response) of
+        Left err -> return $ Left $ T.pack err
+        Right (results :: [Value]) -> do
+          let commitmentsList = concatMap extractShieldCommitments results
+          return $ Right commitmentsList
   where
     extractShieldCommitments :: Value -> [(Integer, Integer)]
     extractShieldCommitments v = fromMaybe [] $ parseMaybe parseShieldEvent v
@@ -197,15 +191,12 @@ fetchTransactCommitments = do
                 ++ "&event_name=eq.Transact&order=block_number"
       request <- parseRequest url
       let requestWithHeaders = request { requestHeaders = [("Accept", "application/json")] }
-      result <- authRequest requestWithHeaders
-      case result of
-        Left authErr -> return $ Left $ formatAuthError authErr
-        Right response ->
-          case Aeson.eitherDecode (responseBody response) of
-            Left err -> return $ Left $ T.pack err
-            Right (results :: [Value]) -> do
-              let commitmentsList = concatMap extractTransactCommitments results
-              return $ Right commitmentsList
+      response <- authRequest requestWithHeaders
+      case Aeson.eitherDecode (responseBody response) of
+        Left err -> return $ Left $ T.pack err
+        Right (results :: [Value]) -> do
+          let commitmentsList = concatMap extractTransactCommitments results
+          return $ Right commitmentsList
   where
     extractTransactCommitments :: Value -> [(Integer, Integer)]
     extractTransactCommitments v = fromMaybe [] $ parseMaybe parseTransactEvent v
@@ -270,18 +261,15 @@ fetchNextLeafIndex = do
           url = baseUrl ++ "/cirrus/search/storage?address=eq." ++ T.unpack contractAddr
       request <- parseRequest url
       let requestWithHeaders = request { requestHeaders = [("Accept", "application/json")] }
-      result <- authRequest requestWithHeaders
-      case result of
-        Left authErr -> return $ Left $ formatAuthError authErr
-        Right response ->
-          case Aeson.eitherDecode (responseBody response) of
-            Left err -> return $ Left $ T.pack err
-            Right (results :: [Value]) -> 
-              case results of
-                [] -> return $ Left "No storage found"
-                (r:_) -> case parseMaybe extractNextLeafIndex r of
-                  Nothing -> return $ Right 0
-                  Just idx -> return $ Right idx
+      response <- authRequest requestWithHeaders
+      case Aeson.eitherDecode (responseBody response) of
+        Left err -> return $ Left $ T.pack err
+        Right (results :: [Value]) -> 
+          case results of
+            [] -> return $ Left "No storage found"
+            (r:_) -> case parseMaybe extractNextLeafIndex r of
+              Nothing -> return $ Right 0
+              Just idx -> return $ Right idx
   where
     extractNextLeafIndex :: Value -> Parser Integer
     extractNextLeafIndex v = do

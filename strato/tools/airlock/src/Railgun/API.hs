@@ -45,7 +45,7 @@ import Servant.Client.Core (addHeader, ResponseF(..))
 import Network.HTTP.Types (Status(..))
 import Text.Printf (printf)
 import Strato.Strato23.API.Types (AddressAndKey(..))
-import Strato.Auth (runServantWithAuthEnv, authRequest, formatAuthError)
+import Strato.Auth (runServantWithAuthEnv, authRequest)
 import Blockchain.EthConf.Model (EthConf(..), ContractsConf(..))
 import Data.Yaml (decodeFileEither)
 import System.Directory (doesFileExist, getHomeDirectory)
@@ -145,9 +145,8 @@ callShield shieldReqs = do
       result <- runServantWithAuthEnv clientEnv $ \authHeader ->
         postBlocTransactionParallelExternal authHeader Nothing True request
       pure $ case result of
-        Left authErr -> Left $ formatAuthError authErr
-        Right (Left clientErr) -> Left $ formatClientError clientErr
-        Right (Right txResults) -> Right txResults
+        Left clientErr -> Left $ formatClientError clientErr
+        Right txResults -> Right txResults
 
 -- | Call the transact function on the Railgun contract (for unshield/transfer)
 callTransact :: UnshieldRequest  -- ^ Unshield request with transactions
@@ -178,9 +177,8 @@ callTransact unshieldReq = do
       result <- runServantWithAuthEnv clientEnv $ \authHeader ->
         postBlocTransactionParallelExternal authHeader Nothing True request
       pure $ case result of
-        Left authErr -> Left $ formatAuthError authErr
-        Right (Left clientErr) -> Left $ formatClientError clientErr
-        Right (Right txResults) -> Right txResults
+        Left clientErr -> Left $ formatClientError clientErr
+        Right txResults -> Right txResults
 
 -- | Approve token spending for the Railgun contract
 approveToken :: Text      -- ^ Token contract address
@@ -216,9 +214,8 @@ approveToken tokenAddr amount = do
       result <- runServantWithAuthEnv clientEnv $ \authHeader ->
         postBlocTransactionParallelExternal authHeader Nothing True request
       pure $ case result of
-        Left authErr -> Left $ formatAuthError authErr
-        Right (Left clientErr) -> Left $ formatClientError clientErr
-        Right (Right txResults) -> Right txResults
+        Left clientErr -> Left $ formatClientError clientErr
+        Right txResults -> Right txResults
 
 -- | Convert ShieldRequests to ArgValue for the API
 shieldRequestsToArgValue :: [ShieldRequest] -> ArgValue
@@ -330,18 +327,15 @@ getMerkleRoot = do
                 ++ T.unpack contractAddr ++ "&limit=1"
       request <- HTTP.parseRequest storageUrl
       let requestWithHeaders = request { HTTP.requestHeaders = [("Accept", "application/json")] }
-      result <- authRequest requestWithHeaders
-      case result of
-        Left authErr -> return $ Left $ formatAuthError authErr
-        Right response ->
-          case eitherDecode (HTTP.responseBody response) of
-            Left err -> return $ Left $ "Failed to parse Cirrus storage response: " <> T.pack err
-            Right (results :: [Value]) -> 
-              case results of
-                [] -> return $ Left "No storage found for contract"
-                (r:_) -> case parseMaybe extractMerkleRoot r of
-                  Nothing -> return $ Left "merkleRoot not found in storage"
-                  Just root -> return $ Right $ padHex64 root
+      response <- authRequest requestWithHeaders
+      case eitherDecode (HTTP.responseBody response) of
+        Left err -> return $ Left $ "Failed to parse Cirrus storage response: " <> T.pack err
+        Right (results :: [Value]) -> 
+          case results of
+            [] -> return $ Left "No storage found for contract"
+            (r:_) -> case parseMaybe extractMerkleRoot r of
+              Nothing -> return $ Left "merkleRoot not found in storage"
+              Just root -> return $ Right $ padHex64 root
   where
     extractMerkleRoot :: Value -> Parser Text
     extractMerkleRoot v = do
@@ -410,9 +404,8 @@ getBoundParamsHash treeNum chainId ciphertexts isUnshield = do
       result <- runServantWithAuthEnv clientEnv $ \authHeader ->
         postBlocTransactionParallelExternal authHeader Nothing True request
       pure $ case result of
-        Left authErr -> Left $ formatAuthError authErr
-        Right (Left clientErr) -> Left $ formatClientError clientErr
-        Right (Right txResults) -> case txResults of
+        Left clientErr -> Left $ formatClientError clientErr
+        Right txResults -> case txResults of
           [] -> Left "No transaction result"
           (r:_) -> case blocTransactionData r of
             Just (Call contents) -> case contents of
@@ -436,18 +429,15 @@ getTreeNumber = do
                 ++ T.unpack contractAddr ++ "&limit=1"
       request <- HTTP.parseRequest storageUrl
       let requestWithHeaders = request { HTTP.requestHeaders = [("Accept", "application/json")] }
-      result <- authRequest requestWithHeaders
-      case result of
-        Left authErr -> return $ Left $ formatAuthError authErr
-        Right response ->
-          case eitherDecode (HTTP.responseBody response) of
-            Left err -> return $ Left $ "Failed to parse Cirrus storage response: " <> T.pack err
-            Right (results :: [Value]) -> 
-              case results of
-                [] -> return $ Right 0
-                (r:_) -> case parseMaybe extractTreeNumberFromStorage r of
-                  Nothing -> return $ Right 0  -- Default to 0 if not found
-                  Just n -> return $ Right n
+      response <- authRequest requestWithHeaders
+      case eitherDecode (HTTP.responseBody response) of
+        Left err -> return $ Left $ "Failed to parse Cirrus storage response: " <> T.pack err
+        Right (results :: [Value]) -> 
+          case results of
+            [] -> return $ Right 0
+            (r:_) -> case parseMaybe extractTreeNumberFromStorage r of
+              Nothing -> return $ Right 0  -- Default to 0 if not found
+              Just n -> return $ Right n
   where
     extractTreeNumberFromStorage :: Value -> Parser Integer
     extractTreeNumberFromStorage v = do
@@ -468,13 +458,10 @@ getUserAddress = do
             ++ "/strato/v2.3/key"
   request <- HTTP.parseRequest url
   let requestWithHeaders = request { HTTP.requestHeaders = [("Accept", "application/json")] }
-  result <- authRequest requestWithHeaders
-  case result of
-    Left authErr -> return $ Left $ formatAuthError authErr
-    Right response ->
-      case eitherDecode (HTTP.responseBody response) of
-        Left err -> return $ Left $ "Failed to parse key response: " <> T.pack err
-        Right addrAndKey -> return $ Right $ T.pack $ formatAddressWithoutColor $ unAddress addrAndKey
+  response <- authRequest requestWithHeaders
+  case eitherDecode (HTTP.responseBody response) of
+    Left err -> return $ Left $ "Failed to parse key response: " <> T.pack err
+    Right addrAndKey -> return $ Right $ T.pack $ formatAddressWithoutColor $ unAddress addrAndKey
 
 -- | Get the unshielded balance of a token for a given address
 -- Reads directly from Cirrus storage (no transaction fees)
@@ -490,16 +477,14 @@ getTokenBalance tokenAddr userAddr = do
   
   request <- HTTP.parseRequest url
   let requestWithHeaders = request { HTTP.requestHeaders = [("Accept", "application/json")] }
-  result <- authRequest requestWithHeaders
-  pure $ case result of
-    Left authErr -> Left $ formatAuthError authErr
-    Right response -> case eitherDecode (HTTP.responseBody response) of
-      Left err -> Left $ T.pack err
-      Right (results :: [Value]) -> case results of
-        [] -> Right 0  -- No balance entry means 0
-        (r:_) -> case parseMaybe extractBalance r of
-          Nothing -> Right 0
-          Just bal -> Right bal
+  response <- authRequest requestWithHeaders
+  pure $ case eitherDecode (HTTP.responseBody response) of
+    Left err -> Left $ T.pack err
+    Right (results :: [Value]) -> case results of
+      [] -> Right 0  -- No balance entry means 0
+      (r:_) -> case parseMaybe extractBalance r of
+        Nothing -> Right 0
+        Just bal -> Right bal
   where
     extractBalance :: Value -> Parser Integer
     extractBalance v = do
@@ -533,9 +518,8 @@ getTokenDecimals tokenAddr = do
   result <- runServantWithAuthEnv clientEnv $ \authHeader ->
     postBlocTransactionParallelExternal authHeader Nothing True request
   pure $ case result of
-    Left _ -> 18  -- Default to 18 decimals on auth failure
-    Right (Left _) -> 18  -- Default on client error
-    Right (Right txResults) -> case txResults of
+    Left _ -> 18  -- Default on client error
+    Right txResults -> case txResults of
       [] -> 18
       (r:_) -> case blocTransactionData r of
         Just (Call contents) -> case contents of

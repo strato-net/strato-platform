@@ -30,7 +30,7 @@ import Railgun.Keys (deriveFromMnemonic, railgunAddress, getMasterPublicKeyPoint
 import Railgun.Shield (createERC20ShieldRequest, serializeShieldRequest)
 import Railgun.Unshield (createUnshieldRequest)
 import Railgun.API (callShield, callTransact, approveToken, getMerkleRoot, getTreeNumber, getBoundParamsHash, getUserAddress, getTokenBalance, getTokenDecimals, formatTokenAmount, parseTokenAmount)
-import Strato.Auth (runServant, formatAuthError)
+import Strato.Auth (runServant)
 import Handlers.Metadata (getMetaDataClient, MetadataResponse(..))
 import Servant.Client (BaseUrl(..), Scheme(..))
 import Railgun.Types (RailgunAddress(..), RailgunKeys(..), TokenType(..))
@@ -428,20 +428,6 @@ opts = info (commandParser <**> helper)
 main :: IO ()
 main = do
   cmd <- customExecParser prefs' opts
-  -- Trigger auth early for commands that need it (before any other checks)
-  case cmd of
-    SetupWallet _ -> return ()  -- Local only, no auth needed
-    ListWallets -> return ()    -- Local only, no auth needed
-    ListAddresses _ -> return () -- Local only, no auth needed
-    _ -> do
-      -- Make an authenticated call to trigger login if needed
-      authResult <- getUserAddress
-      case authResult of
-        Left err -> do
-          TIO.hPutStrLn stderr $ "Authentication failed: " <> err
-          exitFailure
-        Right _ -> return ()
-  -- Now run the actual command
   case cmd of
     SetupWallet o -> runSetupWallet o
     ListWallets -> runListWallets
@@ -732,13 +718,10 @@ runUnshield uopts = do
       let metadataUrl = BaseUrl Http "localhost" 8081 "/strato-api/eth/v1.2"
       metadataResult <- runServant metadataUrl getMetaDataClient
       chainId <- case metadataResult of
-        Left authErr -> do
-          TIO.hPutStrLn stderr $ "Auth failed: " <> formatAuthError authErr
-          exitFailure
-        Right (Left clientErr) -> do
+        Left clientErr -> do
           TIO.hPutStrLn stderr $ "Failed to get metadata: " <> T.pack (show clientErr)
           exitFailure
-        Right (Right metadata) -> do
+        Right metadata -> do
           let cid = read (networkID metadata) :: Integer
           TIO.putStrLn $ "Chain ID: " <> T.pack (show cid)
           return cid
@@ -1041,13 +1024,10 @@ runTransfer topts = do
       let metadataUrl = BaseUrl Http "localhost" 8081 "/strato-api/eth/v1.2"
       metadataResult <- runServant metadataUrl getMetaDataClient
       chainId <- case metadataResult of
-        Left authErr -> do
-          TIO.hPutStrLn stderr $ "Auth failed: " <> formatAuthError authErr
-          exitFailure
-        Right (Left clientErr) -> do
+        Left clientErr -> do
           TIO.hPutStrLn stderr $ "Failed to get metadata: " <> T.pack (show clientErr)
           exitFailure
-        Right (Right metadata) -> do
+        Right metadata -> do
           let cid = read (networkID metadata) :: Integer
           TIO.putStrLn $ "Chain ID: " <> T.pack (show cid)
           return cid

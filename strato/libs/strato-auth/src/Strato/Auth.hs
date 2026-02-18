@@ -43,6 +43,8 @@ module Strato.Auth
 import Control.Concurrent (threadDelay)
 import Control.Exception (try, SomeException)
 import Data.Aeson (decode, encode, object, (.:), (.=))
+import System.Exit (exitFailure)
+import System.IO (hPutStrLn, stderr)
 import qualified Data.Aeson.Key as Key
 import Data.Aeson.Types (parseMaybe)
 import qualified Data.ByteString.Lazy as LBS
@@ -135,71 +137,85 @@ loadAuthConfig = do
           , configStorePath = configPath
           }
 
--- | Simple: Make an authenticated HTTP request.
+-- | Simple: Make an authenticated HTTP request (sudo-style).
 --
--- Config is loaded internally. This is the preferred way to make raw HTTP calls.
+-- Config is loaded internally. Exits on auth failure.
 --
 -- @
 -- response <- authRequest myRequest
 -- @
-authRequest :: Request -> IO (Either AuthError (Response LBS.ByteString))
+authRequest :: Request -> IO (Response LBS.ByteString)
 authRequest request = do
-  configResult <- loadAuthConfig
-  case configResult of
-    Left err -> return $ Left err
-    Right config -> authenticatedHttp config request
+  config <- requireAuthConfig
+  result <- authenticatedHttp config request
+  case result of
+    Left err -> authFail err
+    Right response -> return response
 
--- | Simple: Run a Servant client with automatic authentication.
+-- | Simple: Run a Servant client with automatic authentication (sudo-style).
 --
--- Config is loaded internally. This is the preferred way to call Servant APIs.
+-- Config is loaded internally. Exits on auth failure.
 --
 -- @
 -- result <- runServant baseUrl getMetadata
 -- @
-runServant :: BaseUrl -> ClientM a -> IO (Either AuthError (Either ClientError a))
+runServant :: BaseUrl -> ClientM a -> IO (Either ClientError a)
 runServant baseUrl action = do
-  configResult <- loadAuthConfig
-  case configResult of
-    Left err -> return $ Left err
-    Right config -> runAuthenticated config baseUrl action
+  config <- requireAuthConfig
+  result <- runAuthenticated config baseUrl action
+  case result of
+    Left err -> authFail err
+    Right clientResult -> return clientResult
 
--- | Simple: Run a Servant client that takes auth header as a parameter.
+-- | Simple: Run a Servant client that takes auth header as a parameter (sudo-style).
 --
 -- For APIs where the auth token is passed explicitly (e.g., bloc APIs).
 -- The token is obtained internally and never exposed to the caller.
+-- Exits on auth failure.
 --
 -- @
 -- result <- runServantWithAuth baseUrl $ \authHeader ->
 --   postBlocTransactionParallelExternal authHeader Nothing True request
 -- @
-runServantWithAuth :: BaseUrl -> (Maybe T.Text -> ClientM a) -> IO (Either AuthError (Either ClientError a))
+runServantWithAuth :: BaseUrl -> (Maybe T.Text -> ClientM a) -> IO (Either ClientError a)
 runServantWithAuth baseUrl mkAction = do
   manager <- newManager tlsManagerSettings
   let env = mkClientEnv manager baseUrl
   runServantWithAuthEnv env mkAction
 
--- | Run a Servant client that takes auth header, with custom ClientEnv.
+-- | Run a Servant client that takes auth header, with custom ClientEnv (sudo-style).
 --
 -- Use this when you need custom headers or other env customization.
+-- Exits on auth failure.
 --
 -- @
 -- env <- makeCustomClientEnv  -- your env with CSRF bypass headers etc
 -- result <- runServantWithAuthEnv env $ \authHeader ->
 --   postBlocTransactionParallelExternal authHeader Nothing True request
 -- @
-runServantWithAuthEnv :: ClientEnv -> (Maybe T.Text -> ClientM a) -> IO (Either AuthError (Either ClientError a))
+runServantWithAuthEnv :: ClientEnv -> (Maybe T.Text -> ClientM a) -> IO (Either ClientError a)
 runServantWithAuthEnv env mkAction = do
-  configResult <- loadAuthConfig
-  case configResult of
-    Left err -> return $ Left err
-    Right config -> do
-      tokenResult <- getValidToken config
-      case tokenResult of
-        Left err -> return $ Left err
-        Right token -> do
-          let authHeader = Just $ "Bearer " <> token
-          result <- runClientM (mkAction authHeader) env
-          return $ Right result
+  config <- requireAuthConfig
+  tokenResult <- getValidToken config
+  case tokenResult of
+    Left err -> authFail err
+    Right token -> do
+      let authHeader = Just $ "Bearer " <> token
+      runClientM (mkAction authHeader) env
+
+-- | Load auth config or exit with error (sudo-style helper)
+requireAuthConfig :: IO AuthConfig
+requireAuthConfig = do
+  result <- loadAuthConfig
+  case result of
+    Left err -> authFail err
+    Right config -> return config
+
+-- | Exit with auth error message (sudo-style helper)
+authFail :: AuthError -> IO a
+authFail err = do
+  hPutStrLn stderr $ T.unpack $ formatAuthError err
+  exitFailure
 
 -- | Run a Servant client action with automatic authentication.
 --
