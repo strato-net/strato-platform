@@ -87,7 +87,7 @@ export let referralUrl: string | undefined;
 export let escrow: string = '';
 export let vaultFactory: string = '';
 
-export function setBridgeConfig(networkId: string) {
+function setBridgeConfig(networkId: string) {
   if (process.env.BRIDGE_SERVICE_URL) {
     bridgeUrl = process.env.BRIDGE_SERVICE_URL;
   } else {
@@ -95,7 +95,7 @@ export function setBridgeConfig(networkId: string) {
   }
 }
 
-export function setRewardsConfig(networkId: string) {
+function setRewardsConfig(networkId: string) {
   if (process.env.REWARDS) {
     rewards = process.env.REWARDS;
   } else {
@@ -103,7 +103,7 @@ export function setRewardsConfig(networkId: string) {
   }
 }
 
-export function setReferralConfig(networkId: string) {
+function setReferralConfig(networkId: string) {
   if (process.env.ESCROW_ADDRESS) {
     escrow = process.env.ESCROW_ADDRESS;
   } else {
@@ -116,7 +116,7 @@ export function setReferralConfig(networkId: string) {
   }
 }
 
-export function setVaultFactoryConfig(networkId: string) {
+function setVaultFactoryConfig(networkId: string) {
   if (process.env.VAULT_FACTORY) {
     vaultFactory = process.env.VAULT_FACTORY;
   } else {
@@ -142,11 +142,7 @@ export async function initNetworkConfig() {
 // Addresses of internal protocol contracts whose Token:Transfer events should
 // be excluded from the activity feed (gas fees, pool operations, minting, etc.).
 // Populated at startup by initInternalAddresses().
-let internalAddresses: Set<string> = new Set();
-
-export function getInternalAddresses(): string[] {
-  return Array.from(internalAddresses);
-}
+export let internalAddresses: Array<string> = [];
 
 /**
  * Fetch and cache internal protocol contract addresses by querying the on-chain registries and factories.
@@ -164,67 +160,39 @@ export async function initInternalAddresses() {
   ];
 
   // Network-specific addresses (set by initNetworkConfig)
-  if (rewards) addresses.push(rewards);
-  if (escrow) addresses.push(escrow);
-  if (vaultFactory) addresses.push(vaultFactory);
+  addresses.push(rewards || '', escrow, vaultFactory);
 
-  // Lending Registry → lendingPool, collateralVault, liquidityPool
-  try {
-    const { data: [lending] } = await cirrus.get(accessToken, "/BlockApps-LendingRegistry", {
-      params: {
-        address: `eq.${lendingRegistry}`,
-        select: "lendingPool:lendingPool_fkey(address),collateralVault:collateralVault_fkey(address),liquidityPool:liquidityPool_fkey(address)",
-      },
-    });
-    if (lending?.lendingPool?.address) addresses.push(lending.lendingPool.address);
-    if (lending?.collateralVault?.address) addresses.push(lending.collateralVault.address);
-    if (lending?.liquidityPool?.address) addresses.push(lending.liquidityPool.address);
-  } catch (err) {
-    console.warn("Failed to fetch lending registry addresses:", err);
-  }
+  // Lending Registry --> lendingPool, collateralVault, liquidityPool
+  const { data: [lending] } = await cirrus.get(accessToken, "/BlockApps-LendingRegistry", {
+    params: {
+      address: `eq.${lendingRegistry}`,
+      select: "lendingPool:lendingPool_fkey(address),collateralVault:collateralVault_fkey(address),liquidityPool:liquidityPool_fkey(address)",
+    },
+  });
+  addresses.push(lending.lendingPool.address, lending.collateralVault.address, lending.liquidityPool.address);
 
-  // CDP Registry → cdpEngine, cdpVault, feeCollector
-  try {
-    const { data: [cdp] } = await cirrus.get(accessToken, "/BlockApps-CDPRegistry", {
-      params: {
-        address: `eq.${cdpRegistry}`,
-        select: "feeCollector,cdpEngine:cdpEngine_fkey(address),cdpVault:cdpVault_fkey(address),cdpReserve:cdpReserve_fkey(address)",
-      },
-    });
-    if (cdp?.feeCollector) addresses.push(cdp.feeCollector);
-    if (cdp?.cdpEngine?.address) addresses.push(cdp.cdpEngine.address);
-    if (cdp?.cdpVault?.address) addresses.push(cdp.cdpVault.address);
-    if (cdp?.cdpReserve?.address) addresses.push(cdp.cdpReserve.address);
-  } catch (err) {
-    console.warn("Failed to fetch CDP registry addresses:", err);
-  }
+  // CDP Registry --> cdpEngine, cdpVault, feeCollector
+  const { data: [cdp] } = await cirrus.get(accessToken, "/BlockApps-CDPRegistry", {
+    params: {
+      address: `eq.${cdpRegistry}`,
+      select: "feeCollector,cdpEngine:cdpEngine_fkey(address),cdpVault:cdpVault_fkey(address),cdpReserve:cdpReserve_fkey(address)",
+    },
+  });
+  addresses.push(cdp.feeCollector, cdp.cdpEngine.address, cdp.cdpVault.address, cdp.cdpReserve.address);
 
-  // Pool Factory → all swap pool addresses
-  try {
-    const { data: pools } = await cirrus.get(accessToken, "/BlockApps-PoolFactory-allPools", {
-      params: { address: `eq.${poolFactory}`, select: "value" },
-    });
-    for (const pool of pools || []) {
-      if (pool.value) addresses.push(pool.value);
-    }
-  } catch (err) {
-    console.warn("Failed to fetch pool addresses:", err);
-  }
+  // Pool Factory --> all swap pool addresses
+  const { data: pools } = await cirrus.get(accessToken, "/BlockApps-PoolFactory-allPools", {
+    params: { address: `eq.${poolFactory}`, select: "value" },
+  });
+  addresses.push(...pools.map((pool: any) => pool.value));
 
-  // Vault Factory → all vault addresses
+  // Vault Factory --> all vault addresses
   if (vaultFactory) {
-    try {
-      const { data: vaults } = await cirrus.get(accessToken, "/BlockApps-VaultFactory-allVaults", {
-        params: { address: `eq.${vaultFactory}`, select: "value" },
-      });
-      for (const vault of vaults || []) {
-        if (vault.value) addresses.push(vault.value);
-      }
-    } catch (err) {
-      console.warn("Failed to fetch vault addresses:", err);
-    }
+    const { data: vaults } = await cirrus.get(accessToken, "/BlockApps-VaultFactory-allVaults", {
+      params: { address: `eq.${vaultFactory}`, select: "value" },
+    });
+    addresses.push(...vaults.map((vault: any) => vault.value));
   }
 
-  internalAddresses = new Set(addresses.filter(Boolean));
-  console.log(`Internal addresses loaded: ${internalAddresses.size} addresses`);
+  internalAddresses = Array.from(new Set(addresses.filter(Boolean)));
 }
