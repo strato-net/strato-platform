@@ -38,6 +38,7 @@ export const nodeUrl = process.env.NODE_URL;
 export const baseUrl = process.env.BASE_URL || "http://localhost";
 
 // Smart contract addresses
+export const burnAddress = process.env.BURN_ADDRESS || "0000000000000000000000000000000000000000";
 export const poolConfigurator = process.env.POOL_CONFIGURATOR || "0000000000000000000000000000000000001006";
 export const lendingRegistry = process.env.LENDING_REGISTRY || "0000000000000000000000000000000000001007";
 export const mercataBridge = process.env.MERCATA_BRIDGE || "0000000000000000000000000000000000001008";
@@ -136,4 +137,94 @@ export async function initNetworkConfig() {
   setRewardsConfig(networkId);
   setReferralConfig(networkId);
   setVaultFactoryConfig(networkId);
+}
+
+// Addresses of internal protocol contracts whose Token:Transfer events should
+// be excluded from the activity feed (gas fees, pool operations, minting, etc.).
+// Populated at startup by initInternalAddresses().
+let internalAddresses: Set<string> = new Set();
+
+export function getInternalAddresses(): string[] {
+  return Array.from(internalAddresses);
+}
+
+/**
+ * Fetch and cache internal protocol contract addresses by querying the on-chain registries and factories.
+ * Must be called after initNetworkConfig() so network-specific addresses are available.
+ * Used to exclude internal transfers from the My Activity / All Activity feed.
+ */
+export async function initInternalAddresses() {
+  const { cirrus } = await import("../utils/mercataApiHelper");
+  const accessToken = await getServiceToken();
+
+  // Static: well-known system contract addresses from config
+  const addresses: string[] = [
+    mercataBridge,
+    burnAddress,
+  ];
+
+  // Network-specific addresses (set by initNetworkConfig)
+  if (rewards) addresses.push(rewards);
+  if (escrow) addresses.push(escrow);
+  if (vaultFactory) addresses.push(vaultFactory);
+
+  // Lending Registry → lendingPool, collateralVault, liquidityPool
+  try {
+    const { data: [lending] } = await cirrus.get(accessToken, "/BlockApps-LendingRegistry", {
+      params: {
+        address: `eq.${lendingRegistry}`,
+        select: "lendingPool:lendingPool_fkey(address),collateralVault:collateralVault_fkey(address),liquidityPool:liquidityPool_fkey(address)",
+      },
+    });
+    if (lending?.lendingPool?.address) addresses.push(lending.lendingPool.address);
+    if (lending?.collateralVault?.address) addresses.push(lending.collateralVault.address);
+    if (lending?.liquidityPool?.address) addresses.push(lending.liquidityPool.address);
+  } catch (err) {
+    console.warn("Failed to fetch lending registry addresses:", err);
+  }
+
+  // CDP Registry → cdpEngine, cdpVault, feeCollector
+  try {
+    const { data: [cdp] } = await cirrus.get(accessToken, "/BlockApps-CDPRegistry", {
+      params: {
+        address: `eq.${cdpRegistry}`,
+        select: "feeCollector,cdpEngine:cdpEngine_fkey(address),cdpVault:cdpVault_fkey(address),cdpReserve:cdpReserve_fkey(address)",
+      },
+    });
+    if (cdp?.feeCollector) addresses.push(cdp.feeCollector);
+    if (cdp?.cdpEngine?.address) addresses.push(cdp.cdpEngine.address);
+    if (cdp?.cdpVault?.address) addresses.push(cdp.cdpVault.address);
+    if (cdp?.cdpReserve?.address) addresses.push(cdp.cdpReserve.address);
+  } catch (err) {
+    console.warn("Failed to fetch CDP registry addresses:", err);
+  }
+
+  // Pool Factory → all swap pool addresses
+  try {
+    const { data: pools } = await cirrus.get(accessToken, "/BlockApps-PoolFactory-allPools", {
+      params: { address: `eq.${poolFactory}`, select: "value" },
+    });
+    for (const pool of pools || []) {
+      if (pool.value) addresses.push(pool.value);
+    }
+  } catch (err) {
+    console.warn("Failed to fetch pool addresses:", err);
+  }
+
+  // Vault Factory → all vault addresses
+  if (vaultFactory) {
+    try {
+      const { data: vaults } = await cirrus.get(accessToken, "/BlockApps-VaultFactory-allVaults", {
+        params: { address: `eq.${vaultFactory}`, select: "value" },
+      });
+      for (const vault of vaults || []) {
+        if (vault.value) addresses.push(vault.value);
+      }
+    } catch (err) {
+      console.warn("Failed to fetch vault addresses:", err);
+    }
+  }
+
+  internalAddresses = new Set(addresses.filter(Boolean));
+  console.log(`Internal addresses loaded: ${internalAddresses.size} addresses`);
 }

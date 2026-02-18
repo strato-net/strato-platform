@@ -1,27 +1,11 @@
 import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
+import { getInternalAddresses } from "../../config/config";
 import type {
   EventData,
   EventResponse,
   ContractInfoResponse,
 } from "@mercata/shared-types";
-
-/**
- * Known protocol contract addresses whose Token:Transfer events are internal
- * (gas fees, pool operations, minting, etc.) and should be hidden from the
- * My Activity / All Activity feed.
- * 
- * @dev TODO: Improve how these are fetched, rather than hardcoding them here.
- */
-const getProtocolAddresses = (): string[] => [
-  "0000000000000000000000000000000000001003", //CollateralVault
-  "0000000000000000000000000000000000001004", //LiquidityPool
-  "0000000000000000000000000000000000001005", //LendingPool
-  "0000000000000000000000000000000000001008", //MercataBridge
-  "000000000000000000000000000000000000100d", //FeeCollector
-  "0000000000000000000000000000000000001011", //CDPEngine
-  "0000000000000000000000000000000000001013", //CDPVault
-].filter((addr): addr is string => Boolean(addr));
 
 export const getEvents = async (
   accessToken: string,
@@ -219,20 +203,19 @@ export const getActivitiesByTypes = async (
 
   // Exclude internal transfers involving protocol contracts.
   // Activity types opt in via excludeProtocolAddresses in their filterConfig.
-  const protocolAddresses = getProtocolAddresses();
-  const protocolAddrList = protocolAddresses.join(",");
+  const internalAddresses = getInternalAddresses();
+  const internalAddrList = internalAddresses.join(",");
 
   const applyFilters = (
     pairs: ActivityTypePair[],
     params: Record<string, string>
   ) => {
-    // Apply protocol address exclusions from filterConfig
-    if (protocolAddrList) {
+    if (internalAddrList) {
       for (const pair of pairs) {
         const attrs = pair.filterConfig?.excludeProtocolAddresses;
         if (attrs) {
           for (const attr of attrs) {
-            params[`attributes->>${attr}`] = `not.in.(${protocolAddrList})`;
+            params[`attributes->>${attr}`] = `not.in.(${internalAddrList})`;
           }
         }
       }
