@@ -30,9 +30,11 @@ import Data.Function (on)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
-import Network.HTTP.Client (Manager, newManager, defaultManagerSettings, httpLbs, parseRequest, requestHeaders, responseBody)
+import Network.HTTP.Client (parseRequest, requestHeaders, responseBody)
 
 import Railgun.Crypto (poseidonHash)
+import Railgun.API (readContractAddress, defaultHost, defaultPort)
+import Strato.Auth (authRequest, formatAuthError)
 
 -- | Tree depth (16 levels for Railgun)
 treeDepth :: Int
@@ -59,28 +61,25 @@ data MerkleTreeData = MerkleTreeData
   } deriving (Show, Eq)
 
 -- | Fetch Merkle tree data from Cirrus
-fetchMerkleTreeData :: Text -> Int -> Text -> Text -> IO (Either Text MerkleTreeData)
-fetchMerkleTreeData host port authToken contractAddr = do
-  manager <- newManager defaultManagerSettings
-  let baseUrl = "http://" ++ T.unpack host ++ ":" ++ show port
-  
+fetchMerkleTreeData :: IO (Either Text MerkleTreeData)
+fetchMerkleTreeData = do
   -- Fetch zeros from mapping table
-  zerosResult <- fetchMapping manager baseUrl authToken contractAddr "zeros"
+  zerosResult <- fetchMapping "zeros"
   case zerosResult of
     Left err -> return $ Left $ "Failed to fetch zeros: " <> err
     Right zeros -> do
       -- Fetch filledSubTrees from mapping table
-      filledResult <- fetchMapping manager baseUrl authToken contractAddr "filledSubTrees"
+      filledResult <- fetchMapping "filledSubTrees"
       case filledResult of
         Left err -> return $ Left $ "Failed to fetch filledSubTrees: " <> err
         Right filled -> do
           -- Fetch commitments from Shield events
-          commitmentsResult <- fetchCommitments manager baseUrl authToken contractAddr
+          commitmentsResult <- fetchCommitments
           case commitmentsResult of
             Left err -> return $ Left $ "Failed to fetch commitments: " <> err
             Right commitments -> do
               -- Fetch nextLeafIndex from storage
-              nextIndexResult <- fetchNextLeafIndex manager baseUrl authToken contractAddr
+              nextIndexResult <- fetchNextLeafIndex
               case nextIndexResult of
                 Left err -> return $ Left $ "Failed to fetch nextLeafIndex: " <> err
                 Right nextIndex ->
@@ -92,22 +91,25 @@ fetchMerkleTreeData host port authToken contractAddr = do
                     }
 
 -- | Fetch a mapping array from Cirrus
-fetchMapping :: Manager -> String -> Text -> Text -> Text -> IO (Either Text (Map Int Integer))
-fetchMapping manager baseUrl authToken contractAddr collectionName = do
-  let url = baseUrl ++ "/cirrus/search/mapping?address=eq." ++ T.unpack contractAddr 
-            ++ "&collection_name=eq." ++ T.unpack collectionName
-  request <- parseRequest url
-  let requestWithAuth = request 
-        { requestHeaders = 
-            [ ("Authorization", TE.encodeUtf8 $ "Bearer " <> authToken)
-            , ("Accept", "application/json")
-            ]
-        }
-  response <- httpLbs requestWithAuth manager
-  case Aeson.eitherDecode (responseBody response) of
-    Left err -> return $ Left $ T.pack err
-    Right (results :: [Value]) -> 
-      return $ Right $ Map.fromList $ mapMaybe extractIndexValue results
+fetchMapping :: Text -> IO (Either Text (Map Int Integer))
+fetchMapping collectionName = do
+  maybeContractAddr <- readContractAddress
+  case maybeContractAddr of
+    Nothing -> return $ Left "Railgun contract address not found"
+    Just contractAddr -> do
+      let baseUrl = "http://" ++ defaultHost ++ ":" ++ show defaultPort
+          url = baseUrl ++ "/cirrus/search/mapping?address=eq." ++ T.unpack contractAddr 
+                ++ "&collection_name=eq." ++ T.unpack collectionName
+      request <- parseRequest url
+      let requestWithHeaders = request { requestHeaders = [("Accept", "application/json")] }
+      result <- authRequest requestWithHeaders
+      case result of
+        Left authErr -> return $ Left $ formatAuthError authErr
+        Right response ->
+          case Aeson.eitherDecode (responseBody response) of
+            Left err -> return $ Left $ T.pack err
+            Right (results :: [Value]) -> 
+              return $ Right $ Map.fromList $ mapMaybe extractIndexValue results
   where
     extractIndexValue :: Value -> Maybe (Int, Integer)
     extractIndexValue v = parseMaybe parseEntry v
@@ -123,12 +125,12 @@ fetchMapping manager baseUrl authToken contractAddr collectionName = do
       return (index, value)
 
 -- | Fetch commitments from Shield events
-fetchCommitments :: Manager -> String -> Text -> Text -> IO (Either Text [(Integer, Integer)])
-fetchCommitments manager baseUrl authToken contractAddr = do
+fetchCommitments :: IO (Either Text [(Integer, Integer)])
+fetchCommitments = do
   -- Fetch from Shield events (initial deposits)
-  shieldResult <- fetchShieldCommitments manager baseUrl authToken contractAddr
+  shieldResult <- fetchShieldCommitments
   -- Fetch from Transact events (transfers/unshields that create change outputs)
-  transactResult <- fetchTransactCommitments manager baseUrl authToken contractAddr
+  transactResult <- fetchTransactCommitments
   
   case (shieldResult, transactResult) of
     (Left err, _) -> return $ Left err
@@ -138,23 +140,26 @@ fetchCommitments manager baseUrl authToken contractAddr = do
       return $ Right $ sortBy (compare `on` fst) (shieldCommits ++ transactCommits)
 
 -- | Fetch commitments from Shield events
-fetchShieldCommitments :: Manager -> String -> Text -> Text -> IO (Either Text [(Integer, Integer)])
-fetchShieldCommitments manager baseUrl authToken contractAddr = do
-  let url = baseUrl ++ "/cirrus/search/event?address=eq." ++ T.unpack contractAddr 
-            ++ "&event_name=eq.Shield&order=block_number"
-  request <- parseRequest url
-  let requestWithAuth = request 
-        { requestHeaders = 
-            [ ("Authorization", TE.encodeUtf8 $ "Bearer " <> authToken)
-            , ("Accept", "application/json")
-            ]
-        }
-  response <- httpLbs requestWithAuth manager
-  case Aeson.eitherDecode (responseBody response) of
-    Left err -> return $ Left $ T.pack err
-    Right (results :: [Value]) -> do
-      let commitmentsList = concatMap extractShieldCommitments results
-      return $ Right commitmentsList
+fetchShieldCommitments :: IO (Either Text [(Integer, Integer)])
+fetchShieldCommitments = do
+  maybeContractAddr <- readContractAddress
+  case maybeContractAddr of
+    Nothing -> return $ Left "Railgun contract address not found"
+    Just contractAddr -> do
+      let baseUrl = "http://" ++ defaultHost ++ ":" ++ show defaultPort
+          url = baseUrl ++ "/cirrus/search/event?address=eq." ++ T.unpack contractAddr 
+                ++ "&event_name=eq.Shield&order=block_number"
+      request <- parseRequest url
+      let requestWithHeaders = request { requestHeaders = [("Accept", "application/json")] }
+      result <- authRequest requestWithHeaders
+      case result of
+        Left authErr -> return $ Left $ formatAuthError authErr
+        Right response ->
+          case Aeson.eitherDecode (responseBody response) of
+            Left err -> return $ Left $ T.pack err
+            Right (results :: [Value]) -> do
+              let commitmentsList = concatMap extractShieldCommitments results
+              return $ Right commitmentsList
   where
     extractShieldCommitments :: Value -> [(Integer, Integer)]
     extractShieldCommitments v = fromMaybe [] $ parseMaybe parseShieldEvent v
@@ -181,23 +186,26 @@ fetchShieldCommitments manager baseUrl authToken contractAddr = do
         Nothing -> []
 
 -- | Fetch commitments from Transact events (these contain commitment hashes directly)
-fetchTransactCommitments :: Manager -> String -> Text -> Text -> IO (Either Text [(Integer, Integer)])
-fetchTransactCommitments manager baseUrl authToken contractAddr = do
-  let url = baseUrl ++ "/cirrus/search/event?address=eq." ++ T.unpack contractAddr 
-            ++ "&event_name=eq.Transact&order=block_number"
-  request <- parseRequest url
-  let requestWithAuth = request 
-        { requestHeaders = 
-            [ ("Authorization", TE.encodeUtf8 $ "Bearer " <> authToken)
-            , ("Accept", "application/json")
-            ]
-        }
-  response <- httpLbs requestWithAuth manager
-  case Aeson.eitherDecode (responseBody response) of
-    Left err -> return $ Left $ T.pack err
-    Right (results :: [Value]) -> do
-      let commitmentsList = concatMap extractTransactCommitments results
-      return $ Right commitmentsList
+fetchTransactCommitments :: IO (Either Text [(Integer, Integer)])
+fetchTransactCommitments = do
+  maybeContractAddr <- readContractAddress
+  case maybeContractAddr of
+    Nothing -> return $ Left "Railgun contract address not found"
+    Just contractAddr -> do
+      let baseUrl = "http://" ++ defaultHost ++ ":" ++ show defaultPort
+          url = baseUrl ++ "/cirrus/search/event?address=eq." ++ T.unpack contractAddr 
+                ++ "&event_name=eq.Transact&order=block_number"
+      request <- parseRequest url
+      let requestWithHeaders = request { requestHeaders = [("Accept", "application/json")] }
+      result <- authRequest requestWithHeaders
+      case result of
+        Left authErr -> return $ Left $ formatAuthError authErr
+        Right response ->
+          case Aeson.eitherDecode (responseBody response) of
+            Left err -> return $ Left $ T.pack err
+            Right (results :: [Value]) -> do
+              let commitmentsList = concatMap extractTransactCommitments results
+              return $ Right commitmentsList
   where
     extractTransactCommitments :: Value -> [(Integer, Integer)]
     extractTransactCommitments v = fromMaybe [] $ parseMaybe parseTransactEvent v
@@ -252,25 +260,28 @@ extractCommitmentHashes str =
       return $ poseidonHash [npk, tokenId, value]
 
 -- | Fetch nextLeafIndex from storage
-fetchNextLeafIndex :: Manager -> String -> Text -> Text -> IO (Either Text Integer)
-fetchNextLeafIndex manager baseUrl authToken contractAddr = do
-  let url = baseUrl ++ "/cirrus/search/storage?address=eq." ++ T.unpack contractAddr
-  request <- parseRequest url
-  let requestWithAuth = request 
-        { requestHeaders = 
-            [ ("Authorization", TE.encodeUtf8 $ "Bearer " <> authToken)
-            , ("Accept", "application/json")
-            ]
-        }
-  response <- httpLbs requestWithAuth manager
-  case Aeson.eitherDecode (responseBody response) of
-    Left err -> return $ Left $ T.pack err
-    Right (results :: [Value]) -> 
-      case results of
-        [] -> return $ Left "No storage found"
-        (r:_) -> case parseMaybe extractNextLeafIndex r of
-          Nothing -> return $ Right 0
-          Just idx -> return $ Right idx
+fetchNextLeafIndex :: IO (Either Text Integer)
+fetchNextLeafIndex = do
+  maybeContractAddr <- readContractAddress
+  case maybeContractAddr of
+    Nothing -> return $ Left "Railgun contract address not found"
+    Just contractAddr -> do
+      let baseUrl = "http://" ++ defaultHost ++ ":" ++ show defaultPort
+          url = baseUrl ++ "/cirrus/search/storage?address=eq." ++ T.unpack contractAddr
+      request <- parseRequest url
+      let requestWithHeaders = request { requestHeaders = [("Accept", "application/json")] }
+      result <- authRequest requestWithHeaders
+      case result of
+        Left authErr -> return $ Left $ formatAuthError authErr
+        Right response ->
+          case Aeson.eitherDecode (responseBody response) of
+            Left err -> return $ Left $ T.pack err
+            Right (results :: [Value]) -> 
+              case results of
+                [] -> return $ Left "No storage found"
+                (r:_) -> case parseMaybe extractNextLeafIndex r of
+                  Nothing -> return $ Right 0
+                  Just idx -> return $ Right idx
   where
     extractNextLeafIndex :: Value -> Parser Integer
     extractNextLeafIndex v = do

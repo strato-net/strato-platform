@@ -37,6 +37,8 @@ library:
     - base64-bytestring
     - bloc2api
     - bloc2client
+    - blockapps-vault-wrapper-api
+    - blockapps-vault-wrapper-client
     - bytestring
     - containers
     - cryptonite
@@ -48,9 +50,13 @@ library:
     - process
     - servant-client
     - servant-client-core
+    - core-api2
+    - strato-auth
+    - strato-conf
     - strato-model
     - temporary
     - text
+    - yaml
     - transformers
     - vector
     - directory
@@ -70,6 +76,7 @@ executables:
       - base16-bytestring
       - bloc2api
       - bytestring
+      - core-api2
       - directory
       - filepath
       - http-client
@@ -77,6 +84,8 @@ executables:
       - http-types
       - network-uri
       - optparse-applicative
+      - servant-client
+      - strato-auth
       - strato-conf
       - strato-model
       - text
