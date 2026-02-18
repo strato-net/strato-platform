@@ -7,8 +7,8 @@
 SCRIPT_DIR="$(dirname "$0")"
 source "$SCRIPT_DIR/refresh-token.sh"
 
-# Get valid token (auto-refreshes if needed)
-TOKEN=$(ensure_valid_token 2>/dev/null)
+# Get valid token (auto-refreshes if needed, triggers login if no token)
+TOKEN=$(ensure_valid_token)
 
 if [ -z "$TOKEN" ]; then
     echo '{"headers": {}}' 

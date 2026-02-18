@@ -4,7 +4,7 @@ Scripts for deploying and configuring the Railgun contract on STRATO.
 
 ## Prerequisites
 
-- Run `airlock login` first to authenticate (token stored in `~/.secrets/stratoToken`)
+- Run `strato-auth` first to authenticate (token stored in `~/.secrets/stratoToken`)
 - jq and restish must be installed
 - For bash autocomplete, source the completion script
 

@@ -198,11 +198,11 @@ fi
 
 # Login (use existing token if valid, otherwise do device flow)
 log_info "Checking authentication..."
-if airlock list_wallets > /dev/null 2>&1; then
-  log_pass "Already authenticated (token valid)"
+if [ -f "$HOME/.secrets/stratoToken" ]; then
+  log_pass "Already authenticated (token exists)"
 else
-  log_info "Token expired or missing, logging in..."
-  run_cmd airlock login
+  log_info "Token missing, authenticating..."
+  run_cmd strato-auth
 fi
 
 # Setup wallet

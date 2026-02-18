@@ -9,13 +9,13 @@ OAUTH_FILE="${HOME}/.secrets/oauth_credentials"
 
 # Check if token is expired and refresh if needed
 ensure_valid_token() {
+    # If no token file, trigger login
     if [ ! -f "$TOKEN_FILE" ]; then
-        echo "Error: Token file not found. Run 'airlock login' first." >&2
-        return 1
+        strato-auth >&2 || return 1
     fi
     
     if [ ! -f "$OAUTH_FILE" ]; then
-        echo "Error: OAuth credentials not found. Run 'airlock login' first." >&2
+        echo "Error: OAuth credentials not found at $OAUTH_FILE" >&2
         return 1
     fi
     
@@ -45,7 +45,7 @@ refresh_token() {
     local TOKEN_URL=$(curl -s "$OAUTH_DISCOVERY_URL" | jq -r '.token_endpoint')
     
     if [ -z "$REFRESH_TOKEN" ] || [ "$REFRESH_TOKEN" = "null" ]; then
-        echo "Error: No refresh token found. Run 'airlock login' first." >&2
+        echo "Error: No refresh token found. Run 'strato-auth' first." >&2
         return 1
     fi
     
@@ -60,7 +60,7 @@ refresh_token() {
     if echo "$RESPONSE" | jq -e '.error' >/dev/null 2>&1; then
         local ERROR=$(echo "$RESPONSE" | jq -r '.error_description // .error')
         echo "Error refreshing token: $ERROR" >&2
-        echo "Run 'airlock login' to get new credentials." >&2
+        echo "Run 'strato-auth' to get new credentials." >&2
         return 1
     fi
     
