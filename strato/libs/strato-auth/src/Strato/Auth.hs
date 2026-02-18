@@ -24,6 +24,7 @@ module Strato.Auth
   , runServant
   , runServantWithAuth
   , runServantWithAuthEnv
+  , ensureAuthenticated
   
     -- * Configuration (for advanced use)
   , AuthConfig(..)
@@ -216,6 +217,18 @@ authFail :: AuthError -> IO a
 authFail err = do
   hPutStrLn stderr $ T.unpack $ formatAuthError err
   exitFailure
+
+-- | Ensure user is authenticated, triggering device flow login if needed.
+--
+-- This is intended for CLI tools and scripts that need to ensure auth
+-- before proceeding. Exits on failure.
+ensureAuthenticated :: IO ()
+ensureAuthenticated = do
+  config <- requireAuthConfig
+  tokenResult <- getValidToken config
+  case tokenResult of
+    Left err -> authFail err
+    Right _ -> return ()
 
 -- | Run a Servant client action with automatic authentication.
 --

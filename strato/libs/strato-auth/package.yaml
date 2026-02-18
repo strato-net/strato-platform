@@ -21,3 +21,10 @@ library:
   source-dirs: src
   exposed-modules:
     - Strato.Auth
+
+executables:
+  strato-auth:
+    main: Main.hs
+    source-dirs: exec_src
+    dependencies:
+      - strato-auth
