@@ -428,6 +428,20 @@ opts = info (commandParser <**> helper)
 main :: IO ()
 main = do
   cmd <- customExecParser prefs' opts
+  -- Trigger auth early for commands that need it (before any other checks)
+  case cmd of
+    SetupWallet _ -> return ()  -- Local only, no auth needed
+    ListWallets -> return ()    -- Local only, no auth needed
+    ListAddresses _ -> return () -- Local only, no auth needed
+    _ -> do
+      -- Make an authenticated call to trigger login if needed
+      authResult <- getUserAddress
+      case authResult of
+        Left err -> do
+          TIO.hPutStrLn stderr $ "Authentication failed: " <> err
+          exitFailure
+        Right _ -> return ()
+  -- Now run the actual command
   case cmd of
     SetupWallet o -> runSetupWallet o
     ListWallets -> runListWallets
