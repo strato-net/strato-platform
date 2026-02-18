@@ -193,12 +193,24 @@ export const getActivitiesByTypes = async (
     return { events: [], total: 0 };
   }
 
-  const groupEntries = Array.from(groups.entries());
+  // Sub-split groups by excludeProtocolAddresses config
+  // So each activity can have its own exclusion filter
+  const groupEntries: [string, ActivityTypePair[]][] = [];
+  for (const [contractName, pairs] of groups) {
+    const byExclusion = new Map<string, ActivityTypePair[]>();
+    for (const pair of pairs) {
+      const key = pair.filterConfig?.excludeProtocolAddresses?.length
+        ? [...pair.filterConfig.excludeProtocolAddresses].sort().join(",")
+        : "";
+      const existing = byExclusion.get(key);
+      if (existing) existing.push(pair);
+      else byExclusion.set(key, [pair]);
+    }
+    for (const subPairs of byExclusion.values()) {
+      groupEntries.push([contractName, subPairs]);
+    }
+  }
 
-  // Build parallel queries: one count + one data query per contract group.
-  // For data, fetch (limit + offset) from each group so merge-sort can produce
-  // the correct global page. Any event in the global top N must be in the top N
-  // of its own group, so this is always correct.
   const fetchLimit = limit + offset;
 
   // Exclude internal transfers involving protocol contracts.
