@@ -1,4 +1,5 @@
 import { api } from './axios';
+import { clearDismissedForUser, LAST_USER_ADDRESS_KEY } from '@/hooks/useLiquidationDismiss';
 
 // Check authentication status via server API call (works with HttpOnly cookies)
 export const isAuthenticated = async (): Promise<boolean> => {
@@ -18,5 +19,14 @@ export const isAuthenticated = async (): Promise<boolean> => {
 
 // Logout function that redirects to external logout endpoint
 export const logout = (): void => {
+  try {
+    const lastUserAddress = localStorage.getItem(LAST_USER_ADDRESS_KEY);
+    if (lastUserAddress) {
+      clearDismissedForUser(lastUserAddress);
+      localStorage.removeItem(LAST_USER_ADDRESS_KEY);
+    }
+  } catch {
+    // Ignore storage errors
+  }
   window.location.href = '/auth/logout';
 }; 
