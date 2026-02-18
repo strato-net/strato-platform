@@ -186,12 +186,20 @@ export async function initInternalAddresses() {
   });
   addresses.push(...pools.map((pool: any) => pool.value));
 
-  // Vault Factory --> all vault addresses
+  // Vault Factory --> all vault addresses + their botExecutor addresses
   if (vaultFactory) {
     const { data: vaults } = await cirrus.get(accessToken, "/BlockApps-VaultFactory-allVaults", {
       params: { address: `eq.${vaultFactory}`, select: "value" },
     });
-    addresses.push(...vaults.map((vault: any) => vault.value));
+    const vaultAddresses = vaults.map((v: any) => v.value);
+    addresses.push(...vaultAddresses);
+
+    if (vaultAddresses.length > 0) {
+      const { data: vaultRecords } = await cirrus.get(accessToken, "/BlockApps-Vault", {
+        params: { address: `in.(${vaultAddresses.join(",")})`, select: "botExecutor" },
+      });
+      addresses.push(...vaultRecords.map((v: any) => v.botExecutor));
+    }
   }
 
   internalAddresses = Array.from(new Set(addresses.filter(Boolean)));
