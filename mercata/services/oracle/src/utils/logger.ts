@@ -1,5 +1,5 @@
 import { healthMonitor } from "./healthMonitor";
-import { sendWarningToSlack } from "./slackNotifier";
+import { sendWarningToSlack, sendErrorToSlack } from "./slackNotifier";
 
 // Utility function to sanitize sensitive data in log messages
 function sanitizeLogMessage(message: string): string {
@@ -49,6 +49,10 @@ export function logError(context: string, error: Error): void {
     healthMonitor.appendToErrorFile(error_message).catch(err => {
         console.error("CRITICAL: Failed to write the error log. That is an unexpected server configuration error, so we exit(1):", err);
         process.exit(1);
+    })
+    sendErrorToSlack(context, sanitizedMessage, logTime).catch(err => {
+        // Log to console only - do not call logError here to avoid infinite recursion
+        console.error(`Failed to send error to Slack: ${err instanceof Error ? err.message : String(err)}`);
     })
 }
 

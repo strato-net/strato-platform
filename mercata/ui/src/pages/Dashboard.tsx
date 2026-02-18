@@ -23,6 +23,7 @@ import { BalanceSnapshot } from "@mercata/shared-types";
 import { useUserLeaderboardRank } from "@/hooks/useUserLeaderboardRank";
 import { Button } from "@/components/ui/button";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
+import LiquidationAlertBanner from "@/components/ui/LiquidationAlertBanner";
 
 const TIME_RANGES = ["1d", "7d", "1m", "3m", "6m", "1y", "all"] as const;
 type TimeRange = typeof TIME_RANGES[number];
@@ -321,6 +322,7 @@ const Dashboard = () => {
           {!isLoggedIn && (
             <GuestSignInBanner message="Sign in to view your portfolio, track rewards, and manage your assets" />
           )}
+          {isLoggedIn && <LiquidationAlertBanner />}
           <div className={`grid grid-cols-1 ${rewardsEnabled && isLoggedIn ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-3 md:gap-6 mb-4 md:mb-8`}>
             <AssetSummary
               title="Net Balance"

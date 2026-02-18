@@ -5,10 +5,28 @@ import { StratoPaths, constants } from "../../config/constants";
 import { escrow } from "../../config/config";
 import { extractContractName } from "../../utils/utils";
 import { TransactionResponse } from "@mercata/shared-types";
+import JSONBig from "json-bigint";
 
 const { Token } = constants;
 const Escrow = "storage";
 const EscrowDeposits = `mapping`;
+const JSONbigString = JSONBig({ storeAsString: true });
+
+const normalizeArrayLike = (value: any): string[] => {
+  if (typeof value === "string") {
+    try {
+      value = JSONbigString.parse(value);
+    } catch {
+      return [];
+    }
+  }
+  if (Array.isArray(value)) return value.map(String);
+  if (!value || typeof value !== "object") return [];
+  return Object.keys(value)
+    .filter((key) => /^\d+$/.test(key))
+    .sort((a, b) => Number(a) - Number(b))
+    .map((key) => String(value[key]));
+};
 
 export interface DepositParams {
   tokens: string[]; // Array of token addresses (with or without 0x)
@@ -270,14 +288,14 @@ export const getUserReferrals = async (
       return [];
     }
 
-    return data.filter((d) => Array.isArray(d.value?.tokens)).map((deposit) => ({
+    return data.map((deposit) => ({
       ephemeralAddress: deposit.key.key || "",
       sender: deposit.value?.sender || "",
-      tokens: deposit.value?.tokens || [],
-      amounts: deposit.value?.amounts || [],
+      tokens: normalizeArrayLike(deposit.value?.tokens),
+      amounts: normalizeArrayLike(deposit.value?.amounts),
       expiry: deposit.value?.expiry || 0,
       quantity: deposit.value?.quantity || 1,
-    }));
+    })).filter((deposit) => deposit.tokens.length > 0);
   } catch (error: any) {
     if (error.response?.status === 404 || error.response?.status === 200) {
       return [];
@@ -520,13 +538,13 @@ export const getReferralHistory = async (
       const attributes = typeof event.attributes === 'string' 
         ? JSON.parse(event.attributes) 
         : event.attributes || {};
-      
+
       return {
         id: event.id?.toString() || "",
         eventName: event.event_name || "",
         ephemeralAddress: attributes.ephemeralAddress || "",
-        tokens: Array.isArray(attributes.tokens) ? attributes.tokens : [],
-        amounts: Array.isArray(attributes.amounts) ? attributes.amounts : [],
+        tokens: normalizeArrayLike(attributes.tokens),
+        amounts: normalizeArrayLike(attributes.amounts),
         sender: attributes.sender || "",
         recipient: attributes.recipient || undefined,
         blockTimestamp: event.block_timestamp ? new Date(event.block_timestamp) : new Date(),
