@@ -413,27 +413,36 @@ doDeviceFlowLogin config = do
 parseDeviceCodeResponse :: AuthConfig -> Manager -> LBS.ByteString -> IO (Either AuthError T.Text)
 parseDeviceCodeResponse config manager body =
   case decode body of
-    Nothing -> return $ Left $ DeviceFlowError "Invalid device code response"
+    Nothing -> return $ Left $ DeviceFlowError $ "Invalid device code response: " ++ show body
     Just json -> do
       let getValue :: T.Text -> Maybe T.Text
           getValue key = parseMaybe (\obj -> obj .: Key.fromText key) json
           getValueInt :: T.Text -> Maybe Int
           getValueInt key = parseMaybe (\obj -> obj .: Key.fromText key) json
       
-      case (getValue "user_code", getValue "verification_uri", getValue "device_code", getValueInt "interval") of
-        (Just userCode, Just verifyUri, Just deviceCode, Just interval) -> do
-          TIO.putStrLn "============================================================"
-          TIO.putStrLn ""
-          TIO.putStrLn $ "  Visit: " <> verifyUri
-          TIO.putStrLn $ "  Enter code: " <> userCode
-          TIO.putStrLn ""
-          TIO.putStrLn "============================================================"
-          TIO.putStrLn ""
-          TIO.putStr "Waiting for authentication..."
-          hFlush stdout
-          
-          pollForToken config manager deviceCode interval
-        _ -> return $ Left $ DeviceFlowError "Invalid device code response"
+      -- Check for error response first
+      case getValue "error" of
+        Just err -> do
+          let desc = case getValue "error_description" of
+                Just d -> d
+                Nothing -> err
+          return $ Left $ DeviceFlowError $ T.unpack desc
+        Nothing ->
+          -- Parse as success response
+          case (getValue "user_code", getValue "verification_uri", getValue "device_code", getValueInt "interval") of
+            (Just userCode, Just verifyUri, Just deviceCode, Just interval) -> do
+              TIO.putStrLn "============================================================"
+              TIO.putStrLn ""
+              TIO.putStrLn $ "  Visit: " <> verifyUri
+              TIO.putStrLn $ "  Enter code: " <> userCode
+              TIO.putStrLn ""
+              TIO.putStrLn "============================================================"
+              TIO.putStrLn ""
+              TIO.putStr "Waiting for authentication..."
+              hFlush stdout
+              
+              pollForToken config manager deviceCode interval
+            _ -> return $ Left $ DeviceFlowError "Missing required fields in device code response"
 
 -- | Poll for token until success or failure
 pollForToken :: AuthConfig -> Manager -> T.Text -> Int -> IO (Either AuthError T.Text)
