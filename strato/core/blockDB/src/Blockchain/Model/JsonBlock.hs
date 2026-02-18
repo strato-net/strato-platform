@@ -100,7 +100,7 @@ instance FromJSON RawTransaction' where
     contractName <- t .:? "cName"
     funcName <- t .:? "funcName"
     args <- t .: "args"
-    network <- t .: "code"
+    network <- t .: "network"
     code <- t .:? "code"
     (tr :: Integer) <- parseHexStr (t .: "r")
     (ts :: Integer) <- parseHexStr (t .: "s")
