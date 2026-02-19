@@ -7,8 +7,12 @@ DIR="$HOME/.config/restish"
 
 mkdir -p "$DIR"
 
+echo "Authenticating..."
+strato-auth >/dev/null 2>&1
+TOKEN=$(jq -r '.access_token' ~/.secrets/stratoToken)
+
 echo "Fetching swagger from $HOST..."
-if ! curl -f "http://$HOST/strato-api/swagger.json" -o "$DIR/strato-swagger.json" 2>&1; then
+if ! curl -f -H "Authorization: Bearer $TOKEN" "http://$HOST/strato-api/swagger.json" -o "$DIR/strato-swagger.json" 2>&1; then
     echo "Error: Failed to fetch swagger spec from http://$HOST/strato-api/swagger.json"
     exit 1
 fi
