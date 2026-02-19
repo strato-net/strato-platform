@@ -8,7 +8,10 @@ DIR="$HOME/.config/restish"
 mkdir -p "$DIR"
 
 echo "Fetching swagger from $HOST..."
-curl -sf "http://$HOST/strato-api/swagger.json" > "$DIR/strato-swagger.json"
+if ! curl -f "http://$HOST/strato-api/swagger.json" -o "$DIR/strato-swagger.json" 2>&1; then
+    echo "Error: Failed to fetch swagger spec from http://$HOST/strato-api/swagger.json"
+    exit 1
+fi
 
 echo "Creating auth helper..."
 cat > "$DIR/strato-auth-helper.sh" << 'EOF'
