@@ -2,7 +2,6 @@
 # Setup restish for STRATO. Usage: ./setup-restish.sh [host:port]
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 HOST="${1:-localhost:8081}"
 
 # Mac uses ~/Library/Application Support/restish, Linux uses ~/.config/restish
@@ -18,8 +17,15 @@ HELPER_DIR="$HOME/.local/bin"
 mkdir -p "$DIR"
 mkdir -p "$HELPER_DIR"
 
-echo "Copying OpenAPI spec..."
-cp "$SCRIPT_DIR/restish/strato-openapi3.json" "$DIR/"
+echo "Authenticating..."
+strato-auth >/dev/null 2>&1
+TOKEN=$(jq -r '.access_token' ~/.secrets/stratoToken)
+
+echo "Fetching OpenAPI spec from $HOST..."
+if ! curl -sf -H "Authorization: Bearer $TOKEN" "http://$HOST/strato-api/openapi.json" -o "$DIR/strato-openapi3.json"; then
+    echo "Error: Failed to fetch spec from http://$HOST/strato-api/openapi.json"
+    exit 1
+fi
 
 echo "Creating auth helper..."
 cat > "$HELPER_DIR/strato-auth-helper.sh" << 'EOF'

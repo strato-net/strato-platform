@@ -9,7 +9,7 @@ import qualified BlockApps.Solidity.Xabi.Type as Xabi
 import Control.DeepSeq
 import Control.Lens (mapped, (&), (?~))
 import Data.Aeson
-import Data.Swagger
+import Data.OpenApi
 import Data.Text (Text)
 import GHC.Generics
 import qualified Generic.Random as GR

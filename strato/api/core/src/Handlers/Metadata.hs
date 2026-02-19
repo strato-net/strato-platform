@@ -38,7 +38,7 @@ import Data.Aeson hiding (Success)
 import Data.Aeson.Casing.Internal (camelCase, dropFPrefix)
 import Data.Map (Map, fromList)
 import Data.Maybe (fromJust, fromMaybe)
-import Data.Swagger hiding (url)
+import Data.OpenApi hiding (url, server)
 import GHC.Generics
 import qualified LabeledError
 import Servant
@@ -94,12 +94,8 @@ exMetadataRespone =
 -- | The model's field modifiers will match the JSON instances
 metadataSchemaOptions :: SchemaOptions
 metadataSchemaOptions =
-  SchemaOptions
-    { fieldLabelModifier = camelCase . dropFPrefix,
-      constructorTagModifier = id,
-      datatypeNameModifier = id,
-      allNullaryToStringTag = True,
-      unwrapUnaryRecords = True
+  defaultSchemaOptions
+    { Data.OpenApi.fieldLabelModifier = camelCase . dropFPrefix
     }
 
 getMetaData ::

@@ -38,9 +38,9 @@ library:
     - product-profunctors
     - profunctors
     - saltine
-    - servant-swagger
+    - servant-openapi3
     - strato-model
-    - swagger2
+    - openapi3
     - transformers
     - unliftio
     - resource-pool

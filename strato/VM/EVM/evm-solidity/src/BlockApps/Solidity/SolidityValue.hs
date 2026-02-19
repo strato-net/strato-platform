@@ -12,7 +12,7 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
 import Data.Foldable
 import qualified Data.Map.Strict as M
-import Data.Swagger
+import Data.OpenApi
 import Data.Text (Text)
 import GHC.Generics
 import Test.QuickCheck

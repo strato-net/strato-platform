@@ -24,7 +24,7 @@ import qualified Data.ByteString.Lazy as BL
 import Data.Data
 import Data.Hashable (Hashable)
 import qualified Data.Map.Strict as M
-import Data.Swagger
+import Data.OpenApi
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
@@ -54,7 +54,7 @@ instance ToSchema SourceMap where
       NamedSchema
         (Just "SourceMap")
         ( mempty
-            & type_ ?~ SwaggerString
+            & type_ ?~ OpenApiString
             & example ?~ toJSON (namedSource "SimpleStorage.sol" "contract SimpleStorage { }")
             & description ?~ "SourceMap"
         )

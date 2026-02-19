@@ -52,8 +52,8 @@ import qualified Data.HashMap.Strict.InsOrd as H
 import Data.Map (fromList, traverseWithKey)
 import Data.Maybe (listToMaybe)
 import Data.Source.Map
-import Data.Swagger hiding (Header, Http, delete)
-import qualified Data.Swagger as Sw
+import Data.OpenApi hiding (Header, delete)
+import qualified Data.OpenApi as OPENAPI
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as Text
@@ -71,7 +71,7 @@ import Network.Wai.Middleware.RequestLogger
 import SQLM
 import Servant
 import Servant.Multipart
-import Servant.Swagger
+import Servant.OpenApi
 import Servant.Swagger.UI
 import qualified Strato.Strato23.API.Types as V
 import Strato.Strato23.Client
@@ -154,7 +154,7 @@ fullServer jwtToken = hoistServer (Proxy :: Proxy CoreAPI) (flip runReaderT (Acc
 
 ----------------
 
-hoistCoreServer :: BlocEnv -> UrlMap -> Server FullAPI
+hoistCoreServer :: BlocEnv -> UrlMap -> Servant.Server FullAPI
 hoistCoreServer blocEnv urlMap = hoistServer (Proxy :: Proxy FullAPI) convertErrors fullServer
   where
     convertErrors :: VaultM (ReaderT UrlMap (ReaderT BlocEnv (CirrusM (SQLM (LoggingT IO))))) a -> Handler a
@@ -209,7 +209,7 @@ main = do
 
   let theDoc =
         addOperationIds $
-        toSwagger (Proxy :: Proxy FullAPI)
+        toOpenApi (Proxy :: Proxy FullAPI)
           & info . title .~ "Strato API"
           & info . description
             ?~ "This is the great Strato API, which let's \
@@ -241,16 +241,16 @@ main = do
           }
   runSettings (setPort 3000 $ setHost (fromString $ ipAddress $ apiConfig ethConf) defaultSettings) $ app env theDoc urlMap
 
-app :: BlocEnv -> Swagger -> UrlMap -> Application
+app :: BlocEnv -> OpenApi -> UrlMap -> Application
 app blocEnv theDoc urlMap =
   prometheus def {prometheusInstrumentApp = False} $
     instrumentApp "core-api" $
       logStdoutDev $
         cors (const $ Just simpleCorsResourcePolicy {corsRequestHeaders = ["Content-Type"]})
-        --  $ serve (Proxy :: Proxy (CoreAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $ (coreServer pool :<|> swaggerSchemaUIServer theDoc)
+        --  $ serve (Proxy :: Proxy (CoreAPI :<|> SwaggerSchemaUI "openapi-ui" "openapi.json")) $ (coreServer pool :<|> swaggerSchemaUIServer theDoc)
         $
           addPathsTo404 $
-            serve (Proxy :: Proxy (FullAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $
+            serve (Proxy :: Proxy (FullAPI :<|> SwaggerSchemaUI "openapi-ui" "openapi.json")) $
               hoistCoreServer blocEnv urlMap :<|> swaggerSchemaUIServer theDoc
 
 addPathsTo404 :: Middleware
@@ -267,25 +267,25 @@ addPathsTo404 baseApp req respond' =
                 ++ tab ("\n" ++ unlines allPaths)
                 ++ "\n"
   where
-    allPaths = H.keys $ _swaggerPaths $ toSwagger (Proxy :: Proxy FullAPI)
+    allPaths = H.keys $ _openApiPaths $ toOpenApi (Proxy :: Proxy FullAPI)
 
 ----------
 
 -- | Add operationId to all operations based on path and method
 -- This makes CLI tools like restish generate cleaner command names
-addOperationIds :: Swagger -> Swagger
-addOperationIds swagger = swagger & Sw.paths %~ H.mapWithKey addIdsToPathItem
+addOperationIds :: OpenApi -> OpenApi
+addOperationIds swagger = swagger & OPENAPI.paths %~ H.mapWithKey addIdsToPathItem
   where
     addIdsToPathItem :: FilePath -> PathItem -> PathItem
     addIdsToPathItem apiPath item = item
-      & Sw.get    %~ fmap (setOpId "get" apiPath)
-      & Sw.put    %~ fmap (setOpId "put" apiPath)
-      & Sw.post   %~ fmap (setOpId "post" apiPath)
-      & Sw.delete %~ fmap (setOpId "delete" apiPath)
-      & Sw.patch  %~ fmap (setOpId "patch" apiPath)
+      & OPENAPI.get    %~ fmap (setOpId "get" apiPath)
+      & OPENAPI.put    %~ fmap (setOpId "put" apiPath)
+      & OPENAPI.post   %~ fmap (setOpId "post" apiPath)
+      & OPENAPI.delete %~ fmap (setOpId "delete" apiPath)
+      & OPENAPI.patch  %~ fmap (setOpId "patch" apiPath)
 
     setOpId :: Text -> FilePath -> Operation -> Operation
-    setOpId method apiPath op = op & Sw.operationId ?~ generateOperationId method apiPath
+    setOpId method apiPath op = op & OPENAPI.operationId ?~ generateOperationId method apiPath
 
     -- Convert "/eth/v1.2/account" + "get" -> "getAccount"
     -- Convert "/bloc/v2.2/contracts/{contractName}" + "get" -> "getContract"
@@ -326,8 +326,8 @@ addOperationIds swagger = swagger & Sw.paths %~ H.mapWithKey addIdsToPathItem
 
 -- Temporary location for a couple of instance definitions needed for toSwagger, we need to find a better place
 
-instance HasSwagger a => HasSwagger (MultipartForm Mem (MultipartData Mem) :> a) where
-  toSwagger _ = toSwagger (Proxy :: Proxy a)
+instance HasOpenApi a => HasOpenApi (MultipartForm Mem (MultipartData Mem) :> a) where
+  toOpenApi _ = toOpenApi (Proxy :: Proxy a)
 
 instance ToSchema Value where
   declareNamedSchema _ =

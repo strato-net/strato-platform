@@ -12,8 +12,8 @@ import Control.DeepSeq
 import Control.Lens (mapped, (&), (?~))
 import Data.Aeson
 import Data.Binary
+import Data.OpenApi
 import Data.Source
-import Data.Swagger
 import GHC.Generics
 import qualified Generic.Random as GR
 import qualified SolidVM.Model.CodeCollection.VarDef as SolidVM
