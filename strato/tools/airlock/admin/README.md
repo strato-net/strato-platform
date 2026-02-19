@@ -8,6 +8,26 @@ Scripts for deploying and configuring the Railgun contract on STRATO.
 - jq and restish must be installed
 - For bash autocomplete, source the completion script
 
+## Initial Setup
+
+### setup-restish.sh
+
+Configures restish to work with the STRATO API. Run this once per machine, or whenever you need to update the API spec.
+
+```bash
+./setup-restish.sh [strato-host]
+
+# Example with custom host:
+./setup-restish.sh my-strato-node:8081
+```
+
+This script:
+1. Downloads the swagger spec from your running STRATO instance
+2. Creates an auth helper script that uses `strato-auth`
+3. Creates/updates `~/.config/restish/apis.json` with auth configuration
+
+After setup, restish commands like `restish strato post-bloc-transaction --resolve` will work.
+
 ## Tools
 
 ### strato-call
