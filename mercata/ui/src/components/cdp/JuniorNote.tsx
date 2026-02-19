@@ -5,6 +5,7 @@ import { RefreshCw } from "lucide-react";
 import { cdpService, JuniorNote as JuniorNoteType } from "@/services/cdpService";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/context/UserContext";
+import { redirectToLogin } from "@/lib/auth";
 import { formatWeiToDecimalHP, formatNumber } from "@/utils/numberUtils";
 import CopyableHash from "../common/CopyableHash";
 
@@ -164,10 +165,7 @@ const JuniorNote: React.FC<JuniorNoteProps> = ({ refreshTrigger, onNoteActionSuc
           Sign in to view your Junior Note details, claimable rewards, and remaining cap.
         </p>
         <Button
-          onClick={() => {
-            const theme = localStorage.getItem('theme') || 'light';
-            window.location.href = `/login?theme=${theme}`;
-          }}
+          onClick={() => redirectToLogin()}
         >
           Sign In to View Your Junior Note
         </Button>
