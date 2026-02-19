@@ -2,6 +2,7 @@
 # Setup restish for STRATO. Usage: ./setup-restish.sh [host:port]
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 HOST="${1:-localhost:8081}"
 
 # Mac uses ~/Library/Application Support/restish, Linux uses ~/.config/restish
@@ -11,29 +12,26 @@ else
     DIR="$HOME/.config/restish"
 fi
 
+# Auth helper goes in a path without spaces
+HELPER_DIR="$HOME/.local/bin"
+
 mkdir -p "$DIR"
+mkdir -p "$HELPER_DIR"
 
-echo "Authenticating..."
-strato-auth >/dev/null 2>&1
-TOKEN=$(jq -r '.access_token' ~/.secrets/stratoToken)
-
-echo "Fetching swagger from $HOST..."
-if ! curl -f -H "Authorization: Bearer $TOKEN" "http://$HOST/strato-api/swagger.json" -o "$DIR/strato-swagger.json" 2>&1; then
-    echo "Error: Failed to fetch swagger spec from http://$HOST/strato-api/swagger.json"
-    exit 1
-fi
+echo "Copying OpenAPI spec..."
+cp "$SCRIPT_DIR/restish/strato-openapi3.json" "$DIR/"
 
 echo "Creating auth helper..."
-cat > "$DIR/strato-auth-helper.sh" << 'EOF'
+cat > "$HELPER_DIR/strato-auth-helper.sh" << 'EOF'
 #!/bin/bash
 strato-auth >/dev/null 2>&1
 TOKEN=$(jq -r '.access_token' ~/.secrets/stratoToken)
 echo "{\"headers\":{\"Authorization\":[\"Bearer $TOKEN\"]}}"
 EOF
-chmod +x "$DIR/strato-auth-helper.sh"
+chmod +x "$HELPER_DIR/strato-auth-helper.sh"
 
 echo "Configuring restish..."
-CONFIG='{"base":"http://'"$HOST"'/strato-api","spec_files":["'"$DIR"'/strato-swagger.json"],"profiles":{"default":{"auth":{"name":"external-tool","params":{"commandline":"'"$DIR"'/strato-auth-helper.sh","omitbody":"true"}}}}}'
+CONFIG='{"base":"http://'"$HOST"'/strato-api","spec_files":["'"$DIR"'/strato-openapi3.json"],"profiles":{"default":{"auth":{"name":"external-tool","params":{"commandline":"'"$HELPER_DIR"'/strato-auth-helper.sh","omitbody":"true"}}}}}'
 
 if [ -f "$DIR/apis.json" ]; then
     jq --argjson cfg "$CONFIG" '.strato = $cfg' "$DIR/apis.json" > "$DIR/apis.json.tmp"

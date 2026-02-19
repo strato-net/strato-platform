@@ -1,0 +1,3425 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "description": "This is the great Strato API, which let's  you query the blockchain.",
+        "title": "Strato API",
+        "version": "1.2"
+    },
+    "paths": {
+        "/bloc/v2.2": {
+            "get": {
+                "operationId": "getBloc",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-USER-ACCESS-TOKEN",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GitInfo"
+                                }
+                            },
+                            "text/plain;charset=utf-8": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GitInfo"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid `X-USER-ACCESS-TOKEN`"
+                    }
+                }
+            }
+        },
+        "/bloc/v2.2/contracts": {
+            "get": {
+                "operationId": "getBlocContracts",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-USER-ACCESS-TOKEN",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "name",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "offset",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "limit",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Get_Contract_Response"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid `limit` or `offset` or `name` or `X-USER-ACCESS-TOKEN`"
+                    }
+                }
+            }
+        },
+        "/bloc/v2.2/contracts/compile": {
+            "post": {
+                "operationId": "postContractsCompile",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-USER-ACCESS-TOKEN",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json;charset=utf-8": {
+                            "schema": {
+                                "items": {
+                                    "$ref": "#/components/schemas/Post_Compile_Request"
+                                },
+                                "type": "array"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/Post_Compile_Response"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid `body` or `X-USER-ACCESS-TOKEN`"
+                    }
+                }
+            }
+        },
+        "/bloc/v2.2/contracts/contract/{contractAddress}/details": {
+            "get": {
+                "operationId": "getByContractAddressDetails",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-USER-ACCESS-TOKEN",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "path",
+                        "name": "contractAddress",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "hex string",
+                            "minimum": 0,
+                            "maximum": 1.461501637330903e+48
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Contract"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid `contractAddress` or `X-USER-ACCESS-TOKEN`"
+                    }
+                }
+            }
+        },
+        "/bloc/v2.2/contracts/states": {
+            "post": {
+                "operationId": "postContractsStates",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-USER-ACCESS-TOKEN",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json;charset=utf-8": {
+                            "schema": {
+                                "items": {
+                                    "$ref": "#/components/schemas/Get_Contracts_States"
+                                },
+                                "type": "array"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "items": {
+                                        "additionalProperties": {
+                                            "$ref": "#/components/schemas/Solidity_Value"
+                                        },
+                                        "type": "object"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid `body` or `X-USER-ACCESS-TOKEN`"
+                    }
+                }
+            }
+        },
+        "/bloc/v2.2/contracts/xabi": {
+            "post": {
+                "operationId": "postContractsXabi",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-USER-ACCESS-TOKEN",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json;charset=utf-8": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Post_Xabi_Request"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Post_Xabi_Request"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Post_Xabi_Response"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid `body` or `X-USER-ACCESS-TOKEN`"
+                    }
+                }
+            }
+        },
+        "/bloc/v2.2/contracts/{contractName}": {
+            "get": {
+                "operationId": "getContractsByContractName",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-USER-ACCESS-TOKEN",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "path",
+                        "name": "contractName",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/Address"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid `contractName` or `X-USER-ACCESS-TOKEN`"
+                    }
+                }
+            }
+        },
+        "/bloc/v2.2/contracts/{contractName}/all/states": {
+            "get": {
+                "operationId": "getAllStates",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-USER-ACCESS-TOKEN",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "path",
+                        "name": "contractName",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "items": {
+                                        "additionalProperties": {
+                                            "additionalProperties": {
+                                                "$ref": "#/components/schemas/Solidity_Value"
+                                            },
+                                            "type": "object"
+                                        },
+                                        "type": "object"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid `contractName` or `X-USER-ACCESS-TOKEN`"
+                    }
+                }
+            }
+        },
+        "/bloc/v2.2/contracts/{contractName}/{contractAddress}": {
+            "get": {
+                "operationId": "getByContractNameByContractAddress",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-USER-ACCESS-TOKEN",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "path",
+                        "name": "contractName",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "path",
+                        "name": "contractAddress",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "hex string",
+                            "minimum": 0,
+                            "maximum": 1.461501637330903e+48
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Contract"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid `contractAddress` or `contractName` or `X-USER-ACCESS-TOKEN`"
+                    }
+                }
+            }
+        },
+        "/bloc/v2.2/contracts/{contractName}/{contractAddress}/enum/{enumName}": {
+            "get": {
+                "operationId": "getEnumByEnumName",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-USER-ACCESS-TOKEN",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "path",
+                        "name": "contractName",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "path",
+                        "name": "contractAddress",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "hex string",
+                            "minimum": 0,
+                            "maximum": 1.461501637330903e+48
+                        }
+                    },
+                    {
+                        "in": "path",
+                        "name": "enumName",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/Enum_Value"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid `enumName` or `contractAddress` or `contractName` or `X-USER-ACCESS-TOKEN`"
+                    }
+                }
+            }
+        },
+        "/bloc/v2.2/contracts/{contractName}/{contractAddress}/functions": {
+            "get": {
+                "operationId": "getByContractAddressFunctions",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-USER-ACCESS-TOKEN",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "path",
+                        "name": "contractName",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "path",
+                        "name": "contractAddress",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "hex string",
+                            "minimum": 0,
+                            "maximum": 1.461501637330903e+48
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/Function_Name"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid `contractAddress` or `contractName` or `X-USER-ACCESS-TOKEN`"
+                    }
+                }
+            }
+        },
+        "/bloc/v2.2/contracts/{contractName}/{contractAddress}/state": {
+            "get": {
+                "operationId": "getByContractAddressState",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-USER-ACCESS-TOKEN",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "path",
+                        "name": "contractName",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "path",
+                        "name": "contractAddress",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "hex string",
+                            "minimum": 0,
+                            "maximum": 1.461501637330903e+48
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "name",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "count",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "offset",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "allowEmptyValue": true,
+                        "in": "query",
+                        "name": "length",
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "additionalProperties": {
+                                        "$ref": "#/components/schemas/Solidity_Value"
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid `length` or `offset` or `count` or `name` or `contractAddress` or `contractName` or `X-USER-ACCESS-TOKEN`"
+                    }
+                }
+            }
+        },
+        "/bloc/v2.2/contracts/{contractName}/{contractAddress}/state/{mapping}/{key}": {
+            "get": {
+                "operationId": "getByMappingByKey",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-USER-ACCESS-TOKEN",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "path",
+                        "name": "contractName",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "path",
+                        "name": "contractAddress",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "hex string",
+                            "minimum": 0,
+                            "maximum": 1.461501637330903e+48
+                        }
+                    },
+                    {
+                        "in": "path",
+                        "name": "mapping",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "path",
+                        "name": "key",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Get_Contract_States_Mapping_Response"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid `key` or `mapping` or `contractAddress` or `contractName` or `X-USER-ACCESS-TOKEN`"
+                    }
+                }
+            }
+        },
+        "/bloc/v2.2/contracts/{contractName}/{contractAddress}/symbols": {
+            "get": {
+                "operationId": "getByContractAddressSymbols",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-USER-ACCESS-TOKEN",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "path",
+                        "name": "contractName",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "path",
+                        "name": "contractAddress",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "hex string",
+                            "minimum": 0,
+                            "maximum": 1.461501637330903e+48
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "items": {
+                                        "example": "SymbolName",
+                                        "type": "string"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid `contractAddress` or `contractName` or `X-USER-ACCESS-TOKEN`"
+                    }
+                }
+            }
+        },
+        "/bloc/v2.2/transaction": {
+            "post": {
+                "operationId": "postBlocTransaction",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-USER-ACCESS-TOKEN",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "username",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "allowEmptyValue": true,
+                        "in": "query",
+                        "name": "resolve",
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/PostBlocTransactionRequest"
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/BlocTransactionResult"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid `body` or `resolve` or `username` or `X-USER-ACCESS-TOKEN`"
+                    }
+                }
+            }
+        },
+        "/bloc/v2.2/transaction/body": {
+            "post": {
+                "operationId": "postTransactionBody",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-USER-ACCESS-TOKEN",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/PostBlocTransactionRequest"
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/BlocTransactionBodyResult"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid `body` or `X-USER-ACCESS-TOKEN`"
+                    }
+                }
+            }
+        },
+        "/bloc/v2.2/transaction/parallel": {
+            "post": {
+                "operationId": "postTransactionParallel",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-USER-ACCESS-TOKEN",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "username",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "allowEmptyValue": true,
+                        "in": "query",
+                        "name": "resolve",
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/PostBlocTransactionRequest"
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/BlocTransactionResult"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid `body` or `resolve` or `username` or `X-USER-ACCESS-TOKEN`"
+                    }
+                }
+            }
+        },
+        "/bloc/v2.2/transaction/unsigned": {
+            "post": {
+                "operationId": "postTransactionUnsigned",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-USER-ACCESS-TOKEN",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/PostBlocTransactionRequest"
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/BlocTransactionUnsignedResult"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid `body` or `X-USER-ACCESS-TOKEN`"
+                    }
+                }
+            }
+        },
+        "/bloc/v2.2/transactions/results": {
+            "post": {
+                "operationId": "postTransactionsResults",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-USER-ACCESS-TOKEN",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "allowEmptyValue": true,
+                        "in": "query",
+                        "name": "resolve",
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json;charset=utf-8": {
+                            "schema": {
+                                "items": {
+                                    "$ref": "#/components/schemas/Keccak256_hash_32_byte_hex_encoded_string"
+                                },
+                                "type": "array"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/BlocTransactionResult"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid `body` or `resolve` or `X-USER-ACCESS-TOKEN`"
+                    }
+                }
+            }
+        },
+        "/bloc/v2.2/transactions/{hash}/result": {
+            "get": {
+                "operationId": "getByHashResult",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-USER-ACCESS-TOKEN",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "path",
+                        "name": "hash",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "allowEmptyValue": true,
+                        "in": "query",
+                        "name": "resolve",
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BlocTransactionResult"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid `resolve` or `hash` or `X-USER-ACCESS-TOKEN`"
+                    }
+                }
+            }
+        },
+        "/eth/v1.2/account": {
+            "get": {
+                "operationId": "getEthAccount",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-USER-ACCESS-TOKEN",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "address",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "hex string",
+                            "minimum": 0,
+                            "maximum": 1.461501637330903e+48
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "balance",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": false
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "minbalance",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": false
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "maxbalance",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": false
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "nonce",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": false
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "minnonce",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": false
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "maxnonce",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": false
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "maxnumber",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": false
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "codeHash",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "contractName",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "external",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "limit",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": false
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "offset",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": false
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "search",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/AddresStateRef_"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid `search` or `offset` or `limit` or `external` or `contractName` or `codeHash` or `maxnumber` or `maxnonce` or `minnonce` or `nonce` or `maxbalance` or `minbalance` or `balance` or `address` or `X-USER-ACCESS-TOKEN`"
+                    }
+                }
+            }
+        },
+        "/eth/v1.2/block": {
+            "get": {
+                "operationId": "getEthBlock",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-USER-ACCESS-TOKEN",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "txaddress",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "hex string",
+                            "minimum": 0,
+                            "maximum": 1.461501637330903e+48
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "coinbase",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "hex string",
+                            "minimum": 0,
+                            "maximum": 1.461501637330903e+48
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "address",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "hex string",
+                            "minimum": 0,
+                            "maximum": 1.461501637330903e+48
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "blockid",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "hash",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "mindiff",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": false
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "maxdiff",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": false
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "diff",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": false
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "gasused",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": false
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "mingasused",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": false
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "maxgasused",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": false
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "gaslim",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": false
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "mingaslim",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": false
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "maxgaslim",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": false
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "number",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": false
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "minnumber",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": false
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "maxnumber",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": false
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "index",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": -9223372036854776000,
+                            "maximum": 9223372036854776000
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "sortby",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/Block_"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid `sortby` or `index` or `maxnumber` or `minnumber` or `number` or `maxgaslim` or `mingaslim` or `gaslim` or `maxgasused` or `mingasused` or `gasused` or `diff` or `maxdiff` or `mindiff` or `hash` or `blockid` or `address` or `coinbase` or `txaddress` or `X-USER-ACCESS-TOKEN`"
+                    }
+                }
+            }
+        },
+        "/eth/v1.2/block/last/{num}": {
+            "get": {
+                "operationId": "getLastByNum",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-USER-ACCESS-TOKEN",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "path",
+                        "name": "num",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/Block_"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid `num` or `X-USER-ACCESS-TOKEN`"
+                    }
+                }
+            }
+        },
+        "/eth/v1.2/code/{codeHash}": {
+            "get": {
+                "operationId": "getCodeByCodeHash",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-USER-ACCESS-TOKEN",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "path",
+                        "name": "codeHash",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SourceMap"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid `codeHash` or `X-USER-ACCESS-TOKEN`"
+                    }
+                }
+            }
+        },
+        "/eth/v1.2/metadata": {
+            "get": {
+                "operationId": "getEthMetadata",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-USER-ACCESS-TOKEN",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MetadataResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid `X-USER-ACCESS-TOKEN`"
+                    }
+                }
+            }
+        },
+        "/eth/v1.2/peers": {
+            "get": {
+                "operationId": "getEthPeers",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-USER-ACCESS-TOKEN",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/JSON_Value"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid `X-USER-ACCESS-TOKEN`"
+                    }
+                }
+            }
+        },
+        "/eth/v1.2/stats/totaltx": {
+            "get": {
+                "operationId": "getStatsTotaltx",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-USER-ACCESS-TOKEN",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TransactionCount"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid `X-USER-ACCESS-TOKEN`"
+                    }
+                }
+            }
+        },
+        "/eth/v1.2/storage": {
+            "get": {
+                "operationId": "getEthStorage",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-USER-ACCESS-TOKEN",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "key",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "Path to SolidVM storage location"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "minkey",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "Path to SolidVM storage location"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "maxkey",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "Path to SolidVM storage location"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "value",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "simple SolidVM expression"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "minvalue",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "simple SolidVM expression"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "maxvalue",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "simple SolidVM expression"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "search",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "address",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "hex string",
+                            "minimum": 0,
+                            "maximum": 1.461501637330903e+48
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "offset",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": false
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "limit",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": false
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/StorageAddress"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid `limit` or `offset` or `address` or `search` or `maxvalue` or `minvalue` or `value` or `maxkey` or `minkey` or `key` or `X-USER-ACCESS-TOKEN`"
+                    }
+                }
+            }
+        },
+        "/eth/v1.2/transaction": {
+            "get": {
+                "operationId": "getEthTransaction",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-USER-ACCESS-TOKEN",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "address",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "hex string",
+                            "minimum": 0,
+                            "maximum": 1.461501637330903e+48
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "from",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "hex string",
+                            "minimum": 0,
+                            "maximum": 1.461501637330903e+48
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "to",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "hex string",
+                            "minimum": 0,
+                            "maximum": 1.461501637330903e+48
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "hash",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "gasprice",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": false
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "mingasprice",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": false
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "maxgasprice",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": false
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "gaslimit",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": false
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "mingaslimit",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": false
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "maxgaslimit",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": false
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "value",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": false
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "minvalue",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": false
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "maxvalue",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": false
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "blocknumber",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": false
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "minblocknumber",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": false
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "maxblocknumber",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": false
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "mintimestamp",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "yyyy-mm-ddThh:MM:ssZ"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "maxtimestamp",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "yyyy-mm-ddThh:MM:ssZ"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "limit",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": false
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "offset",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": false
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "search",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "sortby",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/RawTransaction_"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid `sortby` or `search` or `offset` or `limit` or `maxtimestamp` or `mintimestamp` or `maxblocknumber` or `minblocknumber` or `blocknumber` or `maxvalue` or `minvalue` or `value` or `maxgaslimit` or `mingaslimit` or `gaslimit` or `maxgasprice` or `mingasprice` or `gasprice` or `hash` or `to` or `from` or `address` or `X-USER-ACCESS-TOKEN`"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "postEthTransaction",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-USER-ACCESS-TOKEN",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json;charset=utf-8": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RawTransaction_"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Keccak256_hash_32_byte_hex_encoded_string"
+                                }
+                            },
+                            "text/plain;charset=utf-8": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Keccak256_hash_32_byte_hex_encoded_string"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid `body` or `X-USER-ACCESS-TOKEN`"
+                    }
+                }
+            }
+        },
+        "/eth/v1.2/transaction/last/queued": {
+            "get": {
+                "operationId": "getLastQueued",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-USER-ACCESS-TOKEN",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/RawTransaction_"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid `X-USER-ACCESS-TOKEN`"
+                    }
+                }
+            }
+        },
+        "/eth/v1.2/transaction/last/{num}": {
+            "get": {
+                "operationId": "getLastByNum",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-USER-ACCESS-TOKEN",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "path",
+                        "name": "num",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/RawTransaction_"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid `num` or `X-USER-ACCESS-TOKEN`"
+                    }
+                }
+            }
+        },
+        "/eth/v1.2/transactionResult/batch": {
+            "post": {
+                "operationId": "postTransactionResultBatch",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-USER-ACCESS-TOKEN",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json;charset=utf-8": {
+                            "schema": {
+                                "items": {
+                                    "$ref": "#/components/schemas/Keccak256_hash_32_byte_hex_encoded_string"
+                                },
+                                "type": "array"
+                            }
+                        },
+                        "text/plain;charset=utf-8": {
+                            "schema": {
+                                "items": {
+                                    "$ref": "#/components/schemas/Keccak256_hash_32_byte_hex_encoded_string"
+                                },
+                                "type": "array"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "additionalProperties": {
+                                        "items": {
+                                            "$ref": "#/components/schemas/TransactionResult"
+                                        },
+                                        "type": "array"
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid `body` or `X-USER-ACCESS-TOKEN`"
+                    }
+                }
+            }
+        },
+        "/eth/v1.2/transactionResult/{txHash}": {
+            "get": {
+                "operationId": "getTransactionResultByTxHash",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-USER-ACCESS-TOKEN",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "path",
+                        "name": "txHash",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/TransactionResult"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid `txHash` or `X-USER-ACCESS-TOKEN`"
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "requestBodies": {
+            "PostBlocTransactionRequest": {
+                "content": {
+                    "application/json;charset=utf-8": {
+                        "schema": {
+                            "$ref": "#/components/schemas/PostBlocTransactionRequest"
+                        }
+                    }
+                },
+                "required": true
+            }
+        },
+        "schemas": {
+            "Address": {
+                "description": "Ethereum Address, 20 byte hex encoded string",
+                "example": "address=deadbeef",
+                "type": "string"
+            },
+            "BasicValue": {
+                "format": "simple SolidVM expression",
+                "type": "string"
+            },
+            "BlocTransactionBodyResult": {
+                "description": "Bloc Transaction body result",
+                "example": {
+                    "hash": "a1cac15d7e566bfd40a0d4454b5225c6c70892c26b5b82fdae2ff34ec581abd1",
+                    "raw": null
+                },
+                "properties": {
+                    "transactionHash": {
+                        "$ref": "#/components/schemas/Keccak256_hash_32_byte_hex_encoded_string"
+                    },
+                    "transactionRaw": {
+                        "$ref": "#/components/schemas/RawTransaction_"
+                    }
+                },
+                "required": [
+                    "transactionHash"
+                ],
+                "type": "object"
+            },
+            "BlocTransactionPayload": {
+                "description": "Bloc Transaction Payload",
+                "example": {
+                    "payload": {
+                        "args": {
+                            "_x": 1
+                        },
+                        "contract": null,
+                        "metadata": null,
+                        "src": [
+                            [
+                                "SimpleStorage.sol",
+                                "contract SimpleStorage { uint x; function SimpleStorage(uint _x) { x = _x; } function set(uint _x) { x = _x; } }"
+                            ]
+                        ],
+                        "txParams": null
+                    },
+                    "type": "CONTRACT"
+                },
+                "maxProperties": 1,
+                "minProperties": 1,
+                "properties": {
+                    "BlocContract": {
+                        "$ref": "#/components/schemas/ContractPayload"
+                    },
+                    "BlocFunction": {
+                        "$ref": "#/components/schemas/FunctionPayload"
+                    },
+                    "BlocTransfer": {
+                        "$ref": "#/components/schemas/TransferPayload"
+                    }
+                },
+                "type": "object"
+            },
+            "BlocTransactionResult": {
+                "description": "Bloc Transaction Result",
+                "example": {
+                    "data": null,
+                    "hash": "41b1a0649752af1b28b3dc29a1556eee781e4a4c3a1f7f53f90fa834de098c4d",
+                    "status": "Success",
+                    "txResult": null
+                },
+                "properties": {
+                    "transactionData": {
+                        "$ref": "#/components/schemas/Bloc_Transaction_Data"
+                    },
+                    "transactionHash": {
+                        "$ref": "#/components/schemas/Keccak256_hash_32_byte_hex_encoded_string"
+                    },
+                    "transactionStatus": {
+                        "$ref": "#/components/schemas/BlocTransactionStatus"
+                    },
+                    "transactionTxResult": {
+                        "$ref": "#/components/schemas/TransactionResult"
+                    }
+                },
+                "required": [
+                    "transactionStatus",
+                    "transactionHash"
+                ],
+                "type": "object"
+            },
+            "BlocTransactionStatus": {
+                "description": "Bloc Transaction Status",
+                "enum": [
+                    "Success",
+                    "Failure",
+                    "Pending"
+                ],
+                "example": "Success",
+                "type": "string"
+            },
+            "BlocTransactionUnsignedResult": {
+                "description": "Bloc Transaction unsigned result",
+                "example": {
+                    "data": null,
+                    "hash": "a1cac15d7e566bfd40a0d4454b5225c6c70892c26b5b82fdae2ff34ec581abd1"
+                },
+                "properties": {
+                    "transactionUnsignedData": {
+                        "$ref": "#/components/schemas/UnsignedRawTransaction_"
+                    },
+                    "transactionUnsignedHash": {
+                        "$ref": "#/components/schemas/Keccak256_hash_32_byte_hex_encoded_string"
+                    }
+                },
+                "required": [
+                    "transactionUnsignedHash"
+                ],
+                "type": "object"
+            },
+            "Contract": {
+                "description": "A Solidity contract parsed for SolidVM",
+                "example": {
+                    "_constants": {},
+                    "_constructor": null,
+                    "_contractContext": {
+                        "annotation": [],
+                        "end": {
+                            "column": 0,
+                            "line": 0,
+                            "name": ""
+                        },
+                        "start": {
+                            "column": 0,
+                            "line": 0,
+                            "name": ""
+                        }
+                    },
+                    "_contractName": "",
+                    "_contractType": "ContractType",
+                    "_enums": {},
+                    "_errors": {},
+                    "_events": {},
+                    "_functions": {},
+                    "_importedFrom": null,
+                    "_isContractRecord": false,
+                    "_modifiers": {},
+                    "_parents": [],
+                    "_storageDefs": {},
+                    "_structs": {},
+                    "_userDefined": {},
+                    "_usings": {}
+                }
+            },
+            "ContractName": {
+                "description": "The name of the smart contract.",
+                "example": "MySmartContract",
+                "type": "string"
+            },
+            "ContractPayload": {
+                "description": "Contract Payload",
+                "example": {
+                    "args": {
+                        "_x": 1
+                    },
+                    "contract": null,
+                    "metadata": null,
+                    "src": [
+                        [
+                            "SimpleStorage.sol",
+                            "contract SimpleStorage { uint x; function SimpleStorage(uint _x) { x = _x; } function set(uint _x) { x = _x; } }"
+                        ]
+                    ],
+                    "txParams": null
+                },
+                "properties": {
+                    "args": {
+                        "additionalProperties": {
+                            "$ref": "#/components/schemas/Solidity_Argument_Value"
+                        },
+                        "type": "object"
+                    },
+                    "contract": {
+                        "type": "string"
+                    },
+                    "metadata": {
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "type": "object"
+                    },
+                    "src": {
+                        "$ref": "#/components/schemas/SourceMap"
+                    },
+                    "txParams": {
+                        "$ref": "#/components/schemas/Transaction_Parameters"
+                    }
+                },
+                "required": [
+                    "src"
+                ],
+                "type": "object"
+            },
+            "FieldType": {
+                "description": "Represents a Solidity Field Type",
+                "example": {
+                    "atBytes": 32,
+                    "tag": "Address"
+                },
+                "properties": {
+                    "fieldTypeAtBytes": {
+                        "format": "int32",
+                        "maximum": 2147483647,
+                        "minimum": -2147483648,
+                        "type": "integer"
+                    },
+                    "fieldTypeType": {
+                        "$ref": "#/components/schemas/Solidity_type"
+                    }
+                },
+                "required": [
+                    "fieldTypeAtBytes",
+                    "fieldTypeType"
+                ],
+                "type": "object"
+            },
+            "FunctionPayload": {
+                "description": "Function Payload",
+                "example": {
+                    "args": {
+                        "_x": 5
+                    },
+                    "contractAddress": "00000000000000000000000000000000deadbeef",
+                    "metadata": null,
+                    "method": "set",
+                    "txParams": null
+                },
+                "properties": {
+                    "args": {
+                        "additionalProperties": {
+                            "$ref": "#/components/schemas/Solidity_Argument_Value"
+                        },
+                        "type": "object"
+                    },
+                    "contractAddress": {
+                        "$ref": "#/components/schemas/Address"
+                    },
+                    "metadata": {
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "type": "object"
+                    },
+                    "method": {
+                        "type": "string"
+                    },
+                    "txParams": {
+                        "$ref": "#/components/schemas/Transaction_Parameters"
+                    }
+                },
+                "required": [
+                    "contractAddress",
+                    "method",
+                    "args"
+                ],
+                "type": "object"
+            },
+            "GitInfo": {
+                "properties": {
+                    "gitInfoBranch": {
+                        "type": "string"
+                    },
+                    "gitInfoCommitCount": {
+                        "type": "string"
+                    },
+                    "gitInfoCommitDate": {
+                        "type": "string"
+                    },
+                    "gitInfoDescribe": {
+                        "type": "string"
+                    },
+                    "gitInfoDirty": {
+                        "type": "boolean"
+                    },
+                    "gitInfoDirtyTracked": {
+                        "type": "boolean"
+                    },
+                    "gitInfoHash": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "gitInfoHash",
+                    "gitInfoBranch",
+                    "gitInfoCommitCount",
+                    "gitInfoCommitDate",
+                    "gitInfoDescribe",
+                    "gitInfoDirty",
+                    "gitInfoDirtyTracked"
+                ],
+                "type": "object"
+            },
+            "MetadataResponse": {
+                "description": "MetadataResponse",
+                "example": {
+                    "isSynced": true,
+                    "isVaultPasswordSet": true,
+                    "networkID": "0",
+                    "nodeAddress": "44f1b8c88be13021806e1c3a7a2d5204a1bda57a",
+                    "nodePubKey": "04b1145444ab72758420e9dec9dc21b5aab0b84ed5f709677b9e9bfe477b8dffcd8e9a88338769f6d1a958c3063620593d504f6b4e0c56f72a6ca98fae7ce92eb7",
+                    "urls": {
+                        "vault": "http://vault.com"
+                    },
+                    "validators": [
+                        "00000000000000000000000000000000deadbeef"
+                    ]
+                },
+                "items": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "$ref": "#/components/schemas/Validator"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "additionalProperties": {
+                                "type": "string"
+                            },
+                            "type": "object"
+                        }
+                    ]
+                },
+                "maxItems": 2,
+                "minItems": 2,
+                "properties": {
+                    "address": {
+                        "$ref": "#/components/schemas/Address"
+                    },
+                    "iD": {
+                        "type": "string"
+                    },
+                    "pubKey": {
+                        "$ref": "#/components/schemas/PublicKey"
+                    },
+                    "synced": {
+                        "type": "boolean"
+                    },
+                    "vaultPasswordSet": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "pubKey",
+                    "address",
+                    "synced",
+                    "vaultPasswordSet",
+                    "iD"
+                ],
+                "type": "array"
+            },
+            "PostBlocTransactionRequest": {
+                "description": "Post Bloc Transaction Request",
+                "example": {
+                    "address": "00000000000000000000000000000000deadbeef",
+                    "srcs": null,
+                    "txParams": {
+                        "gasLimit": 1000000,
+                        "gasPrice": 1,
+                        "nonce": 0
+                    },
+                    "txs": [
+                        {
+                            "payload": {
+                                "metadata": {
+                                    "purpose": "groceries"
+                                },
+                                "toAddress": "0000000000000000000000000000000012345678",
+                                "txParams": null
+                            },
+                            "type": "TRANSFER"
+                        }
+                    ]
+                },
+                "properties": {
+                    "address": {
+                        "$ref": "#/components/schemas/Address"
+                    },
+                    "srcs": {
+                        "additionalProperties": {
+                            "$ref": "#/components/schemas/SourceMap"
+                        },
+                        "type": "object"
+                    },
+                    "txParams": {
+                        "$ref": "#/components/schemas/Transaction_Parameters"
+                    },
+                    "txs": {
+                        "items": {
+                            "$ref": "#/components/schemas/BlocTransactionPayload"
+                        },
+                        "type": "array"
+                    }
+                },
+                "required": [
+                    "txs"
+                ],
+                "type": "object"
+            },
+            "PostTransaction": {
+                "description": "Post Transaction",
+                "example": {
+                    "codeOrData": "",
+                    "from": "111dec89c25cbda1c12d67621ee3c10ddb8196bf",
+                    "gasLimit": 21000,
+                    "hash": "4fbe47914a102ae6561597c95ab95819ddfd6b18c7abc3004c099aeaed2234b4",
+                    "nonce": 0,
+                    "r": "1",
+                    "s": "1",
+                    "to": "00000000000000000000000000000000deadbeef",
+                    "v": "1c"
+                },
+                "properties": {
+                    "codeOrData": {
+                        "type": "string"
+                    },
+                    "from": {
+                        "$ref": "#/components/schemas/Address"
+                    },
+                    "gasLimit": {
+                        "exclusiveMinimum": false,
+                        "minimum": 0,
+                        "type": "integer"
+                    },
+                    "hash": {
+                        "$ref": "#/components/schemas/Keccak256_hash_32_byte_hex_encoded_string"
+                    },
+                    "nonce": {
+                        "exclusiveMinimum": false,
+                        "minimum": 0,
+                        "type": "integer"
+                    },
+                    "r": {
+                        "$ref": "#/components/schemas/hex_natural"
+                    },
+                    "s": {
+                        "$ref": "#/components/schemas/hex_natural"
+                    },
+                    "to": {
+                        "$ref": "#/components/schemas/Address"
+                    },
+                    "v": {
+                        "$ref": "#/components/schemas/hex_word8"
+                    }
+                },
+                "required": [
+                    "hash",
+                    "gasLimit",
+                    "codeOrData",
+                    "from",
+                    "r",
+                    "s",
+                    "v",
+                    "nonce"
+                ],
+                "type": "object"
+            },
+            "PublicKey": {
+                "format": "binary",
+                "type": "string"
+            },
+            "SourceMap": {
+                "description": "SourceMap",
+                "example": [
+                    [
+                        "SimpleStorage.sol",
+                        "contract SimpleStorage { }"
+                    ]
+                ],
+                "type": "string"
+            },
+            "StorageAddress": {
+                "properties": {
+                    "address": {
+                        "$ref": "#/components/schemas/Address"
+                    },
+                    "key": {
+                        "$ref": "#/components/schemas/StoragePath"
+                    },
+                    "value": {
+                        "$ref": "#/components/schemas/BasicValue"
+                    }
+                },
+                "required": [
+                    "key",
+                    "value",
+                    "address"
+                ],
+                "type": "object"
+            },
+            "StoragePath": {
+                "format": "Path to SolidVM storage location",
+                "type": "string"
+            },
+            "TransactionCount": {},
+            "TransactionResult": {},
+            "TransferPayload": {
+                "description": "Transfer Payload",
+                "example": {
+                    "metadata": null,
+                    "toAddress": "00000000000000000000000000000000deadbeef",
+                    "txParams": null
+                },
+                "properties": {
+                    "metadata": {
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "type": "object"
+                    },
+                    "toAddress": {
+                        "$ref": "#/components/schemas/Address"
+                    },
+                    "txParams": {
+                        "$ref": "#/components/schemas/Transaction_Parameters"
+                    }
+                },
+                "required": [
+                    "toAddress"
+                ],
+                "type": "object"
+            },
+            "TypeDef": {
+                "description": "User defined type (Struct or Enum)",
+                "example": {
+                    "bytes": 3735928559,
+                    "names": [
+                        "SUCCESS",
+                        "FAILURE",
+                        "NOT_AUTHORIZED"
+                    ],
+                    "tag": "Enum"
+                },
+                "maxProperties": 1,
+                "minProperties": 1,
+                "properties": {
+                    "Contract": {
+                        "properties": {
+                            "bytes": {
+                                "maximum": 18446744073709552000,
+                                "minimum": 0,
+                                "type": "integer"
+                            }
+                        },
+                        "required": [
+                            "bytes"
+                        ],
+                        "type": "object"
+                    },
+                    "Enum": {
+                        "properties": {
+                            "bytes": {
+                                "maximum": 18446744073709552000,
+                                "minimum": 0,
+                                "type": "integer"
+                            },
+                            "names": {
+                                "items": {
+                                    "type": "string"
+                                },
+                                "type": "array"
+                            }
+                        },
+                        "required": [
+                            "names",
+                            "bytes"
+                        ],
+                        "type": "object"
+                    },
+                    "Struct": {
+                        "properties": {
+                            "bytes": {
+                                "maximum": 18446744073709552000,
+                                "minimum": 0,
+                                "type": "integer"
+                            },
+                            "fields": {
+                                "items": {
+                                    "items": {
+                                        "anyOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "$ref": "#/components/schemas/FieldType"
+                                            }
+                                        ]
+                                    },
+                                    "maxItems": 2,
+                                    "minItems": 2,
+                                    "type": "array"
+                                },
+                                "type": "array"
+                            }
+                        },
+                        "required": [
+                            "fields",
+                            "bytes"
+                        ],
+                        "type": "object"
+                    }
+                },
+                "type": "object"
+            },
+            "UploadContractDetails": {
+                "description": "Returned data from contract creation.",
+                "example": {
+                    "address": "00000000000000000000000000000000deadbeef",
+                    "name": "Example"
+                },
+                "properties": {
+                    "address": {
+                        "$ref": "#/components/schemas/Address"
+                    },
+                    "name": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "name"
+                ],
+                "type": "object"
+            },
+            "Validator": {
+                "description": "STRATO Validator Address",
+                "example": "0c4cecae296c33f71f9a6e6fb57f418f9d5f7e82",
+                "type": "string"
+            },
+            "VarType": {
+                "description": "Represents a Solidity Variable",
+                "example": {
+                    "atBytes": 16,
+                    "constant": false,
+                    "initialValue": "6120418de8a7a0ce3c3a0e3fe907e1351ceb4fe7",
+                    "public": true,
+                    "tag": "Address"
+                },
+                "properties": {
+                    "varTypeAtBytes": {
+                        "format": "int32",
+                        "maximum": 2147483647,
+                        "minimum": -2147483648,
+                        "type": "integer"
+                    },
+                    "varTypeConstant": {
+                        "type": "boolean"
+                    },
+                    "varTypeInitialValue": {
+                        "type": "string"
+                    },
+                    "varTypePublic": {
+                        "type": "boolean"
+                    },
+                    "varTypeType": {
+                        "$ref": "#/components/schemas/Solidity_type"
+                    }
+                },
+                "required": [
+                    "varTypeAtBytes",
+                    "varTypeType"
+                ],
+                "type": "object"
+            },
+            "AddresStateRef_": {},
+            "Address_Created_At": {
+                "description": "Address and its creation time (POSIX)",
+                "example": {
+                    "address": "00000000000000000000000000000000deadbeef",
+                    "createdAt": 1494448021000
+                },
+                "items": {
+                    "$ref": "#/components/schemas/Address"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "properties": {
+                    "at": {
+                        "format": "int64",
+                        "maximum": 9223372036854776000,
+                        "minimum": -9223372036854776000,
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "at"
+                ],
+                "type": "array"
+            },
+            "Bloc_Transaction_Data": {
+                "description": "Bloc Transaction Data",
+                "example": {
+                    "contents": [],
+                    "tag": "Call"
+                },
+                "maxProperties": 1,
+                "minProperties": 1,
+                "properties": {
+                    "Call": {
+                        "items": {
+                            "$ref": "#/components/schemas/Solidity_Value"
+                        },
+                        "type": "array"
+                    },
+                    "Send": {
+                        "$ref": "#/components/schemas/PostTransaction"
+                    },
+                    "Upload": {
+                        "$ref": "#/components/schemas/UploadContractDetails"
+                    }
+                },
+                "type": "object"
+            },
+            "Block_": {},
+            "Enum_Value": {
+                "example": "Red",
+                "type": "string"
+            },
+            "Event_schema": {
+                "description": "Xabi Event",
+                "example": {
+                    "anonymous": true,
+                    "logs": [
+                        [
+                            "_from",
+                            {
+                                "index": 0,
+                                "tag": "Address"
+                            }
+                        ],
+                        [
+                            "_to",
+                            {
+                                "index": 1,
+                                "tag": "Address"
+                            }
+                        ]
+                    ]
+                },
+                "properties": {
+                    "anonymous": {
+                        "type": "boolean"
+                    },
+                    "logs": {
+                        "items": {
+                            "items": {
+                                "anyOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/Solidity_type"
+                                    }
+                                ]
+                            },
+                            "maxItems": 2,
+                            "minItems": 2,
+                            "type": "array"
+                        },
+                        "type": "array"
+                    }
+                },
+                "required": [
+                    "anonymous",
+                    "logs"
+                ],
+                "type": "object"
+            },
+            "Function_Modifier": {
+                "description": "Xabi Function Modifier",
+                "example": {
+                    "args": {
+                        "userAddress": {
+                            "bytes": 32,
+                            "index": 0,
+                            "signed": false,
+                            "tag": "Int"
+                        }
+                    },
+                    "contents": null,
+                    "selector": "0adfe412",
+                    "vals": {
+                        "#0": {
+                            "bytes": 32,
+                            "index": 0,
+                            "signed": false,
+                            "tag": "Int"
+                        }
+                    }
+                },
+                "properties": {
+                    "args": {
+                        "additionalProperties": {
+                            "$ref": "#/components/schemas/Solidity_type"
+                        },
+                        "type": "object"
+                    },
+                    "contents": {
+                        "type": "string"
+                    },
+                    "selector": {
+                        "type": "string"
+                    },
+                    "vals": {
+                        "additionalProperties": {
+                            "$ref": "#/components/schemas/Solidity_type"
+                        },
+                        "type": "object"
+                    }
+                },
+                "required": [
+                    "args",
+                    "selector",
+                    "vals"
+                ],
+                "type": "object"
+            },
+            "Function_Name": {
+                "example": "fireMissiles",
+                "type": "string"
+            },
+            "Function_Type": {
+                "description": "Xabi Function Type",
+                "example": {
+                    "args": {
+                        "userAddress": {
+                            "bytes": 32,
+                            "index": 0,
+                            "signed": false,
+                            "tag": "Int"
+                        }
+                    },
+                    "constant": true,
+                    "contents": "return userAddress;",
+                    "modifiers": null,
+                    "payable": false,
+                    "stateMutability": "view",
+                    "vals": {
+                        "#0": {
+                            "bytes": 32,
+                            "index": 0,
+                            "signed": false,
+                            "tag": "Int"
+                        }
+                    },
+                    "visibility": null
+                },
+                "properties": {
+                    "args": {
+                        "additionalProperties": {
+                            "$ref": "#/components/schemas/Solidity_type"
+                        },
+                        "type": "object"
+                    },
+                    "contents": {
+                        "type": "string"
+                    },
+                    "modifiers": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "stateMutability": {
+                        "$ref": "#/components/schemas/State_Mutability"
+                    },
+                    "vals": {
+                        "additionalProperties": {
+                            "$ref": "#/components/schemas/Solidity_type"
+                        },
+                        "type": "object"
+                    },
+                    "visibility": {
+                        "$ref": "#/components/schemas/Visibility_of_a_Function"
+                    }
+                },
+                "required": [
+                    "args",
+                    "vals"
+                ],
+                "type": "object"
+            },
+            "Get_Contract_Response": {
+                "additionalProperties": {
+                    "items": {
+                        "$ref": "#/components/schemas/Address_Created_At"
+                    },
+                    "type": "array"
+                },
+                "description": "Response to Get Contracts endpoint",
+                "example": {
+                    "MySampleContract": [
+                        {
+                            "address": "00000000000000000000000000000000deadbeef",
+                            "createdAt": 1976
+                        }
+                    ]
+                },
+                "type": "object"
+            },
+            "Get_Contract_States_Mapping_Response": {
+                "description": "Response to the Get Cotnracts State Mapping route",
+                "example": {
+                    "willRain": false
+                }
+            },
+            "Get_Contracts_States": {
+                "example": {
+                    "address": "00000000000000000000000000000000deadbeef",
+                    "contractName": "MySampleContract",
+                    "count": null,
+                    "length": null,
+                    "offset": null,
+                    "varName": null
+                },
+                "properties": {
+                    "address": {
+                        "$ref": "#/components/schemas/Address"
+                    },
+                    "contractName": {
+                        "$ref": "#/components/schemas/ContractName"
+                    },
+                    "count": {
+                        "type": "integer"
+                    },
+                    "length": {
+                        "type": "boolean"
+                    },
+                    "offset": {
+                        "type": "integer"
+                    },
+                    "varName": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "contractName",
+                    "address"
+                ],
+                "type": "object"
+            },
+            "JSON_Value": {},
+            "Keccak256_hash_32_byte_hex_encoded_string": {
+                "description": "Keccak256 hash, 32 byte hex encoded string",
+                "example": "4fbe47914a102ae6561597c95ab95819ddfd6b18c7abc3004c099aeaed2234b4",
+                "type": "string"
+            },
+            "Post_Compile_Request": {
+                "example": {
+                    "contractName": "MySampleContract",
+                    "source": "contract MySampleContract { ...} ",
+                    "vm": "SolidVM"
+                },
+                "properties": {
+                    "contractName": {
+                        "type": "string"
+                    },
+                    "source": {
+                        "$ref": "#/components/schemas/SourceMap"
+                    },
+                    "vm": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "source"
+                ],
+                "type": "object"
+            },
+            "Post_Compile_Response": {
+                "example": {
+                    "codeHash": "2c2831bc66a7b43faba30136666c705d6f47b78b9a25e51f823f142a19853212",
+                    "contractName": "MySampleContract"
+                },
+                "properties": {
+                    "codeHash": {
+                        "$ref": "#/components/schemas/Keccak256_hash_32_byte_hex_encoded_string"
+                    },
+                    "contractName": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "contractName",
+                    "codeHash"
+                ],
+                "type": "object"
+            },
+            "Post_Xabi_Request": {
+                "example": {
+                    "src": "contract x { }"
+                },
+                "type": "string"
+            },
+            "Post_Xabi_Response": {
+                "additionalProperties": {
+                    "$ref": "#/components/schemas/Xabi_schema"
+                },
+                "example": {
+                    "src": {}
+                },
+                "type": "object"
+            },
+            "RawTransaction_": {},
+            "Solidity_Argument_Value": {
+                "description": "A Solidity argument value",
+                "example": 5
+            },
+            "Solidity_Value": {
+                "description": "A Solidity return type value",
+                "example": true
+            },
+            "Solidity_type": {
+                "description": "Represents a soldity type",
+                "example": {
+                    "dynamic": false,
+                    "index": 10,
+                    "key": {
+                        "tag": "Address"
+                    },
+                    "tag": "Mapping",
+                    "value": {
+                        "tag": "Bytes"
+                    }
+                },
+                "properties": {
+                    "indexedTypeIndex": {
+                        "format": "int32",
+                        "maximum": 2147483647,
+                        "minimum": -2147483648,
+                        "type": "integer"
+                    },
+                    "indexedTypeType": {
+                        "$ref": "#/components/schemas/Solidity_type"
+                    }
+                },
+                "required": [
+                    "indexedTypeIndex",
+                    "indexedTypeType"
+                ],
+                "type": "object"
+            },
+            "State_Mutability": {
+                "description": "Reserved keywords for function state mutability",
+                "enum": [
+                    "Pure",
+                    "Constant",
+                    "View",
+                    "Payable"
+                ],
+                "example": "view",
+                "type": "string"
+            },
+            "Transaction_Parameters": {
+                "description": "Transaction Parameters",
+                "example": {
+                    "gasLimit": 123,
+                    "gasPrice": 345,
+                    "nonce": 9876
+                },
+                "properties": {
+                    "gasLimit": {
+                        "maximum": 18446744073709552000,
+                        "minimum": 0,
+                        "type": "integer"
+                    },
+                    "gasPrice": {
+                        "maximum": 18446744073709552000,
+                        "minimum": 0,
+                        "type": "integer"
+                    },
+                    "nonce": {
+                        "maximum": 18446744073709552000,
+                        "minimum": 0,
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "UnsignedRawTransaction_": {},
+            "Using_schema": {
+                "description": "Xabi of a `using` declaration",
+                "example": "for uint[]",
+                "type": "string"
+            },
+            "Visibility_of_a_Function": {
+                "description": "Xabi Function Visibility",
+                "enum": [
+                    "Private",
+                    "Public",
+                    "Internal",
+                    "External"
+                ],
+                "example": "Public",
+                "type": "string"
+            },
+            "Xabi_Kind_Schema": {
+                "description": "Whether this xabi is a contract, a library, an abstract contract or an interface",
+                "enum": [
+                    "ContractKind",
+                    "InterfaceKind",
+                    "AbstractKind",
+                    "LibraryKind"
+                ],
+                "example": "ContractKind",
+                "type": "string"
+            },
+            "Xabi_schema": {
+                "description": "Xabi types",
+                "example": {
+                    "constr": null,
+                    "events": {},
+                    "funcs": {
+                        "get": {
+                            "args": {},
+                            "constant": true,
+                            "contents": "return x; ",
+                            "modifiers": null,
+                            "payable": false,
+                            "stateMutability": "view",
+                            "vals": {
+                                "#0": {
+                                    "bytes": 32,
+                                    "index": 0,
+                                    "signed": false,
+                                    "tag": "Int"
+                                }
+                            },
+                            "visibility": null
+                        },
+                        "set": {
+                            "args": {
+                                "x": {
+                                    "bytes": 32,
+                                    "index": 0,
+                                    "signed": false,
+                                    "tag": "Int"
+                                }
+                            },
+                            "constant": true,
+                            "contents": "return; ",
+                            "modifiers": null,
+                            "payable": false,
+                            "stateMutability": "pure",
+                            "vals": {},
+                            "visibility": null
+                        }
+                    },
+                    "kind": "ContractKind",
+                    "modifiers": {
+                        "onlyOwner": {
+                            "args": {},
+                            "contents": "if (msg.sender != owner) throw; _;",
+                            "selector": "onlyOwner",
+                            "vals": {}
+                        }
+                    },
+                    "types": {
+                        "SimpleStorage": {
+                            "bytes": 0,
+                            "names": [
+                                "SUCCESS",
+                                "ERROR"
+                            ],
+                            "tag": "Enum"
+                        }
+                    },
+                    "using": {
+                        "SafeMath": "for uint256"
+                    },
+                    "vars": {
+                        "storedData": {
+                            "atBytes": 0,
+                            "bytes": 32,
+                            "constant": true,
+                            "initialValue": null,
+                            "public": false,
+                            "signed": false,
+                            "tag": "Int"
+                        }
+                    }
+                },
+                "properties": {
+                    "constr": {
+                        "$ref": "#/components/schemas/Function_Type"
+                    },
+                    "events": {
+                        "additionalProperties": {
+                            "$ref": "#/components/schemas/Event_schema"
+                        },
+                        "type": "object"
+                    },
+                    "funcs": {
+                        "additionalProperties": {
+                            "$ref": "#/components/schemas/Function_Type"
+                        },
+                        "type": "object"
+                    },
+                    "kind": {
+                        "$ref": "#/components/schemas/Xabi_Kind_Schema"
+                    },
+                    "modifiers": {
+                        "additionalProperties": {
+                            "$ref": "#/components/schemas/Function_Modifier"
+                        },
+                        "type": "object"
+                    },
+                    "types": {
+                        "additionalProperties": {
+                            "$ref": "#/components/schemas/TypeDef"
+                        },
+                        "type": "object"
+                    },
+                    "using": {
+                        "additionalProperties": {
+                            "$ref": "#/components/schemas/Using_schema"
+                        },
+                        "type": "object"
+                    },
+                    "vars": {
+                        "additionalProperties": {
+                            "$ref": "#/components/schemas/VarType"
+                        },
+                        "type": "object"
+                    }
+                },
+                "required": [
+                    "funcs",
+                    "vars",
+                    "types",
+                    "modifiers",
+                    "events",
+                    "kind",
+                    "using"
+                ],
+                "type": "object"
+            },
+            "hex_natural": {
+                "example": "8",
+                "type": "string"
+            },
+            "hex_word8": {
+                "format": "binary",
+                "type": "string"
+            }
+        }
+    }
+}
