@@ -3,7 +3,13 @@
 set -e
 
 HOST="${1:-localhost:8081}"
-DIR="$HOME/.config/restish"
+
+# Mac uses ~/Library/Application Support/restish, Linux uses ~/.config/restish
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    DIR="$HOME/Library/Application Support/restish"
+else
+    DIR="$HOME/.config/restish"
+fi
 
 mkdir -p "$DIR"
 
