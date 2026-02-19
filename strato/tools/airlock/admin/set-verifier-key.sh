@@ -49,12 +49,13 @@ RESPONSE=$("$SCRIPT_DIR/strato-call" "$CONTRACT_ADDR" setVerificationKey \
     "_commitments=$COMMITMENTS" \
     "_verifyingKey=$VERIFYING_KEY")
 
-STATUS=$(echo "$RESPONSE" | jq -r '.[0].status // empty')
+STATUS=$(echo "$RESPONSE" | jq -r '.[0].status // empty' 2>/dev/null)
 
 if [ "$STATUS" = "Success" ]; then
     echo "Verification key set successfully!"
 else
     echo "Failed to set verification key:"
-    echo "$RESPONSE" | jq .
+    # Try to pretty-print as JSON, fall back to raw output
+    echo "$RESPONSE" | jq . 2>/dev/null || echo "$RESPONSE"
     exit 1
 fi
