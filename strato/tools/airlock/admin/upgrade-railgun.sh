@@ -15,7 +15,6 @@ set -e
 
 SCRIPT_DIR="$(dirname "$0")"
 CONTRACT_FILE="$SCRIPT_DIR/../contracts/railgun.sol"
-source "$SCRIPT_DIR/refresh-token.sh"
 source "$SCRIPT_DIR/get-contract-address.sh"
 
 # Get proxy address

@@ -14,7 +14,6 @@ set -e
 
 SCRIPT_DIR="$(dirname "$0")"
 CONTRACT_FILE="$SCRIPT_DIR/../contracts/railgun.sol"
-source "$SCRIPT_DIR/refresh-token.sh"
 
 if [ ! -f "$CONTRACT_FILE" ]; then
     echo "Error: Contract file not found at $CONTRACT_FILE"
@@ -23,7 +22,8 @@ fi
 
 # Get deployer address for ownership
 echo "Getting user address..."
-TOKEN=$(ensure_valid_token) || exit 1
+strato-auth >/dev/null 2>&1
+TOKEN=$(jq -r '.access_token' ~/.secrets/stratoToken)
 HOST=${STRATO_HOST:-localhost:8081}
 USER_ADDR=$(curl -s -H "Authorization: Bearer $TOKEN" "http://$HOST/strato/v2.3/key" | jq -r '.address')
 
