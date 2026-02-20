@@ -205,7 +205,7 @@ Later, consider steps like adding rewards for the new pool and adding the new po
 STRATO Mainnet syrupUSDCST Deployment Steps
 1. Acquire some syrupUSDC on ethereum. This should go in an account which will be able to bridge in, so ideally an EOA with a MetaMask wallet. The syrupUSDC token information can be found at https://etherscan.io/token/0x80ac24aa929eaf5013f6436cda2a7ba190f5cc0b. We decided to purchase it on an exchange, rather than minting from the MaplePool.
 
-2. Create a token named syrupUSDCST on STRATO testnet. To reach 11 characters in length through the Admin Create Token UI, consider updating the app node first.
+2. Create a token named syrupUSDCST on STRATO mainnet. To reach 11 characters in length through the Admin Create Token UI, consider updating the app node first.
 Name: syrupUSDCST
 Symbol: syrupUSDCST
 Token Image: https://blockappsdev.slack.com/files/U09AHANPD88/F0ADSE3TXU7/syrupusdcst.png
