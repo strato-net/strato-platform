@@ -20,8 +20,6 @@ defineFlag "c:depblockcachesize" (0 :: Int) "Cache size of LevelDB for dependent
 -- kafka-related flags
 defineFlag "k:kafkaclientid" defaultKafkaClientId' "KafkaClientId (for runKafkaConfigured)"
 
-defineFlag "kafkaaddress" ("" :: String) "Alternate kafka instance to connect to."
-
 -- blockstanbul related flags
 defineFlag "blockstanbul_block_period_ms" (1000 :: Int) "Minimum delay between block creations"
 defineFlag
@@ -49,7 +47,6 @@ exportFlagsAsMetrics = do
   set "depblockdbpath" flags_depblockdbpath
   set "depblockdbcachesize" $ show flags_depblockcachesize
   set "kafkaclientid" $ show flags_kafkaclientid
-  set "kafkaaddress" flags_kafkaaddress
   set "blockstanbul_block_period_ms" $ show flags_blockstanbul_block_period_ms
   set "blockstanbul_round_period_s" $ show flags_blockstanbul_round_period_s
   set "vaultWrapperUrl" $ flags_vaultWrapperUrl
