@@ -10,6 +10,9 @@ description: |
   Supports shielding, unshielding, and managing private token balances.
 license: Apache-2.0
 
+data-files:
+  - circuits/01x02/*
+
 dependencies:
   - base
 

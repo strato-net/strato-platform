@@ -7,13 +7,16 @@ module Railgun.Prover
   , ProverMode(..)
     -- * Proof generation
   , generateProof
-  , defaultProverConfig
+  , getProverConfig
   ) where
 
 import qualified Data.ByteString.Lazy as LBS
 import Data.Text (Text)
 import qualified Data.Text as T
 import System.Environment (lookupEnv)
+import System.FilePath ((</>))
+
+import Paths_airlock (getDataDir)
 
 import Railgun.Unshield (SnarkProof(..), G1Point(..), G2Point(..))
 import Railgun.Witness (CircuitInputs, witnessToJSON)
@@ -36,17 +39,32 @@ data ProverConfig = ProverConfig
   , pcProverMode     :: !ProverMode -- ^ Which prover to use
   } deriving (Show, Eq)
 
--- | Default prover config for 01x02 circuit
+-- | Get prover config for 01x02 circuit
+-- Uses AIRLOCK_CIRCUITS_DIR env var, or falls back to data-files location
 -- Uses native witness calculation (wasm3) + native proving (rapidsnark FFI)
 -- No Node.js or snarkjs required!
-defaultProverConfig :: ProverConfig
-defaultProverConfig = ProverConfig
-  { pcCircuitWasm = "/home/golemshid/strato-platform/strato/tools/airlock/circuits/01x02/circuit.wasm"
-  , pcProvingKey = "/home/golemshid/strato-platform/strato/tools/airlock/circuits/01x02/zkey"
-  , pcProvingKeyJSON = "/home/golemshid/strato-platform/strato/tools/airlock/circuits/01x02/circuit_pk.json"
-  , pcSnarkjsPath = "snarkjs"  -- Only used if mode is SnarkjsProver
-  , pcProverMode = RapidsnarkProver
-  }
+getProverConfig :: IO ProverConfig
+getProverConfig = do
+  circuitsDir <- getCircuitsDir
+  let circuitDir = circuitsDir </> "01x02"
+  return ProverConfig
+    { pcCircuitWasm = circuitDir </> "circuit.wasm"
+    , pcProvingKey = circuitDir </> "zkey"
+    , pcProvingKeyJSON = circuitDir </> "circuit_pk.json"
+    , pcSnarkjsPath = "snarkjs"
+    , pcProverMode = RapidsnarkProver
+    }
+
+-- | Get circuits directory from env var or package data-files location
+getCircuitsDir :: IO FilePath
+getCircuitsDir = do
+  env <- lookupEnv "AIRLOCK_CIRCUITS_DIR"
+  case env of
+    Just dir -> return dir
+    Nothing -> do
+      dataDir <- getDataDir
+      return $ dataDir </> "circuits"
+
 
 -- | Generate a Groth16 proof
 --   Use AIRLOCK_PROVER env var to override: native, snarkjs, rapidsnark

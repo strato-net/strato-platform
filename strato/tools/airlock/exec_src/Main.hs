@@ -44,7 +44,7 @@ import Railgun.Transfer (parseRecipientAddress, createTransferRequest, TransferN
 import qualified Railgun.Transfer
 import qualified Railgun.Unshield
 import Railgun.Unshield (CommitmentCiphertext(..))
-import Railgun.Prover (generateProof, defaultProverConfig)
+import Railgun.Prover (generateProof, getProverConfig)
 import Railgun.Signing (deriveSigningKey, signTransactionData, computeSignatureMessage, RailgunSignature(..))
 
 -- | Path to the mnemonic file for a named wallet
@@ -878,7 +878,7 @@ runUnshield uopts = do
       
       -- Step 8: Generate proof using snarkjs
       TIO.putStrLn "\nGenerating SNARK proof..."
-      let proverConfig = defaultProverConfig
+      proverConfig <- getProverConfig
       
       proofResult <- generateProof proverConfig witnessResult
       snarkProof <- case proofResult of
@@ -1220,7 +1220,7 @@ runTransfer topts = do
       
       -- Step 8: Generate SNARK proof
       TIO.putStrLn "\nGenerating SNARK proof..."
-      let proverConfig = defaultProverConfig
+      proverConfig <- getProverConfig
       
       proofResult <- generateProof proverConfig witnessResult
       snarkProof <- case proofResult of
