@@ -26,21 +26,31 @@ The initial total supply should be zero here, because all mints will be through 
 
 Vote to approve the issue.
 
-3. Set the token status to active using the admin panel Tokens -> Token Status UI.
+3. Configure the oracle servers (mainnet/testnet according to which deployment is being done) to provide a price feed for the newly created token.
 
-You can search by token name in the search bar on that tab if it's sufficiently unique; if there is any question, determine the newly created token address and then search by address. In any case, copy the address of the token; you’ll need it below.
+The below example flow notwithstanding, **this is best done immediately after token creation, before activation.** The STRATO address of the newly created token is now known from step 2. If you activate the token before configuring the oracle, the token will appear in the app at $0 price, and any swap pool created later will show a loading spinner instead of a price. The oracle price feed sources should have been identified and prepared in advance (see Required Parameters), so that they can be deployed as soon as the token address is known.
+
+This is typically done by an engineer / ops person. At least 3 sources must be added, and the normal oracle server update process should be followed according to the STRATO Support Doc. Be careful because the STRATO address may be different on mainnet than in testnet.
+
+After configuration, verify the oracle is serving the correct price before proceeding.
+
+4. Set the token status to active using the admin panel Tokens -> Token Status UI.
+
+You can search by token name in the search bar on that tab if it’s sufficiently unique; if there is any question, determine the newly created token address and then search by address. In any case, copy the address of the token; you’ll need it below.
 
 Under the Actions column, click Set, and in the modal, change PENDING to ACTIVE in the dropdown and press Update Token Status to submit.
 
 Vote to approve the issue.
 
-4. Whitelist mercata bridge to mint and burn the newly created token.
+Since the oracle was configured in step 3, the token should appear in the app with the correct price immediately upon activation. Verify the price shows correctly. If it shows $0, resolve the oracle configuration before continuing.
+
+5. Whitelist mercata bridge to mint and burn the newly created token.
 
 In the Admin Panel Vote on Issues tab, click Create New Issue.
 
 Contract address: <AdminRegistry Address> (likely 000000000000000000000000000000000000100c)
 Function Name: addWhitelist
-_target: <Newly created token address> 
+_target: <Newly created token address>
 _func: mint
 _user: <MercataBridge address> (likely 0x1008; be sure to use 0x prefix)
 
@@ -54,19 +64,19 @@ _user: <MercataBridge address>
 
 Vote to approve both of these whitelists.
 
-5. Configure the Deposit Router.
+6. Configure the Deposit Router.
 
 Go to SMD, check MercataBridge Proxy (likely `1008`), and check state variable `chains`, and under the network id corresponding to the external chain where the token you're adding resides (such as "1" for ethereum), find the `"depositRouter"`: "c3be40e5eae865d6d80ec334f009eb1bdd107e1b" and `“custody”` entries. Confirm that the custody address matches the address of the custodial Gnosis Safe on that chain. For instance, `"1":{"custody":"8c458f866e603335ef179a63a2528f357732f5d5"}` means you can find the Safe at https://app.safe.global/home?safe=eth:0x8c458F866e603335ef179A63a2528F357732f5d5
 Confirm the deposit router address on the corresponding blockchain explorer.
 
 From the Safe app interface, use New Transaction --> Transaction Builder to call DepositRouter(<depositRouterAddr>).setPermitted(<externalTokenAddr>, true)
-and, if a minimum deposit is desired, DepositRouter(<depositRouterAddr>).setMinDepositAmount(<externalTokenAddr>, <N>) where N is expressed in the token's decimals, such as 1000000 for 1 USDC or 25000000000000000 for 0.025 wETH. As of Feb 19th 2026, minimum deposits are typically 0 (meaning no limit) and thus no need to call the latter.
+and, if a minimum deposit is desired, DepositRouter(<depositRouterAddr>).setMinDepositAmount(<externalTokenAddr>, <N>) where N is expressed in the token’s decimals, such as 1000000 for 1 USDC or 25000000000000000 for 0.025 wETH. As of Feb 19th 2026, minimum deposits are typically 0 (meaning no limit) and thus no need to call the latter.
 
-You'll need to supply the ABI if it’s not automatically loaded; it can be found on the bottom of the page of a verified implementation contract on etherscan.
+The Safe may auto-load the proxy ABI (showing only `fallback`), not the implementation ABI. If so, you will need to supply the DepositRouter implementation ABI manually — either from the verified implementation contract on Etherscan or from the repo at `mercata/ethereum/artifacts/contracts/bridge/DepositRouter.sol/DepositRouter.json` (extract the `abi` field).
 
 Simulate the transaction, then Send Batch. Execute the transaction, using quorum to approve.
 
-6. Configure the STRATO-side MercataBridge.
+7. Configure the STRATO-side MercataBridge.
 
 In SMD, do
 function setAsset(
@@ -87,21 +97,21 @@ maxPerWithdrawal is expressed in STRATO token units, currently always 1e18, even
 
 Vote to approve the issue.
 
-7. Check that the bridge now supports bridging in on the Deposit UI and bridging out on the Withdrawals UI.
+8. Check that the bridge now supports bridging in on the Deposit UI and bridging out on the Withdrawals UI.
 
-8. Prepare a quantity of USDST equivalent to the dollar value of the newly created token that is planned to be supplied as initial liquidity to the swap pool.
+9. Prepare a quantity of USDST equivalent to the dollar value of the newly created token that is planned to be supplied as initial liquidity to the swap pool.
 
-For instance, if I am supplying 1000 units of a new token worth $20, prepare 20,000 USDST.
+For instance, if I am supplying 1000 units of a new token worth $20, prepare 20,000 USDST. The account `<x>` should hold at least this much USDST (it can hold more for gas vouchers, etc.).
 
 This USDST should be held in STRATO account <x>.
 
 If it is not already possessed on STRATO, this can be bridged from an external stablecoin using the Easy Savings interface on the Deposit page of the app, ensuring that the "Earn saving rate by offering USDST for lending" checkbox is disabled.
 
-9. Bridge in the desired amount of the external token from <y> MetaMask wallet to <x> on STRATO, where it will be held as the newly created STRATO token.
+10. Bridge in the desired amount of the external token from <y> MetaMask wallet to <x> on STRATO, where it will be held as the newly created STRATO token.
 
 Confirm success of the deposit.
 
-10. Create the stable swap pool using the Admin UI:
+11. Create the swap pool using the Admin UI:
 Token A: <NewlyCreatedTokenAddr>,
 Token B: USDST,
 isStable: ?
@@ -110,13 +120,10 @@ If the swap pool should be stable, such as either keeping a constant value or pe
 
 Vote to approve the issue.
 
-11. Configure the oracle servers (mainnet/testnet according to which deployment is being done) to provide a price feed for syrupUSDC.
-
-This is typically done by an engineer / ops person. At least 3 sources must be added, and the normal oracle server update process should be followed according to the STRATO Support Doc.
-
-This step can be done once the STRATO address of the newly created token is known. Be careful because the STRATO address may be different on mainnet than in testnet.
-
-After this, the price should show in the app.
+After creation, find the Pool Address (Proxy) and LP Token Address (Proxy):
+a. Go to Activity Feed -> Blockchain Events and find the NewPool event containing the pool address.
+b. Go to that address in SMD, confirm it is a proxy to a Pool contract.
+c. In the pool’s state variables, find the `lpToken` field — this is the LP Token Address (Proxy).
 
 12. Whitelist the swap pool to mint and burn the LP token (remember to use the proxy addrs)
 _target: <LP Token Address>
@@ -139,7 +146,7 @@ Be careful, because the exchange rate you set will be the initial exchange rate;
 
 Sanity check: newToken Amount * newToken Price == USDST Amount
 
-You'll have to type the USDST amount first, and the new token amount second (it won’t autopopulate with a nonzero value). Don't use the MAX buttons.
+You’ll have to type the USDST amount first, and the new token amount second (it won’t autopopulate with a nonzero value). Don’t use the MAX buttons. Double-check the implied ratio (USDST / newToken) matches the oracle price before confirming.
 
 This should be done by <x>, the STRATO user account who was the recipient of the bridge ins from <y>.
 
@@ -176,6 +183,7 @@ In order to complete these steps, the following values must first be determined:
 - AdminRegistry address (likely 000000000000000000000000000000000000100c)
 - MercataBridge address (likely 0000000000000000000000000000000000001008)
 - PriceOracle address (likely 0000000000000000000000000000000000001002)
+- **Confirmed token/USD price** — the admin must check and confirm the current price of the token being added before deciding how much to acquire. This price determines the initial pool ratio, and an incorrect ratio risks loss of funds.
 - How much initial liquidity will be supplied to the swap pool?
   - A certain dollar value of the newly added token should be decided upon
   - An amount of USDST **equivalent to the dollar value** will also be supplied,
@@ -185,14 +193,14 @@ In order to complete these steps, the following values must first be determined:
   - The minimum external token wei that can be deposited through the DepositRouter; often 0
 - maxPerWithdrawal
   - The maximum STRATO token wei that can be withdrawn through the MercataBridge; often 0 meaning no maximum
-- Price Oracle feeds for the token (at least 3 reliable sources)
+- **Price Oracle feeds for the token (at least 3 reliable sources) — these should be identified and ready to deploy before starting.** The oracle configuration (step 3) requires the STRATO token address from step 2, but the source feeds themselves should be prepared in advance so they can be deployed immediately after the token is created. The engineer/ops person responsible for oracle configuration should be on standby.
 
 Additionally, if there's anything else uncertain, it should be confirmed with the admin before the steps begin.
 
 ## Follow-Up Steps
 Later, consider steps like adding rewards for the new pool and adding the new pool to the arbitrage bot.
 
-## Example: Below is found an example for reference of this flow being implemented on mainnet.
+## Example 1: Below is found an example for reference of this flow being implemented on mainnet.
 
 STRATO Mainnet syrupUSDCST Deployment Steps
 1. Acquire some syrupUSDC on ethereum. This should go in an account which will be able to bridge in, so ideally an EOA with a MetaMask wallet. The syrupUSDC token information can be found at https://etherscan.io/token/0x80ac24aa929eaf5013f6436cda2a7ba190f5cc0b. We decided to purchase it on an exchange, rather than minting from the MaplePool.
