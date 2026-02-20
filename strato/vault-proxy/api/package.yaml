@@ -29,6 +29,6 @@ library:
   - http-client
   - scientific
   - strato-model
-  - swagger2
+  - openapi3
   - text
 

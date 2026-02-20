@@ -19,7 +19,7 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Secp256k1
 import Data.Aeson.Types hiding (fieldLabelModifier)
 import Data.Cache
-import Data.Swagger
+import Data.OpenApi
 import qualified Data.Text as T
 import GHC.Generics
 import Strato.VaultProxy.DataTypes

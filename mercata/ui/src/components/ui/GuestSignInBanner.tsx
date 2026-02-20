@@ -1,15 +1,13 @@
 import { LogIn } from 'lucide-react';
-import { useTheme } from 'next-themes';
+import { redirectToLogin } from '@/lib/auth';
 
 interface GuestSignInBannerProps {
   message: string;
 }
 
 const GuestSignInBanner = ({ message }: GuestSignInBannerProps) => {
-  const { theme } = useTheme();
-
   const handleSignIn = () => {
-    window.location.href = `/login?theme=${theme}`;
+    redirectToLogin();
   };
 
   return (

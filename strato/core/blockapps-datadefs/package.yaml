@@ -19,7 +19,7 @@ dependencies:
   - QuickCheck
   - solid-vm-model
   - strato-model
-  - swagger2
+  - openapi3
   - text
   - time
   - transformers

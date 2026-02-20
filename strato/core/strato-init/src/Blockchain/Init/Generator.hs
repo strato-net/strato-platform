@@ -114,6 +114,16 @@ mkAll network = do
   liftIO $ YAML.encodeFile (dir </> "ethconf.yaml") ethconf
   liftIO $ makeReadOnly $ dir </> "ethconf.yaml"
 
+  -- Set this node as the default for airlock and other tools
+  liftIO $ do
+    nodeDir <- getCurrentDirectory
+    home <- getHomeDirectory
+    let stratoDir = home </> ".strato"
+        defaultNodeFile = stratoDir </> "default-node"
+    createDirectoryIfMissing True stratoDir
+    writeFile defaultNodeFile nodeDir
+    putStrLn $ "Set default node directory: " ++ nodeDir
+
   genesisExists <- doesFileExist "genesis.json"
 
   if genesisExists

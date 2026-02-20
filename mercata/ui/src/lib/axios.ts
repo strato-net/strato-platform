@@ -3,6 +3,7 @@ import axios from "axios";
 import { toast } from "@/hooks/use-toast";
 import { getErrorTitle } from "./errorConfig";
 import { getCsrfToken } from "./csrf";
+import { redirectToLogin } from "./auth";
 
 const api = axios.create({
   baseURL: "/api",
@@ -148,12 +149,10 @@ api.interceptors.response.use(
       // For non-guest-safe URLs, show session expired message and redirect
       toast({
         title: "Session Expired",
-        description: "Redirecting to login...",
-        variant: "destructive",
+        description: "Reauthenticating the user...",
       });
       setTimeout(() => {
-        const theme = localStorage.getItem('theme') || 'light';
-        window.location.href = `/login?theme=${theme}`;
+        redirectToLogin();
       }, 1500);
       return Promise.reject(error);
     }

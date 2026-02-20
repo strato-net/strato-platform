@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
@@ -18,10 +19,11 @@ where
 
 import Blockchain.DB.SQLDB
 import Blockchain.Data.DataDefs
+import Control.Lens.Operators ((&), (.~), (?~))
 import Control.Monad.Change.Modify
 import Control.Monad.Composable.SQL
 import Data.Aeson
-import Data.Swagger
+import Data.OpenApi hiding (server)
 import qualified Database.Esqueleto.Legacy as E
 import Servant
 import UnliftIO
@@ -36,9 +38,12 @@ instance FromJSON TotalDifficulty where
   parseJSON e = fail $ "FromJSON TotalDifficulty: Expected object, got " ++ show e
 
 instance ToSchema TotalDifficulty where
-  declareNamedSchema _ =
-    return $
-      NamedSchema (Just "TotalDifficulty") mempty
+  declareNamedSchema _ = do
+    intSchema <- declareSchemaRef (Proxy :: Proxy Integer)
+    return $ NamedSchema (Just "TotalDifficulty") $ mempty
+      & type_ ?~ OpenApiObject
+      & properties .~ [("difficulty", intSchema)]
+      & required .~ ["difficulty"]
 
 newtype TransactionCount = TransactionCount Integer
 
@@ -50,9 +55,12 @@ instance FromJSON TransactionCount where
   parseJSON e = fail $ "FromJSON TransactionCount: Expected object, got " ++ show e
 
 instance ToSchema TransactionCount where
-  declareNamedSchema _ =
-    return $
-      NamedSchema (Just "TransactionCount") mempty
+  declareNamedSchema _ = do
+    intSchema <- declareSchemaRef (Proxy :: Proxy Integer)
+    return $ NamedSchema (Just "TransactionCount") $ mempty
+      & type_ ?~ OpenApiObject
+      & properties .~ [("transactionCount", intSchema)]
+      & required .~ ["transactionCount"]
 
 type API =
   "stats" :> "totaltx" :> Get '[JSON] TransactionCount

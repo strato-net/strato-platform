@@ -3,12 +3,12 @@
 # Set verification key on Railgun contract
 #
 # Usage: ./set-verifier-key.sh <nullifiers> <commitments> [contract_address]
-#        If no contract address, reads from .contract-address
+#        If no contract address, reads from node's ethconf.yaml
 
 set -e
 
 SCRIPT_DIR="$(dirname "$0")"
-CONTRACT_FILE="$SCRIPT_DIR/.contract-address"
+source "$SCRIPT_DIR/get-contract-address.sh"
 KEYS_DIR="$SCRIPT_DIR/verifier-keys"
 
 if [ $# -lt 2 ]; then
@@ -23,12 +23,8 @@ COMMITMENTS="$2"
 
 if [ -n "$3" ]; then
     CONTRACT_ADDR="$3"
-elif [ -f "$CONTRACT_FILE" ]; then
-    CONTRACT_ADDR=$(cat "$CONTRACT_FILE" | tr -d '[:space:]')
 else
-    echo "Error: No contract address provided and $CONTRACT_FILE not found"
-    echo "       Run deploy-railgun.sh first or provide address as argument"
-    exit 1
+    CONTRACT_ADDR=$(get_railgun_address) || exit 1
 fi
 
 KEY_FILE="${KEYS_DIR}/key-${NULLIFIERS}-${COMMITMENTS}.json"

@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric       #-}
+{-# LANGUAGE OverloadedLists     #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -36,7 +37,9 @@ import           Data.Aeson
 import           Data.Aeson.Types                     (Parser)
 import qualified Data.ByteString                      as B
 import           Data.Maybe
-import           Data.Swagger                         hiding (format)
+import           Control.Lens.Operators ((&), (.~), (?~))
+import           Data.OpenApi                         hiding (format)
+import           Data.Proxy
 import           Data.Time.Calendar
 import           Data.Time.Clock
 import           Data.Word
@@ -58,7 +61,7 @@ instance NFData RawTransaction'
 instance ToSchema RawTransaction' where
   declareNamedSchema _ =
     return $
-      NamedSchema (Just "RawTransaction'") mempty
+      NamedSchema (Just "RawTransaction") mempty
 
 instance ToJSON RawTransaction' where
   toJSON (RawTransaction' rt@(RawTransaction{..}) next) =
@@ -142,7 +145,7 @@ instance FromJSON RawTransaction' where
 instance ToSchema UnsignedRawTransaction' where
   declareNamedSchema _ =
     return $
-      NamedSchema (Just "UnsignedRawTransaction'") mempty
+      NamedSchema (Just "UnsignedRawTransaction") mempty
 
 instance ToJSON UnsignedRawTransaction' where
   toJSON (UnsignedRawTransaction' (RawTransaction{..})) =
@@ -308,7 +311,7 @@ data Block' = Block' Block String deriving (Eq, Show)
 instance ToSchema Block' where
   declareNamedSchema _ =
     return $
-      NamedSchema (Just "Block'") mempty
+      NamedSchema (Just "Block") mempty
 
 instance ToJSON Block' where
   toJSON (Block' (Block bd rt bu) next) =
@@ -499,9 +502,26 @@ csr2s (CommitmentSignatureRef _ _ r s v) =
 data AddressStateRef' = AddressStateRef' AddressStateRef String deriving (Eq, Show)
 
 instance ToSchema AddressStateRef' where
-  declareNamedSchema _ =
-    return $
-      NamedSchema (Just "AddresStateRef'") mempty
+  declareNamedSchema _ = do
+    addrSchema <- declareSchemaRef (Proxy :: Proxy Address)
+    intSchema <- declareSchemaRef (Proxy :: Proxy Integer)
+    strSchema <- declareSchemaRef (Proxy :: Proxy String)
+    keccakSchema <- declareSchemaRef (Proxy :: Proxy (Maybe Keccak256))
+    maybeStrSchema <- declareSchemaRef (Proxy :: Proxy (Maybe String))
+    return $ NamedSchema (Just "AddressStateRef") $ mempty
+      & type_ ?~ OpenApiObject
+      & properties .~
+        [ ("next", strSchema)
+        , ("kind", strSchema)
+        , ("address", addrSchema)
+        , ("nonce", intSchema)
+        , ("balance", strSchema)
+        , ("contractRoot", strSchema)
+        , ("codeHash", keccakSchema)
+        , ("contractName", maybeStrSchema)
+        , ("latestBlockNum", intSchema)
+        ]
+      & required .~ ["next", "kind", "address", "nonce", "balance", "contractRoot", "latestBlockNum"]
 
 instance ToJSON AddressStateRef' where
   toJSON (AddressStateRef' (AddressStateRef addr n b cr ch cn bNum) next) =

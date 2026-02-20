@@ -46,7 +46,7 @@ library:
   - mtl
   - quickcheck-instances
   - semver-range
-  - swagger2
+  - openapi3
 
 
 # tests:
@@ -62,4 +62,4 @@ library:
 #      - quickcheck-instances
 #      - raw-strings-qq
 #      - servant
-#      - swagger2
+#      - openapi3

@@ -9,6 +9,7 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { ModeToggle } from '../mode-toggle';
+import { redirectToLogin } from '@/lib/auth';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import STRATOICON from '@/assets/icon.png';
 import STRATOICONDARK from '@/assets/dark-theme-strato-compressed-logo.png';
@@ -34,8 +35,7 @@ const DashboardHeader = ({ title }: DashboardHeaderProps) => {
   const isPortfolioPage = pathname === '/dashboard';
 
   const handleLogin = () => {
-    const theme = localStorage.getItem('theme') || 'light';
-    window.location.href = `/login?theme=${theme}`;
+    redirectToLogin();
   };
   
   // Handle back navigation - check for 'from' query param for bridge-transactions page

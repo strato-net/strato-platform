@@ -138,15 +138,11 @@ pipeline {
           color: 'danger',
           message: "Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
       )
-//      script {
-//        if (env.BRANCH_NAME == 'develop') {
-//          slackSend(
-//              channel: '#engineering',
-//              color: 'danger',
-//              message: "Sync test build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL} on node ${env.NODE_NAME})"
-//          )
-//        }
-//      }
+      slackSend(
+          channel: '#engineering',
+          color: 'danger',
+          message: "Sync test build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+      )
     }
   }
 }

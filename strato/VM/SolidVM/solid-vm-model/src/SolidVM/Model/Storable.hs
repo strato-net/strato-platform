@@ -28,9 +28,9 @@ import qualified Data.ByteString.Unsafe as BU
 import Data.Char
 import Data.Hashable
 import Data.Maybe
+import qualified Data.OpenApi as OPENAPI
 import Data.Scientific (isInteger, toBoundedInteger)
 import Data.String
-import qualified Data.Swagger as SWAGGER
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8, decodeUtf8', encodeUtf8)
@@ -85,18 +85,18 @@ instance FromHttpApiData BasicValue where
       Nothing -> Left $ T.pack $ "malformed value string in call to parseUrlPiece: " ++ show v
       Just theBasicValue -> Right theBasicValue
 
-instance SWAGGER.ToParamSchema BasicValue where
+instance OPENAPI.ToParamSchema BasicValue where
   toParamSchema _ =
       mempty
-        & SWAGGER.type_   ?~ SWAGGER.SwaggerString
-        & SWAGGER.format  ?~ "simple SolidVM expression"
+        & OPENAPI.type_   ?~ OPENAPI.OpenApiString
+        & OPENAPI.format  ?~ "simple SolidVM expression"
 
-instance SWAGGER.ToSchema BasicValue where
+instance OPENAPI.ToSchema BasicValue where
   declareNamedSchema _ =
-    pure $ SWAGGER.NamedSchema (Just "BasicValue") $
+    pure $ OPENAPI.NamedSchema (Just "BasicValue") $
       mempty
-        & SWAGGER.type_        ?~ SWAGGER.SwaggerString
-        & SWAGGER.format       ?~ "simple SolidVM expression"
+        & OPENAPI.type_        ?~ OPENAPI.OpenApiString
+        & OPENAPI.format       ?~ "simple SolidVM expression"
 
 instance JSON.ToJSON BasicValue where
   toJSON v = JSON.toJSON $ format v
@@ -243,18 +243,18 @@ instance FromHttpApiData StoragePath where
       Left e -> Left $ T.pack $ "malformed value string in call to parseUrlPiece: " ++ show v ++ "\n" ++ e
       Right theStoragePath -> Right theStoragePath
 
-instance SWAGGER.ToParamSchema StoragePath where
+instance OPENAPI.ToParamSchema StoragePath where
   toParamSchema _ =
       mempty
-        & SWAGGER.type_   ?~ SWAGGER.SwaggerString
-        & SWAGGER.format  ?~ "Path to SolidVM storage location"
+        & OPENAPI.type_   ?~ OPENAPI.OpenApiString
+        & OPENAPI.format  ?~ "Path to SolidVM storage location"
 
-instance SWAGGER.ToSchema StoragePath where
+instance OPENAPI.ToSchema StoragePath where
   declareNamedSchema _ =
-    pure $ SWAGGER.NamedSchema (Just "StoragePath") $
+    pure $ OPENAPI.NamedSchema (Just "StoragePath") $
       mempty
-        & SWAGGER.type_        ?~ SWAGGER.SwaggerString
-        & SWAGGER.format       ?~ "Path to SolidVM storage location"
+        & OPENAPI.type_        ?~ OPENAPI.OpenApiString
+        & OPENAPI.format       ?~ "Path to SolidVM storage location"
 
 empty :: StoragePath
 empty = StoragePath []
