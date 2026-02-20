@@ -63,6 +63,7 @@ struct ActivityState {
 struct CommunityBonusConfig {
     address token;         // Community token address
     uint256 multiplier;    // 1e18 = 1x, 1.2e18 = +20%, 0 = disabled
+    uint256 minBalance;    // Minimum token balance required to qualify
 }
 
 /**
@@ -114,7 +115,13 @@ contract record Rewards is Ownable {
         string reason
     );
     event ActivityNameUpdated(uint256 indexed activityId, string newName);
-    event CommunityBonusMultiplierUpdated(address indexed token, uint256 oldMultiplier, uint256 newMultiplier);
+    event CommunityBonusMultiplierUpdated(
+        address indexed token,
+        uint256 oldMultiplier,
+        uint256 newMultiplier,
+        uint256 oldMinBalance,
+        uint256 newMinBalance
+    );
 
     // ═════════════════════════════════════════════════════════════════════════
     // CONSTANTS
@@ -397,8 +404,13 @@ contract record Rewards is Ownable {
      * @dev Update community bonus multiplier for a token
      * @param token Community token address
      * @param newMultiplier Bonus multiplier (1e18 = 1x, 1.2e18 = +20%, 0 = disabled)
+     * @param minBalance Minimum token balance required to qualify for this bonus
      */
-    function setCommunityBonusMultiplier(address token, uint256 newMultiplier) external onlyOwner {
+    function setCommunityBonusMultiplier(
+        address token,
+        uint256 newMultiplier,
+        uint256 minBalance
+    ) external onlyOwner {
         require(token != address(0), "Invalid token address");
         require(
             newMultiplier == 0 || newMultiplier >= PRECISION_MULTIPLIER,
@@ -408,14 +420,22 @@ contract record Rewards is Ownable {
         for (uint256 i = 0; i < communityBonusConfigs.length; i++) {
             if (communityBonusConfigs[i].token == token) {
                 uint256 oldMultiplier = communityBonusConfigs[i].multiplier;
+                uint256 oldMinBalance = communityBonusConfigs[i].minBalance;
                 communityBonusConfigs[i].multiplier = newMultiplier;
-                emit CommunityBonusMultiplierUpdated(token, oldMultiplier, newMultiplier);
+                communityBonusConfigs[i].minBalance = minBalance;
+                emit CommunityBonusMultiplierUpdated(
+                    token,
+                    oldMultiplier,
+                    newMultiplier,
+                    oldMinBalance,
+                    minBalance
+                );
                 return;
             }
         }
 
-        communityBonusConfigs.push(CommunityBonusConfig(token, newMultiplier));
-        emit CommunityBonusMultiplierUpdated(token, 0, newMultiplier);
+        communityBonusConfigs.push(CommunityBonusConfig(token, newMultiplier, minBalance));
+        emit CommunityBonusMultiplierUpdated(token, 0, newMultiplier, 0, minBalance);
     }
 
     /**
@@ -600,9 +620,10 @@ contract record Rewards is Ownable {
             _settlePendingRewards(activityIdsToSettle[i], user);
         }
 
-        // Get total accumulated rewards
-        uint256 totalRewards = unclaimedRewards[user];
-        require(totalRewards > 0, "No rewards to claim");
+        // Get accumulated base rewards and apply claim-time community bonus
+        uint256 baseRewards = unclaimedRewards[user];
+        require(baseRewards > 0, "No rewards to claim");
+        uint256 totalRewards = _applyCommunityBonus(user, baseRewards);
 
         // Ensure contract has sufficient reward tokens
         require(rewardToken.balanceOf(address(this)) >= totalRewards, "Insufficient reward tokens");
@@ -625,9 +646,10 @@ contract record Rewards is Ownable {
             _settlePendingRewards(activityIds[i], user);
         }
 
-        // Get total accumulated rewards
-        uint256 totalRewards = unclaimedRewards[user];
-        require(totalRewards > 0, "No rewards to claim");
+        // Get accumulated base rewards and apply claim-time community bonus
+        uint256 baseRewards = unclaimedRewards[user];
+        require(baseRewards > 0, "No rewards to claim");
+        uint256 totalRewards = _applyCommunityBonus(user, baseRewards);
 
         // Ensure contract has sufficient reward tokens
         require(rewardToken.balanceOf(address(this)) >= totalRewards, "Insufficient reward tokens");
@@ -913,11 +935,7 @@ contract record Rewards is Ownable {
             pendingRewards = (oldStake * indexDelta) / PRECISION_MULTIPLIER;
 
             if (pendingRewards > 0) {
-                uint256 rewardsWithBonus = _applyCommunityBonus(
-                    action.user,
-                    pendingRewards
-                );
-                unclaimedRewards[action.user] += rewardsWithBonus;
+                unclaimedRewards[action.user] += pendingRewards;
             }
         }
 
@@ -977,11 +995,7 @@ contract record Rewards is Ownable {
             uint256 pending = (userStake * indexDelta) / PRECISION_MULTIPLIER;
 
             if (pending > 0) {
-                uint256 rewardsWithBonus = _applyCommunityBonus(
-                    user,
-                    pending
-                );
-                unclaimedRewards[user] += rewardsWithBonus;
+                unclaimedRewards[user] += pending;
             }
 
             // Update user index to current (without changing stake)
@@ -1045,7 +1059,7 @@ contract record Rewards is Ownable {
                 if (multiplier <= PRECISION_MULTIPLIER) {
                     continue;
                 }
-                if (Token(cfg.token).balanceOf(user) == 0) {
+                if (Token(cfg.token).balanceOf(user) < cfg.minBalance) {
                     continue;
                 }
 
