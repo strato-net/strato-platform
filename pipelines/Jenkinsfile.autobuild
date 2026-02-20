@@ -303,12 +303,12 @@ pipeline {
                 }
                 unstash 'bootstrapDocker'
                 dir("bootstrap-docker"){
-                  withCredentials([usernamePassword(credentialsId: 'mercata-testnet-buildtest-client', passwordVariable: 'BUILDTEST_CLIENT_SECRET', usernameVariable: 'BUILDTEST_CLIENT_ID'),
+                  withCredentials([usernamePassword(credentialsId: 'testnet-buildtest-client', passwordVariable: 'BUILDTEST_CLIENT_SECRET', usernameVariable: 'BUILDTEST_CLIENT_ID'),
                                    string(credentialsId: 'buildtest-rpc-url-sepolia', variable: 'BUILDTEST_RPC_URL_SEPOLIA'),
                                    string(credentialsId: 'buildtest-rpc-url-sepolia-fallback', variable: 'BUILDTEST_RPC_URL_SEPOLIA_FALLBACK')
                                    ]) {
                     writeFile file: "strato-run.sh", text: """#!/bin/bash
-                        NODE_HOST='buildtest.mercata-testnet.blockapps.net' \\
+                        NODE_HOST='buildtest.testnet.strato.nexus' \\
                           network='helium' \\
                           OAUTH_CLIENT_ID='$BUILDTEST_CLIENT_ID' \\
                           OAUTH_CLIENT_SECRET='$BUILDTEST_CLIENT_SECRET' \\
@@ -336,7 +336,7 @@ pipeline {
                     slackSend(
                         channel: '#engineering',
                         color: 'good',
-                        message: "buildtest.mercata-testnet.blockapps.net was redeployed from develop with STRATO v.${VERSION}"
+                        message: "buildtest.testnet.strato.nexus was redeployed from develop with STRATO v.${VERSION}"
                     )
                   }
 
