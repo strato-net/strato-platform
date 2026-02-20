@@ -1,27 +1,129 @@
 name: groth16-rapidsnark
 version: 0.1.0
-synopsis: Groth16 prover wrapper for rapidsnark CLI
+synopsis: Groth16 prover via FFI to rapidsnark
 description: |
-  Wrapper for rapidsnark (C++) Groth16 proof generation.
-  Uses snarkjs for witness calculation, rapidsnark for fast proving.
+  Native FFI bindings to rapidsnark for fast Groth16 proof generation.
+  
+  Builds rapidsnark from vendored source (pure C++, generic field arithmetic).
+  No cmake, nasm, or external setup required - just stack build.
+  
+  Requirements:
+    - g++ (C++ compiler)  
+    - libgmp-dev (GNU Multiple Precision library)
+  
+  Note: This package includes rapidsnark which is licensed under LGPL v3.
+  See NOTICE.md for license details.
 license: AllRightsReserved
 author: BlockApps
 maintainer: info@blockapps.net
 
+extra-source-files:
+  - NOTICE.md
+  - vendor/**/*.cpp
+  - vendor/**/*.hpp
+  - vendor/**/*.h
+  - vendor/**/*.c
+  - vendor/wasm3/LICENSE
+
 library:
   source-dirs: src
   exposed-modules:
-    - Groth16.Rapidsnark
+    - Groth16.Prover
+    - Groth16.Prover.FFI
+    - Groth16.Witness
+    - Groth16.Witness.FFI
   dependencies:
     - base
     - aeson
     - bytestring
     - text
     - vector
-    - process
-    - temporary
     - filepath
-
+    - temporary
+    - directory
+    - process
+  
+  # C sources (wasm3 + circom witness calculator)
+  c-sources:
+    # wasm3 WASM interpreter
+    - vendor/wasm3/m3_bind.c
+    - vendor/wasm3/m3_code.c
+    - vendor/wasm3/m3_compile.c
+    - vendor/wasm3/m3_core.c
+    - vendor/wasm3/m3_env.c
+    - vendor/wasm3/m3_exec.c
+    - vendor/wasm3/m3_function.c
+    - vendor/wasm3/m3_info.c
+    - vendor/wasm3/m3_module.c
+    - vendor/wasm3/m3_parse.c
+    # Circom witness calculator
+    - vendor/circom_witness.c
+  
+  # C compiler flags
+  cc-options:
+    - -std=c99
+    - -O2
+    - -fPIC
+    - -Wno-unused-parameter
+    - -Wno-unused-variable
+    - -Dd_m3HasFloat=0
+  
+  # C++ sources from rapidsnark
+  cxx-sources:
+    # Main rapidsnark sources
+    - vendor/rapidsnark/src/prover.cpp
+    # NOTE: groth16.cpp is #included by groth16.hpp (template implementation)
+    - vendor/rapidsnark/src/binfile_utils.cpp
+    - vendor/rapidsnark/src/zkey_utils.cpp
+    - vendor/rapidsnark/src/wtns_utils.cpp
+    - vendor/rapidsnark/src/fileloader.cpp
+    - vendor/rapidsnark/src/logger.cpp
+    # Generated field arithmetic (generic C++ version - no assembly)
+    - vendor/rapidsnark/build/fr.cpp
+    - vendor/rapidsnark/build/fr_generic.cpp
+    - vendor/rapidsnark/build/fr_raw_generic.cpp
+    - vendor/rapidsnark/build/fq.cpp
+    - vendor/rapidsnark/build/fq_generic.cpp
+    - vendor/rapidsnark/build/fq_raw_generic.cpp
+    # ffiasm support files (only non-template sources)
+    # NOTE: curve.cpp, f2field.cpp, f6field.cpp, f12field.cpp, fft.cpp, 
+    #       msm.cpp, multiexp.cpp, pointparallelprocessor.cpp are all
+    #       #included from their corresponding .hpp files (template implementations)
+    - vendor/ffiasm/c/misc.cpp
+    - vendor/ffiasm/c/naf.cpp
+    - vendor/ffiasm/c/splitparstr.cpp
+    - vendor/ffiasm/c/alt_bn128.cpp
+  
+  # Include directories for headers
+  include-dirs:
+    - vendor/rapidsnark/src
+    - vendor/rapidsnark/build
+    - vendor/ffiasm/c
+    - vendor/json/single_include
+    - vendor/wasm3
+    - vendor
+  
+  # Link against gmp and pthread (system libraries)
+  extra-libraries:
+    - gmp
+    - pthread
+    - stdc++
+  
+  # C++ compiler flags
+  cxx-options:
+    - -std=c++17
+    - -O2
+    - -fPIC
+    - -Wno-address-of-packed-member
+    - -Wno-unused-parameter
+  
 ghc-options:
   - -Wall
-  - -Werror
+
+tests:
+  test-ffi:
+    main: TestFFI.hs
+    source-dirs: test
+    dependencies:
+      - base
+      - groth16-rapidsnark

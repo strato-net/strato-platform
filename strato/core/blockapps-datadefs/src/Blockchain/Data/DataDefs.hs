@@ -38,7 +38,6 @@ import Control.DeepSeq
 import Control.Monad.Trans.Class (lift)
 import qualified Data.Binary as BIN
 import qualified Data.ByteString as BS
-import Data.Swagger hiding (Format, format)
 import Data.Text (Text)
 import Data.Time
 import Data.Word
@@ -104,11 +103,6 @@ instance NFData RawTransaction
 instance NFData LogDB
 
 instance NFData EventDB
-
-instance ToSchema LogDB where
-  declareNamedSchema _ =
-    return $
-      NamedSchema (Just "LogDB") mempty
 
 instance BIN.Binary LogDB
 

@@ -35,6 +35,8 @@ import Text.Printf (printf)
 
 import Railgun.Crypto (getSharedSymmetricKey, decryptRandom, poseidonHash, computeNullifier, aesDecryptCTR)
 import Railgun.Types (RailgunKeys(..), TokenType(..))
+import Railgun.API (readContractAddress, defaultHost, defaultPort)
+import Strato.Auth (authRequest)
 import qualified Data.Set as Set
 
 -- | A Shield event from Cirrus
@@ -106,27 +108,21 @@ data TransactCiphertext = TransactCiphertext
   } deriving (Show, Eq, Generic)
 
 -- | Fetch all Shield events from Cirrus
-fetchShieldEvents :: Text -> Text -> Text -> IO (Either Text [ShieldEvent])
-fetchShieldEvents baseUrl authToken contractAddr = do
-  manager <- newManager defaultManagerSettings
-  
-  let url = T.unpack baseUrl <> "/cirrus/search/event?event_name=eq.Shield&address=eq." <> T.unpack (normalizeAddress contractAddr)
-  
-  requestResult <- try $ parseRequest url
-  case requestResult of
-    Left (e :: SomeException) -> return $ Left $ "Failed to parse URL: " <> T.pack (show e)
-    Right request -> do
-      let requestWithAuth = request
-            { requestHeaders = 
-                [ ("Authorization", TE.encodeUtf8 $ "Bearer " <> authToken)
-                , ("Accept", "application/json")
-                ]
-            }
+fetchShieldEvents :: IO (Either Text [ShieldEvent])
+fetchShieldEvents = do
+  maybeContractAddr <- readContractAddress
+  case maybeContractAddr of
+    Nothing -> return $ Left "Railgun contract address not found"
+    Just contractAddr -> do
+      let baseUrl = "http://" <> defaultHost <> ":" <> show defaultPort
+          url = baseUrl <> "/cirrus/search/event?event_name=eq.Shield&address=eq." <> T.unpack (normalizeAddress contractAddr)
       
-      responseResult <- try $ httpLbs requestWithAuth manager
-      case responseResult of
-        Left (e :: SomeException) -> return $ Left $ "HTTP request failed: " <> T.pack (show e)
-        Right response -> do
+      requestResult <- try $ parseRequest url
+      case requestResult of
+        Left (e :: SomeException) -> return $ Left $ "Failed to parse URL: " <> T.pack (show e)
+        Right request -> do
+          let requestWithHeaders = request { requestHeaders = [("Accept", "application/json")] }
+          response <- authRequest requestWithHeaders
           let status = statusCode $ responseStatus response
           if status /= 200
             then return $ Left $ "HTTP error " <> T.pack (show status) <> ": " <> TE.decodeUtf8 (LBS.toStrict $ responseBody response)
@@ -250,27 +246,21 @@ extractJsonArray str =
        _ -> Nothing
 
 -- | Fetch all Nullified events from Cirrus (these indicate spent notes)
-fetchNullifierEvents :: Text -> Text -> Text -> IO (Either Text [NullifiedEvent])
-fetchNullifierEvents baseUrl authToken contractAddr = do
-  manager <- newManager defaultManagerSettings
-  
-  let url = T.unpack baseUrl <> "/cirrus/search/event?event_name=eq.Nullified&address=eq." <> T.unpack (normalizeAddress contractAddr)
-  
-  requestResult <- try $ parseRequest url
-  case requestResult of
-    Left (e :: SomeException) -> return $ Left $ "Failed to parse URL: " <> T.pack (show e)
-    Right request -> do
-      let requestWithAuth = request
-            { requestHeaders = 
-                [ ("Authorization", TE.encodeUtf8 $ "Bearer " <> authToken)
-                , ("Accept", "application/json")
-                ]
-            }
+fetchNullifierEvents :: IO (Either Text [NullifiedEvent])
+fetchNullifierEvents = do
+  maybeContractAddr <- readContractAddress
+  case maybeContractAddr of
+    Nothing -> return $ Left "Railgun contract address not found"
+    Just contractAddr -> do
+      let baseUrl = "http://" <> defaultHost <> ":" <> show defaultPort
+          url = baseUrl <> "/cirrus/search/event?event_name=eq.Nullified&address=eq." <> T.unpack (normalizeAddress contractAddr)
       
-      responseResult <- try $ httpLbs requestWithAuth manager
-      case responseResult of
-        Left (e :: SomeException) -> return $ Left $ "HTTP request failed: " <> T.pack (show e)
-        Right response -> do
+      requestResult <- try $ parseRequest url
+      case requestResult of
+        Left (e :: SomeException) -> return $ Left $ "Failed to parse URL: " <> T.pack (show e)
+        Right request -> do
+          let requestWithHeaders = request { requestHeaders = [("Accept", "application/json")] }
+          response <- authRequest requestWithHeaders
           let status = statusCode $ responseStatus response
           if status /= 200
             then return $ Left $ "HTTP error " <> T.pack (show status)
@@ -308,27 +298,21 @@ parseNullifierList str =
     extractText _ = Nothing
 
 -- | Fetch all Transact events from Cirrus (for finding change notes)
-fetchTransactEventsForNotes :: Text -> Text -> Text -> IO (Either Text [TransactEvent])
-fetchTransactEventsForNotes baseUrl authToken contractAddr = do
-  manager <- newManager defaultManagerSettings
-  
-  let url = T.unpack baseUrl <> "/cirrus/search/event?event_name=eq.Transact&address=eq." <> T.unpack (normalizeAddress contractAddr)
-  
-  requestResult <- try $ parseRequest url
-  case requestResult of
-    Left (e :: SomeException) -> return $ Left $ "Failed to parse URL: " <> T.pack (show e)
-    Right request -> do
-      let requestWithAuth = request
-            { requestHeaders = 
-                [ ("Authorization", TE.encodeUtf8 $ "Bearer " <> authToken)
-                , ("Accept", "application/json")
-                ]
-            }
+fetchTransactEventsForNotes :: IO (Either Text [TransactEvent])
+fetchTransactEventsForNotes = do
+  maybeContractAddr <- readContractAddress
+  case maybeContractAddr of
+    Nothing -> return $ Left "Railgun contract address not found"
+    Just contractAddr -> do
+      let baseUrl = "http://" <> defaultHost <> ":" <> show defaultPort
+          url = baseUrl <> "/cirrus/search/event?event_name=eq.Transact&address=eq." <> T.unpack (normalizeAddress contractAddr)
       
-      responseResult <- try $ httpLbs requestWithAuth manager
-      case responseResult of
-        Left (e :: SomeException) -> return $ Left $ "HTTP request failed: " <> T.pack (show e)
-        Right response -> do
+      requestResult <- try $ parseRequest url
+      case requestResult of
+        Left (e :: SomeException) -> return $ Left $ "Failed to parse URL: " <> T.pack (show e)
+        Right request -> do
+          let requestWithHeaders = request { requestHeaders = [("Accept", "application/json")] }
+          response <- authRequest requestWithHeaders
           let status = statusCode $ responseStatus response
           if status /= 200
             then return $ Left $ "HTTP error " <> T.pack (show status)
@@ -523,24 +507,21 @@ tryDecryptTransactEvent keys event =
 
 -- | Scan all Shield and Transact events and return notes that belong to us (excluding spent notes)
 scanShieldedBalance :: RailgunKeys 
-                    -> Text  -- ^ Base URL
-                    -> Text  -- ^ Auth token
-                    -> Text  -- ^ Railgun contract address
                     -> IO (Either Text ([ShieldedNote], [TokenBalance]))
-scanShieldedBalance keys baseUrl authToken contractAddr = do
+scanShieldedBalance keys = do
   -- Fetch Shield events
-  shieldEventsResult <- fetchShieldEvents baseUrl authToken contractAddr
+  shieldEventsResult <- fetchShieldEvents
   case shieldEventsResult of
     Left err -> return $ Left err
     Right shieldEvents -> do
       -- Fetch Transact events (for change notes)
-      transactEventsResult <- fetchTransactEventsForNotes baseUrl authToken contractAddr
+      transactEventsResult <- fetchTransactEventsForNotes
       let transactEvents = case transactEventsResult of
             Left _ -> []
             Right evts -> evts
       
       -- Fetch Nullified events to find spent notes
-      nullifierResult <- fetchNullifierEvents baseUrl authToken contractAddr
+      nullifierResult <- fetchNullifierEvents
       let spentNullifiers = case nullifierResult of
             Left _ -> Set.empty  -- If we can't fetch, assume none spent
             Right nullEvents -> Set.fromList $ concatMap neNullifiers nullEvents

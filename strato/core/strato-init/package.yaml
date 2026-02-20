@@ -19,6 +19,7 @@ library:
   - aeson
   - base16-bytestring
   - blockapps-data
+  - data-default
   - blockapps-datadefs
   - blockapps-mpdbs
   - blockapps-vault-wrapper-api

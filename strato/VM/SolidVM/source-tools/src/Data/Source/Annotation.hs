@@ -32,8 +32,8 @@ import Data.Binary
 import Data.Data
 import Data.Default
 import qualified Data.Map as M
+import Data.OpenApi
 import Data.Source.Position
-import Data.Swagger
 import Data.Text (Text, pack)
 import qualified Data.Text as T
 import GHC.Generics
@@ -75,13 +75,13 @@ instance Arbitrary a => Arbitrary (SourceAnnotation a) where
 instance Default a => Default (SourceAnnotation a) where
   def = SourceAnnotation def def def
 
-instance ToSchema (SourceAnnotation a) where
+instance Typeable a => ToSchema (SourceAnnotation a) where
   declareNamedSchema _ =
     return $
       NamedSchema
         (Just "SourceAnnotation")
         ( mempty
-            & type_ ?~ SwaggerString
+            & type_ ?~ OpenApiString
             & example
               ?~ toJSON
                 ( SourceAnnotation

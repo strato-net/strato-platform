@@ -23,8 +23,9 @@ import Data.Bifunctor (bimap)
 import Data.Binary
 import Data.Data
 import Data.Hashable (Hashable)
-import qualified Data.Swagger as S
-import Data.Swagger.Internal.Schema (named)
+import qualified Data.OpenApi as OPENAPI
+import Data.OpenApi (binarySchema)
+import Data.OpenApi.Internal.Schema (named)
 import qualified Data.Text as T
 import Database.Persist.Sql
 import GHC.Generics
@@ -38,8 +39,8 @@ data CodePtr
   | SolidVMCode String Keccak256
   deriving (Show, Read, Eq, Ord, Generic, NFData, Hashable, Data)
 
-instance S.ToSchema CodePtr where
-  declareNamedSchema _ = return $ named "Code Pointer" S.binarySchema
+instance OPENAPI.ToSchema CodePtr where
+  declareNamedSchema _ = return $ named "Code Pointer" binarySchema
 
 instance RLPSerializable CodePtr where
   rlpEncode (ExternallyOwned codeHash) = rlpEncode codeHash
@@ -115,8 +116,8 @@ instance FromHttpApiData CodePtr where
            [name, hsh] -> SolidVMCode (T.unpack name) <$> parseQueryParam hsh
            _ -> Left $ "FromHttpApiData CodePtr: couldn't resolve CodePtr from " `T.append` x
 
-instance S.ToParamSchema CodePtr where
+instance OPENAPI.ToParamSchema CodePtr where
   toParamSchema _ =
     mempty
-      & S.type_ ?~ S.SwaggerString
-      & S.format ?~ "hex string"
+      & OPENAPI.type_ ?~ OPENAPI.OpenApiString
+      & OPENAPI.format ?~ "hex string"

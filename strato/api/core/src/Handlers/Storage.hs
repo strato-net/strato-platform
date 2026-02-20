@@ -30,7 +30,7 @@ import Control.Monad.Composable.SQL
 import Data.Aeson
 import Data.Foldable (for_)
 import Data.Maybe
-import Data.Swagger hiding (name)
+import Data.OpenApi hiding (name, server)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Database.Esqueleto.Internal.Internal as E

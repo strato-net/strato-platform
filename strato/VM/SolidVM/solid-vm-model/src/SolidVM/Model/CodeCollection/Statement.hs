@@ -31,13 +31,12 @@ module SolidVM.Model.CodeCollection.Statement
 where
 
 import Blockchain.Strato.Model.Address
-import Data.Swagger (ToSchema)
-
 import Control.DeepSeq
 import Data.Aeson
 import Data.Binary
 import Data.Decimal
 import qualified Data.Map.Strict as Map
+import Data.OpenApi (ToSchema)
 import Data.Source
 import qualified Data.Text as T
 import GHC.Generics

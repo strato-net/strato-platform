@@ -47,7 +47,7 @@ library:
     - source-tools
     - sql-monad
     - strato-model
-    - swagger2
+    - openapi3
     - template-haskell
     - text
     - transformers
