@@ -18,5 +18,3 @@ import HFlags
 --defineFlag "sourceCacheTimeout" (60::Integer) "The number of seconds nonces are held in the global source code cache"
 --defineFlag "txQueueSize" (4096::Integer) "The maximum number of requests to queue"
 defineFlag "vaultProxyPort" ("8013" :: String) "URL to Vault"
-defineFlag "userRegistryAddress" ("0000000000000000000000000000000000000720" :: String) "Address of the User Registry contract" -- TODO: Change back to 720 once we start deploying networks with UserRegistry in the genesis block
-defineFlag "useBuiltinUserRegistry" (True :: Bool) "Whether to use the code hash for the standard UserRegistry contracts"

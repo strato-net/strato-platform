@@ -149,11 +149,9 @@ function newnode {
   runBackgroundProcess strato-p2p \
      --averageTxsPerBlock=${averageTxsPerBlock:-40} \
      --connectionTimeout=${connectionTimeout:-3600} \
-     --debugFail=${debugFail:-true}  \
      --maxConn=${maxConn:-1000} \
      --maxReturnedHeaders=${maxReturnedHeaders:-500} \
      --networkID=${networkID:--1} \
-     --sqlPeers=true \
      --minLogLevel=$p2pMinLogLevel \
      ${networkFlag} "${iFlag}" &>> logs/strato-p2p
 
@@ -212,8 +210,6 @@ function newnode {
     --maxTxsPerBlock=${maxTxsPerBlock:-500} \
     --minLogLevel=${vmMinLogLevel} \
     --networkID=${networkID:--1} \
-    --seqEventsBatchSize=${seqEventsBatchSize:--1} \
-    --seqEventsCostHeuristic=${seqEventsCostHeuristic:-20000} \
     --sqlDiff=${sqlDiff:-true} \
     --svmDev=${svmDev:-false} \
     --svmTrace=${svmTrace:-false} \
@@ -338,7 +334,6 @@ function doInit {
   --redisHost=$redisBDBHost \
   --redisPort=$redisBDBPort \
   --redisDBNumber=${redisBDBNumber:-0} \
-  --zkhost=$zkHost \
   ${networkFlag} \
   ${stratoBootnode}"
 

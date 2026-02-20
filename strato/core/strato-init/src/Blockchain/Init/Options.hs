@@ -15,7 +15,6 @@ defineFlag "P:pghost" ("" :: String) "Postgres hostname"
 defineFlag "p:password" ("" :: String) "Postgres password"
 defineFlag "K:kafkahost" ("" :: String) "Kafka hostname"
 defineFlag "vaultWrapperUrl" ("http://localhost:8013/strato/v2.3" :: String) "Vault-Wrapper URL"
-defineFlag "z:zkhost" ("localhost" :: String) "Zookeeper hostname"
 defineFlag "z:lazyblocks" (False :: Bool) "Don't mine empty blocks"
 defineFlag "addBootnodes" True "Adds bootnodes to the peer DB at setup time.  If set to false, the peer will not be able to initiate a connection to the network by itself (this option is useful if you want to set up a peer to itself be a bootnode in a private network)"
 defineCustomFlag
@@ -33,7 +32,6 @@ defineFlag "redisPort" (6379 :: Int) "Redis BlockDB port"
 defineFlag "redisDBNumber" (0 :: Integer) "Redis database number"
 
 defineFlag "minPeers" (0 :: Int) "Threshold for discovery to stop querying for more peers"
-defineFlag "genesisBlockName" "livenet" "use the alternate stablenet genesis block"
 
 defineFlag "apiIPAddress" "127.0.0.1" "The IP address that strato-api will bind to"
 
