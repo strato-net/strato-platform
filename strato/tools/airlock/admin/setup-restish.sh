@@ -18,7 +18,7 @@ mkdir -p "$DIR"
 mkdir -p "$HELPER_DIR"
 
 echo "Authenticating..."
-strato-auth >/dev/null 2>&1
+strato-auth
 TOKEN=$(jq -r '.access_token' ~/.secrets/stratoToken)
 
 echo "Fetching OpenAPI spec from $HOST..."
