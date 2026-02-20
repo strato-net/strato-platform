@@ -61,7 +61,7 @@ instance NFData RawTransaction'
 instance ToSchema RawTransaction' where
   declareNamedSchema _ =
     return $
-      NamedSchema (Just "RawTransaction'") mempty
+      NamedSchema (Just "RawTransaction") mempty
 
 instance ToJSON RawTransaction' where
   toJSON (RawTransaction' rt@(RawTransaction{..}) next) =
@@ -145,7 +145,7 @@ instance FromJSON RawTransaction' where
 instance ToSchema UnsignedRawTransaction' where
   declareNamedSchema _ =
     return $
-      NamedSchema (Just "UnsignedRawTransaction'") mempty
+      NamedSchema (Just "UnsignedRawTransaction") mempty
 
 instance ToJSON UnsignedRawTransaction' where
   toJSON (UnsignedRawTransaction' (RawTransaction{..})) =
@@ -311,7 +311,7 @@ data Block' = Block' Block String deriving (Eq, Show)
 instance ToSchema Block' where
   declareNamedSchema _ =
     return $
-      NamedSchema (Just "Block'") mempty
+      NamedSchema (Just "Block") mempty
 
 instance ToJSON Block' where
   toJSON (Block' (Block bd rt bu) next) =
@@ -508,7 +508,7 @@ instance ToSchema AddressStateRef' where
     strSchema <- declareSchemaRef (Proxy :: Proxy String)
     keccakSchema <- declareSchemaRef (Proxy :: Proxy (Maybe Keccak256))
     maybeStrSchema <- declareSchemaRef (Proxy :: Proxy (Maybe String))
-    return $ NamedSchema (Just "AddressStateRef'") $ mempty
+    return $ NamedSchema (Just "AddressStateRef") $ mempty
       & type_ ?~ OpenApiObject
       & properties .~
         [ ("next", strSchema)
