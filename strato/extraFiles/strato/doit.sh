@@ -236,12 +236,7 @@ function newnode {
     "${iFlag}" +RTS -N1 >> logs/strato-api 2>&1
 
   SLIPSTREAM_CMD="slipstream \
-  --database=${postgres_slipstream_db} \
   --minLogLevel=${slipMinLogLevel} \
-  --pghost=${postgres_host} \
-  --pgport=${postgres_port} \
-  --pguser=${postgres_user} \
-  --password=${postgres_password} \
   ${iFlag}"
 
   echo "Starting slipstream"

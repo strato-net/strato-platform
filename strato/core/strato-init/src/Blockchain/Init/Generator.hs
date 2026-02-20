@@ -95,7 +95,7 @@ strato-p2p-indexer
 
 strato-api-indexer
 
-slipstream --database=cirrus --minLogLevel=LevelInfo --pghost=localhost --pgport=5432 --pguser=postgres --password=api +RTS -T -RTS
+slipstream --minLogLevel=LevelInfo +RTS -T -RTS
 
 strato-api --minLogLevel=LevelInfo --networkID=-1 --vaultUrl=https://vault.blockapps.net:8093 --oauthDiscoveryUrl=https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration --network=helium +RTS -T -RTS +RTS -N1
 

@@ -14,13 +14,12 @@ import Blockchain.Slipstream.Data.CirrusTables
 import Blockchain.Slipstream.MessageConsumer
 import Blockchain.Slipstream.Options ()
 import Blockchain.Slipstream.OutputData
-import Blockchain.Slipstream.SQL (cirrusConnStr)
 import Control.Concurrent
 import Control.Monad
 import Control.Monad.Composable.SQL
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Resource
-import Blockchain.EthConf (runKafkaMConfigured)
+import Blockchain.EthConf (cirrusConnStr, runKafkaMConfigured)
 import Data.Text.Encoding (encodeUtf8)
 import Database.Persist.Postgresql
 import Blockchain.Slipstream.PostgresqlTypedShim
