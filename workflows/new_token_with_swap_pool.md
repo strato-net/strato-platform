@@ -164,7 +164,7 @@ Check that Swap is now available. The ratio should be close to the oracle price.
 
 From a normal user, test bridge in and bridge out, swap, liquidity provision and withdrawal.
 
-Ensure that the new token shows up with a price and balance on the Portfiolio page, and that it contributes to Net Portfolio Value and the historical net worth chart. Click the token name and ensure that the Asset Details page looks good. Ensure that the LP token shows up under My Pool Participation.
+Ensure that the new token shows up with a price and balance on the Portfolio page, and that it contributes to Net Portfolio Value and the historical net worth chart. Click the token name and ensure that the Asset Details page looks good. Ensure that the LP token shows up under My Pool Participation.
 
 ## Required parameters
 In order to complete these steps, the following values must first be determined:
