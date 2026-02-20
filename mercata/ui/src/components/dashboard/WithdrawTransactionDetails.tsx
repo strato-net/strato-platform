@@ -24,6 +24,7 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
     loading: isLoading,
     fetchWithdrawTransactions,
     availableNetworks,
+    withdrawalRefreshKey,
   } = useBridgeContext();
 
   useEffect(() => {
@@ -60,7 +61,7 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
     };
 
     loadTransactions();
-  }, [currentPage, withdrawalStatus, selectedChainId, fetchWithdrawTransactions, context, selectedType]);
+  }, [currentPage, withdrawalStatus, selectedChainId, fetchWithdrawTransactions, context, selectedType, withdrawalRefreshKey]);
 
   const columns = [
     {
