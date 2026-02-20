@@ -136,7 +136,7 @@ Vote to approve both issues.
 
 If this is a StablePool, but one where the token price is expected to drift slowly over time rather than stay constant (such as a yield-bearing stablecoin), then we'll need to set the peg mode of the oracle to keep a dynamic stable peg.
 
-In SMD, call StablePool(<PoolAddr>).updateRateOracles(<PriceOracle>, <PriceOracle>). The is the PriceOracle proxy is likely 0x1002. Important - remember to use the 0x prefix or the full zero-padding so that numerical addresses are recognized as hexadecimal.
+In SMD, call StablePool(<PoolAddr>).updateRateOracles(<PriceOracle>, <PriceOracle>). The PriceOracle proxy is likely 0x1002. Important - remember to use the 0x prefix or the full zero-padding so that numerical addresses are recognized as hexadecimal.
 
 Vote to approve the issue.
 
