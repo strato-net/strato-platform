@@ -71,12 +71,12 @@ executables:
       - bloc2
       - blockapps-init
       - hflags
-      - kafka-monad
       - persistent-postgresql
       - process-monitor
       - postgresql-simple
       - slipstream
       - sql-monad
+      - strato-conf
       - text
       - transformers
       - wai-middleware-prometheus

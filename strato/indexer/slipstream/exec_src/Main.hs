@@ -12,16 +12,15 @@ import BlockApps.Init
 import BlockApps.Logging
 import Blockchain.Slipstream.Data.CirrusTables
 import Blockchain.Slipstream.MessageConsumer
-import Blockchain.Slipstream.Options
+import Blockchain.Slipstream.Options ()
 import Blockchain.Slipstream.OutputData
 import Blockchain.Slipstream.SQL (cirrusConnStr)
 import Control.Concurrent
 import Control.Monad
-import Control.Monad.Composable.Kafka
 import Control.Monad.Composable.SQL
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Resource
-import Data.String
+import Blockchain.EthConf (runKafkaMConfigured)
 import Data.Text.Encoding (encodeUtf8)
 import Database.Persist.Postgresql
 import Blockchain.Slipstream.PostgresqlTypedShim
@@ -38,7 +37,7 @@ main = do
 
   runLoggingT
     . runResourceT
-    . runKafkaM ("slipstream" :: KafkaClientId) (fromString flags_kafkahost, fromIntegral flags_kafkaport)
+    . runKafkaMConfigured "slipstream"
     $ do
       $logInfoS "main" "Welcome to Slipstream!!!!"
       void . liftIO . forkIO . run 10777 $ metricsApp

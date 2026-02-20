@@ -237,8 +237,6 @@ function newnode {
 
   SLIPSTREAM_CMD="slipstream \
   --database=${postgres_slipstream_db} \
-  --kafkahost=${kafkaHost} \
-  --kafkaport=${kafkaPort} \
   --minLogLevel=${slipMinLogLevel} \
   --pghost=${postgres_host} \
   --pgport=${postgres_port} \
