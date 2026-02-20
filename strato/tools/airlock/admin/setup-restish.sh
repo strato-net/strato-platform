@@ -30,7 +30,7 @@ fi
 echo "Creating auth helper..."
 cat > "$HELPER_DIR/strato-auth-helper.sh" << 'EOF'
 #!/bin/bash
-strato-auth >/dev/null 2>&1
+strato-auth >/dev/null
 TOKEN=$(jq -r '.access_token' ~/.secrets/stratoToken)
 echo "{\"headers\":{\"Authorization\":[\"Bearer $TOKEN\"]}}"
 EOF

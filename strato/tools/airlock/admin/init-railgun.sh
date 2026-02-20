@@ -18,7 +18,7 @@ fi
 
 # Get user's address for treasury
 echo "Getting user address..."
-strato-auth >/dev/null 2>&1
+strato-auth
 TOKEN=$(jq -r '.access_token' ~/.secrets/stratoToken)
 # Get current user's address from the key endpoint
 HOST=${STRATO_HOST:-localhost:8081}

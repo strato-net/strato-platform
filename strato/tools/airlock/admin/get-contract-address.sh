@@ -20,7 +20,8 @@ get_railgun_address() {
         return 1
     fi
     
-    local ADDR=$(yq -r '.contractsConfig.railgunProxy // empty' "$ETHCONF_FILE" 2>/dev/null)
+    local ADDR
+    ADDR=$(yq -r '.contractsConfig.railgunProxy' "$ETHCONF_FILE" 2>/dev/null)
     
     if [ -z "$ADDR" ] || [ "$ADDR" = "null" ]; then
         echo "Error: Railgun contract address not found. Has it been deployed?" >&2

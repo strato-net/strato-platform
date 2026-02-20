@@ -22,7 +22,7 @@ fi
 
 # Get deployer address for ownership
 echo "Getting user address..."
-strato-auth >/dev/null 2>&1
+strato-auth
 TOKEN=$(jq -r '.access_token' ~/.secrets/stratoToken)
 HOST=${STRATO_HOST:-localhost:8081}
 USER_ADDR=$(curl -s -H "Authorization: Bearer $TOKEN" "http://$HOST/strato/v2.3/key" | jq -r '.address')
