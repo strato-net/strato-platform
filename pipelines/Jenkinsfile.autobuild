@@ -317,6 +317,11 @@ pipeline {
                           ssl='true' \\
                           ./strato
                     """
+                    
+                    // Copy .pem and .key for SSL
+                    sh 'cp /home/ec2-user/cloudflare-ssl/server.pem ssl/certs/'
+                    sh 'cp /home/ec2-user/cloudflare-ssl/server.key ssl/private/'
+                    
                     sh "sudo ./strato --pull"
                     sh "sudo ./strato --wipe"
                     sh "sudo ./strato-run.sh"
