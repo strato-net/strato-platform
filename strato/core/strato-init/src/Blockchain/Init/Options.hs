@@ -14,7 +14,6 @@ defineFlag "u:pguser" ("" :: String) "Postgres user"
 defineFlag "P:pghost" ("" :: String) "Postgres hostname"
 defineFlag "p:password" ("" :: String) "Postgres password"
 defineFlag "K:kafkahost" ("" :: String) "Kafka hostname"
-defineFlag "vaultWrapperUrl" ("http://localhost:8013/strato/v2.3" :: String) "Vault-Wrapper URL"
 defineFlag "z:lazyblocks" (False :: Bool) "Don't mine empty blocks"
 defineFlag "addBootnodes" True "Adds bootnodes to the peer DB at setup time.  If set to false, the peer will not be able to initiate a connection to the network by itself (this option is useful if you want to set up a peer to itself be a bootnode in a private network)"
 defineCustomFlag

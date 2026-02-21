@@ -522,8 +522,7 @@ initConfig wireMessagesRef = do
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
   vaultClient <- do
     mgr <- liftIO $ newManager defaultManagerSettings
-    url <- liftIO $ parseBaseUrl flags_vaultWrapperUrl
-    return $ mkClientEnv mgr url
+    return $ mkClientEnv mgr (vaultProxyUrl . urlConfig $ ethConf)
   nodePubKey <- do
     $logInfoS "HasVault" "Calling vault-wrapper to get the node's public key"
     fmap VC.unPubKey $ waitOnVault $ liftIO $ runClientM (VC.getKey Nothing Nothing) vaultClient

@@ -18,6 +18,8 @@ module Blockchain.Init.Monad (
 
 import BlockApps.Logging
 import Blockchain.Constants
+import Blockchain.EthConf (UrlConfig, vaultProxyUrl)
+import Data.Default
 import Blockchain.DB.CodeDB
 import Blockchain.DB.HashDB
 import Blockchain.DB.MemAddressStateDB
@@ -25,7 +27,6 @@ import Blockchain.DB.RawStorageDB
 import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
 import qualified Blockchain.Database.MerklePatricia as MP
-import Blockchain.Init.Options (flags_vaultWrapperUrl)
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
@@ -72,8 +73,7 @@ runSetupDBM mv = do
   [m3, m4] <- liftIO . replicateM 2 . newIORef $ M.empty
   vdb <- do
     mgr <- liftIO $ newManager defaultManagerSettings
-    url <- liftIO $ parseBaseUrl flags_vaultWrapperUrl
-    return $ mkClientEnv mgr url
+    return $ mkClientEnv mgr (vaultProxyUrl (def :: UrlConfig))
   runReaderT mv $ SetupDBs sdb srRef hdb cdb vdb m1 m2 m3 m4
 
 waitOnVault :: (MonadLogger m, MonadIO m, Show a) => m (Either a b) -> m b

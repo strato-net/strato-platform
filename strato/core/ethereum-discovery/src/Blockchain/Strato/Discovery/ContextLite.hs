@@ -229,17 +229,16 @@ waitOnVault action = do
       waitOnVault action
     Right val -> return val
 
-initContextLite :: MonadUnliftIO m => String -> UDPPort -> TCPPort -> m ContextLite
+initContextLite :: MonadUnliftIO m => BaseUrl -> UDPPort -> TCPPort -> m ContextLite
 initContextLite vaultUrl udpPort tcpPort = do
   dbs <- openDBs
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
   mgr <- liftIO $ newManager defaultManagerSettings
-  url <- liftIO $ parseBaseUrl vaultUrl
   return
     ContextLite
       { liteSQLDB = sqlDB' dbs,
         redisBlockDB = RBDB.RedisConnection redisBDBPool,
-        vaultClient = mkClientEnv mgr url,
+        vaultClient = mkClientEnv mgr vaultUrl,
         sock = error "initContextLite: Uninitialized socket",
         myUdpPort = udpPort,
         myTcpPort = tcpPort

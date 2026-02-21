@@ -45,8 +45,7 @@ runtimeConfig = def
 getNodeKey :: IO (VC.PublicKey, Address)
 getNodeKey = do
   mgr <- newManager defaultManagerSettings
-  vaultWrapperUrl <- parseBaseUrl flags_vaultWrapperUrl
-  let clientEnv = mkClientEnv mgr vaultWrapperUrl
+  let clientEnv = mkClientEnv mgr (vaultProxyUrl (def :: UrlConfig))
   putStrLn "asking vault-wrapper for the node's key, or to create one, if it does not exist"
   ak <- waitOnVault clientEnv $ runClientM (getKey Nothing Nothing) clientEnv
   return (VC.unPubKey ak, VC.unAddress ak)

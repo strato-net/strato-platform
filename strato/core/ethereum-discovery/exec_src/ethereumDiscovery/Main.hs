@@ -13,7 +13,7 @@ import Control.Monad.Reader
 import Control.Monad.Trans.Resource
 import qualified Data.Text as T
 import Executable.EthereumDiscovery
-import Executable.Options
+import Executable.Options ()
 import HFlags
 import Instrumentation
 import qualified Network.Socket as S
@@ -27,12 +27,13 @@ main = do
   _ <- $initHFlags "ethereum-discover"
 
   let runner f = do
-        $logInfoS "ethereumDiscovery" $ T.pack $ CL.green $ "Talking to vault-wrapper at " ++ flags_vaultWrapperUrl
+        let vaultProxyUrl' = vaultProxyUrl . urlConfig $ ethConf
+        $logInfoS "ethereumDiscovery" $ T.pack $ CL.green $ "Talking to vault-wrapper at " ++ show vaultProxyUrl'
         let port' = discoveryPort $ discoveryConfig ethConf
             udpPort = UDPPort port'
             tcpPort = TCPPort port' -- TODO: where do we get the TCP port from?
             minPeers = minAvailablePeers (discoveryConfig ethConf)
-        cxt <- initContextLite flags_vaultWrapperUrl udpPort tcpPort
+        cxt <- initContextLite vaultProxyUrl' udpPort tcpPort
         runResourceT . flip runReaderT cxt $
           bracket
             (connectMe udpPort)

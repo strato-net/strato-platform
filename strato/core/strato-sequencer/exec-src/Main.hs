@@ -62,15 +62,15 @@ main = do
   putStrLn $ "strato-sequencer ignoring unknown flags: " ++ show s
   putStrLn $ "strato-sequencer network: " ++ show flags_network
   putStrLn $ "strato-sequencer validators: " ++ show validators
-  putStrLn $ "strato-sequencer vault-proxy URL: " ++ show flags_vaultWrapperUrl
+  let vaultProxyUrl' = vaultProxyUrl . urlConfig $ ethConf
+  putStrLn $ "strato-sequencer vault-proxy URL: " ++ show vaultProxyUrl'
   putStrLn $ "strato-sequencer validatorBehavior: " ++ show flags_validatorBehavior
 
   pkg <- atomically newCablePackage
 
   -- setup the connection with vault-proxy
   mgr <- newManager defaultManagerSettings
-  vaultWrapperUrl <- parseBaseUrl flags_vaultWrapperUrl
-  let clientEnv = mkClientEnv mgr vaultWrapperUrl
+  let clientEnv = mkClientEnv mgr vaultProxyUrl'
 
   selfAddress <- do --send to vm with kafka
     addrAndKey <- waitOnVault $ runClientM (VC.getKey Nothing Nothing) clientEnv

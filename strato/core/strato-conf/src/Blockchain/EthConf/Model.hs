@@ -18,6 +18,7 @@ import Data.Yaml
 import qualified Database.PostgreSQL.Simple as PS (ConnectInfo (..), postgreSQLConnectionString)
 import qualified Database.Redis as Redis
 import GHC.Generics
+import Servant.Client (BaseUrl, parseBaseUrl)
 
 postgreSQLConnectionString :: SqlConf -> B.ByteString
 postgreSQLConnectionString sqlc =
@@ -51,9 +52,24 @@ data EthConf = EthConf
     blockConfig :: BlockConf,
     discoveryConfig :: DiscoveryConf,
     apiConfig :: ApiConfig,
-    contractsConfig :: Maybe ContractsConf
+    contractsConfig :: Maybe ContractsConf,
+    urlConfig :: UrlConfig
   }
-  deriving (Show, Eq, Generic, FromJSON)
+  deriving (Show, Eq, Generic)
+
+instance FromJSON EthConf where
+  parseJSON = withObject "EthConf" $ \v -> EthConf
+    <$> v .: "sqlConfig"
+    <*> v .: "cirrusConfig"
+    <*> v .: "redisBlockDBConfig"
+    <*> v .: "kafkaConfig"
+    <*> v .: "levelDBConfig"
+    <*> v .: "quarryConfig"
+    <*> v .: "blockConfig"
+    <*> v .: "discoveryConfig"
+    <*> v .: "apiConfig"
+    <*> v .:? "contractsConfig"
+    <*> v .:? "urlConfig" .!= def
 
 instance ToJSON EthConf where
   toJSON = Aeson.genericToJSON Aeson.defaultOptions { Aeson.omitNothingFields = True }
@@ -115,6 +131,11 @@ data BlockConf = BlockConf
 
 data ContractsConf = ContractsConf
   { railgunProxy :: Maybe Address  -- ^ RailgunSmartWallet proxy contract address
+  }
+  deriving (Show, Eq, Generic, FromJSON, ToJSON)
+
+data UrlConfig = UrlConfig
+  { vaultProxyUrl :: BaseUrl
   }
   deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
@@ -180,6 +201,13 @@ instance Default ContractsConf where
     { railgunProxy = Nothing
     }
 
+instance Default UrlConfig where
+  def = UrlConfig
+    { vaultProxyUrl = case parseBaseUrl "http://localhost:8013/strato/v2.3" of
+        Just url -> url
+        Nothing -> error "Invalid default vaultProxyUrl"
+    }
+
 instance Default EthConf where
   def = EthConf
     { sqlConfig = def
@@ -192,4 +220,5 @@ instance Default EthConf where
     , discoveryConfig = def
     , apiConfig = def
     , contractsConfig = Nothing
+    , urlConfig = def
     }
