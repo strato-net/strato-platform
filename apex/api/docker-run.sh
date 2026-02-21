@@ -27,7 +27,7 @@ sed -i -e 's|__strato_postgres_host__|'"${postgres_host}"'|g' models/strato/eth/
 sed -i -e 's|__strato_postgres_port__|'"${postgres_port}"'|g' models/strato/eth/config.js
 
 echo 'Waiting for strato to be available...'
-until curl --silent --output /dev/null --fail --location ${stratoRoot}/stats/totaltx
+until wget --quiet --spider "${stratoRoot}/stats/totaltx"
 do
   echo "Check at $(date)"
   sleep 1
