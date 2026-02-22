@@ -13,23 +13,18 @@ if (siteId && siteId.trim() !== '') {
   document.head.appendChild(script);
 }
 
-// Conditionally load Google Analytics
-// Use runtime config (from /config.js) if available, fallback to build-time env var
-const gaId = (window as any).ENV?.GOOGLE_ANALYTICS_ID || import.meta.env.VITE_GOOGLE_ANALYTICS_ID;
-if (gaId && gaId.trim() !== '') {
-  // Load gtag.js library
-  const gtagScript = document.createElement('script');
-  gtagScript.src = `https://www.googletagmanager.com/gtag/js?id=${gaId}`;
-  gtagScript.async = true;
-  document.head.appendChild(gtagScript);
+// Google tag (gtag.js)
+const gtagScript = document.createElement('script');
+gtagScript.src = 'https://www.googletagmanager.com/gtag/js?id=G-B5TCWNS0BX';
+gtagScript.async = true;
+document.head.appendChild(gtagScript);
 
-  // Initialize dataLayer and gtag (expose gtag globally for custom event tracking)
-  (window as any).dataLayer = (window as any).dataLayer || [];
-  (window as any).gtag = function (...args: any[]) {
-    (window as any).dataLayer.push(args);
-  };
-  (window as any).gtag('js', new Date());
-  (window as any).gtag('config', gaId);
-}
+(window as any).dataLayer = (window as any).dataLayer || [];
+(window as any).gtag = function() {
+  // eslint-disable-next-line prefer-rest-params
+  (window as any).dataLayer.push(arguments);
+};
+(window as any).gtag('js', new Date());
+(window as any).gtag('config', 'G-B5TCWNS0BX');
 
 createRoot(document.getElementById("root")!).render(<App />);
