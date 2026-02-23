@@ -17,14 +17,12 @@ const TARGETS = [
   { address: "5888fbe6d6774c1d5788a7b631fc2a2fe88c44c6", contractName: "Pool" },
   { address: "d379288a399ed0e1d12f5556cd13aaf3b4cdc7c5", contractName: "Pool" },
   { address: "72f029994b1003447b4fcae5025ae78fcbec258e", contractName: "Pool" },
-  { address: "902651e10ab7d64fa7d0480657ac36676d155f2e", contractName: "Pool" },
-  { address: "50160ce5184913cada2660ab51a4f464f904d5eb", contractName: "Pool" },
   { address: "34d7caf576cf9493f054d9eced99dcd463eba4b7", contractName: "Pool" },
   { address: "cb85e12ca5d98de95715fc75ae251a66b662ea06", contractName: "Pool" },
   { address: "000000000000000000000000000000000000101d", contractName: "Pool" },
   { address: "000000000000000000000000000000000000101b", contractName: "Pool" },
   { address: "0000000000000000000000000000000000001019", contractName: "Pool" },
-  { address: "0000000000000000000000000000000000001017", contractName: "Pool" }, // ETHST-USDST
+  { address: "0000000000000000000000000000000000001017", contractName: "Pool" },
 ];
 
 // Optional initialize args overrides the developer can populate.
