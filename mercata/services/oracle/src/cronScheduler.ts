@@ -167,7 +167,7 @@ function aggregatePrices(
         }
 
         const isValid = sources.length >= requiredSources;
-        if (!isValid) {
+        if (!isValid && asset.submit !== false) {
             logError('CronScheduler', new Error(`Insufficient sources for ${assetKey}: got ${sources.length}, need ${requiredSources}. Failed: [${failedSources.join(', ')}]`));
         }
         

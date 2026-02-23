@@ -40,8 +40,8 @@ import Data.Aeson as A
 import Data.Binary
 import Data.Default
 import Data.Map (Map, empty, fromList)
+import Data.OpenApi
 import Data.Source
-import Data.Swagger
 import GHC.Generics
 import SolidVM.Model.CodeCollection.ConstantDecl
 import qualified SolidVM.Model.CodeCollection.Event as SolidVM

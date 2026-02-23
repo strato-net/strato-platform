@@ -20,35 +20,37 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
   const [selectedType, setSelectedType] = useState<'bridge' | 'convert' | ''>('');
   const [transactions, setTransactions] = useState<any[]>([]);
 
+  const [isLoading, setIsLoading] = useState(false);
   const {
-    loading: isLoading,
     fetchWithdrawTransactions,
     availableNetworks,
+    withdrawalRefreshKey,
   } = useBridgeContext();
 
   useEffect(() => {
     const loadTransactions = async () => {
+      setIsLoading(true);
       try {
         const params: Record<string, string> = {
           limit: ITEMS_PER_PAGE.toString(),
           offset: ((currentPage - 1) * ITEMS_PER_PAGE).toString(),
           order: 'block_timestamp.desc',
         };
-        
+
         if (selectedType === 'convert') {
           (params as any)["value->>stratoToken"] = `eq.${usdstAddress}`;
         } else if (selectedType === 'bridge') {
           (params as any)["value->>stratoToken"] = `neq.${usdstAddress}`;
         }
-        
+
         if (withdrawalStatus !== 0) {
           (params as any)["value->>bridgeStatus"] = `eq.${withdrawalStatus}`;
         }
-        
+
         if (selectedChainId !== 0) {
           (params as any)["value->>externalChainId"] = `eq.${selectedChainId}`;
         }
-        
+
         const result = await fetchWithdrawTransactions(params, context);
         setTransactions(result.data);
         setTotalCount(result.totalCount);
@@ -56,11 +58,13 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
         console.error('Error loading transactions:', error);
         setTransactions([]);
         setTotalCount(0);
+      } finally {
+        setIsLoading(false);
       }
     };
 
     loadTransactions();
-  }, [currentPage, withdrawalStatus, selectedChainId, fetchWithdrawTransactions, context, selectedType]);
+  }, [currentPage, withdrawalStatus, selectedChainId, fetchWithdrawTransactions, context, selectedType, withdrawalRefreshKey]);
 
   const columns = [
     {

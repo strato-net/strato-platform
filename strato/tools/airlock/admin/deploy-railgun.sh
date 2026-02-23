@@ -14,7 +14,6 @@ set -e
 
 SCRIPT_DIR="$(dirname "$0")"
 CONTRACT_FILE="$SCRIPT_DIR/../contracts/railgun.sol"
-source "$SCRIPT_DIR/refresh-token.sh"
 
 if [ ! -f "$CONTRACT_FILE" ]; then
     echo "Error: Contract file not found at $CONTRACT_FILE"
@@ -23,7 +22,8 @@ fi
 
 # Get deployer address for ownership
 echo "Getting user address..."
-TOKEN=$(ensure_valid_token) || exit 1
+strato-auth
+TOKEN=$(jq -r '.access_token' ~/.secrets/stratoToken)
 HOST=${STRATO_HOST:-localhost:8081}
 USER_ADDR=$(curl -s -H "Authorization: Bearer $TOKEN" "http://$HOST/strato/v2.3/key" | jq -r '.address')
 
@@ -98,10 +98,42 @@ echo "Proxy contract:  $PROXY_ADDRESS (this is the address users interact with)"
 echo ""
 echo "Next step: Run init-railgun.sh to initialize"
 
-# Save proxy address as the main contract address
-echo "$PROXY_ADDRESS" > "$SCRIPT_DIR/.contract-address"
-echo "Saved proxy address to: $SCRIPT_DIR/.contract-address"
-
-# Also save logic address for reference
-echo "$LOGIC_ADDRESS" > "$SCRIPT_DIR/.logic-address"
-echo "Saved logic address to: $SCRIPT_DIR/.logic-address"
+# Update node's ethconf.yaml
+DEFAULT_NODE_FILE="$HOME/.strato/default-node"
+if [ -f "$DEFAULT_NODE_FILE" ]; then
+    NODE_DIR=$(cat "$DEFAULT_NODE_FILE" | tr -d '\n')
+    ETHCONF_FILE="$NODE_DIR/.ethereumH/ethconf.yaml"
+    if [ -f "$ETHCONF_FILE" ]; then
+        echo ""
+        echo "Updating node config with Railgun address..."
+        if command -v yq &> /dev/null; then
+            # File may be read-only, temporarily make writable
+            chmod u+w "$ETHCONF_FILE" 2>/dev/null || true
+            
+            # Check which yq version (Go vs Python)
+            if yq --version 2>&1 | grep -q "mikefarah"; then
+                # Go version (mikefarah/yq)
+                yq -i ".contractsConfig.railgunProxy = \"$PROXY_ADDRESS\"" "$ETHCONF_FILE"
+            else
+                # Python version - write to temp file then move
+                yq -y ".contractsConfig.railgunProxy = \"$PROXY_ADDRESS\"" "$ETHCONF_FILE" > "$ETHCONF_FILE.tmp"
+                mv -f "$ETHCONF_FILE.tmp" "$ETHCONF_FILE"
+            fi
+            
+            # Restore read-only
+            chmod u-w "$ETHCONF_FILE"
+            echo "Updated: $ETHCONF_FILE"
+        else
+            echo "Error: yq not installed, cannot update ethconf.yaml"
+            echo "Install yq: https://github.com/mikefarah/yq"
+            exit 1
+        fi
+    else
+        echo "Warning: ethconf.yaml not found at $ETHCONF_FILE"
+    fi
+else
+    echo "Warning: No default node set (~/.strato/default-node not found)"
+    echo "Run strato-setup first, or manually add to your node's ethconf.yaml:"
+    echo "  contractsConfig:"
+    echo "    railgunProxy: \"$PROXY_ADDRESS\""
+fi

@@ -8,7 +8,6 @@ module Railgun.API
     callShield
   , callTransact
   , approveToken
-  , getChainId
   , getMerkleRoot
   , getTreeNumber
   , getBoundParamsHash
@@ -18,15 +17,16 @@ module Railgun.API
   , formatTokenAmount
   , parseTokenAmount
     -- * Configuration
-  , StratoConfig(..)
-  , defaultConfig
+  , readContractAddress
+  , defaultHost
+  , defaultPort
   ) where
 
 import Bloc.API (FunctionPayload(..), PostBlocTransactionRequest(..), BlocTransactionPayload(..), BlocTransactionResult(..), BlocTransactionData(..))
 import Bloc.Client (postBlocTransactionParallelExternal)
 import BlockApps.Solidity.ArgValue (ArgValue(..))
 import BlockApps.Solidity.SolidityValue (SolidityValue(..))
-import Blockchain.Strato.Model.Address (Address(..))
+import Blockchain.Strato.Model.Address (Address(..), formatAddressWithoutColor)
 import qualified Data.Aeson.KeyMap as KM
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as B16
@@ -34,15 +34,22 @@ import qualified Data.Map as Map
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
+import qualified Data.Text.IO as TIO
 import qualified Data.Vector as V
 import Data.Aeson (eitherDecode, parseJSON, (.:), Value)
 import Data.Aeson.Types (parseMaybe, Parser)
 import qualified Data.ByteString.Lazy as LBS
 import qualified Network.HTTP.Client as HTTP
-import Servant.Client (BaseUrl(..), Scheme(..), ClientEnv(..), mkClientEnv, runClientM, defaultMakeClientRequest, ClientError(..))
+import Servant.Client (BaseUrl(..), Scheme(..), ClientEnv(..), mkClientEnv, defaultMakeClientRequest, ClientError(..))
 import Servant.Client.Core (addHeader, ResponseF(..))
 import Network.HTTP.Types (Status(..))
 import Text.Printf (printf)
+import Strato.Strato23.API.Types (AddressAndKey(..))
+import Strato.Auth (runServantWithAuthEnv, authRequest)
+import Blockchain.EthConf.Model (EthConf(..), ContractsConf(..))
+import Data.Yaml (decodeFileEither)
+import System.Directory (doesFileExist, getHomeDirectory)
+import System.FilePath ((</>))
 
 import Railgun.Types (ShieldRequest(..), CommitmentPreimage(..), ShieldCiphertext(..), TokenData(..), TokenType(..), integerToHex32, encryptedBundleToHexList)
 import Railgun.Unshield (UnshieldRequest(..), Transaction(..), SnarkProof(..), G1Point(..), G2Point(..), BoundParams(..), UnshieldType(..), CommitmentCiphertext(..))
@@ -60,28 +67,40 @@ formatClientError (UnsupportedContentType _ _) = "Unsupported content type in re
 formatClientError (InvalidContentTypeHeader _) = "Invalid content type header"
 formatClientError (ConnectionError ex) = "Connection error: " <> T.pack (show ex)
 
--- | STRATO API configuration
-data StratoConfig = StratoConfig
-  { stratoHost :: Text              -- ^ e.g., "localhost"
-  , stratoPort :: Int               -- ^ e.g., 8081
-  , stratoAuthToken :: Text         -- ^ OAuth bearer token
-  , railgunContractAddress :: Text  -- ^ RailgunSmartWallet proxy address
-  } deriving (Show, Eq)
+-- | Default STRATO host
+defaultHost :: String
+defaultHost = "localhost"
 
--- | Default configuration for local jimtest
-defaultConfig :: StratoConfig
-defaultConfig = StratoConfig
-  { stratoHost = "localhost"
-  , stratoPort = 8081
-  , stratoAuthToken = ""  -- Must be set from .token file
-  , railgunContractAddress = ""  -- Read from .contract-address file at runtime
-  }
+-- | Default STRATO port  
+defaultPort :: Int
+defaultPort = 8081
+
+-- | Read contract address from ethconf.yaml
+readContractAddress :: IO (Maybe Text)
+readContractAddress = do
+  home <- getHomeDirectory
+  let defaultNodePath = home </> ".strato" </> "default-node"
+  exists <- doesFileExist defaultNodePath
+  if not exists
+    then return Nothing
+    else do
+      nodeDir <- T.unpack . T.strip <$> TIO.readFile defaultNodePath
+      let ethconfPath = nodeDir </> ".ethereumH" </> "ethconf.yaml"
+      ethconfExists <- doesFileExist ethconfPath
+      if not ethconfExists
+        then return Nothing
+        else do
+          result <- decodeFileEither ethconfPath
+          case result of
+            Left _ -> return Nothing
+            Right ethConf -> 
+              return $ T.pack . formatAddressWithoutColor <$> (contractsConfig ethConf >>= railgunProxy)
 
 -- | Create a servant-client environment with custom headers for nginx CSRF bypass
-makeClientEnv :: StratoConfig -> IO ClientEnv
-makeClientEnv config = do
+makeBlocClientEnv :: IO ClientEnv
+makeBlocClientEnv = do
   manager <- HTTP.newManager HTTP.defaultManagerSettings
-  let baseUrl = BaseUrl Http (T.unpack $ stratoHost config) (stratoPort config) "/strato-api/bloc/v2.2"
+  let baseUrl = BaseUrl Http defaultHost defaultPort "/strato-api/bloc/v2.2"
       env = mkClientEnv manager baseUrl
       -- Add headers to bypass nginx CSRF protection
       customMakeRequest burl req = defaultMakeClientRequest burl 
@@ -97,103 +116,106 @@ textToAddress t =
   in Address $ read ("0x" ++ T.unpack hex)
 
 -- | Call the shield function on the Railgun contract
-callShield :: StratoConfig 
-           -> [ShieldRequest]  -- ^ Shield requests (can batch multiple)
+callShield :: [ShieldRequest]  -- ^ Shield requests (can batch multiple)
            -> IO (Either Text [BlocTransactionResult])
-callShield config shieldReqs = do
-  clientEnv <- makeClientEnv config
-  
-  let contractAddr = textToAddress (railgunContractAddress config)
-      args = Map.singleton "_shieldRequests" (shieldRequestsToArgValue shieldReqs)
+callShield shieldReqs = do
+  maybeContractAddr <- readContractAddress
+  case maybeContractAddr of
+    Nothing -> return $ Left "Railgun contract address not found in ethconf.yaml"
+    Just contractAddrText -> do
+      clientEnv <- makeBlocClientEnv
+      let contractAddr = textToAddress contractAddrText
+          args = Map.singleton "_shieldRequests" (shieldRequestsToArgValue shieldReqs)
+          
+          payload = BlocFunction $ FunctionPayload
+            { functionpayloadContractAddress = contractAddr
+            , functionpayloadMethod = "shield"
+            , functionpayloadArgs = args
+            , functionpayloadTxParams = Nothing
+            , functionpayloadMetadata = Nothing
+            }
+          
+          request = PostBlocTransactionRequest
+            { postbloctransactionrequestAddress = Nothing
+            , postbloctransactionrequestTxs = [payload]
+            , postbloctransactionrequestTxParams = Nothing
+            , postbloctransactionrequestSrcs = Nothing
+            }
       
-      payload = BlocFunction $ FunctionPayload
-        { functionpayloadContractAddress = contractAddr
-        , functionpayloadMethod = "shield"
-        , functionpayloadArgs = args
-        , functionpayloadTxParams = Nothing
-        , functionpayloadMetadata = Nothing
-        }
-      
-      request = PostBlocTransactionRequest
-        { postbloctransactionrequestAddress = Nothing
-        , postbloctransactionrequestTxs = [payload]
-        , postbloctransactionrequestTxParams = Nothing
-        , postbloctransactionrequestSrcs = Nothing
-        }
-      
-      authHeader = Just $ "Bearer " <> stratoAuthToken config
-  
-  result <- runClientM (postBlocTransactionParallelExternal authHeader Nothing True request) clientEnv
-  pure $ case result of
-    Left err -> Left $ formatClientError err
-    Right txResults -> Right txResults
+      result <- runServantWithAuthEnv clientEnv $ \authHeader ->
+        postBlocTransactionParallelExternal authHeader Nothing True request
+      pure $ case result of
+        Left clientErr -> Left $ formatClientError clientErr
+        Right txResults -> Right txResults
 
 -- | Call the transact function on the Railgun contract (for unshield/transfer)
-callTransact :: StratoConfig 
-             -> UnshieldRequest  -- ^ Unshield request with transactions
+callTransact :: UnshieldRequest  -- ^ Unshield request with transactions
              -> IO (Either Text [BlocTransactionResult])
-callTransact config unshieldReq = do
-  clientEnv <- makeClientEnv config
-  
-  let contractAddr = textToAddress (railgunContractAddress config)
-      args = Map.singleton "_transactions" (transactionsToArgValue (urTransactions unshieldReq))
-      payload = BlocFunction $ FunctionPayload
-        { functionpayloadContractAddress = contractAddr
-        , functionpayloadMethod = "transact"
-        , functionpayloadArgs = args
-        , functionpayloadTxParams = Nothing
-        , functionpayloadMetadata = Nothing
-        }
+callTransact unshieldReq = do
+  maybeContractAddr <- readContractAddress
+  case maybeContractAddr of
+    Nothing -> return $ Left "Railgun contract address not found"
+    Just contractAddrText -> do
+      clientEnv <- makeBlocClientEnv
+      let contractAddr = textToAddress contractAddrText
+          args = Map.singleton "_transactions" (transactionsToArgValue (urTransactions unshieldReq))
+          payload = BlocFunction $ FunctionPayload
+            { functionpayloadContractAddress = contractAddr
+            , functionpayloadMethod = "transact"
+            , functionpayloadArgs = args
+            , functionpayloadTxParams = Nothing
+            , functionpayloadMetadata = Nothing
+            }
+          
+          request = PostBlocTransactionRequest
+            { postbloctransactionrequestAddress = Nothing
+            , postbloctransactionrequestTxs = [payload]
+            , postbloctransactionrequestTxParams = Nothing
+            , postbloctransactionrequestSrcs = Nothing
+            }
       
-      request = PostBlocTransactionRequest
-        { postbloctransactionrequestAddress = Nothing
-        , postbloctransactionrequestTxs = [payload]
-        , postbloctransactionrequestTxParams = Nothing
-        , postbloctransactionrequestSrcs = Nothing
-        }
-      
-      authHeader = Just $ "Bearer " <> stratoAuthToken config
-  
-  result <- runClientM (postBlocTransactionParallelExternal authHeader Nothing True request) clientEnv
-  pure $ case result of
-    Left err -> Left $ formatClientError err
-    Right txResults -> Right txResults
+      result <- runServantWithAuthEnv clientEnv $ \authHeader ->
+        postBlocTransactionParallelExternal authHeader Nothing True request
+      pure $ case result of
+        Left clientErr -> Left $ formatClientError clientErr
+        Right txResults -> Right txResults
 
 -- | Approve token spending for the Railgun contract
-approveToken :: StratoConfig
-             -> Text      -- ^ Token contract address
+approveToken :: Text      -- ^ Token contract address
              -> Integer   -- ^ Amount to approve
              -> IO (Either Text [BlocTransactionResult])
-approveToken config tokenAddr amount = do
-  clientEnv <- makeClientEnv config
-  
-  let contractAddr = textToAddress tokenAddr
-      args = Map.fromList
-        [ ("spender", ArgString $ railgunContractAddress config)
-        , ("value", ArgString $ T.pack $ show amount)
-        ]
+approveToken tokenAddr amount = do
+  maybeRailgunAddr <- readContractAddress
+  case maybeRailgunAddr of
+    Nothing -> return $ Left "Railgun contract address not found"
+    Just railgunAddr -> do
+      clientEnv <- makeBlocClientEnv
+      let contractAddr = textToAddress tokenAddr
+          args = Map.fromList
+            [ ("spender", ArgString railgunAddr)
+            , ("value", ArgString $ T.pack $ show amount)
+            ]
+          
+          payload = BlocFunction $ FunctionPayload
+            { functionpayloadContractAddress = contractAddr
+            , functionpayloadMethod = "approve"
+            , functionpayloadArgs = args
+            , functionpayloadTxParams = Nothing
+            , functionpayloadMetadata = Nothing
+            }
+          
+          request = PostBlocTransactionRequest
+            { postbloctransactionrequestAddress = Nothing
+            , postbloctransactionrequestTxs = [payload]
+            , postbloctransactionrequestTxParams = Nothing
+            , postbloctransactionrequestSrcs = Nothing
+            }
       
-      payload = BlocFunction $ FunctionPayload
-        { functionpayloadContractAddress = contractAddr
-        , functionpayloadMethod = "approve"
-        , functionpayloadArgs = args
-        , functionpayloadTxParams = Nothing
-        , functionpayloadMetadata = Nothing
-        }
-      
-      request = PostBlocTransactionRequest
-        { postbloctransactionrequestAddress = Nothing
-        , postbloctransactionrequestTxs = [payload]
-        , postbloctransactionrequestTxParams = Nothing
-        , postbloctransactionrequestSrcs = Nothing
-        }
-      
-      authHeader = Just $ "Bearer " <> stratoAuthToken config
-  
-  result <- runClientM (postBlocTransactionParallelExternal authHeader Nothing True request) clientEnv
-  pure $ case result of
-    Left err -> Left $ formatClientError err
-    Right txResults -> Right txResults
+      result <- runServantWithAuthEnv clientEnv $ \authHeader ->
+        postBlocTransactionParallelExternal authHeader Nothing True request
+      pure $ case result of
+        Left clientErr -> Left $ formatClientError clientErr
+        Right txResults -> Right txResults
 
 -- | Convert ShieldRequests to ArgValue for the API
 shieldRequestsToArgValue :: [ShieldRequest] -> ArgValue
@@ -290,50 +312,30 @@ boundParamsToArgValue BoundParams{..} = ArgObject $ KM.fromList
       ++ (if BS.null ccAnnotationData then [] else [("annotationData", ArgString $ TE.decodeUtf8 $ B16.encode ccAnnotationData)])
       ++ (if BS.null ccMemo then [] else [("memo", ArgString $ TE.decodeUtf8 $ B16.encode ccMemo)])
 
--- | Get the chain ID from STRATO metadata endpoint
-getChainId :: StratoConfig -> IO (Either Text Integer)
-getChainId config = do
-  manager <- HTTP.newManager HTTP.defaultManagerSettings
-  let url = "http://" ++ T.unpack (stratoHost config) ++ ":" ++ show (stratoPort config) ++ "/strato-api/eth/v1.2/metadata"
-  request <- HTTP.parseRequest url
-  let requestWithAuth = request 
-        { HTTP.requestHeaders = [("Authorization", TE.encodeUtf8 $ "Bearer " <> stratoAuthToken config)]
-        }
-  response <- HTTP.httpLbs requestWithAuth manager
-  case eitherDecode (HTTP.responseBody response) of
-    Left err -> return $ Left $ "Failed to parse metadata response: " <> T.pack err
-    Right json -> case parseMaybe (\obj -> obj .: "networkID") json of
-      Nothing -> return $ Left "networkID not found in metadata"
-      Just (networkIdStr :: Text) -> case reads (T.unpack networkIdStr) of
-        [(n, "")] -> return $ Right n
-        _ -> return $ Left $ "Failed to parse networkID: " <> networkIdStr
-
 -- | Get the current merkle root from the Railgun contract
 -- Note: Cirrus may strip leading zeros from bytes32 values. We pad to 64 chars
 -- but this may cause contract lookup failures due to a SolidVM bug with
 -- bytes32 mapping keys. See: [TODO: add bug tracker link]
-getMerkleRoot :: StratoConfig -> IO (Either Text Text)
-getMerkleRoot config = do
-  manager <- HTTP.newManager HTTP.defaultManagerSettings
-  let storageUrl = "http://" ++ T.unpack (stratoHost config) ++ ":" ++ show (stratoPort config) 
-            ++ "/cirrus/search/storage?address=eq." 
-            ++ T.unpack (railgunContractAddress config) ++ "&limit=1"
-  request <- HTTP.parseRequest storageUrl
-  let requestWithAuth = request 
-        { HTTP.requestHeaders = 
-            [ ("Authorization", TE.encodeUtf8 $ "Bearer " <> stratoAuthToken config)
-            , ("Accept", "application/json")
-            ]
-        }
-  response <- HTTP.httpLbs requestWithAuth manager
-  case eitherDecode (HTTP.responseBody response) of
-    Left err -> return $ Left $ "Failed to parse Cirrus storage response: " <> T.pack err
-    Right (results :: [Value]) -> 
-      case results of
-        [] -> return $ Left "No storage found for contract"
-        (r:_) -> case parseMaybe extractMerkleRoot r of
-          Nothing -> return $ Left "merkleRoot not found in storage"
-          Just root -> return $ Right $ padHex64 root
+getMerkleRoot :: IO (Either Text Text)
+getMerkleRoot = do
+  maybeContractAddr <- readContractAddress
+  case maybeContractAddr of
+    Nothing -> return $ Left "Railgun contract address not found"
+    Just contractAddr -> do
+      let storageUrl = "http://" ++ defaultHost ++ ":" ++ show defaultPort 
+                ++ "/cirrus/search/storage?address=eq." 
+                ++ T.unpack contractAddr ++ "&limit=1"
+      request <- HTTP.parseRequest storageUrl
+      let requestWithHeaders = request { HTTP.requestHeaders = [("Accept", "application/json")] }
+      response <- authRequest requestWithHeaders
+      case eitherDecode (HTTP.responseBody response) of
+        Left err -> return $ Left $ "Failed to parse Cirrus storage response: " <> T.pack err
+        Right (results :: [Value]) -> 
+          case results of
+            [] -> return $ Left "No storage found for contract"
+            (r:_) -> case parseMaybe extractMerkleRoot r of
+              Nothing -> return $ Left "merkleRoot not found in storage"
+              Just root -> return $ Right $ padHex64 root
   where
     extractMerkleRoot :: Value -> Parser Text
     extractMerkleRoot v = do
@@ -350,92 +352,92 @@ getMerkleRoot config = do
 
 -- | Call the contract's hashBoundParams function to get the exact hash it will compute
 -- This is needed because SolidVM's ABI encoding may differ from standard Ethereum
-getBoundParamsHash :: StratoConfig 
-                   -> Int       -- ^ Tree number
+getBoundParamsHash :: Int       -- ^ Tree number
                    -> Integer   -- ^ Chain ID
                    -> [CommitmentCiphertext]  -- ^ Actual ciphertext entries
                    -> Bool      -- ^ True for unshield (NORMAL), False for transfer (NONE)
                    -> IO (Either Text Integer)
-getBoundParamsHash config treeNum chainId ciphertexts isUnshield = do
-  clientEnv <- makeClientEnv config
-  
-  -- Convert CommitmentCiphertext to ArgValue
-  let ciphertextToArg ct = ArgObject $ KM.fromList
-        [ ("ciphertext", ArgArray $ V.fromList $ 
-            map (ArgString . TE.decodeUtf8 . B16.encode) (ccCiphertext ct))
-        , ("blindedSenderViewingKey", ArgString $ TE.decodeUtf8 $ B16.encode $ ccBlindedSenderViewingKey ct)
-        , ("blindedReceiverViewingKey", ArgString $ TE.decodeUtf8 $ B16.encode $ ccBlindedReceiverViewingKey ct)
-        ]
-      ciphertextArray = V.fromList $ map ciphertextToArg ciphertexts
-      -- Use NORMAL for unshield, NONE for transfer
-      unshieldType = if isUnshield then "NORMAL" else "NONE"
-  
-  let contractAddr = textToAddress (railgunContractAddress config)
-      boundParams = ArgObject $ KM.fromList
-        [ ("treeNumber", ArgInt $ fromIntegral treeNum)
-        , ("minGasPrice", ArgString "0")
-        , ("unshield", ArgString unshieldType)
-        , ("chainID", ArgString $ T.pack $ show chainId)
-        , ("adaptContract", ArgString "0000000000000000000000000000000000000000")
-        , ("adaptParams", ArgString "0000000000000000000000000000000000000000000000000000000000000000")
-        , ("commitmentCiphertext", ArgArray ciphertextArray)
-        ]
-      args = Map.singleton "_boundParams" boundParams
+getBoundParamsHash treeNum chainId ciphertexts isUnshield = do
+  maybeContractAddr <- readContractAddress
+  case maybeContractAddr of
+    Nothing -> return $ Left "Railgun contract address not found"
+    Just contractAddrText -> do
+      clientEnv <- makeBlocClientEnv
+      -- Convert CommitmentCiphertext to ArgValue
+      let ciphertextToArg ct = ArgObject $ KM.fromList
+            [ ("ciphertext", ArgArray $ V.fromList $ 
+                map (ArgString . TE.decodeUtf8 . B16.encode) (ccCiphertext ct))
+            , ("blindedSenderViewingKey", ArgString $ TE.decodeUtf8 $ B16.encode $ ccBlindedSenderViewingKey ct)
+            , ("blindedReceiverViewingKey", ArgString $ TE.decodeUtf8 $ B16.encode $ ccBlindedReceiverViewingKey ct)
+            ]
+          ciphertextArray = V.fromList $ map ciphertextToArg ciphertexts
+          -- Use NORMAL for unshield, NONE for transfer
+          unshieldType = if isUnshield then "NORMAL" else "NONE"
+          
+          contractAddr = textToAddress contractAddrText
+          boundParams = ArgObject $ KM.fromList
+            [ ("treeNumber", ArgInt $ fromIntegral treeNum)
+            , ("minGasPrice", ArgString "0")
+            , ("unshield", ArgString unshieldType)
+            , ("chainID", ArgString $ T.pack $ show chainId)
+            , ("adaptContract", ArgString "0000000000000000000000000000000000000000")
+            , ("adaptParams", ArgString "0000000000000000000000000000000000000000000000000000000000000000")
+            , ("commitmentCiphertext", ArgArray ciphertextArray)
+            ]
+          args = Map.singleton "_boundParams" boundParams
+          
+          payload = BlocFunction $ FunctionPayload
+            { functionpayloadContractAddress = contractAddr
+            , functionpayloadMethod = "hashBoundParams"
+            , functionpayloadArgs = args
+            , functionpayloadTxParams = Nothing
+            , functionpayloadMetadata = Nothing
+            }
+          
+          request = PostBlocTransactionRequest
+            { postbloctransactionrequestAddress = Nothing
+            , postbloctransactionrequestTxs = [payload]
+            , postbloctransactionrequestTxParams = Nothing
+            , postbloctransactionrequestSrcs = Nothing
+            }
       
-      payload = BlocFunction $ FunctionPayload
-        { functionpayloadContractAddress = contractAddr
-        , functionpayloadMethod = "hashBoundParams"
-        , functionpayloadArgs = args
-        , functionpayloadTxParams = Nothing
-        , functionpayloadMetadata = Nothing
-        }
-      
-      request = PostBlocTransactionRequest
-        { postbloctransactionrequestAddress = Nothing
-        , postbloctransactionrequestTxs = [payload]
-        , postbloctransactionrequestTxParams = Nothing
-        , postbloctransactionrequestSrcs = Nothing
-        }
-      
-      authHeader = Just $ "Bearer " <> stratoAuthToken config
-  
-  result <- runClientM (postBlocTransactionParallelExternal authHeader Nothing True request) clientEnv
-  pure $ case result of
-    Left err -> Left $ formatClientError err
-    Right txResults -> case txResults of
-      [] -> Left "No transaction result"
-      (r:_) -> case blocTransactionData r of
-        Just (Call contents) -> case contents of
-          [] -> Left "Empty result from hashBoundParams"
-          (SolidityValueAsString hashStr:_) -> case reads (T.unpack hashStr) of
-            [(n, "")] -> Right n
-            _ -> Left $ "Failed to parse hash: " <> hashStr
-          _ -> Left "Unexpected value type from hashBoundParams"
-        _ -> Left "Unexpected result type from hashBoundParams"
+      result <- runServantWithAuthEnv clientEnv $ \authHeader ->
+        postBlocTransactionParallelExternal authHeader Nothing True request
+      pure $ case result of
+        Left clientErr -> Left $ formatClientError clientErr
+        Right txResults -> case txResults of
+          [] -> Left "No transaction result"
+          (r:_) -> case blocTransactionData r of
+            Just (Call contents) -> case contents of
+              [] -> Left "Empty result from hashBoundParams"
+              (SolidityValueAsString hashStr:_) -> 
+                case reads (T.unpack hashStr) of
+                  [(n, "")] -> Right n
+                  _ -> Left $ "Failed to parse hash: " <> hashStr
+              _ -> Left "Unexpected value type from hashBoundParams"
+            _ -> Left "Unexpected result type from hashBoundParams"
 
 -- | Get the current tree number from the Railgun contract
-getTreeNumber :: StratoConfig -> IO (Either Text Integer)
-getTreeNumber config = do
-  manager <- HTTP.newManager HTTP.defaultManagerSettings
-  let storageUrl = "http://" ++ T.unpack (stratoHost config) ++ ":" ++ show (stratoPort config) 
-            ++ "/cirrus/search/storage?address=eq." 
-            ++ T.unpack (railgunContractAddress config) ++ "&limit=1"
-  request <- HTTP.parseRequest storageUrl
-  let requestWithAuth = request 
-        { HTTP.requestHeaders = 
-            [ ("Authorization", TE.encodeUtf8 $ "Bearer " <> stratoAuthToken config)
-            , ("Accept", "application/json")
-            ]
-        }
-  response <- HTTP.httpLbs requestWithAuth manager
-  case eitherDecode (HTTP.responseBody response) of
-    Left err -> return $ Left $ "Failed to parse Cirrus storage response: " <> T.pack err
-    Right (results :: [Value]) -> 
-      case results of
-        [] -> return $ Right 0
-        (r:_) -> case parseMaybe extractTreeNumberFromStorage r of
-          Nothing -> return $ Right 0  -- Default to 0 if not found
-          Just n -> return $ Right n
+getTreeNumber :: IO (Either Text Integer)
+getTreeNumber = do
+  maybeContractAddr <- readContractAddress
+  case maybeContractAddr of
+    Nothing -> return $ Left "Railgun contract address not found"
+    Just contractAddr -> do
+      let storageUrl = "http://" ++ defaultHost ++ ":" ++ show defaultPort 
+                ++ "/cirrus/search/storage?address=eq." 
+                ++ T.unpack contractAddr ++ "&limit=1"
+      request <- HTTP.parseRequest storageUrl
+      let requestWithHeaders = request { HTTP.requestHeaders = [("Accept", "application/json")] }
+      response <- authRequest requestWithHeaders
+      case eitherDecode (HTTP.responseBody response) of
+        Left err -> return $ Left $ "Failed to parse Cirrus storage response: " <> T.pack err
+        Right (results :: [Value]) -> 
+          case results of
+            [] -> return $ Right 0
+            (r:_) -> case parseMaybe extractTreeNumberFromStorage r of
+              Nothing -> return $ Right 0  -- Default to 0 if not found
+              Just n -> return $ Right n
   where
     extractTreeNumberFromStorage :: Value -> Parser Integer
     extractTreeNumberFromStorage v = do
@@ -450,43 +452,32 @@ getTreeNumber config = do
           _ -> return 0
 
 -- | Get the user's Ethereum address from the vault-proxy key endpoint
-getUserAddress :: StratoConfig -> IO (Either Text Text)
-getUserAddress config = do
-  manager <- HTTP.newManager HTTP.defaultManagerSettings
-  let url = "http://" ++ T.unpack (stratoHost config) ++ ":" ++ show (stratoPort config) ++ "/strato/v2.3/key"
+getUserAddress :: IO (Either Text Text)
+getUserAddress = do
+  let url = "http://" ++ defaultHost ++ ":" ++ show defaultPort 
+            ++ "/strato/v2.3/key"
   request <- HTTP.parseRequest url
-  let requestWithAuth = request 
-        { HTTP.requestHeaders = [("Authorization", TE.encodeUtf8 $ "Bearer " <> stratoAuthToken config)]
-        }
-  response <- HTTP.httpLbs requestWithAuth manager
+  let requestWithHeaders = request { HTTP.requestHeaders = [("Accept", "application/json")] }
+  response <- authRequest requestWithHeaders
   case eitherDecode (HTTP.responseBody response) of
     Left err -> return $ Left $ "Failed to parse key response: " <> T.pack err
-    Right json -> case parseMaybe (\obj -> obj .: "address") json of
-      Nothing -> return $ Left "address not found in key response"
-      Just addr -> return $ Right addr
+    Right addrAndKey -> return $ Right $ T.pack $ formatAddressWithoutColor $ unAddress addrAndKey
 
 -- | Get the unshielded balance of a token for a given address
 -- Reads directly from Cirrus storage (no transaction fees)
-getTokenBalance :: StratoConfig -> Text -> Text -> IO (Either Text Integer)
-getTokenBalance config tokenAddr userAddr = do
-  manager <- HTTP.newManager HTTP.defaultManagerSettings
-  
+getTokenBalance :: Text -> Text -> IO (Either Text Integer)
+getTokenBalance tokenAddr userAddr = do
   let normalizedToken = T.toLower $ if "0x" `T.isPrefixOf` T.toLower tokenAddr then T.drop 2 tokenAddr else tokenAddr
       normalizedUser = T.toLower $ if "0x" `T.isPrefixOf` T.toLower userAddr then T.drop 2 userAddr else userAddr
-      baseUrl = "http://" ++ T.unpack (stratoHost config) ++ ":" ++ show (stratoPort config)
+      baseUrl = "http://" ++ defaultHost ++ ":" ++ show defaultPort
       -- Query the _balances mapping in the token contract
       -- The key is stored as {"key": "<address>"} so we use the jsonb operator ->>
       url = baseUrl ++ "/cirrus/search/mapping?address=eq." ++ T.unpack normalizedToken
             ++ "&collection_name=eq._balances&key->>key=eq." ++ T.unpack normalizedUser
   
   request <- HTTP.parseRequest url
-  let requestWithAuth = request 
-        { HTTP.requestHeaders = 
-            [ ("Authorization", TE.encodeUtf8 $ "Bearer " <> stratoAuthToken config)
-            , ("Accept", "application/json")
-            ]
-        }
-  response <- HTTP.httpLbs requestWithAuth manager
+  let requestWithHeaders = request { HTTP.requestHeaders = [("Accept", "application/json")] }
+  response <- authRequest requestWithHeaders
   pure $ case eitherDecode (HTTP.responseBody response) of
     Left err -> Left $ T.pack err
     Right (results :: [Value]) -> case results of
@@ -502,9 +493,9 @@ getTokenBalance config tokenAddr userAddr = do
       obj .: "value"
 
 -- | Get the decimals for a token (default 18 if not found)
-getTokenDecimals :: StratoConfig -> Text -> IO Int
-getTokenDecimals config tokenAddr = do
-  clientEnv <- makeClientEnv config
+getTokenDecimals :: Text -> IO Int
+getTokenDecimals tokenAddr = do
+  clientEnv <- makeBlocClientEnv
   
   let normalizedToken = if "0x" `T.isPrefixOf` T.toLower tokenAddr then T.drop 2 tokenAddr else tokenAddr
       contractAddr = textToAddress normalizedToken
@@ -523,12 +514,11 @@ getTokenDecimals config tokenAddr = do
         , postbloctransactionrequestTxParams = Nothing
         , postbloctransactionrequestSrcs = Nothing
         }
-      
-      authHeader = Just $ "Bearer " <> stratoAuthToken config
   
-  result <- runClientM (postBlocTransactionParallelExternal authHeader Nothing True request) clientEnv
+  result <- runServantWithAuthEnv clientEnv $ \authHeader ->
+    postBlocTransactionParallelExternal authHeader Nothing True request
   pure $ case result of
-    Left _ -> 18  -- Default to 18 decimals
+    Left _ -> 18  -- Default on client error
     Right txResults -> case txResults of
       [] -> 18
       (r:_) -> case blocTransactionData r of

@@ -47,8 +47,8 @@ import Data.Char
 import Data.Data
 import Data.Hashable
 import qualified Data.NibbleString as N
-import Data.Swagger hiding (Format, format, get, put)
-import qualified Data.Swagger as Sw
+import Data.OpenApi hiding (Format, format, get, put)
+import qualified Data.OpenApi as OPENAPI
 import qualified Data.Text as T
 import Database.Persist.Sql hiding (get)
 -- import Debug.Trace
@@ -217,10 +217,10 @@ instance ToCapture (Capture "userAddress" Address) where
 instance ToParamSchema Address where
   toParamSchema _ =
     mempty
-      & type_ ?~ SwaggerString
+      & type_ ?~ OpenApiString
       & minimum_ ?~ fromInteger (toInteger . unAddress $ (minBound :: Address))
       & maximum_ ?~ fromInteger (toInteger . unAddress $ (maxBound :: Address))
-      & Sw.format ?~ "hex string"
+      & OPENAPI.format ?~ "hex string"
 
 unAddress :: Address -> Word160
 unAddress (Address n) = n
@@ -231,7 +231,7 @@ instance ToSchema Address where
       NamedSchema
         (Just "Address")
         ( mempty
-            & type_ ?~ SwaggerString
+            & type_ ?~ OpenApiString
             & example ?~ "address=deadbeef" --toJSON (Address 0xdeadbeef) -- FIXME if causing troubles outside /faucet
             & description ?~ "Ethereum Address, 20 byte hex encoded string"
         )

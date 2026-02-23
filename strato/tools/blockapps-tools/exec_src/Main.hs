@@ -25,9 +25,13 @@ import Blockchain.Participation
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Model.Address
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
 import qualified LabeledError
 import System.Console.CmdArgs
--- import System.Process
+import System.Directory
+import System.FilePath
+import System.IO
 
 data Options
   = AddTx {txJson :: String}
@@ -331,9 +335,29 @@ options =
 
 main :: IO ()
 main = do
+  changeToDefaultNodeDir
   opts <- cmdArgs_ options
   run opts
 
+changeToDefaultNodeDir :: IO ()
+changeToDefaultNodeDir = do
+  home <- getHomeDirectory
+  let defaultNodeFile = home </> ".strato" </> "default-node"
+  exists <- doesFileExist defaultNodeFile
+  if exists
+    then do
+      contents <- TIO.readFile defaultNodeFile
+      let nodeDir = T.unpack $ T.strip contents
+      dirExists <- doesDirectoryExist nodeDir
+      if dirExists
+        then do
+          setCurrentDirectory nodeDir
+          hPutStrLn stderr $ "Using node directory: " ++ nodeDir
+        else do
+          hPutStrLn stderr $ "Error: Node directory not found: " ++ nodeDir
+          hPutStrLn stderr $ "Check ~/.strato/default-node or run from the node directory"
+          fail "Node directory not found"
+    else return ()
 
 run :: Options -> IO ()
 run AddTx {..} = addTx txJson

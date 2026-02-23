@@ -49,7 +49,7 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy.Char8 as BLC
 import Data.Data
 import Data.Hashable (Hashable)
-import Data.Swagger hiding (Format)
+import Data.OpenApi hiding (Format)
 import qualified Data.Text as T
 import Database.Persist.Sql
 import FastKeccak256
@@ -228,7 +228,7 @@ instance ToCapture (Capture "hash" Keccak256) where
   toCapture _ = DocCapture "hash" "a transaction hash"
 
 instance ToParamSchema Keccak256 where
-  toParamSchema _ = mempty & type_ ?~ SwaggerString
+  toParamSchema _ = mempty & type_ ?~ OpenApiString
 
 instance ToSample Keccak256 where
   toSamples _ =
@@ -240,7 +240,7 @@ instance ToSchema Keccak256 where
       NamedSchema
         (Just "Keccak256 hash, 32 byte hex encoded string")
         ( mempty
-            & type_ ?~ SwaggerString
+            & type_ ?~ OpenApiString
             & example ?~ Ae.toJSON (hash $ BLC.toStrict (encode @Integer 1))
             & description ?~ "Keccak256 hash, 32 byte hex encoded string"
         )

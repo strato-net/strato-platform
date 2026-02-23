@@ -11,7 +11,7 @@ import Data.Aeson
 import qualified Data.Aeson.KeyMap as KeyMap
 import Data.Binary
 import Data.Int (Int32)
-import Data.Swagger
+import Data.OpenApi
 import GHC.Generics
 import qualified Generic.Random as GR
 import SolidVM.Model.Type
