@@ -11,16 +11,36 @@ const path = require('path');
 // The owner of the implementation address is ignored in favor of the proxy owner
 const DEFAULT_CONSTRUCTOR_ARGS = {"initialOwner": "deadbeef"};
 
+// Batch upgrade targets: proxy addresses
+const BATCH_TARGETS = [
+  "5888fbe6d6774c1d5788a7b631fc2a2fe88c44c6",
+  "d379288a399ed0e1d12f5556cd13aaf3b4cdc7c5",
+  "72f029994b1003447b4fcae5025ae78fcbec258e",
+  "902651e10ab7d64fa7d0480657ac36676d155f2e",
+  "50160ce5184913cada2660ab51a4f464f904d5eb",
+  "34d7caf576cf9493f054d9eced99dcd463eba4b7",
+  "cb85e12ca5d98de95715fc75ae251a66b662ea06",
+  "000000000000000000000000000000000000101d",
+  "000000000000000000000000000000000000101b",
+  "0000000000000000000000000000000000001019",
+  "0000000000000000000000000000000000001017",
+];
+
 /**
  * Print usage information
  */
 function printUsage() {
   console.error('Usage: node upgrade.js [options]');
   console.error('');
-  console.error('Required arguments:');
+  console.error('Required arguments (single mode):');
   console.error('  --proxy-address <address>    Address of the proxy contract to upgrade');
   console.error('  --contract-name <name>       Name of the implementation contract (e.g., PoolFactory)');
-  console.error('  --contract-file <file>       Filename of the contract (e.g., Pools/PoolFactory.sol)');
+  console.error('  --contract-file <file>       Filename of BCC source file which imports the implementation contract (probably BaseCodeCollection.sol)');
+  console.error('');
+  console.error('Required arguments (batch mode):');
+  console.error('  --batch                      Upgrade all proxies in the hardcoded BATCH_TARGETS list');
+  console.error('  --contract-name <name>       Name of the implementation contract (e.g., Pool)');
+  console.error('  --contract-file <file>       Filename of BCC source file which imports the implementation contract (probably BaseCodeCollection.sol)');
   console.error('');
   console.error('Optional arguments:');
   console.error('  --constructor-args <json>    JSON string of constructor arguments (default: ' + JSON.stringify(DEFAULT_CONSTRUCTOR_ARGS) + ')');
@@ -30,8 +50,9 @@ function printUsage() {
   console.error('  OAUTH_CLIENT_SECRET, OAUTH_CLIENT_ID, OAUTH_URL, NODE_URL, GLOBAL_ADMIN_NAME, GLOBAL_ADMIN_PASSWORD');
   console.error('');
   console.error('Example:');
-  console.error('  node upgrade.js --proxy-address abc123 --contract-name PoolFactory --contract-file Pools/PoolFactory.sol');
-  console.error('  node upgrade.js --proxy-address abc123 --contract-name LendingPool --contract-file Lending/LendingPool.sol --constructor-args \'{"param":"value"}\'');
+  console.error('  node upgrade.js --proxy-address abc123 --contract-name PoolFactory --contract-file BaseCodeCollection.sol');
+  console.error('  node upgrade.js --proxy-address abc123 --contract-name LendingPool --contract-file BaseCodeCollection.sol --constructor-args \'{"param":"value"}\'');
+  console.error('  node upgrade.js --batch --contract-name Pool --contract-file BaseCodeCollection.sol');
 }
 
 /**
@@ -45,6 +66,10 @@ function parseArgs() {
     const arg = args[i];
     if (arg.startsWith('--')) {
       const key = arg.slice(2);
+      if (key === 'batch') {
+        parsed[key] = true;
+        continue;
+      }
       const value = args[i + 1];
       if (!value || value.startsWith('--')) {
         throw new Error(`Missing value for argument: ${arg}`);
@@ -144,7 +169,9 @@ async function main() {
     }
     
     // Check for required arguments
-    const requiredArgs = ['proxy-address', 'contract-name', 'contract-file'];
+    const requiredArgs = args['batch']
+      ? ['contract-name', 'contract-file']
+      : ['proxy-address', 'contract-name', 'contract-file'];
     const missingArgs = requiredArgs.filter(arg => !args[arg]);
     
     if (missingArgs.length > 0) {
@@ -164,18 +191,24 @@ async function main() {
     }
     
     // Get configuration from command-line arguments
-    const proxyAddress = args['proxy-address'];
-    const contractName = args['contract-name'];
     const contractFile = args['contract-file'];
     const constructorArgs = args['constructor-args'] ? JSON.parse(args['constructor-args']) : DEFAULT_CONSTRUCTOR_ARGS;
     
     const username = process.env.GLOBAL_ADMIN_NAME;
     const password = process.env.GLOBAL_ADMIN_PASSWORD;
+
+    // Build targets list: proxy addresses to upgrade
+    const targets = args['batch']
+      ? BATCH_TARGETS
+      : [args['proxy-address']];
+
+    if (args['batch'] && BATCH_TARGETS.length === 0) {
+      throw new Error('BATCH_TARGETS is empty. Add proxy addresses to the list before running in batch mode.');
+    }
     
-    console.log(`Proxy Address: ${proxyAddress}`);
-    console.log(`Contract Name: ${contractName}`);
     console.log(`Contract File: ${contractFile}`);
     console.log(`Constructor Args: ${JSON.stringify(constructorArgs)}`);
+    console.log(`Targets: ${targets.length} proxy contract(s) to upgrade`);
     console.log('');
     
     // Authenticate
@@ -184,12 +217,7 @@ async function main() {
     const tokenObj = { token };
     console.log(`Authenticated as ${username}\n`);
 
-    // Verify that the proxy exists and the implementation contract name matches the new contract name
-    args['OVERRIDE-CHECKS'] || await verifyProxyAndImplementation(tokenObj, proxyAddress, contractName);
-    
-    // Step 1: Deploy new implementation
-    console.log(`Deploying new implementation: ${contractName}`);
-    
+    // Prepare contract source (shared across all targets)
     const contractsDir = config.resolvePath(config.contractsDir);
     const contractFilePath = path.join(contractsDir, contractFile);
     
@@ -234,8 +262,11 @@ async function main() {
     console.log('Comments stripped from combined source(s)');
 
     fs.writeFileSync("contract_source",source);
-    
-    // Deploy the implementation
+
+    // Step 1: Deploy new implementation
+    const contractName = args['contract-name'];
+    console.log(`Deploying new implementation: ${contractName}`);
+
     const contractArgs = {
       name: contractName,
       source,
@@ -245,61 +276,70 @@ async function main() {
         gasLimit: config.gasLimit,
       },
     };
-    
+
     const deployOptions = {
       config,
       logger: console,
       history: [contractName],
       cacheNonce: true,
     };
-    
+
     const implementation = await rest.createContract(tokenObj, contractArgs, deployOptions);
     console.log(`Implementation deployed at: ${implementation.address}\n`);
-    
-    // Step 2: Upgrade the proxy
-    console.log(`Upgrading proxy at ${proxyAddress}...`);
-    console.log(`New implementation: ${implementation.address}`);
-    
-    const callArgs = {
-      contract: { address: proxyAddress, name: 'Proxy' },
-      method: 'setLogicContract',
-      args: { _logicContract: implementation.address },
-      txParams: {
-        gasPrice: config.gasPrice,
-        gasLimit: config.gasLimit,
-      },
-    };
-    
-    const callOptions = {
-      config,
-      cacheNonce: true,
-    };
-    
-    const upgradeResult = await rest.call(tokenObj, callArgs, callOptions);
 
-    if (upgradeResult[0]) {
-        console.log('\n======  Upgrade  Pending  ======');
-        console.log("Proxy Uploaded and Upgrade Requested.")
-        console.log("Governance Vote Required.\nVote Issue ID: " + upgradeResult[0]);
-    }
-    else {
-        console.log('\n====== Upgrade Successful ======');
+    // Step 2: Upgrade each proxy to point to the new implementation
+    const results = [];
+
+    for (let i = 0; i < targets.length; i++) {
+      const proxyAddress = targets[i];
+      console.log(`\n--- [${i + 1}/${targets.length}] Upgrading proxy ${proxyAddress} ---\n`);
+
+      // Verify proxy
+      args['OVERRIDE-CHECKS'] || await verifyProxyAndImplementation(tokenObj, proxyAddress, contractName);
+
+      console.log(`Upgrading proxy at ${proxyAddress}...`);
+      console.log(`New implementation: ${implementation.address}`);
+
+      const callArgs = {
+        contract: { address: proxyAddress, name: 'Proxy' },
+        method: 'setLogicContract',
+        args: { _logicContract: implementation.address },
+        txParams: {
+          gasPrice: config.gasPrice,
+          gasLimit: config.gasLimit,
+        },
+      };
+
+      const callOptions = {
+        config,
+        cacheNonce: true,
+      };
+
+      const upgradeResult = await rest.call(tokenObj, callArgs, callOptions);
+
+      if (upgradeResult[0]) {
+          console.log('\n======  Upgrade  Pending  ======');
+          console.log("Proxy Uploaded and Upgrade Requested.")
+          console.log("Governance Vote Required.\nVote Issue ID: " + upgradeResult[0]);
+      }
+      else {
+          console.log('\n====== Upgrade Successful ======');
+      }
+
+      console.log(`Proxy Address: ${proxyAddress}`);
+      console.log(`New Implementation: ${implementation.address}`);
+      console.log('================================\n');
+
+      results.push({
+        proxyAddress,
+        newImplementation: implementation.address,
+        contractName,
+        contractFile,
+        upgradeTime: new Date().toISOString(),
+      });
     }
 
-    console.log(`Proxy Address: ${proxyAddress}`);
-    console.log(`New Implementation: ${implementation.address}`);
-    console.log('================================\n');
-    
-    // Save upgrade information
-    const upgradeInfo = {
-      proxyAddress,
-      newImplementation: implementation.address,
-      contractName,
-      contractFile,
-      upgradeTime: new Date().toISOString(),
-    };
-    
-    return upgradeInfo;
+    return results.length === 1 ? results[0] : results;
   } catch (error) {
     console.error('\nUpgrade failed:', error.message);
     if (error.stack) {

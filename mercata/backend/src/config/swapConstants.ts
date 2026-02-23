@@ -47,6 +47,8 @@ export const SWAP_POOL_SELECT_FIELDS = [
   "tokenBBalance::text",
   `lpToken:lpToken_fkey(${SWAP_TOKEN_SELECT_FIELDS.join(',')})`,
   "isStable",
+  "isPaused",
+  "isDisabled",
 ] as const;
 
 /**
