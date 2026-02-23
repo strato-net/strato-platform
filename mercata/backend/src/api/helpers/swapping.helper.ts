@@ -336,8 +336,8 @@ export const buildPoolList = (
       swapFeeRate,
       lpSharePercent,
       isStable: pool.isStable,
-      isPaused: pool.isPaused,
-      isDisabled: pool.isDisabled,
+      isPaused: pool.isPaused ?? false,
+      isDisabled: pool.isDisabled ?? false,
     };
   });
 };
