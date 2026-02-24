@@ -1427,6 +1427,7 @@ byteArgs x =
       :| [ intType' x
          , addressType' x
          , Product [stringType' x, stringType' x] x
+         , bytesType' x
          ]
 
 keccak256Args :: SourceAnnotation Text -> Type'
@@ -1506,6 +1507,14 @@ ecrecoverArgs x = Product [ stringType' x
                           , Sum $ (stringType' x) :| [intType' x]
                           ] x
 
+verifyP256Args :: SourceAnnotation Text -> Type'
+verifyP256Args x = Product [ bytesType' x
+                           , Sum $ (stringType' x) :| [intType' x]
+                           , Sum $ (stringType' x) :| [intType' x]
+                           , Sum $ (stringType' x) :| [intType' x]
+                           , Sum $ (stringType' x) :| [intType' x]
+                           ] x
+
 addmodArgs :: SourceAnnotation Text -> Type'
 addmodArgs x = Product [intType' x, intType' x, intType' x] x
 
@@ -1570,6 +1579,7 @@ getVarType' "mulmod" ctx = pure $ Function (mulmodArgs ctx) (intType' ctx) ctx [
 getVarType' "payable" ctx = pure $ Function (payableArgs ctx) (Static (SVMType.Address True) ctx) ctx [] [] False
 getVarType' "blockhash" ctx = pure $ Function (blockhashArgs ctx) (Static (SVMType.Bytes Nothing (Just 32)) ctx) ctx [] [] False
 getVarType' "ecrecover" ctx = pure $ Function (ecrecoverArgs ctx) (addressType' ctx) ctx [] [] False
+getVarType' "verifyP256" ctx = pure $ Function (verifyP256Args ctx) (boolType' ctx) ctx [] [] False
 getVarType' "parseCert" ctx = pure $ Function (parseCertArgs ctx) (certType' ctx) ctx [] [] False
 getVarType' "create" ctx = pure $ Function (createFuncArgs ctx) (addressType' ctx) ctx [] [] False
 getVarType' "create2" ctx = pure $ Function (saltCreateArgs ctx) (addressType' ctx) ctx [] [] False
@@ -1855,7 +1865,7 @@ simpleStatementHelper _ (ExpressionStatement expr) =
 
 tcExpr :: Annotated ExpressionF -> SSS Type'
 tcExpr (Binary x "+" a b) =
-  sumType [intType' x, stringType' x, decimalType' x] ~> tcExpr a <~> tcExpr b
+  sumType [intType' x, stringType' x, decimalType' x, bytesType' x] ~> tcExpr a <~> tcExpr b
 tcExpr (Binary x "-" a b) =
   sumType' (intType' x) (decimalType' x) ~> tcExpr a <~> tcExpr b
 tcExpr (Binary x "*" a b) =

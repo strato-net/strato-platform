@@ -191,6 +191,20 @@ contract Describe_Mercata is Authorizable {
         require(success, "Groth16 proof failed!");
     }
 
+    function it_can_verify_p256() {
+        string message = "Hallelujah!";
+        uint r = 111812406968280556887309161541670890688342740771217603417112256244675252770954;
+        uint s = 69794988671688531321311227746003226764691315458172986192026128195324243923064;
+        uint x = 102396230969586467009226886506862623657318724148434895532623014254764145364321;
+        uint y = 87130768018175665529254388393063563572785429725661944920479895196939055716302;
+        bytes authenticatorData = bytes(0x49960de5880e8c687434170f6476605b8fe4aeb9a28632c7995cf3ba831d97631d00000000);
+        bytes clientDataJSON = bytes(0x7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a22534746736247567364577068614345222c226f726967696e223a22687474703a2f2f6c6f63616c686f73743a38303835222c2263726f73734f726967696e223a66616c73657d);
+        bytes clientDataHash = sha256(clientDataJSON);
+        bytes fullData = authenticatorData + bytes(clientDataHash);
+        bytes h = sha256(fullData);
+        require(verifyP256(h, r, s, x, y), "P256 verification failed");
+    }
+
     string output;
 
     function performIssue(uint num, bool should, address isDeadbeef, string message) public {

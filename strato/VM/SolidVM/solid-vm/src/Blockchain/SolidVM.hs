@@ -5,6 +5,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PackageImports #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -70,6 +71,11 @@ import qualified Control.Monad.Catch as EUnsafe
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.IO.Class
+import Crypto.ECC (Curve_P256R1)
+import Crypto.Error
+import qualified Crypto.PubKey.ECC.P256 as P256
+import Crypto.PubKey.ECDSA (signatureFromIntegers, verifyDigest)
+import "crypton" Crypto.Hash (SHA256, digestFromByteString)
 import qualified Crypto.Hash.RIPEMD160 as RIPEMD160
 import qualified Crypto.Hash.SHA256 as SHA256
 import Data.Bits
@@ -1940,6 +1946,17 @@ expToVarAdd expr1 expr2 = do
             deductGasForOp . fromIntegral $ length a
             return . Constant $ SString a
           _ -> typeError "expToVarAdd" $ show (i1, i2)
+        SBytes a -> case i2 of
+          SBytes b -> do
+            deductGasForOp . fromIntegral $ ((+) `on` B.length) a b
+            return . Constant . SBytes $ a <> b
+          SNULL -> do
+            deductGasForOp . fromIntegral $ B.length a
+            return . Constant $ SBytes a
+          SReference{} -> do
+            deductGasForOp . fromIntegral $ B.length a
+            return . Constant $ SBytes a
+          _ -> typeError "expToVarAdd" $ show (i1, i2)
         SNULL -> case i2 of
           SNULL -> return $ Constant SNULL
           _ -> addEm i2 i1
@@ -2249,6 +2266,7 @@ callBuiltin "byte" [SNULL] = return $ SInteger 0
 callBuiltin "byte" vs = typeError "byte cast" $ show vs
 callBuiltin "bytes" [SInteger i] = pure . SBytes $ integer2Bytes i
 callBuiltin "bytes" [SString s] = pure . SBytes . DT.encodeUtf8 $ T.pack s
+callBuiltin "bytes" [SBytes bs] = pure $ SBytes bs
 callBuiltin "bytes" [SString s, SString "utf-8"] = pure . SBytes . DT.encodeUtf8 $ T.pack s
 callBuiltin "bytes" [SString s, SString "raw"] = pure . SBytes $ BC.pack s
 callBuiltin "bytes" [SAddress a _] = pure . SBytes . B.pack . word160ToBytes $ unAddress a
@@ -2298,8 +2316,20 @@ callBuiltin "ecrecover" [SString h, SInteger v, r', s'] = case B16.decode (BC.pa
     case theSignerAddress of
       Nothing -> return . ((flip SAddress) False) $ fromIntegral theZero
       Just theAddress -> return . ((flip SAddress) False) $ theAddress
-callBuiltin "sha256" args = pure . SString . BC.unpack . SHA256.hash . rlpSerialize $ rlpEncodeValues args
-callBuiltin "ripemd160" args = pure . SString . BC.unpack . RIPEMD160.hash . rlpSerialize $ rlpEncodeValues args
+callBuiltin "verifyP256" [SBytes h, r', s', x', y'] = case digestFromByteString @SHA256 h of
+  Nothing -> invalidArguments "Could not decode hash from string" h
+  Just digest -> do
+    let int = getInt . Constant
+    (r,s,x,y) <- (,,,) <$> int r' <*> int s' <*> int x' <*> int y'
+    sig <- case signatureFromIntegers (Mod.Proxy @Curve_P256R1) (r, s) of
+      CryptoPassed sig' -> pure sig'
+      CryptoFailed e -> invalidArguments "Invalid P256 signature" e
+    let pub = P256.pointFromIntegers (x, y)
+        !isValidSig = verifyDigest (Mod.Proxy @Curve_P256R1) pub sig digest
+    pure $ SBool isValidSig
+callBuiltin "sha256" [SBytes bs] = pure . SBytes $ SHA256.hash bs
+callBuiltin "sha256" args = pure . SString . BC.unpack . B16.encode . SHA256.hash . rlpSerialize $ rlpEncodeValues args
+callBuiltin "ripemd160" args = pure . SString . BC.unpack . B16.encode . RIPEMD160.hash . rlpSerialize $ rlpEncodeValues args
 callBuiltin "modExp" [SInteger b, SInteger e, SInteger m] = pure . SInteger $ Builtins.modExp b e m
 callBuiltin "ecAdd" [SInteger x1, SInteger y1, SInteger x2, SInteger y2] =
   let (x, y) = Builtins.ecAdd (x1, y1) (x2, y2)
