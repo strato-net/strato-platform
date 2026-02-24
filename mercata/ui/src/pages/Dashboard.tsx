@@ -437,7 +437,7 @@ const Dashboard = () => {
                       {rewardsActivitiesLoading ? (
                         <Skeleton className="h-4 w-36 mt-1" />
                       ) : (
-                        <>Earn Upto {highestIncentiveApy.toFixed(2)}% APY</>
+                        <>Earn up to {highestIncentiveApy.toFixed(2)}% APY</>
                       )}
                     </div>
                   </div>
