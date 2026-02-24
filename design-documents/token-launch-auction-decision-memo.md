@@ -4,7 +4,6 @@
 **Status:** Implemented
 **Last Updated:** February 2026
 **Related:** [Operational Runbook](./token-launch-auction-runbook.md)
-**Superseded:** [Early Design Exploration](./token-launch-auction-implementation.md) (historical; does not reflect the implemented contract)
 
 ---
 
