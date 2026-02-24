@@ -1,5 +1,17 @@
+import bonusTokenConfigsRaw from "./bonusTokenConfig.json";
+
 export const ERROR_FILE_NAME = "rewards-poller-error.flag";
 export const BLOCK_TRACKING_FILE = "lastProcessedBlock.json";
+export const BONUS_TRACKING_FILE = "lastBonusRun.json";
+
+const bonusTokenConfigs = (Array.isArray(bonusTokenConfigsRaw) ? bonusTokenConfigsRaw : [])
+  .filter((item: any) => item && typeof item.address === "string")
+  .map((item: any) => ({
+    address: item.address,
+    bonusPercentage: Number(item.bonusPercentage) || 0,
+    minBalance: typeof item.minBalance === "string" ? item.minBalance : "0",
+  }))
+  .filter((item) => item.address.length > 0 && item.bonusPercentage > 0);
 
 const config = {
   auth: {
@@ -25,11 +37,15 @@ const config = {
     interval: Number(process.env.POLLING_INTERVAL) || 10 * 60 * 1000,
     maxBatchSize: Number(process.env.MAX_BATCH_SIZE) || 50,
   },
+  bonus: {
+    cron: process.env.BONUS_CRON_SCHEDULE || "0 3,9,15,21 * * *",
+    tokenConfigs: bonusTokenConfigs,
+  },
   balance: {
     gasFeeUSDST: BigInt(process.env.GAS_FEE_USDST || '1') * BigInt(1e16),
     gasFeeVoucher: BigInt(process.env.GAS_FEE_VOUCHER || '100') * BigInt(1e16),
     minTransactionsThreshold: BigInt(process.env.MIN_TRANSACTIONS_THRESHOLD || '1'),
-    warningTransactionsThreshold: BigInt(process.env.WARNING_TRANSACTIONS_THRESHOLD || '50'),
+    warningTransactionsThreshold: BigInt(process.env.WARNING_TRANSACTIONS_THRESHOLD || '100'),
   },
   retry: {
     maxAttempts: Number(process.env.RETRY_MAX_ATTEMPTS) || 2,
