@@ -119,6 +119,12 @@ export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) =
                 <TableHead>Type</TableHead>
                 <TableHead>
                   <div className="flex items-center gap-1">
+                    CATA APR
+                    <InfoTooltip content="Estimated annual percentage return from CATA incentives, assuming a $25M fully diluted valuation ($0.25/CATA). APR = (annual CATA emitted × $0.25) / TVL." />
+                  </div>
+                </TableHead>
+                <TableHead>
+                  <div className="flex items-center gap-1">
                     Emission Rate
                     <InfoTooltip content="The rate at which rewards are emitted for this activity (points per second). This is the base emission rate before factoring in your stake." />
                   </div>
@@ -185,6 +191,16 @@ export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) =
                           ? (activity.activityType === 1 ? "One-Time" : "Position")
                           : "?"}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {(() => {
+                        const tvlUsd = activity?.totalStakeUsd ? Number(BigInt(activity.totalStakeUsd)) / 1e18 : 0;
+                        if (!emissionRateStr || tvlUsd <= 0) return <span className="text-muted-foreground">-</span>;
+                        const annualCata = (Number(BigInt(emissionRateStr)) / 1e18) * 86400 * 365;
+                        const apr = (annualCata * 0.25 / tvlUsd) * 100;
+                        const display = apr >= 1000 ? `${Math.round(apr).toLocaleString()}%` : apr >= 10 ? `${apr.toFixed(0)}%` : `${apr.toFixed(1)}%`;
+                        return <span className="font-medium">{display}</span>;
+                      })()}
                     </TableCell>
                     <TableCell>
                       <div>
