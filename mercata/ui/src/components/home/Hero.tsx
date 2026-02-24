@@ -75,10 +75,10 @@ const Hero = () => {
                   <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
                 </button>
                 <Link
-                  to="/dashboard/stats"
+                  to="/dashboard/rewards"
                   className="inline-flex items-center justify-center gap-2 bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700 text-foreground px-6 py-3 rounded-lg font-medium border border-border transition-all duration-300"
                 >
-                  Explore Stats
+                  Earn Rewards
             </Link>
           </div>
         </div>

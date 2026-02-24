@@ -23,19 +23,8 @@ const Rewards = () => {
   const [searchParams] = useSearchParams();
   const { isLoggedIn } = useUser();
   
-  // Default to leaderboard for guests, my-rewards for logged-in users
-  const [activeTab, setActiveTab] = useState<"activities" | "my-rewards" | "leaderboard">(() => {
-    const tabParam = searchParams.get("tab");
-    if (tabParam === "leaderboard" || tabParam === "activities" || tabParam === "my-rewards") {
-      // If guest tries to access my-rewards directly, redirect to leaderboard
-      if (tabParam === "my-rewards" && !isLoggedIn) {
-        return "leaderboard";
-      }
-      return tabParam;
-    }
-    // Default: leaderboard for guests, my-rewards for logged-in users
-    return isLoggedIn ? "my-rewards" : "leaderboard";
-  });
+
+  const [activeTab, setActiveTab] = useState<"activities" | "my-rewards" | "leaderboard">("activities");
 
   const { state, loading: stateLoading, refetch: refetchState } = useRewards();
   const { activities, loading: activitiesLoading, refetch: refetchActivities } = useRewardsActivities();
@@ -146,8 +135,8 @@ const Rewards = () => {
             className="w-full"
           >
             <TabsList className="grid w-full grid-cols-3 mb-6">
+            <TabsTrigger value="activities">Activities</TabsTrigger>
                <TabsTrigger value="my-rewards">My Rewards</TabsTrigger>
-              <TabsTrigger value="activities">Activities</TabsTrigger>
               <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
             </TabsList>
 
