@@ -2,10 +2,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { Activity } from "@/services/rewardsService";
 import { formatBalance } from "@/utils/numberUtils";
 import { formatEmissionRatePerDay, formatEmissionRatePerWeek, roundByMagnitude, formatRoundedWithCommas } from "@/services/rewardsService";
-import { formatDistanceToNow } from "date-fns";
 import { Info } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Link } from "react-router-dom";
@@ -20,6 +20,22 @@ interface ActivitiesTableProps {
 const truncateActivityName = (name: string, maxLength: number = 30): string => {
   if (!name || name.length <= maxLength) return name;
   return name.substring(0, maxLength) + "...";
+};
+
+const getEstimatedApyPercent = (activity: Activity): number => {
+  try {
+    if (!activity?.emissionRate || !activity?.totalStakeUsd) return -1;
+
+    const tvlUsd = Number(BigInt(activity.totalStakeUsd)) / 1e18;
+    if (!Number.isFinite(tvlUsd) || tvlUsd <= 0) return -1;
+
+    const annualCata = (Number(BigInt(activity.emissionRate)) / 1e18) * 86400 * 365;
+    if (!Number.isFinite(annualCata) || annualCata < 0) return -1;
+
+    return (annualCata * 0.25 / tvlUsd) * 100;
+  } catch {
+    return -1;
+  }
 };
 
 // Mobile-friendly Info Tooltip component
@@ -71,6 +87,9 @@ const InfoTooltip = ({ content }: { content: string }) => {
 };
 
 export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) => {
+  const loginButtonClass = "bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90";
+  const sortedActivities = [...activities].sort((a, b) => getEstimatedApyPercent(b) - getEstimatedApyPercent(a));
+
   if (loading) {
     return (
       <Card>
@@ -114,15 +133,16 @@ export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) =
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>ID</TableHead>
+                {/* <TableHead>ID</TableHead> */}
+                <TableHead>S. No</TableHead>
                 <TableHead>Name</TableHead>
-                <TableHead>Type</TableHead>
                 <TableHead>
                   <div className="flex items-center gap-1">
-                    CATA APR
-                    <InfoTooltip content="Estimated annual percentage return from CATA incentives, assuming a $25M fully diluted valuation ($0.25/CATA). APR = (annual CATA emitted × $0.25) / TVL." />
+                  Est. Incentive APY
+                    <InfoTooltip content="Estimated annual percentage yield from CATA incentives, assuming a $25M fully diluted valuation ($0.25/CATA). APY = (annual CATA emitted × $0.25) / TVL." />
                   </div>
                 </TableHead>
+                <TableHead>Type</TableHead>
                 <TableHead>
                   <div className="flex items-center gap-1">
                     Emission Rate
@@ -135,14 +155,16 @@ export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) =
                     <InfoTooltip content="The total amount staked across all users in this activity. Your share of rewards is proportional to your stake relative to this total.\n\nNote: Different activities may use different stake units (token units, USD-notional, or shares)." />
                   </div>
                 </TableHead>
-                <TableHead>Last Update</TableHead>
+                {/* <TableHead>Last Update</TableHead> */}
+                <TableHead>Earn Now</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {activities.map((activity) => {
+              {sortedActivities.map((activity, index) => {
                 const emissionRateStr = activity?.emissionRate || null;
                 const emissionPerDay = emissionRateStr ? formatEmissionRatePerDay(emissionRateStr) : "?";
                 const emissionPerWeek = emissionRateStr ? formatEmissionRatePerWeek(emissionRateStr) : "?";
+                const estimatedApr = getEstimatedApyPercent(activity);
                 
                 // Format total stake with denomination context
                 const totalStakeStr = activity?.totalStake || null;
@@ -159,17 +181,20 @@ export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) =
                   totalStakeFormatted = `$${totalStakeRounded}`;
                 }
                 
-                const lastUpdateTimeStr = activity?.lastUpdateTime || null;
-                const lastUpdate = lastUpdateTimeStr ? new Date(Number(lastUpdateTimeStr) * 1000) : null;
-                const timeAgo = lastUpdate ? formatDistanceToNow(lastUpdate, { addSuffix: true }) : "?";
+                // const lastUpdateTimeStr = activity?.lastUpdateTime || null;
+                // const lastUpdate = lastUpdateTimeStr ? new Date(Number(lastUpdateTimeStr) * 1000) : null;
+                // const timeAgo = lastUpdate ? formatDistanceToNow(lastUpdate, { addSuffix: true }) : "?";
                 const activityLink = activity?.name ? getActivityLink(activity.name) : null;
 
                 return (
                   <TableRow
                     key={activity?.activityId || Math.random()}
                   >
-                    <TableCell className="font-mono font-medium">
+                    {/* <TableCell className="font-mono font-medium">
                       {activity?.activityId !== undefined && activity?.activityId !== null ? activity.activityId : "?"}
+                    </TableCell> */}
+                    <TableCell className="font-mono font-medium">
+                      {index + 1}
                     </TableCell>
                     <TableCell className="font-medium">
                       {activity?.name ? (
@@ -186,21 +211,24 @@ export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) =
                       ) : "?"}
                     </TableCell>
                     <TableCell>
+                      {estimatedApr < 0 ? (
+                        <span className="text-muted-foreground">-</span>
+                      ) : (
+                        <span className="font-medium">
+                          {estimatedApr >= 1000
+                            ? `${Math.round(estimatedApr).toLocaleString()}%`
+                            : estimatedApr >= 10
+                              ? `${estimatedApr.toFixed(0)}%`
+                              : `${estimatedApr.toFixed(1)}%`}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>
                       <Badge variant="secondary">
                         {activity?.activityType !== undefined && activity?.activityType !== null
                           ? (activity.activityType === 1 ? "One-Time" : "Position")
                           : "?"}
                       </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {(() => {
-                        const tvlUsd = activity?.totalStakeUsd ? Number(BigInt(activity.totalStakeUsd)) / 1e18 : 0;
-                        if (!emissionRateStr || tvlUsd <= 0) return <span className="text-muted-foreground">-</span>;
-                        const annualCata = (Number(BigInt(emissionRateStr)) / 1e18) * 86400 * 365;
-                        const apr = (annualCata * 0.25 / tvlUsd) * 100;
-                        const display = apr >= 1000 ? `${Math.round(apr).toLocaleString()}%` : apr >= 10 ? `${apr.toFixed(0)}%` : `${apr.toFixed(1)}%`;
-                        return <span className="font-medium">{display}</span>;
-                      })()}
                     </TableCell>
                     <TableCell>
                       <div>
@@ -224,7 +252,16 @@ export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) =
                       </div>
                     </TableCell>
                     <TableCell>{totalStakeFormatted}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{timeAgo}</TableCell>
+                    {/* <TableCell className="text-sm text-muted-foreground">{timeAgo}</TableCell> */}
+                    <TableCell>
+                      {activityLink ? (
+                        <Link to={activityLink}>
+                          <Button size="sm" className={loginButtonClass}>Earn Now</Button>
+                        </Link>
+                      ) : (
+                        <Button size="sm" className={loginButtonClass} disabled>Earn Now</Button>
+                      )}
+                    </TableCell>
                   </TableRow>
                 );
               })}
