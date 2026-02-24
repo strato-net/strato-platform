@@ -9,7 +9,7 @@ import { useUser } from "@/context/UserContext";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import { api } from "@/lib/axios";
 import { getConfig } from "@/lib/config";
-import { Loader2, AlertCircle, CheckCircle2, Clock, Info } from "lucide-react";
+import { Loader2, AlertCircle, CheckCircle2, Clock, Info, CreditCard, ArrowDown, Wallet } from "lucide-react";
 
 type SessionStatus =
   | "idle"
@@ -127,23 +127,32 @@ const OnrampPage = () => {
     switch (sessionStatus) {
       case "fulfillment_processing":
         return (
-          <div className="flex items-center gap-2 text-blue-600 bg-blue-50 dark:bg-blue-900/20 px-3 py-2 rounded-lg text-sm">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Crypto delivery in progress...
+          <div className="flex items-start gap-2 text-blue-600 bg-blue-50 dark:bg-blue-900/20 px-3 py-2 rounded-lg text-sm">
+            <Loader2 className="h-4 w-4 animate-spin mt-0.5 shrink-0" />
+            <span>
+              Payment received! Stripe is purchasing crypto and delivering it to
+              STRATO. Once received, we'll credit the tokens to your account.
+            </span>
           </div>
         );
       case "fulfillment_complete":
         return (
-          <div className="flex items-center gap-2 text-green-600 bg-green-50 dark:bg-green-900/20 px-3 py-2 rounded-lg text-sm">
-            <CheckCircle2 className="h-4 w-4" />
-            Purchase complete! Tokens will appear in your portfolio shortly.
+          <div className="flex items-start gap-2 text-green-600 bg-green-50 dark:bg-green-900/20 px-3 py-2 rounded-lg text-sm">
+            <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+            <span>
+              Purchase complete! Tokens have been credited to your STRATO
+              account and will appear in your portfolio shortly.
+            </span>
           </div>
         );
       case "rejected":
         return (
-          <div className="flex items-center gap-2 text-red-600 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg text-sm">
-            <AlertCircle className="h-4 w-4" />
-            This session was rejected by Stripe.
+          <div className="flex items-start gap-2 text-red-600 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg text-sm">
+            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+            <span>
+              This session was rejected by Stripe. No payment was processed and
+              your account has not been charged.
+            </span>
           </div>
         );
       default:
@@ -166,97 +175,126 @@ const OnrampPage = () => {
             <GuestSignInBanner message="Sign in to purchase crypto with card, ACH, or Apple Pay" />
           )}
 
-          <div className="max-w-lg mx-auto space-y-4">
-            {/* Status Badge */}
-            {renderStatusBadge()}
+          <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+            {/* Left Column — Stripe Widget */}
+            <div className="space-y-4 max-w-lg w-full mx-auto lg:mx-0">
+              {renderStatusBadge()}
 
-            {/* Loading State */}
-            {sessionStatus === "loading" && (
-              <div className="flex items-center justify-center py-16">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              </div>
-            )}
-
-            {/* Error State */}
-            {sessionStatus === "error" && (
-              <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
-                <AlertCircle className="h-10 w-10 text-red-400" />
-                <p className="text-sm text-muted-foreground max-w-sm">{errorMessage}</p>
-                <button
-                  onClick={initOnramp}
-                  className="text-sm text-blue-600 hover:underline"
-                >
-                  Try again
-                </button>
-              </div>
-            )}
-
-            {/* Stripe Widget — no Card wrapper so the iframe blends with the page */}
-            <div
-              ref={onrampContainerRef}
-              className={`rounded-xl overflow-hidden ${
-                sessionStatus === "loading" || sessionStatus === "error" ? "hidden" : ""
-              }`}
-            />
-
-            {/* Info Note */}
-            <div className="flex items-start gap-2 text-xs text-muted-foreground px-1">
-              <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-              <span>
-                Powered by Stripe. Available in the US (excl. Hawaii) and EU.
-                All KYC and payments are handled securely by Stripe.
-                Tokens are credited to your STRATO account automatically.
-              </span>
-            </div>
-          </div>
-
-          {/* Transaction History */}
-          {isLoggedIn && transactions.length > 0 && (
-            <Card className="shadow-sm mt-8 max-w-2xl mx-auto">
-              <CardHeader>
-                <CardTitle className="text-base">Purchase History</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b text-left text-muted-foreground">
-                        <th className="pb-2 font-medium">Date</th>
-                        <th className="pb-2 font-medium">Currency</th>
-                        <th className="pb-2 font-medium">Network</th>
-                        <th className="pb-2 font-medium">Amount</th>
-                        <th className="pb-2 font-medium">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {transactions.map((tx) => {
-                        const statusInfo = STATUS_LABELS[tx.status] || {
-                          label: tx.status,
-                          color: "text-gray-500",
-                        };
-                        return (
-                          <tr key={tx.stripeSessionId} className="border-b last:border-0">
-                            <td className="py-3">
-                              <div className="flex items-center gap-1.5">
-                                <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                                {new Date(tx.createdAt).toLocaleDateString()}
-                              </div>
-                            </td>
-                            <td className="py-3 uppercase">{tx.destinationCurrency || "—"}</td>
-                            <td className="py-3 capitalize">{tx.destinationNetwork || "—"}</td>
-                            <td className="py-3">{tx.destinationAmount || "—"}</td>
-                            <td className={`py-3 font-medium ${statusInfo.color}`}>
-                              {statusInfo.label}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+              {sessionStatus === "loading" && (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
-              </CardContent>
-            </Card>
-          )}
+              )}
+
+              {sessionStatus === "error" && (
+                <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+                  <AlertCircle className="h-10 w-10 text-red-400" />
+                  <p className="text-sm text-muted-foreground max-w-sm">{errorMessage}</p>
+                  <button
+                    onClick={initOnramp}
+                    className="text-sm text-blue-600 hover:underline"
+                  >
+                    Try again
+                  </button>
+                </div>
+              )}
+
+              <div
+                ref={onrampContainerRef}
+                className={`rounded-xl overflow-hidden ${sessionStatus === "loading" || sessionStatus === "error" ? "hidden" : ""
+                  }`}
+              />
+
+              <div className="flex items-start gap-2 text-xs text-muted-foreground px-1">
+                <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                <span>
+                  Powered by Stripe. Available in the US (excl. Hawaii) and EU.
+                  Identity verification and payment processing are handled
+                  securely by Stripe — STRATO never sees your card or bank
+                  details. The wallet address shown in the Stripe widget is
+                  STRATO's receiving address; once crypto arrives, we
+                  automatically credit the tokens to your account.
+                </span>
+              </div>
+            </div>
+
+            {/* Right Column — How It Works + Purchase History */}
+            {isLoggedIn && (
+              <div className="space-y-6 max-w-lg w-full mx-auto lg:mx-0">
+                <div className="rounded-lg border bg-muted/40 px-4 py-3 space-y-2">
+                  <p className="text-sm">How it works</p>
+                  <ol className="space-y-1.5 text-sm text-muted-foreground">
+                    <li className="flex items-center gap-2">
+                      <CreditCard className="h-3.5 w-3.5 shrink-0" />
+                      <span>Pay with card, bank transfer, or Apple Pay via Stripe</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <ArrowDown className="h-3.5 w-3.5 shrink-0" />
+                      <span>Stripe delivers the purchased crypto to STRATO on chosen chain</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Wallet className="h-3.5 w-3.5 shrink-0" />
+                      <span>We credit the equivalent tokens to your STRATO account</span>
+                    </li>
+                  </ol>
+                </div>
+
+                {(() => {
+                  const purchases = transactions.filter((tx) => tx.status === "fulfillment_complete" || tx.status === "rejected");
+                  return (
+                    <Card className="shadow-sm">
+                      <CardHeader>
+                        <CardTitle className="text-base">Purchase History</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {purchases.length === 0 ? (
+                          <p className="text-sm text-muted-foreground py-4 text-center">
+                            No purchases yet. Complete a purchase to see it here.
+                          </p>
+                        ) : (
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="border-b text-left text-muted-foreground">
+                                  <th className="pb-2 font-medium">Date</th>
+                                  <th className="pb-2 font-medium">Currency</th>
+                                  <th className="pb-2 font-medium">Amount</th>
+                                  <th className="pb-2 font-medium">Status</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {purchases.map((tx) => {
+                                  const statusInfo = STATUS_LABELS[tx.status] || {
+                                    label: tx.status,
+                                    color: "text-gray-500",
+                                  };
+                                  return (
+                                    <tr key={tx.stripeSessionId} className="border-b last:border-0">
+                                      <td className="py-3">
+                                        <div className="flex items-center gap-1.5">
+                                          <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                                          {new Date(tx.createdAt).toLocaleDateString()}
+                                        </div>
+                                      </td>
+                                      <td className="py-3 uppercase">{tx.destinationCurrency || "—"}</td>
+                                      <td className="py-3">{tx.destinationAmount || "—"}</td>
+                                      <td className={`py-3 font-medium ${statusInfo.color}`}>
+                                        {statusInfo.label}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })()}
+              </div>
+            )}
+          </div>
         </main>
       </div>
 
