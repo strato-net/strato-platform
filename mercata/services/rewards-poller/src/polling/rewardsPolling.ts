@@ -1,16 +1,21 @@
+import cron from "node-cron";
 import { config } from "../config";
 import { logInfo, logError } from "../utils/logger";
 import {
   getEventsBatch,
   getEventQueryParams,
+  getBonusEligibleUsers,
 } from "../services/cirrusService";
 import {
   batchHandleAction,
+  batchAddBonus,
 } from "../services/rewardsService";
 import { checkBalances } from "../utils/balanceCheck";
-import { RewardsAction, NonEmptyArray } from "../types";
+import { RewardsAction, NonEmptyArray, BonusCredit } from "../types";
 import { blockTrackingService } from "../services/blockTrackingService";
+import { bonusTrackingService } from "../services/bonusTrackingService";
 import { nextCursorAfter } from "../utils/eventHelpers";
+import { calculateBonusCreditsForUsers, getCronIntervalSeconds, MAX_BONUS_INTERVAL_SECONDS } from "../utils/bonusUtils";
 
 const processEvents = async (): Promise<void> => {
   try {
@@ -84,17 +89,86 @@ const processEvents = async (): Promise<void> => {
   }
 };
 
-export const startRewardsPolling = (): void => {
-  const pollingInterval = config.polling.interval;
+const processBonus = async (): Promise<void> => {
+  try {
+    const tokenConfigs = config.bonus.tokenConfigs;
+    if (tokenConfigs.length === 0) return;
 
+    logInfo("RewardsBonusPolling", "Starting bonus polling cycle");
+    await checkBalances();
+
+    const state = await bonusTrackingService.getState();
+    const bonusUsers = await getBonusEligibleUsers(tokenConfigs);
+
+    const elapsed = state.lastSuccessfulTimestamp
+      ? Math.floor((Date.now() - new Date(state.lastSuccessfulTimestamp).getTime()) / 1000)
+      : getCronIntervalSeconds(config.bonus.cron);
+    const intervalSeconds = Math.min(Math.max(1, elapsed), MAX_BONUS_INTERVAL_SECONDS);
+
+    const newCredits = bonusUsers.length > 0
+      ? await calculateBonusCreditsForUsers(bonusUsers, intervalSeconds)
+      : [];
+
+    const allCredits = [...state.pendingCredits, ...newCredits];
+    if (allCredits.length === 0) {
+      await bonusTrackingService.updateState({ lastSuccessfulTimestamp: new Date().toISOString(), pendingCredits: [] });
+      return;
+    }
+
+    if (state.pendingCredits.length > 0) {
+      logInfo("RewardsBonusPolling", `Retrying ${state.pendingCredits.length} pending + ${newCredits.length} new credits`);
+    }
+
+    await bonusTrackingService.clearPending();
+
+    const maxBatchSize = config.polling.maxBatchSize;
+    let applied = 0;
+
+    for (let i = 0; i < allCredits.length; i += maxBatchSize) {
+      const batch = allCredits.slice(i, i + maxBatchSize) as NonEmptyArray<BonusCredit>;
+      try {
+        await batchAddBonus(batch);
+        applied += batch.length;
+      } catch (error) {
+        logError("RewardsBonusPolling", error as Error, { operation: "processBonus", message: "Batch failed - added to pending", batchSize: batch.length });
+        await bonusTrackingService.appendPending(batch);
+      }
+    }
+
+    await bonusTrackingService.updateState({
+      lastSuccessfulTimestamp: new Date().toISOString(),
+      pendingCredits: (await bonusTrackingService.getState()).pendingCredits,
+    });
+
+    logInfo("RewardsBonusPolling", `Applied ${applied}/${allCredits.length} bonus credits`);
+  } catch (error) {
+    logError("RewardsBonusPolling", error as Error, { operation: "processBonus" });
+  }
+};
+
+const startPollingLoop = (
+  component: string,
+  interval: number,
+  fn: () => Promise<void>
+): void => {
   const poll = async () => {
-    await processEvents();
-    setTimeout(poll, pollingInterval);
+    await fn();
+    setTimeout(poll, interval);
   };
 
   void poll();
+  logInfo(component, `Started polling with interval ${interval}ms`);
+};
 
-  logInfo("RewardsPolling", `Started rewards polling with interval ${pollingInterval}ms`);
+export const startRewardsPolling = (): void => {
+  startPollingLoop("RewardsPolling", config.polling.interval, processEvents);
+};
+
+export const startRewardsBonusPolling = (): void => {
+  cron.schedule(config.bonus.cron, () => {
+    void processBonus();
+  });
+  logInfo("RewardsBonusPolling", `Scheduled bonus polling with cron: ${config.bonus.cron}`);
 };
 
 export const initializeRewardsPolling = async () => {
@@ -103,7 +177,7 @@ export const initializeRewardsPolling = async () => {
   await blockTrackingService.getCursor();
 
   startRewardsPolling();
+  startRewardsBonusPolling();
 
   logInfo("RewardsPolling", "Rewards polling initialized");
 };
-

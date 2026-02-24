@@ -106,7 +106,6 @@ contract record Rewards is Ownable {
         string reason
     );
     event ActivityNameUpdated(uint256 indexed activityId, string newName);
-    event BonusApplied(address indexed user, uint256 amount);
 
     // ═════════════════════════════════════════════════════════════════════════
     // CONSTANTS
@@ -679,36 +678,6 @@ contract record Rewards is Ownable {
         }
     }
 
-    /**
-     * @dev Credit a bonus amount directly to a user's unclaimed rewards
-     * @param user The user receiving the bonus
-     * @param amount Bonus amount to credit
-     */
-    function addBonus(address user, uint256 amount) external onlyOwner {
-        _addBonus(user, amount);
-    }
-
-    /**
-     * @dev Credit bonus amounts directly to users' unclaimed rewards
-     * @param users Array of users receiving bonuses
-     * @param amounts Array of bonus amounts
-     */
-    function batchAddBonus(
-        address[] calldata users,
-        uint256[] calldata amounts
-    ) external onlyOwner {
-        // Workaround for SolidVM bug: initialize if zero
-        if (maxBatchSize == 0) {
-            maxBatchSize = 100;
-        }
-        require(users.length <= maxBatchSize, "Batch too large");
-        require(users.length == amounts.length, "Array length mismatch");
-
-        for (uint256 i = 0; i < users.length; i++) {
-            _addBonus(users[i], amounts[i]);
-        }
-    }
-
     // ═════════════════════════════════════════════════════════════════════════
     // INTERNAL FUNCTIONS
     // ═════════════════════════════════════════════════════════════════════════
@@ -973,16 +942,6 @@ contract record Rewards is Ownable {
             // Update user index to current (without changing stake)
             userState.userIndex = state.accRewardPerStake;
         }
-    }
-
-    function _addBonus(address user, uint256 amount) internal {
-        require(user != address(0), "Invalid user");
-        if (amount == 0) {
-            return;
-        }
-
-        unclaimedRewards[user] += amount;
-        emit BonusApplied(user, amount);
     }
 
     /**

@@ -2,29 +2,40 @@ import { cirrus } from "./api";
 import { config } from "../config";
 import { logError } from "./logger";
 import { getBAUserAddress } from "../auth";
+import { retryWithBackoff } from "./retry";
+
+const BALANCE_RETRY_OPTS = { maxAttempts: 3, initialDelay: 5000, maxDelay: 5000 };
 
 const fetchVoucherBalance = async (): Promise<bigint> => {
   const userAddress = await getBAUserAddress();
-  const response = await cirrus.get("/BlockApps-Voucher-_balances", {
-    params: {
-      address: `eq.${config.voucher.address}`,
-      key: `eq.${userAddress}`,
-      select: "balance:value::text",
-    },
-  });
+  const response = await retryWithBackoff(
+    () => cirrus.get("/BlockApps-Voucher-_balances", {
+      params: {
+        address: `eq.${config.voucher.address}`,
+        key: `eq.${userAddress}`,
+        select: "balance:value::text",
+      },
+    }),
+    "BalanceCheck-fetchVoucherBalance",
+    BALANCE_RETRY_OPTS
+  );
 
   return BigInt(response?.[0]?.balance || "0");
 };
 
 const fetchUSDSTBalance = async (): Promise<bigint> => {
   const userAddress = await getBAUserAddress();
-  const response = await cirrus.get("/BlockApps-Token-_balances", {
-    params: {
-      address: `eq.${config.usdst.address}`,
-      key: `eq.${userAddress}`,
-      select: "balance:value::text",
-    },
-  });
+  const response = await retryWithBackoff(
+    () => cirrus.get("/BlockApps-Token-_balances", {
+      params: {
+        address: `eq.${config.usdst.address}`,
+        key: `eq.${userAddress}`,
+        select: "balance:value::text",
+      },
+    }),
+    "BalanceCheck-fetchUSDSTBalance",
+    BALANCE_RETRY_OPTS
+  );
 
   return BigInt(response?.[0]?.balance || "0");
 };
