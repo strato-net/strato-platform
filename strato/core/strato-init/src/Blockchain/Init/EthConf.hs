@@ -7,14 +7,7 @@ import Blockchain.EthConf
 import Blockchain.Init.Options
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Options (flags_network)
-import Control.Concurrent
 import Data.Default
-import Network.HTTP.Client (defaultManagerSettings, newManager)
-import Network.HTTP.Types.Status
-import Servant.Client
-import qualified Strato.Strato23.API as VC
-import Strato.Strato23.Client
-import Text.Format
 
 -- | Get Railgun contract addresses for known networks
 -- Returns Nothing for networks where contracts haven't been deployed yet
@@ -42,46 +35,6 @@ runtimeConfig = def
       Just ContractsConf { railgunProxy = Just addr }
   }
 
-getNodeKey :: IO (VC.PublicKey, Address)
-getNodeKey = do
-  mgr <- newManager defaultManagerSettings
-  let clientEnv = mkClientEnv mgr (vaultProxyUrl (def :: UrlConfig))
-  putStrLn "asking vault-wrapper for the node's key, or to create one, if it does not exist"
-  ak <- waitOnVault clientEnv $ runClientM (getKey Nothing Nothing) clientEnv
-  return (VC.unPubKey ak, VC.unAddress ak)
-
-waitOnVault :: ClientEnv -> IO (Either ClientError VC.AddressAndKey) -> IO VC.AddressAndKey
-waitOnVault clientEnv request = do
-  res <- request
-  case res of
-    Left (FailureResponse _ (Response (Status code _) _ _ body)) -> case code of
-      503 -> do
-        -- 503 is thrown when the password is not set
-        putStrLn "vault password is not set. I'll keep trying until it is set"
-        threadDelay 2000000 -- 2 seconds
-        waitOnVault clientEnv request
-      400 ->
-        -- 400 is thrown when the key does not exist
-        if flags_generateKey
-          then do
-            putStrLn "nodekey does not exist -  I'm going to create one"
-            waitOnVault clientEnv $ runClientM (postKey Nothing) clientEnv
-          else do
-            putStrLn "nodekey does not exist - I'm going to wait until you insert it manually"
-            threadDelay 5000000 -- 5 seconds
-            waitOnVault clientEnv request
-      _ -> do
-        putStrLn $ "unexpected error thrown by vault-wrapper: " ++ show body
-        putStrLn "will keep retrying anyway"
-        threadDelay 5000000 -- 5 seconds
-        waitOnVault clientEnv request
-    Left err -> do
-      putStrLn $ "unexpected servant error: " ++ show err
-      putStrLn "will keep retrying anyway"
-      threadDelay 5000000 -- 5 seconds
-      waitOnVault clientEnv request
-    Right val -> return val
-
 genEthConf :: IO EthConf
 genEthConf = do
   pgUser <- case flags_pguser of
@@ -106,10 +59,6 @@ genEthConf = do
       return "localhost"
     h -> return h
 
-  (pub, addr) <- getNodeKey
-  putStrLn $ "the node's public key: " ++ format pub
-  putStrLn $ "the node's address: " ++ format addr
-
   return runtimeConfig
     { sqlConfig = (sqlConfig runtimeConfig)
         { user = pgUser
@@ -127,7 +76,6 @@ genEthConf = do
         , minBlockDifficulty = flags_minBlockDifficulty
         }
     , quarryConfig = def
-        { coinbaseAddress = formatAddressWithoutColor addr
-        , lazyBlocks = flags_lazyblocks
+        { lazyBlocks = flags_lazyblocks
         }
     }

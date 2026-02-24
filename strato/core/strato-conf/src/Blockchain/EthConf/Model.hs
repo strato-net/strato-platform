@@ -118,8 +118,7 @@ data LevelDBConf = LevelDBConf
   deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
 data QuarryConf = QuarryConf
-  { coinbaseAddress :: String,
-    lazyBlocks :: Bool
+  { lazyBlocks :: Bool
   }
   deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
@@ -175,8 +174,7 @@ instance Default LevelDBConf where
 
 instance Default QuarryConf where
   def = QuarryConf
-    { coinbaseAddress = ""
-    , lazyBlocks = False
+    { lazyBlocks = False
     }
 
 instance Default BlockConf where
