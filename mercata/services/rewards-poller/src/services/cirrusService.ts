@@ -1,8 +1,9 @@
 import { cirrus } from "../utils/api";
-import { ProtocolEvent, CirrusEvent, EventCursor } from "../types";
+import { ProtocolEvent, CirrusEvent, EventCursor, BonusTokenConfig, BonusEligibleUser } from "../types";
 import { logError, logInfo } from "../utils/logger";
 import { config } from "../config";
 import { blockTrackingService } from "./blockTrackingService";
+import { retryWithBackoff } from "../utils/retry";
 import {
   buildFilter,
   parseJson,
@@ -17,6 +18,8 @@ import {
 } from "../utils/attributeMapping";
 
 const MERCATA_PREFIX = "BlockApps-";
+
+const CIRRUS_RETRY_OPTS = { maxAttempts: 3, initialDelay: 5000, maxDelay: 5000 };
 
 const queryRegularEvents = async (
   eventAddresses: string[],
@@ -255,4 +258,129 @@ export const getEventsBatch = async (
   );
 
   return allEvents;
+};
+
+export const getBonusEligibleUsers = async (
+  tokenConfigs: BonusTokenConfig[]
+): Promise<BonusEligibleUser[]> => {
+  if (tokenConfigs.length === 0) return [];
+
+  const ruleByToken = new Map(
+    tokenConfigs.map((c) => [
+      c.address.toLowerCase(),
+      { bonusPercentage: c.bonusPercentage, minBalance: BigInt(c.minBalance) },
+    ])
+  );
+
+  const addresses = [...ruleByToken.keys()];
+  const data = await retryWithBackoff(
+    () => cirrus.get("/BlockApps-Token-_balances", {
+      params: {
+        address: `in.(${addresses.join(",")})`,
+        select: "address,user:key,balance:value::text",
+      },
+    }),
+    "CirrusService-getBonusEligibleUsers",
+    CIRRUS_RETRY_OPTS
+  );
+
+  if (!Array.isArray(data) || data.length === 0) return [];
+
+  const userBonusMap = new Map<string, number>();
+  for (const row of data) {
+    const rule = ruleByToken.get(row.address.toLowerCase());
+    if (!rule || BigInt(row.balance || "0") <= rule.minBalance) continue;
+    userBonusMap.set(row.user, Math.max(userBonusMap.get(row.user) ?? 0, rule.bonusPercentage));
+  }
+
+  const users = [...userBonusMap.entries()].map(([user, bonusPercentage]) => ({ user, bonusPercentage }));
+  logInfo("CirrusService", `Loaded ${users.length} bonus-eligible users from ${addresses.length} bonus tokens`);
+  return users;
+};
+
+export const getUserEmissionRates = async (
+  users: string[]
+): Promise<Map<string, bigint>> => {
+  if (users.length === 0) return new Map();
+
+  const rewardsAddress = config.rewards.address;
+  const [activitiesData, statesData, userInfoData] = await Promise.all([
+    retryWithBackoff(
+      () => cirrus.get("/mapping", {
+        params: {
+          address: `eq.${rewardsAddress}`,
+          collection_name: "eq.activities",
+          select: "key,value",
+        },
+      }),
+      "CirrusService-getUserEmissionRates-activities",
+      CIRRUS_RETRY_OPTS
+    ),
+    retryWithBackoff(
+      () => cirrus.get("/mapping", {
+        params: {
+          address: `eq.${rewardsAddress}`,
+          collection_name: "eq.activityStates",
+          select: "key,value",
+        },
+      }),
+      "CirrusService-getUserEmissionRates-states",
+      CIRRUS_RETRY_OPTS
+    ),
+    retryWithBackoff(
+      () => cirrus.get("/mapping", {
+        params: {
+          address: `eq.${rewardsAddress}`,
+          collection_name: "eq.userInfo",
+          key: `in.(${users.join(",")})`,
+          select: "key,key2,value",
+        },
+      }),
+      "CirrusService-getUserEmissionRates-userInfo",
+      CIRRUS_RETRY_OPTS
+    ),
+  ]);
+
+  const parseValue = (v: any): any => {
+    if (v && typeof v === "object") return v;
+    if (typeof v === "string") { try { return JSON.parse(v); } catch { return {}; } }
+    return {};
+  };
+  const toBigInt = (v: any): bigint => {
+    try { return BigInt(v); } catch { return 0n; }
+  };
+
+  const emissionByActivity = new Map<string, bigint>();
+  if (Array.isArray(activitiesData)) {
+    for (const row of activitiesData) {
+      emissionByActivity.set(String(row.key), toBigInt(parseValue(row.value).emissionRate));
+    }
+  }
+
+  const totalStakeByActivity = new Map<string, bigint>();
+  if (Array.isArray(statesData)) {
+    for (const row of statesData) {
+      totalStakeByActivity.set(String(row.key), toBigInt(parseValue(row.value).totalStake));
+    }
+  }
+
+  const rateByUser = new Map<string, bigint>();
+  if (Array.isArray(userInfoData)) {
+    for (const row of userInfoData) {
+      const user = String(row.key);
+      const activityId = String(row.key2);
+      const stake = toBigInt(parseValue(row.value).stake);
+      if (stake <= 0n) continue;
+
+      const emissionRate = emissionByActivity.get(activityId) ?? 0n;
+      const totalStake = totalStakeByActivity.get(activityId) ?? 0n;
+      if (emissionRate <= 0n || totalStake <= 0n) continue;
+
+      const personalRate = (stake * emissionRate) / totalStake;
+      rateByUser.set(user, (rateByUser.get(user) ?? 0n) + personalRate);
+    }
+  }
+
+  logInfo("CirrusService", `Computed emission rates for ${rateByUser.size}/${users.length} users`);
+  return rateByUser;
 };

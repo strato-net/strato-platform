@@ -76,6 +76,27 @@ export interface RewardsAction {
   eventIndex: number;
 }
 
+export interface BonusTokenConfig {
+  address: string;
+  bonusPercentage: number;
+  minBalance: string;
+}
+
+export interface BonusCredit {
+  user: string;
+  amount: string;
+}
+
+export interface BonusRunState {
+  lastSuccessfulTimestamp: string | null;
+  pendingCredits: BonusCredit[];
+}
+
+export interface BonusEligibleUser {
+  user: string;
+  bonusPercentage: number;
+}
+
 export interface EventCursor {
   blockNumber: number;
   block_timestamp: string;
