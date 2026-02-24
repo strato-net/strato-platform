@@ -87,7 +87,7 @@ class OnrampController {
   ): Promise<void> {
     try {
       const userAddress = req.address;
-      const transactions = getUserTransactions(userAddress);
+      const transactions = await getUserTransactions(userAddress);
       res.json({ success: true, data: { transactions } });
     } catch (error: any) {
       next(error);

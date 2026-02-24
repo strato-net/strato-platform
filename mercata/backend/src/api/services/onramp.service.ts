@@ -4,23 +4,18 @@ import Stripe from "stripe";
 // Types
 // ————————————————————————————————————————————————————————————————
 
-export interface OnrampSession {
+export interface OnrampTransaction {
   stripeSessionId: string;
-  userStratoAddress: string;
   status: string;
-  createdAt: Date;
-  completedAt?: Date;
+  createdAt: string;
   destinationCurrency?: string;
   destinationNetwork?: string;
   destinationAmount?: string;
-  externalTxHash?: string;
 }
 
 // ————————————————————————————————————————————————————————————————
-// In-memory session store (Should be replaced with a database )
+// Stripe SDK setup
 // ————————————————————————————————————————————————————————————————
-
-const sessionStore = new Map<string, OnrampSession>();
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
 
@@ -28,6 +23,10 @@ const StripeResourceClass = (Stripe as any).StripeResource;
 const OnrampSessionResource = StripeResourceClass.extend({
   create: StripeResourceClass.method({
     method: "POST",
+    path: "crypto/onramp_sessions",
+  }),
+  list: StripeResourceClass.method({
+    method: "GET",
     path: "crypto/onramp_sessions",
   }),
 });
@@ -55,16 +54,12 @@ export async function createOnrampSession(
     destination_currencies: ["usdc", "eth"],
     destination_networks: ["ethereum"],
     lock_wallet_address: true,
+    metadata: {
+      strato_user_address: userStratoAddress,
+    },
   });
 
-  sessionStore.set(onrampSession.id, {
-    stripeSessionId: onrampSession.id,
-    userStratoAddress,
-    status: "initialized",
-    createdAt: new Date(),
-  });
-
-  console.log(`[Onramp] Session created — stripeId=${onrampSession.id}, storeSize=${sessionStore.size}`);
+  console.log(`[Onramp] Session created — stripeId=${onrampSession.id}`);
   return { clientSecret: onrampSession.client_secret };
 }
 
@@ -82,38 +77,40 @@ export function verifyWebhookSignature(
 export function handleSessionUpdate(sessionData: any): void {
   const stripeSessionId: string = sessionData.id;
   const status: string = sessionData.status;
+  const userAddress: string | undefined = sessionData.metadata?.strato_user_address;
   const txDetails = sessionData.transaction_details;
 
-  const session = sessionStore.get(stripeSessionId);
-  if (!session) {
-    console.warn(`[Onramp] Webhook received for unknown session: ${stripeSessionId}`);
+  if (!userAddress) {
+    console.warn(`[Onramp] Webhook for session ${stripeSessionId} — no strato_user_address in metadata`);
     return;
   }
 
-  session.status = status;
-  if (txDetails) {
-    session.destinationCurrency = txDetails.destination_currency;
-    session.destinationNetwork = txDetails.destination_network;
-    session.destinationAmount = txDetails.destination_amount;
-    session.externalTxHash = txDetails.transaction_id;
-  }
-
   if (status === "fulfillment_complete") {
-    session.completedAt = new Date();
     console.log(
       `[Onramp] Fulfillment complete — session=${stripeSessionId}, ` +
-      `user=${session.userStratoAddress}, currency=${session.destinationCurrency}, ` +
-      `network=${session.destinationNetwork}, amount=${session.destinationAmount}, ` +
-      `txHash=${session.externalTxHash}`
+      `user=${userAddress}, currency=${txDetails?.destination_currency}, ` +
+      `network=${txDetails?.destination_network}, amount=${txDetails?.destination_amount}, ` +
+      `txHash=${txDetails?.transaction_id}`
     );
     // TODO: On-chain verification + MercataBridge minting (Steps 4 & 5)
   } else {
-    console.log(`[Onramp] Session ${stripeSessionId} → ${status}`);
+    console.log(`[Onramp] Session ${stripeSessionId} → ${status} (user=${userAddress})`);
   }
 }
 
-export function getUserTransactions(userStratoAddress: string): OnrampSession[] {
-  return Array.from(sessionStore.values())
-    .filter((s) => s.userStratoAddress === userStratoAddress)
-    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+export async function getUserTransactions(userStratoAddress: string): Promise<OnrampTransaction[]> {
+  const resource = new OnrampSessionResource(stripe);
+  const response = await resource.list({ limit: 100 });
+
+  return (response.data as any[])
+    .filter((s: any) => s.metadata?.strato_user_address === userStratoAddress)
+    .map((s: any) => ({
+      stripeSessionId: s.id,
+      status: s.status,
+      createdAt: new Date(s.created * 1000).toISOString(),
+      destinationCurrency: s.transaction_details?.destination_currency,
+      destinationNetwork: s.transaction_details?.destination_network,
+      destinationAmount: s.transaction_details?.destination_amount,
+    }))
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
