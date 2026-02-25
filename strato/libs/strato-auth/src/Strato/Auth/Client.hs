@@ -5,8 +5,10 @@ module Strato.Auth.Client
   ( AuthEnv
   , newAuthEnv
   , runWithAuth
+  , runWithUserToken
   ) where
 
+import Data.Text (Text)
 import Network.HTTP.Client (Manager, newManager)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 import Network.HTTP.Types.Status (Status(..))
@@ -49,3 +51,11 @@ runWithAuth ae action = do
 
 status401 :: Status
 status401 = Status 401 "Unauthorized"
+
+-- | Run a Servant client action with a user-provided token (no node credentials)
+runWithUserToken :: AuthEnv -> Text -> ClientM a -> IO (Either ClientError a)
+runWithUserToken AuthEnv{..} token action = do
+  let addAuth :: Request -> Request
+      addAuth = addHeader "Authorization" ("Bearer " <> token)
+      env = (mkClientEnv aeManager aeBaseUrl) { makeClientRequest = \url req -> defaultMakeClientRequest url (addAuth req) }
+  runClientM action env

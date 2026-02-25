@@ -23,6 +23,7 @@ module Bloc.Monad
     blocMaybe,
     getBlocEnv,
     blocVaultWrapper,
+    blocVaultWrapperWithUserToken,
     BlocEnv (..),
   )
 where
@@ -38,7 +39,7 @@ import Data.Text (Text)
 import GHC.Stack
 import SQLM
 import Servant.Client (ClientM)
-import Strato.Auth.Client (runWithAuth)
+import Strato.Auth.Client (runWithAuth, runWithUserToken)
 import qualified Strato.Strato23.API.Types         as V
 import UnliftIO hiding (Handler (..))
 
@@ -68,6 +69,17 @@ blocVaultWrapper client' = do
   logInfoCS callStack "Querying Vault"
   env <- access Proxy
   resultEither <- liftIO $ runWithAuth env client'
+  either (blocError . VaultWrapperError) return resultEither
+
+blocVaultWrapperWithUserToken ::
+  (MonadIO m, MonadLogger m, Accessible VaultData m, HasCallStack) =>
+  Text ->
+  ClientM x ->
+  m x
+blocVaultWrapperWithUserToken userToken client' = do
+  logInfoCS callStack "Querying Vault with user token"
+  env <- access Proxy
+  resultEither <- liftIO $ runWithUserToken env userToken client'
   either (blocError . VaultWrapperError) return resultEither
 
 blocMaybe :: MonadIO m => Text -> Maybe x -> m x
